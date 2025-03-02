@@ -60,7 +60,7 @@ jobs:
   - task: DotNetCoreCLI@2
     inputs:
       command: 'publish'
-      publishWebProjects: true
+      publishWebProjects: false
       projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio.Server/Automaton.Studio.Server.csproj'
       arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
       zipAfterPublish: false
@@ -72,11 +72,11 @@ jobs:
     inputs:
       folderPath: '$(build.artifactStagingDirectory)'
       fileType: 'json'
-      targetFiles: 'src/Automaton.Studio.Server/appsettings.json'
+      targetFiles: 'Automaton.Studio.Server/appsettings.json'
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Server artifact
     inputs:
       targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio.Server'
-      artifact: 'automatonServerSolution'
+      artifact: 'Automaton.Studio.Server'
       publishLocation: 'pipeline'
