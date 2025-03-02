@@ -72,7 +72,7 @@ jobs:
     inputs:
       folderPath: '$(build.artifactStagingDirectory)'
       fileType: 'json'
-      targetFiles: 'src/Automaton.Studio.Server/appsettings.json'
+      targetFiles: 'Automaton.Studio.Server/appsettings.json'
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Server artifact
