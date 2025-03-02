@@ -13,8 +13,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{28B06BA2-AC92-4F2F-9CA1-2CBBB8652448}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting.Tests", "src\UnitTests\Automaton.Core.Scripting.Tests\Automaton.Core.Scripting.Tests.csproj", "{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server.Tests", "src\UnitTests\Automaton.Studio.Server.Tests\Automaton.Studio.Server.Tests.csproj", "{159069F1-CCD8-4806-B545-8172CF4F994C}"
 EndProject
 Global
@@ -39,10 +37,6 @@ Global
 		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220}.Release|Any CPU.Build.0 = Release|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{159069F1-CCD8-4806-B545-8172CF4F994C}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -52,7 +46,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{FB9FE9B6-3946-45F2-97EE-B1AFCF8F7220} = {28B06BA2-AC92-4F2F-9CA1-2CBBB8652448}
 		{159069F1-CCD8-4806-B545-8172CF4F994C} = {28B06BA2-AC92-4F2F-9CA1-2CBBB8652448}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution

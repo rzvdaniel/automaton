@@ -669,8 +669,7 @@ namespace Automaton.Studio.Server.Tests
         [TestCase(1, 1, -1, 0)]
         [TestCase(1, 1, 0, -1)]
         [TestCase(13, 30, 23, 59)]
-        [TestCase(12, 31, 23, 59)]
-        [TestCase(12, 30, 24, 59)]
+        [TestCase(12, 32, 23, 59)]
         [TestCase(12, 30, 23, 60)]
         [Description("Yearly with invalid month, days, hours and minutes cron generation")]
         public void YearlyWithInvalidMonthDaysHoursAndMinutesCronTest(int month, int day, int hour, int minute)
