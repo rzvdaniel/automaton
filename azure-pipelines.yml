@@ -78,5 +78,5 @@ jobs:
     displayName: Publish Automaton Server artifact
     inputs:
       targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio.Server'
-      artifact: 'automatonServerSolution'
+      artifact: 'Automaton.Studio.Server'
       publishLocation: 'pipeline'
