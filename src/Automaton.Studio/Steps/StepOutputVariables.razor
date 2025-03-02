@@ -1,0 +1,48 @@
+﻿@using Automaton.Studio.Domain
+@using Automaton.Core.Models
+@using Blazored.FluentValidation
+
+<Collapse Bordered="false" DefaultActiveKey="@(new[]{"1"})" Class="output-variables-collapse">
+    <Panel Key="1" Class="output-variables-collapse-panel">
+        <HeaderTemplate>
+            Variables produced
+        </HeaderTemplate>
+        <ChildContent>
+            @foreach (var variable in Step.Outputs.Values)
+            {
+                <StepOutputVariable Step="@Step" Variable="@variable" />
+            }
+        </ChildContent>
+    </Panel>
+
+</Collapse>
+
+@code {
+    [Parameter]
+    public StudioStep Step { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+}
+
+<style>
+
+    .output-variables-collapse {
+        border: 0px;
+        overflow: hidden;
+    }
+
+    .output-variables-collapse-panel .ant-collapse-header {
+        background: #fff;
+        font-weight: bold;
+        padding-left: 0px !important;
+        padding-bottom: 0px !important  ;
+    }
+
+    .output-variables-collapse-panel .ant-collapse-content-box {
+        background: #fff;
+    }
+
+</style>

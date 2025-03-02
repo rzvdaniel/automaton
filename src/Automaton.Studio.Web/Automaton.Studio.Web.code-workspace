@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../Automaton.Studio"
+		},
+		{
+			"path": "../Automaton.Steps"
+		},
+		{
+			"path": "../Automaton.App.Account"
+		},
+		{
+			"path": "../Automaton.App.Authentication"
+		},
+		{
+			"path": "../Automaton.Client.Auth"
+		},
+		{
+			"path": "../Automaton.Studio.Desktop"
+		}
+	],
+	"settings": {}
+}

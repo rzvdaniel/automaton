@@ -1,0 +1,55 @@
+﻿@page "/"
+@layout MainLayout
+
+<Header Class="header">
+    <Row>
+        <Col Flex=@("none")>
+        <Space Size="@AntSizeLDSType.Large">
+            <SpaceItem Class="header-item">
+                <Title Level="4">Dashboard</Title>
+            </SpaceItem>
+        </Space>
+        </Col>
+
+        <Col Class="right-actions">
+        <Space Class="right-header-items">
+        </Space>
+        </Col>
+    </Row>
+</Header>
+
+<Descriptions Bordered Layout="@DescriptionsLayout.Horizontal">
+    <DescriptionsItem Title="Status" Span="3">
+        <Space Align="center" Direction="DirectionVHType.Horizontal">
+            <SpaceItem><Icon Type="check-circle" Theme="Fill" Class="@DashboardViewModel.ConnectionIcon" /></SpaceItem>
+            <SpaceItem>@DashboardViewModel.ConnectionText</SpaceItem>
+        </Space>
+    </DescriptionsItem>
+    <DescriptionsItem Title="Runner name" Span="3">@DashboardViewModel.RunnerName</DescriptionsItem>
+</Descriptions>
+
+<style>
+    .status-connecting {
+        color: deepskyblue;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .status-connected {
+        color: limegreen;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .status-disconnected {
+        color: red;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .editable-label  {
+        font-size: 1em !important;
+        font-weight: normal !important;
+    }
+</style>
+

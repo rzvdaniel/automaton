@@ -1,0 +1,258 @@
+﻿@page "/flow/schedule/{flowid}/{flowname}"
+@using AntDesign
+@using Automaton.Studio.Models
+@using Automaton.Studio.Enums
+@using Blazored.FluentValidation
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Direction="DirectionVHType.Horizontal">
+                    <SpaceItem>
+                        <Breadcrumb AutoGenerate>
+                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
+                            <BreadcrumbItem><b><Icon Type="clock-circle"></Icon> Schedule</b></BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <span class="bullet">&#x2022;</span>@FlowName
+                    </SpaceItem>
+                </Space>
+            </Col>
+
+            <Col Class="right-actions">
+            <Space Class="right-header-items">
+                <SpaceItem>
+                    <Tooltip Title="New schedule">
+                        <Button Class="header-button" Icon="plus" @onclick="@(() => NewSchedule())">
+                            New
+                        </Button>
+                    </Tooltip>
+                </SpaceItem>
+            </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content>
+        <Table TItem="FlowScheduleModel" 
+            DataSource="@FlowScheduleViewModel.Schedules"
+            RowExpandable="@((record)=>true)"
+            Loading="@loading" 
+            Class="autoscroll-list"
+            OnRow="OnRow"
+            OnChange="OnChange">
+            <ColumnDefinitions>
+                <Column Title="Name" @bind-Field="@context.Name">
+                    @context.Name
+                </Column>
+
+                <PropertyColumn Title="Type" Property="c=>c.CronRecurrence.CronType" />
+
+                <PropertyColumn Title="Description" Property="c=>c.CronDescription" />
+
+                <PropertyColumn Title="Next Execution" Property="c=>c.CronNextExecution" />
+
+                <Column Title="CreatedAt" @bind-Field="@context.CreatedAt">
+                    @context.CreatedAt
+                </Column>
+                <ActionColumn Title="Action" Width="10%">
+                    <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                                <Overlay>
+                                    <Menu>
+                                        <Popconfirm Title="Sure to delete?"
+                                                    OnConfirm="()=> DeleteSchedule(context.Id)"
+                                                    OkText="Yes"
+                                                    CancelText="No">
+                                            <MenuItem Icon="delete">
+                                                Delete
+                                            </MenuItem>
+                                        </Popconfirm>
+                                    </Menu>
+                                </Overlay>
+                                <ChildContent>
+                                    <Tooltip Title="More actions">
+                                        <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                            <Icon Type="more" Theme="outline" />
+                                        </a>
+                                    </Tooltip>
+                                </ChildContent>
+                            </Dropdown>
+                </ActionColumn>
+            </ColumnDefinitions>
+            <ExpandTemplate Context="rowData">
+                <Form @ref="form"
+                      Model="@rowData.Data"
+                      Loading="rowData.Data.Loading"
+                      Class="step-form"
+                      Layout="@FormLayout.Vertical"
+                      OnFinish="Save"
+                      OnFinishFailed="SaveFailed">
+
+                    <Validator>
+                        <FluentValidationValidator />
+                    </Validator>
+
+                    <ChildContent>
+                        <GridRow>
+                            <GridCol>
+                                <FormItem Label="Name" Id="schedule-name">
+                                    <Input Type="text" @bind-Value="@rowData.Data.Name"  />
+                                </FormItem>
+                            </GridCol>
+                            <GridCol>
+                                <FormItem Label="Runners" Id="schedule-runners">
+                                   <Select Mode="multiple" 
+                                    @bind-Values="context.RunnerIds"
+                                    Placeholder="Select runners..."
+                                    TItemValue="Guid"
+                                    TItem="Guid"
+                                    AllowClear>
+                                    <SelectOptions>
+                                        @foreach (var item in FlowScheduleViewModel.Runners)
+                                        {
+                                            <SelectOption TItemValue="Guid" TItem="Guid" Value=@item.Id Label=@item.Name />
+                                        }
+                                    </SelectOptions>
+                                </Select>   
+                                </FormItem>
+                            </GridCol>
+                        </GridRow>
+                        <GridRow>
+                            <GridCol>
+                                <FormItem Label="Repeat">
+                                    <RadioGroup TValue="CronType"
+                                    @bind-Value="context.CronRecurrence.CronType" 
+                                    ButtonStyle="@RadioButtonStyle.Solid" 
+                                    OnChange="(e) => OnCronTypeChange(e)">
+                                        <Radio RadioButton Value="@CronType.Never">Never</Radio>
+                                        <Radio RadioButton Value="@CronType.Minutely">Minutely</Radio>
+                                        <Radio RadioButton Value="@CronType.Hourly">Hourly</Radio>
+                                        <Radio RadioButton Value="@CronType.Daily">Daily</Radio>
+                                        <Radio RadioButton Value="@CronType.Weekly">Weekly</Radio>
+                                        <Radio RadioButton Value="@CronType.Monthly">Monthly</Radio>
+                                        <Radio RadioButton Value="@CronType.Yearly">Yearly</Radio>
+                                    </RadioGroup>
+                                </FormItem>
+                            </GridCol>                          
+                        </GridRow>
+                        <GridRow Class="cron-dates">
+
+                            @if(!IsMinuteHidden(context.CronRecurrence.CronType))
+                            {
+                                <GridCol Class="schedule-repeat-value-input">
+                                    <FormItem Label="Minute">
+                                        <AntDesign.InputNumber @bind-Value="@rowData.Data.CronRecurrence.Minute" 
+                                                               Min="0" Max="59" DefaultValue="0" />
+                                    </FormItem>
+                                </GridCol>
+                            }
+
+                            @if(!IsHourHidden(context.CronRecurrence.CronType))
+                            {
+                                <GridCol Class="schedule-repeat-value-input">
+                                    <FormItem Label="Hour">
+                                        <AntDesign.InputNumber @bind-Value="@rowData.Data.CronRecurrence.Hour"
+                                                               Min="0" Max="23" DefaultValue="0" />
+                                    </FormItem>
+                                </GridCol>
+                            }
+
+                            @if (!IsDayHidden(context.CronRecurrence.CronType))
+                            {
+                                <GridCol Class="schedule-repeat-value-input">
+                                    <FormItem Label="Day">
+                                        <AntDesign.InputNumber @bind-Value="@rowData.Data.CronRecurrence.Day"
+                                                               Min="1" Max="31" DefaultValue="1" />
+                                    </FormItem>
+                                </GridCol>
+                            }
+
+                            @if (!IsDayOfWeekHidden(context.CronRecurrence.CronType))
+                            {
+                                <GridCol Class="schedule-repeat-value-select">
+                                    <FormItem Label="Day of Week">
+                                        <Select @bind-Value="rowData.Data.CronRecurrence.DayOfWeek"
+                                                Placeholder="Select type..."
+                                                TItem="DayOfWeek"
+                                                TItemValue="DayOfWeek"
+                                                Class="day-of-week"
+                                                DefaultValue="DayOfWeek.Sunday">
+                                            <SelectOptions>
+                                                @foreach (var day in Enum.GetValues(typeof(DayOfWeek)))
+                                                {
+                                                    <SelectOption TItemValue="DayOfWeek" TItem="DayOfWeek" Value="(DayOfWeek)day" Label=@day.ToString() />
+                                                }
+                                            </SelectOptions>
+                                        </Select>
+                                    </FormItem>
+                                </GridCol>
+                            }
+                            
+                            @if (!IsMonthHidden(context.CronRecurrence.CronType))
+                            {
+                                <GridCol Class="schedule-repeat-value-input">
+                                    <FormItem Label="Month">
+                                        <AntDesign.InputNumber @bind-Value="@rowData.Data.CronRecurrence.Month"
+                                                               Min="1" Max="12" DefaultValue="1" />
+                                    </FormItem>
+                                </GridCol>
+                            }
+                        </GridRow>
+                        <GridRow>
+                            <FormItem>
+                                <Button Type="@ButtonType.Primary" HtmlType="submit">
+                                    Save
+                                </Button>
+                            </FormItem>
+                        </GridRow>
+                    </ChildContent>
+                </Form>
+            </ExpandTemplate>
+        </Table>
+    </Content>
+</Layout>
+
+<style>
+    #flow-logs {
+        width: 100%;
+        height: 300px !important;
+        overflow-x: hidden;
+        font-size: smaller;
+    }
+
+    .log-spin {
+        text-align: center;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        margin: 20px 0;
+    }
+
+    .schedule-repeat-value-input {
+        width: 80px;
+        margin-right: 6px;
+    }
+
+    .schedule-repeat-value-select {
+        width: 100px;
+        margin-right: 6px;
+    }
+
+    #cron-date  {
+        width: 160px !important;
+    }
+
+    #schedule-name {
+        width: 255px;
+        padding-right: 10px;
+    }
+
+    #schedule-runners {
+        width: 300px;
+    }
+
+</style>
+
+
+

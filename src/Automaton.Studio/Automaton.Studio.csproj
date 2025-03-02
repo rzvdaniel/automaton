@@ -1,0 +1,109 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AntDesign" Version="1.0.1" />
+    <PackageReference Include="AutoMapper" Version="13.0.1" />
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+    <PackageReference Include="Blazored.FluentValidation" Version="2.2.0" />
+    <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+    <PackageReference Include="CronExpressionDescriptor" Version="2.36.0" />
+    <PackageReference Include="Cronos" Version="0.8.4" />
+    <PackageReference Include="Hangfire" Version="1.8.16" />
+    <PackageReference Include="MediatR.Courier" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView" Version="8.0.11" />
+    <PackageReference Include="Serilog" Version="4.1.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Http" Version="9.0.0" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.4.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Automaton.App.Account\Automaton.App.Account.csproj" />
+    <ProjectReference Include="..\Automaton.App.Authentication\Automaton.App.Authentication.csproj" />
+    <ProjectReference Include="..\Automaton.Client.Auth\Automaton.Client.Auth.csproj" />
+    <ProjectReference Include="..\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj" />
+    <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
+    <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Resources\AppInfo.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>AppInfo.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Resources\Errors.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Errors.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Resources\Information.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Information.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Resources\Labels.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Labels.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Resources\Placeholders.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Placeholders.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Resources\Variables.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Variables.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="Pages\FlowDesigner\FlowDashboard.razor">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Update="Steps\Custom\CustomDesigner.razor">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Update="Steps\Custom\CustomProperties.razor">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Resources\AppInfo.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>AppInfo.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Errors.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Errors.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Information.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Information.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Labels.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Labels.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Placeholders.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Placeholders.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Variables.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Variables.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>

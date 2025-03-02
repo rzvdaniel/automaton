@@ -1,0 +1,81 @@
+﻿@page "/customsteps"
+@using AntDesign
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none") Class="page-title">
+                <Space Size="@AntSizeLDSType.Large">
+                    <SpaceItem Class="header-item">
+                    <Breadcrumb AutoGenerate></Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+
+            <Col Class="right-actions">
+                <Space Class="right-header-items">
+                    <SpaceItem>
+                        <Tooltip Title="New custom step">
+                            <Button Class="header-button" Icon="plus" @onclick="@(() => ShowNewCustomStepDialog())">
+                                New
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+
+    </Header>
+
+    <Content>
+        <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
+            <Column Title="Name" @bind-Field="@context.Name">
+                @context.Name
+            </Column>
+
+            <Column Title="Created" @bind-Field="@context.Created">
+                @context.Created
+            </Column>
+
+            <Column Title="Updated" @bind-Field="@context.Updated">
+                @context.Updated
+            </Column>
+
+            <ActionColumn Title="Action">
+                <div>
+                    <Space>
+                        <SpaceItem>
+                            <Tooltip Title="Edit step">
+                                <Button Icon="edit" @onclick="@(() => EditCustomStep(context.Id))">Edit</Button>
+                            </Tooltip>
+                        </SpaceItem>
+                    </Space>
+
+                    <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                        <Overlay>
+                            <Menu>
+                                <Popconfirm Title="Sure to delete?"
+                                            OnConfirm="()=> DeleteCustomStep(context.Id)"
+                                            OkText="Yes"
+                                            CancelText="No">
+                                    <MenuItem Icon="delete">                               
+                                        Delete
+                                    </MenuItem>
+                                </Popconfirm>
+                            </Menu>
+                        </Overlay>
+                        <ChildContent>
+                            <Tooltip Title="More actions">
+                                <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                    <Icon Type="more" Theme="outline" />
+                                </a>
+                            </Tooltip>
+                        </ChildContent>
+                    </Dropdown>
+                </div>
+            </ActionColumn>
+        </Table>
+    </Content>
+</Layout>
+
+

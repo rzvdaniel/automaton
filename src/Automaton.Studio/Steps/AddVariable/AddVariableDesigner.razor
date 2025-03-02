@@ -1,0 +1,23 @@
+﻿@using Automaton.Studio.Steps
+
+<StepDesigner Step=@Step>
+    <div>
+        <b>@Step.DisplayName</b>
+    </div>
+    <div>
+        Add variable <a href="" @onclick:preventDefault>
+            @Step.Variable?.Name
+        </a> with value <a href="" @onclick:preventDefault>@Step.Variable?.StringValue</a>
+    </div>
+</StepDesigner>
+
+@code {
+    [Parameter]
+    public AddVariableStep Step { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+}
+

@@ -1,0 +1,53 @@
+﻿@page "/account"
+@using AntDesign
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+            <Space Size="@AntSizeLDSType.Large">
+                <SpaceItem Class="header-item">
+                    <Breadcrumb AutoGenerate></Breadcrumb>
+                </SpaceItem>
+            </Space>
+            </Col>
+
+            <Col Class="right-actions">
+            <Space Class="right-header-items">
+                <SpaceItem>
+                </SpaceItem>
+            </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Layout Class="designer-container account-form">
+
+        <Tabs TabPosition="TabPosition.Top">
+            <TabPane Tab="User profile" Key="1">
+                <UserProfile></UserProfile>
+            </TabPane>
+            <TabPane Tab="User security" Key="2">
+                <UserSecurity></UserSecurity>
+            </TabPane>
+        </Tabs>
+
+    </Layout>
+
+</Layout>
+
+@code {
+    bool collapsed;
+}
+
+<style>
+
+    .account-form {
+        background-color: #fff;
+        margin: 0 0 0 1px;
+        padding: 20px;
+        height: calc(100vh - 118px);
+        overflow: auto;
+    }
+
+</style>

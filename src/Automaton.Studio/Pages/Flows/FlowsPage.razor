@@ -1,0 +1,137 @@
+﻿@page "/"
+@using AntDesign
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="@AntSizeLDSType.Large">
+                    <SpaceItem Class="header-item">
+                    <Breadcrumb AutoGenerate></Breadcrumb>
+                    </SpaceItem>               
+                </Space>
+            </Col>
+
+            <Col Class="right-actions">
+                <Space Class="right-header-items">
+                    <SpaceItem>
+                        <Tooltip Title="New flow">
+                            <Button Class="header-button" Icon="plus" @onclick="@(() => NewFlowDialog())">
+                                New
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content>
+        <Table TItem="FlowModel" DataSource="@FlowsViewModel.Flows" Loading="@loading" Class="autoscroll-list">
+
+            <Column Title="Name" @bind-Field="@context.Name">
+                @context.Name
+            </Column>
+
+            <Column Title="Last Executed" @bind-Field="@context.Started">
+                @context.StartedMessage
+            </Column>
+
+            <Column Title="Last Result" @bind-Field="@context.Status">
+                <span class="@context.StatusClass">@context.Status</span>
+            </Column>
+
+            <Column @bind-Field="@context.RunnerIds" Title="Runners" Width="300">
+                <Select Mode="multiple" 
+                    @bind-Values="context.RunnerIds"
+                    Placeholder="Select runners..."
+                    TItemValue="Guid"
+                    TItem="Guid"
+                    AllowClear>
+                    <SelectOptions>
+                        @foreach (var item in FlowsViewModel.Runners)
+                        {
+                            <SelectOption TItemValue="Guid" TItem="Guid" Value=@item.Id Label=@item.Name />
+                        }
+                    </SelectOptions>
+                </Select>                
+            </Column>
+
+            <ActionColumn Title="Action">
+                <div>
+                    <Space>
+                        <SpaceItem>
+                            <Tooltip Title="Run flow">
+                                <Button Icon="caret-right" @onclick="@(() => RunFlow(context))" Disabled="context.DoesNotHaveRunners" Loading="@context.Running" />
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="Edit flow">
+                                <Button Icon="edit" @onclick="@(() => EditFlow(context.Id, context.Name))">Edit</Button>
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                                <Overlay>
+                                    <Menu>
+                                        <Popconfirm Title="Sure to delete?"
+                                                    OnConfirm="()=> DeleteFlow(context.Id)"
+                                                    OkText="Yes"
+                                                    CancelText="No">
+                                            <MenuItem Icon="delete">
+                                                Delete
+                                            </MenuItem>
+                                        </Popconfirm>
+                                    </Menu>
+                                </Overlay>
+                                <ChildContent>
+                                    <Tooltip Title="More actions">
+                                        <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                            <Icon Type="more" Theme="outline" />
+                                        </a>
+                                    </Tooltip>
+                                </ChildContent>
+                            </Dropdown>
+                        </SpaceItem>
+                    </Space>                  
+                </div>
+            </ActionColumn>
+        </Table>
+    </Content>
+</Layout>
+
+<style>
+    .status-none {
+        color: gray;
+        padding-top: 3px;
+        font-size: 20px;
+        visibility: collapse;
+    }
+
+    .status-working {
+        color: deepskyblue;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .status-success {
+        color: limegreen;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .status-error {
+        color: red;
+        padding-top: 3px;
+        font-size: 20px;
+    }
+
+    .flow-running {
+        color: blue;
+        padding-top: 3px;
+        font-size: 20px;
+        float: left;
+    }
+</style>
+
+

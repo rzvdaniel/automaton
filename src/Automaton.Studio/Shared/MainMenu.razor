@@ -1,0 +1,25 @@
+﻿<Menu Mode="MenuMode.Vertical" Theme="MenuTheme.Light" Selectable="true" DefaultSelectedKeys=@(new[]{"1"}) Class="menu">
+
+    <MenuItem Key="1" Icon="profile" RouterLink="/"> 
+        <b>Flows</b>
+    </MenuItem>
+    <MenuItem Key="2" Icon="play-square" RouterLink="/runners">
+        <b>Runners</b>
+    </MenuItem>
+    <MenuItem Key="3" Icon="experiment" RouterLink="/customsteps/">
+        <b>Steps</b>
+    </MenuItem>
+    <MenuItem Key="4" Icon="user" RouterLink="/account/">
+        <b>Account</b>
+    </MenuItem>
+    <MenuItem Key="5" Icon="poweroff" OnClick="Logout">
+        <b>Logout</b>
+    </MenuItem>
+</Menu>
+
+<style>
+    .menu {
+        background-color: #fafafa;
+    }
+</style>
+

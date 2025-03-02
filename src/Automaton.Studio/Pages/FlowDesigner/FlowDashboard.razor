@@ -1,0 +1,55 @@
+﻿@page "/flow/dashboard/{flowid}/{flowname}"
+@using AntDesign
+@using Automaton.Studio.Models
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Direction="DirectionVHType.Horizontal">
+                    <SpaceItem>
+                        <Breadcrumb AutoGenerate>
+                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
+                            <BreadcrumbItem><b><Icon Type="profile"></Icon> Dashboard</b></BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <span class="bullet">&#x2022;</span>@FlowName
+                    </SpaceItem>
+                </Space>
+            </Col>
+
+            <Col Class="right-actions">
+                <Space Class="right-header-items">
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content>
+        <Descriptions Bordered>
+            <DescriptionsItem Title="Name">@ViewModel.Name</DescriptionsItem>
+            <DescriptionsItem Title="Created">@ViewModel.Created</DescriptionsItem>
+            <DescriptionsItem Title="Updated">@ViewModel.Updated</DescriptionsItem>            
+        </Descriptions>
+    </Content>
+</Layout>
+
+<style>
+    #flow-logs {
+        width: 100%;
+        height: 300px !important;
+        overflow-x: hidden;
+        font-size: smaller;
+    }
+
+    .log-spin {
+        text-align: center;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        margin: 20px 0;
+    }
+</style>
+
+
+

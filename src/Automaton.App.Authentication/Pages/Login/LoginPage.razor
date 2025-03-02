@@ -1,0 +1,82 @@
+﻿@attribute [AllowAnonymous]
+@page "/login"
+
+<Layout>
+    <Content>
+        <GridRow Justify="center" Align="center" Class="grid-container">
+            <GridCol>
+
+                <Form Loading="loading"
+                      Model="@Model"
+                      Layout="@FormLayout.Vertical"
+                      OnFinish="OnFinish"
+                      OnFinishFailed="OnFinishFailed"
+                      Style="width: 400px">
+
+                    <ChildContent>
+                        <Title Level="1">Sign in</Title>
+
+                        @if (ConfigurationService.UserSignUp)
+                        {
+                            <FormItem>
+                                Don't have an account? <a href="/register">Sign up</a>
+                            </FormItem>
+                        }
+                       
+                        <FormItem Label="Email">
+                            <Input @bind-Value="@context.Email" />
+                        </FormItem>
+                        <FormItem Label="Password">
+                            <InputPassword @bind-Value="@context.Password" />
+                        </FormItem>
+                        <FormItem>
+                            <div class="remember-me-container">
+                                <Checkbox @bind-Value="context.RememberMe">Remember me</Checkbox>
+                                <div class="forgot-password">
+                                    <a href="Account/ForgotPassword">Forgot your password?</a>
+                                </div>
+                            </div>
+                        </FormItem>
+                        <FormItem WrapperColSpan="16">
+                            <Button Type="@ButtonType.Primary" HtmlType="submit">
+                                Submit
+                            </Button>
+                        </FormItem>
+                    </ChildContent>
+
+                </Form>
+
+            </GridCol>
+        </GridRow>
+    </Content>
+</Layout>
+
+
+<style>
+    .grid-container {
+        height: 100%;
+        background-color: white;
+        align-items: center
+    }
+
+    .site-layout-content {
+        height: 100%;
+    }
+
+    .ant-layout {
+        height: 100%;
+    }
+
+    .remember-me-container {
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+    }
+
+    .forgot-password {
+        margin-left: auto;
+    }
+</style>
+
+
+

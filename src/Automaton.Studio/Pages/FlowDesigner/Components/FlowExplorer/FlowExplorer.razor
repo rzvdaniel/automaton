@@ -1,0 +1,74 @@
+﻿<div class="workflows-container">
+    <Row>
+        <div class="workflows-search">
+            <Search @bind-Value="@searchText"
+                    Placeholder="Search definitions"
+                    Size="@InputSize.Default"
+                    OnChange="(e)=>OnSearchTextChange(e)"
+                    OnSearch="OnSearch">
+            </Search>
+        </div>
+    </Row>
+    <Row>
+        <Col Span="24">
+            <Tree ShowIcon
+                  DataSource="@FlowExplorerViewModel.ExplorerDefinitions"
+                  TitleExpression="x => x.DataItem.Name"
+                  IconExpression="x => x.DataItem.Icon"
+                  KeyExpression="x => x.DataItem.Name"
+                  Class="workflows-tree"
+                  TItem="FlowExplorerDefinition">
+                <TitleTemplate>
+                    <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.ContextMenu })">
+                        <Overlay>
+                            <Menu>
+                                <MenuItem @onclick="@(() => RenameDefinition(context.DataItem))">
+                                    Rename
+                                </MenuItem>
+                                <MenuItem @onclick="@(() => SetStartupDefinition(context.DataItem))">
+                                    Set As Startup
+                                </MenuItem>
+                                <MenuItem @onclick="@(() => DeleteDefinition(context.DataItem))">
+                                    Delete
+                                </MenuItem>
+                            </Menu>
+                        </Overlay>
+                        <ChildContent>
+                            <span class="@GetClassForDefinition(context.DataItem)">
+                                @context.DataItem.Name
+                            </span>
+                        </ChildContent>
+                    </Dropdown>
+                </TitleTemplate>
+            </Tree>
+        </Col>
+    </Row>
+</div>
+
+<style>
+    .workflows-container {
+        background-color: #fafafa;
+        height: 100%;
+    }
+
+    .workflows-header {
+        background-color: #fff;
+        padding: 0px 0px 4px 20px;
+    }
+
+    .workflows-search {
+        padding: 5px 10px 5px 10px;
+    }
+
+    .workflows-tree {
+        padding-top: 10px;
+        background-color: white;
+        border-right: 1px solid #f0f0f0;
+        height: calc(100vh - 245px);
+        overflow: auto
+    }
+
+    .selected-definition {
+        font-weight: bold;
+    }
+</style>

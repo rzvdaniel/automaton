@@ -1,0 +1,381 @@
+﻿@page "/stepdesigner/{stepId}"
+@using AntDesign
+@using Blazored.FluentValidation;
+@using Automaton.Core.Enums;
+
+<Layout>
+
+    <Content>
+
+        <Header Class="header">
+            <Row>
+                <Col>
+
+                    <Space Direction="DirectionVHType.Horizontal">
+                        <SpaceItem>
+                            <Breadcrumb AutoGenerate>
+                                <BreadcrumbItem Href="/customsteps">Steps</BreadcrumbItem>
+                                <BreadcrumbItem><b><Icon Type="profile"></Icon> Step</b></BreadcrumbItem>
+                            </Breadcrumb>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <span class="bullet">&#x2022;</span>@StepDesignerViewModel.CustomStep.Name
+                        </SpaceItem>
+                    </Space>
+
+                </Col>
+
+                <Col Class="right-actions">
+                    <Space Class="right-header-items">
+                        <SpaceItem>
+                            <Tooltip Title="Save step">
+                                <Button Class="header-button" Icon="save" OnClick="Save">
+                                    Save
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                    </Space>
+                </Col>
+            </Row>
+        </Header>
+
+        <Form @ref="form"
+              Model="@StepDesignerViewModel.CustomStep"
+              Loading="loading"
+              Class="step-form"
+              Layout="@FormLayout.Vertical"
+              LabelColSpan="24"
+              WrapperColSpan="24">
+
+            <Validator>
+                <FluentValidationValidator />
+                <ValidationSummary />
+            </Validator>
+
+            <ChildContent>
+                <Tabs>
+                    <TabPane Tab="Details" Key="1">
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Name">
+                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Display Name">
+                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
+                            </FormItem>
+                            </Col>
+                        </Row>
+
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Description">
+                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="More info URL">
+                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter description" />
+                            </FormItem>
+                            </Col>
+                        </Row>
+                    </TabPane>
+
+                    <TabPane Tab="Input Variables" Key="2">
+                        <Space Direction="DirectionVHType.Vertical">
+                            <SpaceItem>
+                                <Tooltip Title="Add input variable">
+                                    <Button OnClick="AddInputVariable" Type="@ButtonType.Primary">
+                                        Add
+                                    </Button>
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Table DataSource="@context.Definition.CodeInputVariables"
+                                       RowExpandable="@((record)=>true)"
+                                       ScrollY="calc(100vh - 310px);"
+                                       ScrollBarWidth="5"
+                                       HidePagination>
+                                    <ChildContent Context="inputVariable">
+                                        <Column Title="Name" TData="string">
+                                            <Input Type="text" @bind-Value="inputVariable.Name" AutoFocus />
+                                        </Column>
+                                        <Column Title="Type" TData="string">
+                                            <Select @bind-Value="inputVariable.Type"
+                                                    Placeholder="Select type..."
+                                                    TItemValue="VariableType"
+                                                    TItem="VariableType">
+                                                <SelectOptions>
+                                                    @foreach (var variableType in VariableTypes)
+                                                    {
+                                                        <SelectOption TItemValue="VariableType" TItem="VariableType" Value=@variableType Label=@variableType.ToString() />
+                                                    }
+                                                </SelectOptions>
+                                            </Select>
+                                        </Column>
+                                        <ActionColumn Title="Action">
+                                            <Tooltip Title="Delete variable">
+                                                <Popconfirm Title="Sure to delete?"
+                                                            OnConfirm="()=> DeleteInputVariable(inputVariable.Name)"
+                                                            OkText="Yes"
+                                                            CancelText="No">
+                                                    <a>Delete</a>
+                                                </Popconfirm>
+                                            </Tooltip>
+                                        </ActionColumn>
+                                    </ChildContent>
+                                    <ExpandTemplate Context="inputVariable2">
+                                        <GridRow Gutter="(16, 0)" Class="expanded-content">
+                                            <GridCol Xs="6" Md="6">
+                                                <FormItem Label="Description">
+                                                    <Input Type="text" @bind-Value="inputVariable2.Data.Description" />
+                                                </FormItem>
+                                            </GridCol>
+                                            <GridCol Xs="6" Md="6">
+                                                <FormItem Label="Value">
+                                                    <Input Type="text" TValue="string" Value="inputVariable2.Data.Value?.ToString()" OnChange="(x) => { inputVariable2.Data.Value = x; }" />
+                                                </FormItem>
+                                            </GridCol>
+                                        </GridRow>
+                                    </ExpandTemplate>
+                                </Table>
+                            </SpaceItem>
+                        </Space>
+                    </TabPane>
+
+                    <TabPane Tab="Output Variables" Key="3">
+                        <Space Direction="DirectionVHType.Vertical" Style="width: 100%">
+                            <SpaceItem>
+                                <Tooltip Title="Add output variable">
+                                    <Button OnClick="AddOutputVariable" Type="@ButtonType.Primary" >
+                                        Add
+                                    </Button>
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Table DataSource="context.Definition.CodeOutputVariables"
+                                       RowExpandable="@((record)=>true)"
+                                       ScrollY="calc(100vh - 310px);"
+                                       ScrollBarWidth="5"
+                                       HidePagination>
+                                    <ChildContent Context="outputVariable">
+                                        <Column Title="Id" TData="string">
+                                            <Input Type="text" @bind-Value="outputVariable.Id" AutoFocus />
+                                        </Column>
+                                        <Column Title="Name" TData="string">
+                                            <Input Type="text" @bind-Value="outputVariable.Name" />
+                                        </Column>
+                                        <Column Title="Type" TData="string">
+                                            <Select @bind-Value="outputVariable.Type"
+                                                    Placeholder="Select type..."
+                                                    TItemValue="VariableType"
+                                                    TItem="VariableType">
+                                                <SelectOptions>
+                                                    @foreach (var variableType in VariableTypes)
+                                                    {
+                                                        <SelectOption TItemValue="VariableType" TItem="VariableType" Value=@variableType Label=@variableType.ToString() />
+                                                    }
+                                                </SelectOptions>
+                                            </Select>
+                                        </Column>
+                                        <ActionColumn Title="Action">
+                                            <Tooltip Title="Delete variable">
+                                                <Popconfirm Title="Sure to delete?"
+                                                            OnConfirm="()=> DeleteOutputVariable(outputVariable.Name)"
+                                                            OkText="Yes"
+                                                            CancelText="No">
+                                                    <a>Delete</a>
+                                                </Popconfirm>
+                                            </Tooltip>
+                                        </ActionColumn>
+                                    </ChildContent>
+                                    <ExpandTemplate Context="outputVariable2">
+                                        <GridRow Gutter="(16, 0)" Class="expanded-content">
+                                            <GridCol Xs="6" Md="6">
+                                                <FormItem Label="Description">
+                                                    <Input Type="text" @bind-Value="outputVariable2.Data.Description" />
+                                                </FormItem>
+                                            </GridCol>
+                                            <GridCol Xs="6" Md="6">
+                                                <FormItem Label="Value">
+                                                    <Input Type="text" TValue="string" Value="outputVariable2.Data.Value?.ToString()" OnChange="(x) => { outputVariable2.Data.Value = x; }" />
+                                                </FormItem>
+                                            </GridCol>
+                                        </GridRow>
+                                    </ExpandTemplate>
+                                </Table>
+                            </SpaceItem>
+                        </Space>
+                    </TabPane>
+
+                    <TabPane Tab="Code" Key="4">
+                        <Form @ref="codeForm"
+                              Model="@StepDesignerViewModel.CustomStep"
+                              Class="code-form"
+                              Layout="@FormLayout.Vertical"
+                              LabelColSpan="24"
+                              WrapperColSpan="24">
+
+                            <Validator>
+                                <FluentValidationValidator />
+                                <ValidationSummary />
+                            </Validator>
+
+                            <ChildContent Context="codeContext">
+                                <Row Gutter="(16, 0)">
+                                    <Col Md="12">
+                                     <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
+                                     <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
+                                     </Col>
+                                     <Col Md="12">
+                                     <Row>
+                                         <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
+                                             Run
+                                         </Button>
+                                     </Row>
+                                     <Row>
+                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
+                                             <Panel Key="1">
+                                                 <HeaderTemplate>
+                                                     <b>Test Input Variables</b>
+                                                 </HeaderTemplate>
+                                                 <ChildContent>
+                                                     <div class="scrollable-list">
+                                                        @foreach(var inputVariable in @codeContext.Definition.CodeInputVariables)
+                                                        {
+                                                            <div class="variable">
+                                                                <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                            </div>
+                                                        }  
+                                                     </div>
+                                                 </ChildContent>
+                                             </Panel>
+                                         </Collapse>
+                                     </Row>
+
+                                     <Row>
+                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
+                                             <Panel Key="1">
+                                                 <HeaderTemplate>
+                                                     <b>Test Output Variables</b>
+                                                 </HeaderTemplate>
+                                                 <ChildContent>
+                                                    <div class="scrollable-list">
+                                                        @foreach (var outputVariable in @codeContext.Definition.CodeOutputVariables)
+                                                        {
+                                                            <div class="variable">
+                                                                <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                 </ChildContent>
+                                             </Panel>
+                                         </Collapse>
+                                     </Row>
+                                     </Col>
+                                 </Row>
+                             </ChildContent>
+                         </Form>
+
+                     </TabPane>
+
+                    <TabPane Tab="AI" Key="5">
+                        <Form @ref="codeForm"
+                              Model="@StepDesignerViewModel.CustomStep"
+                              Class="code-form"
+                              Layout="@FormLayout.Vertical"
+                              LabelColSpan="24"
+                              WrapperColSpan="24">
+
+                            <Validator>
+                                <FluentValidationValidator />
+                                <ValidationSummary />
+                            </Validator>
+
+                            <ChildContent Context="codeContext">
+                                <Row Gutter="(16, 0)">
+                                    <Col Md="12">
+                                    <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
+                                    <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
+                                        Generate
+                                    </Button>
+                                    </Col>
+                                    <Col Md="12">
+                                    <Row>
+                                        <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
+                                    </Row>
+                                    </Col>
+                                </Row>
+                            </ChildContent>
+                        </Form>
+
+                    </TabPane>
+                </Tabs>
+            </ChildContent>
+        </Form>
+
+    </Content>
+</Layout>
+
+<style>
+    .step-form {
+        background-color: #fff;
+        padding: 20px;
+        height: calc(100vh - 117px);
+    }
+
+    #step-code {
+        height: calc(100vh - 360px) !important;
+        margin: 0 0 5px 0;
+    }
+
+    #code-log {
+        margin: 0 0 5px 0;
+    }
+
+    .code-form {
+        background-color: #fff;
+    }
+
+    .code-button {
+        margin: 0 0 8px 0px;
+    }
+
+    .expanded-content {
+        padding: 0 50px 0 50px;
+    }
+
+    .editable-title {
+        padding: 18px 0 0 10px;
+    }
+
+    .header .ant-typography-edit-content {
+        padding-top: 18px;
+    }
+
+    .scrollable-list {
+        overflow-x: hidden;
+        overflow-y: auto;
+        max-height: 250px;
+        padding-right: 30px;
+    }
+
+        .scrollable-list .variable
+        {
+            margin: 6px 0 0 0;
+        }
+
+    .variable-row {
+        margin-bottom: 5px;
+    }
+
+    .variables-collapse-panel {
+        background-color: #efefef;
+        border-radius: 2px;
+        margin: 5px 0 10px 0;
+        border-radius: 5px;
+        width: 300px;
+    }
+
+</style>

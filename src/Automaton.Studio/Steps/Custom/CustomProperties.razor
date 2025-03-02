@@ -1,0 +1,84 @@
+﻿@using Automaton.Core.Enums;
+@using Automaton.Studio.Domain;
+@using Automaton.Studio.Steps.Custom.Variables;
+@using Blazored.FluentValidation;
+@using Automaton.Core.Models;
+@inherits FeedbackComponent<CustomStep>
+
+<StepProperties Step="@step">
+
+    <Form @ref="form"
+        Model="@step"
+        LabelColSpan="4"
+        WrapperColSpan="24"
+        Layout="Vertical">
+        <Validator>
+            <FluentValidationValidator @ref="fluentValidationValidator" />
+            <ValidationSummary />
+        </Validator>
+
+        <ChildContent>
+            @foreach (var variable in step.CodeInputVariables)
+            {
+                <GridRow Gutter="(24, 0)" Class="variable-row">
+                    <GridCol Xs="24" Md="24">
+                        <DynamicComponent Type="GetVariableComponent(variable.Type)" Parameters="GetVariableComponentParameters(variable)" />
+                    </GridCol>
+                </GridRow>
+            }
+        </ChildContent>
+    </Form>
+
+</StepProperties>
+
+@code {
+    private CustomStep step;
+    private Form<CustomStep> form;
+    private FluentValidationValidator fluentValidationValidator;
+
+    protected override void OnInitialized()
+    {
+        step = this.Options;
+
+        base.OnInitialized();
+    }
+
+    public override async Task OnFeedbackOkAsync(ModalClosingEventArgs args)
+    {
+        // Below workaround is required to avoid NewWorkflow dialog
+        // close unexpectedly when shown for the first time.
+        // The fact that validation happens synchronous (while this method is async) may be the cause of the problem.
+        // Please keep both of the next two lines, or find a fix for the issue.
+        // Razvan, May 2021
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+
+        var valid = fluentValidationValidator.Validate(options => options.IncludeAllRuleSets());
+
+        args.Cancel = !valid;
+    }
+
+    private Type GetVariableComponent(VariableType type)
+    {
+        return type switch
+        {
+            VariableType.String => typeof(StringVariable),
+            VariableType.Text => typeof(TextVariable),
+            VariableType.Boolean => typeof(BooleanVariable),
+            VariableType.Number => typeof(NumericVariable),
+            VariableType.Date => typeof(DateVariable),
+            _ => throw new NotImplementedException()
+        };
+    }
+
+    private Dictionary<string, object> GetVariableComponentParameters(Core.Models.StepVariable customStepVariable)
+    {
+        return new Dictionary<string, object>() { { "Variable", customStepVariable } };
+    }
+}
+
+<style>
+    .variable-row {
+        margin-bottom: 5px;
+    }
+</style>
