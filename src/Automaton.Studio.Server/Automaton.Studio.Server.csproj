@@ -58,14 +58,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Update="Keys\private-key.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Keys\public-key.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Migrations\" />
   </ItemGroup>
 </Project>

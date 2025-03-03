@@ -121,7 +121,7 @@ namespace Common.Authentication
                 }
 
                 RSA privateRsa = RSA.Create();
-                var privateKeyXml = File.ReadAllText(setting.RsaSettings.RsaPrivateKey);
+                var privateKeyXml = setting.RsaSettings.RsaPrivateKey;
                 privateRsa.FromXmlString(privateKeyXml);
                 var privateKey = new RsaSecurityKey(privateRsa);
                 return new SigningCredentials(privateKey, SecurityAlgorithms.RsaSha256);
@@ -129,7 +129,7 @@ namespace Common.Authentication
             else
             {
                 RSA publicRsa = RSA.Create();
-                var publicKeyXml = File.ReadAllText(setting.RsaSettings.RsaPublicKey);
+                var publicKeyXml = setting.RsaSettings.RsaPublicKey;
                 publicRsa.FromXmlString(publicKeyXml);
                 var publicKey = new RsaSecurityKey(publicRsa);
                 return new SigningCredentials(publicKey, SecurityAlgorithms.RsaSha256);
