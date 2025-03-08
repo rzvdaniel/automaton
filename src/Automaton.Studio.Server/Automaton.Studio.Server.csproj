@@ -52,7 +52,9 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Logs\" />
+	  <None Include="Logs\README.md">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
     <Folder Include="Migrations\" />
   </ItemGroup>
 </Project>
