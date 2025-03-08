@@ -1,0 +1,81 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+parameters:
+    - name: isRelease
+      displayName: Is a release build
+      default: false
+      type: boolean
+
+jobs:
+
+- job: AutomatonClient
+  
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  variables:
+    automatonClientSolution: './Automaton.Client.sln'
+    buildPlatform: 'Any CPU'
+    buildConfiguration: 'Release'
+
+  steps:
+  - task: UseDotNet@2 
+    displayName: ".NET 8.x"
+    inputs:
+      version: '8.x'
+      packageType: sdk
+
+  - task: DotNetCoreCLI@2
+    displayName: "Test"
+    inputs:
+      command: test
+      projects: '**/$(automatonClientSolution)'
+      arguments: '--configuration $(buildConfiguration)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore Nuget Packages'
+    inputs:
+      command: 'restore'
+      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
+      includeNuGetOrg: true
+    
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'build'
+      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
+      arguments: '--no-restore'
+    displayName: 'Build projects'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
+      arguments: '--no-restore --no-build'
+    displayName: 'Run Tests'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio.Web/Automaton.Studio.Web.csproj'
+      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
+      zipAfterPublish: false
+    displayName: 'Publish Automaton Studio Client'
+
+  - task: FileTransform@1
+    displayName: Transform appsettings
+    condition: eq(${{ parameters.isRelease }}, false)
+    inputs:
+      folderPath: '$(build.artifactStagingDirectory)'
+      fileType: 'json'
+      targetFiles: '**/appsettings.json'
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Automaton Studio Client artifact
+    inputs:
+      targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio.Client'
+      artifact: 'Automaton.Studio.Client'
+      publishLocation: 'pipeline'
