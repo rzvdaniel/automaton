@@ -7,6 +7,7 @@
     <RootNamespace>Automaton.Runner</RootNamespace>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
+	<EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Icon.ico" />
