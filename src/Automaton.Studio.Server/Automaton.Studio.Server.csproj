@@ -6,12 +6,6 @@
     <UserSecretsId>aspnet-Automaton.Studio.Server-73B302BA-8B66-4371-B2F7-55537435EA1F</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Migrations2\**" />
-    <Content Remove="Migrations2\**" />
-    <EmbeddedResource Remove="Migrations2\**" />
-    <None Remove="Migrations2\**" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="Destructurama.Attributed" Version="4.0.0" />
     <PackageReference Include="Destructurama.JsonNet" Version="3.0.0" />
@@ -58,6 +52,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Logs\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 </Project>
