@@ -10,10 +10,10 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
     public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebToken>
     {
         private readonly ApplicationDbContext dataContext;
-        private readonly UserManagerService userManagerService;
+        private readonly UsersService userManagerService;
         private readonly IJwtService jwtService;
 
-        public SignInUserQueryHandler(ApplicationDbContext dataContext, UserManagerService userManagerService, IJwtService jwtService)
+        public SignInUserQueryHandler(ApplicationDbContext dataContext, UsersService userManagerService, IJwtService jwtService)
         {
             this.dataContext = dataContext;
             this.userManagerService = userManagerService;

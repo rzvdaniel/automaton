@@ -13,12 +13,12 @@ public class AccountController : BaseController
 {
     private readonly ConfigurationService configurationService;
     private readonly ApplicationDbContext dataContext;
-    private readonly UserManagerService userManagerService;
+    private readonly UsersService userManagerService;
     private readonly EmailService emailService;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext, 
-        UserManagerService userManagerService,
+        UsersService userManagerService,
         EmailService emailService)
     {
         this.configurationService = configurationService;

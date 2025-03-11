@@ -6,9 +6,9 @@ namespace AuthServer.Application.Queries.Handlers
 {
     public class UserRolesQueryHandler : IRequestHandler<UserRolesQuery, IEnumerable<string>>
     {
-        private readonly UserManagerService _userManagerService;
+        private readonly UsersService _userManagerService;
 
-        public UserRolesQueryHandler(UserManagerService userManagerService)
+        public UserRolesQueryHandler(UsersService userManagerService)
         {
             _userManagerService = userManagerService;
         }

@@ -140,7 +140,7 @@ namespace Automaton.Studio.Server.Migrations
                     Id = table.Column<Guid>(type: "char(36)", nullable: false),
                     UserId = table.Column<Guid>(type: "char(36)", nullable: false),
                     Token = table.Column<string>(type: "longtext", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValue: new DateTime(2025, 2, 16, 21, 16, 10, 334, DateTimeKind.Local).AddTicks(3936)),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValue: new DateTime(2025, 3, 11, 9, 34, 45, 188, DateTimeKind.Local).AddTicks(6573)),
                     RevokedAt = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     Expires = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },

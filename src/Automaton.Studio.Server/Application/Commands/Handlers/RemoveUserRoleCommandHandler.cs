@@ -9,9 +9,9 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
     public class RemoveUserRoleCommandHandler : IRequestHandler<RemoveUserRoleCommand>
     {
         private readonly ApplicationDbContext dataContext;
-        private readonly UserManagerService userManagerService;
+        private readonly UsersService userManagerService;
         
-        public RemoveUserRoleCommandHandler(ApplicationDbContext dataContext,UserManagerService userManagerService)
+        public RemoveUserRoleCommandHandler(ApplicationDbContext dataContext,UsersService userManagerService)
         {
             this.dataContext = dataContext;
             this.userManagerService = userManagerService;

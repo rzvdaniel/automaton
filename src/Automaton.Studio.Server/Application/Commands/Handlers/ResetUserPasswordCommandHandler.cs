@@ -8,12 +8,12 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
 {
     public class ResetUserPasswordCommandHandler : IRequestHandler<ResetUserPasswordCommand>
     {
-        private UserManagerService UserManagerService { get; set; }
+        private UsersService UserManagerService { get; set; }
         private ConfigurationService ConfigurationService { get; set; }
         private EmailService EmailService { get; set; }
         private ILogger<ResetUserPasswordCommandHandler> Logger { get; set; }
 
-        public ResetUserPasswordCommandHandler(UserManagerService userManager, ConfigurationService configurationService, 
+        public ResetUserPasswordCommandHandler(UsersService userManager, ConfigurationService configurationService, 
             EmailService emailService, ILogger<ResetUserPasswordCommandHandler> logger)
         {
             UserManagerService = userManager;

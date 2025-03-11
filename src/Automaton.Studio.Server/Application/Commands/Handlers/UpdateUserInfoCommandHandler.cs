@@ -9,9 +9,9 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
     public class UpdateUserInfoCommandHandler : IRequestHandler<UpdateUserInfoCommand>
     {
         private readonly ApplicationDbContext dataContext;
-        private readonly UserManagerService userManager;
+        private readonly UsersService userManager;
 
-        public UpdateUserInfoCommandHandler(ApplicationDbContext dataContext, UserManagerService userManager)
+        public UpdateUserInfoCommandHandler(ApplicationDbContext dataContext, UsersService userManager)
         {
             this.dataContext = dataContext;
             this.userManager = userManager;

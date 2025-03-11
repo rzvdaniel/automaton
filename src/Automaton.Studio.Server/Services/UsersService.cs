@@ -1,15 +1,16 @@
 ﻿using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
 
-public class UserManagerService
+public class UsersService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
 
-    public UserManagerService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager)
+    public UsersService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -111,10 +112,12 @@ public class UserManagerService
         int pageindex, int pageSize)
     {
         await Task.CompletedTask;
-        var result = _userManager.Users.Where(
-                u =>
-                    (name == null || name == "" || u.Name.StartsWith(name)) &&
-                    (email == null || email == "" || u.Name == name)
+        var result = _userManager.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .Where( u =>
+                (name == null || name == "" || u.Name.StartsWith(name)) &&
+                (email == null || email == "" || u.Name == name)
             )
             .Skip(pageindex * pageSize)
             .Take(pageSize);

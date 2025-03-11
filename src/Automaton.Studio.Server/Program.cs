@@ -34,14 +34,7 @@ var configurationService = new ConfigurationService(configurationBuilder);
 
 var services = applicationBuilder.Services;
 
-services.AddDbContext<ApplicationDbContext>(
-    options => _ = configurationService.DatabaseType switch
-    {
-        ConfigurationService.MySqlDatabaseType => options.UseMySQL(
-        configurationManager.GetConnectionString("MySqlConnection")),
-
-        _ => throw new Exception($"Unsupported database provider: {configurationService.DatabaseType}")
-    });
+services.AddDbContext<ApplicationDbContext, MySqlDbContext>();
 
 services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -97,7 +90,6 @@ applicationBuilder.Host.UseSerilog((context, services, config) =>
         wt => wt.MariaDB(
             connectionString: configurationManager.GetConnectionString("MySqlConnection"),
             tableName: "Logs"))
-
 );
 
 services.AddHangfire(x =>
@@ -131,7 +123,7 @@ services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<EmailService>();
-services.AddTransient<UserManagerService>();
+services.AddTransient<UsersService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();
 

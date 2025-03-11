@@ -1,0 +1,1290 @@
+2025-03-09 12:02:14.323 +01:00 [INF] Executed DbCommand (17ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:02:14.505 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:02:14.529 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT `MigrationId`, `ProductVersion`
+FROM `__EFMigrationsHistory`
+ORDER BY `MigrationId`;
+2025-03-09 12:02:14.551 +01:00 [INF] No migrations were applied. The database is already up to date.
+2025-03-09 12:02:16.275 +01:00 [INF] DB tables already exist. Exit install
+2025-03-09 12:02:16.454 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-09 12:02:16.455 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-09 12:02:16.467 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-09 12:02:16.470 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-09 12:02:16.472 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-09 12:02:16.477 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-09 12:02:16.537 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-09 12:02:16.554 +01:00 [INF] Hosting environment: Development
+2025-03-09 12:02:16.555 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-09 12:02:16.694 +01:00 [INF] Server daniel:18072:ad3ffd9a successfully announced in 160.3771 ms
+2025-03-09 12:02:16.700 +01:00 [INF] Server daniel:18072:ad3ffd9a is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-09 12:02:16.735 +01:00 [INF] 3 servers were removed due to timeout
+2025-03-09 12:02:17.019 +01:00 [INF] Server daniel:18072:ad3ffd9a all the dispatchers started
+2025-03-09 12:02:17.317 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 153.8074 ms
+2025-03-09 12:02:19.360 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 6.2994 ms
+2025-03-09 12:02:29.391 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 5.4918 ms
+2025-03-09 12:02:49.407 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.8768 ms
+2025-03-09 12:03:29.432 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 1.0612 ms
+2025-03-09 12:03:31.309 +01:00 [INF] Executed DbCommand (15ms) [Parameters=[@__normalizedEmail_0='?' (Size = 256)], CommandType='"Text"', CommandTimeout='30']
+SELECT `a`.`Id`, `a`.`AccessFailedCount`, `a`.`ConcurrencyStamp`, `a`.`Email`, `a`.`EmailConfirmed`, `a`.`LockoutEnabled`, `a`.`LockoutEnd`, `a`.`Name`, `a`.`NormalizedEmail`, `a`.`NormalizedUserName`, `a`.`PasswordHash`, `a`.`PhoneNumber`, `a`.`PhoneNumberConfirmed`, `a`.`SecurityStamp`, `a`.`TwoFactorEnabled`, `a`.`UserName`
+FROM `AspNetUsers` AS `a`
+WHERE `a`.`NormalizedEmail` = @__normalizedEmail_0
+LIMIT 2
+2025-03-09 12:03:31.527 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `a0`.`Name`
+FROM `AspNetUserRoles` AS `a`
+INNER JOIN `AspNetRoles` AS `a0` ON `a`.`RoleId` = `a0`.`Id`
+WHERE `a`.`UserId` = @__userId_0
+2025-03-09 12:03:31.701 +01:00 [INF] Executed DbCommand (6ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = DateTime), @p2='?' (DbType = DateTime), @p3='?' (DbType = DateTime), @p4='?' (Size = 4000), @p5='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO `RefreshTokens` (`Id`, `CreatedAt`, `Expires`, `RevokedAt`, `Token`, `UserId`)
+VALUES (@p0, @p1, @p2, @p3, @p4, @p5);
+2025-03-09 12:03:31.740 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 788.9924 ms
+2025-03-09 12:03:32.153 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:03:32.212 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 294.5714 ms
+2025-03-09 12:03:32.292 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:03:32.302 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 71.4829 ms
+2025-03-09 12:03:32.412 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:03:32.420 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 35.5014 ms
+2025-03-09 12:03:33.639 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:03:33.685 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 67.6905 ms
+2025-03-09 12:03:35.259 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:03:35.269 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 24.3391 ms
+2025-03-09 12:04:49.494 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.498 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.499 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.500 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.502 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.503 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.504 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.505 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.506 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.507 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.508 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.509 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:49.510 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 31.3716 ms
+2025-03-09 12:04:51.535 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.538 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.540 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.543 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.544 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.547 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.548 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.549 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.550 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.551 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.552 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.553 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.554 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.555 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.556 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.557 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.559 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.560 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.563 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.564 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.569 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.571 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.572 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.573 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.574 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:04:51.576 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 45.2609 ms
+2025-03-09 12:16:08.068 +01:00 [INF] Executed DbCommand (10ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:16:08.345 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:16:08.437 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT `MigrationId`, `ProductVersion`
+FROM `__EFMigrationsHistory`
+ORDER BY `MigrationId`;
+2025-03-09 12:16:08.458 +01:00 [INF] No migrations were applied. The database is already up to date.
+2025-03-09 12:16:09.437 +01:00 [INF] DB tables already exist. Exit install
+2025-03-09 12:16:09.554 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-09 12:16:09.556 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-09 12:16:09.564 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-09 12:16:09.566 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-09 12:16:09.567 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-09 12:16:09.569 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-09 12:16:09.595 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-09 12:16:09.605 +01:00 [INF] Hosting environment: Development
+2025-03-09 12:16:09.607 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-09 12:16:09.697 +01:00 [INF] Server daniel:7952:26513afa successfully announced in 103.3163 ms
+2025-03-09 12:16:09.706 +01:00 [INF] Server daniel:7952:26513afa is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-09 12:16:09.956 +01:00 [INF] Server daniel:7952:26513afa all the dispatchers started
+2025-03-09 12:16:10.281 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.287 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.288 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.289 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.290 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.291 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.292 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.294 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.295 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:16:10.302 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 246.4938 ms
+2025-03-09 12:16:10.602 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:16:10.703 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 650.8067 ms
+2025-03-09 12:16:10.900 +01:00 [INF] Executed DbCommand (13ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:16:10.917 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 153.3742 ms
+2025-03-09 12:16:11.121 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:16:11.157 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 81.4834 ms
+2025-03-09 12:16:20.139 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__name_0='?' (Size = 4000), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM `Flows` AS `f`
+    WHERE (`f`.`Name` = @__name_0) AND EXISTS (
+        SELECT 1
+        FROM `FlowUsers` AS `f0`
+        WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1)))
+2025-03-09 12:16:20.156 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/exists/T responded 404 in 32.3939 ms
+2025-03-09 12:16:20.242 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__name_0='?' (Size = 4000), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT EXISTS (
+    SELECT 1
+    FROM `Flows` AS `f`
+    WHERE (`f`.`Name` = @__name_0) AND EXISTS (
+        SELECT 1
+        FROM `FlowUsers` AS `f0`
+        WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1)))
+2025-03-09 12:16:20.247 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/exists/T responded 404 in 12.8596 ms
+2025-03-09 12:16:20.416 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (Size = 4000), @p2='?' (DbType = DateTime), @p3='?' (Size = 4000), @p4='?' (DbType = DateTime), @p5='?' (DbType = Guid), @p6='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+INSERT INTO `Flows` (`Id`, `Body`, `Created`, `Name`, `Updated`)
+VALUES (@p0, @p1, @p2, @p3, @p4);
+INSERT INTO `FlowUsers` (`FlowId`, `UserId`)
+VALUES (@p5, @p6);
+2025-03-09 12:16:20.438 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:16:20.461 +01:00 [INF] ::1 https localhost:7091 POST /api/flows responded 201 in 183.2666 ms
+2025-03-09 12:16:22.205 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:16:22.219 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 19.9120 ms
+2025-03-09 12:16:23.779 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:16:23.787 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 15.0161 ms
+2025-03-09 12:17:49.651 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:17:49.657 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 23.0309 ms
+2025-03-09 12:17:49.669 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:17:49.675 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 10.0783 ms
+2025-03-09 12:17:50.952 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:17:50.961 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 13.0054 ms
+2025-03-09 12:17:53.820 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE (`c`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:17:53.828 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps/b7ddcfcd-592e-4c00-acd7-865f488b2a7d responded 200 in 15.1575 ms
+2025-03-09 12:18:05.001 +01:00 [INF] Start step: Step 01
+2025-03-09 12:18:05.024 +01:00 [ERR] Step: Step 01 encountered an error. Message: No module named 'Crypto.PublicKey'
+System.Exception: IronPython.Runtime.Exceptions.ImportException: No module named 'Crypto.PublicKey'
+   at Microsoft.Scripting.Runtime.LightExceptions.ThrowException(LightException lightEx)
+   at Microsoft.Scripting.Runtime.LightExceptions.CheckAndThrow(Object value)
+   at Microsoft.Scripting.Interpreter.FuncCallInstruction`2.Run(InterpretedFrame frame)
+   at Microsoft.Scripting.Interpreter.Interpreter.Run(InterpretedFrame frame)
+   at Microsoft.Scripting.Interpreter.LightLambda.Run2[T0,T1,TRet](T0 arg0, T1 arg1)
+   at IronPython.Compiler.PythonScriptCode.RunWorker(CodeContext ctx)
+   at IronPython.Compiler.PythonScriptCode.Run(Scope scope)
+   at IronPython.Compiler.RuntimeScriptCode.InvokeTarget(Scope scope)
+   at IronPython.Compiler.RuntimeScriptCode.Run(Scope scope)
+   at Microsoft.Scripting.SourceUnit.Execute(Scope scope, ErrorSink errorSink)
+   at Microsoft.Scripting.SourceUnit.Execute(Scope scope)
+   at Microsoft.Scripting.Hosting.ScriptSource.Execute(ScriptScope scope)
+   at Automaton.Core.Scripting.ScriptEngineHost.Execute(ScriptResource resource, IDictionary`2 inputs) in C:\Work\automaton\src\Automaton.Core.Scripting\ScriptEngineHost.cs:line 31
+   at Automaton.Studio.Services.CustomStepExecuteService.ExecuteAsync(CustomStep step) in C:\Work\automaton\src\Automaton.Studio\Services\CustomStepExecuteService.cs:line 83
+   at Automaton.Studio.Services.CustomStepExecuteService.Execute(CustomStep step, CancellationToken cancellationToken) in C:\Work\automaton\src\Automaton.Studio\Services\CustomStepExecuteService.cs:line 57
+2025-03-09 12:18:05.030 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 30.7893 ms
+2025-03-09 12:21:09.782 +01:00 [INF] 1 servers were removed due to timeout
+2025-03-09 12:21:59.325 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:21:59.329 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 13.6427 ms
+2025-03-09 12:21:59.338 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:21:59.342 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 7.1935 ms
+2025-03-09 12:22:01.623 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:22:01.654 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 41.0230 ms
+2025-03-09 12:22:02.737 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:22:02.749 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 15.0731 ms
+2025-03-09 12:23:21.222 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:23:21.229 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 17.2525 ms
+2025-03-09 12:23:21.238 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:23:21.247 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 12.2616 ms
+2025-03-09 12:23:24.268 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:23:24.273 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 8.5975 ms
+2025-03-09 12:23:26.453 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE (`c`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:23:26.457 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps/b7ddcfcd-592e-4c00-acd7-865f488b2a7d responded 200 in 7.2428 ms
+2025-03-09 12:23:35.199 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE (`c`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:23:35.229 +01:00 [INF] Executed DbCommand (11ms) [Parameters=[@p2='?' (DbType = Guid), @p0='?' (Size = 4000), @p1='?' (DbType = DateTime)], CommandType='"Text"', CommandTimeout='30']
+UPDATE `CustomSteps` SET `Definition` = @p0, `Updated` = @p1
+WHERE `Id` = @p2;
+2025-03-09 12:23:35.234 +01:00 [INF] ::1 https localhost:7091 PUT /api/customsteps/b7ddcfcd-592e-4c00-acd7-865f488b2a7d responded 204 in 47.1927 ms
+2025-03-09 12:23:39.255 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:23:39.263 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 15.7506 ms
+2025-03-09 12:23:39.289 +01:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:23:39.291 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 5.1843 ms
+2025-03-09 12:23:40.739 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:23:40.750 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 14.1739 ms
+2025-03-09 12:23:43.324 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:23:43.328 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 6.3474 ms
+2025-03-09 12:23:53.045 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:23:53.057 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 24.1777 ms
+2025-03-09 12:23:53.072 +01:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:23:53.075 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 5.0193 ms
+2025-03-09 12:23:54.422 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:23:54.428 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 9.7033 ms
+2025-03-09 12:24:18.640 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:24:18.717 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 12:24:18.736 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT `MigrationId`, `ProductVersion`
+FROM `__EFMigrationsHistory`
+ORDER BY `MigrationId`;
+2025-03-09 12:24:18.758 +01:00 [INF] No migrations were applied. The database is already up to date.
+2025-03-09 12:24:19.278 +01:00 [INF] DB tables already exist. Exit install
+2025-03-09 12:24:19.411 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-09 12:24:19.412 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-09 12:24:19.419 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-09 12:24:19.420 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-09 12:24:19.421 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-09 12:24:19.422 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-09 12:24:19.445 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-09 12:24:19.447 +01:00 [INF] Hosting environment: Development
+2025-03-09 12:24:19.448 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-09 12:24:19.589 +01:00 [INF] Server daniel:15696:6c7cd525 successfully announced in 143.8902 ms
+2025-03-09 12:24:19.594 +01:00 [INF] Server daniel:15696:6c7cd525 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-09 12:24:19.776 +01:00 [INF] Server daniel:15696:6c7cd525 all the dispatchers started
+2025-03-09 12:24:20.298 +01:00 [INF] Executed DbCommand (4ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:24:20.410 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 911.3305 ms
+2025-03-09 12:24:20.573 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.576 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.577 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.578 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.579 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.580 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.581 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.583 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.584 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 12:24:20.587 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 52.2597 ms
+2025-03-09 12:24:20.658 +01:00 [INF] Executed DbCommand (9ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:24:20.672 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 158.7110 ms
+2025-03-09 12:24:20.800 +01:00 [INF] Executed DbCommand (4ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:24:20.815 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 43.9342 ms
+2025-03-09 12:24:35.759 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 12:24:35.766 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 24.8843 ms
+2025-03-09 12:24:37.931 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE (`c`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:24:37.938 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps/b7ddcfcd-592e-4c00-acd7-865f488b2a7d responded 200 in 21.8305 ms
+2025-03-09 12:24:42.201 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:24:42.207 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 30.5946 ms
+2025-03-09 12:24:42.229 +01:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:24:42.232 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 6.4601 ms
+2025-03-09 12:24:43.845 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:24:43.878 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 58.2057 ms
+2025-03-09 12:24:45.279 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:24:45.287 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 16.3768 ms
+2025-03-09 12:27:44.487 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 12:27:44.492 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 16.7369 ms
+2025-03-09 12:27:44.501 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:27:44.505 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 7.2890 ms
+2025-03-09 12:27:55.514 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:27:55.526 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 21.0495 ms
+2025-03-09 12:28:07.961 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:07.972 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 15.5120 ms
+2025-03-09 12:28:10.117 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:10.128 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 16.2957 ms
+2025-03-09 12:28:16.536 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:16.540 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 6.4513 ms
+2025-03-09 12:28:17.055 +01:00 [INF] Executed DbCommand (6ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid), @__p_3='?' (DbType = Int32), @__p_2='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Application`, `f`.`Finished`, `f`.`FlowId`, `f`.`Started`, `f`.`Status`
+FROM `FlowExecutions` AS `f`
+WHERE (`f`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowExecutionUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowExecutionId`) AND (`f0`.`UserId` = @__userId_1))
+ORDER BY `f`.`Started` DESC
+LIMIT @__p_3 OFFSET @__p_2
+2025-03-09 12:28:17.108 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM `FlowExecutions` AS `f`
+WHERE (`f`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowExecutionUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowExecutionId`) AND (`f0`.`UserId` = @__userId_1))
+2025-03-09 12:28:17.126 +01:00 [INF] ::1 https localhost:7091 GET /api/flowexecutions/flow/7efd8b33-6743-43a9-961f-d64e5cece732/0/40 responded 200 in 102.6481 ms
+2025-03-09 12:28:19.159 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 12:28:19.163 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 6.4530 ms
+2025-03-09 12:28:19.210 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `s`.`Id`, `s`.`CronRecurrence`, `s`.`FlowId`, `s`.`Name`, `s`.`RunnerIds`
+FROM `Schedules` AS `s`
+WHERE (`s`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `ScheduleUsers` AS `s0`
+    WHERE (`s`.`Id` = `s0`.`ScheduleId`) AND (`s0`.`UserId` = @__userId_1))
+2025-03-09 12:28:19.235 +01:00 [INF] ::1 https localhost:7091 GET /api/schedules/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 48.3873 ms
+2025-03-09 12:28:20.375 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:20.381 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 9.2860 ms
+2025-03-09 12:28:20.791 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:20.795 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 6.7655 ms
+2025-03-09 12:28:29.934 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 12:28:29.938 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/7efd8b33-6743-43a9-961f-d64e5cece732 responded 200 in 6.5919 ms
+2025-03-09 12:29:19.616 +01:00 [INF] 1 servers were removed due to timeout
+2025-03-09 13:06:07.697 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 13:06:07.846 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='automaton.studio' AND TABLE_NAME='__EFMigrationsHistory';
+2025-03-09 13:06:07.934 +01:00 [INF] Executed DbCommand (7ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT `MigrationId`, `ProductVersion`
+FROM `__EFMigrationsHistory`
+ORDER BY `MigrationId`;
+2025-03-09 13:06:08.011 +01:00 [INF] No migrations were applied. The database is already up to date.
+2025-03-09 13:06:08.571 +01:00 [INF] DB tables already exist. Exit install
+2025-03-09 13:06:08.692 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-09 13:06:08.693 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-09 13:06:08.699 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-09 13:06:08.701 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-09 13:06:08.701 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-09 13:06:08.702 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-09 13:06:08.726 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-09 13:06:08.736 +01:00 [INF] Hosting environment: Development
+2025-03-09 13:06:08.738 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-09 13:06:08.826 +01:00 [INF] Server daniel:21428:96ee03d8 successfully announced in 101.9026 ms
+2025-03-09 13:06:08.833 +01:00 [INF] Server daniel:21428:96ee03d8 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-09 13:06:08.858 +01:00 [INF] 1 servers were removed due to timeout
+2025-03-09 13:06:09.057 +01:00 [INF] Server daniel:21428:96ee03d8 all the dispatchers started
+2025-03-09 13:06:09.541 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.547 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.549 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.550 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.551 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.552 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.553 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.554 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.555 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-09 13:06:09.561 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 91.8520 ms
+2025-03-09 13:06:09.714 +01:00 [INF] Executed DbCommand (6ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 13:06:09.797 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 620.9753 ms
+2025-03-09 13:06:09.987 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:06:10.002 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 147.8478 ms
+2025-03-09 13:06:10.323 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:06:10.332 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 216.5828 ms
+2025-03-09 13:06:12.840 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:06:12.876 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 60.1113 ms
+2025-03-09 13:06:14.108 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:06:14.117 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 24.3896 ms
+2025-03-09 13:34:32.630 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:34:32.636 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 126.1674 ms
+2025-03-09 13:34:32.653 +01:00 [INF] Executed DbCommand (4ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:34:32.656 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 9.9272 ms
+2025-03-09 13:34:38.186 +01:00 [INF] Executed DbCommand (10ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 13:34:38.192 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 19.9439 ms
+2025-03-09 13:45:59.723 +01:00 [INF] Executed DbCommand (8ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:45:59.727 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 86.7270 ms
+2025-03-09 13:45:59.738 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:45:59.741 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 9.8011 ms
+2025-03-09 13:46:49.198 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:46:49.205 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 13.2385 ms
+2025-03-09 13:46:57.096 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:46:57.101 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 8.0289 ms
+2025-03-09 13:49:11.735 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:49:11.739 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 11.9114 ms
+2025-03-09 13:49:11.769 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:49:11.773 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 10.7566 ms
+2025-03-09 13:49:13.200 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 13:49:13.204 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 11.2387 ms
+2025-03-09 13:49:15.762 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE (`c`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:49:15.770 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps/b7ddcfcd-592e-4c00-acd7-865f488b2a7d responded 200 in 24.5387 ms
+2025-03-09 13:51:35.138 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:51:35.144 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 28.7826 ms
+2025-03-09 13:51:35.177 +01:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:51:35.180 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 5.0622 ms
+2025-03-09 13:51:36.784 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `c`.`Id`, `c`.`Category`, `c`.`Created`, `c`.`Definition`, `c`.`Description`, `c`.`DisplayName`, `c`.`Icon`, `c`.`MoreInfo`, `c`.`Name`, `c`.`Updated`, `c`.`VisibleInExplorer`
+FROM `CustomSteps` AS `c`
+WHERE EXISTS (
+    SELECT 1
+    FROM `CustomStepUsers` AS `c0`
+    WHERE (`c`.`Id` = `c0`.`CustomStepId`) AND (`c0`.`UserId` = @__userId_0))
+2025-03-09 13:51:36.788 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 7.2355 ms
+2025-03-09 13:51:50.456 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:51:50.470 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 23.1113 ms
+2025-03-09 13:51:50.481 +01:00 [INF] Executed DbCommand (0ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:51:50.484 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 5.8301 ms
+2025-03-09 13:51:53.125 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:51:53.132 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 10.1253 ms
+2025-03-09 13:51:54.605 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:51:54.610 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 7.6711 ms
+2025-03-09 13:54:36.896 +01:00 [INF] Executed DbCommand (6ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid), @__p_3='?' (DbType = Int32), @__p_2='?' (DbType = Int32)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Application`, `f`.`Finished`, `f`.`FlowId`, `f`.`Started`, `f`.`Status`
+FROM `FlowExecutions` AS `f`
+WHERE (`f`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowExecutionUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowExecutionId`) AND (`f0`.`UserId` = @__userId_1))
+ORDER BY `f`.`Started` DESC
+LIMIT @__p_3 OFFSET @__p_2
+2025-03-09 13:54:36.929 +01:00 [INF] Executed DbCommand (2ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT COUNT(*)
+FROM `FlowExecutions` AS `f`
+WHERE (`f`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowExecutionUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowExecutionId`) AND (`f0`.`UserId` = @__userId_1))
+2025-03-09 13:54:36.949 +01:00 [INF] ::1 https localhost:7091 GET /api/flowexecutions/flow/92be9edb-9a55-4d93-8f0a-9732d7f124e7/0/40 responded 200 in 87.2733 ms
+2025-03-09 13:54:37.875 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:54:37.880 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 10.2053 ms
+2025-03-09 13:54:37.928 +01:00 [INF] Executed DbCommand (5ms) [Parameters=[@__flowId_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `s`.`Id`, `s`.`CronRecurrence`, `s`.`FlowId`, `s`.`Name`, `s`.`RunnerIds`
+FROM `Schedules` AS `s`
+WHERE (`s`.`FlowId` = @__flowId_0) AND EXISTS (
+    SELECT 1
+    FROM `ScheduleUsers` AS `s0`
+    WHERE (`s`.`Id` = `s0`.`ScheduleId`) AND (`s0`.`UserId` = @__userId_1))
+2025-03-09 13:54:37.951 +01:00 [INF] ::1 https localhost:7091 GET /api/schedules/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 48.2326 ms
+2025-03-09 13:54:50.151 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__id_0='?' (DbType = Guid), @__userId_1='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Body`, `f`.`Created`, `f`.`Name`, `f`.`Updated`
+FROM `Flows` AS `f`
+WHERE (`f`.`Id` = @__id_0) AND EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_1))
+LIMIT 2
+2025-03-09 13:54:50.154 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/92be9edb-9a55-4d93-8f0a-9732d7f124e7 responded 200 in 7.0584 ms
+2025-03-09 13:54:51.845 +01:00 [INF] Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `f`.`Id`, `f`.`Created`, `f`.`Updated`, `f`.`Name`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Started`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Started`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Finished`
+    ELSE '0001-01-01 00:00:00.000000'
+END AS `Finished`, CASE
+    WHEN `t0`.`Id` IS NOT NULL THEN `t0`.`Status`
+    ELSE 'None'
+END AS `Status`
+FROM `Flows` AS `f`
+LEFT JOIN (
+    SELECT `t`.`Id`, `t`.`Finished`, `t`.`FlowId`, `t`.`Started`, `t`.`Status`
+    FROM (
+        SELECT `f1`.`Id`, `f1`.`Finished`, `f1`.`FlowId`, `f1`.`Started`, `f1`.`Status`, ROW_NUMBER() OVER(PARTITION BY `f1`.`FlowId` ORDER BY `f1`.`Started` DESC) AS `row`
+        FROM `FlowExecutions` AS `f1`
+    ) AS `t`
+    WHERE `t`.`row` <= 1
+) AS `t0` ON `f`.`Id` = `t0`.`FlowId`
+WHERE EXISTS (
+    SELECT 1
+    FROM `FlowUsers` AS `f0`
+    WHERE (`f`.`Id` = `f0`.`FlowId`) AND (`f0`.`UserId` = @__userId_0))
+2025-03-09 13:54:51.853 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 16.9765 ms
+2025-03-09 13:54:51.860 +01:00 [INF] Executed DbCommand (1ms) [Parameters=[@__userId_0='?' (DbType = Guid)], CommandType='"Text"', CommandTimeout='30']
+SELECT `r`.`Id`, `r`.`ConnectionId`, `r`.`Name`
+FROM `Runners` AS `r`
+WHERE EXISTS (
+    SELECT 1
+    FROM `RunnerUsers` AS `r0`
+    WHERE (`r`.`Id` = `r0`.`RunnerId`) AND (`r0`.`UserId` = @__userId_0))
+2025-03-09 13:54:51.865 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 6.7826 ms

@@ -9,9 +9,9 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
     public class AddUserRoleCommandHandler : IRequestHandler<AddUserRoleCommand>
     {
         private readonly ApplicationDbContext dataContext;
-        private readonly UserManagerService userManagerService;
+        private readonly UsersService userManagerService;
 
-        public AddUserRoleCommandHandler(ApplicationDbContext dataContext, UserManagerService userManagerService)
+        public AddUserRoleCommandHandler(ApplicationDbContext dataContext, UsersService userManagerService)
         {
             this.dataContext = dataContext;
             this.userManagerService = userManagerService;

@@ -8,9 +8,9 @@ namespace AuthServer.Application.Queries.Handlers
 {
     public class UserQueryHandler : IRequestHandler<UserQuery, UserDetails>
     {
-        private readonly UserManagerService _userManagerService;
+        private readonly UsersService _userManagerService;
         private readonly IMapper _mapper;
-        public UserQueryHandler(UserManagerService userManagerService, IMapper mapper)
+        public UserQueryHandler(UsersService userManagerService, IMapper mapper)
         {
             _userManagerService = userManagerService;
             _mapper = mapper;

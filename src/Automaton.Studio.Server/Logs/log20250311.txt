@@ -1,0 +1,650 @@
+2025-03-11 09:26:54.095 +01:00 [INF] DB tables already exist. Exit install
+2025-03-11 09:26:54.451 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-11 09:26:54.452 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-11 09:26:54.460 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-11 09:26:54.461 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-11 09:26:54.462 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-11 09:26:54.463 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-11 09:26:54.491 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-11 09:26:54.492 +01:00 [INF] Hosting environment: Development
+2025-03-11 09:26:54.493 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-11 09:26:54.633 +01:00 [INF] Server daniel:18452:dc25de8f successfully announced in 142.4803 ms
+2025-03-11 09:26:54.650 +01:00 [INF] Server daniel:18452:dc25de8f is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-11 09:26:54.690 +01:00 [INF] 1 servers were removed due to timeout
+2025-03-11 09:26:55.103 +01:00 [INF] Server daniel:18452:dc25de8f all the dispatchers started
+2025-03-11 09:26:55.309 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 161.7944 ms
+2025-03-11 09:26:56.065 +01:00 [INF] ::1 https localhost:7091 POST /api/token/refreshaccesstoken responded 200 in 923.8612 ms
+2025-03-11 09:26:56.518 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 278.5422 ms
+2025-03-11 09:26:56.676 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 87.4945 ms
+2025-03-11 09:26:56.898 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 41.8396 ms
+2025-03-11 09:26:57.340 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.346 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.350 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.352 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.353 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.354 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.355 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.356 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.357 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:26:57.358 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 34.6187 ms
+2025-03-11 09:26:59.379 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 1.0912 ms
+2025-03-11 09:27:00.619 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 149.1354 ms
+2025-03-11 09:27:00.668 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 19.6405 ms
+2025-03-11 09:27:00.697 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 3.9528 ms
+2025-03-11 09:27:01.391 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.394 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.395 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.396 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.397 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.398 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.400 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.401 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.402 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.402 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.404 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.405 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.406 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.407 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.408 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.409 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.410 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.411 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.412 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.413 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.414 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.415 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.416 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.416 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.417 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:27:01.418 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 29.5529 ms
+2025-03-11 09:27:03.422 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.7310 ms
+2025-03-11 09:29:08.808 +01:00 [INF] DB tables already exist. Exit install
+2025-03-11 09:29:09.062 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-11 09:29:09.065 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-11 09:29:09.077 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-11 09:29:09.078 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-11 09:29:09.081 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-11 09:29:09.090 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-11 09:29:09.140 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-11 09:29:09.157 +01:00 [INF] Hosting environment: Development
+2025-03-11 09:29:09.159 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-11 09:29:09.318 +01:00 [INF] Server daniel:7240:53c13d1a successfully announced in 194.4526 ms
+2025-03-11 09:29:09.326 +01:00 [INF] Server daniel:7240:53c13d1a is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-11 09:29:09.742 +01:00 [INF] Server daniel:7240:53c13d1a all the dispatchers started
+2025-03-11 09:29:10.892 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 148.0274 ms
+2025-03-11 09:29:12.227 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 836.7073 ms
+2025-03-11 09:29:12.698 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 272.0606 ms
+2025-03-11 09:29:12.793 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 71.9122 ms
+2025-03-11 09:29:12.934 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 42.1948 ms
+2025-03-11 09:29:12.984 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.987 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.989 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.992 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.994 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.995 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.997 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.998 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:12.999 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.001 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.002 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.003 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.004 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.005 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.007 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.008 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.010 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.011 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.012 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.013 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.014 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.015 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.016 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.017 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.018 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.019 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.020 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.021 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.023 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:13.027 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 64.0172 ms
+2025-03-11 09:29:15.048 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.8692 ms
+2025-03-11 09:29:16.852 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 100.1004 ms
+2025-03-11 09:29:16.894 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 22.2899 ms
+2025-03-11 09:29:16.918 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 6.7586 ms
+2025-03-11 09:29:17.070 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.073 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.074 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.074 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.075 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.078 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.085 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.088 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.090 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.091 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.092 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.093 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.094 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.095 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.097 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.099 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.100 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.101 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.103 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.105 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.106 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.107 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.108 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.109 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.110 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:29:17.111 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 47.4719 ms
+2025-03-11 09:29:21.140 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.5457 ms
+2025-03-11 09:33:43.052 +01:00 [INF] Start installing Hangfire SQL objects...
+2025-03-11 09:33:43.547 +01:00 [INF] Hangfire SQL objects installed.
+2025-03-11 09:33:43.684 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-11 09:33:43.688 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-11 09:33:43.694 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-11 09:33:43.696 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-11 09:33:43.697 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-11 09:33:43.698 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-11 09:33:43.726 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-11 09:33:43.728 +01:00 [INF] Hosting environment: Development
+2025-03-11 09:33:43.729 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-11 09:33:43.922 +01:00 [INF] Server daniel:19380:6e0ba63e successfully announced in 196.8682 ms
+2025-03-11 09:33:43.930 +01:00 [INF] Server daniel:19380:6e0ba63e is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-11 09:33:44.312 +01:00 [INF] Server daniel:19380:6e0ba63e all the dispatchers started
+2025-03-11 09:33:44.574 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 150.6045 ms
+2025-03-11 09:33:46.275 +01:00 [ERR] An unhandled exception has occurred while executing the request.
+System.Exception: User with Email or UserName 'rzvdaniel@gmail.com' not found!
+   at Automaton.Studio.Server.Services.UsersService.GetUserByEmailOrUserName(String emailOrUserName) in C:\Work\automaton\src\Automaton.Studio.Server\Services\UsersService.cs:line 83
+   at Automaton.Studio.Server.Application.Queries.Handlers.SignInUserQueryHandler.Handle(SignInUserQuery command, CancellationToken cancellationToken) in C:\Work\automaton\src\Automaton.Studio.Server\Application\Queries\Handlers\SignInUserQueryHandler.cs:line 25
+   at Automaton.Studio.Server.Controllers.AccountController.LoginUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken) in C:\Work\automaton\src\Automaton.Studio.Server\Controllers\AccountController.cs:line 79
+   at lambda_method120(Closure, Object)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+2025-03-11 09:33:46.318 +01:00 [ERR] ::1 https localhost:7091 POST /api/account/loginuser responded 500 in 721.4026 ms
+2025-03-11 09:33:46.612 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 2.8617 ms
+2025-03-11 09:33:56.634 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.5414 ms
+2025-03-11 09:34:01.902 +01:00 [INF] Connect to email server smtppro.zoho.eu port 465 ssl True
+2025-03-11 09:34:02.373 +01:00 [INF] Authenticating to email server...
+2025-03-11 09:34:02.676 +01:00 [INF] Sending email...
+2025-03-11 09:34:03.503 +01:00 [INF] Email sent.
+2025-03-11 09:34:03.595 +01:00 [INF] ::1 https localhost:7091 POST /api/account/registeruser responded 201 in 4516.2896 ms
+2025-03-11 09:34:05.573 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 239.1067 ms
+2025-03-11 09:34:05.947 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 190.0342 ms
+2025-03-11 09:34:06.043 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 80.3987 ms
+2025-03-11 09:34:06.173 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 46.7447 ms
+2025-03-11 09:35:25.423 +01:00 [INF] Start installing Hangfire SQL objects...
+2025-03-11 09:35:25.832 +01:00 [INF] Hangfire SQL objects installed.
+2025-03-11 09:35:25.942 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-11 09:35:25.944 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-11 09:35:25.950 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-11 09:35:25.952 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-11 09:35:25.953 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-11 09:35:25.954 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-11 09:35:25.982 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-11 09:35:25.985 +01:00 [INF] Hosting environment: Development
+2025-03-11 09:35:25.996 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-11 09:35:26.088 +01:00 [INF] Server daniel:7436:d93ca912 successfully announced in 105.7437 ms
+2025-03-11 09:35:26.093 +01:00 [INF] Server daniel:7436:d93ca912 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-11 09:35:26.335 +01:00 [INF] Server daniel:7436:d93ca912 all the dispatchers started
+2025-03-11 09:35:26.646 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 200.4548 ms
+2025-03-11 09:35:27.319 +01:00 [ERR] An unhandled exception has occurred while executing the request.
+System.Exception: User with Email or UserName 'rzvdaniel@gmail.com' not found!
+   at Automaton.Studio.Server.Services.UsersService.GetUserByEmailOrUserName(String emailOrUserName) in C:\Work\automaton\src\Automaton.Studio.Server\Services\UsersService.cs:line 83
+   at Automaton.Studio.Server.Application.Queries.Handlers.SignInUserQueryHandler.Handle(SignInUserQuery command, CancellationToken cancellationToken) in C:\Work\automaton\src\Automaton.Studio.Server\Application\Queries\Handlers\SignInUserQueryHandler.cs:line 25
+   at Automaton.Studio.Server.Controllers.AccountController.LoginUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken) in C:\Work\automaton\src\Automaton.Studio.Server\Controllers\AccountController.cs:line 79
+   at lambda_method120(Closure, Object)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+2025-03-11 09:35:27.369 +01:00 [ERR] ::1 https localhost:7091 POST /api/account/loginuser responded 500 in 617.3634 ms
+2025-03-11 09:35:28.682 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 2.3160 ms
+2025-03-11 09:35:38.705 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 401 in 0.3374 ms
+2025-03-11 09:35:39.030 +01:00 [INF] Connect to email server smtppro.zoho.eu port 465 ssl True
+2025-03-11 09:35:39.297 +01:00 [INF] Authenticating to email server...
+2025-03-11 09:35:39.396 +01:00 [INF] Sending email...
+2025-03-11 09:35:41.865 +01:00 [INF] Email sent.
+2025-03-11 09:35:41.953 +01:00 [INF] ::1 https localhost:7091 POST /api/account/registeruser responded 201 in 3874.1022 ms
+2025-03-11 09:35:46.731 +01:00 [INF] ::1 https localhost:7091 POST /api/account/loginuser responded 200 in 226.4529 ms
+2025-03-11 09:35:47.076 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 168.8618 ms
+2025-03-11 09:35:47.158 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 69.2552 ms
+2025-03-11 09:35:47.281 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 44.4072 ms
+2025-03-11 09:35:53.194 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/exists/T responded 404 in 26.3043 ms
+2025-03-11 09:35:53.269 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/exists/T responded 404 in 7.0496 ms
+2025-03-11 09:35:53.363 +01:00 [INF] ::1 https localhost:7091 POST /api/flows responded 201 in 74.0374 ms
+2025-03-11 09:35:54.825 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 7.4539 ms
+2025-03-11 09:35:58.721 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.723 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.724 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.725 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.726 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.727 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.728 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.730 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.731 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.731 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.732 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.733 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.734 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.735 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.736 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.737 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.738 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.739 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.739 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.741 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.743 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.744 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.745 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.746 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.747 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.748 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.749 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.750 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.751 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:35:58.752 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 42.1334 ms
+2025-03-11 09:36:00.754 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.757 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.758 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.760 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.761 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.762 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.763 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.764 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.766 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.767 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.768 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.768 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.769 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.770 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.771 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.772 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.773 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.774 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.776 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.777 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.778 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.779 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.780 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.781 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.782 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.783 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.784 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.785 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.786 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.787 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.788 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.789 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.790 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.791 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.792 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.793 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.794 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.795 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.796 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.797 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.798 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.799 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.800 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.801 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.802 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.803 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.804 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.804 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.805 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.806 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.808 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.809 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.810 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.811 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.812 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.813 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.814 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.815 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.816 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.817 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.819 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.819 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.820 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.821 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.822 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.823 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.824 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.825 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.826 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.827 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.828 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.829 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.830 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.831 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.832 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.833 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.834 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.835 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.836 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.837 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.838 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.839 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.840 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.840 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:36:00.841 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 95.4671 ms
+2025-03-11 09:36:09.049 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 11.1773 ms
+2025-03-11 09:36:14.158 +01:00 [INF] ::1 https localhost:7091 PUT /api/flows/3bedf724-48fd-420f-be5e-1658facbd668 responded 204 in 27.3824 ms
+2025-03-11 09:36:15.509 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 19.5001 ms
+2025-03-11 09:36:15.531 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 3.1978 ms
+2025-03-11 09:36:17.097 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 3.9871 ms
+2025-03-11 09:36:18.933 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 5.2394 ms
+2025-03-11 09:36:19.849 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 21.1804 ms
+2025-03-11 09:36:19.871 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 3.2546 ms
+2025-03-11 09:38:06.243 +01:00 [INF] DB tables already exist. Exit install
+2025-03-11 09:38:06.549 +01:00 [INF] Now listening on: https://localhost:7091
+2025-03-11 09:38:06.551 +01:00 [INF] Now listening on: http://localhost:5091
+2025-03-11 09:38:06.557 +01:00 [INF] Starting Hangfire Server using job storage: 'Server: localhost@automaton.studio'
+2025-03-11 09:38:06.558 +01:00 [INF] Using the following options for SQL Server job storage:
+2025-03-11 09:38:06.559 +01:00 [INF]     Queue poll interval: 00:00:15.
+2025-03-11 09:38:06.560 +01:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2025-03-11 09:38:06.590 +01:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-03-11 09:38:06.591 +01:00 [INF] Hosting environment: Development
+2025-03-11 09:38:06.592 +01:00 [INF] Content root path: C:\Work\automaton\src\Automaton.Studio.Server
+2025-03-11 09:38:06.714 +01:00 [INF] Server daniel:17640:ff265201 successfully announced in 125.167 ms
+2025-03-11 09:38:06.747 +01:00 [INF] Server daniel:17640:ff265201 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2025-03-11 09:38:07.177 +01:00 [INF] Server daniel:17640:ff265201 all the dispatchers started
+2025-03-11 09:38:08.110 +01:00 [INF] ::1 https localhost:7091 GET /api/customsteps responded 200 in 520.4772 ms
+2025-03-11 09:38:08.369 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.372 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.375 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.377 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.378 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.380 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.381 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.385 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.387 +01:00 [INF] Authorization failed. These requirements were not met:
+DenyAnonymousAuthorizationRequirement: Requires an authenticated user.
+2025-03-11 09:38:08.389 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 65.6643 ms
+2025-03-11 09:38:08.415 +01:00 [INF] ::1 https localhost:7091 GET /api/flows responded 200 in 172.6588 ms
+2025-03-11 09:38:08.584 +01:00 [INF] ::1 https localhost:7091 GET /api/runners responded 200 in 50.2665 ms
+2025-03-11 09:38:14.279 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/dashboard/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 91.4732 ms
+2025-03-11 09:38:15.753 +01:00 [INF] ::1 https localhost:7091 GET /api/flows/3bedf724-48fd-420f-be5e-1658facbd668 responded 200 in 22.9926 ms
+2025-03-11 09:38:17.334 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:17.336 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 3.7818 ms
+2025-03-11 09:38:17.694 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 126.0933 ms
+2025-03-11 09:38:19.335 +01:00 [INF] End workflow: T
+2025-03-11 09:38:19.337 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 3.1092 ms
+2025-03-11 09:38:24.936 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 17.8759 ms
+2025-03-11 09:38:25.349 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:25.353 +01:00 [INF] End workflow: T
+2025-03-11 09:38:25.355 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 9.0313 ms
+2025-03-11 09:38:26.592 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 11.7285 ms
+2025-03-11 09:38:27.322 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 7.6936 ms
+2025-03-11 09:38:27.364 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:27.365 +01:00 [INF] End workflow: T
+2025-03-11 09:38:27.366 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:27.367 +01:00 [INF] End workflow: T
+2025-03-11 09:38:27.368 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 5.4269 ms
+2025-03-11 09:38:28.004 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 6.6728 ms
+2025-03-11 09:38:28.710 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 8.6405 ms
+2025-03-11 09:38:29.379 +01:00 [INF] ::1 https localhost:7091 POST /api/flowexecutions responded 200 in 12.7601 ms
+2025-03-11 09:38:29.398 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:29.401 +01:00 [INF] End workflow: T
+2025-03-11 09:38:29.402 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:29.403 +01:00 [INF] End workflow: T
+2025-03-11 09:38:29.404 +01:00 [INF] Start workflow: T
+2025-03-11 09:38:29.405 +01:00 [INF] End workflow: T
+2025-03-11 09:38:29.406 +01:00 [INF] ::1 https localhost:7091 POST /api/clientlogs responded 204 in 8.8588 ms

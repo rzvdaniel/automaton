@@ -14,14 +14,14 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
         private readonly ApplicationDbContext dataContext;
         private readonly IJwtService jwtService;
         private readonly IMediator mediator;
-        private readonly UserManagerService userManagerService;
+        private readonly UsersService userManagerService;
         private readonly ILogger<RefreshAccessTokenQueryHandler> logger;
 
         public RefreshAccessTokenQueryHandler
         (
             ApplicationDbContext dataContext, 
             IJwtService jwtService, IMediator mediator,
-            UserManagerService userManagerService, 
+            UsersService userManagerService, 
             ILogger<RefreshAccessTokenQueryHandler> logger
         )
         {

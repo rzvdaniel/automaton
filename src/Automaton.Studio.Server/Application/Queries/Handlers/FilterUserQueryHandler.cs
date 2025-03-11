@@ -8,10 +8,10 @@ namespace AuthServer.Application.Queries.Handlers
 {
     public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, IEnumerable<UserDetails>>
     {
-        private readonly UserManagerService _userManagerService;
+        private readonly UsersService _userManagerService;
         private readonly IMapper _mapper;
 
-        public FilterUserQueryHandler(UserManagerService userManagerService, IMapper mapper)
+        public FilterUserQueryHandler(UsersService userManagerService, IMapper mapper)
         {
             _userManagerService = userManagerService;
             _mapper = mapper;

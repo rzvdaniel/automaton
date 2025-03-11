@@ -52,6 +52,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+	  <Folder Include="Migrations\MySqlDb\" />
 	  <None Include="Logs\README.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
