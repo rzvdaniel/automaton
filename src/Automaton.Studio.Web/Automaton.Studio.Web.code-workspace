@@ -20,6 +20,9 @@
 		},
 		{
 			"path": "../Automaton.Studio.Desktop"
+		},
+		{
+			"path": "../Automaton.App.Install"
 		}
 	],
 	"settings": {}

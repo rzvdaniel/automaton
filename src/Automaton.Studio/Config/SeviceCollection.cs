@@ -42,6 +42,7 @@ public static class SeviceCollection
     {
         var configService = new Services.ConfigurationService(configuration);
 
+        services.AddInstallApp(configuration);
         services.AddAccountApp(configuration);
         services.AddAuthenticationApp(configuration);
 

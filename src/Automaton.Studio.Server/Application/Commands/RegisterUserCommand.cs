@@ -3,24 +3,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Automaton.Studio.Server.Core.Commands
 {
-    public class RegisterUserCommand
+    public class InstallCommand
     {
         [Required(ErrorMessage = "Name is mandatory")]
-        public string? Name { get; }
+        public string? Name { get; set; }
 
         [Required(ErrorMessage = "Email address is mandatory")]
         [EmailAddress(ErrorMessage = "Invalid email address")]
-        public string? Email { get; }
+        public string? Email { get; set; }
 
         [Required(ErrorMessage = "Password is mandatory")]
-        public string? Password { get; }
-
-        [JsonConstructor]
-        public RegisterUserCommand(string name, string email, string password)
-        {
-            Name = name;
-            Email = email;
-            Password = password;
-        }
+        public string? Password { get; set; }
     }
 }

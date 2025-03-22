@@ -72,7 +72,10 @@ services.AddHttpClient();
 services.AddRazorPages();
 services.AddServerSideBlazor();
 services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
-services.AddControllers();
+services.AddControllers(options =>
+{
+    options.Filters.Add<GlobalExceptionFilter>();
+});
 
 services.AddTransient<UserNameEnricher>();
 services.AddHttpContextAccessor();
@@ -123,6 +126,7 @@ services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<EmailService>();
+services.AddScoped<InstallService>();
 services.AddTransient<UsersService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();
