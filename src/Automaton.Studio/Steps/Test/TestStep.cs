@@ -11,7 +11,8 @@ namespace Automaton.Studio.Steps.Test;
     Category = "Test",
     Description = "Container for testing if functionality behaves as intended",
     MoreInfo = "https://www.automaton.studio/documentation",
-    Icon = "schedule"
+    Icon = "schedule",
+    VisibleInExplorer = false
 )]
 public class TestStep : SequenceStep
 {    

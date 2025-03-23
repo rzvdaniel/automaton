@@ -10,7 +10,8 @@ namespace Automaton.Studio.Steps.TestAssert;
     Category = "Test",
     Description = "Evaluate conditional expression and record its result",
     MoreInfo = "https://www.automaton.studio/documentation",
-    Icon = "schedule"
+    Icon = "schedule",
+    VisibleInExplorer = false
 )]
 public class TestAssertStep : StudioStep
 {

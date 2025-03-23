@@ -1,7 +1,6 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Attributes;
 using Automaton.Studio.Domain;
-using Automaton.Studio.Events;
 using Automaton.Studio.Resources;
 
 namespace Automaton.Studio.Steps.TestReport;
@@ -13,7 +12,8 @@ namespace Automaton.Studio.Steps.TestReport;
     Category = "Test",
     Description = "Generates a report based on flow tests",
     MoreInfo = "https://www.automaton.studio/documentation",
-    Icon = "profile"
+    Icon = "profile",
+    VisibleInExplorer = false
 )]
 public class TestReportStep : StudioStep
 {
