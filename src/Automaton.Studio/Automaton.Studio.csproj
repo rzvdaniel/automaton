@@ -71,7 +71,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Update="Pages\FlowDesigner\FlowDashboard.razor">
+    <Content Update="Pages\FlowDesigner\FlowSettings.razor">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
     <Content Update="Steps\Custom\CustomDesigner.razor">

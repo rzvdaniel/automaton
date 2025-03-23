@@ -54,15 +54,15 @@ namespace Automaton.Studio.Shared
         }
 
         private static bool IsFlowMenu(string uri) =>
-            uri.Contains("flow/dashboard") ||
+            uri.Contains("flow/settings") ||
             uri.Contains("flow/designer") ||
             uri.Contains("flow/activity") ||
             uri.Contains("flow/schedule");
 
         private static string GetPage(string uri)
         {
-            if (uri.Contains("flow/dashboard"))
-                return "flow/dashboard";
+            if (uri.Contains("flow/settings"))
+                return "flow/settings";
             if (uri.Contains("flow/designer"))
                 return "flow/designer";
             else if (uri.Contains("flow/activity"))

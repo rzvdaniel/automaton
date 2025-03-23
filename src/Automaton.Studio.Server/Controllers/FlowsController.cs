@@ -75,10 +75,10 @@ public class FlowsController : BaseController
         return exists ? Ok(exists) : NotFound();
     }
 
-    [HttpGet("dashboard/{id}")]
-    public ActionResult<FlowDashboard> Dashboard(Guid id)
+    [HttpGet("settings/{id}")]
+    public ActionResult<FlowSettings> Dashboard(Guid id)
     {
-        var flow = flowsService.GetDashboard(id);
+        var flow = flowsService.GetSettings(id);
 
         if (flow is null)
         {

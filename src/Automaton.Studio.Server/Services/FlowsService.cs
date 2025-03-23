@@ -133,11 +133,11 @@ public class FlowsService
         return result;
     }
 
-    public FlowDashboard GetDashboard(Guid id)
+    public FlowSettings GetSettings(Guid id)
     {
         var flow = Get(id);
 
-        var dashboard = new FlowDashboard
+        var settings = new FlowSettings
         {
             Id = flow.Id,
             Name = flow.Name,
@@ -145,7 +145,7 @@ public class FlowsService
             Updated = flow.Updated,
         };
 
-        return dashboard;
+        return settings;
     }
 
     private static Flow DeserializeFlow(string jsonFlow)

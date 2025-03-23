@@ -3,14 +3,14 @@ using Automaton.Studio.Models;
 
 namespace Automaton.Studio.Services;
 
-public class FlowDashboardService
+public class FlowSettingsService
 {
     private HttpClient httpClient;
     private readonly ConfigurationService configService;
     private readonly IMapper mapper;
     private readonly ILogger logger;
 
-    public FlowDashboardService
+    public FlowSettingsService
     (
         ConfigurationService configService,
         IMapper mapper,
@@ -23,15 +23,15 @@ public class FlowDashboardService
         this.mapper = mapper;
     }
 
-    public async Task<FlowDashboard> GetDashboardDetails(Guid flowId)
+    public async Task<FlowSettings> GetDashboardDetails(Guid flowId)
     {
         try
         {
-            var result = await httpClient.GetAsync($"{configService.FlowsUrl}/dashboard/{flowId}");
+            var result = await httpClient.GetAsync($"{configService.FlowsUrl}/settings/{flowId}");
 
             result.EnsureSuccessStatusCode();
 
-            var dashboardResult = await result.Content.ReadAsAsync<FlowDashboard>();
+            var dashboardResult = await result.Content.ReadAsAsync<FlowSettings>();
 
             return dashboardResult;
         }

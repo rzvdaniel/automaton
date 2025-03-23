@@ -43,7 +43,7 @@ namespace Automaton.Studio.Pages.Flows
 
         private void EditFlow(Guid id, string name)
         {
-            NavigationManager.NavigateTo($"flow/dashboard/{id}/{name}");
+            NavigationManager.NavigateTo($"flow/designer/{id}/{name}");
         }
 
         private async Task DeleteFlow(Guid id)

@@ -1,12 +1,11 @@
 ﻿using AutoMapper;
-using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Pages.Runners;
 
-public class FlowDashboardViewModel
+public class FlowSettingsViewModel
 {
-    private readonly FlowDashboardService flowDashboardService;
+    private readonly FlowSettingsService flowDashboardService;
     private readonly IMapper mapper;
 
     public Guid Id { get; set; }
@@ -14,9 +13,9 @@ public class FlowDashboardViewModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
-    public FlowDashboardViewModel
+    public FlowSettingsViewModel
     (
-        FlowDashboardService flowDashboardService,
+        FlowSettingsService flowDashboardService,
         IMapper mapper
     )
     {
