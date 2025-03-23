@@ -84,15 +84,37 @@ Serilog.Debugging.SelfLog.Enable(Console.Out);
 
 applicationBuilder.Host.UseSerilog((context, services, config) =>
     config.Destructure.UsingAttributes()
-    .ReadFrom.Configuration(configurationBuilder)
-    .Destructure.JsonNetTypes()
-    .Enrich.With<EventTypeEnricher>()
-    .Enrich.With(services.GetService<UserNameEnricher>())
-    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .WriteTo.Conditional(evt => configurationService.IsDatabaseTypeMySql(),
-        wt => wt.MariaDB(
-            connectionString: configurationManager.GetConnectionString("MySqlConnection"),
-            tableName: "Logs"))
+          .Destructure.JsonNetTypes()
+          .Enrich.With<EventTypeEnricher>()
+          .Enrich.With(services.GetService<UserNameEnricher>())
+          .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+          .WriteTo.MariaDB(
+              connectionString: configurationManager.GetConnectionString("MySqlConnection"),
+              tableName: "Logs",
+              autoCreateTable: true,
+              useBulkInsert: true,
+              restrictedToMinimumLevel: LogEventLevel.Information,
+              batchPostingLimit: 1000,
+              period: TimeSpan.FromSeconds(30),
+              options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
+              {
+                  PropertiesToColumnsMapping = new Dictionary<string, string>
+                  {
+                      { "Exception", "Exception" },
+                      { "Level", "Level" },
+                      { "Message", "Message" },
+                      { "MessageTemplate", "MessageTemplate" },
+                      { "Properties", "Properties" },
+                      { "Timestamp", "Timestamp" },
+                      { "EventType", "EventType" },
+                      { "UserName", "UserName" }
+                  },
+                  TimestampInUtc = true,
+                  ExcludePropertiesWithDedicatedColumn = false,
+                  EnumsAsInts = false,
+                  LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
+                  LogRecordsExpiration = TimeSpan.FromDays(31)
+              })
 );
 
 services.AddHangfire(x =>
