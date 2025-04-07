@@ -1,0 +1,42 @@
+@using Blazored.FluentValidation;
+
+@inherits FeedbackComponent<WhileStep>
+
+<StepProperties Step="@step">
+
+    <Form @ref="form"
+          Model="@step"
+          LabelColSpan="4"
+          WrapperColSpan="20">
+        <Validator>
+            <FluentValidationValidator @ref="fluentValidationValidator" />
+        </Validator>
+
+        <ChildContent>
+            <FormItem Label="Condition">
+                <Input @bind-Value="@context.Condition" Placeholder="Enter condition" />
+            </FormItem>
+        </ChildContent>
+    </Form>
+
+</StepProperties>
+
+@code {
+    private WhileStep step;
+    private Form<WhileStep> form;
+    private FluentValidationValidator fluentValidationValidator;
+
+    protected override void OnInitialized()
+    {
+        step = this.Options;
+        base.OnInitialized();
+    }
+
+    public override async Task OnFeedbackOkAsync(ModalClosingEventArgs args)
+    {
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+
+        args.Cancel = !fluentValidationValidator.Validate(options => options.IncludeAllRuleSets());
+    }
+}

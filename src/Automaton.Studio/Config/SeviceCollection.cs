@@ -27,6 +27,7 @@ using Automaton.Studio.Steps.Sequence;
 using Automaton.Studio.Steps.Test;
 using Automaton.Studio.Steps.TestAssert;
 using Automaton.Studio.Steps.TestReport;
+using Automaton.Studio.Steps.While;
 using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -106,6 +107,7 @@ public static class SeviceCollection
         services.AddTransient<SequenceStep>();
         services.AddTransient<SequenceEndStep>();
         services.AddTransient<IfStep>();
+        services.AddTransient<WhileStep>();
         services.AddTransient<Steps.Custom.CustomStep>();
 
         // Models
