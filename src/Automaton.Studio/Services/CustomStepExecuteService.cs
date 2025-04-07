@@ -84,9 +84,9 @@ public class CustomStepExecuteService : IDisposable
 
         foreach (var variable in step.OutputVariables)
         {
-            if (scriptVariables.ContainsKey(variable.Id))
+            if (scriptVariables.ContainsKey(variable.Name))
             {
-                variable.Value = scriptVariables[variable.Id].ToString();
+                variable.Value = scriptVariables[variable.Name].ToString();
             }
         }
     }
