@@ -5,6 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Automaton.Studio.Web",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Automaton.Studio.Web/bin/Debug/net8.0/Automaton.Studio.Web.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Automaton.Studio.Web",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on: (https?://\\S+)"
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Launch Automaton.Studio.Server",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Automaton.Studio.Server/bin/Debug/net8.0/Automaton.Studio.Server.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Automaton.Studio.Server",
+            "stopAtEntry": false
+        },
+        {
             "name": "Python Debugger: Current File with Arguments",
             "type": "debugpy",
             "request": "launch",
@@ -12,6 +37,15 @@
             "console": "integratedTerminal",
             "args": [
                 "${command:pickArgs}"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Launch Studio Web + Server",
+            "configurations": [
+                "Launch Automaton.Studio.Web",
+                "Launch Automaton.Studio.Server"
             ]
         }
     ]

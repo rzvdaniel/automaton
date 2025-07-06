@@ -1,10 +1,12 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
+using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Services;
+using MediatR;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace Automaton.Studio.Factories;
 
@@ -12,17 +14,19 @@ public class StepFactory
 {
     private const string StepsAssembly = "Automaton.Studio";
 
+    private readonly IMediator mediator;
     private readonly IServiceProvider serviceProvider;
     private readonly CustomStepsService customStepsService;
     private readonly StepTypeDescriptor stepTypeDescriptor;
     private readonly IDictionary<string, StepExplorerModel> explorerSteps = new Dictionary<string, StepExplorerModel>();
     private readonly IDictionary<string, Type> solutionTypes = new Dictionary<string, Type>();
 
-    public StepFactory(StepTypeDescriptor stepTypeDescriptor, IServiceProvider serviceProvider, CustomStepsService customStepsService)
+    public StepFactory(StepTypeDescriptor stepTypeDescriptor, IServiceProvider serviceProvider, CustomStepsService customStepsService, IMediator mediator)
     {
         this.serviceProvider = serviceProvider;
         this.stepTypeDescriptor = stepTypeDescriptor;
         this.customStepsService = customStepsService;
+        this.mediator = mediator;
 
         LoadSteps();
     }
@@ -70,6 +74,32 @@ public class StepFactory
         step.Created();
 
         return step;
+    }
+
+    public void AddStepToExplorer(CustomStep customStep)
+    {
+        var customSteps = Task.Run(customStepsService.List).Result;
+
+        AddExplorerCategory(customStep.Category);
+
+        var explorerStep = CreateCustomStepExplorerModel(customStep);
+
+        var categoryStep = explorerSteps[customStep.Category];
+        categoryStep.AddStep(explorerStep);
+    }
+
+    public void RemoveStepFromExplorer(Guid id)
+    {
+        foreach (var category in explorerSteps.Values)
+        {
+            var stepToRemove = category.Steps.FirstOrDefault(step => step.Id == id);
+
+            if (stepToRemove != null)
+            {
+                category.Steps.Remove(stepToRemove);
+                break;
+            }
+        }
     }
 
     public StudioStep CreateStep(Step step, StudioDefinition activeDefinition)
@@ -190,6 +220,7 @@ public class StepFactory
     {
         var stepExplorerModel = new CustomStepExplorerModel
         {
+            Id = customStep.Id,
             Name = customStep.Name,
             Type = customStep.Type,
             Description = customStep.Description,

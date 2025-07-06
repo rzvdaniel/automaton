@@ -12,6 +12,8 @@ public class CustomStepsService
     private readonly IMapper mapper;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
+    private const string DefaultIcon = "user";
+    private const string DefaultGroup = "My Steps";
 
     public CustomStepsService
     (
@@ -48,12 +50,12 @@ public class CustomStepsService
         {
             Id = Guid.NewGuid(),
             Name = step.Name,
-            DisplayName = step.DisplayName,
-            Description = step.Description,
-            Icon = step.Icon,
-            Category = step.Category,
+            Icon = DefaultIcon,
+            Category = DefaultGroup,
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
+            DisplayName = string.Empty,
+            Description = string.Empty,
             MoreInfo = string.Empty,
             Definition = JsonSerializer.Serialize(new CustomStepDefinition())
         };

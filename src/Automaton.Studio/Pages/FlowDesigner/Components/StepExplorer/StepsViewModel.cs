@@ -1,5 +1,4 @@
 ﻿using AntDesign;
-using AutoMapper;
 using Automaton.Studio.Factories;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -10,7 +9,6 @@ public class StepsViewModel : INotifyPropertyChanged
 {
     private readonly DesignerViewModel designerViewModel;
     private readonly StepFactory stepFactory;
-    private readonly IMapper mapper;
 
     private IEnumerable<StepExplorerModel> steps;
     public IEnumerable<StepExplorerModel> Steps
@@ -24,12 +22,8 @@ public class StepsViewModel : INotifyPropertyChanged
         }
     }
 
-    public StepsViewModel(
-        DesignerViewModel designerViewModel,
-        StepFactory stepFactory,
-        IMapper mapper)
+    public StepsViewModel(DesignerViewModel designerViewModel, StepFactory stepFactory)
     {
-        this.mapper = mapper;
         this.designerViewModel = designerViewModel;
         this.stepFactory = stepFactory;
     }

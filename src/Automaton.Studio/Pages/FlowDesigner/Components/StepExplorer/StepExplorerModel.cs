@@ -3,7 +3,8 @@
 public class StepExplorerModel
 {
     private const string DefaultIcon = "file";
-
+    
+    public Guid Id { get; set; }
     public string Name { get; set; }
     public string DisplayName { get; set; }
     public string Type { get; set; }
