@@ -22,7 +22,7 @@ public class CustomStepsViewModel(CustomStepsService customStepsService, StepFac
         var customStepModel = mapper.Map<CustomStepListItem>(step);
         CustomSteps.Add(customStepModel);
 
-        stepFactory.AddStepToExplorer(step);
+        stepFactory.AddCustomStep(step);
     }
 
     public async Task DeleteCustomStep(Guid id)

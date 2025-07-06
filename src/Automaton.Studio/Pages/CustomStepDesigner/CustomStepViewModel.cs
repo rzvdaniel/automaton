@@ -1,5 +1,6 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
+using Automaton.Studio.Factories;
 using Automaton.Studio.Services;
 using System.Text;
 
@@ -7,6 +8,7 @@ namespace Automaton.Studio.Pages.CustomStepDesigner;
 
 public class CustomStepViewModel : IDisposable
 {
+    private StepFactory stepFactory;
     private readonly CustomStepsService customStepsService;
     private readonly CustomStepExecuteService customStepExecuteService;
     private CustomStepDefinition CustomStepDefinition => CustomStep.Definition;
@@ -16,8 +18,9 @@ public class CustomStepViewModel : IDisposable
 
     public event EventHandler ScriptTextWritten;
 
-    public CustomStepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService)
+    public CustomStepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory)
     {
+        this.stepFactory = stepFactory;
         this.customStepsService = customStepsService;
         this.customStepExecuteService = customStepExecuteService;
         customStepExecuteService.ScriptTextWritten += OnNewScriptText;
@@ -31,6 +34,8 @@ public class CustomStepViewModel : IDisposable
     public async Task Save()
     {
         await customStepsService.Update(CustomStep);
+
+        stepFactory.UpdateCustomStep(CustomStep);
     }
 
     public void Execute()

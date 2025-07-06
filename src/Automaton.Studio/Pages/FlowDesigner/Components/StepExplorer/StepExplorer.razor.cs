@@ -8,7 +8,6 @@ partial class StepExplorer : ComponentBase
     private StepsViewModel StepsViewModel { get; set; } = default!;
 
     private string searchText;
-    private bool hideUnmatched;
 
     protected override async Task OnInitializedAsync()
     {

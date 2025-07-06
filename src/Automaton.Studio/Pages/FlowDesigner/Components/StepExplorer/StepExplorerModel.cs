@@ -14,8 +14,9 @@ public class StepExplorerModel
     public string Category { get; set; }
     public bool VisibleInExplorer { get; set; }
     public bool IsCustomStep { get; set; }
+    public string Title => string.IsNullOrEmpty(DisplayName) ? Name : DisplayName;
 
-    public IList<StepExplorerModel> Steps { get; set; } = new List<StepExplorerModel>();
+    public List<StepExplorerModel> Steps { get; set; } = [];
 
     public StepExplorerModel()
     {

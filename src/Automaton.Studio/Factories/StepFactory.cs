@@ -1,12 +1,9 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
-using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Services;
-using MediatR;
 using System.Reflection;
-using System.Threading;
 
 namespace Automaton.Studio.Factories;
 
@@ -76,18 +73,6 @@ public class StepFactory
         return step;
     }
 
-    public void AddStepToExplorer(CustomStep customStep)
-    {
-        var customSteps = Task.Run(customStepsService.List).Result;
-
-        AddExplorerCategory(customStep.Category);
-
-        var explorerStep = CreateCustomStepExplorerModel(customStep);
-
-        var categoryStep = explorerSteps[customStep.Category];
-        categoryStep.AddStep(explorerStep);
-    }
-
     public void RemoveStepFromExplorer(Guid id)
     {
         foreach (var category in explorerSteps.Values)
@@ -127,7 +112,7 @@ public class StepFactory
     }
 
     private void LoadSteps()
-    {        
+    {
         LoadAssemblySteps();
 
         LoadCustomSteps();
@@ -153,12 +138,7 @@ public class StepFactory
 
         foreach (var customStep in customSteps)
         {
-            AddExplorerCategory(customStep.Category);
-
-            var explorerStep = CreateCustomStepExplorerModel(customStep);
-
-            var category = explorerSteps[customStep.Category];
-            category.Steps.Add(explorerStep);
+            AddCustomStep(customStep);
         }
     }
 
@@ -197,6 +177,24 @@ public class StepFactory
                 category.Steps.Add(explorerStep);
             }
         }
+    }
+
+    public void AddCustomStep(CustomStep customStep)
+    {
+        AddExplorerCategory(customStep.Category);
+
+        var explorerStep = CreateCustomStepExplorerModel(customStep);
+
+        var category = explorerSteps[customStep.Category];
+        category.Steps.Add(explorerStep);
+    }
+
+    public void UpdateCustomStep(CustomStep customStep)
+    {
+        var explorerCategory = explorerSteps[customStep.Category];
+        var steps = explorerCategory.Steps;
+        var index = steps.FindIndex(x => x.Id == customStep.Id);
+        steps[index] = CreateCustomStepExplorerModel(customStep);
     }
 
     private static StepExplorerModel CreateStepExplorerModel(StepDescriptor stepDescriptor)
