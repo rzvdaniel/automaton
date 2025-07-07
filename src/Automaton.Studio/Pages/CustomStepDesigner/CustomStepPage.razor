@@ -54,33 +54,76 @@
 
             <ChildContent>
                 <Tabs>
-                    <TabPane Tab="Details" Key="1">
-                        <Row Gutter="(16, 0)" Justify="left">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Name">
-                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Display Name">
-                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
-                            </FormItem>
-                            </Col>
-                        </Row>
+                    <TabPane Tab="Code" Key="1">
+                        <Form @ref="codeForm"
+                              Model="@StepDesignerViewModel.CustomStep"
+                              Class="code-form"
+                              Layout="@FormLayout.Vertical"
+                              LabelColSpan="24"
+                              WrapperColSpan="24">
 
-                        <Row Gutter="(16, 0)" Justify="left">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Description">
-                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="More info URL">
-                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter description" />
-                            </FormItem>
-                            </Col>
-                        </Row>
-                    </TabPane>
+                            <Validator>
+                                <FluentValidationValidator />
+                                <ValidationSummary />
+                            </Validator>
+
+                            <ChildContent Context="codeContext">
+                                <Row Gutter="(16, 0)">
+                                    <Col Md="12">
+                                     <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
+                                     <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
+                                     </Col>
+                                     <Col Md="12">
+                                     <Row>
+                                         <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
+                                             Run
+                                         </Button>
+                                     </Row>
+                                     <Row>
+                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
+                                             <Panel Key="1">
+                                                 <HeaderTemplate>
+                                                     <b>Test Input Variables</b>
+                                                 </HeaderTemplate>
+                                                 <ChildContent>
+                                                     <div class="scrollable-list">
+                                                        @foreach(var inputVariable in @codeContext.Definition.CodeInputVariables)
+                                                        {
+                                                            <div class="variable">
+                                                                <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                            </div>
+                                                        }  
+                                                     </div>
+                                                 </ChildContent>
+                                             </Panel>
+                                         </Collapse>
+                                     </Row>
+
+                                     <Row>
+                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
+                                             <Panel Key="1">
+                                                 <HeaderTemplate>
+                                                     <b>Test Output Variables</b>
+                                                 </HeaderTemplate>
+                                                 <ChildContent>
+                                                    <div class="scrollable-list">
+                                                        @foreach (var outputVariable in @codeContext.Definition.CodeOutputVariables)
+                                                        {
+                                                            <div class="variable">
+                                                                <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                 </ChildContent>
+                                             </Panel>
+                                         </Collapse>
+                                     </Row>
+                                     </Col>
+                                 </Row>
+                             </ChildContent>
+                         </Form>
+
+                     </TabPane>
 
                     <TabPane Tab="Input Variables" Key="2">
                         <Space Direction="DirectionVHType.Vertical">
@@ -209,78 +252,7 @@
                         </Space>
                     </TabPane>
 
-                    <TabPane Tab="Code" Key="4">
-                        <Form @ref="codeForm"
-                              Model="@StepDesignerViewModel.CustomStep"
-                              Class="code-form"
-                              Layout="@FormLayout.Vertical"
-                              LabelColSpan="24"
-                              WrapperColSpan="24">
-
-                            <Validator>
-                                <FluentValidationValidator />
-                                <ValidationSummary />
-                            </Validator>
-
-                            <ChildContent Context="codeContext">
-                                <Row Gutter="(16, 0)">
-                                    <Col Md="12">
-                                     <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
-                                     <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                     </Col>
-                                     <Col Md="12">
-                                     <Row>
-                                         <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
-                                             Run
-                                         </Button>
-                                     </Row>
-                                     <Row>
-                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-                                             <Panel Key="1">
-                                                 <HeaderTemplate>
-                                                     <b>Test Input Variables</b>
-                                                 </HeaderTemplate>
-                                                 <ChildContent>
-                                                     <div class="scrollable-list">
-                                                        @foreach(var inputVariable in @codeContext.Definition.CodeInputVariables)
-                                                        {
-                                                            <div class="variable">
-                                                                <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
-                                                            </div>
-                                                        }  
-                                                     </div>
-                                                 </ChildContent>
-                                             </Panel>
-                                         </Collapse>
-                                     </Row>
-
-                                     <Row>
-                                         <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-                                             <Panel Key="1">
-                                                 <HeaderTemplate>
-                                                     <b>Test Output Variables</b>
-                                                 </HeaderTemplate>
-                                                 <ChildContent>
-                                                    <div class="scrollable-list">
-                                                        @foreach (var outputVariable in @codeContext.Definition.CodeOutputVariables)
-                                                        {
-                                                            <div class="variable">
-                                                                <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
-                                                            </div>
-                                                        }
-                                                    </div>
-                                                 </ChildContent>
-                                             </Panel>
-                                         </Collapse>
-                                     </Row>
-                                     </Col>
-                                 </Row>
-                             </ChildContent>
-                         </Form>
-
-                     </TabPane>
-
-                    <TabPane Tab="AI" Key="5">
+                    <TabPane Tab="AI" Key="4">
                         <Form @ref="codeForm"
                               Model="@StepDesignerViewModel.CustomStep"
                               Class="code-form"
@@ -310,6 +282,61 @@
                             </ChildContent>
                         </Form>
 
+
+                      <TabPane Tab="Details" Key="5"></TabPane>
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Name">
+                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Display Name">
+                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
+                            </FormItem>
+                            </Col>
+                        </Row>
+
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Description">
+                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="More info URL">
+                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter more info" />
+                            </FormItem>
+                            </Col>
+                        </Row>
+                    </TabPane>
+
+                    <TabPane Tab="Details" Key="5">
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Name">
+                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Display Name">
+                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
+                            </FormItem>
+                            </Col>
+                        </Row>
+
+                        <Row Gutter="(16, 0)" Justify="left">
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="Description">
+                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
+                            </FormItem>
+                            </Col>
+                            <Col Xs="24" Md="6">
+                            <FormItem Label="More info URL">
+                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter more info" />
+                            </FormItem>
+                            </Col>
+                        </Row>
                     </TabPane>
                 </Tabs>
             </ChildContent>

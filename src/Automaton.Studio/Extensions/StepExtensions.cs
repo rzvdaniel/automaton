@@ -1,6 +1,5 @@
 ﻿using AntDesign;
 using Automaton.Studio.Domain;
-using System.Threading.Tasks;
 
 namespace Automaton.Studio.Extensions;
 
@@ -15,7 +14,7 @@ public static class StepExtensions
     {
         var modalConfig = new ModalOptions
         {
-            Title = step.DisplayName
+            Title = step.Title
         };
 
         // 1. Select the method to be executed

@@ -44,6 +44,8 @@ public abstract class StudioStep : INotifyPropertyChanged
 
     public bool IsExecuting { get; private set; }
 
+    public string Title => string.IsNullOrEmpty(DisplayName) ? Name : DisplayName;
+
     public IDictionary<string, StepVariable> Inputs { get; set; } = new Dictionary<string, StepVariable>();
 
     public IDictionary<string, StepVariable> Outputs { get; set; } = new Dictionary<string, StepVariable>();
