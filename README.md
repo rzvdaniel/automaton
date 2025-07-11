@@ -1,6 +1,6 @@
 # Automaton
 
-Automaton is an RPA application which helps automate software tasks.
+Automaton is an application which helps automate software tasks.
 
 ## Updates
 
