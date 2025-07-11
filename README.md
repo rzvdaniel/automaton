@@ -4,17 +4,16 @@ Automaton is an RPA application which helps automate software tasks.
 
 ## Updates
 
-15/10/2023 
+11/07/2025 
 The project is still in early stage, but it's getting close to the alpha version. A demo website will be deployed to showcase the core functionality.
 
 Until then, here are are few of the intended capabilities:
-- create and debug flows
-- deploy runner desktop applications on Windows machines to execute scheduled flows (intention is to add capability for Linux)
-- create custom steps written in Python (big thing because it makes the application extendable)
+- create flows
+- add custom steps written in Python
 - execute flows anywhere you have a working runner
-- comes with basic logic steps like programming conditionals, logic loops, HTTP requests, sending email (more will be added on the fly)
+- add basic logic steps like conditionals, logic loops, HTTP requests (more will be added on the fly)
 
-The application can be installed on favourite web server that supports .NET 7/Blazor. Persistency happens in MySQL databases but will hopefully support MSSQL and others as well.
+The application can be installed on favourite web server that supports .NET 7/Blazor, persistency uses MySQL.
 
 ## Screenshots
 
