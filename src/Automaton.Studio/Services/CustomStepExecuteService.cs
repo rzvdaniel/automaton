@@ -7,8 +7,6 @@ namespace Automaton.Studio.Services;
 
 public class CustomStepExecuteService : IDisposable
 {
-    private const string ScriptType = @"text/x-python";
-
     private readonly IMediator mediator;
     private readonly IMapper mapper;
     private readonly ILogger logger;
@@ -72,9 +70,16 @@ public class CustomStepExecuteService : IDisposable
 
     protected void ExecuteAsync(CustomStep step)
     {
+        var contentType = step.Definition.Language switch
+        {
+            CustomStepLanguage.Python => "text/x-python",
+            CustomStepLanguage.Batch => "text/x-batch",
+            _ => "text/x-python"
+        };
+
         var resource = new ScriptResource()
         {
-            ContentType = ScriptType,
+            ContentType = contentType,
             Content = step.Code
         };
 

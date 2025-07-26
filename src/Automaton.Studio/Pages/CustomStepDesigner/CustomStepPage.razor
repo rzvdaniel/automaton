@@ -70,6 +70,18 @@
                             <ChildContent Context="codeContext">
                                 <Row Gutter="(16, 0)">
                                     <Col Md="12">
+                                    
+                                    <!-- Language Dropdown: Add here -->
+                                    <FormItem Label="Script Language">
+                                        <InputSelect @bind-Value="codeContext.Definition.Language">
+                                            @foreach (var lang in Enum.GetValues<Automaton.Steps.CustomStepLanguage>())
+                                            {
+                                                <option value="@lang">@lang</option>
+                                            }
+                                        </InputSelect>
+                                    </FormItem>
+                                    <!-- End Language Dropdown -->
+
                                      <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
                                      <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
                                      </Col>
@@ -252,38 +264,7 @@
                         </Space>
                     </TabPane>
 
-                    <TabPane Tab="AI" Key="4">
-                        <Form @ref="codeForm"
-                              Model="@StepDesignerViewModel.CustomStep"
-                              Class="code-form"
-                              Layout="@FormLayout.Vertical"
-                              LabelColSpan="24"
-                              WrapperColSpan="24">
-
-                            <Validator>
-                                <FluentValidationValidator />
-                                <ValidationSummary />
-                            </Validator>
-
-                            <ChildContent Context="codeContext">
-                                <Row Gutter="(16, 0)">
-                                    <Col Md="12">
-                                    <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
-                                    <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
-                                        Generate
-                                    </Button>
-                                    </Col>
-                                    <Col Md="12">
-                                    <Row>
-                                        <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                    </Row>
-                                    </Col>
-                                </Row>
-                            </ChildContent>
-                        </Form>
-
-
-                      <TabPane Tab="Details" Key="5"></TabPane>
+                    <TabPane Tab="Settings" Key="4">
                         <Row Gutter="(16, 0)" Justify="left">
                             <Col Xs="24" Md="6">
                             <FormItem Label="Name">
@@ -311,33 +292,6 @@
                         </Row>
                     </TabPane>
 
-                    <TabPane Tab="Details" Key="5">
-                        <Row Gutter="(16, 0)" Justify="left">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Name">
-                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Display Name">
-                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
-                            </FormItem>
-                            </Col>
-                        </Row>
-
-                        <Row Gutter="(16, 0)" Justify="left">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Description">
-                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="More info URL">
-                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter more info" />
-                            </FormItem>
-                            </Col>
-                        </Row>
-                    </TabPane>
                 </Tabs>
             </ChildContent>
         </Form>

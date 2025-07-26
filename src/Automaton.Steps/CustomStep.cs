@@ -13,6 +13,8 @@ public class CustomStep : WorkflowStep
     [IgnorePropertyParsing(true)]
     public string? Code { get; set; }
 
+    public CustomStepLanguage Language { get; set; } = CustomStepLanguage.Python;
+
     public IList<StepVariable> CodeInputVariables { get; set; }
 
     public CustomStep(ScriptEngineHost scriptHost)

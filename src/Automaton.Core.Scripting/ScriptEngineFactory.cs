@@ -2,38 +2,37 @@
 using Microsoft.Scripting.Hosting;
 using System.Text;
 
-namespace Automaton.Core.Scripting;
-
-public class ScriptEngineFactory
+namespace Automaton.Core.Scripting
 {
-    private const string PythonScrypt = @"text/x-python";
-
-    private readonly Dictionary<string, ScriptRuntime> runtimes;
-    private readonly Dictionary<string, ScriptEngine> engines;
-
-    public EventRaisingStreamWriter EventRaisingStreamWriter { get; set; }
-
-    public ScriptEngineFactory()
+    public class ScriptEngineFactory
     {
-        EventRaisingStreamWriter = new EventRaisingStreamWriter();
+        private const string PythonScrypt = @"text/x-python";
+        private const string BatchScript = @"text/x-batch";
 
-        runtimes = new()
+        private readonly Dictionary<string, ScriptRuntime> runtimes;
+        private readonly Dictionary<string, IScriptEngine> engines;
+
+        public EventRaisingStreamWriter EventRaisingStreamWriter { get; set; }
+
+        public ScriptEngineFactory()
         {
-            [PythonScrypt] = Python.CreateRuntime(),
-        };
+            EventRaisingStreamWriter = new EventRaisingStreamWriter();
 
-        // Changes to the Shared IO are not picked up 
-        // Workaround is to call SetOutput before creating of the engine
-        // https://github.com/IronLanguages/ironpython3/issues/961
-        runtimes[PythonScrypt].IO.SetOutput(EventRaisingStreamWriter, Encoding.ASCII);
+            runtimes = new()
+            {
+                [PythonScrypt] = Python.CreateRuntime(),
+            };
 
-        engines = new()
-        {
-            [PythonScrypt] = Python.GetEngine(runtimes[PythonScrypt])
-        };
+            // Workaround for IronPython output
+            runtimes[PythonScrypt].IO.SetOutput(EventRaisingStreamWriter, Encoding.ASCII);
+
+            engines = new()
+            {
+                [PythonScrypt] = new PythonScriptEngine(Python.GetEngine(runtimes[PythonScrypt])),
+                [BatchScript] = new BatchScriptEngine()
+            };
+        }
+
+        public IScriptEngine GetEngine(string contentType) => engines[contentType];
     }
-
-    public ScriptEngine GetEngine(string contentType) => engines[contentType];
-
-    public ScriptRuntime GetRuntime(string contentType) => runtimes[contentType];
 }
