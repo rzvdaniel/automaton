@@ -2,9 +2,6 @@
 
 public class ScriptEngineHost
 {
-    private const string BuiltinsVariable = "__builtins__";
-    private const string ArgvVariable = "argv";
-
     private readonly ScriptEngineFactory engineFactory;
 
     public event EventHandler<string> ScriptTextWritten;
@@ -18,8 +15,17 @@ public class ScriptEngineHost
 
     public IDictionary<string, dynamic> Execute(ScriptResource resource, IDictionary<string, object> inputs)
     {
-        var engine = engineFactory.GetEngine(resource.ContentType);
-        return engine.Execute(resource.Content, inputs);
+        try
+        {
+            var engine = engineFactory.GetEngine(resource.ContentType);
+            return engine.Execute(resource.Content, inputs);
+
+        }
+        catch (Exception ex)
+        {
+            ScriptTextWritten?.Invoke(this, ex.Message);
+            throw;
+        }
     }
 
     private void OnTextWritten(object? sender, string e)

@@ -18,9 +18,17 @@
 #     print(f"Free space on {drive_letter}: {free_space} bytes")
 
 # Method 2
+# import shutil
+# import sys
+# # Automaton takes drive_letter from sys.argv[0]
+# drive_letter = sys.argv[1]
+# total, used, free = shutil.disk_usage(drive_letter)
+# print(f"Free space on {drive_letter}: {free} bytes")
+
+
+# Method 3 (latest update)
 import shutil
-import sys
-# Automaton takes drive_letter from sys.argv[0]
-drive_letter = sys.argv[1]
+
+drive_letter = Drive
 total, used, free = shutil.disk_usage(drive_letter)
 print(f"Free space on {drive_letter}: {free} bytes")
