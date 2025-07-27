@@ -6,21 +6,19 @@ namespace Automaton.Steps;
 
 public class CustomStep : WorkflowStep
 {
-    private const string ContentType = @"text/x-python";
-
     private readonly ScriptEngineHost scriptHost;
 
     [IgnorePropertyParsing(true)]
     public string? Code { get; set; }
 
-    public CustomStepLanguage Language { get; set; } = CustomStepLanguage.Python;
+    public CustomStepLanguage Language { get; set; }
 
     public IList<StepVariable> CodeInputVariables { get; set; }
 
     public CustomStep(ScriptEngineHost scriptHost)
     {
         this.scriptHost = scriptHost;
-        CodeInputVariables = new List<StepVariable>();
+        CodeInputVariables = [];
     }
 
     protected override Task<ExecutionResult> RunAsync(StepExecutionContext context)
@@ -31,7 +29,7 @@ public class CustomStep : WorkflowStep
 
             var resource = new ScriptResource()
             {
-                ContentType = ContentType,
+                ContentType = GetContentType(),
                 Content = Code
             };
 
@@ -60,6 +58,8 @@ public class CustomStep : WorkflowStep
     {
         Code = GetInputValue<string>(nameof(Code));
 
+        Language = GetInputValue<CustomStepLanguage>(nameof(Language));
+
         var codeInputVariables = GetInputValue<IList<StepVariable>>(nameof(CodeInputVariables));
 
         foreach (var variable in codeInputVariables)
@@ -74,5 +74,17 @@ public class CustomStep : WorkflowStep
     private void OnScriptTextWritten(object sender, string text)
     {
         logger.Information("{Text}", text);
+    }
+
+    private string GetContentType()
+    {
+        var contentType = Language switch
+        {
+            CustomStepLanguage.Python => "text/x-python",
+            CustomStepLanguage.Batch => "text/x-batch",
+            _ => "text/x-python"
+        };
+
+        return contentType;
     }
 }

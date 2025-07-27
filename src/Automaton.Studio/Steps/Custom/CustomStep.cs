@@ -22,6 +22,12 @@ public class CustomStep : StudioStep
         set => SetInputValue(nameof(Code), value);
     }
 
+    public CustomStepLanguage Language
+    {
+        get => GetInputValue<CustomStepLanguage>(nameof(Language));
+        set => SetInputValue(nameof(Language), value);
+    }
+
     public IList<StepVariable> CodeInputVariables
     {
         get

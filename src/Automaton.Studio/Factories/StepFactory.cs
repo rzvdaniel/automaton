@@ -57,6 +57,7 @@ public class StepFactory
         {
             Id = Guid.NewGuid().ToString(),
             Code = explorerStep.Definition.Code,
+            Language = explorerStep.Definition.Language,
             CodeInputVariables = explorerStep.Definition.CodeInputVariables,
             CodeOutputVariables = explorerStep.Definition.CodeOutputVariables,
             Name = explorerStep.Name,
