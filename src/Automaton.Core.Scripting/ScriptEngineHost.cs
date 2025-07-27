@@ -18,8 +18,14 @@ public class ScriptEngineHost
         try
         {
             var engine = engineFactory.GetEngine(resource.ContentType);
-            return engine.Execute(resource.Content, inputs);
 
+            // Set output callback if supported
+            if (engine is IOutputCallbackScriptEngine outputEngine)
+            {
+                outputEngine.OutputCallback = line => ScriptTextWritten?.Invoke(this, line);
+            }
+
+            return engine.Execute(resource.Content, inputs);
         }
         catch (Exception ex)
         {
