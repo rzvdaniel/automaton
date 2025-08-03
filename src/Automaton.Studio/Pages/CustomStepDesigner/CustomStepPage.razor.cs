@@ -2,6 +2,7 @@
 using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Steps.Custom.Variables;
+using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.CustomStepDesigner;
@@ -13,8 +14,15 @@ partial class CustomStepPage : ComponentBase
 
     private Form<CustomStep> form;
     private Form<CustomStep> codeForm;
+    private StandaloneCodeEditor codeEditor;
 
     public IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
+
+    private static readonly List<string> CustomStepLanguages =
+    [
+        Automaton.Steps.CustomStepLanguage.Python,
+        Automaton.Steps.CustomStepLanguage.Batch
+    ];
 
     [Inject] private CustomStepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
@@ -58,6 +66,8 @@ partial class CustomStepPage : ComponentBase
 
             if (form.Validate())
             {
+                await RefreshCode();
+
                 await StepDesignerViewModel.Save();
             }
         }
@@ -79,6 +89,8 @@ partial class CustomStepPage : ComponentBase
 
             await Task.Delay(100);
 
+            await RefreshCode();
+
             StepDesignerViewModel.Execute();
 
             await MessageService.Success(Resources.Information.CustomStepExecutionSuccessful);
@@ -91,6 +103,11 @@ partial class CustomStepPage : ComponentBase
         {
             runningCode = false;
         }
+    }
+
+    private async Task RefreshCode()
+    {
+        StepDesignerViewModel.CustomStep.Definition.Code = await codeEditor.GetValue();
     }
 
     private Type GetVariableComponent(VariableType type)
@@ -114,6 +131,16 @@ partial class CustomStepPage : ComponentBase
     private void OnScriptOutputWritten(object sender, EventArgs e)
     {
         InvokeAsync(StateHasChanged);
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = StepDesignerViewModel.CustomStep.Definition.Language.ToLower(),
+            Value = StepDesignerViewModel.CustomStep.Definition.Code
+        };
     }
 
     public void Dispose()

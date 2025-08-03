@@ -22,9 +22,9 @@ public class CustomStep : StudioStep
         set => SetInputValue(nameof(Code), value);
     }
 
-    public CustomStepLanguage Language
+    public string Language
     {
-        get => GetInputValue<CustomStepLanguage>(nameof(Language));
+        get => GetInputValue<string>(nameof(Language));
         set => SetInputValue(nameof(Language), value);
     }
 

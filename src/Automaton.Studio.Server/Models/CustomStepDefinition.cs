@@ -7,9 +7,9 @@ public class CustomStepDefinition
 {
     public string? Code { get; set; }
 
-    public CustomStepLanguage Language { get; set; } = CustomStepLanguage.Python;
+    public string Language { get; set; } = CustomStepLanguage.Python;
 
-    public IList<StepVariable>? CodeInputVariables { get; set; } = new List<StepVariable>();
+    public IList<StepVariable>? CodeInputVariables { get; set; } = [];
 
-    public IList<StepVariable>? CodeOutputVariables { get; set; } = new List<StepVariable>();
+    public IList<StepVariable>? CodeOutputVariables { get; set; } = [];
 }

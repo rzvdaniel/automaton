@@ -11,7 +11,7 @@ public class CustomStep : WorkflowStep
     [IgnorePropertyParsing(true)]
     public string? Code { get; set; }
 
-    public CustomStepLanguage Language { get; set; }
+    public string Language { get; set; }
 
     public IList<StepVariable> CodeInputVariables { get; set; }
 
@@ -58,7 +58,7 @@ public class CustomStep : WorkflowStep
     {
         Code = GetInputValue<string>(nameof(Code));
 
-        Language = GetInputValue<CustomStepLanguage>(nameof(Language));
+        Language = GetInputValue<string>(nameof(Language));
 
         var codeInputVariables = GetInputValue<IList<StepVariable>>(nameof(CodeInputVariables));
 

@@ -1,8 +1,8 @@
 ﻿namespace Automaton.Steps
 {
-    public enum CustomStepLanguage
+    public class CustomStepLanguage
     {
-        Python,
-        Batch
+        public const string Python = "Python";
+        public const string Batch = "Batch";
     }
 }

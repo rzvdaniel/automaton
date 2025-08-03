@@ -74,7 +74,7 @@
                                     <!-- Language Dropdown: Add here -->
                                     <FormItem Label="Script Language">
                                         <InputSelect @bind-Value="codeContext.Definition.Language">
-                                            @foreach (var lang in Enum.GetValues<Automaton.Steps.CustomStepLanguage>())
+                                            @foreach (var lang in CustomStepLanguages)
                                             {
                                                 <option value="@lang">@lang</option>
                                             }
@@ -82,7 +82,7 @@
                                     </FormItem>
                                     <!-- End Language Dropdown -->
 
-                                     <TextArea Rows="20" Id="step-code" @bind-Value="codeContext.Definition.Code" AutoFocus />
+                                    <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
                                      <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
                                      </Col>
                                      <Col Md="12">
@@ -305,7 +305,7 @@
     }
 
     #step-code {
-        height: calc(100vh - 360px) !important;
+        height: calc(100vh - 500px) !important;
         margin: 0 0 5px 0;
     }
 
