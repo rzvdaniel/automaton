@@ -70,17 +70,24 @@
                             <ChildContent Context="codeContext">
                                 <Row Gutter="(16, 0)">
                                     <Col Md="12">
-                                    
-                                    <!-- Language Dropdown: Add here -->
-                                    <FormItem Label="Script Language">
-                                        <InputSelect @bind-Value="codeContext.Definition.Language">
-                                            @foreach (var lang in CustomStepLanguages)
-                                            {
-                                                <option value="@lang">@lang</option>
-                                            }
-                                        </InputSelect>
-                                    </FormItem>
-                                    <!-- End Language Dropdown -->
+
+                                    <div class="code-toolbar">
+                                        <Space Direction="DirectionVHType.Horizontal">
+                                            <SpaceItem>
+                                                <Select @bind-Value="codeContext.Definition.Language"
+                                                        Placeholder="Select Language..."
+                                                        TItemValue="string"
+                                                        TItem="string">
+                                                    <SelectOptions>
+                                                        @foreach (var lang in CustomStepLanguages)
+                                                        {
+                                                        <SelectOption TItemValue="string" TItem="string" Value=@lang Label=@lang />
+                                                        }
+                                                    </SelectOptions>
+                                                </Select>
+                                            </SpaceItem>                                      
+                                        </Space>
+                                    </div>
 
                                     <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
                                      <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
@@ -306,7 +313,7 @@
 
     #step-code {
         height: calc(100vh - 500px) !important;
-        margin: 0 0 5px 0;
+        margin: 10px 0 5px 0;
     }
 
     #code-log {
@@ -319,6 +326,11 @@
 
     .code-button {
         margin: 0 0 8px 0px;
+    }
+
+    .code-toolbar {
+        background-color:#EEE; 
+        padding: 4px;
     }
 
     .expanded-content {
