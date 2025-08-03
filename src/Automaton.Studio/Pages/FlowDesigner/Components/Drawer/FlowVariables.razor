@@ -21,11 +21,11 @@
                     </Row>
                 </HeaderTemplate>
                 <ChildContent>
-                    <AntList DataSource="@Variables" Size="small" Class="scrollable-list">
+                    <AntList DataSource="@Variables" Size="ListSize.Small" Class="scrollable-list">
                         <ChildContent Context="item">
                             <ListItem Style="padding-left: 0px; padding-bottom: 2px; padding-top: 2px">
 
-                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => ViewVariable(item))">@item.Name</Button>
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => ViewVariable(item))">@item.Name</Button>
 
                                 <span class="ellipsis">@item.Value?.ToString()</span>
                                 
@@ -44,7 +44,7 @@
                                         </Overlay>
                                         <ChildContent>
                                             <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="outline" />
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
                                             </a>
                                         </ChildContent>
                                     </Dropdown>
@@ -79,10 +79,10 @@
                     </Row>
                 </HeaderTemplate>
                 <ChildContent>
-                    <AntList DataSource="@InputVariables" Size="small" Class="scrollable-list">
+                    <AntList DataSource="@InputVariables" Size="ListSize.Small" Class="scrollable-list">
                         <ChildContent Context="item">
                             <ListItem>
-                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
                                 <div class="designer-step-actions-icon">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
@@ -97,7 +97,7 @@
                                         </Overlay>
                                         <ChildContent>
                                             <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="outline" />
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
                                             </a>
                                         </ChildContent>
                                     </Dropdown>
@@ -131,10 +131,10 @@
                     </Row>
                 </HeaderTemplate>
                 <ChildContent>
-                    <AntList DataSource="@OutputVariables" Size="small" Class="scrollable-list">
+                    <AntList DataSource="@OutputVariables" Size="ListSize.Small" Class="scrollable-list">
                         <ChildContent Context="item">
                             <ListItem>
-                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
                                 <div class="designer-step-actions-icon">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
@@ -149,7 +149,7 @@
                                         </Overlay>
                                         <ChildContent>
                                             <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="outline" />
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
                                             </a>
                                         </ChildContent>
                                     </Dropdown>

@@ -5,7 +5,7 @@
     <Header Class="header">
         <Row>
             <Col Flex=@("none")>
-                <Space Size="@AntSizeLDSType.Large">
+                <Space Size="SpaceSize.Large">
                     <SpaceItem Class="header-item">
                     <Breadcrumb AutoGenerate></Breadcrumb>
                     </SpaceItem>               
@@ -42,7 +42,7 @@
             </Column>
 
             <Column @bind-Field="@context.RunnerIds" Title="Runners" Width="300">
-                <Select Mode="multiple" 
+                <Select Mode="SelectMode.Multiple" 
                     @bind-Values="context.RunnerIds"
                     Placeholder="Select runners..."
                     TItemValue="Guid"
@@ -87,7 +87,7 @@
                                 <ChildContent>
                                     <Tooltip Title="More actions">
                                         <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                            <Icon Type="more" Theme="outline" />
+                                            <Icon Type="more" Theme="IconThemeType.Outline" />
                                         </a>
                                     </Tooltip>
                                 </ChildContent>

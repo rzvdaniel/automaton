@@ -8,7 +8,7 @@
     <Header Class="header">
         <Row>
             <Col Flex=@("none")>
-                <Space Direction="DirectionVHType.Horizontal">
+            <Space Direction="SpaceDirection.Horizontal">
                     <SpaceItem>
                         <Breadcrumb AutoGenerate>
                             <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
@@ -74,7 +74,7 @@
                                 <ChildContent>
                                     <Tooltip Title="More actions">
                                         <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                            <Icon Type="more" Theme="outline" />
+                                        <Icon Type="more" Theme="IconThemeType.Outline" />
                                         </a>
                                     </Tooltip>
                                 </ChildContent>
@@ -98,12 +98,12 @@
                         <GridRow>
                             <GridCol>
                                 <FormItem Label="Name" Id="schedule-name">
-                                    <Input Type="text" @bind-Value="@rowData.Data.Name"  />
+                                    <Input Type="InputType.Text" @bind-Value="@rowData.Data.Name" />
                                 </FormItem>
                             </GridCol>
                             <GridCol>
                                 <FormItem Label="Runners" Id="schedule-runners">
-                                   <Select Mode="multiple" 
+                                   <Select Mode="SelectMode.Multiple" 
                                     @bind-Values="context.RunnerIds"
                                     Placeholder="Select runners..."
                                     TItemValue="Guid"

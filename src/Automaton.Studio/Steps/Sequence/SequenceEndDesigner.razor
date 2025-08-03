@@ -1,10 +1,10 @@
 ﻿@using AntDesign
 
 <div class="@Step.Class" style="margin-left: @Step.GetMargin()px" tabindex="0" @onkeydown="(e)=>OnKeyDown(e, Step)">
-    <Row Align="middle">
+    <Row Align="RowAlign.Middle">
         <Col Flex=@("none")>
         <div class="designer-step-icon-container">
-            <Icon Type="@Step.Icon" Theme="outline" />
+            <Icon Type="@Step.Icon" Theme="IconThemeType.Outline" />
         </div>
         </Col>
         <Col Flex=@("auto")>

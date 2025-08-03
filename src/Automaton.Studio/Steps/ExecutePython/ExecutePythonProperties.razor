@@ -20,9 +20,9 @@
                     <TextArea Rows="6" @bind-Value="context.Code" AutoFocus />
                 </TabPane>
                 <TabPane Tab="Input Variables" Key="2">
-                    <Space Direction="DirectionVHType.Vertical">
+                    <Space Direction="SpaceDirection.Vertical">
                         <SpaceItem>
-                            <Button OnClick="AddCodeInputVariable" Type="primary">
+                            <Button OnClick="AddCodeInputVariable" Type="ButtonType.Primary">
                                 Add
                             </Button>
                         </SpaceItem>
@@ -33,10 +33,10 @@
                                    HidePagination>
                                 <ChildContent Context="inputVariable">
                                     <Column Title="Name" TData="string">
-                                        <Input Type="text" @bind-Value="inputVariable.Name" />
+                                        <Input Type="InputType.Text" @bind-Value="inputVariable.Name" />
                                     </Column>
                                     <Column Title="Value" TData="string">
-                                        <Input Type="text" @bind-Value="inputVariable.StringValue" />
+                                        <Input Type="InputType.Text" @bind-Value="inputVariable.StringValue" />
                                     </Column>
                                     <ActionColumn Title="Action">
                                         <Popconfirm Title="Sure to delete?"
@@ -53,9 +53,9 @@
                 </TabPane>
 
                 <TabPane Tab="Output Variables" Key="3">
-                    <Space Direction="DirectionVHType.Vertical" Style="width: 100%">
+                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%">
                         <SpaceItem>
-                            <Button OnClick="AddCodeOutputVariable" Type="primary">
+                            <Button OnClick="AddCodeOutputVariable" Type="ButtonType.Primary">
                                 Add
                             </Button>
                         </SpaceItem>
@@ -66,7 +66,7 @@
                                    HidePagination>
                                 <ChildContent Context="outputVariable">
                                     <Column Title="Name" TData="string">
-                                        <Input Type="text" @bind-Value="outputVariable.Name" OnBlur="()=>StopEdit(outputVariable)" AutoFocus />
+                                        <Input Type="InputType.Text" @bind-Value="outputVariable.Name" OnBlur="()=>StopEdit(outputVariable)" AutoFocus />
                                     </Column>
                                     <ActionColumn Title="Action">
                                         <Popconfirm Title="Sure to delete?"

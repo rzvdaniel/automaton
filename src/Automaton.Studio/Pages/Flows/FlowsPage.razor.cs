@@ -24,7 +24,7 @@ namespace Automaton.Studio.Pages.Flows
             }
             catch
             {
-                await MessageService.Error(Resources.Errors.FlowsListNotLoaded);
+                await MessageService.ErrorAsync(Resources.Errors.FlowsListNotLoaded);
             }
             finally
             {
@@ -38,7 +38,7 @@ namespace Automaton.Studio.Pages.Flows
         {
             var result = await FlowsViewModel.RunFlow(flow.Id, flow.RunnerIds);
 
-            await MessageService.Info(result);
+            await MessageService.InfoAsync(result);
         }
 
         private void EditFlow(Guid id, string name)
@@ -71,7 +71,7 @@ namespace Automaton.Studio.Pages.Flows
                 }
                 catch
                 {
-                    await MessageService.Error($"Flow {newFlowModel.Name} could not be created");
+                    await MessageService.ErrorAsync($"Flow {newFlowModel.Name} could not be created");
                 }
             };
         }

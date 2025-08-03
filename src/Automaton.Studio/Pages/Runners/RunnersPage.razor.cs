@@ -23,7 +23,7 @@ partial class RunnersPage : ComponentBase
         }
         catch
         {
-            await MessageService.Error(Resources.Errors.FlowsListNotLoaded);
+            await MessageService.ErrorAsync(Resources.Errors.FlowsListNotLoaded);
         }
         finally
         {

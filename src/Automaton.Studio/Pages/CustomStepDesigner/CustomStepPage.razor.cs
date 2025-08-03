@@ -73,7 +73,7 @@ partial class CustomStepPage : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.Error(Resources.Errors.CustomStepUpdateFailed);
+            await MessageService.ErrorAsync(Resources.Errors.CustomStepUpdateFailed);
         }
         finally
         {
@@ -93,11 +93,11 @@ partial class CustomStepPage : ComponentBase
 
             StepDesignerViewModel.Execute();
 
-            await MessageService.Success(Resources.Information.CustomStepExecutionSuccessful);
+            await MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
         }
         catch (Exception ex)
         {
-            await MessageService.Error($"{Resources.Errors.CustomStepExecutionFailed}. Error: {ex.Message}");
+            await MessageService.ErrorAsync($"{Resources.Errors.CustomStepExecutionFailed}. Error: {ex.Message}");
         }
         finally
         {

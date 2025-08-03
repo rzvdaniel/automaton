@@ -13,7 +13,7 @@
     <Resource Include="Icon.ico" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="AntDesign" Version="1.0.1" />
+    <PackageReference Include="AntDesign" Version="1.4.3" />
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="Blazored.FluentValidation" Version="2.2.0" />
     <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />

@@ -12,7 +12,7 @@
     </Validator>
 
     <ChildContent>
-        <GridRow Gutter="(16, 0)" Justify="center">
+        <GridRow Gutter="(16, 0)" Justify="RowJustify.Center">
             <GridCol Xs="24" Md="24">
                 <FormItem Label="Runner name">
                     <Input @bind-Value="@context.RunnerName" />
@@ -21,7 +21,7 @@
         </GridRow>
 
         <FormItem WrapperColSpan="16">
-            <Button Type="@ButtonType.Primary" HtmlType="submit">
+            <Button Type="ButtonType.Primary" HtmlType="submit">
                 Save
             </Button>
         </FormItem>

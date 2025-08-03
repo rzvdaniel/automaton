@@ -28,11 +28,11 @@ public partial class Settings : ComponentBase
 
             await SettingsViewModel.SaveSettings();
 
-            await MessageService.Info("Runner settings updated");
+            await MessageService.InfoAsync("Runner settings updated");
         }
         catch (Exception ex)
         {
-            await MessageService.Error("Runner settings update failed");
+            await MessageService.ErrorAsync("Runner settings update failed");
             logger.Error(ex, "Runner settings update failed");
         }
         finally

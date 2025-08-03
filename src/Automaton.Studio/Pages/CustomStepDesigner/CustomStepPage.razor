@@ -11,7 +11,7 @@
             <Row>
                 <Col>
 
-                    <Space Direction="DirectionVHType.Horizontal">
+                <Space Direction="SpaceDirection.Horizontal">
                         <SpaceItem>
                             <Breadcrumb AutoGenerate>
                                 <BreadcrumbItem Href="/customsteps">Steps</BreadcrumbItem>
@@ -72,7 +72,7 @@
                                     <Col Md="12">
 
                                     <div class="code-toolbar">
-                                        <Space Direction="DirectionVHType.Horizontal">
+                                        <Space Direction="SpaceDirection.Horizontal">
                                             <SpaceItem>
                                                 <Select @bind-Value="codeContext.Definition.Language"
                                                         Placeholder="Select Language..."
@@ -145,10 +145,10 @@
                      </TabPane>
 
                     <TabPane Tab="Input Variables" Key="2">
-                        <Space Direction="DirectionVHType.Vertical">
+                        <Space Direction="SpaceDirection.Vertical">
                             <SpaceItem>
                                 <Tooltip Title="Add input variable">
-                                    <Button OnClick="AddInputVariable" Type="@ButtonType.Primary">
+                                    <Button OnClick="AddInputVariable" Type="ButtonType.Primary">
                                         Add
                                     </Button>
                                 </Tooltip>
@@ -161,7 +161,7 @@
                                        HidePagination>
                                     <ChildContent Context="inputVariable">
                                         <Column Title="Name" TData="string">
-                                            <Input Type="text" @bind-Value="inputVariable.Name" AutoFocus />
+                                            <Input Type="InputType.Text" @bind-Value="inputVariable.Name" AutoFocus />
                                         </Column>
                                         <Column Title="Type" TData="string">
                                             <Select @bind-Value="inputVariable.Type"
@@ -191,12 +191,12 @@
                                         <GridRow Gutter="(16, 0)" Class="expanded-content">
                                             <GridCol Xs="6" Md="6">
                                                 <FormItem Label="Description">
-                                                    <Input Type="text" @bind-Value="inputVariable2.Data.Description" />
+                                                    <Input Type="InputType.Text" @bind-Value="inputVariable2.Data.Description" />
                                                 </FormItem>
                                             </GridCol>
                                             <GridCol Xs="6" Md="6">
                                                 <FormItem Label="Value">
-                                                    <Input Type="text" TValue="string" Value="inputVariable2.Data.Value?.ToString()" OnChange="(x) => { inputVariable2.Data.Value = x; }" />
+                                                    <Input Type="InputType.Text" TValue="string" Value="inputVariable2.Data.Value?.ToString()" OnChange="(x) => { inputVariable2.Data.Value = x; }" />
                                                 </FormItem>
                                             </GridCol>
                                         </GridRow>
@@ -207,7 +207,7 @@
                     </TabPane>
 
                     <TabPane Tab="Output Variables" Key="3">
-                        <Space Direction="DirectionVHType.Vertical" Style="width: 100%">
+                        <Space Direction="SpaceDirection.Vertical" Style="width: 100%">
                             <SpaceItem>
                                 <Tooltip Title="Add output variable">
                                     <Button OnClick="AddOutputVariable" Type="@ButtonType.Primary" >
@@ -224,7 +224,7 @@
                                     <ChildContent Context="outputVariable">
                                         
                                         <Column Title="Name" TData="string">
-                                            <Input Type="text" @bind-Value="outputVariable.Name" />
+                                            <Input Type="InputType.Text" @bind-Value="outputVariable.Name" />
                                         </Column>
                                         <Column Title="Type" TData="string">
                                             <Select @bind-Value="outputVariable.Type"
@@ -254,12 +254,12 @@
                                         <GridRow Gutter="(16, 0)" Class="expanded-content">
                                             <GridCol Xs="6" Md="6">
                                                 <FormItem Label="Description">
-                                                    <Input Type="text" @bind-Value="outputVariable2.Data.Description" />
+                                                    <Input Type="InputType.Text" @bind-Value="outputVariable2.Data.Description" />
                                                 </FormItem>
                                             </GridCol>
                                             <GridCol Xs="6" Md="6">
                                                 <FormItem Label="Value">
-                                                    <Input Type="text" TValue="string" Value="outputVariable2.Data.Value?.ToString()" OnChange="(x) => { outputVariable2.Data.Value = x; }" />
+                                                    <Input Type="InputType.Text" TValue="string" Value="outputVariable2.Data.Value?.ToString()" OnChange="(x) => { outputVariable2.Data.Value = x; }" />
                                                 </FormItem>
                                             </GridCol>
                                         </GridRow>
@@ -270,7 +270,7 @@
                     </TabPane>
 
                     <TabPane Tab="Settings" Key="4">
-                        <Row Gutter="(16, 0)" Justify="left">
+                        <Row Gutter="(16, 0)" Justify="RowJustify.Start">
                             <Col Xs="24" Md="6">
                             <FormItem Label="Name">
                                 <Input @bind-Value="@context.Name" Placeholder="Enter name" />
@@ -283,7 +283,7 @@
                             </Col>
                         </Row>
 
-                        <Row Gutter="(16, 0)" Justify="left">
+                        <Row Gutter="(16, 0)" Justify="RowJustify.Start">
                             <Col Xs="24" Md="6">
                             <FormItem Label="Description">
                                 <Input @bind-Value="@context.Description" Placeholder="Enter description" />

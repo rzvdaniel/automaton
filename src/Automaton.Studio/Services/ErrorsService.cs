@@ -17,14 +17,14 @@ public class ErrorService
 
     public async Task ProcessError(Exception ex)
     {
-        await messageService.Error(Resources.Errors.UnexpectedError);
+        await messageService.ErrorAsync(Resources.Errors.UnexpectedError);
 
         logger.LogError(ex, ex.Message);
     }
 
     public async Task ProcessError(Exception ex, string message)
     {
-        await messageService.Error(message);
+        await messageService.ErrorAsync(message);
 
         logger.LogError(ex, ex.Message);
     }

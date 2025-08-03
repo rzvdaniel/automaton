@@ -26,11 +26,11 @@ public partial class UserProfile : ComponentBase
 
             await UserProfileViewModel.UpdateUserProfile();
 
-            await MessageService.Info("User profile updated");
+            await MessageService.InfoAsync("User profile updated");
         }
         catch (Exception ex)
         {
-            await MessageService.Error("User profile update failed");
+            await MessageService.ErrorAsync("User profile update failed");
         }
         finally
         {

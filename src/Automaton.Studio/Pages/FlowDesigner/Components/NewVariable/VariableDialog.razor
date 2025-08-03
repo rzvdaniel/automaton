@@ -29,7 +29,7 @@
             </Select>
         </FormItem>
 @*        <FormItem Label="Value">
-            <Input Type="Input.Text" TValue="string" Value="context.Value?.ToString()" OnChange="(x) => { context.Value = x; }" Placeholder=@Placeholders.EnterVariableValue />
+            <Input Type="InputType.Text" TValue="string" Value="context.Value?.ToString()" OnChange="(x) => { context.Value = x; }" Placeholder=@Placeholders.EnterVariableValue />
         </FormItem>
 *@        <FormItem Label="Description">
             <Input @bind-Value="@context.Description" Placeholder=@Placeholders.EnterDescription />

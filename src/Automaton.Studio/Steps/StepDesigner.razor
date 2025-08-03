@@ -1,10 +1,10 @@
 ﻿@using AntDesign
 
 <div @ref="stepContainerReference" class="@Step.Class" style="margin-left: @Step.GetMargin()px" tabindex="0" @onkeydown="(e)=>OnKeyDown(e, Step)">
-    <Row Align="middle">
+    <Row Align="RowAlign.Middle">
         <Col Flex=@("none")>
         <div class="designer-step-icon-container">
-            <Icon Type="@Step.Icon" Theme="outline" />
+            <Icon Type="@Step.Icon" Theme="IconThemeType.Outline" />
         </div>
         </Col>
 
@@ -33,7 +33,7 @@
                 </Overlay>
                 <ChildContent>
                     <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                        <Icon Type="more" Theme="outline" />
+                        <Icon Type="more" Theme="IconThemeType.Outline" />
                     </a>
                 </ChildContent>
             </Dropdown>
@@ -46,9 +46,9 @@
 {
     private RenderFragment _content =
     @<div>
-        <Space Direction="DirectionVHType.Vertical">
+        <Space Direction="SpaceDirection.Vertical">
             <SpaceItem>
-                <Icon Type="edit" Theme="outline" /><a href="#" class="options-menu-text">Edit</a>
+                <Icon Type="edit" Theme="IconThemeType.Outline" /><a href="#" class="options-menu-text">Edit</a>
             </SpaceItem>
         </Space>
     </div>;

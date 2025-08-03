@@ -1,4 +1,5 @@
-﻿using Automaton.Core.Enums;
+﻿using AntDesign;
+using Automaton.Core.Enums;
 using Newtonsoft.Json;
 
 namespace Automaton.Studio.Models;
@@ -28,15 +29,15 @@ public class LogModel
         get { return JsonConvert.DeserializeObject<Dictionary<string, object>>(Properties); }
     }
 
-    public string LevelClass => LevelClasses[Level];
+    public BadgeStatus LevelClass => LevelClasses[Level];
 
-    private readonly Dictionary<string, string> LevelClasses = new()
+    private readonly Dictionary<string, BadgeStatus> LevelClasses = new()
     {
-        { "0", "default" },
-        { "1", "default" },
-        { "2", "success" },
-        { "3", "warning" },
-        { "4", "error" },
-        { "5", "error" },
+        { "0", BadgeStatus.Default },
+        { "1", BadgeStatus.Default },
+        { "2", BadgeStatus.Success },
+        { "3", BadgeStatus.Warning },
+        { "4", BadgeStatus.Error },
+        { "5", BadgeStatus.Error },
     };
 }

@@ -4,7 +4,7 @@
 <FormItem Label="@Variable.Name" Class="variable-label">
     <Row>
         <Col Md="23">
-            <Input Type="Input.Text" TValue="string" Value="Variable.Value?.ToString()" OnChange="(x) => { Variable.Value = x; }" Placeholder="@Variable.Description" />
+            <Input Type="InputType.Text" TValue="string" Value="Variable.Value?.ToString()" OnChange="(x) => { Variable.Value = x; }" Placeholder="@Variable.Description" />
         </Col>
         <Col Md="1">
             <Popover Content="@Variable.Description" Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})" Class="variable-description">

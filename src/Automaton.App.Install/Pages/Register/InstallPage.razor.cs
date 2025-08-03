@@ -31,7 +31,7 @@ partial class InstallPage : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.Error(Resources.Errors.InstallationFailed);
+            await MessageService.ErrorAsync(Resources.Errors.InstallationFailed);
         }
         finally
         {

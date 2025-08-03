@@ -36,7 +36,7 @@ partial class UserRegisterPage : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.Error(Resources.Errors.UserRegistrationFailed);
+            await MessageService.ErrorAsync(Resources.Errors.UserRegistrationFailed);
         }
         finally
         {

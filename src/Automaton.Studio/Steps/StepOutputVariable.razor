@@ -5,7 +5,7 @@
 
     @if (editing)
     {
-        <Input Type="text" @bind-Value="@Variable.Name" OnBlur="StopEdit" OnPressEnter="OnPressEnter" AutoFocus />
+        <Input Type="InputType.Text" @bind-Value="@Variable.Name" OnBlur="StopEdit" OnPressEnter="OnPressEnter" AutoFocus />
     }
     else
     {

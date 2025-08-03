@@ -26,7 +26,7 @@ namespace Automaton.Studio.Pages.FlowDesigner
             }
             catch
             {
-                await MessageService.Error(Resources.Errors.FlowsActivityNotLoaded);
+                await MessageService.ErrorAsync(Resources.Errors.FlowsActivityNotLoaded);
             }
             finally
             {

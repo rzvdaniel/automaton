@@ -13,9 +13,9 @@
             <AuthorizeView>
                 <Row Class="main-header">
                     <Col Flex=@("none")>
-                    <Space Size="@AntSizeLDSType.Default">
+                    <Space Size="SpaceSize.Small">
                         <SpaceItem>
-                            <Button Type="@ButtonType.Text" OnClick="ToggleCollapsed">
+                            <Button Type="ButtonType.Text" OnClick="ToggleCollapsed">
                                 @if (MenuCollapsed)
                                 {
                                     <Icon Type="menu-unfold"></Icon>
@@ -33,7 +33,7 @@
                     <Col Class="right-actions">
                     <Space Class="right-header-items">
                         <SpaceItem>
-                            <Button Icon="poweroff" Type="@ButtonType.Text" OnClick="Logout"></Button>
+                            <Button Icon="poweroff" Type="ButtonType.Text" OnClick="Logout"></Button>
                         </SpaceItem>
                     </Space>
                     </Col>

@@ -23,7 +23,7 @@
      ondragstart="event.dataTransfer.setData('text', event.target.id);">
 
     <div>
-        <GridRow Wrap="false" Justify="center" Align="middle">
+        <GridRow Wrap="false" Justify="RowJustify.Center" Align="RowAlign.Middle">
             <GridCol Flex=@("50px")></GridCol>
             <GridCol Flex=@("auto")>
                 <div @ondrop="()=>OnDrop()"
@@ -37,8 +37,8 @@
         </GridRow>
         @{
             foreach (var step in Steps)
-            {       
-                <GridRow Wrap="false" Justify="center" Align="middle">
+            {
+                <GridRow Wrap="false" Justify="RowJustify.Center" Align="RowAlign.Middle">
 
                     <GridCol Flex=@("50px")>                      
                         <DesignerLine Step="step" Line="@GetVisibleStepIndex(step)"></DesignerLine>

@@ -10,7 +10,7 @@ namespace Automaton.App.Authentication.Pages.ForgotPassword;
 partial class ForgotPassword : ComponentBase
 {
     private bool loading = false;
-
+    
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
 
@@ -33,7 +33,7 @@ partial class ForgotPassword : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.Error(Resources.Errors.ForgotPasswordFailed);
+            await MessageService.ErrorAsync(Resources.Errors.ForgotPasswordFailed);
         }
         finally
         {

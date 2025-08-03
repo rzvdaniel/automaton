@@ -27,13 +27,13 @@ public partial class SetupDetails : ComponentBase
 
             await SetupViewModel.SetupRunner();
 
-            await MessageService.Info("Runner Registered");
+            await MessageService.InfoAsync("Runner Registered");
 
             NavigationManager.NavigateTo($"/");
         }
         catch (Exception ex)
         {
-            await MessageService.Error("Runner registration failed");
+            await MessageService.ErrorAsync("Runner registration failed");
             logger.Error(ex, "Runner registration failed");
         }
         finally
