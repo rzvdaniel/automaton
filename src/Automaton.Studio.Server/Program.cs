@@ -159,8 +159,13 @@ services.AddScoped(service => configurationService);
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
-services.AddAutoMapper(Assembly.GetExecutingAssembly());
+services.AddAutoMapper(cfg => 
+{
+    cfg.LicenseKey = configurationService.AutoMapperLicence;
+}, Assembly.GetExecutingAssembly());
+
 services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
+
 services.AddFluentValidation(fv => fv.RegisterValidatorsFromAssemblyContaining<Program>());
 
 services.AddScripting();

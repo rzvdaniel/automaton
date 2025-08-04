@@ -6,5 +6,6 @@ public class AppConfig
     public bool UserSignUp { get; set; }
     public int RefreshTokenLifetime { get; set; }
     public int RunnerRefreshTokenLifetime { get; set; }
-    public string WebsiteUrl { get; set; } 
+    public string WebsiteUrl { get; set; }
+    public string AutoMapperLicence {  get; set; }
 }

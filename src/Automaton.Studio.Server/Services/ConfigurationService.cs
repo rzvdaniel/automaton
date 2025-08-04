@@ -18,7 +18,8 @@ public class ConfigurationService
     public int RefreshTokenLifetime => appConfig.RefreshTokenLifetime;
     public int RunnerRefreshTokenLifetime => appConfig.RunnerRefreshTokenLifetime;
     public string WebsiteUrl => appConfig.WebsiteUrl;
-  
+    public string AutoMapperLicence => appConfig.AutoMapperLicence;
+
     public bool NoUserSignUp => !appConfig.UserSignUp;
 
     public bool RequireDigit => userPasswordConfig.RequireDigit;

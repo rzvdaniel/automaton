@@ -2,6 +2,8 @@
 using Automaton.Core.Models;
 using Automaton.Studio.Server.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Automaton.Studio.Server.Mapper
 {
@@ -70,10 +72,13 @@ namespace Automaton.Studio.Server.Mapper
         /// <returns>IMapper instance</returns>
         private static IMapper GetMapperInstance()
         {
-            var mappingConfig = new MapperConfiguration(mc =>
-            {
-                mc.AddProfile(new AutorMapperProfile());
-            });
+            // Create a null logger factory since we're in a static context
+            var loggerFactory = new NullLoggerFactory();
+            
+            var configExpression = new MapperConfigurationExpression();
+            configExpression.AddProfile(new AutorMapperProfile());
+            
+            var mappingConfig = new MapperConfiguration(configExpression, loggerFactory);
             var mapper = mappingConfig.CreateMapper();
 
             return mapper;

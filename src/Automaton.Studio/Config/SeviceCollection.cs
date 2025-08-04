@@ -136,9 +136,11 @@ public static class SeviceCollection
         Serilog.Debugging.SelfLog.Enable(Console.Error);
 #endif
 
-        services.AddScoped(provider => new MapperConfiguration(cfg =>
-        {
-            cfg.AddProfile(new AutoMapperProfile(provider));
-        }).CreateMapper());
+        services.AddScoped(provider => {
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            var configExpression = new MapperConfigurationExpression();
+            configExpression.AddProfile(new AutoMapperProfile(provider));
+            return new MapperConfiguration(configExpression, loggerFactory).CreateMapper();
+        });
     }
 }
