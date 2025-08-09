@@ -7,6 +7,7 @@ using Automaton.Studio.Pages.FlowDesigner.Components.FlowExplorer;
 using Automaton.Studio.Pages.FlowDesigner.Components.NewDefinition;
 using Automaton.Studio.Resources;
 using Microsoft.AspNetCore.Components;
+using Automaton.Studio.Pages.FlowDesigner;
 
 namespace Automaton.Studio.Pages.FlowDesigner;
 
@@ -14,6 +15,7 @@ partial class DesignerPage : ComponentBase
 {
     private Designer designer;
     private Sider toolsSider;
+    private string activeTabKey = "designer";
     private Type toolsPanel = typeof(FlowVariables);
     private bool isStepCreatedHandlerAttached;
 
@@ -211,6 +213,11 @@ partial class DesignerPage : ComponentBase
         DesignerViewModel.Flow.Variables[notification.Variable.Id] = notification.Variable;
 
         InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTabChange(string key)
+    {
+        activeTabKey = key;
     }
 
     public void Dispose()

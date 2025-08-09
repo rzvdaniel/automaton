@@ -14,13 +14,11 @@
                     <SpaceItem>
                         <Breadcrumb>
                             <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
-                        <BreadcrumbItem><b><Icon Type="apartment"></Icon> Designer</b></BreadcrumbItem>
+                        <BreadcrumbItem></BreadcrumbItem>
                         </Breadcrumb>                         
                     </SpaceItem>
-                    <SpaceItem>
-                        <span class="bullet">&#x2022;</span>@FlowName
-                    </SpaceItem>                   
-                </Space>
+                <SpaceItem><span style="font-size: 20px"><b>@FlowName</b></span></SpaceItem>
+            </Space>
                
             </Col>
 
@@ -111,14 +109,14 @@
                 </Sider>
             </Layout>
         </TabPane>
-        <TabPane Key="settings" Tab="Settings">
-            <!-- Empty content for now -->
-        </TabPane>
         <TabPane Key="activity" Tab="Activity">
-            <!-- Empty content for now -->
+            <FlowActivity FlowId="@FlowId" FlowName="@FlowName" />
         </TabPane>
         <TabPane Key="schedule" Tab="Schedule">
-            <!-- Empty content for now -->
+            <FlowSchedule FlowId="@FlowId" FlowName="@FlowName" />
+        </TabPane>
+        <TabPane Key="settings" Tab="Settings">
+            <FlowSettings FlowId="@FlowId" FlowName="@FlowName" />
         </TabPane>
     </Tabs>
 </Layout>
@@ -162,17 +160,6 @@
     }
 
 </style>
-
-@code {
-    private string activeTabKey = "designer";
-    
-    private void OnTabChange(string key)
-    {
-        activeTabKey = key;
-    }
-    
-    // ...existing code...
-}
 
 
 
