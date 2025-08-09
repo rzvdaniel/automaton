@@ -9,20 +9,6 @@
         <Row>
             <Col Flex=@("none")>
             <Space Direction="SpaceDirection.Horizontal">
-                    <SpaceItem>
-                        <Breadcrumb AutoGenerate>
-                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
-                            <BreadcrumbItem><b><Icon Type="clock-circle"></Icon> Schedule</b></BreadcrumbItem>
-                        </Breadcrumb>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <span class="bullet">&#x2022;</span>@FlowName
-                    </SpaceItem>
-                </Space>
-            </Col>
-
-            <Col Class="right-actions">
-            <Space Class="right-header-items">
                 <SpaceItem>
                     <Tooltip Title="New schedule">
                         <Button Class="header-button" Icon="plus" @onclick="@(() => NewSchedule())">
@@ -30,7 +16,7 @@
                         </Button>
                     </Tooltip>
                 </SpaceItem>
-            </Space>
+                </Space>
             </Col>
         </Row>
     </Header>
