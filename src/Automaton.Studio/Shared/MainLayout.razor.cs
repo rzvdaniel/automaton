@@ -8,7 +8,7 @@ public partial class MainLayout : LayoutComponentBase
 {
     private bool MenuCollapsed { get; set; }
 
-    private NavMenu NavigationMenu { get; set; }
+    private MainMenu NavigationMenu { get; set; }
 
     [Inject] JsInterop JsInterop { get; set; }
     [Inject] NavigationManager NavigationManager { get; set; }
@@ -18,7 +18,6 @@ public partial class MainLayout : LayoutComponentBase
     private void ToggleCollapsed()
     {
         MenuCollapsed = !MenuCollapsed;
-        NavigationMenu.SetCollapsed(MenuCollapsed);
     }
 
     private async Task ToggleFullScreen()

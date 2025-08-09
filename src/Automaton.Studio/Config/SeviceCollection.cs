@@ -89,7 +89,6 @@ public static class SeviceCollection
         services.AddScoped<StepsViewModel>();
         services.AddScoped<FlowExplorerViewModel>();
         services.AddScoped<MainLayoutViewModel>();
-        services.AddScoped<NavMenuViewModel>();
         services.AddScoped<FlowActivityViewModel>();
         services.AddScoped<FlowLogsViewModel>();
         services.AddScoped<FlowScheduleViewModel>();
