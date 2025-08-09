@@ -50,64 +50,77 @@
         </Row>
     </Header>
 
-    <Layout Class="designer-container">
+    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Style="background-color: white; margin-left: 10px;">
+        <TabPane Key="designer" Tab="Designer">
+            <Layout Class="designer-container">
 
-        <Sider Theme="SiderTheme.Light" Style="width: 300px">
-            <CascadingValue Value="DesignerViewModel.Flow">
-                <Tabs DefaultActiveKey="1" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
-                    <TabPane Key="1" Tab="Steps">
-                        <StepExplorer></StepExplorer>
-                    </TabPane>
-                    <TabPane Key="2" Tab="Definitions">
-                        <FlowExplorer></FlowExplorer>
-                    </TabPane>
-                </Tabs>
-            </CascadingValue>
-        </Sider>
+                <Sider Theme="SiderTheme.Light" Style="width: 300px">
+                    <CascadingValue Value="DesignerViewModel.Flow">
+                        <Tabs DefaultActiveKey="1" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
+                            <TabPane Key="1" Tab="Steps">
+                                <StepExplorer></StepExplorer>
+                            </TabPane>
+                            <TabPane Key="2" Tab="Definitions">
+                                <FlowExplorer></FlowExplorer>
+                            </TabPane>
+                        </Tabs>
+                    </CascadingValue>
+                </Sider>
 
-        <Content Class="content-container">
-            <Tabs Type="@TabType.EditableCard"
-                  Size="@TabSize.Small"
-                  ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
-                  DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
-                  OnAddClick="OnDefinitionAddClick"
-                  OnTabClick="OnTabClick"
-                  OnClose="OnTabClose">
+                <Content Class="content-container">
+                    <Tabs Type="@TabType.EditableCard"
+                          Size="@TabSize.Small"
+                          ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
+                          DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
+                          OnAddClick="OnDefinitionAddClick"
+                          OnTabClick="OnTabClick"
+                          OnClose="OnTabClose">
 
-                @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
-                {
-                    <TabPane Key="@definition.Id" Tab="@definition.Name">
-                        <Designer @ref="designer"
-                              Class="dropzone"
-                              Steps="definition.Steps"
-                              ItemDrop="@((p)=>OnItemDrop(p))"
-                              ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
+                        @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
+                        {
+                            <TabPane Key="@definition.Id" Tab="@definition.Name">
+                                <Designer @ref="designer"
+                                      Class="dropzone"
+                                      Steps="definition.Steps"
+                                      ItemDrop="@((p)=>OnItemDrop(p))"
+                                      ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
 
-                            <DesignerStep Step="@context" />
+                                    <DesignerStep Step="@context" />
 
-                        </Designer>
-                    </TabPane>
-                }
-            </Tabs>
-        </Content>
+                                </Designer>
+                            </TabPane>
+                        }
+                    </Tabs>
+                </Content>
 
-        <Sider Theme="SiderTheme.Light" CollapsedWidth="0" Width="400" DefaultCollapsed Class="tools-sider" @ref="toolsSider">
-            <CascadingValue Value="DesignerViewModel.Flow">
-                <DynamicComponent Type="toolsPanel"/>
-            </CascadingValue>
-        </Sider>
+                <Sider Theme="SiderTheme.Light" CollapsedWidth="0" Width="400" DefaultCollapsed Class="tools-sider" @ref="toolsSider">
+                    <CascadingValue Value="DesignerViewModel.Flow">
+                        <DynamicComponent Type="toolsPanel"/>
+                    </CascadingValue>
+                </Sider>
 
-        <Sider Theme="SiderTheme.Light" CollapsedWidth="50" DefaultCollapsed Class="settings-sider">
-            <Menu Mode="MenuMode.Inline" Theme="MenuTheme.Light">
-                <MenuItem Key="1" Icon="function" OnClick="OpenFlowVariables">
-                    Variables
-                </MenuItem>
-                <MenuItem Key="2" Icon="profile" OnClick="OpenFlowLogs">
-                    Logs
-                </MenuItem>
-            </Menu>
-        </Sider>
-    </Layout>
+                <Sider Theme="SiderTheme.Light" CollapsedWidth="50" DefaultCollapsed Class="settings-sider">
+                    <Menu Mode="MenuMode.Inline" Theme="MenuTheme.Light">
+                        <MenuItem Key="1" Icon="function" OnClick="OpenFlowVariables">
+                            Variables
+                        </MenuItem>
+                        <MenuItem Key="2" Icon="profile" OnClick="OpenFlowLogs">
+                            Logs
+                        </MenuItem>
+                    </Menu>
+                </Sider>
+            </Layout>
+        </TabPane>
+        <TabPane Key="settings" Tab="Settings">
+            <!-- Empty content for now -->
+        </TabPane>
+        <TabPane Key="activity" Tab="Activity">
+            <!-- Empty content for now -->
+        </TabPane>
+        <TabPane Key="schedule" Tab="Schedule">
+            <!-- Empty content for now -->
+        </TabPane>
+    </Tabs>
 </Layout>
 
 <style>
@@ -149,6 +162,17 @@
     }
 
 </style>
+
+@code {
+    private string activeTabKey = "designer";
+    
+    private void OnTabChange(string key)
+    {
+        activeTabKey = key;
+    }
+    
+    // ...existing code...
+}
 
 
 
