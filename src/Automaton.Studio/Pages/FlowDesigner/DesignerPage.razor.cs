@@ -14,9 +14,7 @@ namespace Automaton.Studio.Pages.FlowDesigner;
 partial class DesignerPage : ComponentBase
 {
     private Designer designer;
-    private Sider toolsSider;
     private string activeTabKey = "designer";
-    private Type toolsPanel = typeof(FlowVariables);
     private bool isStepCreatedHandlerAttached;
 
     [Parameter] public string FlowId { get; set; }
@@ -138,20 +136,6 @@ partial class DesignerPage : ComponentBase
 
             await InvokeAsync(StateHasChanged);
         };
-    }
-
-    private void OpenFlowVariables()
-    {
-        toolsSider.Collapsed = (!toolsSider.Collapsed && toolsPanel != typeof(FlowVariables)) ? 
-            false : !toolsSider.Collapsed;
-        toolsPanel = typeof(FlowVariables);
-    }
-
-    private void OpenFlowLogs()
-    {
-        toolsSider.Collapsed = (!toolsSider.Collapsed && toolsPanel != typeof(FlowLogs)) ?
-            false : !toolsSider.Collapsed;
-        toolsPanel = typeof(FlowLogs);
     }
 
     private void OnDefinitionAddClick()
