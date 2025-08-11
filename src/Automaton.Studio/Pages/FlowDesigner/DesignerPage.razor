@@ -25,6 +25,12 @@
             <Col Class="right-actions" Span="14">
                 <Space Class="right-header-items">
                     <SpaceItem>
+                        <Button Icon="thunderbolt" Class="header-button ai-button" Type="@ButtonType.Primary">
+                            Create with AI ✨
+                        </Button>
+                    </SpaceItem>
+                    
+                    <SpaceItem>
                         <Button Icon="save" Class="header-button" OnClick="SaveFlow">
                             Save
                         </Button>
@@ -172,6 +178,18 @@
 
     div.ant-tabs-nav-wrap {
         padding-left: 5px;
+    }
+
+    .ai-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        box-shadow: 0 4px 15px 0 rgba(116, 75, 162, 0.3);
+    }
+
+    .ai-button:hover {
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px 0 rgba(116, 75, 162, 0.4);
     }
 
 </style>
