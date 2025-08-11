@@ -25,8 +25,8 @@
             <Col Class="right-actions" Span="14">
                 <Space Class="right-header-items">
                     <SpaceItem>
-                        <Button Icon="thunderbolt" Class="header-button ai-button" Type="@ButtonType.Primary">
-                            Create with AI ✨
+                        <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
+                            Create Flow with AI ✨
                         </Button>
                     </SpaceItem>
                     
@@ -58,16 +58,30 @@
         <TabPane Key="designer" Tab="Designer">
             <Layout Class="designer-container">
 
-                <Sider Theme="SiderTheme.Light" Style="width: 300px">
+                <Sider Theme="SiderTheme.Light" Style="width: 350px">
                     <CascadingValue Value="DesignerViewModel.Flow">
-                        <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
-                            <TabPane Key="core" Tab="Core Steps">
-                                <CoreStepsExplorer></CoreStepsExplorer>
-                            </TabPane>
-                            <TabPane Key="custom" Tab="Custom Steps">
-                                <CustomStepsExplorer></CustomStepsExplorer>
-                            </TabPane>
-                        </Tabs>
+                        <div class="step-library-container">
+                            <div class="step-library-header">
+                                <Title Level="5" Style="margin: 10px 0 5px 15px; color: #666;">Step Library</Title>
+                            </div>
+                            
+                            <div class="step-library-content">
+                                <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
+                                    <TabPane Key="core" Tab="Core Steps">
+                                        <CoreStepsExplorer></CoreStepsExplorer>
+                                    </TabPane>
+                                    <TabPane Key="custom" Tab="Custom Steps">
+                                        <CustomStepsExplorer></CustomStepsExplorer>
+                                    </TabPane>
+                                </Tabs>
+                                
+                                <div class="create-step-ai-section">
+                                    <Button Icon="plus" Type="@ButtonType.Primary" Class="create-step-ai-button">
+                                        Create Step with AI ✨
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </CascadingValue>
                 </Sider>
 
@@ -173,26 +187,42 @@
 
     .explorer-tabs {
         padding-top: 10px;
+        height: calc(100% - 60px); /* Reserve space for AI button */
+    }
+
+    .explorer-tabs .ant-tabs-content-holder {
+        height: calc(100vh - 350px); /* Reduced height for tab content */
+        overflow: auto;
+    }
+
+    .explorer-tabs .ant-tabs-nav {
+        margin-bottom: 0 !important;
+    }
+
+    .create-step-ai-section {
+        padding: 2px 2px;
+    }
+
+    .create-step-ai-button {
+        width: 100%;
+    }
+
+    .step-library-container {
         height: 100%;
+        display: flex;
+        flex-direction: column;
     }
 
-    div.ant-tabs-nav-wrap {
-        padding-left: 5px;
+    .step-library-header {
+        background-color: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+        flex-shrink: 0;
     }
 
-    .ai-button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        box-shadow: 0 4px 15px 0 rgba(116, 75, 162, 0.3);
+    .step-library-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        position: relative;
     }
-
-    .ai-button:hover {
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px 0 rgba(116, 75, 162, 0.4);
-    }
-
 </style>
-
-
-
