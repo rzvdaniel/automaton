@@ -1,7 +1,6 @@
 ﻿@page "/flow/designer/{flowid}/{flowname}"
 @using AntDesign
 @using Automaton.Studio.Pages.FlowDesigner.Components.Drawer
-@using Automaton.Studio.Pages.FlowDesigner.Components.FlowExplorer
 @using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer
 @using Automaton.Studio.Pages.FlowDesigner.Components;
 @using Automaton.Studio.Domain;
@@ -55,12 +54,12 @@
 
                 <Sider Theme="SiderTheme.Light" Style="width: 300px">
                     <CascadingValue Value="DesignerViewModel.Flow">
-                        <Tabs DefaultActiveKey="1" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
-                            <TabPane Key="1" Tab="Steps">
-                                <StepExplorer></StepExplorer>
+                        <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
+                            <TabPane Key="core" Tab="Core Steps">
+                                <CoreStepsExplorer></CoreStepsExplorer>
                             </TabPane>
-                            <TabPane Key="2" Tab="Definitions">
-                                <FlowExplorer></FlowExplorer>
+                            <TabPane Key="custom" Tab="Custom Steps">
+                                <CustomStepsExplorer></CustomStepsExplorer>
                             </TabPane>
                         </Tabs>
                     </CascadingValue>

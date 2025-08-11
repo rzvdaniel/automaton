@@ -3,7 +3,6 @@ using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.CustomSteps;
-using Automaton.Studio.Pages.FlowDesigner.Components.FlowExplorer;
 using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Steps.ExecuteFlow;
 
@@ -21,7 +20,6 @@ public class AutoMapperProfile : Profile
         CreateMap<StudioStep, Step>();
         CreateMap<StudioDefinition, Definition>();
 
-        CreateMap<StudioDefinition, FlowExplorerDefinition>();
         CreateMap<FlowInfo, ExecuteFlowModel>();
         CreateMap<FlowInfo, FlowModel>();
         CreateMap<WorkflowExecution, FlowExecution>();

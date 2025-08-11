@@ -2,12 +2,9 @@
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
-using Automaton.Studio.Pages.FlowDesigner.Components.Drawer;
-using Automaton.Studio.Pages.FlowDesigner.Components.FlowExplorer;
 using Automaton.Studio.Pages.FlowDesigner.Components.NewDefinition;
 using Automaton.Studio.Resources;
 using Microsoft.AspNetCore.Components;
-using Automaton.Studio.Pages.FlowDesigner;
 
 namespace Automaton.Studio.Pages.FlowDesigner;
 
@@ -24,7 +21,6 @@ partial class DesignerPage : ComponentBase
     [Inject] ICourier Courier { get; set; }
     [Inject] ModalService ModalService { get; set; } = default!;
     [Inject] DesignerViewModel DesignerViewModel { get; set; } = default!;
-    [Inject] FlowExplorerViewModel FlowExplorerViewModel { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,9 +96,6 @@ partial class DesignerPage : ComponentBase
         Guid.TryParse(FlowId, out var flowId);
 
         await DesignerViewModel.LoadFlow(flowId);
-
-        FlowExplorerViewModel.LoadDefinitions(DesignerViewModel.Flow);
-
     }
 
     private async Task SaveFlow()
@@ -154,7 +147,6 @@ partial class DesignerPage : ComponentBase
         {
             var definition = DesignerViewModel.CreateDefinition(newDefinitionModel.Name);
             DesignerViewModel.SetActiveDefinition(definition);
-            FlowExplorerViewModel.RefreshDefinitions();
 
             StateHasChanged();
 

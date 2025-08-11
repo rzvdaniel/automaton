@@ -11,19 +11,19 @@ public class StepFactory
 {
     private const string StepsAssembly = "Automaton.Studio";
 
-    private readonly IMediator mediator;
     private readonly IServiceProvider serviceProvider;
     private readonly CustomStepsService customStepsService;
     private readonly StepTypeDescriptor stepTypeDescriptor;
     private readonly IDictionary<string, StepExplorerModel> explorerSteps = new Dictionary<string, StepExplorerModel>();
+    private readonly IDictionary<string, StepExplorerModel> coreSteps = new Dictionary<string, StepExplorerModel>();
+    private readonly IDictionary<string, StepExplorerModel> customSteps = new Dictionary<string, StepExplorerModel>();
     private readonly IDictionary<string, Type> solutionTypes = new Dictionary<string, Type>();
 
-    public StepFactory(StepTypeDescriptor stepTypeDescriptor, IServiceProvider serviceProvider, CustomStepsService customStepsService, IMediator mediator)
+    public StepFactory(StepTypeDescriptor stepTypeDescriptor, IServiceProvider serviceProvider, CustomStepsService customStepsService)
     {
         this.serviceProvider = serviceProvider;
         this.stepTypeDescriptor = stepTypeDescriptor;
         this.customStepsService = customStepsService;
-        this.mediator = mediator;
 
         LoadSteps();
     }
@@ -31,6 +31,16 @@ public class StepFactory
     public IEnumerable<StepExplorerModel> GetSteps()
     {
         return explorerSteps.Values;
+    }
+
+    public IEnumerable<StepExplorerModel> GetCoreSteps()
+    {
+        return coreSteps.Values;
+    }
+
+    public IEnumerable<StepExplorerModel> GetCustomSteps()
+    {
+        return customSteps.Values;
     }
 
     public StudioStep CreateStep(string name, StudioDefinition activeDefinition)
@@ -78,12 +88,14 @@ public class StepFactory
     {
         foreach (var category in explorerSteps.Values)
         {
+            // Find the step with the matching id in the category's Steps collection
             var stepToRemove = category.Steps.FirstOrDefault(step => step.Id == id);
 
             if (stepToRemove != null)
             {
+                // Remove the step from the category's Steps collection
                 category.Steps.Remove(stepToRemove);
-                break;
+                break; // Exit the loop once the step is found and removed
             }
         }
     }
@@ -113,7 +125,7 @@ public class StepFactory
     }
 
     private void LoadSteps()
-    {
+    {        
         LoadAssemblySteps();
 
         LoadCustomSteps();
@@ -135,16 +147,35 @@ public class StepFactory
 
     private void LoadCustomSteps()
     {
-        var customSteps = Task.Run(customStepsService.List).Result;
+        var customStepsList = Task.Run(customStepsService.List).Result;
 
-        foreach (var customStep in customSteps)
+        foreach (var customStep in customStepsList)
         {
-            AddCustomStep(customStep);
+            AddExplorerCategory(customStep.Category, isCustom: true);
+
+            var explorerStep = CreateCustomStepExplorerModel(customStep);
+
+            // Add to custom steps collection
+            var category = customSteps[customStep.Category];
+            category.Steps.Add(explorerStep);
+            
+            // Also add to main collection for backwards compatibility
+            var mainCategory = explorerSteps[customStep.Category];
+            mainCategory.Steps.Add(explorerStep);
         }
     }
 
-    private void AddExplorerCategory(string categoryName)
+    private void AddExplorerCategory(string categoryName, bool isCustom = false)
     {
+        var targetCollection = isCustom ? customSteps : coreSteps;
+        
+        if (!targetCollection.ContainsKey(categoryName))
+        {
+            var categoryModel = CreateCategoryModel(categoryName);
+            targetCollection.Add(categoryName, categoryModel);
+        }
+        
+        // Also add to the main collection for backwards compatibility
         if (!explorerSteps.ContainsKey(categoryName))
         {
             var categoryModel = CreateCategoryModel(categoryName);
@@ -164,38 +195,55 @@ public class StepFactory
         {
             if (string.IsNullOrEmpty(stepDescriptor.Category))
             {
+                coreSteps.Add(explorerStep.Name, explorerStep);
                 explorerSteps.Add(explorerStep.Name, explorerStep);
             }
             else
             {
-                if (!explorerSteps.ContainsKey(stepDescriptor.Category))
-                {
-                    var categoryModel = CreateCategoryModel(stepDescriptor.Category);
-                    explorerSteps.Add(stepDescriptor.Category, categoryModel);
-                }
+                AddExplorerCategory(stepDescriptor.Category, isCustom: false);
 
-                var category = explorerSteps[stepDescriptor.Category];
-                category.Steps.Add(explorerStep);
+                var coreCategory = coreSteps[stepDescriptor.Category];
+                coreCategory.Steps.Add(explorerStep);
+                
+                var mainCategory = explorerSteps[stepDescriptor.Category];
+                mainCategory.Steps.Add(explorerStep);
             }
         }
     }
 
     public void AddCustomStep(CustomStep customStep)
     {
-        AddExplorerCategory(customStep.Category);
+        AddExplorerCategory(customStep.Category, isCustom: true);
 
         var explorerStep = CreateCustomStepExplorerModel(customStep);
 
-        var category = explorerSteps[customStep.Category];
+        var category = customSteps[customStep.Category];
         category.Steps.Add(explorerStep);
+        
+        // Also add to main collection for backwards compatibility
+        var mainCategory = explorerSteps[customStep.Category];
+        mainCategory.Steps.Add(explorerStep);
     }
 
     public void UpdateCustomStep(CustomStep customStep)
     {
-        var explorerCategory = explorerSteps[customStep.Category];
+        // Update in custom steps collection
+        var explorerCategory = customSteps[customStep.Category];
         var steps = explorerCategory.Steps;
         var index = steps.FindIndex(x => x.Id == customStep.Id);
-        steps[index] = CreateCustomStepExplorerModel(customStep);
+        if (index >= 0)
+        {
+            steps[index] = CreateCustomStepExplorerModel(customStep);
+        }
+        
+        // Also update in main collection for backwards compatibility
+        var mainCategory = explorerSteps[customStep.Category];
+        var mainSteps = mainCategory.Steps;
+        var mainIndex = mainSteps.FindIndex(x => x.Id == customStep.Id);
+        if (mainIndex >= 0)
+        {
+            mainSteps[mainIndex] = CreateCustomStepExplorerModel(customStep);
+        }
     }
 
     private static StepExplorerModel CreateStepExplorerModel(StepDescriptor stepDescriptor)

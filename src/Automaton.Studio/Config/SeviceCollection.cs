@@ -12,7 +12,6 @@ using Automaton.Studio.Mapper;
 using Automaton.Studio.Pages.CustomStepDesigner;
 using Automaton.Studio.Pages.CustomSteps;
 using Automaton.Studio.Pages.FlowDesigner;
-using Automaton.Studio.Pages.FlowDesigner.Components.FlowExplorer;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Pages.Runners;
@@ -83,11 +82,12 @@ public static class SeviceCollection
         // ViewModels
         services.AddScoped<FlowsViewModel>();
         services.AddScoped<RunnersViewModel>();
-        services.AddScoped<CustomStepsViewModel>();
+        services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<CustomStepViewModel>();
         services.AddScoped<StepsViewModel>();
-        services.AddScoped<FlowExplorerViewModel>();
+        services.AddScoped<CoreStepsViewModel>();
+        services.AddScoped<Pages.FlowDesigner.Components.StepExplorer.CustomStepsViewModel>();
         services.AddScoped<MainLayoutViewModel>();
         services.AddScoped<FlowActivityViewModel>();
         services.AddScoped<FlowLogsViewModel>();
