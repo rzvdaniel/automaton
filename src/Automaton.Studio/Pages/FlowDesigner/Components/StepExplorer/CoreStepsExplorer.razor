@@ -33,8 +33,9 @@
         padding-top: 10px;
         background-color: white;
         border-right: 1px solid #f0f0f0;
-        height: calc(100vh - 320px);
-        overflow: auto
+        flex: 1;
+        overflow: auto;
+        min-height: 0; /* Important for flex child to shrink */
     }
 
     .activities-search {
@@ -42,9 +43,12 @@
         background-color: white;
         border-right: 1px solid #f0f0f0;
         width: 100%;
+        flex-shrink: 0;
     }
 
     .activities-container {
         height: 100%;
+        display: flex;
+        flex-direction: column;
     }
 </style>

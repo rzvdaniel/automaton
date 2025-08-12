@@ -11,60 +11,60 @@
             <Col Span="10">
 
             <Space Direction="SpaceDirection.Horizontal">
-                    <SpaceItem>
-                        <Breadcrumb>
-                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
+                <SpaceItem>
+                    <Breadcrumb>
+                        <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
                         <BreadcrumbItem></BreadcrumbItem>
-                        </Breadcrumb>                         
-                    </SpaceItem>
+                    </Breadcrumb>
+                </SpaceItem>
                 <SpaceItem><span style="font-size: 20px"><b>@FlowName</b></span></SpaceItem>
             </Space>
-               
+
             </Col>
 
             <Col Class="right-actions" Span="14">
-                <Space Class="right-header-items">
-                    <SpaceItem>
-                        <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
-                            Create Flow with AI ✨
-                        </Button>
-                    </SpaceItem>
-                    
-                    <SpaceItem>
-                        <Button Icon="save" Class="header-button" OnClick="SaveFlow">
-                            Save
-                        </Button>
-                    </SpaceItem>
+            <Space Class="right-header-items">
+                <SpaceItem>
+                    <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
+                        Create Flow with AI ✨
+                    </Button>
+                </SpaceItem>
 
-                    <SpaceItem>
-                        @if (DesignerViewModel.CanExecuteFlow)
+                <SpaceItem>
+                    <Button Icon="save" Class="header-button" OnClick="SaveFlow">
+                        Save
+                    </Button>
+                </SpaceItem>
+
+                <SpaceItem>
+                    @if (DesignerViewModel.CanExecuteFlow)
+                    {
+                        if (DesignerViewModel.IsFlowNotRunning())
                         {
-                            if (DesignerViewModel.IsFlowNotRunning())
-                            {
-                                <Button Icon="caret-right" Class="header-button" OnClick="RunFlow">Run</Button>
-                            }
-                            else
-                            {
-                                <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
-                            }
+                            <Button Icon="caret-right" Class="header-button" OnClick="RunFlow">Run</Button>
                         }
-                    </SpaceItem>
-                </Space>
+                        else
+                        {
+                            <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
+                        }
+                    }
+                </SpaceItem>
+            </Space>
             </Col>
         </Row>
     </Header>
 
-    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Style="background-color: white; margin-left: 10px;">
+    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Class="main-tabs-container" Style="background-color: white; margin-left: 10px;">
         <TabPane Key="designer" Tab="Designer">
             <Layout Class="designer-container">
 
-                <Sider Theme="SiderTheme.Light" Style="width: 350px">
+                <Sider Theme="SiderTheme.Light" Style="width: 320px; min-width: 320px; max-width: 320px;">
                     <CascadingValue Value="DesignerViewModel.Flow">
                         <div class="step-library-container">
                             <div class="step-library-header">
                                 <Title Level="5" Style="margin: 10px 0 5px 15px; color: #666;">Step Library</Title>
                             </div>
-                            
+
                             <div class="step-library-content">
                                 <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
                                     <TabPane Key="core" Tab="Core Steps">
@@ -74,7 +74,7 @@
                                         <CustomStepsExplorer></CustomStepsExplorer>
                                     </TabPane>
                                 </Tabs>
-                                
+
                                 <div class="create-step-ai-section">
                                     <Button Icon="plus" Type="@ButtonType.Primary" Class="create-step-ai-button">
                                         Create Step with AI ✨
@@ -99,10 +99,10 @@
                             {
                                 <TabPane Key="@definition.Id" Tab="@definition.Name">
                                     <Designer @ref="designer"
-                                          Class="dropzone"
-                                          Steps="definition.Steps"
-                                          ItemDrop="@((p)=>OnItemDrop(p))"
-                                          ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
+                                              Class="dropzone"
+                                              Steps="definition.Steps"
+                                              ItemDrop="@((p)=>OnItemDrop(p))"
+                                              ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
 
                                         <DesignerStep Step="@context" />
 
@@ -146,21 +146,25 @@
         background-color: #fff;
         flex: 1;
         overflow: auto;
+        min-width: 0; /* Important for flex shrinking */
     }
 
     .designer-container {
         background-color: #fafafa;
+        height: 100%;
+        overflow: hidden;
     }
 
     .main-content-layout {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - 200px);
+        height: 100%;
+        min-width: 0; /* Important for flex shrinking */
     }
 
     .dropzone {
         overflow: auto;
-        height: calc(100vh - 500px); /* Adjusted for bottom panel */
+        flex: 1;
     }
 
     .bottom-panel {
@@ -176,7 +180,7 @@
     }
 
     .bottom-tabs .ant-tabs-content-holder {
-        height: calc(100% - 44px);
+        flex: 1;
         overflow: auto;
     }
 
@@ -186,25 +190,61 @@
     }
 
     .explorer-tabs {
-        padding-top: 10px;
-        height: calc(100% - 60px); /* Reserve space for AI button */
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     }
 
     .explorer-tabs .ant-tabs-content-holder {
-        height: calc(100vh - 350px); /* Reduced height for tab content */
-        overflow: auto;
+        flex: 1;
+        overflow: hidden;
     }
 
     .explorer-tabs .ant-tabs-nav {
         margin-bottom: 0 !important;
+        flex-shrink: 0;
     }
 
     .create-step-ai-section {
-        padding: 2px 2px;
+        padding: 8px 12px;
+        border-top: 1px solid #e9ecef;
+        background-color: #f8f9fa;
+        flex-shrink: 0;
     }
 
     .create-step-ai-button {
         width: 100%;
+        border-radius: 6px;
+    }
+
+    .main-tabs-container {
+        height: calc(100vh - 53px); /* Account for header height properly */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        width: 100%;
+        max-width: 100vw;
+    }
+
+    /* Fix main tabs to use full height */
+    .ant-tabs {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ant-tabs > .ant-tabs-content-holder {
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content {
+        height: 100%;
+    }
+
+    .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
+        height: 100%;
     }
 
     .step-library-container {
@@ -223,6 +263,7 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        position: relative;
+        min-height: 0; /* Important for flex child to shrink */
+        overflow: hidden;
     }
 </style>
