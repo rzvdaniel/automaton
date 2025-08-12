@@ -54,7 +54,7 @@
         </Row>
     </Header>
 
-    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Class="main-tabs-container" Style="background-color: white; margin-left: 10px;">
+    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Class="main-tabs-container" Style="background-color: white;">
         <TabPane Key="designer" Tab="Designer">
             <Layout Class="designer-container">
 
@@ -145,8 +145,10 @@
     .content-container {
         background-color: #fff;
         flex: 1;
-        overflow: auto;
+        overflow: hidden;
         min-width: 0; /* Important for flex shrinking */
+        display: flex;
+        flex-direction: column;
     }
 
     .designer-container {
@@ -162,10 +164,6 @@
         min-width: 0; /* Important for flex shrinking */
     }
 
-    .dropzone {
-        overflow: auto;
-        flex: 1;
-    }
 
     .bottom-panel {
         background-color: #f8f9fa;
@@ -215,7 +213,6 @@
 
     .create-step-ai-button {
         width: 100%;
-        border-radius: 6px;
     }
 
     .main-tabs-container {
@@ -224,7 +221,8 @@
         flex-direction: column;
         overflow: hidden;
         width: 100%;
-        max-width: 100vw;
+        padding-left: 10px;
+        box-sizing: border-box;
     }
 
     /* Fix main tabs to use full height */
@@ -245,6 +243,8 @@
 
     .ant-tabs > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane {
         height: 100%;
+        display: flex;
+        flex-direction: column;
     }
 
     .step-library-container {
