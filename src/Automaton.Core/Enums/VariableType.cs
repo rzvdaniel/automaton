@@ -4,8 +4,8 @@
     {
         String,
         Text,
-        Number,
         Boolean,
+        Number,
         Date
     }
 }
