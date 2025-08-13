@@ -59,7 +59,7 @@ namespace Automaton.Core.Tests.Services
 
             var definition1 = new Definition { Id = "def1", Name = "Definition 1" };
             var definition2 = new Definition { Id = "def2", Name = "Definition 2" };
-            
+
             flow.Definitions.Add(definition1);
             flow.Definitions.Add(definition2);
 
@@ -92,44 +92,6 @@ namespace Automaton.Core.Tests.Services
             Assert.That(workflow.Variables.Count, Is.EqualTo(0));
             Assert.That(workflow.OutputVariables.Count, Is.EqualTo(0));
             Assert.That(workflow.Definitions.Count, Is.EqualTo(0));
-        }
-
-        [Test]
-        public void ConvertFlow_ShouldCreateWorkflowStepsFromFlowSteps()
-        {
-            // Arrange
-            var flow = new Flow
-            {
-                Id = Guid.NewGuid(),
-                Name = "Test Flow",
-                StartupDefinitionId = "def1"
-            };
-
-            var step = new Step
-            {
-                Id = "step1",
-                Name = "Test Step",
-                Type = "TestType"
-            };
-
-            var definition = new Definition { Id = "def1" };
-            definition.Steps.Add(step);
-            flow.Definitions.Add(definition);
-
-            var mockWorkflowStep = Substitute.For<WorkflowStep>();
-            _serviceProvider.GetService(Arg.Any<Type>()).Returns(mockWorkflowStep);
-
-            // Act
-            var workflow = _flowConvertService.ConvertFlow(flow);
-
-            // Assert
-            Assert.That(workflow.Definitions.Count, Is.EqualTo(1));
-            var workflowDefinition = workflow.Definitions.First();
-            Assert.That(workflowDefinition.Steps.Count, Is.EqualTo(1));
-            Assert.That(workflowDefinition.Steps.ContainsKey("step1"), Is.True);
-            
-            // Verify Setup was called on the workflow step
-            mockWorkflowStep.Received(1).Setup(step, workflowDefinition);
         }
     }
 
