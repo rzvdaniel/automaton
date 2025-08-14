@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="IronPython" Version="3.4.1" />
-    <PackageReference Include="IronPython.StdLib" Version="3.4.1" />
+    <PackageReference Include="IronPython" Version="3.4.2" />
+    <PackageReference Include="IronPython.StdLib" Version="3.4.2" />
     <PackageReference Include="MediatR" Version="13.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
   </ItemGroup>
 </Project>
