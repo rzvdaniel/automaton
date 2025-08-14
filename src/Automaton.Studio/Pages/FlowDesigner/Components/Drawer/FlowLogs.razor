@@ -9,18 +9,18 @@
     <ChildContent>
         <GridRow>
             <Col>
-            <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
-                <SpaceItem>
-                    <Tooltip Placement="@Placement.Top" Title="Clear">
-                        <Button Icon="delete"
-                                Size="@ButtonSize.Small"
-                                Class="flow-logs-clear"
-                                OnClick="ClearLogs"
-                                OnClickStopPropagation>
-                        </Button>
-                    </Tooltip>
-                </SpaceItem>
-            </Space>
+                <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
+                    <SpaceItem>
+                        <Tooltip Placement="@Placement.Top" Title="Clear">
+                            <Button Icon="delete"
+                                    Size="@ButtonSize.Small"
+                                    Class="flow-logs-clear"
+                                    OnClick="ClearLogs"
+                                    OnClickStopPropagation>
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                </Space>
             </Col>
         </GridRow>
         <GridRow>
@@ -35,8 +35,7 @@
 
 <style>
     .flow-logs-form {
-        background-color: #efefef;
-        padding: 20px 20px 0px 20px;
+        padding: 5px;
         overflow: hidden;
         height: 100%;
     }
@@ -47,7 +46,7 @@
 
     #flow-logs {
         width: 100% !important;
-        height: 200px !important;
+        height: 150px !important;
         font-size: smaller;
     }
 </style>

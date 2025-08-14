@@ -86,44 +86,54 @@
                 </Sider>
 
                 <Layout Class="main-content-layout">
-                    <Content Class="content-container">
-                        <Tabs Type="@TabType.EditableCard"
-                              Size="@TabSize.Small"
-                              ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
-                              DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
-                              OnAddClick="OnDefinitionAddClick"
-                              OnTabClick="OnTabClick"
-                              OnClose="OnTabClose">
 
-                            @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
-                            {
-                                <TabPane Key="@definition.Id" Tab="@definition.Name">
-                                    <Designer @ref="designer"
-                                              Class="dropzone"
-                                              Steps="definition.Steps"
-                                              ItemDrop="@((p)=>OnItemDrop(p))"
-                                              ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
+                    <Splitter Layout="@SplitterLayout.Vertical">
+                        <SplitterPanel>
 
-                                        <DesignerStep Step="@context" />
+                            <Content Class="content-container">
+                                <Tabs Type="@TabType.EditableCard"
+                                      Size="@TabSize.Small"
+                                      ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
+                                      DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
+                                      OnAddClick="OnDefinitionAddClick"
+                                      OnTabClick="OnTabClick"
+                                      OnClose="OnTabClose"
+                                      Class="designer-tabs">
 
-                                    </Designer>
-                                </TabPane>
-                            }
-                        </Tabs>
-                    </Content>
+                                    @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
+                                    {
+                                        <TabPane Key="@definition.Id" Tab="@definition.Name">
+                                            <Designer @ref="designer"
+                                                      Class="dropzone"
+                                                      Steps="definition.Steps"
+                                                      ItemDrop="@((p)=>OnItemDrop(p))"
+                                                      ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
 
-                    <Footer Class="bottom-panel">
-                        <CascadingValue Value="DesignerViewModel.Flow">
-                            <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
-                                <TabPane Key="logs" Tab="Logs">
-                                    <FlowLogs />
-                                </TabPane>
-                                <TabPane Key="variables" Tab="Variables">
-                                    <FlowVariables />
-                                </TabPane>
-                            </Tabs>
-                        </CascadingValue>
-                    </Footer>
+                                                <DesignerStep Step="@context" />
+
+                                            </Designer>
+                                        </TabPane>
+                                    }
+                                </Tabs>
+                            </Content>
+                        </SplitterPanel>
+
+                        <SplitterPanel>
+                            <Footer Class="bottom-panel">
+                                <CascadingValue Value="DesignerViewModel.Flow">
+                                    <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
+                                        <TabPane Key="logs" Tab="Logs">
+                                            <FlowLogs />
+                                        </TabPane>
+                                        <TabPane Key="variables" Tab="Variables">
+                                            <FlowVariables />
+                                        </TabPane>
+                                    </Tabs>
+                                </CascadingValue>
+                            </Footer>
+                        </SplitterPanel>
+                    </Splitter>
+
                 </Layout>
 
                 @if (selectedStep != null)
@@ -163,6 +173,7 @@
         min-width: 0; /* Important for flex shrinking */
         display: flex;
         flex-direction: column;
+        height: 100%;
     }
 
     .designer-container {
@@ -203,22 +214,21 @@
     }
 
     .bottom-panel {
-        background-color: #f8f9fa;
-        border-top: 1px solid #d9d9d9;
         height: 300px;
         flex-shrink: 0;
-        padding: 0;
+        padding: 6px;
+    }
+
+    /* Target only the bottom splitter panel (the one containing .bottom-panel) */
+    .ant-splitter-panel:has(.bottom-panel) {
+        overflow: hidden;
     }
 
     .bottom-tabs {
         height: 100%;
     }
 
-    .bottom-tabs .ant-tabs-content-holder {
-        flex: 1;
-        overflow: auto;
-    }
-
+  
     .runners-select {
         min-width: 140px;
         max-width: 140px;
@@ -229,16 +239,6 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-    }
-
-    .explorer-tabs .ant-tabs-content-holder {
-        flex: 1;
-        overflow: hidden;
-    }
-
-    .explorer-tabs .ant-tabs-nav {
-        margin-bottom: 0 !important;
-        flex-shrink: 0;
     }
 
     .create-step-ai-section {
