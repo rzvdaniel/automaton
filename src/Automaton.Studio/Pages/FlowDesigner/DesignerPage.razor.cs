@@ -103,7 +103,6 @@ partial class DesignerPage : ComponentBase
 
     private void OnStepDeleted(object sender, StepEventArgs e)
     {
-        // Close properties panel if the deleted step was selected
         if (selectedStep?.Id == e.Step.Id)
         {
             selectedStep = null;
