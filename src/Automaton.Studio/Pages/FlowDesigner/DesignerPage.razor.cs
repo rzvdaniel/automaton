@@ -13,6 +13,8 @@ partial class DesignerPage : ComponentBase
     private Designer designer;
     private string activeTabKey = "designer";
     private bool isStepCreatedHandlerAttached;
+    private StudioStep selectedStep;
+    private const int PropertiesSiderWidth = 350;
 
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
@@ -76,18 +78,36 @@ partial class DesignerPage : ComponentBase
             return;
         }
 
-        var result = await step.DisplayPropertiesDialog(ModalService);
+        selectedStep = step;
+        StateHasChanged();
+    }
 
-        result.OnOk = () =>
+    private void ClosePropertiesPanel()
+    {
+        selectedStep = null;
+        StateHasChanged();
+    }
+
+    private string GetPropertiesSiderStyle()
+    {
+        return $"width: {PropertiesSiderWidth}px; min-width: {PropertiesSiderWidth}px; max-width: {PropertiesSiderWidth}px;";
+    }
+
+    private Dictionary<string, object> GetStepPropertiesParameters(StudioStep step)
+    {
+        return new Dictionary<string, object>
         {
-            StateHasChanged();
-
-            return Task.CompletedTask;
+            { "Options", step }
         };
     }
 
     private void OnStepDeleted(object sender, StepEventArgs e)
     {
+        // Close properties panel if the deleted step was selected
+        if (selectedStep?.Id == e.Step.Id)
+        {
+            selectedStep = null;
+        }
         StateHasChanged();
     }
 
@@ -114,6 +134,7 @@ partial class DesignerPage : ComponentBase
             return;
         }
 
+        // For new steps, still use modal dialog during creation
         var result = await step.DisplayPropertiesDialog(ModalService);
 
         result.OnOk = async () =>

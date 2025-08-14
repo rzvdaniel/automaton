@@ -10,46 +10,46 @@
         <Row>
             <Col Span="10">
 
-            <Space Direction="SpaceDirection.Horizontal">
-                <SpaceItem>
-                    <Breadcrumb>
-                        <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
-                        <BreadcrumbItem></BreadcrumbItem>
-                    </Breadcrumb>
-                </SpaceItem>
-                <SpaceItem><span style="font-size: 20px"><b>@FlowName</b></span></SpaceItem>
-            </Space>
+                <Space Direction="SpaceDirection.Horizontal">
+                    <SpaceItem>
+                        <Breadcrumb>
+                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
+                            <BreadcrumbItem></BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                    <SpaceItem><span style="font-size: 20px"><b>@FlowName</b></span></SpaceItem>
+                </Space>
 
             </Col>
 
             <Col Class="right-actions" Span="14">
-            <Space Class="right-header-items">
-                <SpaceItem>
-                    <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
-                        Create Flow with AI ✨
-                    </Button>
-                </SpaceItem>
+                <Space Class="right-header-items">
+                    <SpaceItem>
+                        <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
+                            Create Flow with AI ✨
+                        </Button>
+                    </SpaceItem>
 
-                <SpaceItem>
-                    <Button Icon="save" Class="header-button" OnClick="SaveFlow">
-                        Save
-                    </Button>
-                </SpaceItem>
+                    <SpaceItem>
+                        <Button Icon="save" Class="header-button" OnClick="SaveFlow">
+                            Save
+                        </Button>
+                    </SpaceItem>
 
-                <SpaceItem>
-                    @if (DesignerViewModel.CanExecuteFlow)
-                    {
-                        if (DesignerViewModel.IsFlowNotRunning())
+                    <SpaceItem>
+                        @if (DesignerViewModel.CanExecuteFlow)
                         {
-                            <Button Icon="caret-right" Class="header-button" OnClick="RunFlow">Run</Button>
+                            if (DesignerViewModel.IsFlowNotRunning())
+                            {
+                                <Button Icon="caret-right" Class="header-button" OnClick="RunFlow">Run</Button>
+                            }
+                            else
+                            {
+                                <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
+                            }
                         }
-                        else
-                        {
-                            <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
-                        }
-                    }
-                </SpaceItem>
-            </Space>
+                    </SpaceItem>
+                </Space>
             </Col>
         </Row>
     </Header>
@@ -62,7 +62,7 @@
                     <CascadingValue Value="DesignerViewModel.Flow">
                         <div class="step-library-container">
                             <div class="step-library-header">
-                                <Title Level="5" Style="margin: 10px 0 5px 15px; color: #666;">Step Library</Title>
+                                <Title Level="5" Style="margin: 10px 0 5px 15px;">Step Library</Title>
                             </div>
 
                             <div class="step-library-content">
@@ -126,6 +126,20 @@
                     </Footer>
                 </Layout>
 
+                @if (selectedStep != null)
+                {
+                    <Sider Theme="SiderTheme.Light" Style="@GetPropertiesSiderStyle()" Class="properties-sider">
+                         <div class="properties-container">
+                            <div class="step-library-header">
+                                <Title Level="5" Style="margin: 10px 0 5px 15px;">Step Properties</Title>
+                            </div>
+                            <div class="properties-content">
+                                <StepPropertiesWrapper Step="selectedStep" />
+                            </div>
+                        </div> 
+                    </Sider> 
+                }
+
             </Layout>
         </TabPane>
         <TabPane Key="activity" Tab="Activity">
@@ -164,6 +178,29 @@
         min-width: 0; /* Important for flex shrinking */
     }
 
+    .properties-sider {
+        border-left: 1px solid #f0f0f0;
+        background-color: #fff;
+    }
+
+    .properties-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .properties-header {
+        background-color: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 0;
+        flex-shrink: 0;
+    }
+
+    .properties-content {
+        flex: 1;
+        overflow: auto;
+        padding: 15px;
+    }
 
     .bottom-panel {
         background-color: #f8f9fa;
