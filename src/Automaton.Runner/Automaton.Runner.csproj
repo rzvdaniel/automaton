@@ -28,6 +28,7 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
     <PackageReference Include="Polly" Version="8.5.0" />
     <PackageReference Include="Serilog" Version="4.1.0" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Automaton.App.Authentication\Automaton.App.Authentication.csproj" />

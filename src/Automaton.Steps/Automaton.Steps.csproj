@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj" />
