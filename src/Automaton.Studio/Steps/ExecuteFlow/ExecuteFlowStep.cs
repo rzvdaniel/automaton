@@ -10,7 +10,7 @@ namespace Automaton.Studio.Steps.ExecuteFlow;
     Name = "ExecuteFlow",
     Type = "ExecuteFlow",
     DisplayName = "Run flow",
-    Category = "Flow control",
+    Category = "Scripting",
     Description = "Executes a flow",
     MoreInfo = "https://www.automaton.studio/documentation",
     Icon = "apartment"

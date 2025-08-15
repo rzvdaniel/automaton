@@ -2,10 +2,10 @@
 
 <StepDesigner Step=@Step>
     <div>
-        <b>@Step.Title</b>
+        <b>@Step.DisplayName</b>
     </div>
     <div>
-        @Step.Description
+        @Step.Description <a href="" @onclick:preventDefault>@Step.Code</a>
     </div>
 </StepDesigner>
 
