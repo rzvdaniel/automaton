@@ -1,5 +1,4 @@
-﻿
-using AntDesign;
+﻿using AntDesign;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Studio.Domain;
@@ -14,6 +13,7 @@ namespace Automaton.Studio.Pages.FlowDesigner.Components.Drawer;
 public partial class FlowVariables : ComponentBase
 {
     private FluentValidationValidator fluentValidationValidator;
+    private string selectedVariableType = "Flow";
 
     [CascadingParameter] StudioFlow Flow { get; set; }
     [Inject] ModalService ModalService { get; set; } = default!;
@@ -67,6 +67,118 @@ public partial class FlowVariables : ComponentBase
         await base.OnInitializedAsync();
     }
 
+    private void OnVariableTypeChange(string value)
+    {
+        selectedVariableType = value;
+        StateHasChanged();
+    }
+
+    private async Task AddVariable()
+    {
+        if (selectedVariableType == "Input")
+        {
+            await AddInputVariable();
+        }
+        else if (selectedVariableType == "Output")
+        {
+            await AddOutputVariable();
+        }
+    }
+
+    public async Task ViewVariable(StepVariable variable)
+    {
+        var viewVariableModel = new ViewVariableModel
+        {
+            Variable = variable
+        };
+
+        await ModalService.CreateModalAsync<ViewVariableDialog, ViewVariableModel>
+        (
+            new ModalOptions { Title = Labels.Variable }, viewVariableModel
+        );
+    }
+
+    public async Task AddInputVariable()
+    {
+        var newVariable = new VariableModel
+        {
+            ExistingNames = Flow.GetInputVariableNames()
+        };
+
+        var newVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
+        (
+            new ModalOptions { Title = "Input Variable" }, newVariable
+        );
+
+        newVariableDialog.OnOk = () =>
+        {
+            Flow.SetInputVariable(new StepVariable 
+            { 
+                Id = Guid.NewGuid().ToString(),
+                Name = newVariable.Name, 
+                Value = newVariable.Value,
+                Type = newVariable.Type,
+                Description = newVariable.Description
+            });
+
+            StateHasChanged();
+            return Task.CompletedTask;
+        };
+    }
+
+    public async Task EditInputVariable(StepVariable variable)
+    {
+        var inputVariableNames = Flow.GetInputVariableNames();
+        var existingInputVariables = inputVariableNames.Where(x => !x.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
+
+        var updatedVariable = new VariableModel
+        {
+            ExistingNames = existingInputVariables,
+            Name = variable.Name,
+            Type = variable.Type,
+            Value = variable.Value,
+            Description = variable.Description
+        };
+
+        var editVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
+        (
+            new ModalOptions { Title = "Edit Input Variable" }, updatedVariable
+        );
+
+        editVariableDialog.OnOk = () =>
+        {
+            Flow.SetInputVariable(new StepVariable 
+            { 
+                Id = variable.Id,
+                Name = updatedVariable.Name, 
+                Value = updatedVariable.Value,
+                Type = updatedVariable.Type,
+                Description = updatedVariable.Description
+            });
+
+            StateHasChanged();
+            return Task.CompletedTask;
+        };
+    }
+
+    public async Task DeleteInputVariable(StepVariable variable)
+    {
+        var deleteConfirm = await ModalService.ConfirmAsync(new ConfirmOptions()
+        {
+            Title = "Delete Input Variable",
+            Content = $"Are you sure you want to delete the input variable '{variable.Name}'?",
+            OkText = "Delete",
+            CancelText = "Cancel",
+            OkType = ButtonType.Primary
+        });
+
+        if (deleteConfirm)
+        {
+            Flow.DeleteInputVariable(variable.Id);
+            StateHasChanged();
+        }
+    }
+
     public async Task AddOutputVariable()
     {
         var newVariable = new VariableModel
@@ -76,7 +188,7 @@ public partial class FlowVariables : ComponentBase
 
         var newVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
         (
-            new ModalOptions { Title = Labels.Variable }, newVariable
+            new ModalOptions { Title = "Output Variable" }, newVariable
         );
 
         newVariableDialog.OnOk = () =>
@@ -90,6 +202,7 @@ public partial class FlowVariables : ComponentBase
                 Description = newVariable.Description
             });
 
+            StateHasChanged();
             return Task.CompletedTask;
         };
     }
@@ -108,115 +221,42 @@ public partial class FlowVariables : ComponentBase
             Description = variable.Description
         };
 
-        var newVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
+        var editVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
         (
-            new ModalOptions { Title = Labels.Variable }, updatedVariable
+            new ModalOptions { Title = "Edit Output Variable" }, updatedVariable
         );
 
-        newVariableDialog.OnOk = () =>
+        editVariableDialog.OnOk = () =>
         {
-            if (!variable.Name.Equals(updatedVariable.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                Flow.DeleteOutputVariable(variable.Name);
-            }
-
-            Flow.SetOutputVariable(new StepVariable { Id = Guid.NewGuid().ToString(), Name = updatedVariable.Name, Value = updatedVariable.Value });
-
-            return Task.CompletedTask;
-        };
-    }
-
-    public void DeleteOutputVariable(StepVariable variable)
-    {
-        Flow.OutputVariables.Remove(variable.Name);
-    }
-
-    public async Task AddInputVariable()
-    {
-        var newVariable = new VariableModel
-        {
-            ExistingNames = Flow.GetInputVariableNames()
-        };
-
-        var newVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
-        (
-            new ModalOptions { Title = Labels.Variable }, newVariable
-        );
-
-        newVariableDialog.OnOk = () =>
-        {
-            Flow.SetInputVariable(new StepVariable 
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = newVariable.Name, 
-                Type = newVariable.Type, 
-                Value = newVariable.Value,
-                Description = newVariable.Description
-            });
-
-            return Task.CompletedTask;
-        };
-    }
-
-    public async Task EditInputVariable(StepVariable variable)
-    {
-        var inputVariableNames = Flow.GetInputVariableNames();
-        var existingInputVariables = inputVariableNames.Where(x => !x.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
-
-        var updatedVariable = new VariableModel
-        {
-            ExistingNames = existingInputVariables,
-            Name = variable.Name,
-            Value = variable.Value,
-            Type = variable.Type,
-            Description = variable.Description
-        };
-
-        var newVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
-        (
-            new ModalOptions { Title = Labels.Variable }, updatedVariable
-        );
-
-        newVariableDialog.OnOk = () =>
-        {
-            if (!variable.Name.Equals(updatedVariable.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                Flow.DeleteInputVariable(variable.Name);
-            }
-
-            Flow.SetInputVariable(new StepVariable 
-            {
-                Name = updatedVariable.Name,
-                Type = updatedVariable.Type,
+            Flow.SetOutputVariable(new StepVariable 
+            { 
+                Id = variable.Id,
+                Name = updatedVariable.Name, 
                 Value = updatedVariable.Value,
+                Type = updatedVariable.Type,
                 Description = updatedVariable.Description
             });
 
+            StateHasChanged();
             return Task.CompletedTask;
         };
     }
 
-    public void DeleteInputVariable(StepVariable variable)
+    public async Task DeleteOutputVariable(StepVariable variable)
     {
-        Flow.InputVariables.Remove(variable.Name);
-    }
-
-    public async Task ViewVariable(StepVariable variable)
-    {
-        var viewVariableModel = new ViewVariableModel
+        var deleteConfirm = await ModalService.ConfirmAsync(new ConfirmOptions()
         {
-            Variable = variable,
-            Flow = Flow
-        };
+            Title = "Delete Output Variable",
+            Content = $"Are you sure you want to delete the output variable '{variable.Name}'?",
+            OkText = "Delete",
+            CancelText = "Cancel",
+            OkType = ButtonType.Primary
+        });
 
-        var newVariableDialog = await ModalService.CreateModalAsync<ViewVariableDialog, ViewVariableModel>
-        (
-            new ModalOptions { Title = Labels.VariableValue }, viewVariableModel
-        );
-
-        newVariableDialog.OnOk = () =>
+        if (deleteConfirm)
         {
-            return Task.CompletedTask;
-        };
+            Flow.DeleteOutputVariable(variable.Id);
+            StateHasChanged();
+        }
     }
 }

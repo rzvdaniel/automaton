@@ -3,207 +3,286 @@
 @using Blazored.FluentValidation
 @using Automaton.Core.Enums;
 
-<Content Class="variables-form">
+<div class="variables-container">
+    <!-- Segmented Control Header -->
+    <div class="variables-header">
+        <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+            <SpaceItem>
+                <Segmented TValue="string" 
+                          Labels="@(new[]{"Flow", "Input", "Output"})" 
+                          Value="@selectedVariableType" 
+                          OnChange="@OnVariableTypeChange"
+                          Size="@SegmentedSize.Small" />
+            </SpaceItem>
+            <SpaceItem>
+                @if (selectedVariableType != "Flow")
+                {
+                    <Tooltip Title="@($"Add {selectedVariableType.ToLower()} variable")">
+                        <Button Icon="plus" 
+                                Shape="@ButtonShape.Circle" 
+                                Size="@ButtonSize.Small" 
+                                Type="@ButtonType.Primary"
+                                OnClick="@AddVariable" />
+                    </Tooltip>
+                }
+            </SpaceItem>
+        </Space>
+    </div>
 
-    <Row>
-        <Col Span="24">
-        <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-            <Panel Key="1">
-                <HeaderTemplate>
-                    <Row>
-                        <Col Span="20">
-                        <b>Flow Variables</b>
-                        </Col>
-                        <Col Span="4">
-                        </Col>
-                    </Row>
-                </HeaderTemplate>
-                <ChildContent>
-                    <AntList DataSource="@Variables" Size="ListSize.Small" Class="scrollable-list">
-                        <ChildContent Context="item">
-                            <ListItem Style="padding-left: 0px; padding-bottom: 2px; padding-top: 2px">
-
-                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => ViewVariable(item))">@item.Name</Button>
-
-                                <span class="ellipsis">@item.Value?.ToString()</span>
-                                
-                                <div class="designer-step-actions-icon">
+    <!-- Variables Content -->
+    <div class="variables-content">
+        @if (selectedVariableType == "Flow")
+        {
+            <div class="variable-section">
+                @if (Variables.Any())
+                {
+                    <div class="variable-list">
+                        @foreach (var variable in Variables)
+                        {
+                            <div class="variable-item">
+                                <div class="variable-info">
+                                    <div class="variable-name">@variable.Name</div>
+                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
+                                </div>
+                                <div class="variable-actions">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="eye" OnClick="@(() => ViewVariable(item))">
+                                                <MenuItem Icon="eye" OnClick="@(() => ViewVariable(variable))">
                                                     View
                                                 </MenuItem>
-
                                                 <MenuItem Icon="search">
                                                     Find Usages
                                                 </MenuItem>
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="IconThemeType.Outline" />
-                                            </a>
+                                            <Button Icon="more" 
+                                                    Type="@ButtonType.Text" 
+                                                    Size="@ButtonSize.Small" 
+                                                    Class="variable-menu-btn" />
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-
-                            </ListItem>
-                        </ChildContent>
-                    </AntList>
-                </ChildContent>
-            </Panel>
-        </Collapse>
-        </Col>
-    </Row>
-
-    <Row>
-        <Col Span="24">
-        <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-            <Panel Key="1">
-                <HeaderTemplate>
-                    <Row>
-                        <Col Span="20">
-                        <b>Input Variables</b>
-                        </Col>
-                        <Col Span="4">
-                        <Button Shape="@ButtonShape.Circle"
-                                Icon="plus"
-                                Size="@ButtonSize.Small"
-                                OnClick="AddInputVariable"
-                                OnClickStopPropagation>
-                        </Button>
-                        </Col>
-                    </Row>
-                </HeaderTemplate>
-                <ChildContent>
-                    <AntList DataSource="@InputVariables" Size="ListSize.Small" Class="scrollable-list">
-                        <ChildContent Context="item">
-                            <ListItem>
-                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
-                                <div class="designer-step-actions-icon">
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <Icon Type="database" Style="font-size: 24px; color: #d9d9d9;" />
+                        <div class="empty-text">No flow variables</div>
+                        <div class="empty-subtext">Variables will appear here during flow execution</div>
+                    </div>
+                }
+            </div>
+        }
+        else if (selectedVariableType == "Input")
+        {
+            <div class="variable-section">
+                @if (InputVariables.Any())
+                {
+                    <div class="variable-list">
+                        @foreach (var variable in InputVariables)
+                        {
+                            <div class="variable-item">
+                                <div class="variable-info">
+                                    <div class="variable-name">@variable.Name</div>
+                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
+                                </div>
+                                <div class="variable-actions">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="edit" OnClick="@(() => EditInputVariable(item))">
+                                                <MenuItem Icon="edit" OnClick="@(() => EditInputVariable(variable))">
                                                     Edit
                                                 </MenuItem>
-                                                <MenuItem Icon="delete" OnClick="@(() => DeleteInputVariable(item))">
+                                                <MenuItem Icon="delete" OnClick="@(() => DeleteInputVariable(variable))">
                                                     Delete
                                                 </MenuItem>
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="IconThemeType.Outline" />
-                                            </a>
+                                            <Button Icon="more" 
+                                                    Type="@ButtonType.Text" 
+                                                    Size="@ButtonSize.Small" 
+                                                    Class="variable-menu-btn" />
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-                            </ListItem>
-                        </ChildContent>
-                    </AntList>
-                </ChildContent>
-            </Panel>
-        </Collapse>
-        </Col>
-    </Row>
-
-    <Row>
-        <Col Span="24">
-        <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-            <Panel Key="1">
-                <HeaderTemplate>
-                    <Row>
-                        <Col Span="20">
-                        <b>Output Variables</b>
-                        </Col>
-                        <Col Span="4">
-                        <Button Shape="@ButtonShape.Circle"
-                                Icon="plus"
-                                Size="@ButtonSize.Small"
-                                OnClick="AddOutputVariable"
-                                OnClickStopPropagation>
-                        </Button>
-                        </Col>
-                    </Row>
-                </HeaderTemplate>
-                <ChildContent>
-                    <AntList DataSource="@OutputVariables" Size="ListSize.Small" Class="scrollable-list">
-                        <ChildContent Context="item">
-                            <ListItem>
-                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small">@item.Name</Button>
-                                <div class="designer-step-actions-icon">
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <Icon Type="import" Style="font-size: 24px; color: #d9d9d9;" />
+                        <div class="empty-text">No input variables defined</div>
+                        <div class="empty-subtext">Create input variables for workflow parameters</div>
+                    </div>
+                }
+            </div>
+        }
+        else if (selectedVariableType == "Output")
+        {
+            <div class="variable-section">
+                @if (OutputVariables.Any())
+                {
+                    <div class="variable-list">
+                        @foreach (var variable in OutputVariables)
+                        {
+                            <div class="variable-item">
+                                <div class="variable-info">
+                                    <div class="variable-name">@variable.Name</div>
+                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
+                                </div>
+                                <div class="variable-actions">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="edit" OnClick="@(() => EditOutputVariable(item))">
+                                                <MenuItem Icon="edit" OnClick="@(() => EditOutputVariable(variable))">
                                                     Edit
                                                 </MenuItem>
-                                                <MenuItem Icon="delete" OnClick="@(() => DeleteOutputVariable(item))">
+                                                <MenuItem Icon="delete" OnClick="@(() => DeleteOutputVariable(variable))">
                                                     Delete
                                                 </MenuItem>
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                <Icon Type="more" Theme="IconThemeType.Outline" />
-                                            </a>
+                                            <Button Icon="more" 
+                                                    Type="@ButtonType.Text" 
+                                                    Size="@ButtonSize.Small" 
+                                                    Class="variable-menu-btn" />
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-                            </ListItem>
-                        </ChildContent>
-                    </AntList>
-                </ChildContent>
-            </Panel>
-        </Collapse>
-        </Col>
-    </Row>
-
-</Content>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <Icon Type="export" Style="font-size: 24px; color: #d9d9d9;" />
+                        <div class="empty-text">No output variables defined</div>
+                        <div class="empty-subtext">Create output variables to capture workflow results</div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
 
 <style>
-    .scrollable-list {
-        overflow: auto;
-        max-height: 80px;
-    }
-
-    .add-variable-button {
-        margin-top: 10px;
-    }
-
-    .variables-form {
-        background-color: #fff;
-        padding: 20px;
+    .variables-container {
         height: 100%;
-        overflow: auto;
-        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        background-color: #fff;
+        flex: 1;
     }
 
-    .variables-collapse-panel {
-        background-color: #efefef;
-        border-radius: 2px;
-        margin-bottom: 12px;
-        border-radius: 5px;
+    .variables-header {
+        padding: 12px 16px 8px 16px;
+        border-bottom: 1px solid #f0f0f0;
+        background-color: #fafafa;
+        flex-shrink: 0;
     }
 
-    .ant-collapse-content-box {
-        background-color: #fcfcfc;
-        border-radius: 0px 0px 5px 5px;
-    }
-
-    .designer-step-actions-icon {
-        padding: 0px 12px 0px 12px;
-    }
-
-    .ellipsis {
-        display: inline-block;
+    .variables-content {
+        flex: 1;
         overflow: hidden;
-        overflow-wrap: normal;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .variable-section {
+        flex: 1;
+        overflow: auto;
+        padding: 12px 16px;
+    }
+
+    .variable-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .variable-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background-color: #fafafa;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .variable-item:hover {
+        border-color: #d9d9d9;
+        background-color: #f5f5f5;
+    }
+
+    .variable-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .variable-name {
+        font-weight: 500;
+        color: #262626;
+        font-size: 13px;
+        margin-bottom: 2px;
+    }
+
+    .variable-value {
+        font-size: 12px;
+        color: #666;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        width: 100px;
+    }
+
+    .variable-actions {
+        flex-shrink: 0;
+        margin-left: 8px;
+    }
+
+    .variable-menu-btn {
+        color: #666 !important;
+        padding: 2px 6px !important;
+    }
+
+    .variable-menu-btn:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.08) !important;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        text-align: center;
+        min-height: 120px;
+    }
+
+    .empty-text {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .empty-subtext {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #999;
     }
 </style>
 
