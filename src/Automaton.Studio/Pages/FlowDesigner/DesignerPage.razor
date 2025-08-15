@@ -87,8 +87,8 @@
 
                 <Layout Class="main-content-layout">
 
-                    <Splitter Layout="@SplitterLayout.Vertical">
-                        <SplitterPanel>
+                    <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
+                        <SplitterPanel Class="top-splitter-panel">
 
                             <Content Class="content-container">
                                 <Tabs Type="@TabType.EditableCard"
@@ -186,6 +186,19 @@
         flex-direction: column;
         height: 100%;
         min-width: 0; /* Important for flex shrinking */
+    }
+
+    /* Ensure the main splitter fills its container */
+    .main-splitter {
+        height: 100%;
+        flex: 1;
+    }
+
+    /* Ensure the top splitter panel (containing the designer) fills available space */
+    .top-splitter-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0; /* Important for flex child to shrink properly */
     }
 
     .properties-sider {
