@@ -88,7 +88,7 @@
                 <Layout Class="main-content-layout">
 
                     <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
-                        <SplitterPanel>
+                        <SplitterPanel Size="70%">
 
                             <Content Class="content-container">
                                 <Tabs Type="@TabType.EditableCard"
@@ -118,7 +118,7 @@
                             </Content>
                         </SplitterPanel>
 
-                        <SplitterPanel>
+                        <SplitterPanel Size="30%">
                             <Footer Class="bottom-panel">
                                 <CascadingValue Value="DesignerViewModel.Flow">
                                     <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
@@ -226,7 +226,7 @@
     }
 
     .bottom-panel {
-        height: 300px;
+        height: 100%;
         flex-shrink: 0;
         padding: 6px;
     }
