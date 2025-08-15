@@ -27,6 +27,7 @@ public class StepPropertiesWrapper : ComponentBase
             builder.AddAttribute(1, "class", "step-properties-content");
             
             builder.OpenComponent(2, propertiesComponentType);
+            builder.SetKey(Step.Id);
             builder.AddAttribute(3, "Options", Step);
             builder.CloseComponent();
             
