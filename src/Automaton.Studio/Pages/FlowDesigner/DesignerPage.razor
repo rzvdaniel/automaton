@@ -54,7 +54,7 @@
         </Row>
     </Header>
 
-    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Class="main-tabs-container" Style="background-color: white;">
+    <Tabs ActiveKey="@activeTabKey" OnChange="OnTabChange" Class="main-tabs-container">
         <TabPane Key="designer" Tab="Designer">
             <Layout Class="designer-container">
 
@@ -88,7 +88,7 @@
                 <Layout Class="main-content-layout">
 
                     <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
-                        <SplitterPanel Class="top-splitter-panel">
+                        <SplitterPanel>
 
                             <Content Class="content-container">
                                 <Tabs Type="@TabType.EditableCard"
@@ -177,7 +177,7 @@
 
     .designer-container {
         background-color: #fafafa;
-        height: 100%;
+        height: calc(100vh - 135px);
         overflow: hidden;
     }
 
@@ -194,8 +194,8 @@
         flex: 1;
     }
 
-    /* Ensure the top splitter panel (containing the designer) fills available space */
-    .top-splitter-panel {
+    /* Target the first splitter panel (containing the designer) using nth-child */
+    .main-splitter .ant-splitter-panel:first-child {
         display: flex;
         flex-direction: column;
         min-height: 0; /* Important for flex child to shrink properly */
@@ -265,13 +265,13 @@
     }
 
     .main-tabs-container {
-        height: calc(100vh - 53px); /* Account for header height properly */
         display: flex;
         flex-direction: column;
         overflow: hidden;
         width: 100%;
         padding-left: 10px;
         box-sizing: border-box;
+        background-color: white;
     }
 
     /* Fix main tabs to use full height */
@@ -281,6 +281,10 @@
         flex-direction: column;
     }
 
+     .ant-tabs-content-holder .ant-tabs-content .ant-tabs-content-top {
+        height: 100%;
+    }
+
     /* Ensure designer tabs specifically fill available space */
     .designer-tabs {
         height: 100%;
@@ -288,17 +292,17 @@
         flex-direction: column;
     }
 
-    .designer-tabs .ant-tabs-content-holder {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
+        .designer-tabs .ant-tabs-content-holder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
 
-    .designer-tabs .ant-tabs-tabpane {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
+        .designer-tabs .ant-tabs-tabpane {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
    
     .step-library-container {
         height: 100%;
