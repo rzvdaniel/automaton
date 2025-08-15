@@ -2,51 +2,200 @@
 @using Automaton.Studio.Domain
 @using Blazored.FluentValidation
 
-<Form Model="@WorkflowSink"
-      Layout="@FormLayout.Vertical"
-      Class="flow-logs-form">
-
-    <ChildContent>
-        <GridRow>
-            <Col>
+<div class="flow-logs-container">
+    <!-- Toolbar -->
+    <div class="flow-logs-toolbar">
+        <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+            <SpaceItem>
                 <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
                     <SpaceItem>
-                        <Tooltip Placement="@Placement.Top" Title="Clear">
+                        <Icon Type="file-text" Theme="IconThemeType.Outline" Style="color: #666;" />
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Text Strong Style="color: #666; font-size: 12px;">Flow Execution Logs</Text>
+                    </SpaceItem>
+                </Space>
+            </SpaceItem>
+            <SpaceItem>
+                <Space Direction="SpaceDirection.Horizontal" Size="SpaceSize.Small">
+                    <SpaceItem>
+                        <Tooltip Placement="@Placement.TopRight" Title="Auto-scroll to bottom">
+                            <Button Icon="@(autoScroll ? "pause-circle" : "play-circle")"
+                                    Size="@ButtonSize.Small"
+                                    Type="@ButtonType.Text"
+                                    Class="@(autoScroll ? "toolbar-btn-active" : "toolbar-btn")"
+                                    OnClick="ToggleAutoScroll">
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Tooltip Placement="@Placement.TopRight" Title="Copy logs to clipboard">
+                            <Button Icon="copy"
+                                    Size="@ButtonSize.Small"
+                                    Type="@ButtonType.Text"
+                                    Class="toolbar-btn"
+                                    OnClick="CopyLogs">
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Tooltip Placement="@Placement.TopRight" Title="Clear logs">
                             <Button Icon="delete"
                                     Size="@ButtonSize.Small"
-                                    Class="flow-logs-clear"
-                                    OnClick="ClearLogs"
-                                    OnClickStopPropagation>
+                                    Type="@ButtonType.Text"
+                                    Class="toolbar-btn"
+                                    OnClick="ClearLogs">
                             </Button>
                         </Tooltip>
                     </SpaceItem>
                 </Space>
-            </Col>
-        </GridRow>
-        <GridRow>
-            <GridCol Md="24" Xs="24">
-                <FormItem>
-                    <TextArea Id="flow-logs" Value="@context.Logs" />
-                </FormItem>
-            </GridCol>
-        </GridRow>
-    </ChildContent>
-</Form>
+            </SpaceItem>
+        </Space>
+    </div>
+
+    <!-- Logs Content -->
+    <div class="flow-logs-content">
+        @if (!string.IsNullOrEmpty(WorkflowSink?.Logs))
+        {
+            <TextArea @ref="logsTextArea"
+                     Value="@WorkflowSink.Logs"
+                     ReadOnly="true"
+                     ShowCount="false"
+                     AutoSize="false"
+                     Class="flow-logs-textarea"
+                     Id="flow-logs-textarea"
+                     Style="height: 100%; resize: none; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;" />
+        }
+        else
+        {
+            <div class="flow-logs-empty">
+                <Result Status="@ResultStatus.Info"
+                        Title="No logs available"
+                        SubTitle="Logs will appear here when you run the workflow."
+                        Icon="@IconType.Outline.FileText">
+                    <Extra>
+                        <span style="color: #999; font-size: 12px;">
+                            Click the Run button to execute the workflow and generate logs.
+                        </span>
+                    </Extra>
+                </Result>
+            </div>
+        }
+    </div>
+
+    <!-- Status Bar -->
+    <div class="flow-logs-status">
+        <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+            <SpaceItem>
+                <span style="color: #999; font-size: 11px;">
+                    @if (!string.IsNullOrEmpty(WorkflowSink?.Logs))
+                    {
+                        <text>@GetLogLineCount() lines | @GetLogCharCount() characters</text>
+                    }
+                    else
+                    {
+                        <text>Ready</text>
+                    }
+                </span>
+            </SpaceItem>
+            <SpaceItem>
+                @if (lastClearTime.HasValue)
+                {
+                    <span style="color: #999; font-size: 11px;">
+                        Last cleared: @lastClearTime.Value.ToString("HH:mm:ss")
+                    </span>
+                }
+            </SpaceItem>
+        </Space>
+    </div>
+</div>
 
 <style>
-    .flow-logs-form {
-        padding: 5px;
-        overflow: hidden;
+    .flow-logs-container {
         height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #fff;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        overflow: hidden;
+        /* Ensure it fills the available space */
+        flex: 1;
+        min-height: 0;
     }
 
-    .flow-logs-clear {
-        margin-bottom: 4px;
+    .flow-logs-toolbar {
+        background-color: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 6px 12px;
+        flex-shrink: 0;
+        min-height: 32px;
     }
 
-    #flow-logs {
-        width: 100% !important;
-        height: 150px !important;
-        font-size: smaller;
+    .flow-logs-content {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+        min-height: 0; /* Critical for proper flex behavior */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .flow-logs-textarea {
+        border: none !important;
+        box-shadow: none !important;
+        background-color: #fafafa !important;
+        padding: 12px !important;
+        line-height: 1.4 !important;
+        font-size: 12px !important;
+        /* Ensure textarea fills the content area */
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    .flow-logs-textarea:focus {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .flow-logs-empty {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #fafafa;
+        flex: 1;
+    }
+
+    .flow-logs-status {
+        background-color: #f5f5f5;
+        border-top: 1px solid #f0f0f0;
+        padding: 4px 12px;
+        flex-shrink: 0;
+        min-height: 24px;
+    }
+
+    .toolbar-btn {
+        color: #666 !important;
+        border: none !important;
+        background: transparent !important;
+        transition: all 0.2s ease;
+    }
+
+    .toolbar-btn:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.08) !important;
+    }
+
+    .toolbar-btn-active {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.12) !important;
+        border: none !important;
+    }
+
+    .toolbar-btn-active:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.16) !important;
     }
 </style>

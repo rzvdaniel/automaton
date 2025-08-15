@@ -123,7 +123,7 @@
                                 <SplitterPanel Size="30%">
                                     <Footer Class="bottom-panel">
                                         <CascadingValue Value="DesignerViewModel.Flow">
-                                            <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
+                                            <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" TabPosition="@TabPosition.Bottom" Class="bottom-tabs">
                                                 <TabPane Key="logs" Tab="Logs">
                                                     <FlowLogs />
                                                 </TabPane>
@@ -236,7 +236,9 @@
     .bottom-panel {
         height: 100%;
         flex-shrink: 0;
-        padding: 6px;
+        padding: 0; /* Remove padding to allow tabs to fill completely */
+        display: flex;
+        flex-direction: column;
     }
 
     /* Target only the bottom splitter panel (the one containing .bottom-panel) */
@@ -244,8 +246,82 @@
         overflow: hidden;
     }
 
+    /* Target the right splitter panel conditionally */
+    .ant-splitter-panel:nth-child(2) {
+        transition: all 0.3s ease;
+    }
+
+    /* Hide the right splitter panel when no step is selected */
+    .ant-splitter-panel:nth-child(2):has(.properties-container) {
+        display: flex;
+    }
+
+    /* Main tabs container - ensure proper tab behavior for main navigation */
+    .main-tabs-container {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        width: 100%;
+        padding-left: 10px;
+        box-sizing: border-box;
+        background-color: white;
+    }
+
+    /* Main tabs should have normal tab behavior (no custom ordering) */
+    .main-tabs-container .ant-tabs-nav {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        /* Don't override the default order for main tabs */
+    }
+
+    .main-tabs-container .ant-tabs-content-holder {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        /* Don't override the default order for main tabs */
+    }
+
+    /* Bottom tabs with TabPosition.Bottom - adjust layout accordingly */
     .bottom-tabs {
         height: 100%;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    /* When tabs are at bottom, content comes first, then nav */
+    .bottom-tabs .ant-tabs-content-holder {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        order: 1; /* Content area comes first */
+    }
+
+    .bottom-tabs .ant-tabs-nav {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        margin-top: 0;
+        order: 2; /* Navigation comes after content */
+        position: relative;
+    }
+
+    .bottom-tabs .ant-tabs-content {
+        height: 100%;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    /* Style active tab panes to fill space properly */
+    .bottom-tabs .ant-tabs-tabpane {
+        padding: 6px;
+    }
+
+    .bottom-tabs .ant-tabs-tabpane-active {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
 
     .runners-select {
@@ -269,16 +345,6 @@
 
     .create-step-ai-button {
         width: 100%;
-    }
-
-    .main-tabs-container {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        width: 100%;
-        padding-left: 10px;
-        box-sizing: border-box;
-        background-color: white;
     }
 
     /* Fix main tabs to use full height */
