@@ -89,7 +89,14 @@
 
     .dropzone {
         overflow: auto;
-        height: calc(100vh - 525px);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dropzone > div {
+        flex: 1;
+        min-height: 0;
     }
 
     .step-active-spacing {
