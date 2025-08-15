@@ -85,70 +85,82 @@
                     </CascadingValue>
                 </Sider>
 
-                <Layout Class="main-content-layout">
+                <Splitter Layout="@SplitterLayout.Horizontal">
+                    <SplitterPanel Size="@(selectedStep != null ? "70%" : "100%")">
+                        <Layout Class="main-content-layout">
 
-                    <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
-                        <SplitterPanel Size="70%">
+                            <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
+                                <SplitterPanel Size="70%">
 
-                            <Content Class="content-container">
-                                <Tabs Type="@TabType.EditableCard"
-                                      Size="@TabSize.Small"
-                                      ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
-                                      DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
-                                      OnAddClick="OnDefinitionAddClick"
-                                      OnTabClick="OnTabClick"
-                                      OnClose="OnTabClose"
-                                      Class="designer-tabs">
+                                    <Content Class="content-container">
+                                        <Tabs Type="@TabType.EditableCard"
+                                              Size="@TabSize.Small"
+                                              ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
+                                              DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
+                                              OnAddClick="OnDefinitionAddClick"
+                                              OnTabClick="OnTabClick"
+                                              OnClose="OnTabClose"
+                                              Class="designer-tabs">
 
-                                    @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
-                                    {
-                                        <TabPane Key="@definition.Id" Tab="@definition.Name">
-                                            <Designer @ref="designer"
-                                                      Class="dropzone"
-                                                      Steps="definition.Steps"
-                                                      ItemDrop="@((p)=>OnItemDrop(p))"
-                                                      ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
+                                            @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
+                                            {
+                                                <TabPane Key="@definition.Id" Tab="@definition.Name">
+                                                    <Designer @ref="designer"
+                                                              Class="dropzone"
+                                                              Steps="definition.Steps"
+                                                              ItemDrop="@((p)=>OnItemDrop(p))"
+                                                              ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
 
-                                                <DesignerStep Step="@context" />
+                                                        <DesignerStep Step="@context" />
 
-                                            </Designer>
-                                        </TabPane>
-                                    }
-                                </Tabs>
-                            </Content>
-                        </SplitterPanel>
+                                                    </Designer>
+                                                </TabPane>
+                                            }
+                                        </Tabs>
+                                    </Content>
+                                </SplitterPanel>
 
-                        <SplitterPanel Size="30%">
-                            <Footer Class="bottom-panel">
-                                <CascadingValue Value="DesignerViewModel.Flow">
-                                    <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
-                                        <TabPane Key="logs" Tab="Logs">
-                                            <FlowLogs />
-                                        </TabPane>
-                                        <TabPane Key="variables" Tab="Variables">
-                                            <FlowVariables />
-                                        </TabPane>
-                                    </Tabs>
-                                </CascadingValue>
-                            </Footer>
-                        </SplitterPanel>
-                    </Splitter>
+                                <SplitterPanel Size="30%">
+                                    <Footer Class="bottom-panel">
+                                        <CascadingValue Value="DesignerViewModel.Flow">
+                                            <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" Class="bottom-tabs">
+                                                <TabPane Key="logs" Tab="Logs">
+                                                    <FlowLogs />
+                                                </TabPane>
+                                                <TabPane Key="variables" Tab="Variables">
+                                                    <FlowVariables />
+                                                </TabPane>
+                                            </Tabs>
+                                        </CascadingValue>
+                                    </Footer>
+                                </SplitterPanel>
+                            </Splitter>
 
-                </Layout>
+                        </Layout>
+                    </SplitterPanel>
 
-                @if (selectedStep != null)
-                {
-                    <Sider Theme="SiderTheme.Light" Style="@GetPropertiesSiderStyle()" Class="properties-sider">
-                         <div class="properties-container">
-                            <div class="step-library-header">
-                                <Title Level="5" Style="margin: 10px 0 5px 15px;">Step Properties</Title>
+                    <SplitterPanel Size="@(selectedStep != null ? "30%" : "0%")">
+                        @if (selectedStep != null)
+                        {
+                            <div class="properties-container">
+                                <div class="properties-header">
+                                    <Space Style="width: 100%; padding: 8px; justify-content: space-between;">
+                                        <SpaceItem>
+                                            <Title Level="5">Step Details</Title>
+                                        </SpaceItem>
+                                        <SpaceItem>
+                                            <Button Icon="close" Size="@ButtonSize.Small" Type="@ButtonType.Text" 
+                                                    OnClick="ClosePropertiesPanel" />
+                                        </SpaceItem>
+                                    </Space>
+                                </div>
+                                <div class="properties-content">
+                                    <StepPropertiesWrapper Step="selectedStep" />
+                                </div>
                             </div>
-                            <div class="properties-content">
-                                <StepPropertiesWrapper Step="selectedStep" />
-                            </div>
-                        </div> 
-                    </Sider> 
-                }
+                        }
+                    </SplitterPanel>
+                </Splitter>
 
             </Layout>
         </TabPane>
@@ -201,21 +213,17 @@
         min-height: 0; /* Important for flex child to shrink properly */
     }
 
-    .properties-sider {
-        border-left: 1px solid #f0f0f0;
-        background-color: #fff;
-    }
-
     .properties-container {
         height: 100%;
         display: flex;
         flex-direction: column;
+        background-color: #fff;
+        border-left: 1px solid #f0f0f0;
     }
 
     .properties-header {
         background-color: #fafafa;
         border-bottom: 1px solid #f0f0f0;
-        padding: 0;
         flex-shrink: 0;
     }
 
@@ -240,7 +248,6 @@
         height: 100%;
     }
 
-  
     .runners-select {
         min-width: 140px;
         max-width: 140px;
