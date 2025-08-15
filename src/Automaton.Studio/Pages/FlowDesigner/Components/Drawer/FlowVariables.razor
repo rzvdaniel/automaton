@@ -36,19 +36,16 @@
             <div class="variable-section">
                 @if (Variables.Any())
                 {
-                    <div class="variable-list">
-                        @foreach (var variable in Variables)
-                        {
-                            <div class="variable-item">
-                                <div class="variable-info">
-                                    <div class="variable-name">@variable.Name</div>
-                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
-                                </div>
-                                <div class="variable-actions">
+                    <AntList DataSource="@Variables" Size="ListSize.Small" Class="scrollable-list">
+                        <ChildContent Context="item">
+                            <ListItem Style="padding-left: 0px; padding-bottom: 2px; padding-top: 2px">
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => ViewVariable(item))">@item.Name</Button>
+                                <span class="ellipsis">@item.Value?.ToString()</span>
+                                <div class="designer-step-actions-icon">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="eye" OnClick="@(() => ViewVariable(variable))">
+                                                <MenuItem Icon="eye" OnClick="@(() => ViewVariable(item))">
                                                     View
                                                 </MenuItem>
                                                 <MenuItem Icon="search">
@@ -57,16 +54,15 @@
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <Button Icon="more" 
-                                                    Type="@ButtonType.Text" 
-                                                    Size="@ButtonSize.Small" 
-                                                    Class="variable-menu-btn" />
+                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
+                                            </a>
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            </ListItem>
+                        </ChildContent>
+                    </AntList>
                 }
                 else
                 {
@@ -83,37 +79,33 @@
             <div class="variable-section">
                 @if (InputVariables.Any())
                 {
-                    <div class="variable-list">
-                        @foreach (var variable in InputVariables)
-                        {
-                            <div class="variable-item">
-                                <div class="variable-info">
-                                    <div class="variable-name">@variable.Name</div>
-                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
-                                </div>
-                                <div class="variable-actions">
+                    <AntList DataSource="@InputVariables" Size="ListSize.Small" Class="scrollable-list">
+                        <ChildContent Context="item">
+                            <ListItem>
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => EditInputVariable(item))">@item.Name</Button>
+                                <span class="ellipsis">@item.Value?.ToString()</span>
+                                <div class="designer-step-actions-icon">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="edit" OnClick="@(() => EditInputVariable(variable))">
+                                                <MenuItem Icon="edit" OnClick="@(() => EditInputVariable(item))">
                                                     Edit
                                                 </MenuItem>
-                                                <MenuItem Icon="delete" OnClick="@(() => DeleteInputVariable(variable))">
+                                                <MenuItem Icon="delete" OnClick="@(() => DeleteInputVariable(item))">
                                                     Delete
                                                 </MenuItem>
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <Button Icon="more" 
-                                                    Type="@ButtonType.Text" 
-                                                    Size="@ButtonSize.Small" 
-                                                    Class="variable-menu-btn" />
+                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
+                                            </a>
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            </ListItem>
+                        </ChildContent>
+                    </AntList>
                 }
                 else
                 {
@@ -130,37 +122,33 @@
             <div class="variable-section">
                 @if (OutputVariables.Any())
                 {
-                    <div class="variable-list">
-                        @foreach (var variable in OutputVariables)
-                        {
-                            <div class="variable-item">
-                                <div class="variable-info">
-                                    <div class="variable-name">@variable.Name</div>
-                                    <div class="variable-value">@(variable.Value?.ToString() ?? "null")</div>
-                                </div>
-                                <div class="variable-actions">
+                    <AntList DataSource="@OutputVariables" Size="ListSize.Small" Class="scrollable-list">
+                        <ChildContent Context="item">
+                            <ListItem>
+                                <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => EditOutputVariable(item))">@item.Name</Button>
+                                <span class="ellipsis">@item.Value?.ToString()</span>
+                                <div class="designer-step-actions-icon">
                                     <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
                                         <Overlay>
                                             <Menu>
-                                                <MenuItem Icon="edit" OnClick="@(() => EditOutputVariable(variable))">
+                                                <MenuItem Icon="edit" OnClick="@(() => EditOutputVariable(item))">
                                                     Edit
                                                 </MenuItem>
-                                                <MenuItem Icon="delete" OnClick="@(() => DeleteOutputVariable(variable))">
+                                                <MenuItem Icon="delete" OnClick="@(() => DeleteOutputVariable(item))">
                                                     Delete
                                                 </MenuItem>
                                             </Menu>
                                         </Overlay>
                                         <ChildContent>
-                                            <Button Icon="more" 
-                                                    Type="@ButtonType.Text" 
-                                                    Size="@ButtonSize.Small" 
-                                                    Class="variable-menu-btn" />
+                                            <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                                <Icon Type="more" Theme="IconThemeType.Outline" />
+                                            </a>
                                         </ChildContent>
                                     </Dropdown>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            </ListItem>
+                        </ChildContent>
+                    </AntList>
                 }
                 else
                 {
@@ -204,62 +192,26 @@
         padding: 12px 16px;
     }
 
-    .variable-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+    .scrollable-list {
+        overflow: auto;
+        max-height: 300px;
     }
 
-    .variable-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px 12px;
-        background-color: #fafafa;
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-        transition: all 0.2s ease;
+    .designer-step-actions-icon {
+        padding: 0px 12px 0px 12px;
     }
 
-    .variable-item:hover {
-        border-color: #d9d9d9;
-        background-color: #f5f5f5;
-    }
-
-    .variable-info {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .variable-name {
-        font-weight: 500;
-        color: #262626;
-        font-size: 13px;
-        margin-bottom: 2px;
-    }
-
-    .variable-value {
-        font-size: 12px;
-        color: #666;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    .ellipsis {
+        display: inline-block;
         overflow: hidden;
+        overflow-wrap: normal;
         text-overflow: ellipsis;
         white-space: nowrap;
-    }
-
-    .variable-actions {
-        flex-shrink: 0;
+        width: 100px;
         margin-left: 8px;
-    }
-
-    .variable-menu-btn {
-        color: #666 !important;
-        padding: 2px 6px !important;
-    }
-
-    .variable-menu-btn:hover {
-        color: #1890ff !important;
-        background-color: rgba(24, 144, 255, 0.08) !important;
+        color: #666;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 12px;
     }
 
     .empty-state {
