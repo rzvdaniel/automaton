@@ -80,11 +80,16 @@
                 }
                 else
                 {
-                    <div class="empty-state">
-                        <Icon Type="database" Style="font-size: 24px; color: #d9d9d9;" />
-                        <div class="empty-text">No flow variables</div>
-                        <div class="empty-subtext">Variables will appear here during flow execution</div>
-                    </div>
+                    <Result Status="@ResultStatus.Info"
+                            Title="No flow variables"
+                            SubTitle="Variables will appear here during flow execution."
+                            Icon="@IconType.Outline.FileText">
+                        <Extra>
+                            <span style="color: #999; font-size: 12px;">
+                                Click the Run button to execute the workflow and check variables.
+                            </span>
+                        </Extra>
+                    </Result>
                 }
             </div>
         }
@@ -123,11 +128,14 @@
                 }
                 else
                 {
-                    <div class="empty-state">
-                        <Icon Type="import" Style="font-size: 24px; color: #d9d9d9;" />
-                        <div class="empty-text">No input variables defined</div>
-                        <div class="empty-subtext">Create input variables for workflow parameters</div>
-                    </div>
+                    <Result Status="@ResultStatus.Info"
+                            Title="No input variables defined"
+                            SubTitle="Create input variables to pass data into your workflow."
+                            Icon="@IconType.Outline.FileText">
+                        <Extra>
+                            <Button Type="@ButtonType.Primary" OnClick="AddInputVariable">Add Input Variable</Button>
+                        </Extra>
+                    </Result>
                 }
             </div>
         }
@@ -166,11 +174,14 @@
                 }
                 else
                 {
-                    <div class="empty-state">
-                        <Icon Type="export" Style="font-size: 24px; color: #d9d9d9;" />
-                        <div class="empty-text">No output variables defined</div>
-                        <div class="empty-subtext">Create output variables to capture workflow results</div>
-                    </div>
+                    <Result Status="@ResultStatus.Info"
+                            Title="No output variables defined"
+                            SubTitle="Create output variables to capture results from your workflow."
+                            Icon="@IconType.Outline.FileText">
+                        <Extra>
+                            <Button Type="@ButtonType.Primary" OnClick="AddOutputVariable">Add Output Variable</Button>
+                        </Extra>
+                    </Result>
                 }
             </div>
         }
@@ -206,11 +217,16 @@
         flex: 1;
         overflow: auto;
         padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .scrollable-list {
         overflow: auto;
         max-height: 300px;
+        width: 100%;
+        align-self: flex-start;
     }
 
     .designer-step-actions-icon {
@@ -228,29 +244,6 @@
         color: #666;
         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         font-size: 12px;
-    }
-
-    .empty-state {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 40px 20px;
-        text-align: center;
-        min-height: 120px;
-    }
-
-    .empty-text {
-        margin-top: 12px;
-        font-size: 14px;
-        color: #666;
-        font-weight: 500;
-    }
-
-    .empty-subtext {
-        margin-top: 4px;
-        font-size: 12px;
-        color: #999;
     }
 
     .toolbar-btn {
