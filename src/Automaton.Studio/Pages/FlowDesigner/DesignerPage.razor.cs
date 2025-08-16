@@ -10,11 +10,18 @@ namespace Automaton.Studio.Pages.FlowDesigner;
 
 partial class DesignerPage : ComponentBase
 {
+    private const string ZeroPercent = "0%";
+    private const string ThirtyPercent = "30%";
+    private const string SeventyPercent = "70%";
+    private const string HundredPercent = "100%";
+
     private Designer designer;
     private string activeTabKey = "designer";
     private bool isStepCreatedHandlerAttached;
     private StudioStep selectedStep;
-    private const int PropertiesSiderWidth = 350;
+
+    private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
+    private string BottomSplitterPercentage => selectedStep != null ? ThirtyPercent : ZeroPercent;
 
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
@@ -86,19 +93,6 @@ partial class DesignerPage : ComponentBase
     {
         selectedStep = null;
         StateHasChanged();
-    }
-
-    private string GetPropertiesSiderStyle()
-    {
-        return $"width: {PropertiesSiderWidth}px; min-width: {PropertiesSiderWidth}px; max-width: {PropertiesSiderWidth}px;";
-    }
-
-    private Dictionary<string, object> GetStepPropertiesParameters(StudioStep step)
-    {
-        return new Dictionary<string, object>
-        {
-            { "Options", step }
-        };
     }
 
     private void OnStepDeleted(object sender, StepEventArgs e)

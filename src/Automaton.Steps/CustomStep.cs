@@ -13,6 +13,8 @@ public class CustomStep : WorkflowStep
 
     public string Language { get; set; }
 
+    private StepVariableParser StepVariableParser { get; } = new StepVariableParser();
+
     public IList<StepVariable> CodeInputVariables { get; set; }
 
     public CustomStep(ScriptEngineHost scriptHost)

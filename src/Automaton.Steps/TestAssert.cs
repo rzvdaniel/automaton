@@ -10,6 +10,8 @@ public class TestAssert : WorkflowStep
 
     public Test ParentTest { get; set; }
 
+    private StepVariableParser StepVariableParser { get; } = new StepVariableParser();
+
     /// <summary>
     /// Need to override ExecuteAsync because we do not want Expression to be
     /// evaluated during SetInputProperty() from parent class WorkflowStep.

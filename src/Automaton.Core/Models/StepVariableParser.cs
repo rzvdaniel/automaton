@@ -1,4 +1,5 @@
-﻿using System.Linq.Dynamic.Core;
+﻿using Serilog;
+using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Text.RegularExpressions;
 
@@ -9,7 +10,18 @@ namespace Automaton.Core.Models
         private const string Percentage = "%";
         private const string VariablePattern = "%.+?%";
 
-        public static object? Parse(StepVariable variable, Workflow workflow)
+        protected readonly ILogger logger;
+
+        public StepVariableParser(ILogger logger)
+        {
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        public StepVariableParser() : this(Log.ForContext<StepVariableParser>())
+        {
+        }
+
+        public object? Parse(StepVariable variable, Workflow workflow)
         {
             var expression = variable.Value;
 
@@ -41,11 +53,18 @@ namespace Automaton.Core.Models
             return expressionValue;
         }
 
-        private static string ParseString(string expression, IEnumerable<string> variableNames, Workflow workflow)
+        private string ParseString(string expression, IEnumerable<string> variableNames, Workflow workflow)
         {
             foreach(var variableName in variableNames)
             {
                 var variable = workflow.GetVariableByName(variableName);
+
+                if (variable == null)
+                {
+                    logger.Error("Variable {0} does not exist", variableName);
+                    continue;
+                }
+
                 expression = expression.Replace($"%{variableName}%", variable.GetValue<string>());
             }
 

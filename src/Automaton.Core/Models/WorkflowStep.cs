@@ -33,6 +33,8 @@ public abstract class WorkflowStep
 
     protected abstract Task<ExecutionResult> RunAsync(StepExecutionContext context);
 
+    private StepVariableParser StepVariableParser { get; } = new StepVariableParser();
+
     public WorkflowStep()
     {
         logger = Log.ForContext<WorkflowStep>();

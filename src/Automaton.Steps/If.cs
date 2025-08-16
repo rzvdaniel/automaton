@@ -4,6 +4,8 @@ namespace Automaton.Steps;
 
 public class If : Sequence
 {
+    private StepVariableParser StepVariableParser { get; } = new StepVariableParser();
+
     public StepVariable? Expression { get; set; }
 
     protected override Task<ExecutionResult> RunAsync(StepExecutionContext context)

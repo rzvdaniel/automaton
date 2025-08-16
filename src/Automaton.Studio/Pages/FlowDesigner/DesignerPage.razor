@@ -86,7 +86,7 @@
                 </Sider>
 
                 <Splitter Layout="@SplitterLayout.Horizontal">
-                    <SplitterPanel Size="@(selectedStep != null ? "70%" : "100%")">
+                    <SplitterPanel Size="@TopSplitterPercentage">
                         <Layout Class="main-content-layout">
 
                             <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
@@ -139,7 +139,7 @@
                         </Layout>
                     </SplitterPanel>
 
-                    <SplitterPanel Size="@(selectedStep != null ? "30%" : "0%")">
+                    <SplitterPanel Size="@BottomSplitterPercentage">
                         @if (selectedStep != null)
                         {
                             <div class="properties-container">
