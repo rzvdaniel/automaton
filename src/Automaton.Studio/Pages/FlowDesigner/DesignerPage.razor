@@ -58,107 +58,117 @@
         <TabPane Key="designer" Tab="Designer">
             <Layout Class="designer-container">
 
-                <Sider Theme="SiderTheme.Light" Style="width: 320px; min-width: 320px; max-width: 320px;">
-                    <CascadingValue Value="DesignerViewModel.Flow">
-                        <div class="step-library-container">
-                            <div class="step-library-header">
-                                <Title Level="5" Style="margin: 10px 0 5px 15px;">Step Library</Title>
-                            </div>
+                <Splitter Layout="@SplitterLayout.Horizontal">
+                    <SplitterPanel Size="20%">
 
-                            <div class="step-library-content">
-                                <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
-                                    <TabPane Key="core" Tab="Core Steps">
-                                        <CoreStepsExplorer></CoreStepsExplorer>
-                                    </TabPane>
-                                    <TabPane Key="custom" Tab="Custom Steps">
-                                        <CustomStepsExplorer></CustomStepsExplorer>
-                                    </TabPane>
-                                </Tabs>
+                        <Sider Theme="SiderTheme.Light" Style="width: 100%; max-width: 100%; height: 100%">
+                        <CascadingValue Value="DesignerViewModel.Flow">
+                            <div class="step-library-container">
+                                <div class="step-library-header">
+                                    <Title Level="5" Style="margin: 10px 0 5px 15px;">Step Library</Title>
+                                </div>
 
-                                <div class="create-step-ai-section">
-                                    <Button Icon="plus" Type="@ButtonType.Primary" Class="create-step-ai-button">
-                                        Create Step with AI ✨
-                                    </Button>
+                                <div class="step-library-content">
+                                    <Tabs DefaultActiveKey="core" TabPosition="@TabPosition.Bottom" Size="@TabSize.Small" Class="explorer-tabs">
+                                        <TabPane Key="core" Tab="Core Steps">
+                                            <CoreStepsExplorer></CoreStepsExplorer>
+                                        </TabPane>
+                                        <TabPane Key="custom" Tab="Custom Steps">
+                                            <CustomStepsExplorer></CustomStepsExplorer>
+                                        </TabPane>
+                                    </Tabs>
+
+                                    <div class="create-step-ai-section">
+                                        <Button Icon="plus" Type="@ButtonType.Primary" Class="create-step-ai-button">
+                                            Create Step with AI ✨
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </CascadingValue>
-                </Sider>
+                        </CascadingValue>
+                    </Sider>
 
-                <Splitter Layout="@SplitterLayout.Horizontal">
-                    <SplitterPanel Size="@TopSplitterPercentage">
-                        <Layout Class="main-content-layout">
-
-                            <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
-                                <SplitterPanel Size="70%">
-
-                                    <Content Class="content-container">
-                                        <Tabs Type="@TabType.EditableCard"
-                                              Size="@TabSize.Small"
-                                              ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
-                                              DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
-                                              OnAddClick="OnDefinitionAddClick"
-                                              OnTabClick="OnTabClick"
-                                              OnClose="OnTabClose"
-                                              Class="designer-tabs">
-
-                                            @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
-                                            {
-                                                <TabPane Key="@definition.Id" Tab="@definition.Name">
-                                                    <Designer @ref="designer"
-                                                              Class="dropzone"
-                                                              Steps="definition.Steps"
-                                                              ItemDrop="@((p)=>OnItemDrop(p))"
-                                                              ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
-
-                                                        <DesignerStep Step="@context" />
-
-                                                    </Designer>
-                                                </TabPane>
-                                            }
-                                        </Tabs>
-                                    </Content>
-                                </SplitterPanel>
-
-                                <SplitterPanel Size="30%">
-                                    <Footer Class="bottom-panel">
-                                        <CascadingValue Value="DesignerViewModel.Flow">
-                                            <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" TabPosition="@TabPosition.Bottom" Class="bottom-tabs">
-                                                <TabPane Key="logs" Tab="Logs">
-                                                    <FlowLogs />
-                                                </TabPane>
-                                                <TabPane Key="variables" Tab="Variables">
-                                                    <FlowVariables />
-                                                </TabPane>
-                                            </Tabs>
-                                        </CascadingValue>
-                                    </Footer>
-                                </SplitterPanel>
-                            </Splitter>
-
-                        </Layout>
                     </SplitterPanel>
 
-                    <SplitterPanel Size="@BottomSplitterPercentage">
-                        @if (selectedStep != null)
-                        {
-                            <div class="properties-container">
-                                <div class="properties-header">
-                                    <Space Style="width: 100%; padding: 8px; justify-content: space-between;">
-                                        <SpaceItem>
-                                            <Title Level="5">Step Details</Title>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button Icon="close" Size="@ButtonSize.Small" Type="@ButtonType.Text" 
-                                                    OnClick="ClosePropertiesPanel" />
-                                        </SpaceItem>
-                                    </Space>
-                                </div>
-                                <div class="properties-content">
-                                    <StepPropertiesWrapper Step="selectedStep" />
-                                </div>
-                            </div>
-                        }
+                    <SplitterPanel Size="80%">
+
+                        <Splitter Layout="@SplitterLayout.Horizontal">
+                            <SplitterPanel Size="@TopSplitterPercentage">
+                                <Layout Class="main-content-layout">
+
+                                    <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
+                                        <SplitterPanel Size="70%">
+
+                                            <Content Class="content-container">
+                                                <Tabs Type="@TabType.EditableCard"
+                                                      Size="@TabSize.Small"
+                                                      ActiveKey="@DesignerViewModel.ActiveDefinition?.Id"
+                                                      DefaultActiveKey="@DesignerViewModel.GetStartupDefinitionId()"
+                                                      OnAddClick="OnDefinitionAddClick"
+                                                      OnTabClick="OnTabClick"
+                                                      OnClose="OnTabClose"
+                                                      Class="designer-tabs">
+
+                                                    @foreach (var definition in DesignerViewModel.GetFlowDefinitions())
+                                                    {
+                                                        <TabPane Key="@definition.Id" Tab="@definition.Name">
+                                                            <Designer @ref="designer"
+                                                                      Class="dropzone"
+                                                                      Steps="definition.Steps"
+                                                                      ItemDrop="@((p)=>OnItemDrop(p))"
+                                                                      ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
+
+                                                                <DesignerStep Step="@context" />
+
+                                                            </Designer>
+                                                        </TabPane>
+                                                    }
+                                                </Tabs>
+                                            </Content>
+                                        </SplitterPanel>
+
+                                        <SplitterPanel Size="30%">
+                                            <Footer Class="bottom-panel">
+                                                <CascadingValue Value="DesignerViewModel.Flow">
+                                                    <Tabs DefaultActiveKey="logs" Size="@TabSize.Small" TabPosition="@TabPosition.Bottom" Class="bottom-tabs">
+                                                        <TabPane Key="logs" Tab="Logs">
+                                                            <FlowLogs />
+                                                        </TabPane>
+                                                        <TabPane Key="variables" Tab="Variables">
+                                                            <FlowVariables />
+                                                        </TabPane>
+                                                    </Tabs>
+                                                </CascadingValue>
+                                            </Footer>
+                                        </SplitterPanel>
+                                    </Splitter>
+
+                                </Layout>
+                            </SplitterPanel>
+
+                            <SplitterPanel Size="@BottomSplitterPercentage">
+                                @if (selectedStep != null)
+                                {
+                                    <div class="properties-container">
+                                        <div class="properties-header">
+                                            <Space Style="width: 100%; padding: 8px; justify-content: space-between;">
+                                                <SpaceItem>
+                                                    <Title Level="5">Step Details</Title>
+                                                </SpaceItem>
+                                                <SpaceItem>
+                                                    <Button Icon="close" Size="@ButtonSize.Small" Type="@ButtonType.Text" 
+                                                            OnClick="ClosePropertiesPanel" />
+                                                </SpaceItem>
+                                            </Space>
+                                        </div>
+                                        <div class="properties-content">
+                                            <StepPropertiesWrapper Step="selectedStep" />
+                                        </div>
+                                    </div>
+                                }
+                            </SplitterPanel>
+                        </Splitter>
+
                     </SplitterPanel>
                 </Splitter>
 
