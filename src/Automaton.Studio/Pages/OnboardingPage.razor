@@ -1,0 +1,209 @@
+@page "/onboarding"
+@using Automaton.Studio.Services
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ConfigurationService ConfigService
+@implements IDisposable
+
+<Layout>
+
+    <Header Class="header">
+        <Row>
+            <Col>
+               <Space Direction="SpaceDirection.Horizontal">
+                    <SpaceItem><span style="font-size: 20px"><b>Onboarding</b></span></SpaceItem>
+                </Space>
+            </Col>
+            <Col Class="right-actions">
+                <!-- Right side content -->
+            </Col>
+        </Row>
+    </Header>
+
+    <div class="onboarding-container">
+        <div class="onboarding-card">
+            <Title Level="1">Welcome to Automaton!</Title>
+            <Paragraph>Let's get you set up to automate your first workflow.</Paragraph>
+
+            <Paragraph>
+                Because your workflows are executed securely on your computer, we need you to install a small <strong>Agent</strong>
+                or our dedicated <strong>Desktop App</strong> to get started. You have two paths to success!
+            </Paragraph>
+
+            <div class="path-container">
+                <!-- Path A: Web App + Local Agent -->
+                <Card Title="Web App (Recommended)" Class="path-card recommended">
+                    <Extra>
+                        <Icon Type="cloud" /> <Icon Type="desktop" />
+                    </Extra>
+                    <ChildContent>
+                        <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
+                            <Step Title="Download and Install the Agent" Status="@step1Status">
+                                <DescriptionTemplate>
+                                    <div>
+                                        <p>This small program runs in the background on your computer to execute flows from the web app.</p>
+                                        <div class="download-buttons">
+                                            <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Download for Windows</Button>
+                                            <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">Download for macOS</Button>
+                                            <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Download for Linux</Button>
+                                        </div>
+                                        <div class="installation-instructions">
+                                            <Collapse>
+                                                <Panel Header="Installation Instructions">
+                                                    <ol>
+                                                        <li>Run the downloaded installer</li>
+                                                        <li>Follow the prompts to complete installation</li>
+                                                        <li>Launch the Automaton Agent from your start menu/applications folder</li>
+                                                    </ol>
+                                                </Panel>
+                                            </Collapse>
+                                        </div>
+                                    </div>
+                                </DescriptionTemplate>
+                            </Step>
+                            <Step Title="Connect your Agent" Status="@step2Status">
+                                <DescriptionTemplate>
+                                    <div>
+                                        <p>Run this command on your local machine to start the agent:</p>
+                                        @if (!agentConnected)
+                                        {
+                                            <div class="connection-waiting">
+                                                <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
+                                                <div class="connection-status">
+                                                    <Spin /> Waiting for Agent to connect...
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="connection-success">
+                                                <div class="connection-status">
+                                                    <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
+                                                </div>
+                                                <Button Type="@ButtonType.Primary" OnClick="@RunSampleFlow">Run a Sample Flow</Button>
+                                            </div>
+                                        }
+                                    </div>
+                                </DescriptionTemplate>
+                            </Step>
+                        </Steps>
+                    </ChildContent>
+                </Card>
+
+                <!-- Path B: Desktop App -->
+                <Card Title="Desktop App" Class="path-card">
+                    <Extra>
+                        <Icon Type="desktop" />
+                    </Extra>
+                    <ChildContent>
+                        <h3>The All-in-One Solution</h3>
+                        <p>
+                            For a fully local experience with no agent to manage, download our standalone desktop application.
+                            It includes everything you need in a single package.
+                        </p>
+                        <Button Type="@ButtonType.Primary" Size="ButtonSize.Large" OnClick="@DownloadDesktopApp">Download Desktop App</Button>
+                    </ChildContent>
+                </Card>
+            </div>
+
+            <div class="additional-resources">
+                <Space>
+                    <SpaceItem>
+                        <a href="/docs/troubleshooting">Trouble shooting? Check our documentation.</a>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <a href="/support">Contact Support</a>
+                    </SpaceItem>
+                </Space>
+            </div>
+        </div>
+    </div>
+
+
+</Layout>
+
+@code {
+    private int currentStep = 0;
+    private StepsStatus step1Status = StepsStatus.Process;
+    private StepsStatus step2Status = StepsStatus.Wait;
+    private bool agentConnected = false;
+    private System.Timers.Timer connectionCheckTimer;
+
+    protected override void OnInitialized()
+    {
+        // Set up timer to check for agent connection
+        connectionCheckTimer = new System.Timers.Timer(3000);
+        connectionCheckTimer.Elapsed += CheckAgentConnection;
+        connectionCheckTimer.AutoReset = true;
+        connectionCheckTimer.Enabled = true;
+    }
+
+    private async void CheckAgentConnection(object source, System.Timers.ElapsedEventArgs e)
+    {
+        try
+        {
+            // Simulate agent connection check - in real implementation, 
+            // this would call an API endpoint to check if an agent is connected
+            var response = await Http.GetAsync($"{ConfigService.BaseUrl}/api/agent/status");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                agentConnected = true;
+                currentStep = 1;
+                step1Status = StepsStatus.Finish;
+                step2Status = StepsStatus.Process;
+                
+                // Once connected, stop checking
+                connectionCheckTimer.Stop();
+                
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+            // Connection failed or service unavailable, continue checking
+        }
+    }
+
+    private void DownloadAgent(string platform)
+    {
+        // In real implementation, this would navigate to or trigger download of the agent installer
+        string downloadUrl = "";
+        
+        switch (platform)
+        {
+            case "windows":
+                downloadUrl = $"{ConfigService.BaseUrl}/downloads/automaton-agent-setup.exe";
+                break;
+            case "macos":
+                downloadUrl = $"{ConfigService.BaseUrl}/downloads/automaton-agent.dmg";
+                break;
+            case "linux":
+                downloadUrl = $"{ConfigService.BaseUrl}/downloads/automaton-agent.deb";
+                break;
+        }
+        
+        if (!string.IsNullOrEmpty(downloadUrl))
+        {
+            NavigationManager.NavigateTo(downloadUrl, true);
+        }
+    }
+
+    private void DownloadDesktopApp()
+    {
+        // Navigate to desktop app download page
+        NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
+    }
+
+    private void RunSampleFlow()
+    {
+        // Navigate to the sample flow page
+        NavigationManager.NavigateTo("/flows/sample");
+    }
+
+    public void Dispose()
+    {
+        connectionCheckTimer?.Stop();
+        connectionCheckTimer?.Dispose();
+    }
+}
