@@ -1,5 +1,3 @@
-
-
 /* Main wrapper and container */
 .onboarding-wrapper {
     min-height: calc(100vh - 64px);
@@ -76,6 +74,7 @@
     grid-template-columns: 1fr;
     gap: 2rem;
     margin-bottom: 2rem;
+    align-items: stretch; /* This ensures both cards have equal height */
 }
 
 @media (min-width: 1024px) {
@@ -94,6 +93,7 @@
     overflow: hidden;
     display: flex !important;
     flex-direction: column !important;
+    height: 100%; /* Ensure full height */
 }
 
     ::deep .path-card::before {
@@ -153,6 +153,38 @@
     font-size: 1.25rem;
 }
 
+/* Recommended Card Content Layout */
+.recommended-card-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex: 1;
+    min-height: 0; /* Important for flex behavior */
+}
+
+.recommended-main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for flex behavior */
+}
+
+/* Desktop App Card Content Layout */
+.desktop-card-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex: 1;
+    min-height: 0; /* Important for flex behavior */
+}
+
+.desktop-main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for flex behavior */
+}
+
 /* Recommended Badge */
 .recommended-badge {
     background: linear-gradient(135deg, #1890ff, #40a9ff);
@@ -201,19 +233,32 @@
 
 /* Run Sample Button */
 ::deep .run-sample-btn {
-    margin-top: 1rem;
-    width: 100%;
-    height: 48px;
-    font-weight: 600;
-    background: linear-gradient(135deg, #52c41a, #73d13d);
-    border: none;
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    width: 100% !important;
+    height: 48px !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #52c41a, #73d13d) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    flex-shrink: 0 !important; /* Prevent button from shrinking */
+    color: white !important;
 }
 
     ::deep .run-sample-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3) !important;
+        background: linear-gradient(135deg, #52c41a, #73d13d) !important;
+        color: white !important;
+        border: none !important;
+    }
+
+    ::deep .run-sample-btn:focus {
+        background: linear-gradient(135deg, #52c41a, #73d13d) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2) !important;
     }
 
 /* Desktop Features */
@@ -235,21 +280,22 @@
 
 /* Desktop Download Button */
 ::deep .desktop-download-btn {
-    margin-top: auto;
-    margin-bottom: 13px;
-    width: 100%;
-    height: 48px;
-    font-weight: 600;
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
+    width: 100% !important;
+    height: 48px !important;
+    font-weight: 600 !important;
     background: linear-gradient(135deg, #722ed1, #9254de) !important;
     border: none !important;
     color: white !important;
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    flex-shrink: 0 !important; /* Prevent button from shrinking */
 }
 
     ::deep .desktop-download-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3);
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3) !important;
         background: linear-gradient(135deg, #5a1a9e, #7c2db5) !important;
         color: white !important;
         border: none !important;
@@ -259,7 +305,7 @@
         background: linear-gradient(135deg, #722ed1, #9254de) !important;
         color: white !important;
         border: none !important;
-        box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.2);
+        box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.2) !important;
     }
 
 /* Footer */
@@ -296,14 +342,14 @@
         text-decoration: none;
     }
 
-/* AntDesign Component Overrides */
-.ant-card {
+/* AntDesign Component Overrides - Enhanced for proper flex behavior */
+::deep .ant-card {
     display: flex !important;
     flex-direction: column !important;
     height: 100% !important;
 }
 
-.ant-card-head {
+::deep .ant-card-head {
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     padding: 1.5rem 1.5rem 1rem 1.5rem;
     flex-shrink: 0;
@@ -315,15 +361,16 @@
     color: #374151;
 }
 
-.ant-card-body {
-    padding: 0 1.5rem 1.5rem 1.5rem;
+::deep .ant-card-body {
+    padding: 0 1.5rem 1.5rem 1.5rem !important;
     display: flex !important;
     flex-direction: column !important;
     flex: 1 !important;
-    min-height: 0;
+    min-height: 0 !important;
+    height: 100% !important;
 }
 
-.ant-card-extra {
+::deep .ant-card-extra {
     display: flex;
     align-items: center;
 }
@@ -331,6 +378,12 @@
 ::deep .ant-steps-item-title {
     font-weight: 600 !important;
     color: #374151 !important;
+}
+
+/* Force the Steps component to take up available space but allow button to stick to bottom */
+::deep .ant-steps {
+    flex: 1 !important;
+    min-height: 0 !important;
 }
 
 /* Responsive Design */
@@ -372,6 +425,6 @@
     }
 }
 
-.ant-steps-item-finish .ant-steps-item-icon {
+::deep .ant-steps-item-finish .ant-steps-item-icon {
     animation: checkmark 0.3s ease-in-out;
 }

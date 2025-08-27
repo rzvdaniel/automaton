@@ -6,19 +6,6 @@
 @implements IDisposable
 
 <Layout>
-    <Header Class="header">
-        <Row>
-            <Col>
-               <Space Direction="SpaceDirection.Horizontal">
-                    <SpaceItem></SpaceItem>
-                </Space>
-            </Col>
-            <Col Class="right-actions">
-                <!-- Right side content -->
-            </Col>
-        </Row>
-    </Header>
-
     <Content>
         <div class="onboarding-wrapper">
             <div class="onboarding-container">
@@ -45,62 +32,70 @@
                             <span class="recommended-badge">Recommended</span>
                         </Extra>
                         <ChildContent>
-                            <div class="card-intro">
-                                <Paragraph Class="card-description">
-                                    Use our powerful web interface to manage your workflows from anywhere, executed securely on your machines via a lightweight local agent.
-                                </Paragraph>
-                            </div>
+                            <div class="recommended-card-content">
+                                <div class="recommended-main-content">
+                                    <div class="card-intro">
+                                        <Paragraph Class="card-description">
+                                            Use our powerful web interface to manage your workflows from anywhere, executed securely on your machines via a lightweight local agent.
+                                        </Paragraph>
+                                    </div>
 
-                            <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
-                                <Step Title="Download and Install the Agent" Status="@step1Status">
-                                    <DescriptionTemplate>
-                                        <div>
-                                            <p>This small program runs in the background on your computer to execute flows from the web app.</p>
-                                            <div class="download-buttons">
-                                                <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Windows</Button>
-                                                <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">macOS</Button>
-                                                <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Linux</Button>
-                                            </div>
-                                            <div class="installation-instructions">
-                                                <Collapse>
-                                                    <Panel Header="Installation Instructions">
-                                                        <ol>
-                                                            <li>Run the downloaded installer</li>
-                                                            <li>Follow the prompts to complete installation</li>
-                                                            <li>Launch the Automaton Agent from your start menu/applications folder</li>
-                                                        </ol>
-                                                    </Panel>
-                                                </Collapse>
-                                            </div>
-                                        </div>
-                                    </DescriptionTemplate>
-                                </Step>
-                                <Step Title="Connect your Agent" Status="@step2Status">
-                                    <DescriptionTemplate>
-                                        <div>
-                                            <p>Run this command on your local machine to start the agent:</p>
-                                            @if (!agentConnected)
-                                            {
-                                                <div class="connection-waiting">
-                                                    <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
-                                                    <div class="connection-status">
-                                                        <Spin /> Waiting for Agent to connect...
+                                    <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
+                                        <Step Title="Download and Install the Agent" Status="@step1Status">
+                                            <DescriptionTemplate>
+                                                <div>
+                                                    <p>This small program runs in the background on your computer to execute flows from the web app.</p>
+                                                    <div class="download-buttons">
+                                                        <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Windows</Button>
+                                                        <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">macOS</Button>
+                                                        <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Linux</Button>
+                                                    </div>
+                                                    <div class="installation-instructions">
+                                                        <Collapse>
+                                                            <Panel Header="Installation Instructions">
+                                                                <ol>
+                                                                    <li>Run the downloaded installer</li>
+                                                                    <li>Follow the prompts to complete installation</li>
+                                                                    <li>Launch the Automaton Agent from your start menu/applications folder</li>
+                                                                </ol>
+                                                            </Panel>
+                                                        </Collapse>
                                                     </div>
                                                 </div>
-                                            }
-                                            else
-                                            {
-                                                <div class="connection-success">
-                                                    <div class="connection-status">
-                                                        <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
-                                                    </div>
-                                                    <Button Type="@ButtonType.Primary" OnClick="@RunSampleFlow" Size="@ButtonSize.Large" Class="run-sample-btn">Run a Sample Flow</Button>
+                                            </DescriptionTemplate>
+                                        </Step>
+                                        <Step Title="Connect your Agent" Status="@step2Status">
+                                            <DescriptionTemplate>
+                                                <div>
+                                                    <p>Run this command on your local machine to start the agent:</p>
+                                                    @if (!agentConnected)
+                                                    {
+                                                        <div class="connection-waiting">
+                                                            <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
+                                                            <div class="connection-status">
+                                                                <Spin /> Waiting for Agent to connect...
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="connection-success">
+                                                            <div class="connection-status">
+                                                                <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
+                                                            </div>
+                                                        </div>
+                                                    }
                                                 </div>
-                                            }
-                                        </div>
-                                    </DescriptionTemplate>
-                                </Step>
-                            </Steps>
+                                            </DescriptionTemplate>
+                                        </Step>
+                                    </Steps>
+                                </div>
+                                
+                                @if (agentConnected)
+                                {
+                                    <Button Type="@ButtonType.Primary" OnClick="@RunSampleFlow" Size="@ButtonSize.Large" Class="run-sample-btn">Run a Sample Flow</Button>
+                                }
+                            </div>
                         </ChildContent>
                     </Card>
 
@@ -110,32 +105,36 @@
                             <Icon Type="appstore" />
                         </Extra>
                         <ChildContent>
-                            <div class="card-intro">
-                                <h3 class="desktop-subtitle">The All-in-One Solution</h3>
-                                <Paragraph Class="card-description">
-                                    For a fully local experience with no agent to manage, download our standalone desktop application. 
-                                    It includes everything you need in a single package.
-                                </Paragraph>
+                            <div class="desktop-card-content">
+                                <div class="desktop-main-content">
+                                    <div class="card-intro">
+                                        <h3 class="desktop-subtitle">The All-in-One Solution</h3>
+                                        <Paragraph Class="card-description">
+                                            For a fully local experience with no agent to manage, download our standalone desktop application. 
+                                            It includes everything you need in a single package.
+                                        </Paragraph>
+                                    </div>
+                                    
+                                    <div class="desktop-features">
+                                        <div class="feature-item">
+                                            <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                            <span>Fully Local</span>
+                                        </div>
+                                        <div class="feature-item">
+                                            <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                            <span>No Setup Required</span>
+                                        </div>
+                                        <div class="feature-item">
+                                            <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                            <span>Instant Start</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
+                                    Download Desktop App
+                                </Button>
                             </div>
-                            
-                            <div class="desktop-features">
-                                <div class="feature-item">
-                                    <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>Fully Local</span>
-                                </div>
-                                <div class="feature-item">
-                                    <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>No Setup Required</span>
-                                </div>
-                                <div class="feature-item">
-                                    <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>Instant Start</span>
-                                </div>
-                            </div>
-                            
-                            <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
-                                Download Desktop App
-                            </Button>
                         </ChildContent>
                     </Card>
                 </div>
@@ -159,9 +158,6 @@
     </Content>
 </Layout>
 
-<style>
-
-</style>
 @code {
     private int currentStep = 0;
     private StepsStatus step1Status = StepsStatus.Process;
