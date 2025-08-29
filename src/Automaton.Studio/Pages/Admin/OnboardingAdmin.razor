@@ -1,0 +1,138 @@
+@page "/admin/onboarding"
+@using Automaton.Studio.Services
+@inject OnboardingService OnboardingService
+@inject NavigationManager NavigationManager
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col>
+                <Title Level="4" Style="margin: 0; color: white;">Onboarding Admin</Title>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Style="padding: 2rem;">
+        <Card Title="Onboarding Management" Style="max-width: 600px;">
+            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+                <SpaceItem>
+                    <Alert Type="@AlertType.Info" 
+                           Message="Current Status" 
+                           Description="@statusMessage" 
+                           ShowIcon="true" />
+                </SpaceItem>
+                
+                <SpaceItem>
+                    <Space>
+                        <SpaceItem>
+                            <Button Type="@ButtonType.Primary" OnClick="@CheckStatus" Loading="@loading">
+                                Check Status
+                            </Button>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Button OnClick="@ResetOnboarding" Loading="@loading">
+                                Reset Onboarding
+                            </Button>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Button OnClick="@CompleteOnboarding" Loading="@loading">
+                                Mark Complete
+                            </Button>
+                        </SpaceItem>
+                    </Space>
+                </SpaceItem>
+
+                <SpaceItem>
+                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                        Go to Onboarding Page
+                    </Button>
+                </SpaceItem>
+
+                <SpaceItem>
+                    <Alert Type="@AlertType.Warning" 
+                           Message="Note" 
+                           Description="Changes may require a page refresh to take effect due to caching." 
+                           ShowIcon="true" />
+                </SpaceItem>
+            </Space>
+        </Card>
+    </Content>
+</Layout>
+
+@code {
+    private string statusMessage = "Click 'Check Status' to see current onboarding state.";
+    private bool loading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckStatus();
+        }
+    }
+
+    private async Task CheckStatus()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var isCompleted = await OnboardingService.IsOnboardingCompletedAsync();
+            var shouldShow = await OnboardingService.ShouldShowOnboardingAsync();
+            
+            statusMessage = $"Onboarding Completed: {isCompleted} | Should Show: {shouldShow}";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error checking status: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResetOnboarding()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            await OnboardingService.ResetOnboardingAsync();
+            statusMessage = "Onboarding has been reset. User will see onboarding on next page load.";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error resetting onboarding: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CompleteOnboarding()
+    {
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            await OnboardingService.MarkOnboardingCompletedAsync();
+            statusMessage = "Onboarding marked as completed. User will not see onboarding automatically.";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error marking onboarding complete: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+}

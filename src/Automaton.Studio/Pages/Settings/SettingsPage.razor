@@ -1,0 +1,186 @@
+@page "/settings"
+@using Automaton.Studio.Services
+@inject OnboardingService OnboardingService
+@inject NavigationManager NavigationManager
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+            <Space Size="SpaceSize.Large">
+                <SpaceItem Class="header-item">
+                    <Title Level="4" Style="margin: 0; color: white;">Settings</Title>
+                </SpaceItem>
+            </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Style="padding: 2rem;">
+        <div style="max-width: 800px;">
+            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="SpaceSize.Large">
+                
+                <!-- Getting Started Section -->
+                <SpaceItem>
+                    <Card Title="Getting Started & Setup">
+                        <Extra>
+                            <Icon Type="question-circle" Style="color: #1890ff;" />
+                        </Extra>
+                        <ChildContent>
+                            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+                                <SpaceItem>
+                                    <Paragraph>
+                                        Access the setup guide to configure Automaton or troubleshoot your installation.
+                                    </Paragraph>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Space>
+                                        <SpaceItem>
+                                            <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                                                <Icon Type="play-circle" />
+                                                Open Setup Guide
+                                            </Button>
+                                        </SpaceItem>
+                                        <SpaceItem>
+                                            <Button OnClick="@ResetSetupGuide">
+                                                <Icon Type="reload" />
+                                                Reset Setup Status
+                                            </Button>
+                                        </SpaceItem>
+                                    </Space>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Alert Type="@AlertType.Info" 
+                                           Message="Setup Status" 
+                                           Description="@setupStatusMessage"
+                                           ShowIcon="true" />
+                                </SpaceItem>
+                            </Space>
+                        </ChildContent>
+                    </Card>
+                </SpaceItem>
+
+                <!-- Quick Actions Section -->
+                <SpaceItem>
+                    <Card Title="Quick Actions">
+                        <Extra>
+                            <Icon Type="thunderbolt" Style="color: #52c41a;" />
+                        </Extra>
+                        <ChildContent>
+                            <Space Wrap="true">
+                                <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/"))">
+                                        <Icon Type="profile" />
+                                        Manage Flows
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/runners"))">
+                                        <Icon Type="play-square" />
+                                        Manage Runners
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
+                                        <Icon Type="experiment" />
+                                        Custom Steps
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/account"))">
+                                        <Icon Type="user" />
+                                        Account Settings
+                                    </Button>
+                                </SpaceItem>
+                            </Space>
+                        </ChildContent>
+                    </Card>
+                </SpaceItem>
+
+                <!-- Help & Support Section -->
+                <SpaceItem>
+                    <Card Title="Help & Support">
+                        <Extra>
+                            <Icon Type="customer-service" Style="color: #722ed1;" />
+                        </Extra>
+                        <ChildContent>
+                            <Space>
+                                <SpaceItem>
+                                    <Button Type="@ButtonType.Link" OnClick="@(() => OpenExternalLink("/docs"))">
+                                        <Icon Type="book" />
+                                        Documentation
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Button Type="@ButtonType.Link" OnClick="@(() => OpenExternalLink("/support"))">
+                                        <Icon Type="question-circle" />
+                                        Support
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/admin/onboarding"))">
+                                        <Icon Type="setting" />
+                                        Admin Tools
+                                    </Button>
+                                </SpaceItem>
+                            </Space>
+                        </ChildContent>
+                    </Card>
+                </SpaceItem>
+
+            </Space>
+        </div>
+    </Content>
+</Layout>
+
+@code {
+    private string setupStatusMessage = "Checking setup status...";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckSetupStatus();
+        }
+    }
+
+    private async Task CheckSetupStatus()
+    {
+        try
+        {
+            var isCompleted = await OnboardingService.IsOnboardingCompletedAsync();
+            var shouldShow = await OnboardingService.ShouldShowOnboardingAsync();
+            
+            if (isCompleted)
+            {
+                setupStatusMessage = "? Setup completed! You can still access the guide for reference or troubleshooting.";
+            }
+            else if (shouldShow)
+            {
+                setupStatusMessage = "?? Setup is incomplete. Please complete the setup guide to get started.";
+            }
+            else
+            {
+                setupStatusMessage = "?? Setup was skipped temporarily. You can resume it anytime.";
+            }
+        }
+        catch
+        {
+            setupStatusMessage = "? Unable to check setup status. LocalStorage may not be available.";
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task ResetSetupGuide()
+    {
+        await OnboardingService.ResetOnboardingAsync();
+        await CheckSetupStatus(); // Refresh status
+        NavigationManager.NavigateTo("/onboarding");
+    }
+
+    private void OpenExternalLink(string path)
+    {
+        NavigationManager.NavigateTo(path, true);
+    }
+}

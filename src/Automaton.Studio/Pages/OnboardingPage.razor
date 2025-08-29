@@ -3,9 +3,36 @@
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
+@inject OnboardingService OnboardingService
 @implements IDisposable
 
 <Layout>
+    <Header Class="onboarding-header">
+        <Row>
+            <Col>
+               <Space Direction="SpaceDirection.Horizontal">
+                    <SpaceItem>
+                        <Title Level="4" Style="color: white; margin: 0;">Automaton Setup</Title>
+                    </SpaceItem>
+                </Space>
+            </Col>
+            <Col Class="right-actions">
+                <Space>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Text" OnClick="@SkipOnboarding" Style="color: white;">
+                            Skip for now
+                        </Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Text" OnClick="@GoToFlows" Style="color: white;">
+                            Already set up? Go to Flows ?
+                        </Button>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
     <Content>
         <div class="onboarding-wrapper">
             <div class="onboarding-container">
@@ -93,7 +120,7 @@
                                 
                                 @if (agentConnected)
                                 {
-                                    <Button Type="@ButtonType.Primary" OnClick="@RunSampleFlow" Size="@ButtonSize.Large" Class="run-sample-btn">Run a Sample Flow</Button>
+                                    <Button Type="@ButtonType.Primary" OnClick="@CompleteOnboarding" Size="@ButtonSize.Large" Class="run-sample-btn">Get Started with Flows</Button>
                                 }
                             </div>
                         </ChildContent>
@@ -142,11 +169,11 @@
                 <!-- Footer -->
                 <div class="footer-section">
                     <div class="help-links">
-                        <a href="/docs/troubleshooting" class="help-link">
+                        <a href="/docs/troubleshooting" class="help-link" target="_blank">
                             <Icon Type="book" />
                             Documentation
                         </a>
-                        <a href="/support" class="help-link">
+                        <a href="/support" class="help-link" target="_blank">
                             <Icon Type="customer-service" />
                             Support
                         </a>
@@ -201,7 +228,7 @@
         }
     }
 
-    private void DownloadAgent(string platform)
+    private async Task DownloadAgent(string platform)
     {
         // Mark step 1 as completed when user clicks download
         step1Status = StepsStatus.Finish;
@@ -216,20 +243,43 @@
             _ => ""
         };
         
+        // Track the download action
+        await OnboardingService.HandleDownloadActionAsync($"agent-{platform}");
+        
         if (!string.IsNullOrEmpty(downloadUrl))
         {
             NavigationManager.NavigateTo(downloadUrl, true);
         }
     }
 
-    private void DownloadDesktopApp()
+    private async Task DownloadDesktopApp()
     {
+        // Track the download action and mark onboarding as completed
+        await OnboardingService.HandleDownloadActionAsync("desktop-app");
+        
         NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
+        
+        // Navigate to flows after a short delay to allow download to start
+        await Task.Delay(1000);
+        NavigationManager.NavigateTo("/");
     }
 
-    private void RunSampleFlow()
+    private async Task CompleteOnboarding()
     {
-        NavigationManager.NavigateTo("/flows/sample");
+        await OnboardingService.MarkOnboardingCompletedAsync();
+        NavigationManager.NavigateTo("/");
+    }
+
+    private async Task SkipOnboarding()
+    {
+        await OnboardingService.SkipOnboardingTemporarilyAsync(24); // Skip for 24 hours
+        NavigationManager.NavigateTo("/");
+    }
+
+    private async Task GoToFlows()
+    {
+        await OnboardingService.MarkOnboardingCompletedAsync();
+        NavigationManager.NavigateTo("/");
     }
 
     public void Dispose()

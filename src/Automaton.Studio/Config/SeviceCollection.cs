@@ -65,6 +65,7 @@ public static class SeviceCollection
 
         // Services
         services.AddScoped<Services.ConfigurationService>();
+        services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();
         services.AddScoped<FlowService>();
         services.AddScoped<FlowsService>();

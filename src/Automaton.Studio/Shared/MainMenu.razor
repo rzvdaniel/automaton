@@ -1,6 +1,10 @@
-﻿<Menu Mode="MenuMode.Vertical" Theme="MenuTheme.Dark" Selectable="true" DefaultSelectedKeys=@(new[]{"1"}) Style="height: 100%">
+﻿@using Automaton.Studio.Services
+@inject OnboardingService OnboardingService
+@implements IDisposable
 
-    <MenuItem Key="1" Icon="profile" RouterLink="/"> 
+<Menu Mode="MenuMode.Vertical" Theme="MenuTheme.Dark" Selectable="true" DefaultSelectedKeys=@(new[] { "1" }) Style="height: 100%">
+
+    <MenuItem Key="1" Icon="profile" RouterLink="/">
         <b>Flows</b>
     </MenuItem>
     <MenuItem Key="2" Icon="play-square" RouterLink="/runners">
@@ -12,8 +16,59 @@
     <MenuItem Key="4" Icon="user" RouterLink="/account/">
         <b>Account</b>
     </MenuItem>
-    <MenuItem Key="5" Icon="poweroff" OnClick="Logout">
+    <MenuItem Key="5" Icon="setting" RouterLink="/settings">
+        <b>Settings</b>
+    </MenuItem>
+
+    @if (shouldShowOnboarding)
+    {
+        <MenuItem Key="6" Icon="question-circle" RouterLink="/onboarding" Class="setup-guide-item">
+            <b>Complete Setup</b>
+        </MenuItem>
+    }
+
+    <MenuItem Key="7" Icon="poweroff" OnClick="Logout">
         <b>Logout</b>
     </MenuItem>
 </Menu>
 
+@code {
+    private bool shouldShowOnboarding = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        OnboardingService.OnboardingStatusChanged += RefreshOnboardingStatus;
+        await CheckOnboardingStatus();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckOnboardingStatus();
+        }
+    }
+
+    private async Task CheckOnboardingStatus()
+    {
+        try
+        {
+            shouldShowOnboarding = await OnboardingService.TryShouldShowOnboardingAsync();
+            StateHasChanged();
+        }
+        catch
+        {
+            shouldShowOnboarding = false;
+        }
+    }
+
+    private async void RefreshOnboardingStatus()
+    {
+        await CheckOnboardingStatus();
+    }
+
+    public void Dispose()
+    {
+        OnboardingService.OnboardingStatusChanged -= RefreshOnboardingStatus;
+    }
+}

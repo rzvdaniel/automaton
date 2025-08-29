@@ -1,26 +1,37 @@
 ﻿@inherits LayoutComponentBase
 
 @using Microsoft.AspNetCore.Components
+@using Automaton.Studio.Services
 
 <Layout Class="main-layout" Id="main-layout">
 
     <AuthorizeView>
-        <Sider Collapsed="MenuCollapsed" Class="menu-sider">
-            <div style="flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; height: 100%;">
-                <MainMenu Collapsed="MenuCollapsed" />
-            </div>
-        </Sider>
+        <Authorized>
+            <Sider Collapsed="MenuCollapsed" Class="menu-sider">
+                <div style="flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; height: 100%;">
+                    <MainMenu Collapsed="MenuCollapsed" />
+                </div>
+            </Sider>
+
+            <Layout>
+                <Content>
+                    <div class="site-layout-content" tabindex="0" @onkeydown="(e)=>OnKeyDown(e)" @onkeyup="(e)=>OnKeyUp(e)">
+                        @Body
+                    </div>
+                </Content>
+            </Layout>
+        </Authorized>
+
+        <NotAuthorized>
+            <Layout>
+                <Content>
+                    <div class="site-layout-content" tabindex="0" @onkeydown="(e)=>OnKeyDown(e)" @onkeyup="(e)=>OnKeyUp(e)">
+                        @Body
+                    </div>
+                </Content>
+            </Layout>
+        </NotAuthorized>
     </AuthorizeView>
-
-    <Layout>
-        <Content>
-
-            <div class="site-layout-content" tabindex="0" @onkeydown="(e)=>OnKeyDown(e)" @onkeyup="(e)=>OnKeyUp(e)">
-                @Body
-            </div>
-
-        </Content>
-    </Layout>
 </Layout>
 
 <style>

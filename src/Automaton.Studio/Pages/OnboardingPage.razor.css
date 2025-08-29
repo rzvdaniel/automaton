@@ -1,6 +1,17 @@
-/* Main wrapper and container */
+/* Onboarding Header */
+.onboarding-header {
+    background: linear-gradient(135deg, #1890ff, #40a9ff) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 0 2rem !important;
+}
+
+.onboarding-header .right-actions {
+    margin-left: auto;
+}
+
+/* Main wrapper and container - adjusted for sidebar */
 .onboarding-wrapper {
-    min-height: 100vh;
+    min-height: calc(100vh - 64px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10,7 +21,7 @@
 
 .onboarding-container {
     width: 100%;
-    max-width: 80rem;
+    max-width: 75rem; /* Slightly smaller to account for sidebar */
     margin: 0 auto;
     background-color: white;
     border-radius: 1rem;
@@ -386,7 +397,7 @@
     min-height: 0 !important;
 }
 
-/* Responsive Design */
+/* Responsive Design - adjusted for sidebar */
 @media (max-width: 768px) {
     .onboarding-wrapper {
         padding: 0.5rem;
@@ -394,6 +405,7 @@
 
     .onboarding-container {
         padding: 1.5rem;
+        max-width: 95%; /* More space on mobile */
     }
 
     .hero-title {
@@ -407,6 +419,14 @@
 
     ::deep .path-card {
         min-height: auto;
+    }
+
+    .onboarding-header {
+        padding: 0 1rem !important;
+    }
+
+    .onboarding-header .right-actions {
+        display: none; /* Hide skip options on mobile */
     }
 }
 
