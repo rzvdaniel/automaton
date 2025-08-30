@@ -1,13 +1,4 @@
-/* Onboarding Header */
-.onboarding-header {
-    background: linear-gradient(135deg, #1890ff, #40a9ff) !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 0 2rem !important;
-}
-
-.onboarding-header .right-actions {
-    margin-left: auto;
-}
+/* Onboarding Header - Removed for consistent white header styling */
 
 /* Main wrapper and container - adjusted for sidebar */
 .onboarding-wrapper {
@@ -419,14 +410,6 @@
 
     ::deep .path-card {
         min-height: auto;
-    }
-
-    .onboarding-header {
-        padding: 0 1rem !important;
-    }
-
-    .onboarding-header .right-actions {
-        display: none; /* Hide skip options on mobile */
     }
 }
 

@@ -31,4 +31,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Studio\Automaton.Studio.csproj" />
   </ItemGroup>
+  
+  <!-- Automatically copy shared site.css from Automaton.Studio before build -->
+  <Target Name="CopySharedCSS" BeforeTargets="Build">
+    <Copy SourceFiles="..\Automaton.Studio\wwwroot\css\site.css" DestinationFiles="wwwroot\css\site.css" />
+  </Target>
 </Project>

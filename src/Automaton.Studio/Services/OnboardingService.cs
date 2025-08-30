@@ -11,6 +11,7 @@ public class OnboardingService
     private const string ONBOARDING_COMPLETED_KEY = "onboarding_completed";
     private const string ONBOARDING_SKIP_KEY = "onboarding_skip_until";
 
+    // Add event for state changes
     public event Action OnboardingStatusChanged;
 
     public OnboardingService(ILocalStorageService localStorage, NavigationManager navigationManager)
@@ -42,7 +43,7 @@ public class OnboardingService
         try
         {
             await _localStorage.SetItemAsync(ONBOARDING_COMPLETED_KEY, true);
-            OnboardingStatusChanged?.Invoke();
+            OnboardingStatusChanged?.Invoke(); // Notify components
         }
         catch (InvalidOperationException)
         {
@@ -88,7 +89,7 @@ public class OnboardingService
         {
             var skipUntil = DateTime.Now.AddHours(hours);
             await _localStorage.SetItemAsync(ONBOARDING_SKIP_KEY, skipUntil);
-            OnboardingStatusChanged?.Invoke();
+            OnboardingStatusChanged?.Invoke(); // Notify components
         }
         catch (InvalidOperationException)
         {
@@ -106,7 +107,7 @@ public class OnboardingService
         {
             await _localStorage.RemoveItemAsync(ONBOARDING_COMPLETED_KEY);
             await _localStorage.RemoveItemAsync(ONBOARDING_SKIP_KEY);
-            OnboardingStatusChanged?.Invoke();
+            OnboardingStatusChanged?.Invoke(); // Notify components
         }
         catch (InvalidOperationException)
         {

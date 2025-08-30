@@ -1,5 +1,5 @@
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 a, .btn-link {
@@ -46,6 +46,62 @@ a, .btn-link {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+/* Enhanced Breadcrumb Styling - Higher specificity to override AntDesign defaults */
+.ant-layout .ant-breadcrumb,
+.header .ant-breadcrumb,
+.ant-breadcrumb {
+    font-size: 1.125rem !important; /* 18px - larger than default */
+    font-weight: 600 !important;
+}
+
+.ant-layout .ant-breadcrumb .ant-breadcrumb-link,
+.header .ant-breadcrumb .ant-breadcrumb-link,
+.ant-breadcrumb .ant-breadcrumb-link,
+.ant-breadcrumb-link {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    transition: color 0.2s ease !important;
+}
+
+.ant-layout .ant-breadcrumb .ant-breadcrumb-link:hover,
+.header .ant-breadcrumb .ant-breadcrumb-link:hover,
+.ant-breadcrumb .ant-breadcrumb-link:hover,
+.ant-breadcrumb-link:hover {
+    color: #1890ff !important;
+}
+
+.ant-layout .ant-breadcrumb .ant-breadcrumb-separator,
+.header .ant-breadcrumb .ant-breadcrumb-separator,
+.ant-breadcrumb .ant-breadcrumb-separator,
+.ant-breadcrumb-separator {
+    font-size: 1rem !important;
+    color: #6b7280 !important;
+    margin: 0 8px !important;
+}
+
+/* For AutoGenerate breadcrumbs - target the generated items */
+.ant-breadcrumb ol.ant-breadcrumb-ol {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+}
+
+.ant-breadcrumb ol.ant-breadcrumb-ol > li {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+}
+
+.ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
+.ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+}
+
+.ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
+    color: #1890ff !important;
+}
 
 .main-layout {
     height: 100%;

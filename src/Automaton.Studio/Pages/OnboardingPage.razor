@@ -7,24 +7,24 @@
 @implements IDisposable
 
 <Layout>
-    <Header Class="onboarding-header">
+    <Header Class="header">
         <Row>
-            <Col>
-               <Space Direction="SpaceDirection.Horizontal">
-                    <SpaceItem>
-                        <Title Level="4" Style="color: white; margin: 0;">Automaton Setup</Title>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb AutoGenerate></Breadcrumb>
                     </SpaceItem>
                 </Space>
             </Col>
             <Col Class="right-actions">
                 <Space>
                     <SpaceItem>
-                        <Button Type="@ButtonType.Text" OnClick="@SkipOnboarding" Style="color: white;">
+                        <Button Type="@ButtonType.Text" OnClick="@SkipOnboarding">
                             Skip for now
                         </Button>
                     </SpaceItem>
                     <SpaceItem>
-                        <Button Type="@ButtonType.Text" OnClick="@GoToFlows" Style="color: white;">
+                        <Button Type="@ButtonType.Text" OnClick="@GoToFlows">
                             Already set up? Go to Flows ?
                         </Button>
                     </SpaceItem>
