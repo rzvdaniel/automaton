@@ -12,12 +12,17 @@
 
                 <Space Direction="SpaceDirection.Horizontal">
                     <SpaceItem>
-                        <Breadcrumb>
-                            <BreadcrumbItem Href="/">Flows</BreadcrumbItem>
-                            <BreadcrumbItem></BreadcrumbItem>
-                        </Breadcrumb>
+                    <Breadcrumb>
+                        <BreadcrumbItem Href="/">
+                            <Icon Type="profile" Width="16" Height="16" />
+                            <span>Flows</span>
+                        </BreadcrumbItem>
+                        <BreadcrumbItem>
+                            <Icon Type="play-square" Width="16" Height="16" />
+                            <span>@FlowName</span>
+                        </BreadcrumbItem>
+                    </Breadcrumb>
                     </SpaceItem>
-                    <SpaceItem><span style="font-size: 20px"><b>@FlowName</b></span></SpaceItem>
                 </Space>
 
             </Col>
@@ -349,7 +354,6 @@
 
     .create-step-ai-section {
         padding: 8px 12px;
-        border-top: 1px solid #e9ecef;
         background-color: #f8f9fa;
         flex-shrink: 0;
     }
