@@ -55,100 +55,53 @@ a, .btn-link {
     font-weight: 600 !important;
 }
 
-.ant-layout .ant-breadcrumb .ant-breadcrumb-link,
-.header .ant-breadcrumb .ant-breadcrumb-link,
-.ant-breadcrumb .ant-breadcrumb-link,
-.ant-breadcrumb-link {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    color: #374151 !important;
-    transition: color 0.2s ease !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
+    .ant-layout .ant-breadcrumb .ant-breadcrumb-link,
+    .header .ant-breadcrumb .ant-breadcrumb-link,
+    .ant-breadcrumb .ant-breadcrumb-link,
+    .ant-breadcrumb-link {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        color: #374151 !important;
+        transition: color 0.2s ease !important;
+    }
 
-.ant-layout .ant-breadcrumb .ant-breadcrumb-link:hover,
-.header .ant-breadcrumb .ant-breadcrumb-link:hover,
-.ant-breadcrumb .ant-breadcrumb-link:hover,
-.ant-breadcrumb-link:hover {
-    color: #1890ff !important;
-}
+        .ant-layout .ant-breadcrumb .ant-breadcrumb-link:hover,
+        .header .ant-breadcrumb .ant-breadcrumb-link:hover,
+        .ant-breadcrumb .ant-breadcrumb-link:hover,
+        .ant-breadcrumb-link:hover {
+            color: #1890ff !important;
+        }
 
-.ant-layout .ant-breadcrumb .ant-breadcrumb-separator,
-.header .ant-breadcrumb .ant-breadcrumb-separator,
-.ant-breadcrumb .ant-breadcrumb-separator,
-.ant-breadcrumb-separator {
-    font-size: 1rem !important;
-    color: #6b7280 !important;
-    margin: 0 8px !important;
-}
+    .ant-layout .ant-breadcrumb .ant-breadcrumb-separator,
+    .header .ant-breadcrumb .ant-breadcrumb-separator,
+    .ant-breadcrumb .ant-breadcrumb-separator,
+    .ant-breadcrumb-separator {
+        font-size: 1rem !important;
+        color: #6b7280 !important;
+        margin: 0 8px !important;
+    }
 
-/* Enhanced Custom Breadcrumb Icons - For manual BreadcrumbItem components */
-.ant-breadcrumb .ant-breadcrumb-link .anticon,
-.ant-breadcrumb .anticon {
-    width: 1.125rem !important;
-    height: 1.125rem !important;
-    font-size: 1.125rem !important;
-    vertical-align: middle !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
+    /* For AutoGenerate breadcrumbs - target the generated items */
+    .ant-breadcrumb ol.ant-breadcrumb-ol {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+    }
 
-/* Custom breadcrumb item styling */
-.ant-breadcrumb .ant-breadcrumb-link > span {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-}
+        .ant-breadcrumb ol.ant-breadcrumb-ol > li {
+            font-size: 1.125rem !important;
+            font-weight: 600 !important;
+        }
 
-/* Breadcrumb item text styling */
-.ant-breadcrumb .ant-breadcrumb-link > span > span {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    color: #374151 !important;
-}
+            .ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
+            .ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
+                font-size: 1.125rem !important;
+                font-weight: 600 !important;
+                color: #374151 !important;
+            }
 
-/* Current breadcrumb item (no link) */
-.ant-breadcrumb .ant-breadcrumb-separator + span {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    color: #374151 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-/* For AutoGenerate breadcrumbs - kept for compatibility */
-.ant-breadcrumb ol.ant-breadcrumb-ol {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-}
-
-.ant-breadcrumb ol.ant-breadcrumb-ol > li {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-.ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
-.ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    color: #374151 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-.ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
-    color: #1890ff !important;
-}
+                .ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
+                    color: #1890ff !important;
+                }
 
 .main-layout {
     height: 100%;
@@ -238,9 +191,9 @@ a, .btn-link {
         margin: 0px 6px 0px 6px;
     }
 
-    .right-actions {
-        margin-left: auto;
-    }
+.right-actions {
+    margin-left: auto;
+}
 
 .autoscroll-list {
     overflow: auto;

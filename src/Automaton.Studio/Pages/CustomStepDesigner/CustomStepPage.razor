@@ -11,16 +11,25 @@
             <Row>
                 <Col>
 
-                <Space Direction="SpaceDirection.Horizontal">
-                        <SpaceItem>
-                            <Breadcrumb AutoGenerate>
-                                <BreadcrumbItem Href="/customsteps">Steps</BreadcrumbItem>
-                                <BreadcrumbItem><b><Icon Type="profile"></Icon> Step</b></BreadcrumbItem>
+                    <Space Direction="SpaceDirection.Horizontal">
+
+                        <SpaceItem Class="header-item">
+                            <Breadcrumb>
+                                <BreadcrumbItem Href="/">
+                                    <Icon Type="profile" Width="16" Height="16" />
+                                    <span>Flows</span>
+                                </BreadcrumbItem>
+                                <BreadcrumbItem Href="/customsteps">
+                                    <Icon Type="profile" Width="16" Height="16" />
+                                    <span>Steps</span>
+                                </BreadcrumbItem>
+                                <BreadcrumbItem>
+                                    <Icon Type="profile" Width="16" Height="16" />
+                                    <span>@StepDesignerViewModel.CustomStep.Name</span>
+                                </BreadcrumbItem>
                             </Breadcrumb>
                         </SpaceItem>
-                        <SpaceItem>
-                            <span class="bullet">&#x2022;</span>@StepDesignerViewModel.CustomStep.Name
-                        </SpaceItem>
+
                     </Space>
 
                 </Col>
