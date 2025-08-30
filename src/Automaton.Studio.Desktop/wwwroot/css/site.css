@@ -63,6 +63,9 @@ a, .btn-link {
         font-weight: 600 !important;
         color: #374151 !important;
         transition: color 0.2s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
     }
 
         .ant-layout .ant-breadcrumb .ant-breadcrumb-link:hover,
@@ -81,27 +84,99 @@ a, .btn-link {
         margin: 0 8px !important;
     }
 
-    /* For AutoGenerate breadcrumbs - target the generated items */
+    /* Enhanced Custom Breadcrumb Icons - For manual BreadcrumbItem components */
+    .ant-breadcrumb .ant-breadcrumb-link .anticon,
+    .ant-breadcrumb .anticon {
+        width: 1.125rem !important;
+        height: 1.125rem !important;
+        font-size: 1.125rem !important;
+        vertical-align: middle !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Custom breadcrumb item styling */
+    .ant-breadcrumb .ant-breadcrumb-link > span {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* Breadcrumb item text styling */
+    .ant-breadcrumb .ant-breadcrumb-link > span > span {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        color: #374151 !important;
+    }
+
+    /* Current breadcrumb item (no link) */
+    .ant-breadcrumb .ant-breadcrumb-separator + span {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        color: #374151 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+
+    /* For AutoGenerate breadcrumbs - kept for compatibility */
     .ant-breadcrumb ol.ant-breadcrumb-ol {
         font-size: 1.125rem !important;
         font-weight: 600 !important;
     }
 
-        .ant-breadcrumb ol.ant-breadcrumb-ol > li {
+    .ant-breadcrumb ol.ant-breadcrumb-ol > li {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+
+        .ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
+        .ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
             font-size: 1.125rem !important;
             font-weight: 600 !important;
+            color: #374151 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
         }
 
-            .ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
-            .ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
-                font-size: 1.125rem !important;
-                font-weight: 600 !important;
-                color: #374151 !important;
+            .ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
+                color: #1890ff !important;
             }
 
-                .ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
-                    color: #1890ff !important;
-                }
+/* Enhanced Menu Item Icons - Larger size for better visibility */
+.ant-menu .ant-menu-item .anticon,
+.ant-menu .ant-menu-item-selected .anticon {
+    font-size: 18px !important; /* Increased from default ~14px */
+    width: 18px !important;
+    height: 18px !important;
+    margin-right: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Menu item alignment improvements */
+.ant-menu .ant-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    line-height: 40px !important;
+    height: 40px !important;
+}
+
+/* SVG icons within menu items */
+.ant-menu .ant-menu-item svg {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+}
 
 .main-layout {
     height: 100%;

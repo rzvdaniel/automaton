@@ -87,21 +87,49 @@ a, .btn-link {
         font-weight: 600 !important;
     }
 
-        .ant-breadcrumb ol.ant-breadcrumb-ol > li {
+    .ant-breadcrumb ol.ant-breadcrumb-ol > li {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+    }
+
+        .ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
+        .ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
             font-size: 1.125rem !important;
             font-weight: 600 !important;
+            color: #374151 !important;
         }
 
-            .ant-breadcrumb ol.ant-breadcrumb-ol > li > span,
-            .ant-breadcrumb ol.ant-breadcrumb-ol > li > a {
-                font-size: 1.125rem !important;
-                font-weight: 600 !important;
-                color: #374151 !important;
+            .ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
+                color: #1890ff !important;
             }
 
-                .ant-breadcrumb ol.ant-breadcrumb-ol > li > a:hover {
-                    color: #1890ff !important;
-                }
+/* Enhanced Menu Item Icons - Larger size for better visibility */
+.ant-menu .ant-menu-item .anticon,
+.ant-menu .ant-menu-item-selected .anticon {
+    font-size: 18px !important; /* Increased from default ~14px */
+    width: 18px !important;
+    height: 18px !important;
+    margin-right: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Menu item alignment improvements */
+.ant-menu .ant-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    line-height: 40px !important;
+    height: 40px !important;
+}
+
+/* SVG icons within menu items */
+.ant-menu .ant-menu-item svg {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+}
 
 .main-layout {
     height: 100%;
