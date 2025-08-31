@@ -36,14 +36,21 @@
         </Row>
     </Header>
 
-    <Content Class="content-padding">
+    <Content Class="content-padding home-content">
         <div class="home-container">
             <!-- Header Section -->
             <div class="home-header">
-                <Title Level="1">Welcome to Automaton Studio</Title>
-                <Paragraph Class="home-subtitle">
-                    Build, manage, and execute automated workflows with ease. Get started by exploring the sections below.
-                </Paragraph>
+                <div class="home-header-content">
+                    <div class="home-header-icon">
+                        <Icon Type="thunderbolt" Style="font-size: 48px; color: white;" />
+                    </div>
+                    <div class="home-header-text">
+                        <Title Level="1" Style="margin-bottom: 8px;">Welcome to Automaton Studio</Title>
+                        <Paragraph Class="home-subtitle">
+                            Build, manage, and execute automated workflows with ease. Get started by exploring the sections below.
+                        </Paragraph>
+                    </div>
+                </div>
             </div>
 
             <!-- Main Content Tabs -->
@@ -153,15 +160,41 @@
 </Layout>
 
 <style>
+    .home-content {
+        background-color: #fafafa;
+        min-height: calc(100vh - 120px);
+    }
+
     .home-container {
         max-width: 1200px;
         margin: 0 auto;
+        padding: 0 24px;
     }
 
     .home-header {
-        text-align: center;
         margin-bottom: 32px;
         padding: 24px 0;
+    }
+
+    .home-header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .home-header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: #1890ff;
+        border-radius: 16px;
+    }
+
+    .home-header-text {
+        flex: 1;
     }
 
     .home-subtitle {
@@ -204,6 +237,15 @@
         height: 180px;
         display: flex;
         flex-direction: column;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+    }
+
+    .info-card:hover,
+    .action-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
     }
 
     .action-card {
@@ -222,6 +264,10 @@
 
     .activity-content {
         min-height: 400px;
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
     }
 
     .activity-placeholder {
@@ -239,6 +285,14 @@
     .ant-card-meta-description {
         color: #666;
         font-size: 14px;
+    }
+
+    /* Tab content background */
+    .resources-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
     }
 </style>
 
