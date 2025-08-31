@@ -2,9 +2,12 @@
 @inject OnboardingService OnboardingService
 @implements IDisposable
 
-<Menu Mode="MenuMode.Vertical" Theme="MenuTheme.Dark" Selectable="true" DefaultSelectedKeys=@(new[] { "1" }) Style="height: 100%">
+<Menu Mode="MenuMode.Vertical" Theme="MenuTheme.Dark" Selectable="true" DefaultSelectedKeys=@(new[] { "0" }) Style="height: 100%">
 
-    <MenuItem Key="1" Icon="profile" RouterLink="/">
+    <MenuItem Key="0" Icon="home" RouterLink="/">
+        <b>Home</b>
+    </MenuItem>
+    <MenuItem Key="1" Icon="profile" RouterLink="/flows">
         <b>Flows</b>
     </MenuItem>
     <MenuItem Key="2" Icon="play-square" RouterLink="/runners">

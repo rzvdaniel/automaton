@@ -14,8 +14,8 @@
                     <SpaceItem Class="header-item">
                         <Breadcrumb>
                             <BreadcrumbItem Href="/">
-                                <Icon Type="profile" Width="16" Height="16" />
-                                <span>Flows</span>
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
                             </BreadcrumbItem>
                             <BreadcrumbItem>
                                 <Icon Type="question-circle" Width="16" Height="16" />
@@ -270,7 +270,7 @@
         
         // Navigate to flows after a short delay to allow download to start
         await Task.Delay(1000);
-        NavigationManager.NavigateTo("/");
+        NavigationManager.NavigateTo("/flows");
     }
 
     private async Task CompleteOnboarding()
@@ -288,7 +288,7 @@
     private async Task GoToFlows()
     {
         await OnboardingService.MarkOnboardingCompletedAsync();
-        NavigationManager.NavigateTo("/");
+        NavigationManager.NavigateTo("/flows");
     }
 
     public void Dispose()

@@ -11,8 +11,8 @@
                 <SpaceItem Class="header-item">
                     <Breadcrumb>
                         <BreadcrumbItem Href="/">
-                            <Icon Type="profile" Width="16" Height="16" />
-                            <span>Flows</span>
+                            <Icon Type="home" Width="16" Height="16" />
+                            <span>Home</span>
                         </BreadcrumbItem>
                         <BreadcrumbItem>
                             <Icon Type="setting" Width="16" Height="16" />
@@ -78,7 +78,7 @@
                         <ChildContent>
                             <Space Wrap="true">
                                 <SpaceItem>
-                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/"))">
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
                                         <Icon Type="profile" />
                                         Manage Flows
                                     </Button>

@@ -1,0 +1,257 @@
+@page "/"
+@using AntDesign
+@using Automaton.Studio.Services
+@inject NavigationManager NavigationManager
+@inject OnboardingService OnboardingService
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb>
+                            <BreadcrumbItem>
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
+                            </BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+            <Col Class="right-actions">
+                <Space>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                            Create Flow
+                        </Button>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Class="content-padding">
+        <div class="home-container">
+            <!-- Header Section -->
+            <div class="home-header">
+                <Title Level="1">Welcome to Automaton Studio</Title>
+                <Paragraph Class="home-subtitle">
+                    Build, manage, and execute automated workflows with ease. Get started by exploring the sections below.
+                </Paragraph>
+            </div>
+
+            <!-- Main Content Tabs -->
+            <Tabs DefaultActiveKey="resources" Class="home-tabs">
+                <TabPane Key="resources" Tab="Resources">
+                    <div class="resources-content">
+                        <!-- Quick Start Section -->
+                        <div class="section">
+                            <Title Level="3">Getting Started</Title>
+                            <Paragraph>
+                                New to Automaton? Start here to understand the basics and create your first workflow.
+                            </Paragraph>
+                            
+                            @if (shouldShowOnboarding)
+                            {
+                                <Alert Type="@AlertType.Info" ShowIcon="true" Closable="false" Style="margin-bottom: 16px;">
+                                    <MessageTemplate>
+                                        <span>Complete your setup to start creating workflows</span>
+                                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))" Style="margin-left: 8px;">
+                                            Complete Setup
+                                        </Button>
+                                    </MessageTemplate>
+                                </Alert>
+                            }
+
+                            <Row Gutter="16" Class="quick-start-cards">
+                                <Col Span="8">
+                                    <Card Class="info-card" Bordered="true">
+                                        <CardMeta Title="?? Documentation" Description="Learn how to create workflows, manage steps, and deploy agents." />
+                                        <div class="card-actions">
+                                            <Button Type="@ButtonType.Link" Size="@ButtonSize.Small">View Docs</Button>
+                                        </div>
+                                    </Card>
+                                </Col>
+                                <Col Span="8">
+                                    <Card Class="info-card" Bordered="true">
+                                        <CardMeta Title="?? Video Tutorials" Description="Watch step-by-step guides to get up and running quickly." />
+                                        <div class="card-actions">
+                                            <Button Type="@ButtonType.Link" Size="@ButtonSize.Small">Watch Videos</Button>
+                                        </div>
+                                    </Card>
+                                </Col>
+                                <Col Span="8">
+                                    <Card Class="info-card" Bordered="true">
+                                        <CardMeta Title="?? Community" Description="Join our community for support, tips, and best practices." />
+                                        <div class="card-actions">
+                                            <Button Type="@ButtonType.Link" Size="@ButtonSize.Small">Join Community</Button>
+                                        </div>
+                                    </Card>
+                                </Col>
+                            </Row>
+                        </div>
+
+                        <!-- Create Something New Section -->
+                        <div class="section">
+                            <Title Level="3">Create Something New</Title>
+                            <Row Gutter="16" Class="action-cards">
+                                <Col Span="8">
+                                    <div class="action-card-wrapper" @onclick="@(() => NavigationManager.NavigateTo("/flows"))" Style="cursor: pointer;">
+                                        <Card Class="action-card" Hoverable="true">
+                                            <div class="card-icon">
+                                                <Icon Type="profile" Style="font-size: 32px; color: #1890ff;" />
+                                            </div>
+                                            <CardMeta Title="Create a Flow" Description="Build automated workflows using drag-and-drop steps." />
+                                        </Card>
+                                    </div>
+                                </Col>
+                                <Col Span="8">
+                                    <div class="action-card-wrapper" @onclick="@(() => NavigationManager.NavigateTo("/customsteps"))" Style="cursor: pointer;">
+                                        <Card Class="action-card" Hoverable="true">
+                                            <div class="card-icon">
+                                                <Icon Type="experiment" Style="font-size: 32px; color: #52c41a;" />
+                                            </div>
+                                            <CardMeta Title="Create a Custom Step" Description="Build reusable steps with Python, PowerShell, or Batch." />
+                                        </Card>
+                                    </div>
+                                </Col>
+                                <Col Span="8">
+                                    <div class="action-card-wrapper" @onclick="@(() => NavigationManager.NavigateTo("/runners"))" Style="cursor: pointer;">
+                                        <Card Class="action-card" Hoverable="true">
+                                            <div class="card-icon">
+                                                <Icon Type="play-square" Style="font-size: 32px; color: #722ed1;" />
+                                            </div>
+                                            <CardMeta Title="Set Up a Runner" Description="Install and configure agents to execute your workflows." />
+                                        </Card>
+                                    </div>
+                                </Col>
+                            </Row>
+                        </div>
+                    </div>
+                </TabPane>
+
+                <TabPane Key="activity" Tab="Activity">
+                    <div class="activity-content">
+                        <Title Level="3">Recent Activity</Title>
+                        <div class="activity-placeholder">
+                            <div style="text-align: center;">
+                                <Icon Type="inbox" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                                <Paragraph Style="color: #999;">No recent activity to display</Paragraph>
+                                <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                    Create Your First Flow
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </TabPane>
+            </Tabs>
+        </div>
+    </Content>
+</Layout>
+
+<style>
+    .home-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .home-header {
+        text-align: center;
+        margin-bottom: 32px;
+        padding: 24px 0;
+    }
+
+    .home-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    .home-tabs .ant-tabs-content-holder {
+        padding-top: 24px;
+    }
+
+    .section {
+        margin-bottom: 48px;
+    }
+
+    .section:last-child {
+        margin-bottom: 0;
+    }
+
+    .quick-start-cards .ant-col,
+    .action-cards .ant-col {
+        margin-bottom: 16px;
+    }
+
+    .action-card-wrapper {
+        display: block;
+        width: 100%;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .action-card-wrapper:hover {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .info-card,
+    .action-card {
+        height: 180px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .action-card {
+        text-align: center;
+        padding: 24px;
+    }
+
+    .card-icon {
+        margin-bottom: 16px;
+    }
+
+    .card-actions {
+        margin-top: auto;
+        padding-top: 16px;
+    }
+
+    .activity-content {
+        min-height: 400px;
+    }
+
+    .activity-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+    }
+
+    .ant-card-meta-title {
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .ant-card-meta-description {
+        color: #666;
+        font-size: 14px;
+    }
+</style>
+
+@code {
+    private bool shouldShowOnboarding = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            shouldShowOnboarding = await OnboardingService.TryShouldShowOnboardingAsync();
+        }
+        catch
+        {
+            shouldShowOnboarding = false;
+        }
+    }
+}
