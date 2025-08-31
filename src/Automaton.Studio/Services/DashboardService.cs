@@ -70,6 +70,20 @@ public class DashboardService
         }
     }
 
+    public async Task<IEnumerable<FlowInfo>> GetAllRecentFlowsAsync(int count = 20)
+    {
+        try
+        {
+            var flows = await flowsService.List();
+            return flows.OrderByDescending(f => f.Updated).Take(count);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to load all recent flows");
+            return new List<FlowInfo>();
+        }
+    }
+
     public async Task<DashboardStats> GetDashboardStatsAsync()
     {
         try

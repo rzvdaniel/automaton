@@ -8,7 +8,7 @@ namespace Automaton.Studio.Pages
 {
     public partial class HomePage : ComponentBase
     {
-        private bool shouldShowOnboarding = false;
+        private bool shouldShowOnboarding;
         private bool isLoadingActivity = true;
         private DashboardStats? dashboardStats;
         private IEnumerable<FlowExecution>? recentActivity;
@@ -40,8 +40,8 @@ namespace Automaton.Studio.Pages
                 // Load stats
                 dashboardStats = await DashboardService.GetDashboardStatsAsync();
 
-                // Load recent flows
-                recentFlows = await DashboardService.GetRecentFlowsAsync();
+                // Load more recent flows for the dedicated tab
+                recentFlows = await DashboardService.GetAllRecentFlowsAsync();
 
                 StateHasChanged();
             }

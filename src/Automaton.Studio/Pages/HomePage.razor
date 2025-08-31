@@ -107,7 +107,7 @@
             }
 
             <!-- Main Content Tabs -->
-            <Tabs DefaultActiveKey="resources" Class="home-tabs">
+            <Tabs DefaultActiveKey="recent-flows" Class="home-tabs">
                 <TabPane Key="resources" Tab="Resources">
                     <div class="resources-content">
                         <!-- Quick Start Section -->
@@ -193,35 +193,74 @@
                                 </Col>
                             </Row>
                         </div>
+                    </div>
+                </TabPane>
 
-                        <!-- Recent Flows Section -->
+                <TabPane Key="recent-flows" Tab="Recent Flows">
+                    <div class="flows-content">
                         @if (recentFlows != null && recentFlows.Any())
                         {
                             <div class="section">
-                                <Title Level="3">Recent Flows</Title>
-                                <div class="recent-flows">
+                                <Title Level="3">Your Recent Flows</Title>
+                                <Paragraph>
+                                    Quick access to your recently edited workflows. Click any flow to continue editing.
+                                </Paragraph>
+                                
+                                <div class="flows-grid">
                                     @foreach (var flow in recentFlows)
                                     {
-                                        <div class="recent-flow-card" @onclick="@(() => NavigationManager.NavigateTo($"/flow/designer/{flow.Id}/{flow.Name}"))">
-                                            <Card Size="CardSize.Small" Hoverable="true">
-                                                <div class="recent-flow-content">
-                                                    <div class="flow-info">
-                                                        <Text Strong>@flow.Name</Text>
-                                                        <Text Type="@TextElementType.Secondary" Class="flow-date">
-                                                            Updated @flow.Updated.ToString("MMM dd, yyyy")
-                                                        </Text>
+                                        <div class="flow-grid-card" @onclick="@(() => NavigationManager.NavigateTo($"/flow/designer/{flow.Id}/{flow.Name}"))">
+                                            <Card Hoverable="true" Class="flow-card">
+                                                <div class="flow-card-content">
+                                                    <div class="flow-header">
+                                                        <div class="flow-icon">
+                                                            <Icon Type="profile" Style="font-size: 20px; color: #1890ff;" />
+                                                        </div>
+                                                        <div class="flow-info">
+                                                            <Text Strong Class="flow-name">@flow.Name</Text>
+                                                            <Text Type="@TextElementType.Secondary" Class="flow-date">
+                                                                Updated @flow.Updated.ToString("MMM dd, yyyy")
+                                                            </Text>
+                                                        </div>
+                                                        <div class="flow-actions">
+                                                            <Icon Type="edit" Style="color: #1890ff;" />
+                                                        </div>
                                                     </div>
-                                                    <div class="flow-actions">
-                                                        <Icon Type="edit" />
+                                                    <div class="flow-stats">
+                                                        <div class="flow-stat">
+                                                            <Icon Type="clock-circle" Style="font-size: 12px; color: #8c8c8c;" />
+                                                            <span>@flow.Created.ToString("MMM dd")</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </Card>
                                         </div>
                                     }
                                 </div>
-                                <div style="text-align: center; margin-top: 16px;">
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                
+                                <div class="flows-actions">
+                                    <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => NavigationManager.NavigateTo("/flows"))" Size="@ButtonSize.Large">
+                                        Create New Flow
+                                    </Button>
+                                    <Button Type="@ButtonType.Default" OnClick="@(() => NavigationManager.NavigateTo("/flows"))" Size="@ButtonSize.Large">
                                         View All Flows
+                                    </Button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="flows-empty">
+                                <div class="empty-content">
+                                    <div class="empty-icon">
+                                        <Icon Type="profile" Style="font-size: 64px; color: #d9d9d9;" />
+                                    </div>
+                                    <Title Level="3" Style="color: #8c8c8c;">No Recent Flows</Title>
+                                    <Paragraph Style="color: #8c8c8c; margin-bottom: 24px;">
+                                        You haven't created any workflows yet. Get started by creating your first flow!
+                                    </Paragraph>
+                                    <Button Type="@ButtonType.Primary" Icon="plus" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                        Create Your First Flow
                                     </Button>
                                 </div>
                             </div>
@@ -634,5 +673,133 @@
         border-radius: 8px;
         padding: 24px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    }
+
+    /* Recent Flows Tab Styles */
+    .flows-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        min-height: 400px;
+    }
+
+    .flows-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+    }
+
+    .flow-grid-card {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+
+    .flow-grid-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .flow-card {
+        height: 100%;
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+    }
+
+    .flow-card:hover {
+        border-color: #1890ff;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+    }
+
+    .flow-card-content {
+        padding: 8px;
+    }
+
+    .flow-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .flow-icon {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #e6f7ff;
+        border-radius: 6px;
+    }
+
+    .flow-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .flow-name {
+        display: block;
+        font-size: 16px;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .flow-date {
+        font-size: 12px;
+        color: #8c8c8c;
+    }
+
+    .flow-actions {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .flow-card:hover .flow-actions {
+        opacity: 1;
+    }
+
+    .flow-stats {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-top: 8px;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .flow-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: #8c8c8c;
+    }
+
+    .flows-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        padding-top: 24px;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 24px;
+    }
+
+    .flows-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .empty-content {
+        text-align: center;
+        max-width: 400px;
+    }
+
+    .empty-icon {
+        margin-bottom: 24px;
     }
 </style>
