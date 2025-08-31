@@ -22,9 +22,14 @@
             <Col Class="right-actions">
                 <Space>
                     <SpaceItem>
-                        <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
-                            Create Flow
-                        </Button>
+                        <Dropdown Trigger="@(new Trigger[] { Trigger.Click })" OnClick='e => { Console.WriteLine("Dropdown button clicked."); }'>
+                            <Overlay>
+                                @_createMenuOverlay
+                            </Overlay>
+                            <Unbound>
+                                <Button RefBack=@context Type="@ButtonType.Primary">Create <Icon Type="@IconType.Outline.Down" /></Button>
+                            </Unbound>
+                        </Dropdown>
                     </SpaceItem>
                 </Space>
             </Col>
@@ -138,9 +143,6 @@
                             <div style="text-align: center;">
                                 <Icon Type="inbox" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
                                 <Paragraph Style="color: #999;">No recent activity to display</Paragraph>
-                                <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
-                                    Create Your First Flow
-                                </Button>
                             </div>
                         </div>
                     </div>
@@ -243,6 +245,16 @@
 @code {
     private bool shouldShowOnboarding = false;
 
+    private RenderFragment _createMenuOverlay =>
+        @<Menu>
+            <MenuItem OnClick="@(() => NavigateToCreateFlow())">
+                <Icon Type="profile" /> Flows
+            </MenuItem>
+            <MenuItem OnClick="@(() => NavigateToCreateStep())">
+                <Icon Type="experiment" /> Steps
+            </MenuItem>
+        </Menu>;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -253,5 +265,15 @@
         {
             shouldShowOnboarding = false;
         }
+    }
+
+    private void NavigateToCreateFlow()
+    {
+        NavigationManager.NavigateTo("/flows");
+    }
+
+    private void NavigateToCreateStep()
+    {
+        NavigationManager.NavigateTo("/customsteps");
     }
 }
