@@ -1,12 +1,10 @@
 ﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Rendering;
-using AntDesign;
 
 namespace Automaton.Studio.Pages
 {
-    public partial class HomePage : ComponentBase
+    public partial class DashboardPage : ComponentBase
     {
         private bool shouldShowOnboarding;
         private bool isLoadingActivity = true;
