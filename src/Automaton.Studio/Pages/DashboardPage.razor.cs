@@ -1,5 +1,6 @@
 ﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
+using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages
@@ -9,8 +10,9 @@ namespace Automaton.Studio.Pages
         private bool shouldShowOnboarding;
         private bool isLoadingActivity = true;
         private DashboardStats? dashboardStats;
-        private IEnumerable<FlowExecution>? recentActivity;
+        private IEnumerable<RecentActivity>? recentActivity;
         private IEnumerable<FlowInfo>? recentFlows;
+        private int activityCount = 10;
 
         [Inject] NavigationManager NavigationManager { get; set; }
         [Inject] OnboardingService OnboardingService { get; set; }
@@ -56,12 +58,12 @@ namespace Automaton.Studio.Pages
 
             try
             {
-                recentActivity = await DashboardService.GetRecentActivityAsync();
+                recentActivity = await DashboardService.GetRecentActivityAsync(activityCount);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading recent activity: {ex.Message}");
-                recentActivity = new List<FlowExecution>();
+                recentActivity = new List<RecentActivity>();
             }
             finally
             {
@@ -72,6 +74,13 @@ namespace Automaton.Studio.Pages
 
         private async Task RefreshActivity()
         {
+            activityCount = 10; // Reset to initial count
+            await LoadRecentActivity();
+        }
+
+        private async Task LoadMoreActivity()
+        {
+            activityCount += 10;
             await LoadRecentActivity();
         }
 
@@ -92,6 +101,18 @@ namespace Automaton.Studio.Pages
         private void NavigateToCreateStep()
         {
             NavigationManager.NavigateTo("/customsteps");
+        }
+
+        private string GetActivityTagColor(ActivityType activityType)
+        {
+            return activityType switch
+            {
+                ActivityType.FlowCreated or ActivityType.CustomStepCreated or ActivityType.RunnerAdded or ActivityType.ScheduleCreated => "green",
+                ActivityType.FlowUpdated or ActivityType.CustomStepUpdated or ActivityType.RunnerUpdated or ActivityType.ScheduleUpdated => "blue",
+                ActivityType.FlowDeleted or ActivityType.CustomStepDeleted or ActivityType.RunnerDeleted or ActivityType.ScheduleDeleted => "red",
+                ActivityType.FlowExecuted => "purple",
+                _ => "default"
+            };
         }
     }
 }

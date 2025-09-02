@@ -307,6 +307,45 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Logs");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("ActivityType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("RecentActivities");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Runner", b =>
                 {
                     b.Property<Guid>("Id")
@@ -390,7 +429,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 3, 11, 9, 34, 45, 188, DateTimeKind.Local).AddTicks(6573));
+                        .HasDefaultValue(new DateTime(2025, 9, 2, 0, 47, 41, 643, DateTimeKind.Local).AddTicks(5060));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -538,6 +577,17 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("FlowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerUser", b =>

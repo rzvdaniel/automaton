@@ -1,4 +1,3 @@
-using AutoMapper;
 using Automaton.Studio.Models;
 using Automaton.Core.Enums;
 
@@ -11,7 +10,7 @@ public class DashboardService
     private readonly FlowExecutionsService flowExecutionsService;
     private readonly FlowsService flowsService;
     private readonly RunnerService runnerService;
-    private readonly IMapper mapper;
+    private readonly RecentActivityService recentActivityService;
     private readonly ILogger logger;
 
     public DashboardService(
@@ -20,22 +19,37 @@ public class DashboardService
         FlowExecutionsService flowExecutionsService,
         FlowsService flowsService,
         RunnerService runnerService,
-        IMapper mapper)
+        RecentActivityService recentActivityService)
     {
         this.httpClient = httpClient;
         this.configService = configService;
         this.flowExecutionsService = flowExecutionsService;
         this.flowsService = flowsService;
         this.runnerService = runnerService;
-        this.mapper = mapper;
+        this.recentActivityService = recentActivityService;
         this.logger = Log.ForContext<DashboardService>();
     }
 
-    public async Task<IEnumerable<FlowExecution>> GetRecentActivityAsync(int count = 10)
+    public async Task<IEnumerable<RecentActivity>> GetRecentActivityAsync(int count = 10)
     {
         try
         {
-            // Try to get recent activity from a dedicated endpoint first
+            // Use the dedicated recent activity service
+            var recentActivities = await recentActivityService.GetRecentActivitiesAsync(count);
+            return recentActivities;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to load recent activity");
+            return new List<RecentActivity>();
+        }
+    }
+
+    public async Task<IEnumerable<FlowExecution>> GetRecentExecutionsAsync(int count = 10)
+    {
+        try
+        {
+            // Try to get recent executions from a dedicated endpoint first
             var result = await httpClient.GetAsync($"{configService.FlowExecutionUrl}/recent/{count}");
             
             if (result.IsSuccessStatusCode)
@@ -51,7 +65,7 @@ public class DashboardService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Failed to load recent activity");
+            logger.Error(ex, "Failed to load recent executions");
             return new List<FlowExecution>();
         }
     }
@@ -92,7 +106,7 @@ public class DashboardService
             var runners = await runnerService.List();
             
             // Get recent executions to calculate success rate
-            var recentExecutions = await GetRecentActivityAsync(100);
+            var recentExecutions = await GetRecentExecutionsAsync(100);
             
             var totalFlows = flows.Count();
             var totalRunners = runners.Count();

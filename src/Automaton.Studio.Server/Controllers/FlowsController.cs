@@ -34,9 +34,9 @@ public class FlowsController : BaseController
     }
 
     [HttpPost]
-    public IActionResult Post(Flow flow)
+    public async Task<IActionResult> Post(Flow flow)
     {
-        var flowId = flowsService.Create(flow);
+        var flowId = await flowsService.Create(flow);
 
         var newFlow = flowsService.Get(flowId);
 
@@ -44,17 +44,17 @@ public class FlowsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public IActionResult Put(Guid id, Flow flow)
+    public async Task<IActionResult> Put(Guid id, Flow flow)
     {
-        flowsService.Update(id, flow);
+        await flowsService.Update(id, flow);
 
         return NoContent();
     }
 
     [HttpDelete("{id}")]
-    public IActionResult Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        flowsService.Remove(id);
+        await flowsService.Remove(id);
 
         return NoContent();
     }

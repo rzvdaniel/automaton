@@ -80,6 +80,7 @@ public static class SeviceCollection
         services.AddScoped<CustomStepExecuteService>();
         services.AddScoped<FlowSettingsService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<RecentActivityService>();
 
         // ViewModels
         services.AddScoped<FlowsViewModel>();

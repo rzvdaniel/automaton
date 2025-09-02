@@ -29,6 +29,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<Schedule> Schedules { get; set; }
         public virtual DbSet<ScheduleUser> ScheduleUsers { get; set; }
         public virtual DbSet<Log> Logs { get; set; }
+        public virtual DbSet<RecentActivity> RecentActivities { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -125,6 +126,25 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(s => s.RevokedAt).IsRequired(false);
                 entity.Property(s => s.CreatedAt).IsRequired().HasDefaultValue(DateTime.Now);
                 entity.Property(s => s.Expires).IsRequired();
+            });
+
+            modelBuilder.Entity<RecentActivity>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ActivityType).IsRequired();
+                entity.Property(e => e.EntityName).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Description).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.UserId, e.CreatedAt });
             });
         }
 

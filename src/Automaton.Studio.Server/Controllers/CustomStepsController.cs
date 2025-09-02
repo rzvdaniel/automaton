@@ -32,9 +32,9 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPost]
-    public IActionResult Post(Models.NewCustomStep customStep)
+    public async Task<IActionResult> Post(Models.NewCustomStep customStep)
     {
-        var customStepId = customStepsService.Create(customStep);
+        var customStepId = await customStepsService.Create(customStep);
 
         var newCustomStep = customStepsService.Get(customStepId);
 
@@ -42,17 +42,17 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public IActionResult Put(Guid id, Models.CustomStep customStep)
+    public async Task<IActionResult> Put(Guid id, Models.CustomStep customStep)
     {
-        customStepsService.Update(id, customStep);
+        await customStepsService.Update(id, customStep);
 
         return NoContent();
     }
 
     [HttpDelete("{id}")]
-    public IActionResult Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        customStepsService.Remove(id);
+        await customStepsService.Remove(id);
 
         return NoContent();
     }

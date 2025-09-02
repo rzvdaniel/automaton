@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
 using Serilog;
@@ -9,7 +9,7 @@ namespace Automaton.Studio.Server.Services;
 public class CustomStepsService
 {
     private readonly ApplicationDbContext dataContext;
-    private readonly IMapper mapper;
+    private readonly RecentActivityService recentActivityService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
     private const string DefaultIcon = "user";
@@ -19,19 +19,19 @@ public class CustomStepsService
     (
         ApplicationDbContext dataContext,
         UserContextService userContextService,
-        IMapper mapper
+        RecentActivityService recentActivityService
     )
     {
         this.dataContext = dataContext;
-        this.mapper = mapper;
+        this.recentActivityService = recentActivityService;
         this.userId = userContextService.GetUserId();
-        this.logger = Log.ForContext<FlowsService>();
+        this.logger = Log.ForContext<CustomStepsService>();
     }
 
     public IEnumerable<CustomStep> List()
     {
         var entities = dataContext.CustomSteps.Where(x => x.CustomStepUsers.Any(x => x.UserId == userId));
-        var steps = mapper.Map<IEnumerable<CustomStep>>(entities);
+        var steps = entities.Select(MapToModel);
 
         return steps;
     }
@@ -39,12 +39,12 @@ public class CustomStepsService
     public CustomStep Get(Guid id)
     {
         var stepEntity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
-        var step = mapper.Map<CustomStep>(stepEntity);
+        var step = MapToModel(stepEntity);
  
         return step;
     }
 
-    public Guid Create(NewCustomStep step)
+    public async Task<Guid> Create(NewCustomStep step)
     { 
         var entity = new Entities.CustomStep
         {
@@ -72,10 +72,13 @@ public class CustomStepsService
 
         dataContext.SaveChanges();
 
+        // Log activity
+        await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepCreated, step.Name, entity.Id);
+
         return entity.Id;
     }
 
-    public void Update(Guid id, CustomStep step)
+    public async Task Update(Guid id, CustomStep step)
     {
         var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
 
@@ -90,15 +93,21 @@ public class CustomStepsService
         entity.Definition = JsonSerializer.Serialize(step.Definition);
 
         dataContext.SaveChanges();
+
+        // Log activity
+        await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepUpdated, step.Name, id);
     }
 
-    public void Remove(Guid id)
+    public async Task Remove(Guid id)
     {
-        var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
+        var customStep = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
+        var stepName = customStep.Name;
 
-        dataContext.CustomSteps.Remove(entity);
-
+        dataContext.CustomSteps.Remove(customStep);
         dataContext.SaveChanges();
+
+        // Log activity
+        await recentActivityService.LogCustomStepActivityAsync(ActivityType.CustomStepDeleted, stepName, id);
     }
 
     public bool Exists(string name)
@@ -106,5 +115,25 @@ public class CustomStepsService
         var exists = dataContext.CustomSteps.Any(x => x.Name == name && x.CustomStepUsers.Any(x => x.UserId == userId));
 
         return exists;
+    }
+
+    private static CustomStep MapToModel(Entities.CustomStep entity)
+    {
+        if (entity == null) return null;
+
+        return new CustomStep
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            DisplayName = entity.DisplayName,
+            Description = entity.Description,
+            Icon = entity.Icon,
+            Category = entity.Category,
+            MoreInfo = entity.MoreInfo,
+            VisibleInExplorer = entity.VisibleInExplorer,
+            Created = entity.Created,
+            Updated = entity.Updated,
+            Definition = JsonSerializer.Deserialize<CustomStepDefinition>(entity.Definition ?? "{}")
+        };
     }
 }

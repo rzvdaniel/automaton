@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Enums;
+﻿using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
@@ -14,7 +13,7 @@ public class FlowsService
     private readonly ApplicationDbContext dbContext;
     private readonly RunnerService runnerService;
     private readonly ScheduleService scheduleService;
-    private readonly IMapper mapper;
+    private readonly RecentActivityService recentActivityService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -23,14 +22,14 @@ public class FlowsService
         ApplicationDbContext dbContext,
         RunnerService runnerService,
         ScheduleService scheduleService,
-        UserContextService userContextService,
-        IMapper mapper
+        RecentActivityService recentActivityService,
+        UserContextService userContextService
     )
     {
         this.dbContext = dbContext;
         this.runnerService = runnerService;
         this.scheduleService = scheduleService;
-        this.mapper = mapper;
+        this.recentActivityService = recentActivityService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<FlowsService>();
     }
@@ -69,7 +68,7 @@ public class FlowsService
         return flow;
     }
 
-    public Guid Create(Flow flow)
+    public async Task<Guid> Create(Flow flow)
     {
         flow.Id = Guid.NewGuid();
         flow.Created = DateTime.UtcNow;
@@ -96,10 +95,13 @@ public class FlowsService
 
         dbContext.SaveChanges();
 
+        // Log activity
+        await recentActivityService.LogFlowActivityAsync(ActivityType.FlowCreated, flow.Name, flow.Id);
+
         return flowEntity.Id;
     }
 
-    public void Update(Guid id, Flow flow)
+    public async Task Update(Guid id, Flow flow)
     {
         var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id && x.FlowUsers.Any(x => x.UserId == userId));
 
@@ -108,15 +110,21 @@ public class FlowsService
         entity.Updated = DateTime.UtcNow;
 
         dbContext.SaveChanges();
+
+        // Log activity
+        await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, flow.Name, id);
     }
 
-    public void Remove(Guid id)
+    public async Task Remove(Guid id)
     {
         var flow = dbContext.Flows.SingleOrDefault(x => x.Id == id && x.FlowUsers.Any(x => x.UserId == userId));
+        var flowName = flow.Name;
 
         dbContext.Flows.Remove(flow);
-
         dbContext.SaveChanges();
+
+        // Log activity
+        await recentActivityService.LogFlowActivityAsync(ActivityType.FlowDeleted, flowName, id);
     }
 
     public bool Exists(string name)
@@ -128,7 +136,15 @@ public class FlowsService
 
     public async Task<IEnumerable<RunnerFlowResult>> Execute(Guid flowId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
+        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId && x.FlowUsers.Any(x => x.UserId == userId));
+        
         var result = await runnerService.ExecuteFlow(flowId, runnerIds, cancellationToken);
+
+        // Log activity
+        if (flow != null)
+        {
+            await recentActivityService.LogFlowActivityAsync(ActivityType.FlowExecuted, flow.Name, flowId, cancellationToken);
+        }
 
         return result;
     }
