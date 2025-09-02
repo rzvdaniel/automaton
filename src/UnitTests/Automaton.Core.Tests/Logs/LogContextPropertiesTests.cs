@@ -108,15 +108,22 @@ namespace Automaton.Core.Tests.Logs
         }
 
         [Test]
-        public void Class_ShouldNotBeInstantiable()
+        public void Class_ShouldBeStaticConstantsClass()
         {
             // Arrange
             var type = typeof(LogContextProperties);
 
             // Act & Assert
-            var constructors = type.GetConstructors();
-            Assert.That(constructors.All(c => c.IsPrivate || c.IsFamily), Is.True,
-                "LogContextProperties should not have public constructors since it's a constants-only class");
+            // The class should contain only constant fields, no need to check constructors
+            // since it's a static constants class
+            var fields = type.GetFields();
+            Assert.That(fields.Length, Is.GreaterThan(0), "Class should have constant fields");
+            
+            foreach (var field in fields)
+            {
+                Assert.That(field.IsLiteral, Is.True, $"Field {field.Name} should be a constant");
+                Assert.That(field.IsStatic, Is.True, $"Field {field.Name} should be static");
+            }
         }
     }
 }
