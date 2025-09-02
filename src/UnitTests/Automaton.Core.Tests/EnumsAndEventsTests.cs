@@ -115,5 +115,50 @@ namespace Automaton.Core.Tests.Events
             Assert.That(propertyInfo.CanRead, Is.True);
             Assert.That(propertyInfo.SetMethod?.IsPublic, Is.Not.True);
         }
+
+        [Test]
+        public void Constructor_WithNullVariable_ShouldSetVariableToNull()
+        {
+            // Act
+            var notification = new SetVariableNotification(null!);
+
+            // Assert
+            Assert.That(notification.Variable, Is.Null);
+        }
+
+        [Test]
+        public void Notification_ShouldImplementINotification()
+        {
+            // Arrange
+            var variable = new StepVariable { Name = "TestVar" };
+            var notification = new SetVariableNotification(variable);
+
+            // Act & Assert
+            Assert.That(notification, Is.InstanceOf<MediatR.INotification>());
+        }
+
+        [Test]
+        public void Constructor_WithComplexVariable_ShouldPreserveAllProperties()
+        {
+            // Arrange
+            var variable = new StepVariable
+            {
+                Id = "complex-var",
+                Name = "ComplexVariable",
+                Value = new { Name = "Test", Value = 42 },
+                Type = VariableType.Text,
+                Description = "A complex variable for testing"
+            };
+
+            // Act
+            var notification = new SetVariableNotification(variable);
+
+            // Assert
+            Assert.That(notification.Variable, Is.EqualTo(variable));
+            Assert.That(notification.Variable.Id, Is.EqualTo("complex-var"));
+            Assert.That(notification.Variable.Name, Is.EqualTo("ComplexVariable"));
+            Assert.That(notification.Variable.Type, Is.EqualTo(VariableType.Text));
+            Assert.That(notification.Variable.Description, Is.EqualTo("A complex variable for testing"));
+        }
     }
 }

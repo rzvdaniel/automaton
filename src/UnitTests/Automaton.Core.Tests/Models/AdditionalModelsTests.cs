@@ -229,6 +229,85 @@ namespace Automaton.Core.Tests.Models
             Assert.That(context.Step, Is.EqualTo(step));
             Assert.That(context.CancellationToken, Is.EqualTo(cancellationToken));
         }
+
+        [Test]
+        public void Constructor_ShouldAllowSettingAllRequiredProperties()
+        {
+            // Arrange
+            var workflow = new Workflow { Id = Guid.NewGuid(), Name = "Test Workflow" };
+            var definition = new WorkflowDefinition { Id = "test-def" };
+            var step = new TestWorkflowStepForModels 
+            { 
+                Id = "test-step", 
+                Name = "Test Step",
+                DisplayName = "Test Step Display",
+                Type = "TestStep"
+            };
+            var cancellationToken = CancellationToken.None;
+
+            // Act
+            var context = new StepExecutionContext
+            {
+                Workflow = workflow,
+                Definition = definition,
+                Step = step,
+                CancellationToken = cancellationToken
+            };
+
+            // Assert
+            Assert.That(context.Workflow, Is.EqualTo(workflow));
+            Assert.That(context.Definition, Is.EqualTo(definition));
+            Assert.That(context.Step, Is.EqualTo(step));
+            Assert.That(context.CancellationToken, Is.EqualTo(cancellationToken));
+        }
+
+        [Test]
+        public void CancellationToken_ShouldSupportCancelledToken()
+        {
+            // Arrange
+            var cancellationTokenSource = new CancellationTokenSource();
+            cancellationTokenSource.Cancel();
+
+            // Act
+            var context = new StepExecutionContext
+            {
+                Workflow = new Workflow(),
+                Definition = new WorkflowDefinition(),
+                Step = new TestWorkflowStepForModels(),
+                CancellationToken = cancellationTokenSource.Token
+            };
+
+            // Assert
+            Assert.That(context.CancellationToken.IsCancellationRequested, Is.True);
+        }
+
+        [Test]
+        public void Context_WithComplexWorkflow_ShouldMaintainReferences()
+        {
+            // Arrange
+            var workflow = new Workflow { Id = Guid.NewGuid(), Name = "Complex Workflow" };
+            workflow.Variables.Add("var1", new StepVariable { Name = "var1", Value = "value1" });
+            
+            var definition = new WorkflowDefinition { Id = "complex-def" };
+            var step = new TestWorkflowStepForModels { Id = "complex-step" };
+            definition.Steps.Add("complex-step", step);
+            workflow.Definitions.Add(definition);
+
+            // Act
+            var context = new StepExecutionContext
+            {
+                Workflow = workflow,
+                Definition = definition,
+                Step = step,
+                CancellationToken = CancellationToken.None
+            };
+
+            // Assert
+            Assert.That(context.Workflow.Variables.Count, Is.EqualTo(1));
+            Assert.That(context.Workflow.Definitions.Count, Is.EqualTo(1));
+            Assert.That(context.Definition.Steps.Count, Is.EqualTo(1));
+            Assert.That(context.Step.Id, Is.EqualTo("complex-step"));
+        }
     }
 
     // Test helper class
