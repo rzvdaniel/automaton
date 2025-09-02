@@ -147,6 +147,7 @@ services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<RecentActivityService>();
+services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<EmailService>();
 services.AddScoped<InstallService>();

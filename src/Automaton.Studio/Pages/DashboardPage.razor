@@ -368,6 +368,110 @@
                         }
                     </div>
                 </TabPane>
+
+                <TabPane Key="recent-executions" Tab="Recent Executions">
+                    <div class="executions-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                            <Title Level="3" style="margin-bottom: 0;">Recent Flow Executions</Title>
+                            <Button Type="@ButtonType.Link" OnClick="@RefreshExecutions" Icon="reload" Size="@ButtonSize.Small">
+                                Refresh
+                            </Button>
+                        </div>
+                        
+                        @if (isLoadingExecutions)
+                        {
+                            <div style="text-align: center; padding: 40px;">
+                                <Spin Size="SpinSize.Large" />
+                            </div>
+                        }
+                        else if (recentExecutions != null && recentExecutions.Any())
+                        {
+                            <div class="executions-list">
+                                @foreach (var execution in recentExecutions)
+                                {
+                                    <Card Size="CardSize.Small" Class="execution-item" Bordered="true">
+                                        <div class="execution-content-item">
+                                            <div class="execution-icon">
+                                                @if (execution.Status == WorkflowStatus.Success)
+                                                {
+                                                    <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                                }
+                                                else if (execution.Status == WorkflowStatus.Error)
+                                                {
+                                                    <Icon Type="close-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#ff4d4f" />
+                                                }
+                                                else if (execution.Status == WorkflowStatus.Working)
+                                                {
+                                                    <Icon Type="sync" Spin="true" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                                }
+                                                else
+                                                {
+                                                    <Icon Type="clock-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#d9d9d9" />
+                                                }
+                                            </div>
+                                            <div class="execution-details">
+                                                <div class="execution-title">
+                                                    <Text Strong>@execution.Application</Text>
+                                                    <Tag Color="@GetExecutionStatusColor(execution.Status)">@execution.Status</Tag>
+                                                </div>
+                                                <div class="execution-description">
+                                                    <Text Type="@TextElementType.Secondary">Flow ID: @execution.FlowId.ToString().Substring(0, 8)...</Text>
+                                                </div>
+                                                <div class="execution-meta">
+                                                    <span class="execution-meta-text">
+                                                        <Icon Type="clock-circle" Style="font-size: 12px;" />
+                                                        Started: @execution.Started.ToString("MMM dd, yyyy HH:mm")
+                                                    </span>
+                                                    @if (execution.Finished != default)
+                                                    {
+                                                        <span class="execution-meta-text">
+                                                            <Icon Type="check" Style="font-size: 12px;" />
+                                                            Finished: @execution.Finished.ToString("HH:mm")
+                                                        </span>
+                                                        <span class="execution-meta-text">
+                                                            <Icon Type="hourglass" Style="font-size: 12px;" />
+                                                            Duration: @((execution.Finished - execution.Started).TotalSeconds.ToString("F1"))s
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="execution-actions">
+                                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" 
+                                                        OnClick="@(() => NavigationManager.NavigateTo($"/flow/activity/{execution.FlowId}/flow"))">
+                                                    <Icon Type="eye" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                }
+                            </div>
+                            
+                            @if (recentExecutions.Count() >= executionCount)
+                            {
+                                <div style="text-align: center; margin-top: 16px;">
+                                    <Button Type="@ButtonType.Link" OnClick="@LoadMoreExecutions">
+                                        Load More
+                                    </Button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="executions-placeholder">
+                                <div style="text-align: center;">
+                                    <Icon Type="bar-chart" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                                    <Title Level="4" Style="color: #999;">No Recent Executions</Title>
+                                    <Paragraph Style="color: #999; margin-bottom: 24px;">
+                                        Executions will appear here when you run workflows.
+                                    </Paragraph>
+                                    <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                        View Your Flows
+                                    </Button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </TabPane>
             </Tabs>
         </div>
     </Content>
@@ -843,5 +947,93 @@
 
     .empty-icon {
         margin-bottom: 24px;
+    }
+
+    /* Executions Tab Styles */
+    .executions-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        min-height: 400px;
+    }
+
+    .executions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .execution-item {
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .execution-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .execution-content-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 4px 0;
+    }
+
+    .execution-icon {
+        flex-shrink: 0;
+        font-size: 18px;
+        margin-top: 2px;
+    }
+
+    .execution-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .execution-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+    }
+
+    .execution-description {
+        margin-bottom: 8px;
+    }
+
+    .execution-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .execution-meta-text {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #8c8c8c;
+        font-size: 12px;
+    }
+
+    .execution-actions {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .execution-item:hover .execution-actions {
+        opacity: 1;
+    }
+
+    .executions-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
     }
 </style>

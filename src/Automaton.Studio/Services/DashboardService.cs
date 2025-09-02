@@ -102,28 +102,17 @@ public class DashboardService
     {
         try
         {
-            var flows = await flowsService.List();
-            var runners = await runnerService.List();
+            // Use the optimized server-side stats endpoint
+            var response = await httpClient.GetAsync($"{configService.BaseUrl}/api/dashboard/stats");
             
-            // Get recent executions to calculate success rate
-            var recentExecutions = await GetRecentExecutionsAsync(100);
-            
-            var totalFlows = flows.Count();
-            var totalRunners = runners.Count();
-            var onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online);
-            
-            var successfulExecutions = recentExecutions.Count(e => e.Status == WorkflowStatus.Success);
-            var totalExecutions = recentExecutions.Count();
-            var successRate = totalExecutions > 0 ? (double)successfulExecutions / totalExecutions * 100 : 0;
-
-            return new DashboardStats
+            if (response.IsSuccessStatusCode)
             {
-                TotalFlows = totalFlows,
-                TotalRunners = totalRunners,
-                OnlineRunners = onlineRunners,
-                SuccessRate = Math.Round(successRate, 1),
-                RecentExecutions = totalExecutions
-            };
+                var stats = await response.Content.ReadAsAsync<DashboardStats>();
+                return stats ?? new DashboardStats();
+            }
+
+            logger.Warning("Failed to fetch dashboard stats. Status: {StatusCode}", response.StatusCode);
+            return new DashboardStats();
         }
         catch (Exception ex)
         {

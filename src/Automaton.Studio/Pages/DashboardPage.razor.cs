@@ -9,10 +9,13 @@ namespace Automaton.Studio.Pages
     {
         private bool shouldShowOnboarding;
         private bool isLoadingActivity = true;
+        private bool isLoadingExecutions = true;
         private DashboardStats? dashboardStats;
         private IEnumerable<RecentActivity>? recentActivity;
+        private IEnumerable<FlowExecution>? recentExecutions;
         private IEnumerable<FlowInfo>? recentFlows;
         private int activityCount = 10;
+        private int executionCount = 15;
 
         [Inject] NavigationManager NavigationManager { get; set; }
         [Inject] OnboardingService OnboardingService { get; set; }
@@ -72,10 +75,37 @@ namespace Automaton.Studio.Pages
             }
         }
 
+        private async Task LoadRecentExecutions()
+        {
+            isLoadingExecutions = true;
+            StateHasChanged();
+
+            try
+            {
+                recentExecutions = await DashboardService.GetRecentExecutionsAsync(executionCount);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading recent executions: {ex.Message}");
+                recentExecutions = new List<FlowExecution>();
+            }
+            finally
+            {
+                isLoadingExecutions = false;
+                StateHasChanged();
+            }
+        }
+
         private async Task RefreshActivity()
         {
             activityCount = 10; // Reset to initial count
             await LoadRecentActivity();
+        }
+
+        private async Task RefreshExecutions()
+        {
+            executionCount = 15; // Reset to initial count
+            await LoadRecentExecutions();
         }
 
         private async Task LoadMoreActivity()
@@ -84,12 +114,19 @@ namespace Automaton.Studio.Pages
             await LoadRecentActivity();
         }
 
+        private async Task LoadMoreExecutions()
+        {
+            executionCount += 15;
+            await LoadRecentExecutions();
+        }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
             {
                 // Load activity data after the initial render to improve perceived performance
                 await LoadRecentActivity();
+                await LoadRecentExecutions();
             }
         }
 
@@ -111,6 +148,17 @@ namespace Automaton.Studio.Pages
                 ActivityType.FlowUpdated or ActivityType.CustomStepUpdated or ActivityType.RunnerUpdated or ActivityType.ScheduleUpdated => "blue",
                 ActivityType.FlowDeleted or ActivityType.CustomStepDeleted or ActivityType.RunnerDeleted or ActivityType.ScheduleDeleted => "red",
                 ActivityType.FlowExecuted => "purple",
+                _ => "default"
+            };
+        }
+
+        private string GetExecutionStatusColor(WorkflowStatus status)
+        {
+            return status switch
+            {
+                WorkflowStatus.Success => "green",
+                WorkflowStatus.Error => "red",
+                WorkflowStatus.Working => "blue",
                 _ => "default"
             };
         }
