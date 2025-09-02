@@ -4,7 +4,7 @@ namespace Automaton.Studio.Models;
 
 public class RunnerModel
 {
-    private readonly Dictionary<RunnerStatus, string> SrarusClasses = new()
+    private readonly Dictionary<RunnerStatus, string> StatusClasses = new()
     {
         { RunnerStatus.None, "badge badge-none" },
         { RunnerStatus.Online, "badge badge-success" },
@@ -22,9 +22,9 @@ public class RunnerModel
     {
         get
         {
-            return SrarusClasses.ContainsKey(Status) ?
-                SrarusClasses[Status] :
-                SrarusClasses[RunnerStatus.None];
+            return StatusClasses.ContainsKey(Status) ?
+                StatusClasses[Status] :
+                StatusClasses[RunnerStatus.None];
         }
     }
 }
