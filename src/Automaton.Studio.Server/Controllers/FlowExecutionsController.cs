@@ -23,6 +23,13 @@ public class FlowExecutionsController : BaseController
         return Ok(result);
     }
 
+    [HttpGet("recent/{count}")]
+    public async Task<ActionResult<IEnumerable<FlowExecution>>> GetRecentExecutions(int count, CancellationToken cancellationToken = default)
+    {
+        var recentExecutions = await flowExecutionService.GetRecentExecutionsAsync(count, cancellationToken);
+        return Ok(recentExecutions);
+    }
+
     [HttpGet("logs/{flowExecutionId}")]
     public ActionResult<IEnumerable<Entities.Log>> GetLogs(Guid flowExecutionId)
     {
