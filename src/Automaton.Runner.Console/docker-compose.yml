@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  automaton-runner:
+    build:
+      context: ../
+      dockerfile: Automaton.Runner.Console/Dockerfile
+    container_name: automaton-runner
+    environment:
+      - AppConfig__BaseUrl=https://automaton-server:7064
+      - DOTNET_ENVIRONMENT=Production
+    volumes:
+      # Mount config directory to persist authentication and runner registration
+      - automaton-config:/app/.config/AutomatonRunner
+      # Mount logs directory
+      - automaton-logs:/app/logs
+    networks:
+      - automaton-network
+    restart: unless-stopped
+    # Override the default command to run the runner
+    command: ["run", "--name", "Docker-Runner-01"]
+    depends_on:
+      - automaton-server
+
+  # Example server service (you would customize this for your actual server setup)
+  automaton-server:
+    # Replace with your actual server image
+    image: your-automaton-server:latest
+    container_name: automaton-server
+    ports:
+      - "7064:7064"
+    networks:
+      - automaton-network
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=https://+:7064
+
+volumes:
+  automaton-config:
+    driver: local
+  automaton-logs:
+    driver: local
+
+networks:
+  automaton-network:
+    driver: bridge
