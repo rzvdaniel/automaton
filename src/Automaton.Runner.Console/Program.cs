@@ -29,7 +29,8 @@ public class Program
                 CreateRunCommand(),
                 CreateLoginCommand(),
                 CreateRegisterCommand(),
-                CreateStatusCommand()
+                CreateStatusCommand(),
+                CreateClearCommand()
             };
 
             return await rootCommand.InvokeAsync(args);
@@ -77,7 +78,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.StartAsync(name, server);
         }, nameOption, serverOption);
 
@@ -107,7 +109,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args).Build();
-            var authService = host.Services.GetRequiredService<ConsoleAuthenticationService>();
+            using var scope = host.Services.CreateScope();
+            var authService = scope.ServiceProvider.GetRequiredService<ConsoleAuthenticationService>();
             await authService.LoginAsync(server);
         }, serverOption);
 
@@ -145,7 +148,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.RegisterAsync(name, server);
         }, nameOption, serverOption);
 
@@ -169,6 +173,41 @@ public class Program
             System.Console.WriteLine($"Registered: {storageService.IsRunnerRegistered()}");
             System.Console.WriteLine($"Logged In: {storageService.IsLoggedIn()}");
         });
+
+        return command;
+    }
+
+    private static Command CreateClearCommand()
+    {
+        var allOption = new Option<bool>(
+            name: "--all",
+            description: "Clear all stored data (credentials + runner registration)")
+        {
+            IsRequired = false
+        };
+
+        var command = new Command("clear", "Clear stored runner registration or all data")
+        {
+            allOption
+        };
+
+        command.SetHandler(async (bool clearAll) =>
+        {
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            
+            if (clearAll)
+            {
+                System.Console.WriteLine("?? Clearing all stored data (credentials + runner registration)...");
+                await runnerService.ClearAllDataAsync();
+            }
+            else
+            {
+                System.Console.WriteLine("?? Clearing runner registration...");
+                await runnerService.ClearRunnerRegistrationAsync();
+            }
+        }, allOption);
 
         return command;
     }

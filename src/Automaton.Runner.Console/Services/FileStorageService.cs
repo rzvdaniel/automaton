@@ -72,6 +72,14 @@ public class FileStorageService
         await File.WriteAllTextAsync(runnerConfigFile, json);
     }
 
+    public async Task DeleteRunnerConfigAsync()
+    {
+        if (File.Exists(runnerConfigFile))
+        {
+            File.Delete(runnerConfigFile);
+        }
+    }
+
     public string? GetRunnerId()
     {
         if (!File.Exists(runnerConfigFile))

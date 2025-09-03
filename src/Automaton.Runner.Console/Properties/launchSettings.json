@@ -1,0 +1,53 @@
+{
+  "profiles": {
+    "Console Runner - Status": {
+      "commandName": "Project",
+      "commandLineArgs": "status",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Login": {
+      "commandName": "Project",
+      "commandLineArgs": "login --server https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Register": {
+      "commandName": "Project",
+      "commandLineArgs": "register --name \"Debug-Runner\" --server https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Run": {
+      "commandName": "Project",
+      "commandLineArgs": "run --name \"Debug-Runner\" --server https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Clear Runner": {
+      "commandName": "Project",
+      "commandLineArgs": "clear",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Clear All": {
+      "commandName": "Project",
+      "commandLineArgs": "clear --all",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Custom Args": {
+      "commandName": "Project",
+      "commandLineArgs": "--help",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

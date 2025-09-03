@@ -43,28 +43,46 @@ public class RunnerHostService
             System.Console.WriteLine($"Server: {configService.BaseUrl}");
             System.Console.WriteLine();
 
-            // Check if logged in
-            if (!storageService.IsLoggedIn())
+            // Enhanced authentication check - validate token against server
+            if (!await EnsureValidAuthenticationAsync())
             {
-                System.Console.WriteLine("?? Authentication required...");
-                var loginSuccess = await authService.LoginAsync();
-                if (!loginSuccess)
-                {
-                    System.Console.WriteLine("? Authentication failed. Cannot start runner.");
-                    return;
-                }
+                System.Console.WriteLine("? Authentication failed. Cannot start runner.");
+                return;
             }
 
-            // Check if runner is registered
-            if (!configService.IsRunnerRegistered())
+            // Check if runner is registered AND if the name matches
+            var existingRunnerId = storageService.GetRunnerId();
+            var existingRunnerName = storageService.GetRunnerName();
+            
+            if (!storageService.IsRunnerRegistered() || existingRunnerName != runnerName)
             {
-                System.Console.WriteLine("?? Registering runner...");
+                if (!string.IsNullOrEmpty(existingRunnerId) && existingRunnerName != runnerName)
+                {
+                    System.Console.WriteLine($"?? Runner name changed from '{existingRunnerName}' to '{runnerName}'");
+                    System.Console.WriteLine("Re-registering runner with new name...");
+                }
+                else
+                {
+                    System.Console.WriteLine("?? Runner registration required...");
+                }
+                
+                System.Console.WriteLine($"Registering runner '{runnerName}' with the server.");
+                System.Console.WriteLine();
+                
                 var registerSuccess = await RegisterRunnerAsync(runnerName);
                 if (!registerSuccess)
                 {
                     System.Console.WriteLine("? Runner registration failed. Cannot start runner.");
                     return;
                 }
+                
+                System.Console.WriteLine("? Runner registration successful!");
+                System.Console.WriteLine();
+            }
+            else
+            {
+                System.Console.WriteLine($"? Runner '{runnerName}' is already registered (ID: {existingRunnerId})");
+                System.Console.WriteLine();
             }
 
             // Connect to hub
@@ -135,15 +153,10 @@ public class RunnerHostService
             System.Console.WriteLine($"Server: {configService.BaseUrl}");
             System.Console.WriteLine($"Runner Name: {runnerName}");
 
-            // Check if logged in
-            if (!storageService.IsLoggedIn())
+            // Enhanced authentication check - validate token against server
+            if (!await EnsureValidAuthenticationAsync())
             {
-                System.Console.WriteLine("?? Authentication required for registration...");
-                var loginSuccess = await authService.LoginAsync();
-                if (!loginSuccess)
-                {
-                    return false;
-                }
+                return false;
             }
 
             return await RegisterRunnerAsync(runnerName);
@@ -217,12 +230,142 @@ public class RunnerHostService
     {
         System.Console.WriteLine();
         System.Console.WriteLine("=== Runner Status ===");
-        System.Console.WriteLine($"Runner ID: {configService.RunnerId}");
-        System.Console.WriteLine($"Runner Name: {configService.ApplicationName}");
+        System.Console.WriteLine($"Runner ID: {storageService.GetRunnerId() ?? "Not set"}");
+        System.Console.WriteLine($"Runner Name: {storageService.GetRunnerName() ?? "Not set"}");
         System.Console.WriteLine($"Server: {configService.BaseUrl}");
         System.Console.WriteLine($"Connected: {hubService.IsConnected}");
-        System.Console.WriteLine($"Registered: {configService.IsRunnerRegistered()}");
-        System.Console.WriteLine($"Authenticated: {storageService.IsLoggedIn()}");
+        System.Console.WriteLine($"Registered: {storageService.IsRunnerRegistered()}");
+        
+        // Check if we have valid authentication (not just if token exists)
+        var hasToken = storageService.IsLoggedIn();
+        if (hasToken)
+        {
+            // Note: We can't easily check token validity synchronously here without making this async
+            // So we'll show both pieces of information
+            System.Console.WriteLine($"Authenticated: Yes (token stored)");
+            System.Console.WriteLine($"Note: Token validity checked during operations");
+        }
+        else
+        {
+            System.Console.WriteLine($"Authenticated: No");
+        }
+        
         System.Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Ensures we have valid authentication by testing token against server
+    /// </summary>
+    private async Task<bool> EnsureValidAuthenticationAsync()
+    {
+        try
+        {
+            // First check if we have any token stored
+            if (!storageService.IsLoggedIn())
+            {
+                System.Console.WriteLine("?? Authentication required...");
+                System.Console.WriteLine("You need to login before running the runner.");
+                System.Console.WriteLine();
+                
+                return await authService.LoginAsync();
+            }
+
+            // Test if current token works by making a simple authenticated request
+            var validToken = await authService.GetValidAccessTokenAsync();
+            if (string.IsNullOrEmpty(validToken))
+            {
+                System.Console.WriteLine("?? Token expired, authentication required...");
+                System.Console.WriteLine();
+                
+                return await authService.LoginAsync();
+            }
+
+            // Test the token against the server with a simple API call
+            if (!await TestTokenValidityAsync(validToken))
+            {
+                System.Console.WriteLine("?? Token invalid, authentication required...");
+                System.Console.WriteLine();
+                
+                // Clear invalid credentials
+                await storageService.DeleteCredentialsAsync();
+                
+                return await authService.LoginAsync();
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Error during authentication validation");
+            System.Console.WriteLine("?? Authentication validation failed, login required...");
+            System.Console.WriteLine();
+            
+            return await authService.LoginAsync();
+        }
+    }
+
+    /// <summary>
+    /// Test token validity by making a simple authenticated request to the server
+    /// </summary>
+    private async Task<bool> TestTokenValidityAsync(string token)
+    {
+        try
+        {
+            using var testClient = new HttpClient();
+            testClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            // Make a simple request to test authentication (we'll use the runners endpoint)
+            var response = await testClient.GetAsync($"{configService.BaseUrl}/{configService.RunnersUrl}");
+            
+            // If we get 401, token is invalid; any other response (200, 403, etc.) means token is valid
+            return response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Token validation test failed");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Clear runner registration from storage
+    /// </summary>
+    public async Task<bool> ClearRunnerRegistrationAsync()
+    {
+        try
+        {
+            await storageService.DeleteRunnerConfigAsync();
+            System.Console.WriteLine("? Runner registration cleared successfully!");
+            logger.Information("Runner registration cleared");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error clearing runner registration");
+            System.Console.WriteLine($"? Error clearing runner registration: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Clear all stored data (credentials + runner registration)
+    /// </summary>
+    public async Task<bool> ClearAllDataAsync()
+    {
+        try
+        {
+            await storageService.DeleteCredentialsAsync();
+            await storageService.DeleteRunnerConfigAsync();
+            System.Console.WriteLine("? All stored data cleared successfully!");
+            logger.Information("All stored data cleared");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error clearing all data");
+            System.Console.WriteLine($"? Error clearing all data: {ex.Message}");
+            return false;
+        }
     }
 }
