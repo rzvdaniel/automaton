@@ -90,6 +90,12 @@
                                     </Button>
                                 </SpaceItem>
                                 <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/settings/api-keys"))">
+                                        <Icon Type="key" />
+                                        API Keys
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
                                     <Button OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
                                         <Icon Type="experiment" />
                                         Custom Steps
