@@ -27,38 +27,37 @@
                 @if (apiKeys?.Any() == true)
                 {
                     <Card>
-                        <Table DataSource="@apiKeys" 
-                               TItem="ApiKeyResponse" 
+                        <Table TItem="ApiKeyResponse" 
+                               DataSource="@apiKeys" 
                                PageSize="10"
                                Responsive>
-                            <Column @bind-Field="@context.Name" Title="Name" />
-                            <Column @bind-Field="@context.KeyPrefix" Title="API Key">
-                                <Template>
+                            <ColumnDefinitions>
+                                <PropertyColumn Title="Name" Property="c => c.Name" />
+                                
+                                <Column Title="API Key" @bind-Field="@context.KeyPrefix">
                                     <Text Code>@context.KeyPrefix</Text>
-                                </Template>
-                            </Column>
-                            <Column @bind-Field="@context.Scope" Title="Scope">
-                                <Template>
+                                </Column>
+                                
+                                <Column Title="Scope" @bind-Field="@context.Scope">
                                     <Tag Color="@GetScopeColor(context.Scope)">
                                         @context.Scope
                                     </Tag>
-                                </Template>
-                            </Column>
-                            <Column @bind-Field="@context.CreatedAt" Title="Created" Format="yyyy-MM-dd HH:mm" />
-                            <Column @bind-Field="@context.LastUsedAt" Title="Last Used">
-                                <Template>
+                                </Column>
+                                
+                                <PropertyColumn Title="Created" Property="c => c.CreatedAt" Format="yyyy-MM-dd HH:mm" />
+                                
+                                <Column Title="Last Used" @bind-Field="@context.LastUsedAt">
                                     @if (context.LastUsedAt.HasValue)
                                     {
                                         <span>@context.LastUsedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
                                     }
                                     else
                                     {
-                                        <text>Never</text>
+                                        <Text Type="secondary">Never</Text>
                                     }
-                                </Template>
-                            </Column>
-                            <Column @bind-Field="@context.IsActive" Title="Status">
-                                <Template>
+                                </Column>
+                                
+                                <Column Title="Status" @bind-Field="@context.IsActive">
                                     @if (context.IsActive)
                                     {
                                         <Tag Color="green">Active</Tag>
@@ -67,40 +66,41 @@
                                     {
                                         <Tag Color="red">Revoked</Tag>
                                     }
-                                </Template>
-                            </Column>
-                            <ActionColumn>
-                                <Space>
+                                </Column>
+                                
+                                <ActionColumn Title="Action">
                                     @if (context.IsActive)
                                     {
-                                        <SpaceItem>
-                                            <Popconfirm Title="Are you sure you want to revoke this API key?"
-                                                       OnConfirm="@(() => RevokeApiKey(context.Id))"
-                                                       OkText="Yes"
-                                                       CancelText="No">
-                                                <Button Type="@ButtonType.Text" 
-                                                       Danger
-                                                       Icon="delete"
-                                                       Size="@ButtonSize.Small">
-                                                    Revoke
-                                                </Button>
-                                            </Popconfirm>
-                                        </SpaceItem>
+                                        <Space>
+                                            <SpaceItem>
+                                                <Popconfirm Title="Are you sure you want to revoke this API key?"
+                                                           OnConfirm="@(() => RevokeApiKey(context.Id))"
+                                                           OkText="Yes"
+                                                           CancelText="No">
+                                                    <Button Type="@ButtonType.Text" 
+                                                           Danger
+                                                           Icon="delete"
+                                                           Size="@ButtonSize.Small">
+                                                        Revoke
+                                                    </Button>
+                                                </Popconfirm>
+                                            </SpaceItem>
+                                        </Space>
                                     }
-                                </Space>
-                            </ActionColumn>
+                                </ActionColumn>
+                            </ColumnDefinitions>
                         </Table>
                     </Card>
                 }
                 else
                 {
-                    @* <Empty Description="No API keys found">
+                    <Empty Description="No API keys found">
                         <ChildContent>
                             <Button Type="@ButtonType.Primary" OnClick="@ShowCreateModal">
                                 Create Your First API Key
                             </Button>
                         </ChildContent>
-                    </Empty> *@
+                    </Empty>
                 }
             }
         </div>
@@ -121,21 +121,25 @@
                              Rows="3" />
                 </FormItem>
                 <FormItem Label="Scope">
-                    <Select @bind-Value="createRequest.Scope" DefaultValue="ApiKeyScope.Runner" TItemValue="ApiKeyScope" TItem="ApiKeyScope">
-                        <SelectOption Value="ApiKeyScope.Runner" Label="Runner" TItemValue="ApiKeyScope" TItem="ApiKeyScope">
-                            <Icon Type="play-circle" /> Runner - Can register and operate runners
-                        </SelectOption>
-                        <SelectOption Value="ApiKeyScope.Execute" Label="Execute" TItemValue="ApiKeyScope" TItem="ApiKeyScope">
-                            <Icon Type="thunderbolt" /> Execute - Can execute workflows
-                        </SelectOption>
-                        <SelectOption Value="ApiKeyScope.ReadOnly" Label="ReadOnly" TItemValue="ApiKeyScope" TItem="ApiKeyScope">
-                            <Icon Type="eye" /> Read Only - Can read flows and executions
-                        </SelectOption>
+                    <Select @bind-Value="createRequest.Scope" 
+                            DefaultValue="ApiKeyScope.Runner" 
+                            TItemValue="ApiKeyScope" 
+                            TItem="ApiKeyScope">
+                        <SelectOptions>
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Runner" Label="Runner">
+                                <Icon Type="play-circle" /> Runner - Can register and operate runners
+                            </SelectOption>
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Execute" Label="Execute">
+                                <Icon Type="thunderbolt" /> Execute - Can execute workflows
+                            </SelectOption>
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.ReadOnly" Label="ReadOnly">
+                                <Icon Type="eye" /> Read Only - Can read flows and executions
+                            </SelectOption>
+                        </SelectOptions>
                     </Select>
                 </FormItem>
                 <FormItem Label="Expiration (Optional)">
                     <DatePicker @bind-Value="createRequest.ExpiresAt" 
-                               @* Placeholder="Select expiration date (optional)" *@
                                ShowTime="false" />
                 </FormItem>
             </Form>
@@ -150,7 +154,7 @@
             <Alert Type="@AlertType.Success" 
                    Message="API Key Created" 
                    Description="Your API key has been created successfully. Copy it now as it won't be shown again."
-                   ShowIcon="true" />
+                   ShowIcon />
             
             <div style="margin-top: 16px;">
                 <Text Strong>API Key:</Text>
