@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using AntDesign;
 
-namespace Automaton.Studio.Pages.Settings;
+namespace Automaton.Studio.Pages.ApiKeys;
 
 public partial class ApiKeysPage
 {
