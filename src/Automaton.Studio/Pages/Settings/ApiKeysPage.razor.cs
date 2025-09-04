@@ -128,4 +128,15 @@ public partial class ApiKeysPage
             _ => "default"
         };
     }
+
+    private static string GetScopeClass(ApiKeyScope scope)
+    {
+        return scope switch
+        {
+            ApiKeyScope.Runner => "scope-runner",
+            ApiKeyScope.Execute => "scope-execute",
+            ApiKeyScope.ReadOnly => "scope-readonly",
+            _ => ""
+        };
+    }
 }
