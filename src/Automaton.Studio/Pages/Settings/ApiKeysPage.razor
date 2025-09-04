@@ -37,100 +37,97 @@
         </Row>
     </Header>
 
-    <Content>
-        <div class="api-keys-container">
-            
-            @if (loading)
+    <Content Class="content-padding">
+        @if (loading)
+        {
+            <div class="loading-container">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+            @if (apiKeys?.Any() == true)
             {
-                <div class="loading-container">
-                    <Spin Size="SpinSize.Large" />
-                </div>
+                <Table TItem="ApiKeyResponse" 
+                       DataSource="@apiKeys" 
+                       PageSize="10">
+                    <Column Title="Name" @bind-Field="@context.Name">
+                        @context.Name
+                    </Column>
+                    
+                    <Column Title="API Key" @bind-Field="@context.KeyPrefix">
+                        <code>@context.KeyPrefix</code>
+                    </Column>
+                    
+                    <Column Title="Scope" @bind-Field="@context.Scope">
+                        <span class="@GetScopeClass(context.Scope)">
+                            @context.Scope
+                        </span>
+                    </Column>
+                    
+                    <Column Title="Created" @bind-Field="@context.CreatedAt">
+                        @context.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                    </Column>
+                    
+                    <Column Title="Last Used" @bind-Field="@context.LastUsedAt">
+                        @if (context.LastUsedAt.HasValue)
+                        {
+                            <span>@context.LastUsedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary">Never</span>
+                        }
+                    </Column>
+                    
+                    <Column Title="Status" @bind-Field="@context.IsActive">
+                        @if (context.IsActive)
+                        {
+                            <span class="status-active">Active</span>
+                        }
+                        else
+                        {
+                            <span class="status-revoked">Revoked</span>
+                        }
+                    </Column>
+                    
+                    <ActionColumn Title="Action">
+                        @if (context.IsActive)
+                        {
+                            <Space>
+                                <SpaceItem>
+                                    <Popconfirm Title="Are you sure you want to revoke this API key?"
+                                               OnConfirm="@(() => RevokeApiKey(context.Id))"
+                                               OkText="Yes"
+                                               CancelText="No">
+                                        <Button Type="@ButtonType.Text" 
+                                               Danger
+                                               Icon="delete"
+                                               Size="@ButtonSize.Small">
+                                            Revoke
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            </Space>
+                        }
+                    </ActionColumn>
+                </Table>
             }
             else
             {
-                @if (apiKeys?.Any() == true)
-                {
-                    <Table TItem="ApiKeyResponse" 
-                           DataSource="@apiKeys" 
-                           PageSize="10">
-                        <Column Title="Name" @bind-Field="@context.Name">
-                            @context.Name
-                        </Column>
-                        
-                        <Column Title="API Key" @bind-Field="@context.KeyPrefix">
-                            <code>@context.KeyPrefix</code>
-                        </Column>
-                        
-                        <Column Title="Scope" @bind-Field="@context.Scope">
-                            <span class="@GetScopeClass(context.Scope)">
-                                @context.Scope
-                            </span>
-                        </Column>
-                        
-                        <Column Title="Created" @bind-Field="@context.CreatedAt">
-                            @context.CreatedAt.ToString("yyyy-MM-dd HH:mm")
-                        </Column>
-                        
-                        <Column Title="Last Used" @bind-Field="@context.LastUsedAt">
-                            @if (context.LastUsedAt.HasValue)
-                            {
-                                <span>@context.LastUsedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
-                            }
-                            else
-                            {
-                                <span class="text-secondary">Never</span>
-                            }
-                        </Column>
-                        
-                        <Column Title="Status" @bind-Field="@context.IsActive">
-                            @if (context.IsActive)
-                            {
-                                <span class="status-active">Active</span>
-                            }
-                            else
-                            {
-                                <span class="status-revoked">Revoked</span>
-                            }
-                        </Column>
-                        
-                        <ActionColumn Title="Action">
-                            @if (context.IsActive)
-                            {
-                                <Space>
-                                    <SpaceItem>
-                                        <Popconfirm Title="Are you sure you want to revoke this API key?"
-                                                   OnConfirm="@(() => RevokeApiKey(context.Id))"
-                                                   OkText="Yes"
-                                                   CancelText="No">
-                                            <Button Type="@ButtonType.Text" 
-                                                   Danger
-                                                   Icon="delete"
-                                                   Size="@ButtonSize.Small">
-                                                Revoke
-                                            </Button>
-                                        </Popconfirm>
-                                    </SpaceItem>
-                                </Space>
-                            }
-                        </ActionColumn>
-                    </Table>
-                }
-                else
-                {
-                    <Empty>
-                        <DescriptionTemplate>
-                            <span>No API keys found</span>
-                        </DescriptionTemplate>
-                        <ChildContent>
-                            <Button Type="@ButtonType.Primary" OnClick="@ShowCreateModal">
-                                Create Your First API Key
-                            </Button>
-                        </ChildContent>
-                    </Empty>
-                }
+                <Empty>
+                    <DescriptionTemplate>
+                        <span>No API keys found</span>
+                    </DescriptionTemplate>
+                    <ChildContent>
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowCreateModal">
+                            Create Your First API Key
+                        </Button>
+                    </ChildContent>
+                </Empty>
             }
-        </div>
-
+        }
+        
         <!-- Create API Key Modal -->
         <Modal Title="Create API Key"
                @bind-Visible="createModalVisible"
@@ -205,12 +202,6 @@
 </Layout>
 
 <style>
-    .api-keys-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 24px;
-    }
-
     .loading-container {
         display: flex;
         justify-content: center;

@@ -16,6 +16,17 @@ a, .btn-link {
     padding-top: 1.1rem;
 }
 
+/* Global content padding for consistent page layout */
+.content-padding {
+    padding: 20px !important;
+}
+
+/* More specific selectors for AntDesign Layout components */
+.ant-layout-content .content-padding,
+div.content-padding {
+    padding: 20px !important;
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }
@@ -225,7 +236,7 @@ a, .btn-link {
 
 .autoscroll-list {
     overflow: auto;
-    height: calc(100vh - 200px);
+    height: calc(100vh - 240px); /* Adjusted for content padding (200px + 40px for padding) */
     /* Use flex to fill the remaining of dropzone in Dropzone.razor*/
     display: flex;
     flex-direction: column;

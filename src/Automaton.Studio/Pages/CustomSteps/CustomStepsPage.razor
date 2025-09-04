@@ -36,7 +36,7 @@
 
     </Header>
 
-    <Content>
+    <Content Class="content-padding">
         <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
             <Column Title="Name" @bind-Field="@context.Name">
                 @context.Name

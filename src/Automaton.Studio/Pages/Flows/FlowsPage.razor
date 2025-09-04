@@ -35,7 +35,7 @@
         </Row>
     </Header>
 
-    <Content>
+    <Content Class="content-padding">
         <Table TItem="FlowModel" DataSource="@FlowsViewModel.Flows" Loading="@loading" Class="autoscroll-list">
 
             <Column Title="Name" @bind-Field="@context.Name">
@@ -72,12 +72,12 @@
                         <SpaceItem>
                             <Tooltip Title="Run flow">
                                 <Button Icon="caret-right" @onclick="@(() => RunFlow(context))" Disabled="context.DoesNotHaveRunners" Loading="@context.Running" />
-                            </Tooltip>
+                        </Tooltip>
                         </SpaceItem>
                         <SpaceItem>
                             <Tooltip Title="Edit flow">
                                 <Button Icon="edit" @onclick="@(() => EditFlow(context.Id, context.Name))">Edit</Button>
-                            </Tooltip>
+                        </Tooltip>
                         </SpaceItem>
                         <SpaceItem>
                             <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
