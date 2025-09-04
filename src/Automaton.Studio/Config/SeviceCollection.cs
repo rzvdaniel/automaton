@@ -67,6 +67,7 @@ public static class SeviceCollection
         services.AddScoped<Services.ConfigurationService>();
         services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();
+        services.AddScoped<ApiKeysService>();
         services.AddScoped<FlowService>();
         services.AddScoped<FlowsService>();
         services.AddScoped<RunnerService>();

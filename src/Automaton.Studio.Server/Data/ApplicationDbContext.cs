@@ -30,6 +30,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ScheduleUser> ScheduleUsers { get; set; }
         public virtual DbSet<Log> Logs { get; set; }
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
+        public virtual DbSet<ApiKey> ApiKeys { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -145,6 +146,29 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.CreatedAt);
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            });
+
+            modelBuilder.Entity<ApiKey>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.HashedKey).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.Scope).IsRequired().HasDefaultValue(ApiKeyScope.Runner);
+                entity.Property(e => e.Description).HasMaxLength(500);
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.HashedKey).IsUnique();
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.UserId, e.IsActive });
+                entity.HasIndex(e => e.LastUsedAt);
             });
         }
 

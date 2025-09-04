@@ -1,5 +1,6 @@
 using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Areas.Identity;
+using Automaton.Studio.Server.Authentication;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Extensions;
@@ -67,6 +68,13 @@ services.AddMvc(options =>
 
 services.AddAccessTokenValidator();
 services.AddJwtAuthentication(applicationBuilder.Configuration);
+
+// Add API Key authentication
+services.AddAuthentication()
+    .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationSchemeOptions.DefaultScheme, 
+        options => { });
+
 services.AddHttpClient();
 
 services.AddRazorPages();
@@ -154,6 +162,9 @@ services.AddScoped<InstallService>();
 services.AddTransient<UsersService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();
+
+// Add API Key service
+services.AddScoped<ApiKeyService>();
 
 services.AddScoped(service => configurationService);
 

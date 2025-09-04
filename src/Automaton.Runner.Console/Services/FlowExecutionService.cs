@@ -9,17 +9,17 @@ public class FlowExecutionService
 {
     private readonly HttpClient httpClient;
     private readonly ConfigurationService configService;
-    private readonly ConsoleAuthenticationService authService;
+    private readonly ApiKeyAuthenticationService apiKeyAuthService;
     private readonly ILogger logger;
 
     public FlowExecutionService(
         HttpClient httpClient,
         ConfigurationService configService,
-        ConsoleAuthenticationService authService)
+        ApiKeyAuthenticationService apiKeyAuthService)
     {
         this.httpClient = httpClient;
         this.configService = configService;
-        this.authService = authService;
+        this.apiKeyAuthService = apiKeyAuthService;
         this.logger = Log.ForContext<FlowExecutionService>();
     }
 
@@ -71,14 +71,7 @@ public class FlowExecutionService
     {
         try
         {
-            var accessToken = await authService.GetValidAccessTokenAsync();
-            if (string.IsNullOrEmpty(accessToken))
-            {
-                throw new UnauthorizedAccessException("No valid access token available");
-            }
-
-            httpClient.DefaultRequestHeaders.Authorization = 
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            await SetupHttpClientAuthAsync();
 
             var response = await httpClient.GetAsync($"{configService.BaseUrl}/{configService.FlowsUrl}/{workflowId}");
             
@@ -107,15 +100,7 @@ public class FlowExecutionService
     {
         try
         {
-            var accessToken = await authService.GetValidAccessTokenAsync();
-            if (string.IsNullOrEmpty(accessToken))
-            {
-                logger.Warning("Cannot report execution - no valid access token");
-                return;
-            }
-
-            httpClient.DefaultRequestHeaders.Authorization = 
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            await SetupHttpClientAuthAsync();
 
             var executionData = new
             {
@@ -146,5 +131,19 @@ public class FlowExecutionService
         {
             logger.Error(ex, "Error reporting execution for workflow {WorkflowId}", execution.FlowId);
         }
+    }
+
+    private async Task SetupHttpClientAuthAsync()
+    {
+        httpClient.DefaultRequestHeaders.Clear();
+        
+        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+            return;
+        }
+
+        throw new UnauthorizedAccessException("No valid API key available for authentication");
     }
 }

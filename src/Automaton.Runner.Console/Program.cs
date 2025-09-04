@@ -27,10 +27,9 @@ public class Program
             var rootCommand = new RootCommand("Automaton Runner - Command Line Interface")
             {
                 CreateRunCommand(),
-                CreateLoginCommand(),
+                CreateAuthCommand(),
                 CreateRegisterCommand(),
-                CreateStatusCommand(),
-                CreateClearCommand()
+                CreateStatusCommand()
             };
 
             return await rootCommand.InvokeAsync(args);
@@ -78,16 +77,22 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            using var scope = host.Services.CreateScope();
-            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
             await runnerService.StartAsync(name, server);
         }, nameOption, serverOption);
 
         return command;
     }
 
-    private static Command CreateLoginCommand()
+    private static Command CreateAuthCommand()
     {
+        var apiKeyOption = new Option<string>(
+            name: "--api-key",
+            description: "API key for authentication (e.g., ak_runner_xxxxxxxxxxxx)")
+        {
+            IsRequired = true
+        };
+
         var serverOption = new Option<string>(
             name: "--server",
             description: "Server URL (e.g., https://localhost:7091)")
@@ -95,12 +100,13 @@ public class Program
             IsRequired = false
         };
 
-        var command = new Command("login", "Login to the Automaton server")
+        var command = new Command("auth", "Authenticate using API key")
         {
+            apiKeyOption,
             serverOption
         };
 
-        command.SetHandler(async (string server) =>
+        command.SetHandler(async (string apiKey, string server) =>
         {
             var args = Array.Empty<string>();
             if (!string.IsNullOrEmpty(server))
@@ -109,10 +115,9 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args).Build();
-            using var scope = host.Services.CreateScope();
-            var authService = scope.ServiceProvider.GetRequiredService<ConsoleAuthenticationService>();
-            await authService.LoginAsync(server);
-        }, serverOption);
+            var apiKeyAuthService = host.Services.GetRequiredService<ApiKeyAuthenticationService>();
+            await apiKeyAuthService.SetApiKeyAsync(apiKey, server);
+        }, apiKeyOption, serverOption);
 
         return command;
     }
@@ -148,8 +153,7 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            using var scope = host.Services.CreateScope();
-            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
             await runnerService.RegisterAsync(name, server);
         }, nameOption, serverOption);
 
@@ -160,54 +164,30 @@ public class Program
     {
         var command = new Command("status", "Show runner status and configuration");
 
-        command.SetHandler(() =>
+        command.SetHandler(async () =>
         {
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             var configService = host.Services.GetRequiredService<ConfigurationService>();
             var storageService = host.Services.GetRequiredService<FileStorageService>();
+            var apiKeyAuthService = host.Services.GetRequiredService<ApiKeyAuthenticationService>();
             
-            System.Console.WriteLine("Automaton Runner Status:");
+            System.Console.WriteLine("=== Automaton Runner Status ===");
             System.Console.WriteLine($"Runner ID: {storageService.GetRunnerId() ?? "Not set"}");
             System.Console.WriteLine($"Runner Name: {storageService.GetRunnerName() ?? "Not set"}");
             System.Console.WriteLine($"Server URL: {configService.BaseUrl}");
             System.Console.WriteLine($"Registered: {storageService.IsRunnerRegistered()}");
-            System.Console.WriteLine($"Logged In: {storageService.IsLoggedIn()}");
-        });
-
-        return command;
-    }
-
-    private static Command CreateClearCommand()
-    {
-        var allOption = new Option<bool>(
-            name: "--all",
-            description: "Clear all stored data (credentials + runner registration)")
-        {
-            IsRequired = false
-        };
-
-        var command = new Command("clear", "Clear stored runner registration or all data")
-        {
-            allOption
-        };
-
-        command.SetHandler(async (bool clearAll) =>
-        {
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             
-            if (clearAll)
+            var isAuthenticated = await apiKeyAuthService.IsAuthenticatedAsync();
+            var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
+            var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
+            
+            System.Console.WriteLine($"Authenticated: {isAuthenticated}");
+            if (isAuthenticated)
             {
-                System.Console.WriteLine("?? Clearing all stored data (credentials + runner registration)...");
-                await runnerService.ClearAllDataAsync();
+                System.Console.WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
             }
-            else
-            {
-                System.Console.WriteLine("?? Clearing runner registration...");
-                await runnerService.ClearRunnerRegistrationAsync();
-            }
-        }, allOption);
+            System.Console.WriteLine("================================");
+        });
 
         return command;
     }
@@ -224,7 +204,7 @@ public class Program
                 // Register services
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
-                services.AddScoped<ConsoleAuthenticationService>();
+                services.AddScoped<ApiKeyAuthenticationService>();
                 services.AddScoped<HubService>();
                 services.AddScoped<FlowExecutionService>();
                 services.AddScoped<RunnerHostService>();

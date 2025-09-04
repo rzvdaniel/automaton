@@ -5,60 +5,59 @@ namespace Automaton.Runner.Console.Services;
 public class FileStorageService
 {
     private readonly string configDirectory;
-    private readonly string credentialsFile;
+    private readonly string apiKeyFile;
     private readonly string runnerConfigFile;
 
     public FileStorageService()
     {
         configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
-        credentialsFile = Path.Combine(configDirectory, "credentials.json");
+        apiKeyFile = Path.Combine(configDirectory, "apikey.json");
         runnerConfigFile = Path.Combine(configDirectory, "runner.json");
 
         EnsureConfigDirectoryExists();
     }
 
-    public async Task SaveCredentialsAsync(string accessToken, string refreshToken)
+    // API Key methods
+    public async Task SaveApiKeyAsync(string apiKey)
     {
-        var credentials = new
+        var apiKeyData = new
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken,
+            ApiKey = apiKey,
             SavedAt = DateTime.UtcNow
         };
 
-        var json = JsonSerializer.Serialize(credentials, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(credentialsFile, json);
+        var json = JsonSerializer.Serialize(apiKeyData, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(apiKeyFile, json);
     }
 
-    public async Task<(string? AccessToken, string? RefreshToken)> LoadCredentialsAsync()
+    public async Task<string?> LoadApiKeyAsync()
     {
-        if (!File.Exists(credentialsFile))
-            return (null, null);
+        if (!File.Exists(apiKeyFile))
+            return null;
 
         try
         {
-            var json = await File.ReadAllTextAsync(credentialsFile);
-            var credentials = JsonSerializer.Deserialize<JsonElement>(json);
+            var json = await File.ReadAllTextAsync(apiKeyFile);
+            var apiKeyData = JsonSerializer.Deserialize<JsonElement>(json);
 
-            var accessToken = credentials.TryGetProperty("AccessToken", out var at) ? at.GetString() : null;
-            var refreshToken = credentials.TryGetProperty("RefreshToken", out var rt) ? rt.GetString() : null;
-
-            return (accessToken, refreshToken);
+            return apiKeyData.TryGetProperty("ApiKey", out var ak) ? ak.GetString() : null;
         }
         catch
         {
-            return (null, null);
+            return null;
         }
     }
 
-    public async Task DeleteCredentialsAsync()
+    public Task DeleteApiKeyAsync()
     {
-        if (File.Exists(credentialsFile))
+        if (File.Exists(apiKeyFile))
         {
-            File.Delete(credentialsFile);
+            File.Delete(apiKeyFile);
         }
+        return Task.CompletedTask;
     }
 
+    // Runner configuration methods
     public async Task SaveRunnerConfigAsync(string runnerId, string runnerName)
     {
         var config = new
@@ -70,14 +69,6 @@ public class FileStorageService
 
         var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(runnerConfigFile, json);
-    }
-
-    public async Task DeleteRunnerConfigAsync()
-    {
-        if (File.Exists(runnerConfigFile))
-        {
-            File.Delete(runnerConfigFile);
-        }
     }
 
     public string? GetRunnerId()
@@ -121,8 +112,11 @@ public class FileStorageService
 
     public bool IsLoggedIn()
     {
-        var (accessToken, _) = LoadCredentialsAsync().Result;
-        return !string.IsNullOrEmpty(accessToken);
+        // Check API key authentication (both stored and environment variable)
+        var apiKey = LoadApiKeyAsync().Result;
+        var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        
+        return !string.IsNullOrEmpty(apiKey) || !string.IsNullOrEmpty(envApiKey);
     }
 
     private void EnsureConfigDirectoryExists()

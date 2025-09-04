@@ -7,9 +7,9 @@
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Login": {
+    "Console Runner - Auth (API Key)": {
       "commandName": "Project",
-      "commandLineArgs": "login --server https://localhost:7091",
+      "commandLineArgs": "auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
@@ -28,23 +28,16 @@
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Clear Runner": {
-      "commandName": "Project",
-      "commandLineArgs": "clear",
-      "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
-    },
-    "Console Runner - Clear All": {
-      "commandName": "Project",
-      "commandLineArgs": "clear --all",
-      "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
-    },
-    "Console Runner - Custom Args": {
+    "Console Runner - Help": {
       "commandName": "Project",
       "commandLineArgs": "--help",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Login (Deprecated)": {
+      "commandName": "Project",
+      "commandLineArgs": "login --server https://localhost:7091",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }

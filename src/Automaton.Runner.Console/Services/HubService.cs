@@ -14,17 +14,17 @@ public class HubService
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
-    private readonly ConsoleAuthenticationService authService;
+    private readonly ApiKeyAuthenticationService apiKeyAuthService;
     private readonly FlowExecutionService flowExecutionService;
     private readonly ILogger logger;
 
     public HubService(
         ConfigurationService configService,
-        ConsoleAuthenticationService authService,
+        ApiKeyAuthenticationService apiKeyAuthService,
         FlowExecutionService flowExecutionService)
     {
         this.configService = configService;
-        this.authService = authService;
+        this.apiKeyAuthService = apiKeyAuthService;
         this.flowExecutionService = flowExecutionService;
         this.logger = Log.ForContext<HubService>();
     }
@@ -33,10 +33,11 @@ public class HubService
     {
         try
         {
-            var accessToken = await authService.GetValidAccessTokenAsync();
-            if (string.IsNullOrEmpty(accessToken))
+            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            
+            if (string.IsNullOrEmpty(apiKey))
             {
-                System.Console.WriteLine("? Not authenticated. Please login first.");
+                System.Console.WriteLine("? Not authenticated. Please set an API key first.");
                 return false;
             }
 
@@ -47,11 +48,12 @@ public class HubService
             }
 
             var hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
+            System.Console.WriteLine($"?? Connecting to {hubUrl}...");
             
             connection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
                 {
-                    options.AccessTokenProvider = () => Task.FromResult(accessToken)!;
+                    options.Headers.Add("X-API-Key", apiKey);
                     options.Headers.Add(RunnerIdHeader, configService.RunnerId);
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
                 })
@@ -62,7 +64,7 @@ public class HubService
             {
                 try
                 {
-                    System.Console.WriteLine($"?? Executing workflow: {workflowId}");
+                    System.Console.WriteLine($"? Executing workflow: {workflowId}");
                     var result = await flowExecutionService.ExecuteWorkflowAsync(workflowId);
                     System.Console.WriteLine($"? Workflow completed: {result.Status}");
                 }
@@ -90,23 +92,22 @@ public class HubService
 
             connection.Reconnecting += (error) =>
             {
-                logger.Information("Reconnecting to server...");
+                logger.Information("Reconnecting to server: {Error}", error?.Message);
                 System.Console.WriteLine("?? Reconnecting to server...");
                 return Task.CompletedTask;
             };
 
             connection.Reconnected += (connectionId) =>
             {
-                logger.Information("Reconnected to server");
-                System.Console.WriteLine("? Reconnected to server");
+                logger.Information("Reconnected to server with connection ID: {ConnectionId}", connectionId);
+                System.Console.WriteLine("? Reconnected to server successfully");
                 return Task.CompletedTask;
             };
 
-            System.Console.WriteLine($"?? Connecting to {hubUrl}...");
             await connection.StartAsync();
             
-            System.Console.WriteLine($"? Connected as '{configService.ApplicationName}' (ID: {configService.RunnerId})");
-            logger.Information("Runner connected to hub successfully");
+            System.Console.WriteLine("? Connected to server successfully");
+            logger.Information("Connected to hub at {HubUrl}", hubUrl);
             
             return true;
         }
@@ -123,10 +124,13 @@ public class HubService
         if (connection != null)
         {
             await connection.DisposeAsync();
-            System.Console.WriteLine("?? Disconnected from server");
-            logger.Information("Runner disconnected from hub");
+            connection = null;
+            System.Console.WriteLine("? Disconnected from server");
         }
     }
 
-    public bool IsConnected => connection?.State == HubConnectionState.Connected;
+    public bool IsConnected()
+    {
+        return connection?.State == HubConnectionState.Connected;
+    }
 }
