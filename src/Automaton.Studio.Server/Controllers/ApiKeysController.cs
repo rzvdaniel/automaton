@@ -76,6 +76,41 @@ public class ApiKeysController : BaseController
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Validates an API key and returns authentication status - used by console runners
+    /// </summary>
+    [HttpPost("validate")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateApiKey([FromBody] ValidateApiKeyRequest request)
+    {
+        if (string.IsNullOrEmpty(request.ApiKey))
+        {
+            return BadRequest(new { message = "API key is required" });
+        }
+
+        var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(request.ApiKey);
+        
+        if (apiKeyEntity == null)
+        {
+            return Unauthorized(new { message = "Invalid or expired API key" });
+        }
+
+        // Check if the API key has appropriate scope for runner operations
+        if (apiKeyEntity.Scope == ApiKeyScope.ReadOnly)
+        {
+            return Forbid("API key does not have sufficient permissions for runner operations. Required: Runner, Execute, or FullAccess scope.");
+        }
+
+        return Ok(new ValidateApiKeyResponse
+        {
+            IsValid = true,
+            UserId = apiKeyEntity.UserId,
+            UserName = apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email,
+            Scope = apiKeyEntity.Scope,
+            KeyPrefix = apiKeyEntity.KeyPrefix
+        });
+    }
 }
 
 public class CreateApiKeyRequest
@@ -108,4 +143,18 @@ public class ApiKeyResponse
     public DateTime? ExpiresAt { get; set; }
     public bool IsActive { get; set; }
     public string? Description { get; set; }
+}
+
+public class ValidateApiKeyRequest
+{
+    public required string ApiKey { get; set; }
+}
+
+public class ValidateApiKeyResponse
+{
+    public bool IsValid { get; set; }
+    public Guid UserId { get; set; }
+    public required string UserName { get; set; }
+    public ApiKeyScope Scope { get; set; }
+    public required string KeyPrefix { get; set; }
 }
