@@ -1,6 +1,7 @@
 using Serilog;
 using System.Text;
 using System.Text.Json;
+using static System.Console;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -39,20 +40,20 @@ public class RunnerHostService
                 configService.UpdateServerUrl(serverUrl);
             }
 
-            System.Console.WriteLine("=== Automaton Runner ===");
-            System.Console.WriteLine($"Server: {configService.BaseUrl}");
-            System.Console.WriteLine();
+            WriteLine("=== Automaton Runner ===");
+            WriteLine($"Server: {configService.BaseUrl}");
+            WriteLine();
 
             // Check API key authentication
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
-                System.Console.WriteLine("??  API Key authentication required...");
-                System.Console.WriteLine("Options:");
-                System.Console.WriteLine("1. Set API key: automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx");
-                System.Console.WriteLine("2. Set environment variable: export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxx");
-                System.Console.WriteLine();
-                System.Console.WriteLine("?? Get your API key from Automaton Studio ? Settings ? API Keys");
+                WriteLine("??  API Key authentication required...");
+                WriteLine("Options:");
+                WriteLine("1. Set API key: automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx");
+                WriteLine("2. Set environment variable: export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxx");
+                WriteLine();
+                WriteLine("?? Get your API key from Automaton Studio ? Settings ? API Keys");
                 return;
             }
 
@@ -62,11 +63,11 @@ public class RunnerHostService
             // Check if runner is registered
             if (!configService.IsRunnerRegistered())
             {
-                System.Console.WriteLine("?? Registering runner...");
+                WriteLine("?? Registering runner...");
                 var registerSuccess = await RegisterRunnerAsync(runnerName);
                 if (!registerSuccess)
                 {
-                    System.Console.WriteLine("? Runner registration failed. Cannot start runner.");
+                    WriteLine("? Runner registration failed. Cannot start runner.");
                     return;
                 }
             }
@@ -75,28 +76,28 @@ public class RunnerHostService
             var connected = await hubService.ConnectAsync();
             if (!connected)
             {
-                System.Console.WriteLine("? Failed to connect to server. Cannot start runner.");
+                WriteLine("? Failed to connect to server. Cannot start runner.");
                 return;
             }
 
             // Start the runner
             cancellationTokenSource = new CancellationTokenSource();
             
-            System.Console.WriteLine();
-            System.Console.WriteLine("?? Runner is now active and waiting for workflows...");
-            System.Console.WriteLine("Press 'q' to quit, 's' for status");
-            System.Console.WriteLine();
+            WriteLine();
+            WriteLine("?? Runner is now active and waiting for workflows...");
+            WriteLine("Press 'q' to quit, 's' for status");
+            WriteLine();
 
             // Handle console input
             _ = Task.Run(async () =>
             {
                 while (!cancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    var key = System.Console.ReadKey(true);
+                    var key = ReadKey(true);
                     switch (key.KeyChar.ToString().ToLower())
                     {
                         case "q":
-                            System.Console.WriteLine("?? Shutting down runner...");
+                            WriteLine("?? Shutting down runner...");
                             cancellationTokenSource.Cancel();
                             break;
                         case "s":
@@ -119,12 +120,12 @@ public class RunnerHostService
             }
 
             await hubService.DisconnectAsync();
-            System.Console.WriteLine("? Runner stopped");
+            WriteLine("? Runner stopped");
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Error in runner host service");
-            System.Console.WriteLine($"? Error: {ex.Message}");
+            WriteLine($"? Error: {ex.Message}");
         }
     }
 
@@ -142,17 +143,17 @@ public class RunnerHostService
             var success = await RegisterRunnerAsync(runnerName);
             if (success)
             {
-                System.Console.WriteLine($"? Runner '{runnerName}' registered successfully");
+                WriteLine($"? Runner '{runnerName}' registered successfully");
             }
             else
             {
-                System.Console.WriteLine($"? Failed to register runner '{runnerName}'");
+                WriteLine($"? Failed to register runner '{runnerName}'");
             }
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Error registering runner");
-            System.Console.WriteLine($"? Registration error: {ex.Message}");
+            WriteLine($"? Registration error: {ex.Message}");
         }
     }
 
@@ -165,14 +166,14 @@ public class RunnerHostService
         {
             await storageService.DeleteApiKeyAsync();
             await storageService.DeleteRunnerConfigAsync();
-            System.Console.WriteLine("? All stored data cleared successfully!");
+            WriteLine("? All stored data cleared successfully!");
             logger.Information("All stored data cleared");
             return true;
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Error clearing all data");
-            System.Console.WriteLine($"? Error clearing all data: {ex.Message}");
+            WriteLine($"? Error clearing all data: {ex.Message}");
             return false;
         }
     }
@@ -184,8 +185,8 @@ public class RunnerHostService
     {
         try
         {
-            System.Console.WriteLine("?? Cleaning up stored runner data...");
-            System.Console.WriteLine();
+            WriteLine("?? Cleaning up stored runner data...");
+            WriteLine();
 
             var apiKeyCleared = false;
             var runnerConfigCleared = false;
@@ -195,7 +196,7 @@ public class RunnerHostService
             if (hasApiKey)
             {
                 await storageService.DeleteApiKeyAsync();
-                System.Console.WriteLine("? Stored API key removed");
+                WriteLine("? Stored API key removed");
                 apiKeyCleared = true;
             }
 
@@ -203,30 +204,30 @@ public class RunnerHostService
             if (storageService.IsRunnerRegistered())
             {
                 await storageService.DeleteRunnerConfigAsync();
-                System.Console.WriteLine("? Runner configuration removed");
+                WriteLine("? Runner configuration removed");
                 runnerConfigCleared = true;
             }
 
             if (!apiKeyCleared && !runnerConfigCleared)
             {
-                System.Console.WriteLine("??  No stored data found to cleanup");
+                WriteLine("??  No stored data found to cleanup");
             }
             else
             {
-                System.Console.WriteLine();
-                System.Console.WriteLine("? Cleanup completed successfully!");
+                WriteLine();
+                WriteLine("? Cleanup completed successfully!");
                 
                 if (apiKeyCleared)
                 {
-                    System.Console.WriteLine("   - API key authentication cleared");
+                    WriteLine("   - API key authentication cleared");
                 }
                 if (runnerConfigCleared)
                 {
-                    System.Console.WriteLine("   - Runner registration cleared");
+                    WriteLine("   - Runner registration cleared");
                 }
                 
-                System.Console.WriteLine();
-                System.Console.WriteLine("?? Note: Environment variable AUTOMATON_API_KEY (if set) is not affected");
+                WriteLine();
+                WriteLine("?? Note: Environment variable AUTOMATON_API_KEY (if set) is not affected");
             }
 
             logger.Information("Runner cleanup completed. API key cleared: {ApiKeyCleared}, Runner config cleared: {RunnerConfigCleared}", apiKeyCleared, runnerConfigCleared);
@@ -235,7 +236,7 @@ public class RunnerHostService
         catch (Exception ex)
         {
             logger.Error(ex, "Error during cleanup");
-            System.Console.WriteLine($"? Error during cleanup: {ex.Message}");
+            WriteLine($"? Error during cleanup: {ex.Message}");
             return false;
         }
     }
@@ -279,10 +280,10 @@ public class RunnerHostService
 
             var errorContent = await response.Content.ReadAsStringAsync();
             logger.Warning("Runner registration failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
-            System.Console.WriteLine($"Registration failed: {response.StatusCode}");
+            WriteLine($"Registration failed: {response.StatusCode}");
             if (!string.IsNullOrEmpty(errorContent))
             {
-                System.Console.WriteLine($"Error: {errorContent}");
+                WriteLine($"Error: {errorContent}");
             }
 
             return false;
@@ -296,23 +297,23 @@ public class RunnerHostService
 
     private async Task ShowStatusAsync()
     {
-        System.Console.WriteLine();
-        System.Console.WriteLine("=== Runner Status ===");
-        System.Console.WriteLine($"Runner ID: {configService.RunnerId}");
-        System.Console.WriteLine($"Runner Name: {configService.ApplicationName}");
-        System.Console.WriteLine($"Server: {configService.BaseUrl}");
-        System.Console.WriteLine($"Connected: {hubService.IsConnected()}");
+        WriteLine();
+        WriteLine("=== Runner Status ===");
+        WriteLine($"Runner ID: {configService.RunnerId}");
+        WriteLine($"Runner Name: {configService.ApplicationName}");
+        WriteLine($"Server: {configService.BaseUrl}");
+        WriteLine($"Connected: {hubService.IsConnected()}");
         
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
         var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
         var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
         
-        System.Console.WriteLine($"Authenticated: {!string.IsNullOrEmpty(apiKey)}");
+        WriteLine($"Authenticated: {!string.IsNullOrEmpty(apiKey)}");
         if (!string.IsNullOrEmpty(apiKey))
         {
-            System.Console.WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
+            WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
         }
-        System.Console.WriteLine("==================");
-        System.Console.WriteLine();
+        WriteLine("==================");
+        WriteLine();
     }
 }

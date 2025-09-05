@@ -1,4 +1,5 @@
 using Serilog;
+using static System.Console;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -32,18 +33,18 @@ public class ApiKeyAuthenticationService
             // Validate API key format
             if (!IsValidApiKeyFormat(apiKey))
             {
-                System.Console.WriteLine("? Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("? Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
                 return false;
             }
 
-            System.Console.WriteLine($"?? Testing API key against server: {configService.BaseUrl}");
-            System.Console.WriteLine($"?? API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
-            System.Console.WriteLine($"?? API key length: {apiKey.Length}");
-            System.Console.WriteLine($"?? Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
+            WriteLine($"?? Testing API key against server: {configService.BaseUrl}");
+            WriteLine($"?? API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
+            WriteLine($"?? API key length: {apiKey.Length}");
+            WriteLine($"?? Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
 
             // Use dedicated API key validation endpoint
             httpClient.DefaultRequestHeaders.Clear();
-            httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
+            // Don't add Content-Type to DefaultRequestHeaders - it belongs on the content!
 
             var requestBody = new { ApiKey = apiKey };
             var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
@@ -51,57 +52,57 @@ public class ApiKeyAuthenticationService
 
             var response = await httpClient.PostAsync($"{configService.BaseUrl}/api/apikeys/validate", content);
             
-            System.Console.WriteLine($"?? Server response: {response.StatusCode}");
+            WriteLine($"?? Server response: {response.StatusCode}");
             
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
-                System.Console.WriteLine($"?? Validation successful: {responseContent}");
+                WriteLine($"?? Validation successful: {responseContent}");
                 
                 await storageService.SaveApiKeyAsync(apiKey);
-                System.Console.WriteLine("? API key validated and saved!");
+                WriteLine("? API key validated and saved!");
                 logger.Information("API key validated successfully");
                 return true;
             }
 
-            System.Console.WriteLine($"? API key validation failed: {response.StatusCode}");
+            WriteLine($"? API key validation failed: {response.StatusCode}");
             
             // Get detailed error information
             var errorContent = await response.Content.ReadAsStringAsync();
             if (!string.IsNullOrEmpty(errorContent))
             {
-                System.Console.WriteLine($"?? Server error details: {errorContent}");
+                WriteLine($"?? Server error details: {errorContent}");
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                System.Console.WriteLine();
-                System.Console.WriteLine("?? Troubleshooting suggestions:");
-                System.Console.WriteLine("1. Verify the API key is correct and hasn't been modified");
-                System.Console.WriteLine("2. Check if the API key has expired in Automaton Studio");
-                System.Console.WriteLine("3. Ensure the API key has appropriate scope/permissions (not ReadOnly)");
-                System.Console.WriteLine("4. Verify the server URL is correct");
-                System.Console.WriteLine("5. Check if the Automaton Studio server is running and accessible");
-                System.Console.WriteLine("6. Verify the API key was created for the correct server/environment");
+                WriteLine();
+                WriteLine("?? Troubleshooting suggestions:");
+                WriteLine("1. Verify the API key is correct and hasn't been modified");
+                WriteLine("2. Check if the API key has expired in Automaton Studio");
+                WriteLine("3. Ensure the API key has appropriate scope/permissions (not ReadOnly)");
+                WriteLine("4. Verify the server URL is correct");
+                WriteLine("5. Check if the Automaton Studio server is running and accessible");
+                WriteLine("6. Verify the API key was created for the correct server/environment");
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                System.Console.WriteLine("The API key is valid but doesn't have permission to access runner operations.");
-                System.Console.WriteLine("?? Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
+                WriteLine("The API key is valid but doesn't have permission to access runner operations.");
+                WriteLine("?? Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
             }
 
             return false;
         }
         catch (HttpRequestException ex)
         {
-            System.Console.WriteLine($"?? Network error: {ex.Message}");
-            System.Console.WriteLine("?? Check if the Automaton Studio server is running and accessible at the specified URL.");
+            WriteLine($"?? Network error: {ex.Message}");
+            WriteLine("?? Check if the Automaton Studio server is running and accessible at the specified URL.");
             logger.Error(ex, "Network error during API key validation");
             return false;
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"? API key validation error: {ex.Message}");
+            WriteLine($"? API key validation error: {ex.Message}");
             logger.Error(ex, "API key validation error occurred");
             return false;
         }
@@ -120,7 +121,7 @@ public class ApiKeyAuthenticationService
             }
             else
             {
-                System.Console.WriteLine("?? API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("?? API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
                 logger.Warning("API key from environment variable has invalid format");
             }
         }
@@ -136,7 +137,7 @@ public class ApiKeyAuthenticationService
         // Simple validation - in production you might want to test it with a lightweight API call
         if (!IsValidApiKeyFormat(apiKey))
         {
-            System.Console.WriteLine("Stored API key format is invalid. Please set a new API key.");
+            WriteLine("Stored API key format is invalid. Please set a new API key.");
             await storageService.DeleteApiKeyAsync();
             return null;
         }
@@ -153,7 +154,7 @@ public class ApiKeyAuthenticationService
     public async Task LogoutAsync()
     {
         await storageService.DeleteApiKeyAsync();
-        System.Console.WriteLine("? API key removed successfully");
+        WriteLine("? API key removed successfully");
         logger.Information("API key removed");
     }
 
