@@ -119,6 +119,15 @@ public class FileStorageService
         return !string.IsNullOrEmpty(apiKey) || !string.IsNullOrEmpty(envApiKey);
     }
 
+    public Task DeleteRunnerConfigAsync()
+    {
+        if (File.Exists(runnerConfigFile))
+        {
+            File.Delete(runnerConfigFile);
+        }
+        return Task.CompletedTask;
+    }
+
     private void EnsureConfigDirectoryExists()
     {
         if (!Directory.Exists(configDirectory))

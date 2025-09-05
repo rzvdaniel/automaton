@@ -152,6 +152,19 @@ automaton-runner status
 
 Shows current runner configuration, authentication status, and registration status.
 
+#### `cleanup` - Cleanup Stored Data
+
+```bash
+automaton-runner cleanup
+```
+
+Removes stored API key and runner registration data from local storage. Useful for:
+- Switching between different API keys
+- Clearing cached runner registrations
+- Preparing for fresh deployment
+
+**Note**: This command does not affect environment variables.
+
 ## Configuration
 
 ### Configuration File
@@ -293,7 +306,7 @@ services:
    - Verify API key is correct and not expired
    - Check API key scope (should be "Runner" for console runner)
    - Ensure server URL is correct
-   - Check that the key starts with `ak_runner_`
+   - Check that the key starts with `ak_` and is at least 10 characters long
 
 2. **Connection Failed**
    - Check network connectivity to server
@@ -306,7 +319,7 @@ services:
    - Verify user has permission to see runners
 
 ### API Key Issues
-- **Invalid format**: API keys should start with `ak_runner_`, `ak_execute_`, or `ak_readonly_`
+- **Invalid format**: API keys should start with `ak_` and be at least 10 characters long
 - **Expired key**: Check expiration date in Automaton Studio
 - **Revoked key**: Verify the key is still active in the API Keys page
 - **Wrong scope**: Ensure the key has "Runner" scope for console runner operations
@@ -323,11 +336,16 @@ rmdir /s %APPDATA%\AutomatonRunner  # Windows
 
 ## API Key Scopes
 
-| Scope | Description | Use Case |
-|-------|-------------|----------|
-| **Runner** | Can register and operate runners | Console runners, automation agents |
-| **Execute** | Can execute workflows | CI/CD pipelines, external integrations |
-| **ReadOnly** | Can read flows and executions | Monitoring, reporting tools |
+Different API key formats may be used depending on your Automaton Studio configuration:
+
+| Example Format | Description | Use Case |
+|----------------|-------------|----------|
+| **ak_runner_xxx** | Traditional runner keys | Console runners, automation agents |
+| **ak_execute_xxx** | Traditional execution keys | CI/CD pipelines, external integrations |
+| **ak_readonly_xxx** | Traditional read-only keys | Monitoring, reporting tools |
+| **ak_xxxxxxxxx** | Flexible format keys | Any scope (determined by server configuration) |
+
+**Note**: The console runner now accepts any API key starting with `ak_` and at least 10 characters long. The specific scope and permissions are determined by your Automaton Studio server configuration.
 
 ## Architecture
 

@@ -29,7 +29,8 @@ public class Program
                 CreateRunCommand(),
                 CreateAuthCommand(),
                 CreateRegisterCommand(),
-                CreateStatusCommand()
+                CreateStatusCommand(),
+                CreateCleanupCommand()
             };
 
             return await rootCommand.InvokeAsync(args);
@@ -77,7 +78,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.StartAsync(name, server);
         }, nameOption, serverOption);
 
@@ -88,7 +90,7 @@ public class Program
     {
         var apiKeyOption = new Option<string>(
             name: "--api-key",
-            description: "API key for authentication (e.g., ak_runner_xxxxxxxxxxxx)")
+            description: "API key for authentication (e.g., ak_xxxxxxxxxxxx)")
         {
             IsRequired = true
         };
@@ -115,7 +117,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args).Build();
-            var apiKeyAuthService = host.Services.GetRequiredService<ApiKeyAuthenticationService>();
+            using var scope = host.Services.CreateScope();
+            var apiKeyAuthService = scope.ServiceProvider.GetRequiredService<ApiKeyAuthenticationService>();
             await apiKeyAuthService.SetApiKeyAsync(apiKey, server);
         }, apiKeyOption, serverOption);
 
@@ -153,7 +156,8 @@ public class Program
             }
             
             using var host = CreateHostBuilder(args.ToArray()).Build();
-            var runnerService = host.Services.GetRequiredService<RunnerHostService>();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.RegisterAsync(name, server);
         }, nameOption, serverOption);
 
@@ -167,9 +171,10 @@ public class Program
         command.SetHandler(async () =>
         {
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            var configService = host.Services.GetRequiredService<ConfigurationService>();
-            var storageService = host.Services.GetRequiredService<FileStorageService>();
-            var apiKeyAuthService = host.Services.GetRequiredService<ApiKeyAuthenticationService>();
+            using var scope = host.Services.CreateScope();
+            var configService = scope.ServiceProvider.GetRequiredService<ConfigurationService>();
+            var storageService = scope.ServiceProvider.GetRequiredService<FileStorageService>();
+            var apiKeyAuthService = scope.ServiceProvider.GetRequiredService<ApiKeyAuthenticationService>();
             
             System.Console.WriteLine("=== Automaton Runner Status ===");
             System.Console.WriteLine($"Runner ID: {storageService.GetRunnerId() ?? "Not set"}");
@@ -187,6 +192,21 @@ public class Program
                 System.Console.WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
             }
             System.Console.WriteLine("================================");
+        });
+
+        return command;
+    }
+
+    private static Command CreateCleanupCommand()
+    {
+        var command = new Command("cleanup", "Cleanup resources used by the runner");
+
+        command.SetHandler(async () =>
+        {
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            await runnerService.CleanupAsync();
         });
 
         return command;

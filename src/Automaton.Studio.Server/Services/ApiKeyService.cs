@@ -29,9 +29,10 @@ public class ApiKeyService
         var rawKey = Convert.ToBase64String(keyBytes).Replace("+", "").Replace("/", "").Replace("=", "")[..40];
         var prefix = scope switch
         {
-            ApiKeyScope.Runner => "ak_runner_",
             ApiKeyScope.ReadOnly => "ak_readonly_",
             ApiKeyScope.Execute => "ak_execute_",
+            ApiKeyScope.Runner => "ak_runner_",
+            ApiKeyScope.FullAccess => "ak_fullaccess_",
             _ => "ak_"
         };
 

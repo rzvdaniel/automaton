@@ -32,15 +32,34 @@ public class ApiKeyAuthenticationService
             // Validate API key format
             if (!IsValidApiKeyFormat(apiKey))
             {
-                System.Console.WriteLine("?? Invalid API key format. Expected format: ak_runner_xxxxxxxxxxxx");
+                System.Console.WriteLine("? Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
                 return false;
             }
 
-            // Test the API key by making a simple authenticated request
+            System.Console.WriteLine($"?? Testing API key against server: {configService.BaseUrl}");
+            System.Console.WriteLine($"?? API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
+            System.Console.WriteLine($"?? API key length: {apiKey.Length}");
+            System.Console.WriteLine($"?? Validation endpoint: {configService.BaseUrl}/api/runners");
+
+            // Try X-API-Key header first (primary method)
             httpClient.DefaultRequestHeaders.Clear();
             httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
 
             var response = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners");
+            
+            System.Console.WriteLine($"?? Server response (X-API-Key): {response.StatusCode}");
+            
+            // If X-API-Key fails with 401, try Authorization Bearer as fallback
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                System.Console.WriteLine("?? Trying Authorization Bearer header as fallback...");
+                
+                httpClient.DefaultRequestHeaders.Clear();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                
+                response = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners");
+                System.Console.WriteLine($"?? Server response (Authorization Bearer): {response.StatusCode}");
+            }
             
             if (response.IsSuccessStatusCode)
             {
@@ -51,11 +70,38 @@ public class ApiKeyAuthenticationService
             }
 
             System.Console.WriteLine($"? API key validation failed: {response.StatusCode}");
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            
+            // Get detailed error information
+            var errorContent = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrEmpty(errorContent))
             {
-                System.Console.WriteLine("The API key is invalid or has expired.");
+                System.Console.WriteLine($"?? Server error details: {errorContent}");
             }
 
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine("?? Troubleshooting suggestions:");
+                System.Console.WriteLine("1. Verify the API key is correct and hasn't been modified");
+                System.Console.WriteLine("2. Check if the API key has expired in Automaton Studio");
+                System.Console.WriteLine("3. Ensure the API key has 'Runner' scope/permissions");
+                System.Console.WriteLine("4. Verify the server URL is correct");
+                System.Console.WriteLine("5. Check if the Automaton Studio server is running and accessible");
+                System.Console.WriteLine("6. Verify the API key was created for the correct server/environment");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                System.Console.WriteLine("The API key is valid but doesn't have permission to access runner endpoints.");
+                System.Console.WriteLine("?? Make sure the API key has 'Runner' scope in Automaton Studio.");
+            }
+
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            System.Console.WriteLine($"?? Network error: {ex.Message}");
+            System.Console.WriteLine("?? Check if the Automaton Studio server is running and accessible at the specified URL.");
+            logger.Error(ex, "Network error during API key validation");
             return false;
         }
         catch (Exception ex)
@@ -79,7 +125,7 @@ public class ApiKeyAuthenticationService
             }
             else
             {
-                System.Console.WriteLine("?? API key from environment variable has invalid format. Expected format: ak_runner_xxxxxxxxxxxx");
+                System.Console.WriteLine("?? API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
                 logger.Warning("API key from environment variable has invalid format");
             }
         }
@@ -121,9 +167,8 @@ public class ApiKeyAuthenticationService
         if (string.IsNullOrWhiteSpace(apiKey))
             return false;
 
-        // API keys should start with ak_ followed by scope (runner, execute, readonly) and then the key
-        return apiKey.StartsWith("ak_runner_") || 
-               apiKey.StartsWith("ak_execute_") || 
-               apiKey.StartsWith("ak_readonly_");
+        // API keys should start with ak_ and be at least 10 characters long
+        // This is more flexible to accommodate different key generation patterns
+        return apiKey.StartsWith("ak_") && apiKey.Length >= 10;
     }
 }

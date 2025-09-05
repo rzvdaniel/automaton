@@ -156,6 +156,90 @@ public class RunnerHostService
         }
     }
 
+    /// <summary>
+    /// Clear all stored data (credentials + runner registration)
+    /// </summary>
+    public async Task<bool> ClearAllDataAsync()
+    {
+        try
+        {
+            await storageService.DeleteApiKeyAsync();
+            await storageService.DeleteRunnerConfigAsync();
+            System.Console.WriteLine("? All stored data cleared successfully!");
+            logger.Information("All stored data cleared");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error clearing all data");
+            System.Console.WriteLine($"? Error clearing all data: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Cleanup stored API key and runner configuration
+    /// </summary>
+    public async Task<bool> CleanupAsync()
+    {
+        try
+        {
+            System.Console.WriteLine("?? Cleaning up stored runner data...");
+            System.Console.WriteLine();
+
+            var apiKeyCleared = false;
+            var runnerConfigCleared = false;
+
+            // Clear API key if it exists
+            var hasApiKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
+            if (hasApiKey)
+            {
+                await storageService.DeleteApiKeyAsync();
+                System.Console.WriteLine("? Stored API key removed");
+                apiKeyCleared = true;
+            }
+
+            // Clear runner configuration if it exists
+            if (storageService.IsRunnerRegistered())
+            {
+                await storageService.DeleteRunnerConfigAsync();
+                System.Console.WriteLine("? Runner configuration removed");
+                runnerConfigCleared = true;
+            }
+
+            if (!apiKeyCleared && !runnerConfigCleared)
+            {
+                System.Console.WriteLine("??  No stored data found to cleanup");
+            }
+            else
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine("? Cleanup completed successfully!");
+                
+                if (apiKeyCleared)
+                {
+                    System.Console.WriteLine("   - API key authentication cleared");
+                }
+                if (runnerConfigCleared)
+                {
+                    System.Console.WriteLine("   - Runner registration cleared");
+                }
+                
+                System.Console.WriteLine();
+                System.Console.WriteLine("?? Note: Environment variable AUTOMATON_API_KEY (if set) is not affected");
+            }
+
+            logger.Information("Runner cleanup completed. API key cleared: {ApiKeyCleared}, Runner config cleared: {RunnerConfigCleared}", apiKeyCleared, runnerConfigCleared);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error during cleanup");
+            System.Console.WriteLine($"? Error during cleanup: {ex.Message}");
+            return false;
+        }
+    }
+
     private async Task SetupHttpClientAuth()
     {
         httpClient.DefaultRequestHeaders.Clear();
