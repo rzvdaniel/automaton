@@ -15,6 +15,7 @@ using Automaton.Studio.Pages.FlowDesigner;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Pages.Runners;
+using Automaton.Studio.Pages.ApiKeys;
 using Automaton.Studio.Services;
 using Automaton.Studio.Shared;
 using Automaton.Studio.Steps.AddVariable;
@@ -67,7 +68,7 @@ public static class SeviceCollection
         services.AddScoped<Services.ConfigurationService>();
         services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();
-        services.AddScoped<ApiKeysService>();
+        services.AddScoped<IApiKeysService, ApiKeysService>();
         services.AddScoped<FlowService>();
         services.AddScoped<FlowsService>();
         services.AddScoped<RunnerService>();
@@ -86,6 +87,7 @@ public static class SeviceCollection
         // ViewModels
         services.AddScoped<FlowsViewModel>();
         services.AddScoped<RunnersViewModel>();
+        services.AddScoped<ApiKeysViewModel>();
         services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<CustomStepViewModel>();

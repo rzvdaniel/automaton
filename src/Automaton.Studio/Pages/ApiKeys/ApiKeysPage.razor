@@ -27,7 +27,7 @@
                 <Space Class="right-header-items">
                     <SpaceItem>
                         <Tooltip Title="New API Key">
-                            <Button Type="@ButtonType.Primary" Icon="plus" Class="header-button" OnClick="@(() => ShowCreateModal())">
+                            <Button Type="@ButtonType.Primary" Icon="plus" Class="header-button" OnClick="@(() => ViewModel.ShowCreateModal())">
                                 Create API Key
                             </Button>
                         </Tooltip>
@@ -38,7 +38,7 @@
     </Header>
 
     <Content Class="content-padding">
-        @if (loading)
+        @if (ViewModel.Loading)
         {
             <div class="loading-container">
                 <Spin Size="SpinSize.Large" />
@@ -46,10 +46,10 @@
         }
         else
         {
-            @if (apiKeys?.Any() == true)
+            @if (ViewModel.ApiKeys?.Any() == true)
             {
                 <Table TItem="ApiKeyResponse" 
-                       DataSource="@apiKeys" 
+                       DataSource="@ViewModel.ApiKeys" 
                        PageSize="10">
                     <Column Title="Name" @bind-Field="@context.Name">
                         @context.Name
@@ -60,7 +60,7 @@
                     </Column>
                     
                     <Column Title="Scope" @bind-Field="@context.Scope">
-                        <span class="@GetScopeClass(context.Scope)">
+                        <span class="@ApiKeysViewModel.GetScopeClass(context.Scope)">
                             @context.Scope
                         </span>
                     </Column>
@@ -97,7 +97,7 @@
                             <Space>
                                 <SpaceItem>
                                     <Popconfirm Title="Are you sure you want to revoke this API key?"
-                                               OnConfirm="@(() => RevokeApiKey(context.Id))"
+                                               OnConfirm="@(() => ViewModel.RevokeApiKey(context.Id))"
                                                OkText="Yes"
                                                CancelText="No">
                                         <Button Type="@ButtonType.Text" 
@@ -120,7 +120,7 @@
                         <span>No API keys found</span>
                     </DescriptionTemplate>
                     <ChildContent>
-                        <Button Type="@ButtonType.Primary" OnClick="@ShowCreateModal">
+                        <Button Type="@ButtonType.Primary" OnClick="@ViewModel.ShowCreateModal">
                             Create Your First API Key
                         </Button>
                     </ChildContent>
@@ -130,21 +130,21 @@
         
         <!-- Create API Key Modal -->
         <Modal Title="Create API Key"
-               @bind-Visible="createModalVisible"
-               OnOk="@CreateApiKey"
-               ConfirmLoading="@createLoading"
+               @bind-Visible="ViewModel.CreateModalVisible"
+               OnOk="@ViewModel.CreateApiKey"
+               ConfirmLoading="@ViewModel.CreateLoading"
                Width="600">
-            <Form Model="@createRequest" Layout="@FormLayout.Vertical">
+            <Form Model="@ViewModel.CreateRequest" Layout="@FormLayout.Vertical">
                 <FormItem Label="Name" Required>
-                    <Input @bind-Value="createRequest.Name" Placeholder="e.g., Production Runner Key" />
+                    <Input @bind-Value="ViewModel.CreateRequest.Name" Placeholder="e.g., Production Runner Key" />
                 </FormItem>
                 <FormItem Label="Description">
-                    <TextArea @bind-Value="createRequest.Description" 
+                    <TextArea @bind-Value="ViewModel.CreateRequest.Description" 
                              Placeholder="Optional description for this API key"
                              Rows="3" />
                 </FormItem>
                 <FormItem Label="Scope">
-                    <Select @bind-Value="createRequest.Scope" 
+                    <Select @bind-Value="ViewModel.CreateRequest.Scope" 
                             DefaultValue="ApiKeyScope.Runner" 
                             TItemValue="ApiKeyScope" 
                             TItem="ApiKeyScope">
@@ -156,7 +156,7 @@
                     </Select>
                 </FormItem>
                 <FormItem Label="Expiration (Optional)">
-                    <DatePicker @bind-Value="createRequest.ExpiresAt" 
+                    <DatePicker @bind-Value="ViewModel.CreateRequest.ExpiresAt" 
                                ShowTime="false" />
                 </FormItem>
             </Form>
@@ -164,7 +164,7 @@
 
         <!-- API Key Success Modal -->
         <Modal Title="API Key Created Successfully"
-               @bind-Visible="successModalVisible"
+               @bind-Visible="ViewModel.SuccessModalVisible"
                Footer="null"
                Width="700"
                Closable="false">
@@ -176,24 +176,24 @@
             <div style="margin-top: 16px;">
                 <strong>API Key:</strong>
                 <div class="api-key-display">
-                    <Input @bind-Value="newApiKey" 
+                    <Input @bind-Value="ViewModel.NewApiKey" 
                            ReadOnly="true"
                            Style="font-family: monospace;" />
-                    <Button Icon="copy" OnClick="@CopyToClipboard" Style="margin-left: 8px;">Copy</Button>
+                    <Button Icon="copy" OnClick="@ViewModel.CopyToClipboard" Style="margin-left: 8px;">Copy</Button>
                 </div>
             </div>
 
             <div style="margin-top: 24px;">
                 <strong>Usage Examples:</strong>
                 <div style="margin-top: 8px;">
-                    <code>automaton-runner auth --api-key @newApiKey</code>
+                    <code>automaton-runner auth --api-key @ViewModel.NewApiKey</code>
                     <br />
-                    <code>export AUTOMATON_API_KEY="@newApiKey"</code>
+                    <code>export AUTOMATON_API_KEY="@ViewModel.NewApiKey"</code>
                 </div>
             </div>
 
             <div style="margin-top: 24px; text-align: right;">
-                <Button Type="@ButtonType.Primary" OnClick="@CloseSuccessModal">
+                <Button Type="@ButtonType.Primary" OnClick="@ViewModel.CloseSuccessModal">
                     Done
                 </Button>
             </div>

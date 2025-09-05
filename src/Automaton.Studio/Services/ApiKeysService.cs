@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Automaton.Studio.Services;
 
-public class ApiKeysService
+public class ApiKeysService : IApiKeysService
 {
     private readonly HttpClient httpClient;
     private readonly ClientAuthConfigurationService configService;
