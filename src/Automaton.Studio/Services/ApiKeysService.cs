@@ -1,4 +1,3 @@
-using Automaton.Client.Auth.Services;
 using Automaton.Studio.Models;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -8,9 +7,9 @@ namespace Automaton.Studio.Services;
 public class ApiKeysService : IApiKeysService
 {
     private readonly HttpClient httpClient;
-    private readonly ClientAuthConfigurationService configService;
+    private readonly ConfigurationService configService;
 
-    public ApiKeysService(HttpClient httpClient, ClientAuthConfigurationService configService)
+    public ApiKeysService(HttpClient httpClient, ConfigurationService configService)
     {
         this.httpClient = httpClient;
         this.configService = configService;
@@ -21,7 +20,7 @@ public class ApiKeysService : IApiKeysService
     /// </summary>
     public async Task<List<ApiKeyResponse>> GetApiKeysAsync()
     {
-        var response = await httpClient.GetAsync("/api/apikeys");
+        var response = await httpClient.GetAsync($"{configService.ApiKeysUrl}");
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
@@ -38,7 +37,7 @@ public class ApiKeysService : IApiKeysService
     /// </summary>
     public async Task<CreateApiKeyResponse> CreateApiKeyAsync(CreateApiKeyRequest request)
     {
-        var response = await httpClient.PostAsJsonAsync("/api/apikeys", request);
+        var response = await httpClient.PostAsJsonAsync($"{configService.ApiKeysUrl}", request);
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();
@@ -60,7 +59,7 @@ public class ApiKeysService : IApiKeysService
     /// </summary>
     public async Task<bool> RevokeApiKeyAsync(Guid apiKeyId)
     {
-        var response = await httpClient.DeleteAsync($"/api/apikeys/{apiKeyId}");
+        var response = await httpClient.DeleteAsync($"{configService.ApiKeysUrl}/{apiKeyId}");
         return response.IsSuccessStatusCode;
     }
 }
