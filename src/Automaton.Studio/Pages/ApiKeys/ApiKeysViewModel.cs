@@ -50,7 +50,7 @@ public class ApiKeysViewModel
 
     public void ShowCreateModal()
     {
-        CreateRequest = new CreateApiKeyRequest { Name = "", Scope = ApiKeyScope.Runner };
+        CreateRequest = new CreateApiKeyRequest { Name = "", Scope = ApiKeyScope.FullAccess };
         CreateModalVisible = true;
     }
 
@@ -126,9 +126,10 @@ public class ApiKeysViewModel
     {
         return scope switch
         {
-            ApiKeyScope.Runner => "blue",
-            ApiKeyScope.Execute => "green",
             ApiKeyScope.ReadOnly => "orange",
+            ApiKeyScope.Execute => "green", 
+            ApiKeyScope.Runner => "blue",
+            ApiKeyScope.FullAccess => "purple",
             _ => "default"
         };
     }
@@ -137,9 +138,10 @@ public class ApiKeysViewModel
     {
         return scope switch
         {
-            ApiKeyScope.Runner => "scope-runner",
-            ApiKeyScope.Execute => "scope-execute",
             ApiKeyScope.ReadOnly => "scope-readonly",
+            ApiKeyScope.Execute => "scope-execute",
+            ApiKeyScope.Runner => "scope-runner",
+            ApiKeyScope.FullAccess => "scope-fullaccess",
             _ => ""
         };
     }

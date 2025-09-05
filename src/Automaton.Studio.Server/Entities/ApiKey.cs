@@ -31,7 +31,7 @@ public class ApiKey
 
     public bool IsActive { get; set; } = true;
 
-    public ApiKeyScope Scope { get; set; } = ApiKeyScope.Runner;
+    public ApiKeyScope Scope { get; set; } = ApiKeyScope.FullAccess;
 
     [MaxLength(500)]
     public string? Description { get; set; }
@@ -42,7 +42,8 @@ public class ApiKey
 
 public enum ApiKeyScope
 {
-    Runner = 1,      // Can register and operate runners
-    ReadOnly = 2,    // Can read flows and executions
-    Execute = 3      // Can execute flows
+    ReadOnly = 1,    // Can read flows and executions only
+    Execute = 2,     // Can execute workflows (includes ReadOnly)
+    Runner = 3,      // Can register and operate runners (includes Execute + ReadOnly) 
+    FullAccess = 4   // All permissions - recommended for console runners and automation
 }

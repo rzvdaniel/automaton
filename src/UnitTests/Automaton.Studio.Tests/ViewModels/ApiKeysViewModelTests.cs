@@ -71,14 +71,14 @@ public class ApiKeysViewModelTests
         // Assert
         Assert.That(viewModel.CreateModalVisible, Is.True);
         Assert.That(viewModel.CreateRequest.Name, Is.EqualTo(""));
-        Assert.That(viewModel.CreateRequest.Scope, Is.EqualTo(ApiKeyScope.Runner));
+        Assert.That(viewModel.CreateRequest.Scope, Is.EqualTo(ApiKeyScope.FullAccess));
     }
 
     [Test]
     public async Task CreateApiKey_EmptyName_ShouldShowWarning()
     {
         // Arrange
-        viewModel.CreateRequest = new CreateApiKeyRequest { Name = "", Scope = ApiKeyScope.Runner };
+        viewModel.CreateRequest = new CreateApiKeyRequest { Name = "", Scope = ApiKeyScope.FullAccess };
 
         // Act
         await viewModel.CreateApiKey();
@@ -92,14 +92,14 @@ public class ApiKeysViewModelTests
     public async Task CreateApiKey_Success_ShouldShowSuccessModalAndRefreshList()
     {
         // Arrange
-        viewModel.CreateRequest = new CreateApiKeyRequest { Name = "Test Key", Scope = ApiKeyScope.Runner };
+        viewModel.CreateRequest = new CreateApiKeyRequest { Name = "Test Key", Scope = ApiKeyScope.FullAccess };
         var createResponse = new CreateApiKeyResponse 
         { 
             Id = Guid.NewGuid(), 
             Name = "Test Key", 
-            ApiKey = "ak_test_12345", 
-            KeyPrefix = "ak_test",
-            Scope = ApiKeyScope.Runner, 
+            ApiKey = "ak_fullaccess_12345", 
+            KeyPrefix = "ak_fullaccess",
+            Scope = ApiKeyScope.FullAccess, 
             CreatedAt = DateTime.Now 
         };
         mockApiKeysService.CreateApiKeyAsync(Arg.Any<CreateApiKeyRequest>()).Returns(createResponse);
@@ -109,7 +109,7 @@ public class ApiKeysViewModelTests
         await viewModel.CreateApiKey();
 
         // Assert
-        Assert.That(viewModel.NewApiKey, Is.EqualTo("ak_test_12345"));
+        Assert.That(viewModel.NewApiKey, Is.EqualTo("ak_fullaccess_12345"));
         Assert.That(viewModel.CreateModalVisible, Is.False);
         Assert.That(viewModel.SuccessModalVisible, Is.True);
         Assert.That(viewModel.CreateLoading, Is.False);
@@ -133,9 +133,10 @@ public class ApiKeysViewModelTests
     }
 
     [Test]
-    [TestCase(ApiKeyScope.Runner, "blue")]
-    [TestCase(ApiKeyScope.Execute, "green")]
     [TestCase(ApiKeyScope.ReadOnly, "orange")]
+    [TestCase(ApiKeyScope.Execute, "green")]
+    [TestCase(ApiKeyScope.Runner, "blue")]
+    [TestCase(ApiKeyScope.FullAccess, "purple")]
     public void GetScopeColor_ReturnsCorrectColor(ApiKeyScope scope, string expectedColor)
     {
         // Act
@@ -146,9 +147,10 @@ public class ApiKeysViewModelTests
     }
 
     [Test]
-    [TestCase(ApiKeyScope.Runner, "scope-runner")]
-    [TestCase(ApiKeyScope.Execute, "scope-execute")]
     [TestCase(ApiKeyScope.ReadOnly, "scope-readonly")]
+    [TestCase(ApiKeyScope.Execute, "scope-execute")]
+    [TestCase(ApiKeyScope.Runner, "scope-runner")]
+    [TestCase(ApiKeyScope.FullAccess, "scope-fullaccess")]
     public void GetScopeClass_ReturnsCorrectClass(ApiKeyScope scope, string expectedClass)
     {
         // Act

@@ -20,7 +20,7 @@ public class CreateApiKeyRequest
     public required string Name { get; set; }
     public string? Description { get; set; }
     public DateTime? ExpiresAt { get; set; }
-    public ApiKeyScope Scope { get; set; } = ApiKeyScope.Runner;
+    public ApiKeyScope Scope { get; set; } = ApiKeyScope.FullAccess;
 }
 
 public class CreateApiKeyResponse
@@ -36,7 +36,8 @@ public class CreateApiKeyResponse
 
 public enum ApiKeyScope
 {
-    Runner = 1,      // Can register and operate runners
-    ReadOnly = 2,    // Can read flows and executions
-    Execute = 3      // Can execute workflows
+    ReadOnly = 1,    // Can read flows and executions only
+    Execute = 2,     // Can execute workflows (includes ReadOnly)
+    Runner = 3,      // Can register and operate runners (includes Execute + ReadOnly) 
+    FullAccess = 4   // All permissions - recommended for console runners and automation
 }

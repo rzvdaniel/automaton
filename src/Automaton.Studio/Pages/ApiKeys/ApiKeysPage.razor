@@ -145,13 +145,14 @@
                 </FormItem>
                 <FormItem Label="Scope">
                     <Select @bind-Value="ViewModel.CreateRequest.Scope" 
-                            DefaultValue="ApiKeyScope.Runner" 
+                            DefaultValue="ApiKeyScope.FullAccess" 
                             TItemValue="ApiKeyScope" 
                             TItem="ApiKeyScope">
                         <SelectOptions>
-                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Runner" Label="Runner - Can register and operate runners" />
-                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Execute" Label="Execute - Can execute workflows" />
-                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.ReadOnly" Label="ReadOnly - Can read flows and executions" />
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.FullAccess" Label="Full Access - All permissions (Recommended for Console Runners)" />
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Runner" Label="Runner - Can register and operate runners + execute workflows" />
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Execute" Label="Execute - Can execute workflows + read flows" />
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.ReadOnly" Label="ReadOnly - Can only read flows and executions" />
                         </SelectOptions>
                     </Select>
                 </FormItem>
@@ -246,6 +247,11 @@
 
     .scope-readonly {
         color: #fa8c16;
+        font-weight: 500;
+    }
+
+    .scope-fullaccess {
+        color: #722ed1;
         font-weight: 500;
     }
 </style>
