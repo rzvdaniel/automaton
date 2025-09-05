@@ -138,6 +138,25 @@ public class RunnerHostService
                 configService.UpdateServerUrl(serverUrl);
             }
 
+            WriteLine($"?? Attempting to register runner '{runnerName}'...");
+            WriteLine($"?? Server: {configService.BaseUrl}");
+
+            // Check API key authentication first
+            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                WriteLine("? API Key authentication required for runner registration.");
+                WriteLine();
+                WriteLine("?? Available authentication options:");
+                WriteLine("1. Run auth command first: automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx");
+                WriteLine("2. Set environment variable: export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxx");
+                WriteLine();
+                WriteLine("?? Get your API key from Automaton Studio ? Settings ? API Keys");
+                return;
+            }
+
+            WriteLine($"? Using API key from: {(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY") != null ? "Environment Variable" : "Stored Credentials")}");
+
             await SetupHttpClientAuth();
 
             var success = await RegisterRunnerAsync(runnerName);
@@ -249,10 +268,11 @@ public class RunnerHostService
         if (!string.IsNullOrEmpty(apiKey))
         {
             httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+            logger.Debug("HTTP client configured with API key authentication");
             return;
         }
 
-        throw new InvalidOperationException("No valid API key available for authentication");
+        throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
     }
 
     private async Task<bool> RegisterRunnerAsync(string runnerName)

@@ -112,6 +112,8 @@ automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://loca
 
 #### `register` - Register Runner with Server
 
+**?? Authentication Required**: This command requires an API key to be set via `auth` command or `AUTOMATON_API_KEY` environment variable.
+
 ```bash
 automaton-runner register --name <runner-name> [--server <url>]
 ```
@@ -120,9 +122,26 @@ automaton-runner register --name <runner-name> [--server <url>]
 - `--name`: Runner name (required) - will appear in the Automaton Studio UI
 - `--server`: Server URL (optional)
 
+**Prerequisites:**
+1. **Set API key first** (one of these methods):
+   ```bash
+   # Method 1: Use auth command (stores key locally)
+   automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
+   
+   # Method 2: Set environment variable (good for automation)
+   export AUTOMATON_API_KEY="ak_runner_xxxxxxxxxxxx"
+   ```
+
+2. **Then register the runner**:
+   ```bash
+   automaton-runner register --name "Production-Server-01" --server https://localhost:7091
+   ```
+
 **Example:**
 ```bash
-automaton-runner register --name "Production-Server-01" --server https://localhost:7091
+# Complete registration flow
+automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
+automaton-runner register --name "Production-Server-01"
 ```
 
 #### `run` - Start the Runner
