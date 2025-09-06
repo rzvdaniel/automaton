@@ -72,12 +72,16 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
         var claims = new List<Claim>
         {
-            new("uid", apiKeyEntity.UserId.ToString()),
+            new(ClaimTypes.NameIdentifier, apiKeyEntity.UserId.ToString()), // Use ClaimTypes.NameIdentifier instead of "uid"
             new(ClaimTypes.Name, apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email),
             new(ClaimTypes.Email, apiKeyEntity.User.Email),
             new("api_key_scope", apiKeyEntity.Scope.ToString()),
-            new("api_key_id", apiKeyEntity.Id.ToString())
+            new("api_key_id", apiKeyEntity.Id.ToString()),
+            new("uid", apiKeyEntity.UserId.ToString()) // Keep "uid" for backwards compatibility with other parts
         };
+
+        Logger.LogDebug("Created claims for API key authentication: NameIdentifier={UserId}, Name={UserName}, Email={Email}", 
+            apiKeyEntity.UserId, apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email, apiKeyEntity.User.Email);
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
