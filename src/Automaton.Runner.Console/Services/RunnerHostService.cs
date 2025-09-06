@@ -262,17 +262,15 @@ public class RunnerHostService
 
     private async Task SetupHttpClientAuth()
     {
-        httpClient.DefaultRequestHeaders.Clear();
-        
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-        if (!string.IsNullOrEmpty(apiKey))
+        if (string.IsNullOrEmpty(apiKey))
         {
-            httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
-            logger.Debug("HTTP client configured with API key authentication");
-            return;
+            throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
         }
 
-        throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
+        httpClient.DefaultRequestHeaders.Clear();
+        httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
     }
 
     private async Task<bool> RegisterRunnerAsync(string runnerName)
@@ -289,21 +287,45 @@ public class RunnerHostService
             var json = JsonSerializer.Serialize(runnerData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+            WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
+            WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
+            WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
+
             var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
+
+            WriteLine($"?? Server response: {response.StatusCode}");
 
             if (response.IsSuccessStatusCode)
             {
                 await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
                 logger.Information("Runner {RunnerName} registered with ID {RunnerId}", runnerName, runnerId);
+                WriteLine("? Runner registration successful!");
                 return true;
             }
 
             var errorContent = await response.Content.ReadAsStringAsync();
             logger.Warning("Runner registration failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
-            WriteLine($"Registration failed: {response.StatusCode}");
+            
+            WriteLine($"? Registration failed: {response.StatusCode}");
             if (!string.IsNullOrEmpty(errorContent))
             {
-                WriteLine($"Error: {errorContent}");
+                WriteLine($"?? Server response body: {errorContent}");
+            }
+
+            // Provide specific guidance based on status code
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                WriteLine();
+                WriteLine("?? Authentication troubleshooting:");
+                WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
+                WriteLine("2. Check if the API key has expired in Automaton Studio");
+                WriteLine("3. Ensure the API key has sufficient scope (Runner, Execute, or FullAccess)");
+                WriteLine("4. Verify the Automaton Studio server is running and accessible");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                WriteLine("The API key is valid but doesn't have permission for runner registration.");
+                WriteLine("?? Ensure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly').");
             }
 
             return false;
@@ -311,6 +333,7 @@ public class RunnerHostService
         catch (Exception ex)
         {
             logger.Error(ex, "Error during runner registration");
+            WriteLine($"? Registration error: {ex.Message}");
             return false;
         }
     }

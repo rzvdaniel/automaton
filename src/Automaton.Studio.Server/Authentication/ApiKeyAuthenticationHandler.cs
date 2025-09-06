@@ -29,6 +29,8 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        Logger.LogDebug("API Key authentication handler called for request: {Method} {Path}", Request.Method, Request.Path);
+        
         // Try to get API key from header first
         var apiKey = Request.Headers[Options.HeaderName].FirstOrDefault();
         
@@ -50,14 +52,23 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
         if (string.IsNullOrEmpty(apiKey))
         {
+            Logger.LogDebug("No API key found in request headers or query parameters for {Method} {Path}", Request.Method, Request.Path);
             return AuthenticateResult.NoResult();
         }
+
+        Logger.LogDebug("API key found, validating: {KeyPrefix}... for request {Method} {Path}", 
+            apiKey.Length > 15 ? apiKey[..15] : apiKey, Request.Method, Request.Path);
 
         var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(apiKey);
         if (apiKeyEntity == null)
         {
+            Logger.LogWarning("Invalid API key attempted: {KeyPrefix}... for request {Method} {Path}", 
+                apiKey.Length > 15 ? apiKey[..15] : apiKey, Request.Method, Request.Path);
             return AuthenticateResult.Fail("Invalid API key");
         }
+
+        Logger.LogInformation("API key authentication successful for user {UserId} with scope {Scope} on request {Method} {Path}", 
+            apiKeyEntity.UserId, apiKeyEntity.Scope, Request.Method, Request.Path);
 
         var claims = new List<Claim>
         {

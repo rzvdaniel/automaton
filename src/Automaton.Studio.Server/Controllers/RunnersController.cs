@@ -1,5 +1,6 @@
 ﻿using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -26,6 +27,7 @@ public class RunnersController : BaseController
     }
 
     [HttpPost]
+    [Authorize(Policy = "AllowApiKey")]
     public ActionResult Post(RunnerDetails runner, CancellationToken cancellationToken)
     {
         return Ok(runnersService.Add(runner));

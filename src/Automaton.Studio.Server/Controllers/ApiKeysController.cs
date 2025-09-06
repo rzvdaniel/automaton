@@ -7,7 +7,6 @@ namespace Automaton.Studio.Server.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize]
 public class ApiKeysController : BaseController
 {
     private readonly ApiKeyService apiKeyService;
@@ -79,6 +78,7 @@ public class ApiKeysController : BaseController
 
     /// <summary>
     /// Validates an API key and returns authentication status - used by console runners
+    /// Anonymous endpoint - console runners test keys before using them for authentication
     /// </summary>
     [HttpPost("validate")]
     [AllowAnonymous]

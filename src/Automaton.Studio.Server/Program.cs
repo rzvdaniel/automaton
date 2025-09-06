@@ -12,6 +12,7 @@ using Destructurama;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.MySql;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -58,22 +59,38 @@ services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
         .AllowAnyHeader();
 }));
 
-services.AddMvc(options =>
-{
-    var policy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-    options.Filters.Add(new AuthorizeFilter(policy));
-});
+services.AddMvc();
 
 services.AddAccessTokenValidator();
 services.AddJwtAuthentication(applicationBuilder.Configuration);
 
-// Add API Key authentication
 services.AddAuthentication()
     .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
         ApiKeyAuthenticationSchemeOptions.DefaultScheme, 
-        options => { });
+        options => 
+        {
+            options.HeaderName = "X-API-Key";
+            options.QueryParameterName = "api_key";
+        });
+
+// Define specific authorization policies for different access levels
+services.AddAuthorization(options =>
+{
+    // Default policy for web users (Blazor UI) - only Identity and JWT
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes("Identity.Application", JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+
+    // Policy for API endpoints that should support API keys (runner operations)
+    options.AddPolicy("AllowApiKey", policy =>
+        policy.AddAuthenticationSchemes("Identity.Application", JwtBearerDefaults.AuthenticationScheme, ApiKeyAuthenticationSchemeOptions.DefaultScheme)
+              .RequireAuthenticatedUser());
+
+    // Policy for anonymous endpoints (validation, etc.)
+    options.AddPolicy("AllowAnonymous", policy =>
+        policy.RequireAssertion(_ => true));
+});
 
 services.AddHttpClient();
 
@@ -82,6 +99,12 @@ services.AddServerSideBlazor();
 services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
 services.AddControllers(options =>
 {
+    // Apply default authorization to all controllers
+    var policy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes("Identity.Application", JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+    options.Filters.Add(new AuthorizeFilter(policy));
     options.Filters.Add<GlobalExceptionFilter>();
 });
 
