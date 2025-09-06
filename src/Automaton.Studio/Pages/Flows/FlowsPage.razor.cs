@@ -1,4 +1,5 @@
 ﻿using AntDesign;
+using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Flows.Components.NewFlow;
 using Microsoft.AspNetCore.Components;
 
@@ -74,6 +75,18 @@ namespace Automaton.Studio.Pages.Flows
                     await MessageService.ErrorAsync($"Flow {newFlowModel.Name} could not be created");
                 }
             };
+        }
+
+        private string GetRunnerDisplayName(RunnerModel runner)
+        {
+            var statusSymbol = runner.Status switch
+            {
+                Automaton.Core.Enums.RunnerStatus.Online => "●",
+                Automaton.Core.Enums.RunnerStatus.Offline => "●",
+                _ => "○"
+            };
+
+            return $"{statusSymbol} {runner.Name}";
         }
     }
 }
