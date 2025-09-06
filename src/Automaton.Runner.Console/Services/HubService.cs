@@ -1,6 +1,4 @@
-﻿using Automaton.Core.Models;
-using Automaton.Core.Services;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using Serilog;
 using static System.Console;
 
@@ -38,7 +36,7 @@ public class HubService
             
             if (string.IsNullOrEmpty(apiKey))
             {
-                System.Console.WriteLine("❌ Not authenticated. Please set an API key first.");
+                WriteLine("❌ Not authenticated. Please set an API key first.");
                 return false;
             }
 

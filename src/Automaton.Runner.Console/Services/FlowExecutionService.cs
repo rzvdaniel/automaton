@@ -36,20 +36,18 @@ public class FlowExecutionService
         {
             logger.Information("Starting execution of workflow {WorkflowId}", workflowId);
             
-            // Get the flow definition from server and convert to workflow
             var flow = await LoadFlowAsync(workflowId);
+
             if (flow == null)
             {
                 throw new InvalidOperationException($"Workflow {workflowId} not found");
             }
 
-            // Execute the workflow using the same pattern as the old runner
             var workflowExecution = await ExecuteAsync(flow);
             
             logger.Information("Completed execution of workflow {WorkflowId} with status {Status}", 
                 workflowId, workflowExecution.Status);
 
-            // Save the execution result back to server
             await SaveWorkflowExecutionAsync(workflowExecution);
 
             return workflowExecution;
@@ -58,7 +56,6 @@ public class FlowExecutionService
         {
             logger.Error(ex, "Failed to execute workflow {WorkflowId}", workflowId);
             
-            // Create error execution result
             var errorExecution = new WorkflowExecution(workflowId, configService.ApplicationName)
             {
                 Started = DateTime.UtcNow,
@@ -66,17 +63,16 @@ public class FlowExecutionService
                 Status = WorkflowStatus.Error
             };
             
-            await SaveWorkflowExecutionAsync(errorExecution); // Report the failure too
+            await SaveWorkflowExecutionAsync(errorExecution);
+
             throw;
         }
     }
 
     private async Task<WorkflowExecution> ExecuteAsync(Flow flow, CancellationToken cancellationToken = default)
     {
-        // Convert Flow to Workflow (same as old runner)
         var workflow = flowConvertService.ConvertFlow(flow);
 
-        // Execute the workflow using FlowExecuteService (same as old runner) 
         var workflowExecution = await flowExecuteService.Execute(workflow, cancellationToken);
 
         return workflowExecution;
@@ -94,7 +90,6 @@ public class FlowExecutionService
             {
                 var json = await response.Content.ReadAsStringAsync();
                 
-                // Deserialize as Flow first (what the server actually returns)
                 var flow = JsonSerializer.Deserialize<Flow>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -108,6 +103,7 @@ public class FlowExecutionService
             }
 
             logger.Warning("Failed to load flow {WorkflowId}: {StatusCode}", workflowId, response.StatusCode);
+
             return null;
         }
         catch (Exception ex)
@@ -123,7 +119,6 @@ public class FlowExecutionService
         {
             await SetupHttpClientAuthAsync();
 
-            // Convert WorkflowExecution to the format expected by server (same as old runner)
             var flowExecution = new
             {
                 Id = workflowExecution.Id,
@@ -160,6 +155,7 @@ public class FlowExecutionService
         httpClient.DefaultRequestHeaders.Clear();
         
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+
         if (!string.IsNullOrEmpty(apiKey))
         {
             httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
