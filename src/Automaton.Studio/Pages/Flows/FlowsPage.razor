@@ -60,7 +60,9 @@
                     <SelectOptions>
                         @foreach (var item in FlowsViewModel.Runners)
                         {
-                            <SelectOption TItemValue="Guid" TItem="Guid" Value=@item.Id Label=@GetRunnerDisplayName(item) Class=@($"runner-status-{item.Status.ToString().ToLower()}") />
+                            <SelectOption TItemValue="Guid" TItem="Guid" Value=@item.Id Disabled=@(item.Status == Automaton.Core.Enums.RunnerStatus.Offline)>
+                                <span class="runner-status-icon runner-status-@(item.Status.ToString().ToLower())">@GetRunnerStatusSymbol(item.Status)</span> @item.Name
+                            </SelectOption>
                         }
                     </SelectOptions>
                 </Select>                
@@ -142,15 +144,15 @@
         float: left;
     }
 
-    .runner-status-online {
+    .runner-status-icon.runner-status-online {
         color: #52c41a !important; /* Green for online */
     }
 
-    .runner-status-offline {
+    .runner-status-icon.runner-status-offline {
         color: #ff4d4f !important; /* Red for offline */
     }
 
-    .runner-status-none {
+    .runner-status-icon.runner-status-none {
         color: #d9d9d9 !important; /* Gray for none/unknown */
     }
 </style>

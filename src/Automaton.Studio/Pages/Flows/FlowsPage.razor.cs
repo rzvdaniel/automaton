@@ -77,16 +77,14 @@ namespace Automaton.Studio.Pages.Flows
             };
         }
 
-        private string GetRunnerDisplayName(RunnerModel runner)
+        private string GetRunnerStatusSymbol(Automaton.Core.Enums.RunnerStatus status)
         {
-            var statusSymbol = runner.Status switch
+            return status switch
             {
                 Automaton.Core.Enums.RunnerStatus.Online => "●",
                 Automaton.Core.Enums.RunnerStatus.Offline => "●",
                 _ => "○"
             };
-
-            return $"{statusSymbol} {runner.Name}";
         }
     }
 }
