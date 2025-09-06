@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Extensions.Hosting;
 using System.CommandLine;
+using Automaton.Core.Scripting;
 
 namespace Automaton.Runner.Console;
 
@@ -221,13 +222,21 @@ public class Program
                 services.AddHttpClient();
                 services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
                 
-                // Register services
+                // Add Automaton Core services
+                services.AddScripting();
+                services.AddAutomatonSteps(); 
+                services.AddAutomatonCore();
+                
+                // Register console runner services
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
                 services.AddScoped<ApiKeyAuthenticationService>();
                 services.AddScoped<HubService>();
                 services.AddScoped<FlowExecutionService>();
                 services.AddScoped<RunnerHostService>();
+                
+                // Register FlowExecuteService (needed for actual workflow execution)
+                services.AddScoped<Automaton.Core.Services.FlowExecuteService>();
             });
 
     private static IConfiguration GetConfiguration(string[] args)

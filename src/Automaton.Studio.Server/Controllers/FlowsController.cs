@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -21,6 +22,7 @@ public class FlowsController : BaseController
     }
 
     [HttpGet("{id}")]
+    [Authorize(Policy = "AllowApiKey")]
     public ActionResult<Flow> Get(Guid id)
     {
         var flow = flowsService.Get(id);

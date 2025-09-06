@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using Automaton.Core.Services;
 using Automaton.Core.Enums;
 using Serilog;
 using System.Text.Json;
@@ -10,64 +11,78 @@ public class FlowExecutionService
     private readonly HttpClient httpClient;
     private readonly ConfigurationService configService;
     private readonly ApiKeyAuthenticationService apiKeyAuthService;
+    private readonly FlowConvertService flowConvertService;
+    private readonly FlowExecuteService flowExecuteService;
     private readonly ILogger logger;
 
     public FlowExecutionService(
         HttpClient httpClient,
         ConfigurationService configService,
-        ApiKeyAuthenticationService apiKeyAuthService)
+        ApiKeyAuthenticationService apiKeyAuthService,
+        FlowConvertService flowConvertService,
+        FlowExecuteService flowExecuteService)
     {
         this.httpClient = httpClient;
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
+        this.flowConvertService = flowConvertService;
+        this.flowExecuteService = flowExecuteService;
         this.logger = Log.ForContext<FlowExecutionService>();
     }
 
     public async Task<WorkflowExecution> ExecuteWorkflowAsync(Guid workflowId)
-    {
-        var execution = new WorkflowExecution(workflowId, configService.ApplicationName);
-        
+    {        
         try
         {
             logger.Information("Starting execution of workflow {WorkflowId}", workflowId);
             
-            // Get the workflow definition
-            var workflow = await GetWorkflowAsync(workflowId);
-            if (workflow == null)
+            // Get the flow definition from server and convert to workflow
+            var flow = await LoadFlowAsync(workflowId);
+            if (flow == null)
             {
                 throw new InvalidOperationException($"Workflow {workflowId} not found");
             }
 
-            // For now, create a simple execution result
-            // In a full implementation, you would use the FlowExecuteService here
-            execution.Started = DateTime.UtcNow;
-            execution.Status = WorkflowStatus.Working;
-            
-            // Simulate workflow execution
-            await Task.Delay(1000); // Simulate some work
-            
-            execution.Finished = DateTime.UtcNow;
-            execution.Status = WorkflowStatus.Success;
+            // Execute the workflow using the same pattern as the old runner
+            var workflowExecution = await ExecuteAsync(flow);
             
             logger.Information("Completed execution of workflow {WorkflowId} with status {Status}", 
-                workflowId, execution.Status);
+                workflowId, workflowExecution.Status);
 
-            // Report execution result back to server
-            await ReportExecutionAsync(execution);
+            // Save the execution result back to server
+            await SaveWorkflowExecutionAsync(workflowExecution);
 
-            return execution;
+            return workflowExecution;
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to execute workflow {WorkflowId}", workflowId);
-            execution.Finished = DateTime.UtcNow;
-            execution.Status = WorkflowStatus.Error;
-            await ReportExecutionAsync(execution); // Report the failure too
+            
+            // Create error execution result
+            var errorExecution = new WorkflowExecution(workflowId, configService.ApplicationName)
+            {
+                Started = DateTime.UtcNow,
+                Finished = DateTime.UtcNow,
+                Status = WorkflowStatus.Error
+            };
+            
+            await SaveWorkflowExecutionAsync(errorExecution); // Report the failure too
             throw;
         }
     }
 
-    private async Task<Workflow?> GetWorkflowAsync(Guid workflowId)
+    private async Task<WorkflowExecution> ExecuteAsync(Flow flow, CancellationToken cancellationToken = default)
+    {
+        // Convert Flow to Workflow (same as old runner)
+        var workflow = flowConvertService.ConvertFlow(flow);
+
+        // Execute the workflow using FlowExecuteService (same as old runner) 
+        var workflowExecution = await flowExecuteService.Execute(workflow, cancellationToken);
+
+        return workflowExecution;
+    }
+
+    private async Task<Flow?> LoadFlowAsync(Guid workflowId)
     {
         try
         {
@@ -78,58 +93,65 @@ public class FlowExecutionService
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                var workflow = JsonSerializer.Deserialize<Workflow>(json, new JsonSerializerOptions
+                
+                // Deserialize as Flow first (what the server actually returns)
+                var flow = JsonSerializer.Deserialize<Flow>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
                 
-                return workflow;
+                if (flow != null)
+                {
+                    logger.Information("Successfully loaded flow {FlowId} from server", workflowId);
+                    return flow;
+                }
             }
 
-            logger.Warning("Failed to get workflow {WorkflowId}: {StatusCode}", workflowId, response.StatusCode);
+            logger.Warning("Failed to load flow {WorkflowId}: {StatusCode}", workflowId, response.StatusCode);
             return null;
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error getting workflow {WorkflowId}", workflowId);
+            logger.Error(ex, "Error loading flow {WorkflowId}", workflowId);
             return null;
         }
     }
 
-    private async Task ReportExecutionAsync(WorkflowExecution execution)
+    private async Task SaveWorkflowExecutionAsync(WorkflowExecution workflowExecution)
     {
         try
         {
             await SetupHttpClientAuthAsync();
 
-            var executionData = new
+            // Convert WorkflowExecution to the format expected by server (same as old runner)
+            var flowExecution = new
             {
-                execution.Id,
-                execution.FlowId,
-                execution.Started,
-                execution.Finished,
-                Status = execution.Status.ToString(),
-                execution.Application
+                Id = workflowExecution.Id,
+                FlowId = workflowExecution.FlowId,
+                Started = workflowExecution.Started,
+                Finished = workflowExecution.Finished,
+                Status = workflowExecution.Status.ToString(),
+                Application = workflowExecution.Application
             };
 
-            var json = JsonSerializer.Serialize(executionData);
+            var json = JsonSerializer.Serialize(flowExecution);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
             var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.FlowExecutionUrl}", content);
             
             if (response.IsSuccessStatusCode)
             {
-                logger.Information("Execution result reported successfully for workflow {WorkflowId}", execution.FlowId);
+                logger.Information("Execution result saved successfully for workflow {WorkflowId}", workflowExecution.FlowId);
             }
             else
             {
-                logger.Warning("Failed to report execution result for workflow {WorkflowId}: {StatusCode}", 
-                    execution.FlowId, response.StatusCode);
+                logger.Warning("Failed to save execution result for workflow {WorkflowId}: {StatusCode}", 
+                    workflowExecution.FlowId, response.StatusCode);
             }
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error reporting execution for workflow {WorkflowId}", execution.FlowId);
+            logger.Error(ex, "Error saving execution result for workflow {WorkflowId}", workflowExecution.FlowId);
         }
     }
 

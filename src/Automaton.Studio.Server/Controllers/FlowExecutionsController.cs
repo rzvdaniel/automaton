@@ -1,5 +1,6 @@
 ﻿using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -37,6 +38,7 @@ public class FlowExecutionsController : BaseController
     }
 
     [HttpPost]
+    [Authorize(Policy = "AllowApiKey")]
     public ActionResult Post(FlowExecution flowExecution, CancellationToken cancellationToken)
     {
         return Ok(flowExecutionService.Add(flowExecution));
