@@ -27,6 +27,8 @@ dotnet publish -c Release --self-contained false
 
 The executable will be located in `bin/Release/net8.0/publish/automaton-runner.exe` (Windows) or `bin/Release/net8.0/publish/automaton-runner` (Linux/macOS).
 
+**Note**: The compiled executable is named `automaton-runner` regardless of the project folder name.
+
 ## Authentication
 
 ### ?? API Key Authentication
@@ -92,6 +94,48 @@ automaton-runner run --name "Production-Runner" --server https://localhost:7091
    ```bash
    automaton-runner run --name "My-Runner"
    ```
+
+### Help System
+
+The console runner includes a built-in help system to guide you through available commands and options.
+
+#### Getting Help
+
+```bash
+# Show general help and all available commands
+automaton-runner --help
+
+# Show help for a specific command
+automaton-runner <command> --help
+```
+
+**Examples:**
+```bash
+# General help
+automaton-runner --help
+automaton-runner -h
+
+# Command-specific help
+automaton-runner run --help
+automaton-runner auth --help
+automaton-runner register --help
+automaton-runner status --help
+automaton-runner cleanup --help
+```
+
+#### Version Information
+
+```bash
+# Show version information
+automaton-runner --version
+```
+
+#### Global Options
+
+The following options are available for all commands:
+
+- `--version`: Show version information
+- `--help`, `-h`, `-?`: Show help and usage information
 
 ### Commands
 
@@ -160,8 +204,27 @@ automaton-runner run --name "Production-Server-01"
 ```
 
 **Interactive Commands (while running):**
-- `q`: Quit the runner
-- `s`: Show status information
+
+While the runner is active, you can use these keyboard shortcuts:
+
+- **`q`**: Quit the runner gracefully
+  - Stops execution of any current workflows
+  - Disconnects from the server
+  - Exits the application cleanly
+
+- **`s`**: Show status information
+  - Displays current connection status
+  - Shows runner registration details
+  - Provides authentication status
+  - Lists any active workflows
+
+**Usage:**
+```bash
+automaton-runner run --name "My-Runner"
+# Runner starts and shows connection status
+# Press 's' to view detailed status
+# Press 'q' to quit when done
+```
 
 #### `status` - Show Configuration and Status
 
@@ -204,6 +267,11 @@ The runner uses `appsettings.json` for configuration:
 }
 ```
 
+**Note**: The default server URL is `https://localhost:7091`. If your Automaton Studio Server runs on a different port, you can:
+- Override it via command line: `--server https://localhost:YOUR_PORT`  
+- Set environment variable: `AppConfig__BaseUrl=https://localhost:YOUR_PORT`
+- Modify the `appsettings.json` file directly
+
 ### Storage Locations
 
 The runner stores configuration in:
@@ -219,9 +287,43 @@ Files stored:
 
 You can override configuration using environment variables:
 
-- `AUTOMATON_API_KEY`: API key for authentication
-- `AppConfig__BaseUrl`: Server base URL
-- `AppConfig__ApplicationType`: Application type identifier
+### Core Environment Variables
+
+- **`AUTOMATON_API_KEY`**: API key for authentication (most commonly used)
+- **`AppConfig__BaseUrl`**: Server base URL (e.g., `https://localhost:7091`)
+- **`AppConfig__ApplicationType`**: Application type identifier (default: `ConsoleRunner`)
+
+### Advanced Configuration Variables
+
+You can override any configuration from `appsettings.json` using environment variables with the double underscore (`__`) syntax:
+
+- **`AppConfig__WorkflowHubUrl`**: Workflow SignalR hub URL (default: `api/workflow/hub`)
+- **`AppConfig__FlowsUrl`**: Flows API endpoint (default: `api/flows`)
+- **`AppConfig__RunnersUrl`**: Runners API endpoint (default: `api/runners`)
+- **`AppConfig__LogsUrl`**: Logs API endpoint (default: `api/logs`)
+- **`AppConfig__FlowExecutionUrl`**: Flow execution API endpoint (default: `api/flowexecutions`)
+
+### Logging Configuration
+
+Control logging behavior:
+
+- **`Serilog__MinimumLevel__Default`**: Set minimum log level (`Debug`, `Information`, `Warning`, `Error`)
+- **`Logging__LogLevel__Default`**: Alternative logging level configuration
+
+### Examples
+
+```bash
+# Basic usage with API key
+export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
+export AppConfig__BaseUrl="https://automaton.company.com"
+
+# Advanced configuration
+export AppConfig__ApplicationType="Production-ConsoleRunner"
+export Serilog__MinimumLevel__Default="Warning"
+
+# Run with environment variables
+automaton-runner run --name "Production-Runner"
+```
 
 ## Production Deployment
 
@@ -273,11 +375,47 @@ WantedBy=multi-user.target
 
 ## Logging
 
-Logs are written to:
-- Console (with colored output)
-- `logs/automaton-runner-YYYY-MM-DD.log` files (rotated daily, kept for 7 days)
+The console runner uses Serilog for structured logging with the following features:
 
-Log levels can be configured in `appsettings.json` under the `Serilog` section.
+### Log Output
+- **Console**: Colored output with timestamp and log level
+- **File**: Daily rotating log files in the `logs/` directory
+
+### Log Files
+- **Location**: `logs/automaton-runner-YYYY-MM-DD.log`
+- **Retention**: Files are kept for 7 days and then automatically deleted
+- **Format**: Timestamped entries with full exception details
+
+### Log Levels
+Available log levels (from most to least verbose):
+- `Debug`: Detailed diagnostic information
+- `Information`: General application flow (default)
+- `Warning`: Potentially harmful situations
+- `Error`: Error events that don't stop the application
+- `Fatal`: Critical errors that cause application termination
+
+### Configuration
+Configure logging in `appsettings.json` under the `Serilog` section:
+
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    }
+  }
+}
+```
+
+Or use environment variables:
+```bash
+export Serilog__MinimumLevel__Default="Debug"
+export Serilog__MinimumLevel__Override__Microsoft="Error"
+```
 
 ## Examples
 
@@ -336,6 +474,16 @@ services:
    - Ensure runner is registered successfully
    - Check that runner is connected (use `s` command while running)
    - Verify user has permission to see runners
+
+4. **Command Not Found**
+   - Make sure you're using the correct executable name: `automaton-runner`
+   - Verify the build/publish process completed successfully
+   - Check if the executable has proper permissions (Linux/macOS: `chmod +x automaton-runner`)
+
+5. **Help Not Displaying**
+   - Try different help options: `--help`, `-h`, or `-?`
+   - Ensure you're using the correct command syntax
+   - For command-specific help, use: `automaton-runner <command> --help`
 
 ### API Key Issues
 - **Invalid format**: API keys should start with `ak_` and be at least 10 characters long
@@ -396,3 +544,45 @@ The console runner is ideal for:
 - Linux/macOS environments
 - Headless servers
 - Production automation
+
+## Quick Reference
+
+### Essential Commands
+```bash
+# Show all available commands and options
+automaton-runner --help
+
+# Show version
+automaton-runner --version
+
+# Authenticate (store API key locally)
+automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
+
+# Register runner with server
+automaton-runner register --name "My-Runner" --server https://localhost:7091
+
+# Start runner
+automaton-runner run --name "My-Runner"
+
+# Check status
+automaton-runner status
+
+# Clean up stored data
+automaton-runner cleanup
+```
+
+### Quick Setup
+```bash
+# 1. Set API key (choose one method)
+automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
+# OR
+export AUTOMATON_API_KEY="ak_runner_xxxxxxxxxxxx"
+
+# 2. Register and run
+automaton-runner register --name "My-Runner" --server https://localhost:7091
+automaton-runner run --name "My-Runner"
+```
+
+### Interactive Commands (while running)
+- **`s`**: Show detailed status
+- **`q`**: Quit gracefully
