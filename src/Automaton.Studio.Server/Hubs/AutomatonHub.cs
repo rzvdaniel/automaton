@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Studio.Server.Hubs;
 
-[Authorize]
+[Authorize(Policy = "AllowApiKey")] // Use AllowApiKey policy to support console runner API key authentication
 public class AutomatonHub : Hub
 {
     private const string UserIdClaim = "uid";

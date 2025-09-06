@@ -1,7 +1,8 @@
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Automaton.Core.Services;
 using Microsoft.AspNetCore.SignalR.Client;
 using Serilog;
+using static System.Console;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -37,18 +38,21 @@ public class HubService
             
             if (string.IsNullOrEmpty(apiKey))
             {
-                System.Console.WriteLine("? Not authenticated. Please set an API key first.");
+                System.Console.WriteLine("❌ Not authenticated. Please set an API key first.");
                 return false;
             }
 
             if (!configService.IsRunnerRegistered())
             {
-                System.Console.WriteLine("? Runner not registered. Please register first.");
+                WriteLine("❌ Runner not registered. Please register first.");
                 return false;
             }
 
             var hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
-            System.Console.WriteLine($"?? Connecting to {hubUrl}...");
+            WriteLine($"🔗 Connecting to {hubUrl}...");
+            WriteLine($"🔍 API Key: {apiKey[..Math.Min(15, apiKey.Length)]}...");
+            WriteLine($"🔍 Runner ID: {configService.RunnerId}");
+            WriteLine($"🔍 Runner Name: {configService.ApplicationName}");
             
             connection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
@@ -64,14 +68,14 @@ public class HubService
             {
                 try
                 {
-                    System.Console.WriteLine($"? Executing workflow: {workflowId}");
+                    WriteLine($"? Executing workflow: {workflowId}");
                     var result = await flowExecutionService.ExecuteWorkflowAsync(workflowId);
-                    System.Console.WriteLine($"? Workflow completed: {result.Status}");
+                    WriteLine($"? Workflow completed: {result.Status}");
                 }
                 catch (Exception ex)
                 {
                     logger.Error(ex, "Error executing workflow {WorkflowId}", workflowId);
-                    System.Console.WriteLine($"? Workflow failed: {ex.Message}");
+                    WriteLine($"? Workflow failed: {ex.Message}");
                 }
             });
 
@@ -85,7 +89,7 @@ public class HubService
             connection.Closed += async (error) =>
             {
                 logger.Warning("Connection closed: {Error}", error?.Message);
-                System.Console.WriteLine("? Connection to server lost. Attempting to reconnect...");
+                WriteLine("? Connection to server lost. Attempting to reconnect...");
                 await Task.Delay(5000);
                 await ConnectAsync();
             };
@@ -93,20 +97,20 @@ public class HubService
             connection.Reconnecting += (error) =>
             {
                 logger.Information("Reconnecting to server: {Error}", error?.Message);
-                System.Console.WriteLine("?? Reconnecting to server...");
+                WriteLine("?? Reconnecting to server...");
                 return Task.CompletedTask;
             };
 
             connection.Reconnected += (connectionId) =>
             {
                 logger.Information("Reconnected to server with connection ID: {ConnectionId}", connectionId);
-                System.Console.WriteLine("? Reconnected to server successfully");
+                WriteLine("? Reconnected to server successfully");
                 return Task.CompletedTask;
             };
 
             await connection.StartAsync();
-            
-            System.Console.WriteLine("? Connected to server successfully");
+
+            WriteLine("? Connected to server successfully");
             logger.Information("Connected to hub at {HubUrl}", hubUrl);
             
             return true;
@@ -114,7 +118,7 @@ public class HubService
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to connect to hub");
-            System.Console.WriteLine($"? Connection failed: {ex.Message}");
+            WriteLine($"? Connection failed: {ex.Message}");
             return false;
         }
     }
@@ -125,7 +129,7 @@ public class HubService
         {
             await connection.DisposeAsync();
             connection = null;
-            System.Console.WriteLine("? Disconnected from server");
+            WriteLine("? Disconnected from server");
         }
     }
 
