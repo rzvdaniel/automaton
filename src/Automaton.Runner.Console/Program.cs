@@ -2,9 +2,7 @@ using Automaton.Runner.Console.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Extensions.Hosting;
 using System.CommandLine;
 using Automaton.Core.Scripting;
 
@@ -14,7 +12,6 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        // Configure Serilog
         var configuration = GetConfiguration(args);
         
         Log.Logger = new LoggerConfiguration()
