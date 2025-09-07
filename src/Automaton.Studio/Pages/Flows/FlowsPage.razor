@@ -52,19 +52,22 @@
 
             <Column @bind-Field="@context.RunnerIds" Title="Runners" Width="300">
                 <Select Mode="SelectMode.Multiple" 
-                    @bind-Values="context.RunnerIds"
                     Placeholder="Select runners..."
-                    TItemValue="Guid"
-                    TItem="Guid"
+                    DataSource="FlowsViewModel.Runners"
+                    ValueProperty="r => r.Id"
+                    LabelProperty="r => r.Name"
+                    DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
                     AllowClear>
-                    <SelectOptions>
-                        @foreach (var item in FlowsViewModel.Runners)
-                        {
-                            <SelectOption TItemValue="Guid" TItem="Guid" Value=@item.Id Disabled=@(item.Status == Automaton.Core.Enums.RunnerStatus.Offline)>
-                                <span class="runner-status-icon runner-status-@(item.Status.ToString().ToLower())">@GetRunnerStatusSymbol(item.Status)</span> @item.Name
-                            </SelectOption>
-                        }
-                    </SelectOptions>
+                    <ItemTemplate Context="runnerContext">
+                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                        @runnerContext.Name
+                    </ItemTemplate>
+                    <LabelTemplate Context="runnerContext">
+                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                        @runnerContext.Name
+                    </LabelTemplate>
                 </Select>                
             </Column>
 

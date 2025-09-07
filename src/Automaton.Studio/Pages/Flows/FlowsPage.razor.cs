@@ -1,5 +1,5 @@
 ﻿using AntDesign;
-using Automaton.Studio.Models;
+using Automaton.Core.Enums;
 using Automaton.Studio.Pages.Flows.Components.NewFlow;
 using Microsoft.AspNetCore.Components;
 
@@ -77,14 +77,19 @@ namespace Automaton.Studio.Pages.Flows
             };
         }
 
-        private string GetRunnerStatusSymbol(Automaton.Core.Enums.RunnerStatus status)
+        private string GetRunnerStatusIcon(RunnerStatus status)
         {
             return status switch
             {
-                Automaton.Core.Enums.RunnerStatus.Online => "●",
-                Automaton.Core.Enums.RunnerStatus.Offline => "●",
-                _ => "○"
+                RunnerStatus.Online => "check-circle",
+                RunnerStatus.Offline => "close-circle",
+                _ => "question-circle"
             };
+        }
+
+        private string GetRunnerStatusClass(RunnerStatus status)
+        {
+            return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
         }
     }
 }
