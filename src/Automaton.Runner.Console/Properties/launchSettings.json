@@ -14,18 +14,34 @@
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Register": {
+    "Console Runner - Register (after auth)": {
       "commandName": "Project",
       "commandLineArgs": "register --name \"Debug-Runner\" --server https://localhost:7091",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Run": {
+    "Console Runner - Register (with env var)": {
+      "commandName": "Project",
+      "commandLineArgs": "register --name \"Debug-Runner\" --server https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
+      }
+    },
+    "Console Runner - Run (after registration)": {
       "commandName": "Project",
       "commandLineArgs": "run --name \"Debug-Runner\" --server https://localhost:7091",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Run (with env var)": {
+      "commandName": "Project",
+      "commandLineArgs": "run --name \"Debug-Runner\" --server https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
       }
     },
     "Console Runner - Help": {
@@ -35,9 +51,9 @@
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Login (Deprecated)": {
+    "Console Runner - Cleanup": {
       "commandName": "Project",
-      "commandLineArgs": "login --server https://localhost:7091",
+      "commandLineArgs": "cleanup",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
