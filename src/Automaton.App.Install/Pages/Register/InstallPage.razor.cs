@@ -8,7 +8,7 @@ namespace Automaton.App.Install.Pages.Register;
 partial class InstallPage : ComponentBase
 {
     private bool loading = false;
-    private bool installationComplete = false;
+    private bool installationComplete;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private InstallViewModel InstallViewModel { get; set; } = default!;

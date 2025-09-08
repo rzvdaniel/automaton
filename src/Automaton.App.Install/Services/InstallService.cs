@@ -1,6 +1,7 @@
 ﻿using Automaton.App.Install.Models;
 using Automaton.Client.Auth.Services;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Automaton.App.Install.Services;
 
@@ -31,8 +32,8 @@ public class InstallService
             if (result.IsSuccessStatusCode)
             {
                 var content = await result.Content.ReadAsStringAsync();
-                var response = System.Text.Json.JsonSerializer.Deserialize<InstallationStatusResponse>(content, 
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var response = JsonSerializer.Deserialize<InstallationStatusResponse>(content, 
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 return response?.InstallationComplete ?? false;
             }
             
