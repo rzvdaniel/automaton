@@ -107,7 +107,7 @@
             }
 
             <!-- Main Content Tabs -->
-            <Tabs DefaultActiveKey="recent-flows" Class="home-tabs">
+            <Tabs DefaultActiveKey="resources" Class="home-tabs">
                 <TabPane Key="resources" Tab="Resources">
                     <div class="resources-content">
                         <!-- Quick Start Section -->
@@ -119,12 +119,23 @@
                             
                             @if (shouldShowOnboarding)
                             {
-                                <Alert Type="@AlertType.Info" ShowIcon="true" Closable="false" Style="margin-bottom: 16px;">
+                                <Alert Type="@AlertType.Success" ShowIcon="true" Closable="false" Style="margin-bottom: 16px; border: 2px solid #52c41a;">
                                     <MessageTemplate>
-                                        <span>Complete your setup to start creating workflows</span>
-                                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))" Style="margin-left: 8px;">
-                                            Complete Setup
-                                        </Button>
+                                        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                            <div>
+                                                <Text Strong>🚀 Ready to build your first workflow?</Text>
+                                                <br />
+                                                <Text Type="@TextElementType.Secondary">Complete the 5-minute setup guide to unlock all features</Text>
+                                            </div>
+                                            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                                                <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                                                    Start Setup (5 min)
+                                                </Button>
+                                                <Button Size="@ButtonSize.Small" OnClick="@SkipOnboardingForNow">
+                                                    Skip for Now
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </MessageTemplate>
                                 </Alert>
                             }
@@ -198,10 +209,10 @@
 
                 <TabPane Key="recent-flows" Tab="Recent Flows">
                     <div class="flows-content">
+                        <Title Level="3">Your Recent Flows</Title>
                         @if (recentFlows != null && recentFlows.Any())
                         {
                             <div class="section">
-                                <Title Level="3">Your Recent Flows</Title>
                                 <Paragraph>
                                     Quick access to your recently edited workflows. Click any flow to continue editing.
                                 </Paragraph>

@@ -140,6 +140,27 @@ namespace Automaton.Studio.Pages
             NavigationManager.NavigateTo("/customsteps");
         }
 
+        // Add the missing SkipOnboardingForNow method
+        private async Task SkipOnboardingForNow()
+        {
+            try
+            {
+                // Skip onboarding for 72 hours (3 days)
+                await OnboardingService.SkipOnboardingTemporarilyAsync(72);
+                
+                // Update the local state to hide the onboarding alert immediately
+                shouldShowOnboarding = false;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error skipping onboarding: {ex.Message}");
+                // Even if there's an error, hide the alert to avoid user frustration
+                shouldShowOnboarding = false;
+                StateHasChanged();
+            }
+        }
+
         private string GetActivityTagColor(ActivityType activityType)
         {
             return activityType switch
