@@ -8,6 +8,7 @@ namespace Automaton.App.Install.Pages.Register;
 partial class InstallPage : ComponentBase
 {
     private bool loading = false;
+    private bool installationComplete;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private InstallViewModel InstallViewModel { get; set; } = default!;
@@ -16,6 +17,16 @@ partial class InstallPage : ComponentBase
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            installationComplete = await InstallService.IsInstallationComplete();
+        }
+        catch
+        {
+            // If we can't check status, assume installation is not complete
+            installationComplete = false;
+        }
+        
         await base.OnInitializedAsync();
     }
 

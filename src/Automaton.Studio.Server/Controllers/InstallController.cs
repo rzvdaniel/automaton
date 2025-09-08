@@ -14,6 +14,14 @@ public class InstallController : BaseController
         this.installService = installService;
     }
 
+    [HttpGet("status")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetInstallationStatus()
+    {
+        var isComplete = await installService.InstallationComplete();
+        return Ok(new { InstallationComplete = isComplete });
+    }
+
     [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> Post(InstallCommand installCommand, CancellationToken cancellationToken)
