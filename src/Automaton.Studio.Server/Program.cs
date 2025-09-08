@@ -122,7 +122,7 @@ applicationBuilder.Host.UseSerilog((context, services, config) =>
           .WriteTo.MariaDB(
               connectionString: configurationManager.GetConnectionString("MySqlConnection"),
               tableName: "Logs",
-              autoCreateTable: true,
+              autoCreateTable: false,
               useBulkInsert: true,
               restrictedToMinimumLevel: LogEventLevel.Information,
               batchPostingLimit: 1000,
