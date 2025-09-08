@@ -21,4 +21,27 @@ public class InstallService
 
         result.EnsureSuccessStatusCode();
     }
+
+    public async Task<bool> IsInstallationComplete()
+    {
+        try
+        {
+            var result = await httpClient.GetAsync($"{clientAuthConfigService.BaseUrl}/api/install/status");
+            
+            if (result.IsSuccessStatusCode)
+            {
+                var content = await result.Content.ReadAsStringAsync();
+                var response = System.Text.Json.JsonSerializer.Deserialize<InstallationStatusResponse>(content, 
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return response?.InstallationComplete ?? false;
+            }
+            
+            return false;
+        }
+        catch
+        {
+            // If we can't check status, assume installation is not complete
+            return false;
+        }
+    }
 }

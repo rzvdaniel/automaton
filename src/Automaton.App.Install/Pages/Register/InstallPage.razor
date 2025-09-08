@@ -5,39 +5,49 @@
     <Content Id="register-user">
         <GridRow Justify="RowJustify.Center" Align="RowAlign.Middle" Class="grid-container">
             <GridCol>
-                <Form Loading="loading"
-                      Model="@InstallViewModel"
-                      Layout="@FormLayout.Vertical"
-                      OnFinish="OnFinish"
-                      OnFinishFailed="OnFinishFailed"
-                      Style="width: 400px">
+                @if (installationComplete)
+                {
+                    <div style="width: 400px; text-align: center;">
+                        <Title Level="1">Installation Complete</Title>
+                        <p>Automaton has already been installed and configured.</p>
+                    </div>
+                }
+                else
+                {
+                    <Form Loading="loading"
+                          Model="@InstallViewModel"
+                          Layout="@FormLayout.Vertical"
+                          OnFinish="OnFinish"
+                          OnFinishFailed="OnFinishFailed"
+                          Style="width: 400px">
 
-                    <ChildContent>
-                        <Title Level="1">Install Automaton</Title>
+                        <ChildContent>
+                            <Title Level="1">Install Automaton</Title>
 
-                        <FormItem Label="Name">
-                            <Input @bind-Value="@context.Name" />
-                        </FormItem>
+                            <FormItem Label="Name">
+                                <Input @bind-Value="@context.Name" />
+                            </FormItem>
 
-                        <FormItem Label="Email">
-                            <Input @bind-Value="@context.Email" />
-                        </FormItem>
+                            <FormItem Label="Email">
+                                <Input @bind-Value="@context.Email" />
+                            </FormItem>
 
-                        <FormItem Label="Password">
-                            <InputPassword @bind-Value="@context.Password" />
-                        </FormItem>
+                            <FormItem Label="Password">
+                                <InputPassword @bind-Value="@context.Password" />
+                            </FormItem>
 
-                        <FormItem Label="Confirm Password">
-                            <InputPassword @bind-Value="@context.ConfirmPassword" />
-                        </FormItem>
+                            <FormItem Label="Confirm Password">
+                                <InputPassword @bind-Value="@context.ConfirmPassword" />
+                            </FormItem>
 
-                        <FormItem WrapperColSpan="16">
-                            <Button Type="@ButtonType.Primary" HtmlType="submit">
-                                Submit
-                            </Button>
-                        </FormItem>
-                    </ChildContent>
-                </Form>
+                            <FormItem WrapperColSpan="16">
+                                <Button Type="@ButtonType.Primary" HtmlType="submit">
+                                    Submit
+                                </Button>
+                            </FormItem>
+                        </ChildContent>
+                    </Form>
+                }
             </GridCol>
         </GridRow>
     </Content>
