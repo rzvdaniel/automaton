@@ -292,21 +292,15 @@ div.content-padding {
 }
 
 /* Global content background - subtle warm background for all pages */
-.content-background,
-.ant-layout-content.content-background,
-.content-padding.content-background {
-    background-color: #fbf9f7 !important; /* Warm subtle background - slightly beige/cream tint */
+.content-background {
+    background-color: #fff !important; /* Warm subtle background - slightly beige/cream tint */
 }
 
 /* Alternative content background options for easy switching */
-.content-background-cool,
-.ant-layout-content.content-background-cool,
-.content-padding.content-background-cool {
+.content-background-cool {
     background-color: #f8f9fb !important; /* Cool subtle background - slightly blue/purple tint */
 }
 
-.content-background-neutral,
-.ant-layout-content.content-background-neutral,
-.content-padding.content-background-neutral {
+.content-background-neutral {
     background-color: #fafafa !important; /* Original neutral background */
 }

@@ -210,6 +210,9 @@
         background-color: #fafafa;
         height: calc(100vh - 135px);
         overflow: hidden;
+        border-radius: 8px;
+        border: 1px solid #f0f0f0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
     }
 
     .main-content-layout {
@@ -281,7 +284,7 @@
         flex-direction: column;
         overflow: hidden;
         width: 100%;
-        padding-left: 10px;
+        padding: 0 24px; /* Add horizontal margins matching other pages */
         box-sizing: border-box;
         background-color: white;
     }
@@ -289,7 +292,8 @@
     /* Main tabs should have normal tab behavior (no custom ordering) */
     .main-tabs-container .ant-tabs-nav {
         flex-shrink: 0;
-        margin-bottom: 0;
+        margin-bottom: 16px; /* Add vertical separation between tabs and content */
+        margin-top: 16px; /* Add top margin for tab navigation */
         /* Don't override the default order for main tabs */
     }
 
@@ -301,47 +305,17 @@
         /* Don't override the default order for main tabs */
     }
 
-    /* Bottom tabs with TabPosition.Bottom - adjust layout accordingly */
-    .bottom-tabs {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-    }
 
-    /* When tabs are at bottom, content comes first, then nav */
-    .bottom-tabs .ant-tabs-content-holder {
-        flex: 1;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        order: 1; /* Content area comes first */
-    }
 
-    .bottom-tabs .ant-tabs-nav {
-        flex-shrink: 0;
+    /* Designer tab should not have the background/padding since it's a complex layout */
+    .main-tabs-container .ant-tabs-tabpane:has(.designer-container) {
+        background-color: transparent;
+        border-radius: 0;
+        padding: 0;
         margin-bottom: 0;
-        margin-top: 0;
-        margin-left: 10px;
-        order: 2; /* Navigation comes after content */
-        position: relative;
-    }
-
-    .bottom-tabs .ant-tabs-content {
+        box-shadow: none;
+        border: none;
         height: 100%;
-        flex: 1;
-        overflow: hidden;
-    }
-
-    /* Style active tab panes to fill space properly */
-    .bottom-tabs .ant-tabs-tabpane {
-        padding: 6px;
-    }
-
-    .bottom-tabs .ant-tabs-tabpane-active {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
     }
 
     .runners-select {

@@ -2,9 +2,15 @@
 @using AntDesign
 @using Automaton.Studio.Models;
 
-<Layout>
-
-    <Content>
+<div class="flow-tab-content">
+    <div class="flow-tab-header">
+        <Title Level="3" Style="margin-bottom: 8px;">Flow Execution History</Title>
+        <Paragraph Style="color: #666;">
+            View and monitor all executions of this workflow. Expand any row to see detailed logs.
+        </Paragraph>
+    </div>
+    
+    <div class="flow-tab-table">
         <Table TItem="FlowExecution" 
             DataSource="@FlowActivityViewModel.Executions"
             RowExpandable="@((record)=>true)"
@@ -44,15 +50,42 @@
                 }
             </ExpandTemplate>
         </Table>
-    </Content>
-</Layout>
+    </div>
+</div>
 
 <style>
+    .flow-tab-content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: 8px;
+        padding: 0;
+    }
+
+    .flow-tab-header {
+        padding: 24px 24px 16px 24px;
+        border-bottom: 1px solid #f0f0f0;
+        flex-shrink: 0;
+        background: white;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .flow-tab-table {
+        flex: 1;
+        overflow: hidden;
+        padding: 0 24px 24px 24px;
+        background: white;
+        border-radius: 0 0 8px 8px;
+    }
+
     #flow-logs {
         width: 100%;
         height: 300px !important;
         overflow-x: hidden;
         font-size: smaller;
+        border-radius: 6px;
+        border: 1px solid #f0f0f0;
     }
 
     .log-spin {
@@ -62,6 +95,10 @@
         margin: 20px 0;
     }
 
+    /* Override autoscroll-list for this specific context */
+    .flow-tab-table .autoscroll-list {
+        height: calc(100vh - 400px); /* Adjust based on header and margins */
+    }
 </style>
 
 
