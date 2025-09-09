@@ -1,6 +1,5 @@
 /* Settings page styling matching DashboardPage pattern */
 .home-content {
-    background-color: #fafafa;
     min-height: auto;
     padding-bottom: 40px;
 }
@@ -97,4 +96,4 @@
         width: 64px;
         height: 64px;
     }
-}
+}}

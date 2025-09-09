@@ -35,7 +35,7 @@
         </Row>
     </Header>
 
-    <Content Class="content-padding">
+    <Content Class="content-padding content-background">
         <Table TItem="FlowModel" DataSource="@FlowsViewModel.Flows" Loading="@loading" Class="autoscroll-list">
 
             <Column Title="Name" @bind-Field="@context.Name">

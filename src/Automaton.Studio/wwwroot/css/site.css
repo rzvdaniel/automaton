@@ -290,3 +290,17 @@ div.content-padding {
 .home-container {
     padding-bottom: 40px; /* Add bottom padding so content doesn't touch the bottom */
 }
+
+/* Global content background - subtle warm background for all pages */
+.content-background {
+    background-color: #fff !important; /* Warm subtle background - slightly beige/cream tint */
+}
+
+/* Alternative content background options for easy switching */
+.content-background-cool {
+    background-color: #f8f9fb !important; /* Cool subtle background - slightly blue/purple tint */
+}
+
+.content-background-neutral {
+    background-color: #fafafa !important; /* Original neutral background */
+}

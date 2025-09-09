@@ -29,7 +29,7 @@
         </Row>
     </Header>
 
-    <Content Class="content-padding">
+    <Content Class="content-padding content-background">
         <Table TItem="RunnerModel" DataSource="@RunnersViewModel.Runners" Loading="@loading" Class="autoscroll-list">
             <Column Title="Name" @bind-Field="@context.Name">
                 @context.Name
