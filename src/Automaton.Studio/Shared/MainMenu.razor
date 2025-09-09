@@ -27,8 +27,8 @@
     </MenuItem>
     @if (shouldShowOnboarding)
     {
-        <MenuItem Key="6" Icon="question-circle" RouterLink="/onboarding" Class="setup-guide-item">
-            <b>Complete Setup</b>
+        <MenuItem Key="6" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
+            <b>Get Started</b>
         </MenuItem>
     }
     <MenuItem Key="7" Icon="user" RouterLink="/account/">
@@ -78,4 +78,14 @@
     {
         OnboardingService.OnboardingStatusChanged -= RefreshOnboardingStatus;
     }
+}
+
+/* Style the get started item to stand out */
+.get-started-item {
+    background-color: rgba(24, 144, 255, 0.1) !important;
+    border-left: 3px solid #1890ff !important;
+}
+
+.get-started-item:hover {
+    background-color: rgba(24, 144, 255, 0.2) !important;
 }
