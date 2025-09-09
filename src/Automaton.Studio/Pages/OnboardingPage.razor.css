@@ -1,82 +1,82 @@
-/* Onboarding Header - Removed for consistent white header styling */
+/* Onboarding content - matching DashboardPage pattern exactly */
+.home-content {
+    background-color: #fafafa;
+    min-height: auto;
+    padding-bottom: 40px;
+}
 
-/* Main wrapper and container - adjusted for sidebar */
-.onboarding-wrapper {
-    min-height: calc(100vh - 64px);
+.home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 40px 24px;
+}
+
+/* Header Section - matching DashboardPage home-header */
+.onboarding-header {
+    margin-bottom: 24px;
+    padding: 24px 0;
+}
+
+.onboarding-header-content {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.onboarding-header-icon {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    width: 80px;
+    height: 80px;
+    background-color: #1890ff;
+    border-radius: 16px;
 }
 
-.onboarding-container {
-    width: 100%;
-    max-width: 75rem; /* Slightly smaller to account for sidebar */
-    margin: 0 auto;
-    background-color: white;
-    border-radius: 1rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    padding: 2rem;
+.onboarding-header-text {
+    flex: 1;
 }
 
-@media (min-width: 768px) {
-    .onboarding-container {
-        padding: 3rem;
-    }
+.onboarding-subtitle {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 0;
 }
 
-/* Hero Section */
-.hero-section {
+/* Description Section - matching DashboardPage section style */
+.description-section {
+    margin-bottom: 32px;
+}
+
+.description-content {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    border: 1px solid #f0f0f0;
     text-align: center;
-    margin-bottom: 2rem;
 }
 
-::deep .hero-title {
-    font-size: 2.25rem !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    margin: 0 0 0.5rem 0 !important;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: #0f172a; /* Fallback */
-}
-
-::deep .hero-subtitle {
-    margin: 0.5rem 0 0 0;
-    font-size: 1.125rem;
-    color: #64748b;
-}
-
-.hero-description {
-    text-align: center;
-    margin-bottom: 2.5rem;
-    max-width: 48rem;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-::deep .description-text {
+.description-text {
     color: #374151;
     margin: 0;
-    font-size: 1rem;
+    font-size: 16px;
     line-height: 1.6;
 }
 
 .highlight-text {
-    color: #2563eb;
+    color: #1890ff;
     font-weight: 600;
 }
 
-/* Path Container - Grid Layout */
+/* Path Container - Grid Layout matching DashboardPage pattern */
 .path-container {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    align-items: stretch; /* This ensures both cards have equal height */
+    gap: 16px;
+    margin-bottom: 32px;
+    align-items: stretch;
 }
 
 @media (min-width: 1024px) {
@@ -85,266 +85,228 @@
     }
 }
 
-/* Enhanced Path Cards */
+/* Path Cards - matching DashboardPage card styling */
 ::deep .path-card {
-    border-radius: 1rem;
+    border-radius: 8px !important;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    min-height: 500px;
-    position: relative;
-    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    border: 1px solid #f0f0f0 !important;
     display: flex !important;
     flex-direction: column !important;
-    height: 100%; /* Ensure full height */
+    height: 100%;
+    background: white !important;
 }
 
-    ::deep .path-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
+::deep .path-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
 
-    ::deep .path-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    }
+::deep .path-card.recommended {
+    border: 2px solid #1890ff !important;
+    position: relative;
+}
 
-        ::deep .path-card:hover::before {
-            opacity: 1;
-        }
+::deep .path-card.recommended::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #1890ff, #40a9ff);
+    border-radius: 8px 8px 0 0;
+}
 
-    ::deep .path-card.recommended {
-        border: 2px solid #bfdbfe;
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    }
+::deep .path-card.desktop {
+    border: 1px solid #f0f0f0 !important;
+}
 
-        ::deep .path-card.recommended::before {
-            background: linear-gradient(90deg, #1890ff, #40a9ff);
-            opacity: 1;
-        }
-
-    ::deep .path-card.desktop {
-        border: 1px solid #e5e7eb;
-        background: #ffffff;
-    }
-
-        ::deep .path-card.desktop::before {
-            background: linear-gradient(90deg, #722ed1, #9254de);
-        }
-
-/* Card Content */
+/* Card Content Layout */
 .card-intro {
     margin-bottom: 1.5rem;
 }
 
 ::deep .card-description {
-    color: #64748b;
+    color: #666;
     margin-bottom: 1rem;
     line-height: 1.6;
+    font-size: 14px;
 }
 
 .desktop-subtitle {
     color: #374151;
     font-weight: 600;
     margin-bottom: 1rem;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
 }
 
-/* Recommended Card Content Layout */
-.recommended-card-content {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    flex: 1;
-    min-height: 0; /* Important for flex behavior */
-}
-
-.recommended-main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* Important for flex behavior */
-}
-
-/* Desktop App Card Content Layout */
+/* Card Content Flex Layout */
+.recommended-card-content,
 .desktop-card-content {
     display: flex;
     flex-direction: column;
     height: 100%;
     flex: 1;
-    min-height: 0; /* Important for flex behavior */
+    min-height: 0;
 }
 
+.recommended-main-content,
 .desktop-main-content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* Important for flex behavior */
+    min-height: 0;
 }
 
-/* Recommended Badge */
+/* Recommended Badge - matching DashboardPage styling */
 .recommended-badge {
     background: linear-gradient(135deg, #1890ff, #40a9ff);
     color: white;
-    font-size: 0.75rem;
+    font-size: 12px;
     font-weight: 600;
-    padding: 0.25rem 0.75rem;
+    padding: 4px 12px;
     border-radius: 12px;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    box-shadow: 0 2px 4px rgba(24, 144, 255, 0.3);
+    gap: 4px;
 }
 
-    .recommended-badge::before {
-        content: '?';
-        font-size: 0.875rem;
-    }
+.recommended-badge::before {
+    content: '?';
+    font-size: 12px;
+}
 
 /* Download Buttons */
 .download-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: 8px;
+    margin-bottom: 16px;
 }
 
 /* Connection Status */
 .connection-waiting {
-    margin-bottom: 1rem;
+    margin-bottom: 16px;
 }
 
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
-    color: #64748b;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #666;
 }
 
 .connection-success .connection-status {
-    color: #059669;
+    color: #52c41a;
     font-weight: 500;
 }
 
-/* Run Sample Button */
-::deep .run-sample-btn {
+/* Action Buttons - matching DashboardPage button styling */
+::deep .run-sample-btn,
+::deep .desktop-download-btn {
     margin-top: auto !important;
     margin-bottom: 0 !important;
     width: 100% !important;
-    height: 48px !important;
+    height: 44px !important;
     font-weight: 600 !important;
-    background: linear-gradient(135deg, #52c41a, #73d13d) !important;
-    border: none !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     transition: all 0.2s ease !important;
-    flex-shrink: 0 !important; /* Prevent button from shrinking */
+    flex-shrink: 0 !important;
+}
+
+::deep .run-sample-btn {
+    background: #1890ff !important;
+    border: 1px solid #1890ff !important;
     color: white !important;
 }
 
-    ::deep .run-sample-btn:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3) !important;
-        background: linear-gradient(135deg, #52c41a, #73d13d) !important;
-        color: white !important;
-        border: none !important;
-    }
+::deep .run-sample-btn:hover {
+    background: #40a9ff !important;
+    border: 1px solid #40a9ff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3) !important;
+    color: white !important;
+}
 
-    ::deep .run-sample-btn:focus {
-        background: linear-gradient(135deg, #52c41a, #73d13d) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2) !important;
-    }
+::deep .desktop-download-btn {
+    background: white !important;
+    border: 1px solid #d9d9d9 !important;
+    color: #333 !important;
+}
+
+::deep .desktop-download-btn:hover {
+    background: #f5f5f5 !important;
+    border: 1px solid #1890ff !important;
+    color: #1890ff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
 
 /* Desktop Features */
 .desktop-features {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin: 1.5rem 0;
+    gap: 12px;
+    margin: 20px 0;
 }
 
 .feature-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 12px;
     color: #374151;
-    font-size: 0.875rem;
+    font-size: 14px;
     font-weight: 500;
 }
 
-/* Desktop Download Button */
-::deep .desktop-download-btn {
-    margin-top: auto !important;
-    margin-bottom: 0 !important;
-    width: 100% !important;
-    height: 48px !important;
-    font-weight: 600 !important;
-    background: linear-gradient(135deg, #722ed1, #9254de) !important;
-    border: none !important;
-    color: white !important;
-    border-radius: 8px !important;
-    transition: all 0.2s ease !important;
-    flex-shrink: 0 !important; /* Prevent button from shrinking */
+/* Help Section - matching DashboardPage section pattern */
+.help-section {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    border: 1px solid #f0f0f0;
 }
 
-    ::deep .desktop-download-btn:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3) !important;
-        background: linear-gradient(135deg, #5a1a9e, #7c2db5) !important;
-        color: white !important;
-        border: none !important;
-    }
-
-    ::deep .desktop-download-btn:focus {
-        background: linear-gradient(135deg, #722ed1, #9254de) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.2) !important;
-    }
-
-/* Footer */
-.footer-section {
+.help-content {
     text-align: center;
-    margin-top: 2.5rem;
-    padding-top: 2rem;
-    border-top: 1px solid #f0f0f0;
 }
 
 .help-links {
     display: flex;
     justify-content: center;
-    gap: 2rem;
+    gap: 24px;
+    margin-top: 16px;
     flex-wrap: wrap;
 }
 
 .help-link {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    color: #64748b;
+    gap: 8px;
+    color: #666;
     text-decoration: none;
     font-weight: 500;
-    padding: 0.5rem 1rem;
+    padding: 12px 20px;
+    border: 1px solid #f0f0f0;
     border-radius: 8px;
     transition: all 0.2s ease;
+    background: white;
 }
 
-    .help-link:hover {
-        color: #2563eb;
-        background: #f0f8ff;
-        transform: translateY(-1px);
-        text-decoration: none;
-    }
+.help-link:hover {
+    color: #1890ff;
+    border-color: #1890ff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+    text-decoration: none;
+    background: #f0f8ff;
+}
 
-/* AntDesign Component Overrides - Enhanced for proper flex behavior */
+/* AntDesign Component Overrides - matching DashboardPage pattern */
 ::deep .ant-card {
     display: flex !important;
     flex-direction: column !important;
@@ -352,19 +314,19 @@
 }
 
 ::deep .ant-card-head {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-    padding: 1.5rem 1.5rem 1rem 1.5rem;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 16px 20px 12px 20px;
     flex-shrink: 0;
 }
 
 ::deep .ant-card-head-title {
-    font-size: 1.5rem;
+    font-size: 16px;
     font-weight: 600;
-    color: #374151;
+    color: #333;
 }
 
 ::deep .ant-card-body {
-    padding: 0 1.5rem 1.5rem 1.5rem !important;
+    padding: 0 20px 20px 20px !important;
     display: flex !important;
     flex-direction: column !important;
     flex: 1 !important;
@@ -379,53 +341,82 @@
 
 ::deep .ant-steps-item-title {
     font-weight: 600 !important;
-    color: #374151 !important;
+    color: #333 !important;
 }
 
-/* Force the Steps component to take up available space but allow button to stick to bottom */
 ::deep .ant-steps {
     flex: 1 !important;
     min-height: 0 !important;
 }
 
-/* Responsive Design - adjusted for sidebar */
+/* Installation Instructions */
+.installation-instructions {
+    margin-top: 12px;
+}
+
+::deep .ant-collapse {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+}
+
+::deep .ant-collapse-item {
+    border-bottom: none;
+}
+
+::deep .ant-collapse-header {
+    padding: 12px 16px !important;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+::deep .ant-collapse-content-box {
+    padding: 12px 16px !important;
+}
+
+::deep .ant-collapse ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+::deep .ant-collapse li {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-    .onboarding-wrapper {
-        padding: 0.5rem;
+    .home-container {
+        padding: 0 16px 24px 16px;
     }
 
-    .onboarding-container {
-        padding: 1.5rem;
-        max-width: 95%; /* More space on mobile */
+    .onboarding-header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
     }
 
-    .hero-title {
-        font-size: 1.875rem !important;
+    .onboarding-header-icon {
+        width: 64px;
+        height: 64px;
     }
 
     .help-links {
         flex-direction: column;
-        gap: 1rem;
+        gap: 12px;
     }
 
-    ::deep .path-card {
-        min-height: auto;
+    .download-buttons {
+        flex-direction: column;
     }
 }
 
-/* Animation for step completion */
+/* Animation for step completion - subtle like DashboardPage */
 @keyframes checkmark {
-    0% {
-        transform: scale(0);
-    }
-
-    50% {
-        transform: scale(1.1);
-    }
-
-    100% {
-        transform: scale(1);
-    }
+    0% { transform: scale(0); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
 ::deep .ant-steps-item-finish .ant-steps-item-icon {

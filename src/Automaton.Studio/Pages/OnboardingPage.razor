@@ -42,154 +42,167 @@
         </Row>
     </Header>
 
-    <Content>
-        <div class="onboarding-wrapper">
-            <div class="onboarding-container">
-                
-                <!-- Hero Section -->
-                <div class="hero-section">
-                    <Title Level="1" Class="hero-title">Welcome to Automaton!</Title>
-                    <Paragraph Class="hero-subtitle">Let's get you set up to automate your first workflow.</Paragraph>
+    <Content Class="content-padding home-content">
+        <div class="home-container">
+            
+            <!-- Header Section -->
+            <div class="onboarding-header">
+                <div class="onboarding-header-content">
+                    <div class="onboarding-header-icon">
+                        <Icon Type="question-circle" Style="font-size: 48px; color: white;" />
+                    </div>
+                    <div class="onboarding-header-text">
+                        <Title Level="1" Style="margin-bottom: 8px;">Welcome to Automaton!</Title>
+                        <Paragraph Class="onboarding-subtitle">
+                            Let's get you set up to automate your first workflow in just a few minutes.
+                        </Paragraph>
+                    </div>
                 </div>
+            </div>
 
-                <div class="hero-description">
+            <!-- Description Section -->
+            <div class="description-section">
+                <div class="description-content">
                     <Paragraph Class="description-text">
                         Because your workflows are executed securely on your computer, we need you to install a small 
                         <strong class="highlight-text">Agent</strong> or our dedicated <strong class="highlight-text">Desktop App</strong> 
                         to get started. You have two paths to success!
                     </Paragraph>
                 </div>
+            </div>
 
-                <!-- Two Path Grid -->
-                <div class="path-container">
-                    <!-- Path A: Web App + Local Agent -->
-                    <Card Title="Web App + Agent" Class="path-card recommended">
-                        <Extra>
-                            <span class="recommended-badge">Recommended</span>
-                        </Extra>
-                        <ChildContent>
-                            <div class="recommended-card-content">
-                                <div class="recommended-main-content">
-                                    <div class="card-intro">
-                                        <Paragraph Class="card-description">
-                                            Use our powerful web interface to manage your workflows from anywhere, executed securely on your machines via a lightweight local agent.
-                                        </Paragraph>
-                                    </div>
+            <!-- Two Path Grid -->
+            <div class="path-container">
+                <!-- Path A: Web App + Local Agent -->
+                <Card Title="Web App + Agent" Class="path-card recommended" Bordered="true">
+                    <Extra>
+                        <span class="recommended-badge">Recommended</span>
+                    </Extra>
+                    <ChildContent>
+                        <div class="recommended-card-content">
+                            <div class="recommended-main-content">
+                                <div class="card-intro">
+                                    <Paragraph Class="card-description">
+                                        Use our powerful web interface to manage your workflows from anywhere, executed securely on your machines via a lightweight local agent.
+                                    </Paragraph>
+                                </div>
 
-                                    <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
-                                        <Step Title="Download and Install the Agent" Status="@step1Status">
-                                            <DescriptionTemplate>
-                                                <div>
-                                                    <p>This small program runs in the background on your computer to execute flows from the web app.</p>
-                                                    <div class="download-buttons">
-                                                        <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Windows</Button>
-                                                        <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">macOS</Button>
-                                                        <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Linux</Button>
-                                                    </div>
-                                                    <div class="installation-instructions">
-                                                        <Collapse>
-                                                            <Panel Header="Installation Instructions">
-                                                                <ol>
-                                                                    <li>Run the downloaded installer</li>
-                                                                    <li>Follow the prompts to complete installation</li>
-                                                                    <li>Launch the Automaton Agent from your start menu/applications folder</li>
-                                                                </ol>
-                                                            </Panel>
-                                                        </Collapse>
-                                                    </div>
+                                <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
+                                    <Step Title="Download and Install the Agent" Status="@step1Status">
+                                        <DescriptionTemplate>
+                                            <div>
+                                                <p>This small program runs in the background on your computer to execute flows from the web app.</p>
+                                                <div class="download-buttons">
+                                                    <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Windows</Button>
+                                                    <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">macOS</Button>
+                                                    <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Linux</Button>
                                                 </div>
-                                            </DescriptionTemplate>
-                                        </Step>
-                                        <Step Title="Connect your Agent" Status="@step2Status">
-                                            <DescriptionTemplate>
-                                                <div>
-                                                    <p>Run this command on your local machine to start the agent:</p>
-                                                    @if (!agentConnected)
-                                                    {
-                                                        <div class="connection-waiting">
-                                                            <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
-                                                            <div class="connection-status">
-                                                                <Spin /> Waiting for Agent to connect...
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="connection-success">
-                                                            <div class="connection-status">
-                                                                <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
-                                                            </div>
-                                                        </div>
-                                                    }
+                                                <div class="installation-instructions">
+                                                    <Collapse>
+                                                        <Panel Header="Installation Instructions">
+                                                            <ol>
+                                                                <li>Run the downloaded installer</li>
+                                                                <li>Follow the prompts to complete installation</li>
+                                                                <li>Launch the Automaton Agent from your start menu/applications folder</li>
+                                                            </ol>
+                                                        </Panel>
+                                                    </Collapse>
                                                 </div>
-                                            </DescriptionTemplate>
-                                        </Step>
-                                    </Steps>
+                                            </div>
+                                        </DescriptionTemplate>
+                                    </Step>
+                                    <Step Title="Connect your Agent" Status="@step2Status">
+                                        <DescriptionTemplate>
+                                            <div>
+                                                <p>Run this command on your local machine to start the agent:</p>
+                                                @if (!agentConnected)
+                                                {
+                                                    <div class="connection-waiting">
+                                                        <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
+                                                        <div class="connection-status">
+                                                            <Spin /> Waiting for Agent to connect...
+                                                        </div>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="connection-success">
+                                                        <div class="connection-status">
+                                                            <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </DescriptionTemplate>
+                                    </Step>
+                                </Steps>
+                            </div>
+                            
+                            @if (agentConnected)
+                            {
+                                <Button Type="@ButtonType.Primary" OnClick="@CompleteOnboarding" Size="@ButtonSize.Large" Class="run-sample-btn">Get Started with Flows</Button>
+                            }
+                        </div>
+                    </ChildContent>
+                </Card>
+
+                <!-- Path B: Desktop App -->
+                <Card Title="Desktop App" Class="path-card desktop" Bordered="true">
+                    <Extra>
+                        <Icon Type="appstore" />
+                    </Extra>
+                    <ChildContent>
+                        <div class="desktop-card-content">
+                            <div class="desktop-main-content">
+                                <div class="card-intro">
+                                    <h3 class="desktop-subtitle">The All-in-One Solution</h3>
+                                    <Paragraph Class="card-description">
+                                        For a fully local experience with no agent to manage, download our standalone desktop application. 
+                                        It includes everything you need in a single package.
+                                    </Paragraph>
                                 </div>
                                 
-                                @if (agentConnected)
-                                {
-                                    <Button Type="@ButtonType.Primary" OnClick="@CompleteOnboarding" Size="@ButtonSize.Large" Class="run-sample-btn">Get Started with Flows</Button>
-                                }
-                            </div>
-                        </ChildContent>
-                    </Card>
-
-                    <!-- Path B: Desktop App -->
-                    <Card Title="Desktop App" Class="path-card desktop">
-                        <Extra>
-                            <Icon Type="appstore" />
-                        </Extra>
-                        <ChildContent>
-                            <div class="desktop-card-content">
-                                <div class="desktop-main-content">
-                                    <div class="card-intro">
-                                        <h3 class="desktop-subtitle">The All-in-One Solution</h3>
-                                        <Paragraph Class="card-description">
-                                            For a fully local experience with no agent to manage, download our standalone desktop application. 
-                                            It includes everything you need in a single package.
-                                        </Paragraph>
+                                <div class="desktop-features">
+                                    <div class="feature-item">
+                                        <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>Fully Local</span>
                                     </div>
-                                    
-                                    <div class="desktop-features">
-                                        <div class="feature-item">
-                                            <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                            <span>Fully Local</span>
-                                        </div>
-                                        <div class="feature-item">
-                                            <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                            <span>No Setup Required</span>
-                                        </div>
-                                        <div class="feature-item">
-                                            <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                            <span>Instant Start</span>
-                                        </div>
+                                    <div class="feature-item">
+                                        <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>No Setup Required</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>Instant Start</span>
                                     </div>
                                 </div>
-                                
-                                <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
-                                    Download Desktop App
-                                </Button>
                             </div>
-                        </ChildContent>
-                    </Card>
-                </div>
+                            
+                            <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
+                                Download Desktop App
+                            </Button>
+                        </div>
+                    </ChildContent>
+                </Card>
+            </div>
 
-                <!-- Footer -->
-                <div class="footer-section">
+            <!-- Help Section -->
+            <div class="help-section">
+                <div class="help-content">
+                    <Title Level="3">Need Help?</Title>
                     <div class="help-links">
                         <a href="/docs/troubleshooting" class="help-link" target="_blank">
                             <Icon Type="book" />
-                            Documentation
+                            <span>Documentation</span>
                         </a>
                         <a href="/support" class="help-link" target="_blank">
                             <Icon Type="customer-service" />
-                            Support
+                            <span>Support</span>
                         </a>
                     </div>
                 </div>
-
             </div>
+
         </div>
     </Content>
 </Layout>
