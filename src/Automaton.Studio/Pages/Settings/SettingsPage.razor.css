@@ -1,0 +1,100 @@
+/* Settings page styling matching DashboardPage pattern */
+.home-content {
+    background-color: #fafafa;
+    min-height: auto;
+    padding-bottom: 40px;
+}
+
+.home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 40px 24px;
+}
+
+/* Header Section - matching DashboardPage home-header */
+.settings-header {
+    margin-bottom: 24px;
+    padding: 24px 0;
+}
+
+.settings-header-content {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.settings-header-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    background-color: #1890ff;
+    border-radius: 16px;
+}
+
+.settings-header-text {
+    flex: 1;
+}
+
+.settings-subtitle {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 0;
+}
+
+/* Settings content */
+.settings-content {
+    background-color: white;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    border: 1px solid #f0f0f0;
+}
+
+/* Section styling matching DashboardPage */
+.section {
+    margin-bottom: 32px;
+}
+
+.section:last-child {
+    margin-bottom: 0;
+}
+
+/* Settings cards */
+::deep .settings-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    border: 1px solid #f0f0f0;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+
+::deep .settings-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Button styling */
+::deep .settings-card .ant-btn {
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .home-container {
+        padding: 0 16px 24px 16px;
+    }
+
+    .settings-header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
+    }
+
+    .settings-header-icon {
+        width: 64px;
+        height: 64px;
+    }
+}

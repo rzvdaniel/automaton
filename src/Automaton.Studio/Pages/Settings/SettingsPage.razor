@@ -25,13 +25,30 @@
         </Row>
     </Header>
 
-    <Content Style="padding: 2rem;">
-        <div style="max-width: 800px;">
-            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="SpaceSize.Large">
+    <Content Class="content-padding home-content">
+        <div class="home-container">
+            
+            <!-- Header Section -->
+            <div class="settings-header">
+                <div class="settings-header-content">
+                    <div class="settings-header-icon">
+                        <Icon Type="setting" Style="font-size: 48px; color: white;" />
+                    </div>
+                    <div class="settings-header-text">
+                        <Title Level="1" Style="margin-bottom: 8px;">Settings</Title>
+                        <Paragraph Class="settings-subtitle">
+                            Configure your Automaton workspace and manage your preferences.
+                        </Paragraph>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="settings-content">
                 
                 <!-- Getting Started Section -->
-                <SpaceItem>
-                    <Card Title="Getting Started & Setup">
+                <div class="section">
+                    <Card Title="Getting Started & Setup" Class="settings-card" Bordered="true">
                         <Extra>
                             <Icon Type="question-circle" Style="color: #1890ff;" />
                         </Extra>
@@ -67,11 +84,11 @@
                             </Space>
                         </ChildContent>
                     </Card>
-                </SpaceItem>
+                </div>
 
                 <!-- Quick Actions Section -->
-                <SpaceItem>
-                    <Card Title="Quick Actions">
+                <div class="section">
+                    <Card Title="Quick Actions" Class="settings-card" Bordered="true">
                         <Extra>
                             <Icon Type="thunderbolt" Style="color: #52c41a;" />
                         </Extra>
@@ -90,60 +107,57 @@
                                     </Button>
                                 </SpaceItem>
                                 <SpaceItem>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
+                                        <Icon Type="experiment" />
+                                        Manage Steps
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
                                     <Button OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))">
                                         <Icon Type="key" />
                                         API Keys
                                     </Button>
                                 </SpaceItem>
-                                <SpaceItem>
-                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
-                                        <Icon Type="experiment" />
-                                        Custom Steps
-                                    </Button>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/account"))">
-                                        <Icon Type="user" />
-                                        Account Settings
-                                    </Button>
-                                </SpaceItem>
                             </Space>
                         </ChildContent>
                     </Card>
-                </SpaceItem>
+                </div>
 
-                <!-- Help & Support Section -->
-                <SpaceItem>
-                    <Card Title="Help & Support">
+                <!-- System Information Section -->
+                <div class="section">
+                    <Card Title="System Information" Class="settings-card" Bordered="true">
                         <Extra>
-                            <Icon Type="customer-service" Style="color: #722ed1;" />
+                            <Icon Type="info-circle" Style="color: #722ed1;" />
                         </Extra>
                         <ChildContent>
-                            <Space>
+                            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
                                 <SpaceItem>
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => OpenExternalLink("/docs"))">
-                                        <Icon Type="book" />
-                                        Documentation
-                                    </Button>
+                                    <Paragraph>
+                                        View system information and application details.
+                                    </Paragraph>
                                 </SpaceItem>
                                 <SpaceItem>
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => OpenExternalLink("/support"))">
-                                        <Icon Type="question-circle" />
-                                        Support
-                                    </Button>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/admin/onboarding"))">
-                                        <Icon Type="setting" />
-                                        Admin Tools
-                                    </Button>
+                                    <Space>
+                                        <SpaceItem>
+                                            <Button OnClick="@(() => NavigationManager.NavigateTo("/debug/onboarding"))">
+                                                <Icon Type="bug" />
+                                                Debug Onboarding
+                                            </Button>
+                                        </SpaceItem>
+                                        <SpaceItem>
+                                            <Button OnClick="@(() => NavigationManager.NavigateTo("/admin/onboarding"))">
+                                                <Icon Type="crown" />
+                                                Admin Tools
+                                            </Button>
+                                        </SpaceItem>
+                                    </Space>
                                 </SpaceItem>
                             </Space>
                         </ChildContent>
                     </Card>
-                </SpaceItem>
+                </div>
 
-            </Space>
+            </div>
         </div>
     </Content>
 </Layout>
@@ -176,7 +190,7 @@
             }
             else
             {
-                setupStatusMessage = "?? Setup was skipped temporarily. You can resume it anytime.";
+                setupStatusMessage = "? Setup was skipped temporarily. You can resume it anytime.";
             }
         }
         catch
