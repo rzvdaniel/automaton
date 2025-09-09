@@ -8,13 +8,13 @@
     <AuthorizeView>
         <Authorized>
             <Sider Collapsed="MenuCollapsed" Class="menu-sider">
-                <div style="flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; height: 100%;">
+                <div class="menu-container">
                     <MainMenu Collapsed="MenuCollapsed" />
                 </div>
             </Sider>
 
-            <Layout>
-                <Content>
+            <Layout Class="main-content-layout">
+                <Content Class="main-content">
                     <div class="site-layout-content" tabindex="0" @onkeydown="(e)=>OnKeyDown(e)" @onkeyup="(e)=>OnKeyUp(e)">
                         @Body
                     </div>
@@ -35,11 +35,84 @@
 </Layout>
 
 <style>
-    .ant-layout-sider-children {
+    /* Root layout - fixed height, no scrolling */
+    #main-layout {
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden; /* Prevent body-level scrolling */
+    }
+
+    #main-layout.ant-layout {
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Menu container - this is where the navigation scrolls */
+    .menu-container {
+        height: 100vh;
+        overflow-y: auto; /* Navigation menu scrolls here */
+        overflow-x: hidden;
+        flex: 1;
+    }
+
+    .menu-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .menu-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .menu-container::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+    }
+
+    .menu-container::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Main content layout - fixed height */
+    .main-content-layout {
+        height: 100vh;
+        overflow: hidden; /* Container doesn't scroll */
         display: flex;
         flex-direction: column;
     }
-    
+
+    /* Main content area - this is where the page content scrolls */
+    .main-content {
+        height: 100vh;
+        overflow: hidden; /* Container doesn't scroll */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .site-layout-content {
+        height: 100vh;
+        overflow-y: auto; /* Page content scrolls here */
+        overflow-x: hidden;
+        flex: 1;
+    }
+
+    .site-layout-content::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .site-layout-content::-webkit-scrollbar-track {
+        background: #f0f0f0;
+    }
+
+    .site-layout-content::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+
+    .site-layout-content::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.4);
+    }
+
+    /* Legacy styles for backward compatibility */
     .main-header {
         background-color: #1890ff;
     }
@@ -47,28 +120,24 @@
     .menu-header {
         height: 48px;
         display: flex;
-        align-items: center; /* Center items vertically */
+        align-items: center;
         color: white;
         background-color: #1890ff;
     }
 
     .menu-link {
         display: flex;
-        align-items: center; /* Center items vertically within the link */
+        align-items: center;
         color: white;
-        text-decoration: none; /* Remove underline from the link */
+        text-decoration: none;
     }
 
     .menu-title {
         font-size: medium;
     }
 
-    .menu-sider {
-        background-color: #fafafa;
-    }
-
     .logo {
-        margin-right: 14px; /* Add some space between the image and the text */
+        margin-right: 14px;
         margin-left: 16px;
     }
 </style>

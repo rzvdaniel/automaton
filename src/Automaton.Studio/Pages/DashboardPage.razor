@@ -504,13 +504,14 @@
 <style>
     .home-content {
         background-color: #fafafa;
-        min-height: calc(100vh - 120px);
+        min-height: auto; /* Let content size naturally */
+        padding-bottom: 40px; /* Add bottom spacing for better scrolling experience */
     }
 
     .home-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 0 24px;
+        padding: 0 24px 40px 24px; /* Add bottom padding */
     }
 
     .home-header {
