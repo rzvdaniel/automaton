@@ -10,7 +10,6 @@ public partial class FlowLogs : ComponentBase, IDisposable
 {
     private TextArea logsTextArea;
     private bool autoScroll = true;
-    private DateTime? lastClearTime;
     private Timer? scrollTimer;
 
     [CascadingParameter]
@@ -54,7 +53,6 @@ public partial class FlowLogs : ComponentBase, IDisposable
     private void ClearLogs()
     {
         WorkflowSink?.ClearLogs();
-        lastClearTime = DateTime.Now;
         StateHasChanged();
     }
 
@@ -93,19 +91,6 @@ public partial class FlowLogs : ComponentBase, IDisposable
         }
         
         StateHasChanged();
-    }
-
-    private int GetLogLineCount()
-    {
-        if (string.IsNullOrEmpty(WorkflowSink?.Logs))
-            return 0;
-        
-        return WorkflowSink.Logs.Split('\n').Length;
-    }
-
-    private int GetLogCharCount()
-    {
-        return WorkflowSink?.Logs?.Length ?? 0;
     }
 
     public void Dispose()
