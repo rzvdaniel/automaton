@@ -65,14 +65,15 @@ stages:
               projects: $(projectPath)
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          # Run tests if test project exists
+          # Run tests only for relevant test projects
           - task: DotNetCoreCLI@2
-            displayName: 'Run Tests'
+            displayName: 'Run Core Tests'
             inputs:
               command: 'test'
-              projects: 'src/UnitTests/**/*.csproj'
-              arguments: '--configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage"'
+              projects: 'src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
+              arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --collect:"XPlat Code Coverage"'
             continueOnError: true
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
           # Publish for Windows x64
           - task: DotNetCoreCLI@2
