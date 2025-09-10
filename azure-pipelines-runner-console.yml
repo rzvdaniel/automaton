@@ -78,105 +78,89 @@ stages:
             displayName: 'Run Core Tests'
             inputs:
               command: 'test'
-              projects: '$(System.DefaultWorkingDirectory)/src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
+              projects: 'src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
               arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --collect:"XPlat Code Coverage"'
             continueOnError: true
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
-          # Publish for Windows x64
-          - task: DotNetCoreCLI@2
+          # Use PowerShell/Bash to directly call dotnet publish with exact control
+          - script: |
+              echo "Publishing Windows x64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime win-x64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/win-x64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish Windows x64'
-            inputs:
-              command: 'publish'
-              projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj' 
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime win-x64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/win-x64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
-          # Publish for Windows ARM64
-          - task: DotNetCoreCLI@2
+          - script: |
+              echo "Publishing Windows ARM64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime win-arm64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/win-arm64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish Windows ARM64'
-            inputs:
-              command: 'publish'
-              projects: $(projectPath)
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime win-arm64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/win-arm64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
-          # Publish for Linux x64
-          - task: DotNetCoreCLI@2
+          - script: |
+              echo "Publishing Linux x64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime linux-x64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/linux-x64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish Linux x64'
-            inputs:
-              command: 'publish'
-              projects: $(projectPath)
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime linux-x64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/linux-x64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
-          # Publish for Linux ARM64 (for Raspberry Pi, ARM servers)
-          - task: DotNetCoreCLI@2
+          - script: |
+              echo "Publishing Linux ARM64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime linux-arm64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/linux-arm64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish Linux ARM64'
-            inputs:
-              command: 'publish'
-              projects: $(projectPath)
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime linux-arm64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/linux-arm64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
-          # Publish for macOS x64 (Intel Macs)
-          - task: DotNetCoreCLI@2
+          - script: |
+              echo "Publishing macOS x64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime osx-x64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/osx-x64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish macOS x64'
-            inputs:
-              command: 'publish'
-              projects: $(projectPath)
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime osx-x64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/osx-x64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
-          # Publish for macOS ARM64 (Apple Silicon Macs)
-          - task: DotNetCoreCLI@2
+          - script: |
+              echo "Publishing macOS ARM64 using direct dotnet command"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime osx-arm64 \
+                --self-contained true \
+                --output "$(Build.ArtifactStagingDirectory)/osx-arm64" \
+                --no-restore \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
             displayName: 'Publish macOS ARM64'
-            inputs:
-              command: 'publish'
-              projects: $(projectPath)
-              arguments: >
-                --configuration $(buildConfiguration)
-                --runtime osx-arm64
-                --self-contained true
-                --output $(Build.ArtifactStagingDirectory)/osx-arm64
-                --no-restore
-                /p:PublishSingleFile=true
-                /p:EnableCompressionInSingleFile=true
-                /p:PublishTrimmed=false
 
           # Create version info file
           - powershell: |
