@@ -208,7 +208,7 @@
 
     .designer-container {
         background-color: #fafafa;
-        height: calc(100vh - 135px);
+        height: calc(100vh - 120px);
         overflow: hidden;
         border-radius: 8px;
         border: 1px solid #f0f0f0;
@@ -258,14 +258,70 @@
     .bottom-panel {
         height: 100%;
         flex-shrink: 0;
-        padding: 0; /* Remove padding to allow tabs to fill completely */
+        padding: 0;
         display: flex;
         flex-direction: column;
+        background-color: #fff;
+    }
+
+    /* Fix bottom tabs to properly switch between panels */
+    .bottom-tabs {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #fff;
+    }
+
+    .bottom-tabs .ant-tabs-nav {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        background-color: #fafafa;
+        border-top: 1px solid #f0f0f0;
+        padding: 0 8px;
+        min-height: 32px;
+        order: 2; /* Place navigation at bottom for TabPosition.Bottom */
+    }
+
+    .bottom-tabs .ant-tabs-tab {
+        margin: 0 4px !important;
+        padding: 4px 8px !important;
+        min-height: 28px !important;
+        font-size: 12px !important;
+    }
+
+    .bottom-tabs .ant-tabs-content-holder {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        order: 1; /* Place content above navigation for TabPosition.Bottom */
+    }
+
+    .bottom-tabs .ant-tabs-tabpane {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    /* Ensure only active tab pane is visible */
+    .bottom-tabs .ant-tabs-tabpane:not(.ant-tabs-tabpane-active) {
+        display: none !important;
+    }
+
+    .bottom-tabs .ant-tabs-tabpane.ant-tabs-tabpane-active {
+        display: flex !important;
+        flex-direction: column;
+        height: 100%;
     }
 
     /* Target only the bottom splitter panel (the one containing .bottom-panel) */
     .ant-splitter-panel:has(.bottom-panel) {
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     /* Target the right splitter panel conditionally */
@@ -289,14 +345,6 @@
         background-color: white;
     }
 
-    /* Main tabs should have normal tab behavior (no custom ordering) */
-    .main-tabs-container .ant-tabs-nav {
-        flex-shrink: 0;
-        margin-bottom: 16px; /* Add vertical separation between tabs and content */
-        margin-top: 16px; /* Add top margin for tab navigation */
-        /* Don't override the default order for main tabs */
-    }
-
     .main-tabs-container .ant-tabs-content-holder {
         flex: 1;
         overflow: hidden;
@@ -304,8 +352,6 @@
         flex-direction: column;
         /* Don't override the default order for main tabs */
     }
-
-
 
     /* Designer tab should not have the background/padding since it's a complex layout */
     .main-tabs-container .ant-tabs-tabpane:has(.designer-container) {

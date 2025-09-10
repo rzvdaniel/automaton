@@ -69,15 +69,11 @@
         else
         {
             <div class="flow-logs-empty">
-                <Result Status="@ResultStatus.Info"
-                        Title="No logs available"
-                        SubTitle="Logs will appear here when you run the workflow.">
-                    <Extra>
-                        <span style="color: #999; font-size: 12px;">
-                            Click the Run button to execute the workflow and generate logs.
-                        </span>
-                    </Extra>
-                </Result>
+                <div class="flow-logs-empty-content">
+                    <Icon Type="file-text" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                    <div class="flow-logs-empty-title">No logs available</div>
+                    <div class="flow-logs-empty-subtitle">Logs will appear here when you run the workflow.</div>
+                </div>
             </div>
         }
     </div>
@@ -164,8 +160,33 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #ffffff; /* Changed to white */
+        background-color: #ffffff;
         flex: 1;
+        padding: 16px;
+    }
+
+    .flow-logs-empty-content {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 280px;
+    }
+
+    .flow-logs-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .flow-logs-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
+        text-align: center;
     }
 
     .flow-logs-status {
