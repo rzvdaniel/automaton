@@ -172,6 +172,14 @@ stages:
               $versionInfo | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/version.json" -Encoding utf8
             displayName: 'Create Version Info'
 
+          # Publish build artifacts to be consumed by Package stage
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Build Artifacts'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'runner-builds'
+              publishLocation: 'Container'
+
   - stage: Package
     displayName: 'Package Artifacts'
     dependsOn: Build
@@ -181,14 +189,26 @@ stages:
         displayName: 'Create Distribution Packages'
         steps:
           # Download build artifacts
-          - download: current
+          - task: DownloadBuildArtifacts@0
             displayName: 'Download Build Artifacts'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'runner-builds'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          # Debug: List downloaded artifacts
+          - script: |
+              echo "Listing downloaded artifacts:"
+              ls -la "$(System.ArtifactsDirectory)"
+              ls -la "$(System.ArtifactsDirectory)/runner-builds"
+            displayName: 'Debug: List Artifacts'
 
           # Create ZIP packages for each platform
           - task: ArchiveFiles@2
             displayName: 'Package Windows x64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/win-x64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/win-x64'
               includeRootFolder: false
               archiveType: 'zip'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-x64-$(Build.BuildNumber).zip'
@@ -197,7 +217,7 @@ stages:
           - task: ArchiveFiles@2
             displayName: 'Package Windows ARM64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/win-arm64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/win-arm64'
               includeRootFolder: false
               archiveType: 'zip'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-arm64-$(Build.BuildNumber).zip'
@@ -206,7 +226,7 @@ stages:
           - task: ArchiveFiles@2
             displayName: 'Package Linux x64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/linux-x64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/linux-x64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
@@ -216,7 +236,7 @@ stages:
           - task: ArchiveFiles@2
             displayName: 'Package Linux ARM64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/linux-arm64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/linux-arm64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
@@ -226,7 +246,7 @@ stages:
           - task: ArchiveFiles@2
             displayName: 'Package macOS x64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/osx-x64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/osx-x64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
@@ -236,7 +256,7 @@ stages:
           - task: ArchiveFiles@2
             displayName: 'Package macOS ARM64'
             inputs:
-              rootFolderOrFile: '$(Pipeline.Workspace)/BuildRunners/osx-arm64'
+              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/osx-arm64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
