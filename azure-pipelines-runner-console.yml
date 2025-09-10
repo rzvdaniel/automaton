@@ -48,24 +48,25 @@ stages:
               version: $(dotnetVersion)
               installationPath: $(Agent.ToolsDirectory)/dotnet
 
-          # Restore dependencies
+          # Restore dependencies only for Runner Console project
           - task: DotNetCoreCLI@2
-            displayName: 'Restore Dependencies'
+            displayName: 'Restore Runner Console Dependencies'
             inputs:
               command: 'restore'
               projects: $(projectPath)
               feedsToUse: 'select'
               verbosityRestore: 'minimal'
+              arguments: '--no-dependencies'
 
-          # Build and test
+          # Build only the Runner Console project
           - task: DotNetCoreCLI@2
-            displayName: 'Build Project'
+            displayName: 'Build Runner Console Project'
             inputs:
               command: 'build'
               projects: $(projectPath)
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
-          # Run tests only for relevant test projects
+          # Run tests only for Core project (relevant to Runner Console)
           - task: DotNetCoreCLI@2
             displayName: 'Run Core Tests'
             inputs:
@@ -86,6 +87,8 @@ stages:
                 --runtime win-x64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/win-x64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -101,6 +104,8 @@ stages:
                 --runtime win-arm64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/win-arm64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -116,6 +121,8 @@ stages:
                 --runtime linux-x64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/linux-x64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -131,6 +138,8 @@ stages:
                 --runtime linux-arm64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/linux-arm64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -146,6 +155,8 @@ stages:
                 --runtime osx-x64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/osx-x64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -161,6 +172,8 @@ stages:
                 --runtime osx-arm64
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/osx-arm64
+                --no-restore
+                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
