@@ -30,6 +30,7 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.0.x'
+  solutionPath: 'Automaton.Runner.Console.sln'
   projectPath: 'src/Automaton.Runner.Console/Automaton.Runner.Console.csproj'
   artifactName: 'automaton-runner'
 
@@ -48,22 +49,28 @@ stages:
               version: $(dotnetVersion)
               installationPath: $(Agent.ToolsDirectory)/dotnet
 
-          # Restore dependencies only for Runner Console project
+          # List solution contents for debugging
+          - script: |
+              echo "Using dedicated Runner Console solution: $(solutionPath)"
+              echo "Solution contents:"
+              dotnet sln $(solutionPath) list
+            displayName: 'Show Solution Contents'
+
+          # Restore dependencies using the dedicated solution
           - task: DotNetCoreCLI@2
-            displayName: 'Restore Runner Console Dependencies'
+            displayName: 'Restore Runner Console Solution'
             inputs:
               command: 'restore'
-              projects: $(projectPath)
+              projects: $(solutionPath)
               feedsToUse: 'select'
               verbosityRestore: 'minimal'
-              arguments: '--no-dependencies'
 
-          # Build only the Runner Console project
+          # Build using the dedicated solution
           - task: DotNetCoreCLI@2
-            displayName: 'Build Runner Console Project'
+            displayName: 'Build Runner Console Solution'
             inputs:
               command: 'build'
-              projects: $(projectPath)
+              projects: $(solutionPath)
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
           # Run tests only for Core project (relevant to Runner Console)
@@ -88,7 +95,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/win-x64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -105,7 +111,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/win-arm64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -122,7 +127,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/linux-x64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -139,7 +143,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/linux-arm64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -156,7 +159,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/osx-x64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
@@ -173,7 +175,6 @@ stages:
                 --self-contained true
                 --output $(Build.ArtifactStagingDirectory)/osx-arm64
                 --no-restore
-                --no-build
                 /p:PublishSingleFile=true
                 /p:EnableCompressionInSingleFile=true
                 /p:PublishTrimmed=false
