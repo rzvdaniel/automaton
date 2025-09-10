@@ -6,6 +6,7 @@ trigger:
   branches:
     include:
       - main
+      - develop
   paths:
     include:
       - src/Automaton.Runner.Console/**
@@ -16,6 +17,7 @@ pr:
   branches:
     include:
       - main
+      - develop
   paths:
     include:
       - src/Automaton.Runner.Console/**
@@ -28,8 +30,8 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.0.x'
-  solutionPath: './Automaton.Runner.Console.sln'
-  projectPath: '$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj'
+  solutionPath: 'Automaton.Runner.Console.sln'
+  projectPath: 'src/Automaton.Runner.Console/Automaton.Runner.Console.csproj'
   artifactName: 'automaton-runner'
 
 stages:
@@ -59,7 +61,7 @@ stages:
             displayName: 'Restore Runner Console Solution'
             inputs:
               command: 'restore'
-              projects: '$(System.DefaultWorkingDirectory)/$(solutionPath)'
+              projects: $(solutionPath)
               feedsToUse: 'select'
               verbosityRestore: 'minimal'
 
@@ -68,7 +70,7 @@ stages:
             displayName: 'Build Runner Console Solution'
             inputs:
               command: 'build'
-              projects: '$(System.DefaultWorkingDirectory)/$(solutionPath)'
+              projects: $(solutionPath)
               arguments: '--configuration $(buildConfiguration) --no-restore'
 
           # Run tests only for Core project (relevant to Runner Console)
@@ -76,17 +78,16 @@ stages:
             displayName: 'Run Core Tests'
             inputs:
               command: 'test'
-              projects: 'src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
+              projects: '$(System.DefaultWorkingDirectory)/src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
               arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --collect:"XPlat Code Coverage"'
             continueOnError: true
-            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
           # Publish for Windows x64
           - task: DotNetCoreCLI@2
             displayName: 'Publish Windows x64'
             inputs:
               command: 'publish'
-              projects: $(projectPath)
+              projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj' 
               arguments: >
                 --configuration $(buildConfiguration)
                 --runtime win-x64
