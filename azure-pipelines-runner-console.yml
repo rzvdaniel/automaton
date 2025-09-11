@@ -35,11 +35,11 @@ variables:
   artifactName: 'automaton-runner'
 
 stages:
-  - stage: Build
-    displayName: 'Build Cross-Platform Runners'
+  - stage: BuildAndPackage
+    displayName: 'Build and Package Cross-Platform Runners'
     jobs:
-      - job: BuildRunners
-        displayName: 'Build for All Platforms'
+      - job: BuildAndPackageRunners
+        displayName: 'Build and Package for All Platforms'
         steps:
           # Setup .NET SDK
           - task: UseDotNet@2
@@ -83,185 +83,169 @@ stages:
             continueOnError: true
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
-          # Publish using direct dotnet commands (each handles its own restore for specific runtime)
+          # Create temporary directories for builds
           - script: |
-              echo "Publishing Windows x64 using direct dotnet command"
+              mkdir -p "$(Agent.TempDirectory)/builds/win-x64"
+              mkdir -p "$(Agent.TempDirectory)/builds/win-arm64"
+              mkdir -p "$(Agent.TempDirectory)/builds/linux-x64"
+              mkdir -p "$(Agent.TempDirectory)/builds/linux-arm64"
+              mkdir -p "$(Agent.TempDirectory)/builds/osx-x64"
+              mkdir -p "$(Agent.TempDirectory)/builds/osx-arm64"
+            displayName: 'Create Build Directories'
+
+          # Publish and immediately package Windows x64
+          - script: |
+              echo "Publishing Windows x64"
               dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
                 --configuration Release \
                 --runtime win-x64 \
                 --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/win-x64" \
+                --output "$(Agent.TempDirectory)/builds/win-x64" \
                 -p:PublishSingleFile=true \
                 -p:EnableCompressionInSingleFile=true \
                 -p:PublishTrimmed=false
             displayName: 'Publish Windows x64'
 
-          - script: |
-              echo "Publishing Windows ARM64 using direct dotnet command"
-              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
-                --configuration Release \
-                --runtime win-arm64 \
-                --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/win-arm64" \
-                -p:PublishSingleFile=true \
-                -p:EnableCompressionInSingleFile=true \
-                -p:PublishTrimmed=false
-            displayName: 'Publish Windows ARM64'
-
-          - script: |
-              echo "Publishing Linux x64 using direct dotnet command"
-              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
-                --configuration Release \
-                --runtime linux-x64 \
-                --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/linux-x64" \
-                -p:PublishSingleFile=true \
-                -p:EnableCompressionInSingleFile=true \
-                -p:PublishTrimmed=false
-            displayName: 'Publish Linux x64'
-
-          - script: |
-              echo "Publishing Linux ARM64 using direct dotnet command"
-              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
-                --configuration Release \
-                --runtime linux-arm64 \
-                --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/linux-arm64" \
-                -p:PublishSingleFile=true \
-                -p:EnableCompressionInSingleFile=true \
-                -p:PublishTrimmed=false
-            displayName: 'Publish Linux ARM64'
-
-          - script: |
-              echo "Publishing macOS x64 using direct dotnet command"
-              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
-                --configuration Release \
-                --runtime osx-x64 \
-                --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/osx-x64" \
-                -p:PublishSingleFile=true \
-                -p:EnableCompressionInSingleFile=true \
-                -p:PublishTrimmed=false
-            displayName: 'Publish macOS x64'
-
-          - script: |
-              echo "Publishing macOS ARM64 using direct dotnet command"
-              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
-                --configuration Release \
-                --runtime osx-arm64 \
-                --self-contained true \
-                --output "$(Build.ArtifactStagingDirectory)/osx-arm64" \
-                -p:PublishSingleFile=true \
-                -p:EnableCompressionInSingleFile=true \
-                -p:PublishTrimmed=false
-            displayName: 'Publish macOS ARM64'
-
-          # Create version info file
-          - powershell: |
-              $version = "$(Build.BuildNumber)"
-              $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
-              $commitId = "$(Build.SourceVersion)"
-              
-              $versionInfo = @{
-                  Version = $version
-                  BuildDate = $buildDate
-                  CommitId = $commitId
-                  Platforms = @("win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64")
-              } | ConvertTo-Json -Depth 3
-              
-              $versionInfo | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/version.json" -Encoding utf8
-            displayName: 'Create Version Info'
-
-          # Publish build artifacts to be consumed by Package stage
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Build Artifacts'
-            inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-              ArtifactName: 'runner-builds'
-              publishLocation: 'Container'
-
-  - stage: Package
-    displayName: 'Package Artifacts'
-    dependsOn: Build
-    condition: succeeded()
-    jobs:
-      - job: CreatePackages
-        displayName: 'Create Distribution Packages'
-        steps:
-          # Download build artifacts
-          - task: DownloadBuildArtifacts@0
-            displayName: 'Download Build Artifacts'
-            inputs:
-              buildType: 'current'
-              downloadType: 'single'
-              artifactName: 'runner-builds'
-              downloadPath: '$(System.ArtifactsDirectory)'
-
-          # Debug: List downloaded artifacts
-          - script: |
-              echo "Listing downloaded artifacts:"
-              ls -la "$(System.ArtifactsDirectory)"
-              ls -la "$(System.ArtifactsDirectory)/runner-builds"
-            displayName: 'Debug: List Artifacts'
-
-          # Create ZIP packages for each platform
           - task: ArchiveFiles@2
             displayName: 'Package Windows x64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/win-x64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-x64'
               includeRootFolder: false
               archiveType: 'zip'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-x64-$(Build.BuildNumber).zip'
               replaceExistingArchive: true
 
+          # Publish and immediately package Windows ARM64
+          - script: |
+              echo "Publishing Windows ARM64"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime win-arm64 \
+                --self-contained true \
+                --output "$(Agent.TempDirectory)/builds/win-arm64" \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
+            displayName: 'Publish Windows ARM64'
+
           - task: ArchiveFiles@2
             displayName: 'Package Windows ARM64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/win-arm64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-arm64'
               includeRootFolder: false
               archiveType: 'zip'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-arm64-$(Build.BuildNumber).zip'
               replaceExistingArchive: true
 
+          # Publish and immediately package Linux x64
+          - script: |
+              echo "Publishing Linux x64"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime linux-x64 \
+                --self-contained true \
+                --output "$(Agent.TempDirectory)/builds/linux-x64" \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
+            displayName: 'Publish Linux x64'
+
           - task: ArchiveFiles@2
             displayName: 'Package Linux x64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/linux-x64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/linux-x64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-x64-$(Build.BuildNumber).tar.gz'
               replaceExistingArchive: true
 
+          # Publish and immediately package Linux ARM64
+          - script: |
+              echo "Publishing Linux ARM64"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime linux-arm64 \
+                --self-contained true \
+                --output "$(Agent.TempDirectory)/builds/linux-arm64" \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
+            displayName: 'Publish Linux ARM64'
+
           - task: ArchiveFiles@2
             displayName: 'Package Linux ARM64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/linux-arm64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/linux-arm64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-arm64-$(Build.BuildNumber).tar.gz'
               replaceExistingArchive: true
 
+          # Publish and immediately package macOS x64
+          - script: |
+              echo "Publishing macOS x64"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime osx-x64 \
+                --self-contained true \
+                --output "$(Agent.TempDirectory)/builds/osx-x64" \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
+            displayName: 'Publish macOS x64'
+
           - task: ArchiveFiles@2
             displayName: 'Package macOS x64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/osx-x64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/osx-x64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-x64-$(Build.BuildNumber).tar.gz'
               replaceExistingArchive: true
 
+          # Publish and immediately package macOS ARM64
+          - script: |
+              echo "Publishing macOS ARM64"
+              dotnet publish "$(System.DefaultWorkingDirectory)/src/Automaton.Runner.Console/Automaton.Runner.Console.csproj" \
+                --configuration Release \
+                --runtime osx-arm64 \
+                --self-contained true \
+                --output "$(Agent.TempDirectory)/builds/osx-arm64" \
+                -p:PublishSingleFile=true \
+                -p:EnableCompressionInSingleFile=true \
+                -p:PublishTrimmed=false
+            displayName: 'Publish macOS ARM64'
+
           - task: ArchiveFiles@2
             displayName: 'Package macOS ARM64'
             inputs:
-              rootFolderOrFile: '$(System.ArtifactsDirectory)/runner-builds/osx-arm64'
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/osx-arm64'
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
               archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-arm64-$(Build.BuildNumber).tar.gz'
               replaceExistingArchive: true
+
+          # Create version info
+          - powershell: |
+              $version = "$(Build.BuildNumber)"
+              $commitHash = "$(Build.SourceVersion)".Substring(0, 8)
+              $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+              
+              $versionInfo = @{
+                  version = $version
+                  buildNumber = "$(Build.BuildNumber)"
+                  commitHash = $commitHash
+                  buildDate = $buildDate
+                  sourcesBranch = "$(Build.SourceBranchName)"
+                  platforms = @("win-x64", "win-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64")
+              } | ConvertTo-Json -Depth 3
+              
+              $versionInfo | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/version.json" -Encoding utf8
+            displayName: 'Create Version Info'
 
           # Create checksums
           - powershell: |
@@ -276,7 +260,7 @@ stages:
               $checksums | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/checksums.txt" -Encoding utf8
             displayName: 'Create Checksums'
 
-          # Publish final packages
+          # Publish only the final distribution packages
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Distribution Packages'
             inputs:
