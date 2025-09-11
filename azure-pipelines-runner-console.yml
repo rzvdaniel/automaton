@@ -112,7 +112,7 @@ stages:
               rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-x64'
               includeRootFolder: false
               archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-x64-$(Build.BuildNumber).zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-x64.zip'
               replaceExistingArchive: true
 
           # Publish and immediately package Windows ARM64
@@ -134,7 +134,7 @@ stages:
               rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-arm64'
               includeRootFolder: false
               archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-arm64-$(Build.BuildNumber).zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-win-arm64.zip'
               replaceExistingArchive: true
 
           # Publish and immediately package Linux x64
@@ -157,7 +157,7 @@ stages:
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-x64-$(Build.BuildNumber).tar.gz'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-x64.tar.gz'
               replaceExistingArchive: true
 
           # Publish and immediately package Linux ARM64
@@ -180,7 +180,7 @@ stages:
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-arm64-$(Build.BuildNumber).tar.gz'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-linux-arm64.tar.gz'
               replaceExistingArchive: true
 
           # Publish and immediately package macOS x64
@@ -203,7 +203,7 @@ stages:
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-x64-$(Build.BuildNumber).tar.gz'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-x64.tar.gz'
               replaceExistingArchive: true
 
           # Publish and immediately package macOS ARM64
@@ -226,7 +226,7 @@ stages:
               includeRootFolder: false
               archiveType: 'tar'
               tarCompression: 'gz'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-arm64-$(Build.BuildNumber).tar.gz'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/automaton-runner-macos-arm64.tar.gz'
               replaceExistingArchive: true
 
           # Create version info
@@ -247,7 +247,7 @@ stages:
               $versionInfo | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/version.json" -Encoding utf8
             displayName: 'Create Version Info'
 
-          # Create checksums
+          # Create checksums for version-free filenames
           - powershell: |
               $files = Get-ChildItem "$(Build.ArtifactStagingDirectory)" -Filter "automaton-runner-*"
               $checksums = @()
