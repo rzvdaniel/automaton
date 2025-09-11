@@ -11,9 +11,6 @@
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Pages\" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Automaton.Studio\Automaton.Studio.csproj" />
   </ItemGroup>
   
