@@ -4,6 +4,8 @@
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
 @inject OnboardingService OnboardingService
+@inject MessageService MessageService
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <Layout>
@@ -118,7 +120,12 @@
                                                 @if (!agentConnected)
                                                 {
                                                     <div class="connection-waiting">
-                                                        <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
+                                                        <div class="command-display">
+                                                            <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
+                                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyCommand($"automaton-agent --connect {ConfigService.BaseUrl}", "Agent connection command"))" Style="margin-left: 8px;">
+                                                                Copy
+                                                            </Button>
+                                                        </div>
                                                         <div class="connection-status">
                                                             <Spin /> Waiting for Agent to connect...
                                                         </div>
@@ -206,6 +213,32 @@
         </div>
     </Content>
 </Layout>
+
+<style>
+    .connection-waiting {
+        padding: 16px;
+        background: #f6f8fa;
+        border: 1px dashed #d0d7de;
+        border-radius: 6px;
+    }
+
+    .command-display {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 12px;
+    }
+
+    .command-display .ant-typography {
+        flex: 1;
+        margin-bottom: 0 !important;
+    }
+
+    .connection-status {
+        color: #666;
+        font-style: italic;
+    }
+</style>
 
 @code {
     private int currentStep = 0;
@@ -302,6 +335,19 @@
     {
         await OnboardingService.MarkOnboardingCompletedAsync();
         NavigationManager.NavigateTo("/flows");
+    }
+
+    private async Task CopyCommand(string command, string description)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", command);
+            await MessageService.SuccessAsync($"{description} copied to clipboard");
+        }
+        catch
+        {
+            await MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
+        }
     }
 
     public void Dispose()
