@@ -1,5 +1,6 @@
 @page "/onboarding"
 @using Automaton.Studio.Services
+@using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
@@ -260,21 +261,27 @@
     {
         try
         {
-            // Simulate agent connection check - in real implementation, 
-            // this would call an API endpoint to check if an agent is connected
-            var response = await Http.GetAsync($"{ConfigService.BaseUrl}/api/agent/status");
+            // Check if any runners are currently connected
+            var response = await Http.GetAsync($"{ConfigService.BaseUrl}/api/runners/status");
             
             if (response.IsSuccessStatusCode)
             {
-                agentConnected = true;
-                currentStep = 1;
-                step1Status = StepsStatus.Finish;
-                step2Status = StepsStatus.Process;
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var statusData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(jsonResponse);
                 
-                // Once connected, stop checking
-                connectionCheckTimer.Stop();
-                
-                await InvokeAsync(StateHasChanged);
+                if (statusData.TryGetProperty("hasOnlineRunners", out var hasOnlineElement) && 
+                    hasOnlineElement.GetBoolean())
+                {
+                    agentConnected = true;
+                    currentStep = 1;
+                    step1Status = StepsStatus.Finish;
+                    step2Status = StepsStatus.Process;
+                    
+                    // Once connected, stop checking
+                    connectionCheckTimer.Stop();
+                    
+                    await InvokeAsync(StateHasChanged);
+                }
             }
         }
         catch
