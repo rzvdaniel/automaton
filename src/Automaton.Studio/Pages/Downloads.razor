@@ -50,8 +50,8 @@
                         <Icon Type="download" Style="font-size: 48px; color: white;" />
                     </div>
                     <div class="downloads-header-text">
-                        <Title Level="1" Style="margin-bottom: 8px; color: white;">Download Automaton Runner</Title>
-                        <Paragraph Class="downloads-subtitle" Style="color: rgba(255,255,255,0.85); font-size: 18px;">
+                        <Title Level="1" Style="margin-bottom: 8px;">Download Automaton Runner</Title>
+                        <Paragraph Class="downloads-subtitle">
                             Cross-platform console runner for your automation workflows
                         </Paragraph>
                     </div>
@@ -409,23 +409,16 @@
         padding: 0 24px 40px 24px;
     }
 
-    /* Header section with gradient - matching OnboardingPage pattern */
+    /* Header section - matching OnboardingPage pattern exactly */
     .downloads-header {
-        background: linear-gradient(135deg, #1890ff 0%, #722ed1 100%);
-        color: white;
-        padding: 48px 24px;
-        text-align: center;
-        border-radius: 8px;
         margin-bottom: 24px;
+        padding: 24px 0;
     }
 
     .downloads-header-content {
         display: flex;
         align-items: center;
-        justify-content: center;
         gap: 24px;
-        max-width: 600px;
-        margin: 0 auto;
     }
 
     .downloads-header-icon {
@@ -435,17 +428,17 @@
         justify-content: center;
         width: 80px;
         height: 80px;
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: #1890ff;
         border-radius: 16px;
     }
 
     .downloads-header-text {
         flex: 1;
-        text-align: left;
     }
 
     .downloads-subtitle {
         font-size: 16px;
+        color: #666;
         margin-bottom: 0;
     }
 
