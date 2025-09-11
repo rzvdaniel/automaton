@@ -1,4 +1,5 @@
-﻿using Automaton.Studio.Server.Models;
+﻿using Automaton.Core.Enums;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -39,5 +40,18 @@ public class RunnersController : BaseController
         await runnersService.Update(id, runner, cancellationToken);
 
         return NoContent();
+    }
+
+    [HttpGet("status")]
+    public async Task<ActionResult<object>> GetStatus(CancellationToken cancellationToken)
+    {
+        var runners = await runnersService.List(cancellationToken);
+        var hasOnlineRunners = runners.Any(r => r.Status == RunnerStatus.Online);
+        
+        return Ok(new { 
+            hasOnlineRunners = hasOnlineRunners,
+            totalRunners = runners.Count(),
+            onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online)
+        });
     }
 }
