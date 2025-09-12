@@ -31,6 +31,466 @@ public class RunnerHostService
         this.logger = Log.ForContext<RunnerHostService>();
     }
 
+    /// <summary>
+    /// Interactive start - guides user through setup if needed
+    /// </summary>
+    public async Task StartInteractiveAsync()
+    {
+        try
+        {
+            WriteLine("=== Automaton Runner - Interactive Setup ===");
+            WriteLine();
+
+            // Step 1: Check/Configure Server
+            if (string.IsNullOrEmpty(configService.BaseUrl) || configService.BaseUrl.Contains("localhost"))
+            {
+                WriteLine("?? Server configuration needed...");
+                WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+                WriteLine();
+                
+                Write("Enter server URL (or press Enter for default https://localhost:7091): ");
+                var serverUrl = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(serverUrl))
+                {
+                    serverUrl = "https://localhost:7091";
+                }
+                
+                configService.UpdateServerUrl(serverUrl);
+                WriteLine($"? Server configured: {configService.BaseUrl}");
+                WriteLine();
+            }
+            else
+            {
+                WriteLine($"? Server: {configService.BaseUrl}");
+            }
+
+            // Step 2: Check Authentication
+            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                WriteLine("?? Authentication required...");
+                WriteLine();
+                WriteLine("You need an API key to authenticate with the Automaton server.");
+                WriteLine("Get your API key from: Automaton Studio ? Settings ? API Keys");
+                WriteLine();
+                
+                Write("Enter your API key (starts with 'ak_'): ");
+                var inputApiKey = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(inputApiKey))
+                {
+                    WriteLine("? API key is required. Exiting.");
+                    return;
+                }
+                
+                await apiKeyAuthService.SetApiKeyAsync(inputApiKey, null);
+                WriteLine("? Authentication configured successfully!");
+                WriteLine();
+            }
+            else
+            {
+                var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
+                WriteLine($"? Authenticated via: {(hasEnvKey ? "Environment Variable" : "Stored API Key")}");
+            }
+
+            // Set up HTTP client authentication
+            await SetupHttpClientAuth();
+
+            // Step 3: Check/Configure Runner Registration
+            if (!configService.IsRunnerRegistered())
+            {
+                WriteLine("?? Runner registration required...");
+                WriteLine();
+                
+                Write("Enter a name for this runner (e.g., 'My-Server-Runner'): ");
+                var runnerName = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(runnerName))
+                {
+                    runnerName = $"AutoRunner-{Environment.MachineName}";
+                    WriteLine($"Using default name: {runnerName}");
+                }
+                
+                var registerSuccess = await RegisterRunnerAsync(runnerName);
+                if (!registerSuccess)
+                {
+                    WriteLine("? Runner registration failed. Cannot start runner.");
+                    return;
+                }
+                WriteLine();
+            }
+            else
+            {
+                WriteLine($"? Runner registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
+            }
+
+            // Step 4: Start the runner
+            await StartRunnerAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error in interactive runner setup");
+            WriteLine($"? Error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Interactive authentication
+    /// </summary>
+    public async Task AuthenticateInteractiveAsync(string? apiKey = null, string? serverUrl = null)
+    {
+        try
+        {
+            WriteLine("=== Automaton Runner - Authentication ===");
+            WriteLine();
+
+            // Configure server if provided or prompt
+            if (!string.IsNullOrEmpty(serverUrl))
+            {
+                configService.UpdateServerUrl(serverUrl);
+                WriteLine($"? Server configured: {configService.BaseUrl}");
+            }
+            else if (string.IsNullOrEmpty(configService.BaseUrl) || configService.BaseUrl.Contains("localhost"))
+            {
+                WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+                Write("Enter server URL (or press Enter for https://localhost:7091): ");
+                var inputServerUrl = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(inputServerUrl))
+                {
+                    inputServerUrl = "https://localhost:7091";
+                }
+                
+                configService.UpdateServerUrl(inputServerUrl);
+                WriteLine($"? Server configured: {configService.BaseUrl}");
+            }
+
+            // Handle API key authentication
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                await apiKeyAuthService.SetApiKeyAsync(apiKey, null);
+                WriteLine("? Authentication successful!");
+            }
+            else
+            {
+                WriteLine("Get your API key from: Automaton Studio ? Settings ? API Keys");
+                WriteLine();
+                Write("Enter your API key (starts with 'ak_'): ");
+                var inputApiKey = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(inputApiKey))
+                {
+                    WriteLine("? API key is required.");
+                    return;
+                }
+                
+                await apiKeyAuthService.SetApiKeyAsync(inputApiKey, null);
+                WriteLine("? Authentication configured successfully!");
+            }
+
+            // Show next steps
+            WriteLine();
+            WriteLine("?? Next steps:");
+            WriteLine("1. Register runner: automaton-runner register");
+            WriteLine("2. Start runner: automaton-runner run");
+            WriteLine("   (or just run 'automaton-runner run' - it will guide you through registration if needed)");
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error in interactive authentication");
+            WriteLine($"? Authentication error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Interactive registration
+    /// </summary>
+    public async Task RegisterInteractiveAsync(string? runnerName = null, bool force = false)
+    {
+        try
+        {
+            WriteLine("=== Automaton Runner - Registration ===");
+            WriteLine($"Server: {configService.BaseUrl}");
+            WriteLine();
+
+            // Check if already registered and not forcing
+            if (configService.IsRunnerRegistered() && !force)
+            {
+                WriteLine($"? Runner already registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
+                WriteLine();
+                Write("Do you want to register with a different name? (y/N): ");
+                var response = ReadLine()?.Trim().ToLower();
+                
+                if (response != "y" && response != "yes")
+                {
+                    WriteLine("Registration cancelled.");
+                    return;
+                }
+                force = true;
+            }
+
+            // Check authentication
+            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                WriteLine("? Authentication required before registration.");
+                WriteLine("Run: automaton-runner auth");
+                return;
+            }
+
+            await SetupHttpClientAuth();
+
+            // Get runner name if not provided
+            if (string.IsNullOrEmpty(runnerName))
+            {
+                var currentName = configService.ApplicationName;
+                var prompt = !string.IsNullOrEmpty(currentName) 
+                    ? $"Enter runner name (current: {currentName}): " 
+                    : "Enter runner name: ";
+                    
+                Write(prompt);
+                runnerName = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(runnerName))
+                {
+                    if (!string.IsNullOrEmpty(currentName))
+                    {
+                        runnerName = currentName;
+                        WriteLine($"Using current name: {runnerName}");
+                    }
+                    else
+                    {
+                        runnerName = $"AutoRunner-{Environment.MachineName}";
+                        WriteLine($"Using default name: {runnerName}");
+                    }
+                }
+            }
+
+            var success = await RegisterRunnerAsync(runnerName);
+            if (success)
+            {
+                WriteLine($"? Runner '{runnerName}' registered successfully!");
+                WriteLine();
+                WriteLine("?? Next step: automaton-runner run");
+            }
+            else
+            {
+                WriteLine($"? Failed to register runner '{runnerName}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error in interactive registration");
+            WriteLine($"? Registration error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Configure server URL
+    /// </summary>
+    public async Task ConfigureServerAsync(string? serverUrl = null)
+    {
+        try
+        {
+            WriteLine("=== Automaton Runner - Server Configuration ===");
+            WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+            WriteLine();
+
+            if (!string.IsNullOrEmpty(serverUrl))
+            {
+                configService.UpdateServerUrl(serverUrl);
+                WriteLine($"? Server configured: {configService.BaseUrl}");
+            }
+            else
+            {
+                Write("Enter new server URL: ");
+                var inputServerUrl = ReadLine();
+                
+                if (string.IsNullOrWhiteSpace(inputServerUrl))
+                {
+                    WriteLine("Server URL cannot be empty.");
+                    return;
+                }
+                
+                configService.UpdateServerUrl(inputServerUrl);
+                WriteLine($"? Server configured: {configService.BaseUrl}");
+            }
+
+            // Check if we need to re-register due to server change
+            if (configService.IsRunnerRegistered())
+            {
+                WriteLine();
+                WriteLine("?? Note: Server URL changed. You may need to re-register your runner.");
+                WriteLine("Run: automaton-runner register --force");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error configuring server");
+            WriteLine($"? Server configuration error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Start the runner (after setup is complete)
+    /// </summary>
+    private async Task StartRunnerAsync()
+    {
+        // Connect to hub
+        var connected = await hubService.ConnectAsync();
+        if (!connected)
+        {
+            WriteLine("? Failed to connect to server. Cannot start runner.");
+            return;
+        }
+
+        // Start the runner
+        cancellationTokenSource = new CancellationTokenSource();
+        
+        WriteLine("?? Runner is now active and waiting for workflows...");
+        WriteLine($"?? Runner: {configService.ApplicationName} (ID: {configService.RunnerId})");
+        WriteLine($"?? Server: {configService.BaseUrl}");
+        WriteLine();
+        WriteLine("Press 'q' to quit, 's' for status");
+        WriteLine();
+
+        // Handle console input
+        _ = Task.Run(async () =>
+        {
+            while (!cancellationTokenSource.Token.IsCancellationRequested)
+            {
+                var key = ReadKey(true);
+                switch (key.KeyChar.ToString().ToLower())
+                {
+                    case "q":
+                        WriteLine("?? Shutting down runner...");
+                        cancellationTokenSource.Cancel();
+                        break;
+                    case "s":
+                        await ShowStatusAsync();
+                        break;
+                }
+
+                await Task.Delay(100);
+            }
+        }, cancellationTokenSource.Token);
+
+        // Wait for shutdown signal
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when cancellation is requested
+        }
+
+        await hubService.DisconnectAsync();
+        WriteLine("? Runner stopped");
+    }
+
+    private async Task SetupHttpClientAuth()
+    {
+        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
+        }
+
+        httpClient.DefaultRequestHeaders.Clear();
+        httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
+    }
+
+    private async Task<bool> RegisterRunnerAsync(string runnerName)
+    {
+        try
+        {
+            var runnerId = Guid.NewGuid();
+            var runnerData = new
+            {
+                Id = runnerId,
+                Name = runnerName
+            };
+
+            var json = JsonSerializer.Serialize(runnerData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
+            WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
+            WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
+
+            var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
+
+            WriteLine($"?? Server response: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
+                logger.Information("Runner {RunnerName} registered with ID {RunnerId}", runnerName, runnerId);
+                WriteLine("? Runner registration successful!");
+                return true;
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync();
+            logger.Warning("Runner registration failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+            
+            WriteLine($"? Registration failed: {response.StatusCode}");
+            if (!string.IsNullOrEmpty(errorContent))
+            {
+                WriteLine($"?? Server response body: {errorContent}");
+            }
+
+            // Provide specific guidance based on status code
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                WriteLine();
+                WriteLine("?? Authentication troubleshooting:");
+                WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
+                WriteLine("2. Check if the API key has expired in Automaton Studio");
+                WriteLine("3. Ensure the API key has sufficient scope (Runner, Execute, or FullAccess)");
+                WriteLine("4. Verify the Automaton Studio server is running and accessible");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                WriteLine("The API key is valid but doesn't have permission for runner registration.");
+                WriteLine("?? Ensure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly').");
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error during runner registration");
+            WriteLine($"? Registration error: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task ShowStatusAsync()
+    {
+        WriteLine();
+        WriteLine("=== Runner Status ===");
+        WriteLine($"Runner ID: {configService.RunnerId}");
+        WriteLine($"Runner Name: {configService.ApplicationName}");
+        WriteLine($"Server: {configService.BaseUrl}");
+        WriteLine($"Connected: {hubService.IsConnected()}");
+        
+        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+        var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
+        var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
+        
+        WriteLine($"Authenticated: {!string.IsNullOrEmpty(apiKey)}");
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
+        }
+        WriteLine("==================");
+        WriteLine();
+    }
+
+    [Obsolete("Use StartInteractiveAsync instead")]
     public async Task StartAsync(string runnerName, string? serverUrl = null)
     {
         try
@@ -258,105 +718,5 @@ public class RunnerHostService
             WriteLine($"? Error during cleanup: {ex.Message}");
             return false;
         }
-    }
-
-    private async Task SetupHttpClientAuth()
-    {
-        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
-        }
-
-        httpClient.DefaultRequestHeaders.Clear();
-        httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
-        logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
-    }
-
-    private async Task<bool> RegisterRunnerAsync(string runnerName)
-    {
-        try
-        {
-            var runnerId = Guid.NewGuid();
-            var runnerData = new
-            {
-                Id = runnerId,
-                Name = runnerName
-            };
-
-            var json = JsonSerializer.Serialize(runnerData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
-            WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
-            WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-
-            var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
-
-            WriteLine($"?? Server response: {response.StatusCode}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                logger.Information("Runner {RunnerName} registered with ID {RunnerId}", runnerName, runnerId);
-                WriteLine("? Runner registration successful!");
-                return true;
-            }
-
-            var errorContent = await response.Content.ReadAsStringAsync();
-            logger.Warning("Runner registration failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
-            
-            WriteLine($"? Registration failed: {response.StatusCode}");
-            if (!string.IsNullOrEmpty(errorContent))
-            {
-                WriteLine($"?? Server response body: {errorContent}");
-            }
-
-            // Provide specific guidance based on status code
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                WriteLine();
-                WriteLine("?? Authentication troubleshooting:");
-                WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
-                WriteLine("2. Check if the API key has expired in Automaton Studio");
-                WriteLine("3. Ensure the API key has sufficient scope (Runner, Execute, or FullAccess)");
-                WriteLine("4. Verify the Automaton Studio server is running and accessible");
-            }
-            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                WriteLine("The API key is valid but doesn't have permission for runner registration.");
-                WriteLine("?? Ensure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly').");
-            }
-
-            return false;
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Error during runner registration");
-            WriteLine($"? Registration error: {ex.Message}");
-            return false;
-        }
-    }
-
-    private async Task ShowStatusAsync()
-    {
-        WriteLine();
-        WriteLine("=== Runner Status ===");
-        WriteLine($"Runner ID: {configService.RunnerId}");
-        WriteLine($"Runner Name: {configService.ApplicationName}");
-        WriteLine($"Server: {configService.BaseUrl}");
-        WriteLine($"Connected: {hubService.IsConnected()}");
-        
-        var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-        var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
-        var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
-        
-        WriteLine($"Authenticated: {!string.IsNullOrEmpty(apiKey)}");
-        if (!string.IsNullOrEmpty(apiKey))
-        {
-            WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
-        }
-        WriteLine("==================");
-        WriteLine();
     }
 }

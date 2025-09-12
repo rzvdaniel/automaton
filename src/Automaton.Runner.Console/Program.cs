@@ -28,6 +28,7 @@ public class Program
                 CreateAuthCommand(),
                 CreateRegisterCommand(),
                 CreateStatusCommand(),
+                CreateServerCommand(),
                 CreateCleanupCommand()
             };
 
@@ -46,40 +47,15 @@ public class Program
 
     private static Command CreateRunCommand()
     {
-        var nameOption = new Option<string>(
-            name: "--name",
-            description: "Runner name")
-        {
-            IsRequired = true
-        };
+        var command = new Command("run", "Start the runner with interactive setup (guides through auth/register if needed)");
 
-        var serverOption = new Option<string>(
-            name: "--server",
-            description: "Server URL (e.g., https://localhost:7091)")
+        command.SetHandler(async () =>
         {
-            IsRequired = false
-        };
-
-        var command = new Command("run", "Start the runner and connect to the server")
-        {
-            nameOption,
-            serverOption
-        };
-
-        command.SetHandler(async (string name, string server) =>
-        {
-            // Pass the server URL via command line arguments so it can be picked up by configuration
-            var args = new List<string> { "--name", name };
-            if (!string.IsNullOrEmpty(server))
-            {
-                args.AddRange(new[] { "--AppConfig:BaseUrl", server });
-            }
-            
-            using var host = CreateHostBuilder(args.ToArray()).Build();
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.StartAsync(name, server);
-        }, nameOption, serverOption);
+            await runnerService.StartInteractiveAsync();
+        });
 
         return command;
     }
@@ -88,36 +64,30 @@ public class Program
     {
         var apiKeyOption = new Option<string>(
             name: "--api-key",
-            description: "API key for authentication (e.g., ak_xxxxxxxxxxxx)")
-        {
-            IsRequired = true
-        };
-
-        var serverOption = new Option<string>(
-            name: "--server",
-            description: "Server URL (e.g., https://localhost:7091)")
+            description: "API key for authentication (optional - will prompt if not provided)")
         {
             IsRequired = false
         };
 
-        var command = new Command("auth", "Authenticate using API key")
+        var serverOption = new Option<string>(
+            name: "--server",
+            description: "Server URL (optional - will prompt if not provided)")
+        {
+            IsRequired = false
+        };
+
+        var command = new Command("auth", "Authenticate using API key (interactive if no options provided)")
         {
             apiKeyOption,
             serverOption
         };
 
-        command.SetHandler(async (string apiKey, string server) =>
+        command.SetHandler(async (string? apiKey, string? server) =>
         {
-            var args = Array.Empty<string>();
-            if (!string.IsNullOrEmpty(server))
-            {
-                args = new[] { "--AppConfig:BaseUrl", server };
-            }
-            
-            using var host = CreateHostBuilder(args).Build();
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
-            var apiKeyAuthService = scope.ServiceProvider.GetRequiredService<ApiKeyAuthenticationService>();
-            await apiKeyAuthService.SetApiKeyAsync(apiKey, server);
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            await runnerService.AuthenticateInteractiveAsync(apiKey, server);
         }, apiKeyOption, serverOption);
 
         return command;
@@ -127,37 +97,31 @@ public class Program
     {
         var nameOption = new Option<string>(
             name: "--name",
-            description: "Runner name")
-        {
-            IsRequired = true
-        };
-
-        var serverOption = new Option<string>(
-            name: "--server",
-            description: "Server URL (e.g., https://localhost:7091)")
+            description: "Runner name (optional if already configured)")
         {
             IsRequired = false
         };
 
-        var command = new Command("register", "Register this runner with the server")
+        var forceOption = new Option<bool>(
+            name: "--force",
+            description: "Force re-registration even if already registered")
         {
-            nameOption,
-            serverOption
+            IsRequired = false
         };
 
-        command.SetHandler(async (string name, string server) =>
+        var command = new Command("register", "Register this runner with the server (or re-register with new name)")
         {
-            var args = new List<string> { "--name", name };
-            if (!string.IsNullOrEmpty(server))
-            {
-                args.AddRange(new[] { "--AppConfig:BaseUrl", server });
-            }
-            
-            using var host = CreateHostBuilder(args.ToArray()).Build();
+            nameOption,
+            forceOption
+        };
+
+        command.SetHandler(async (string? name, bool force) =>
+        {
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.RegisterAsync(name, server);
-        }, nameOption, serverOption);
+            await runnerService.RegisterInteractiveAsync(name, force);
+        }, nameOption, forceOption);
 
         return command;
     }
@@ -191,6 +155,31 @@ public class Program
             }
             System.Console.WriteLine("================================");
         });
+
+        return command;
+    }
+
+    private static Command CreateServerCommand()
+    {
+        var urlOption = new Option<string>(
+            name: "--url",
+            description: "Server URL (e.g., https://localhost:7091)")
+        {
+            IsRequired = false
+        };
+
+        var command = new Command("server", "Configure server URL")
+        {
+            urlOption
+        };
+
+        command.SetHandler(async (string? url) =>
+        {
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            await runnerService.ConfigureServerAsync(url);
+        }, urlOption);
 
         return command;
     }
