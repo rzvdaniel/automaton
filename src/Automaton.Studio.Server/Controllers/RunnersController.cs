@@ -43,15 +43,16 @@ public class RunnersController : BaseController
     }
 
     [HttpGet("status")]
-    public async Task<ActionResult<object>> GetStatus(CancellationToken cancellationToken)
+    public async Task<ActionResult<RunnerStatusResponse>> GetStatus(CancellationToken cancellationToken)
     {
         var runners = await runnersService.List(cancellationToken);
-        var hasOnlineRunners = runners.Any(r => r.Status == RunnerStatus.Online);
+        var onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online);
         
-        return Ok(new { 
-            hasOnlineRunners = hasOnlineRunners,
-            totalRunners = runners.Count(),
-            onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online)
+        return Ok(new RunnerStatusResponse
+        { 
+            HasOnlineRunners = onlineRunners > 0,
+            TotalRunners = runners.Count(),
+            OnlineRunners = onlineRunners
         });
     }
 }

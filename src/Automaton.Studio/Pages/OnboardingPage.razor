@@ -1,6 +1,5 @@
 @page "/onboarding"
 @using Automaton.Studio.Services
-@using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
@@ -129,6 +128,12 @@
                                                         </div>
                                                         <div class="connection-status">
                                                             <Spin /> Waiting for Agent to connect...
+                                                            <div style="margin-top: 8px;">
+                                                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" OnClick="@RefreshConnectionStatus" Loading="@isRefreshing">
+                                                                    <Icon Type="reload" Style="margin-right: 4px;" />
+                                                                    Refresh Status
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 }
@@ -241,52 +246,167 @@
     }
 </style>
 
+<script>
+    window.setupPageVisibilityDetection = (dotNetRef) => {
+        const handleVisibilityChange = () => {
+            const isVisible = !document.hidden;
+            dotNetRef.invokeMethodAsync('OnPageVisibilityChanged', isVisible);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Cleanup function (called when page unloads)
+        window.addEventListener('beforeunload', () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            dotNetRef.dispose();
+        });
+    };
+</script>
+
 @code {
     private int currentStep = 0;
     private StepsStatus step1Status = StepsStatus.Process;
     private StepsStatus step2Status = StepsStatus.Wait;
     private bool agentConnected = false;
-    private System.Timers.Timer connectionCheckTimer;
+    private bool isRefreshing = false;
+    
+    // Smart polling with exponential backoff - much better than 3-second fixed interval
+    private System.Timers.Timer? connectionCheckTimer;
+    private int pollingAttempts = 0;
+    private readonly int[] pollingIntervals = { 5000, 10000, 20000, 30000, 60000, 120000 }; // 5s, 10s, 20s, 30s, 60s, 120s
+    private bool isPageVisible = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Set up timer to check for agent connection
-        connectionCheckTimer = new System.Timers.Timer(3000);
-        connectionCheckTimer.Elapsed += CheckAgentConnection;
-        connectionCheckTimer.AutoReset = true;
-        connectionCheckTimer.Enabled = true;
+        // Set up page visibility detection to pause polling when tab inactive
+        await SetupPageVisibilityDetection();
+        
+        // Start with initial check
+        await CheckAgentConnectionOnce();
+        
+        // Set up intelligent polling as fallback
+        StartSmartPolling();
     }
 
-    private async void CheckAgentConnection(object source, System.Timers.ElapsedEventArgs e)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Do initial check immediately
+            await CheckAgentConnectionOnce();
+        }
+    }
+
+    private async Task CheckAgentConnectionOnce()
     {
         try
         {
-            // Check if any runners are currently connected
-            var response = await Http.GetAsync($"{ConfigService.BaseUrl}/api/runners/status");
+            var agentSetupComplete = await OnboardingService.CheckAndCompleteAgentSetupAsync();
             
-            if (response.IsSuccessStatusCode)
+            if (agentSetupComplete && !agentConnected)
             {
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var statusData = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(jsonResponse);
-                
-                if (statusData.TryGetProperty("hasOnlineRunners", out var hasOnlineElement) && 
-                    hasOnlineElement.GetBoolean())
-                {
-                    agentConnected = true;
-                    currentStep = 1;
-                    step1Status = StepsStatus.Finish;
-                    step2Status = StepsStatus.Process;
-                    
-                    // Once connected, stop checking
-                    connectionCheckTimer.Stop();
-                    
-                    await InvokeAsync(StateHasChanged);
-                }
+                agentConnected = true;
+                currentStep = 1;
+                step1Status = StepsStatus.Finish;
+                step2Status = StepsStatus.Finish;
+                StopPolling(); // Stop polling once connected
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch
         {
             // Connection failed or service unavailable, continue checking
+        }
+    }
+
+    private void StartSmartPolling()
+    {
+        if (agentConnected) return; // Don't poll if already connected
+        
+        var interval = GetNextPollingInterval();
+        connectionCheckTimer = new System.Timers.Timer(interval);
+        connectionCheckTimer.Elapsed += async (sender, e) =>
+        {
+            if (!isPageVisible) return; // Don't poll when page is not visible
+            
+            await CheckAgentConnectionOnce();
+            
+            if (!agentConnected)
+            {
+                // Restart timer with longer interval (exponential backoff)
+                connectionCheckTimer.Stop();
+                connectionCheckTimer.Interval = GetNextPollingInterval();
+                connectionCheckTimer.Start();
+            }
+        };
+        connectionCheckTimer.AutoReset = false; // Manual restart for interval changes
+        connectionCheckTimer.Start();
+    }
+
+    private int GetNextPollingInterval()
+    {
+        // Use exponential backoff - starts fast, then slows down
+        if (pollingAttempts < pollingIntervals.Length)
+        {
+            return pollingIntervals[pollingAttempts++];
+        }
+        return pollingIntervals[^1]; // Use longest interval (2 minutes) after all attempts
+    }
+
+    private void StopPolling()
+    {
+        connectionCheckTimer?.Stop();
+        connectionCheckTimer?.Dispose();
+        connectionCheckTimer = null;
+    }
+
+    private async Task RefreshConnectionStatus()
+    {
+        if (isRefreshing) return;
+        
+        isRefreshing = true;
+        StateHasChanged();
+        
+        try
+        {
+            // Reset polling attempts for more frequent checks after manual refresh
+            pollingAttempts = Math.Max(0, pollingAttempts - 2);
+            await CheckAgentConnectionOnce();
+            
+            // Restart polling with faster interval after manual refresh
+            if (!agentConnected)
+            {
+                StopPolling();
+                StartSmartPolling();
+            }
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    // Page Visibility API - pause polling when tab is not active
+    private async Task SetupPageVisibilityDetection()
+    {
+        await JSRuntime.InvokeVoidAsync("setupPageVisibilityDetection", 
+            DotNetObjectReference.Create(this));
+    }
+
+    [JSInvokable]
+    public void OnPageVisibilityChanged(bool visible)
+    {
+        isPageVisible = visible;
+        if (visible && !agentConnected && connectionCheckTimer == null)
+        {
+            // Restart polling when page becomes visible
+            StartSmartPolling();
+        }
+        else if (!visible)
+        {
+            // Stop polling when page is hidden to save resources
+            StopPolling();
         }
     }
 
@@ -359,7 +479,7 @@
 
     public void Dispose()
     {
-        connectionCheckTimer?.Stop();
-        connectionCheckTimer?.Dispose();
+        // Stop polling and clean up resources
+        StopPolling();
     }
 }
