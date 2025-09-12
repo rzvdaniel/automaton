@@ -197,8 +197,8 @@ public class RunnerHostService
             WriteLine();
             WriteLine("?? Next steps:");
             WriteLine("1. Register runner: automaton-runner register");
-            WriteLine("2. Start runner: automaton-runner run");
-            WriteLine("   (or just run 'automaton-runner run' - it will guide you through registration if needed)");
+            WriteLine("2. Start runner: automaton-runner");
+            WriteLine("   (or just run 'automaton-runner' - it will guide you through registration if needed)");
         }
         catch (Exception ex)
         {
@@ -280,7 +280,7 @@ public class RunnerHostService
             {
                 WriteLine($"? Runner '{runnerName}' registered successfully!");
                 WriteLine();
-                WriteLine("?? Next step: automaton-runner run");
+                WriteLine("?? Next step: automaton-runner");
             }
             else
             {
@@ -548,7 +548,7 @@ public class RunnerHostService
         }
     }
 
-    private async Task ShowStatusAsync()
+    public async Task ShowStatusAsync()
     {
         WriteLine();
         WriteLine("???????????????????????????????????????");
@@ -601,172 +601,17 @@ public class RunnerHostService
         
         // Available Commands
         WriteLine("??  Available Commands:");
-        WriteLine("   • Press 's' to refresh this status");
-        WriteLine("   • Press 'r' to retry server connection"); 
-        WriteLine("   • Press 'q' to quit the runner");
+        WriteLine("   • automaton-runner (start runner)");
+        WriteLine("   • automaton-runner status (show this status)");
+        WriteLine("   • automaton-runner auth (authenticate)");
+        WriteLine("   • automaton-runner register (register runner)");
+        WriteLine("   • automaton-runner cleanup (clear stored data)");
         
         WriteLine("???????????????????????????????????????");
         WriteLine();
     }
 
-    [Obsolete("Use StartInteractiveAsync instead")]
-    public async Task StartAsync(string runnerName, string? serverUrl = null)
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(serverUrl))
-            {
-                configService.UpdateServerUrl(serverUrl);
-            }
-
-            WriteLine("=== Automaton Runner ===");
-            WriteLine($"Server: {configService.BaseUrl}");
-            WriteLine();
-
-            // Check API key authentication
-            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                WriteLine("??  API Key authentication required...");
-                WriteLine("Options:");
-                WriteLine("1. Set API key: automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx");
-                WriteLine("2. Set environment variable: export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxx");
-                WriteLine();
-                WriteLine("?? Get your API key from Automaton Studio ? Settings ? API Keys");
-                return;
-            }
-
-            // Set up HTTP client authentication
-            await SetupHttpClientAuth();
-
-            // Check if runner is registered
-            if (!configService.IsRunnerRegistered())
-            {
-                WriteLine("?? Registering runner...");
-                var registerSuccess = await RegisterRunnerAsync(runnerName);
-                if (!registerSuccess)
-                {
-                    WriteLine("? Runner registration failed. Cannot start runner.");
-                    return;
-                }
-            }
-
-            // Connect to hub
-            var connected = await hubService.ConnectAsync();
-            if (!connected)
-            {
-                WriteLine("? Failed to connect to server. Cannot start runner.");
-                return;
-            }
-
-            // Start the runner
-            cancellationTokenSource = new CancellationTokenSource();
-            
-            WriteLine();
-            WriteLine("?? Runner is now active and waiting for workflows...");
-            WriteLine("Press 'q' to quit, 's' for status");
-            WriteLine();
-
-            // Handle console input
-            _ = Task.Run(async () =>
-            {
-                while (!cancellationTokenSource.Token.IsCancellationRequested)
-                {
-                    var key = ReadKey(true);
-                    switch (key.KeyChar.ToString().ToLower())
-                    {
-                        case "q":
-                            WriteLine("?? Shutting down runner...");
-                            cancellationTokenSource.Cancel();
-                            break;
-                        case "s":
-                            await ShowStatusAsync();
-                            break;
-                    }
-
-                    await Task.Delay(100);
-                }
-            }, cancellationTokenSource.Token);
-
-            // Wait for shutdown signal
-            try
-            {
-                await Task.Delay(Timeout.Infinite, cancellationTokenSource.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected when cancellation is requested
-            }
-
-            await hubService.DisconnectAsync();
-            WriteLine("? Runner stopped");
-        }
-        catch (Exception ex)
-        {
-            // Log technical details to file logs only
-            logger.Error(ex, "Error in runner host service. Error: {ErrorType}", ex.GetType().Name);
-            
-            // Show friendly message to user
-            WriteLine($"? Runner error: {ex.Message}");
-            WriteLine("Check the log files for detailed technical information.");
-        }
-    }
-
-    public async Task RegisterAsync(string runnerName, string? serverUrl = null)
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(serverUrl))
-            {
-                configService.UpdateServerUrl(serverUrl);
-            }
-
-            WriteLine($"?? Attempting to register runner '{runnerName}'...");
-            WriteLine($"?? Server: {configService.BaseUrl}");
-
-            // Check API key authentication first
-            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                WriteLine("? API Key authentication required for runner registration.");
-                WriteLine();
-                WriteLine("?? Available authentication options:");
-                WriteLine("1. Run auth command first: automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx");
-                WriteLine("2. Set environment variable: export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxx");
-                WriteLine();
-                WriteLine("?? Get your API key from Automaton Studio ? Settings ? API Keys");
-                return;
-            }
-
-            WriteLine($"? Using API key from: {(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY") != null ? "Environment Variable" : "Stored Credentials")}");
-
-            await SetupHttpClientAuth();
-
-            var success = await RegisterRunnerAsync(runnerName);
-            if (success)
-            {
-                WriteLine($"? Runner '{runnerName}' registered successfully");
-            }
-            else
-            {
-                WriteLine($"? Failed to register runner '{runnerName}'");
-            }
-        }
-        catch (Exception ex)
-        {
-            // Log technical details to file logs only
-            logger.Error(ex, "Error registering runner. Error: {ErrorType}", ex.GetType().Name);
-            
-            // Show friendly message to user
-            WriteLine($"? Registration error: {ex.Message}");
-            WriteLine("Check the log files for detailed technical information.");
-        }
-    }
-
-    /// <summary>
-    /// Clear all stored data (credentials + runner registration)
-    /// </summary>
-    public async Task<bool> ClearAllDataAsync()
+    private async Task<bool> ClearAllDataAsync()
     {
         try
         {

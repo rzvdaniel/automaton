@@ -7,7 +7,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAutomatonCore(this IServiceCollection services)
     {
         services.AddTransient<FlowExecuteService>();
-        services.AddScoped<FlowConvertService>();
+        services.AddTransient<FlowConvertService>(); // Changed from Scoped to Transient
 
         return services;
     }

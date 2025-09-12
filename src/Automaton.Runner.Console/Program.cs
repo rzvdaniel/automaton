@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.CommandLine;
 using Automaton.Core.Scripting;
+using MediatR;
 
 namespace Automaton.Runner.Console;
 
@@ -24,13 +25,21 @@ public class Program
 
             var rootCommand = new RootCommand("Automaton Runner - Command Line Interface")
             {
-                CreateRunCommand(),
                 CreateAuthCommand(),
                 CreateRegisterCommand(),
                 CreateStatusCommand(),
                 CreateServerCommand(),
                 CreateCleanupCommand()
             };
+
+            // Default action when no command is specified - start interactive runner
+            rootCommand.SetHandler(async () =>
+            {
+                using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+                using var scope = host.Services.CreateScope();
+                var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+                await runnerService.StartInteractiveAsync();
+            });
 
             return await rootCommand.InvokeAsync(args);
         }
@@ -43,21 +52,6 @@ public class Program
         {
             await Log.CloseAndFlushAsync();
         }
-    }
-
-    private static Command CreateRunCommand()
-    {
-        var command = new Command("run", "Start the runner with interactive setup (guides through auth/register if needed)");
-
-        command.SetHandler(async () =>
-        {
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.StartInteractiveAsync();
-        });
-
-        return command;
     }
 
     private static Command CreateAuthCommand()
@@ -109,7 +103,7 @@ public class Program
             IsRequired = false
         };
 
-        var command = new Command("register", "Register this runner with the server (or re-register with new name)")
+        var command = new Command("register", "Register runner with server (requires prior authentication)")
         {
             nameOption,
             forceOption
@@ -128,32 +122,14 @@ public class Program
 
     private static Command CreateStatusCommand()
     {
-        var command = new Command("status", "Show runner status and configuration");
+        var command = new Command("status", "Show runner configuration and status");
 
         command.SetHandler(async () =>
         {
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
-            var configService = scope.ServiceProvider.GetRequiredService<ConfigurationService>();
-            var storageService = scope.ServiceProvider.GetRequiredService<FileStorageService>();
-            var apiKeyAuthService = scope.ServiceProvider.GetRequiredService<ApiKeyAuthenticationService>();
-            
-            System.Console.WriteLine("=== Automaton Runner Status ===");
-            System.Console.WriteLine($"Runner ID: {storageService.GetRunnerId() ?? "Not set"}");
-            System.Console.WriteLine($"Runner Name: {storageService.GetRunnerName() ?? "Not set"}");
-            System.Console.WriteLine($"Server URL: {configService.BaseUrl}");
-            System.Console.WriteLine($"Registered: {storageService.IsRunnerRegistered()}");
-            
-            var isAuthenticated = await apiKeyAuthService.IsAuthenticatedAsync();
-            var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
-            var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
-            
-            System.Console.WriteLine($"Authenticated: {isAuthenticated}");
-            if (isAuthenticated)
-            {
-                System.Console.WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
-            }
-            System.Console.WriteLine("================================");
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            await runnerService.ShowStatusAsync();
         });
 
         return command;
@@ -163,7 +139,7 @@ public class Program
     {
         var urlOption = new Option<string>(
             name: "--url",
-            description: "Server URL (e.g., https://localhost:7091)")
+            description: "Server URL to configure")
         {
             IsRequired = false
         };
@@ -186,7 +162,7 @@ public class Program
 
     private static Command CreateCleanupCommand()
     {
-        var command = new Command("cleanup", "Cleanup resources used by the runner");
+        var command = new Command("cleanup", "Clean up stored API key and runner configuration");
 
         command.SetHandler(async () =>
         {
@@ -199,39 +175,40 @@ public class Program
         return command;
     }
 
+    private static IConfiguration GetConfiguration(string[] args)
+    {
+        return new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .AddCommandLine(args)
+            .Build();
+    }
+
     private static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .UseSerilog()
             .ConfigureServices((context, services) =>
             {
-                services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
-                services.AddHttpClient();
-                services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
-                
-                // Add Automaton Core services
-                services.AddScripting();
-                services.AddAutomatonSteps(); 
-                services.AddAutomatonCore();
-                
-                // Register console runner services
+                // Register configuration services
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
-                services.AddScoped<ApiKeyAuthenticationService>();
-                services.AddScoped<HubService>();
-                services.AddScoped<FlowExecutionService>();
-                services.AddScoped<RunnerHostService>();
-                
-                // Register FlowExecuteService (needed for actual workflow execution)
-                services.AddScoped<Automaton.Core.Services.FlowExecuteService>();
-            });
+                services.AddSingleton<ApiKeyAuthenticationService>();
+                services.AddSingleton<HubService>();
+                services.AddSingleton<FlowExecutionService>();
+                services.AddSingleton<RunnerHostService>();
 
-    private static IConfiguration GetConfiguration(string[] args)
-    {
-        return new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false)
-            .AddEnvironmentVariables()
-            .AddCommandLine(args)
-            .Build();
-    }
+                // Add HTTP client
+                services.AddHttpClient();
+
+                // Register MediatR - scan current assembly and Core assembly
+                services.AddMediatR(cfg => 
+                {
+                    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+                    cfg.RegisterServicesFromAssembly(typeof(Automaton.Core.Services.FlowExecuteService).Assembly);
+                });
+
+                // Register Automaton Core services
+                services.AddAutomatonCore();
+            });
 }

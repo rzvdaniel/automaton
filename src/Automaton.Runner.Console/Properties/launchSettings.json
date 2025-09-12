@@ -1,15 +1,13 @@
 {
   "profiles": {
-    "Console Runner - Interactive Run": {
+    "Console Runner - Default (Interactive)": {
       "commandName": "Project",
-      "commandLineArgs": "run",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Interactive Run (with API Key)": {
+    "Console Runner - Default (with API Key)": {
       "commandName": "Project",
-      "commandLineArgs": "run",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
