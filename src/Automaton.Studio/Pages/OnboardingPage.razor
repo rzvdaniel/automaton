@@ -2,8 +2,6 @@
 @using Automaton.Studio.Services
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
-@inject MessageService MessageService
-@inject IJSRuntime JSRuntime
 
 <Layout>
     <Header Class="header">
@@ -74,92 +72,38 @@
                     </Extra>
                     <ChildContent>
                         <div class="recommended-card-content">
-                            <div class="card-intro">
-                                <Paragraph Class="card-description">
-                                    Cross-platform console application that runs your workflows. Perfect for servers, CI/CD, and automation.
-                                </Paragraph>
-                            </div>
-
-                            <div class="setup-steps">
-                                <Title Level="4">Quick Setup:</Title>
-                                
-                                <div class="step-group">
-                                    <div class="step-header">
-                                        <span class="step-number">1</span>
-                                        <strong>Download & Install</strong>
-                                    </div>
-                                    <div class="step-content">
-                                        <div class="download-buttons">
-                                            <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))" Size="@ButtonSize.Large">
-                                                Download for Your Platform
-                                            </Button>
-                                        </div>
-                                        <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px;">
-                                            Or use the quick install commands on the Downloads page
-                                        </Paragraph>
-                                    </div>
+                            <div class="recommended-main-content">
+                                <div class="card-intro">
+                                    <h3 class="runner-subtitle">Cross-Platform Solution</h3>
+                                    <Paragraph Class="card-description">
+                                        Cross-platform console application that runs your workflows. Perfect for servers, CI/CD, and automation.
+                                    </Paragraph>
                                 </div>
 
-                                <div class="step-group">
-                                    <div class="step-header">
-                                        <span class="step-number">2</span>
-                                        <strong>Get API Key</strong>
+                                <div class="runner-features">
+                                    <div class="feature-item">
+                                        <Icon Type="global" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        <span>Cross-Platform</span>
                                     </div>
-                                    <div class="step-content">
-                                        <Paragraph>Create an API key with "Runner" scope:</Paragraph>
-                                        <Button Icon="key" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))">
-                                            Go to API Keys
-                                        </Button>
+                                    <div class="feature-item">
+                                        <Icon Type="code" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        <span>Lightweight</span>
                                     </div>
-                                </div>
-
-                                <div class="step-group">
-                                    <div class="step-header">
-                                        <span class="step-number">3</span>
-                                        <strong>Authenticate & Register</strong>
+                                    <div class="feature-item">
+                                        <Icon Type="cloud" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        <span>Server Ready</span>
                                     </div>
-                                    <div class="step-content">
-                                        <div class="command-example">
-                                            <div class="command-display">
-                                                <Text Code># Authenticate with your API key</Text><br/>
-                                                <Text Code Class="highlight-command">automaton-runner auth --api-key YOUR_API_KEY</Text>
-                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner auth --api-key YOUR_API_KEY"))" Style="margin-left: 8px;">
-                                                    Copy
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div class="command-example">
-                                            <div class="command-display">
-                                                <Text Code># Register your runner</Text><br/>
-                                                <Text Code Class="highlight-command">automaton-runner register --name "My-Runner"</Text>
-                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner register --name \"My-Runner\""))" Style="margin-left: 8px;">
-                                                    Copy
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="step-group">
-                                    <div class="step-header">
-                                        <span class="step-number">4</span>
-                                        <strong>Start Running</strong>
-                                    </div>
-                                    <div class="step-content">
-                                        <div class="command-example">
-                                            <div class="command-display">
-                                                <Text Code Class="highlight-command">automaton-runner run --name "My-Runner"</Text>
-                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner run --name \"My-Runner\""))" Style="margin-left: 8px;">
-                                                    Copy
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <Paragraph Type="@TextElementType.Secondary">
-                                            Your runner will appear in the Runners page once registered and connected.
-                                        </Paragraph>
+                                    <div class="feature-item">
+                                        <Icon Type="api" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        <span>CI/CD Friendly</span>
                                     </div>
                                 </div>
                             </div>
+                            
+                            <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))" Class="runner-download-btn">
+                                <Icon Type="download" />
+                                Download & Install
+                            </Button>
                         </div>
                     </ChildContent>
                 </Card>
@@ -171,29 +115,36 @@
                     </Extra>
                     <ChildContent>
                         <div class="desktop-card-content">
-                            <div class="card-intro">
-                                <h3 class="desktop-subtitle">All-in-One Solution</h3>
-                                <Paragraph Class="card-description">
-                                    Full desktop application with built-in workflow designer, runner, and management interface.
-                                </Paragraph>
-                            </div>
-                            
-                            <div class="desktop-features">
-                                <div class="feature-item">
-                                    <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>Fully Local</span>
+                            <div class="desktop-main-content">
+                                <div class="card-intro">
+                                    <h3 class="desktop-subtitle">All-in-One Solution</h3>
+                                    <Paragraph Class="card-description">
+                                        Full desktop application with built-in workflow designer, runner, and management interface.
+                                    </Paragraph>
                                 </div>
-                                <div class="feature-item">
-                                    <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>No Setup Required</span>
-                                </div>
-                                <div class="feature-item">
-                                    <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                    <span>Instant Start</span>
+                                
+                                <div class="desktop-features">
+                                    <div class="feature-item">
+                                        <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>Fully Local</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>No Setup Required</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>Instant Start</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="edit" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        <span>Built-in Designer</span>
+                                    </div>
                                 </div>
                             </div>
                             
                             <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
+                                <Icon Type="download" />
                                 Download Desktop App
                             </Button>
                         </div>
@@ -226,101 +177,142 @@
     </Content>
 </Layout>
 
-<style>
-    .connection-waiting {
-        padding: 16px;
-        background: #f6f8fa;
-        border: 1px dashed #d0d7de;
-        border-radius: 6px;
-    }
-
-    .command-display {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        margin-bottom: 12px;
-    }
-
-    .command-display .ant-typography {
-        flex: 1;
-        margin-bottom: 0 !important;
-    }
-
-    .setup-steps {
-        margin-top: 16px;
-    }
-
-    .step-group {
-        margin-bottom: 24px;
-        padding: 16px;
-        background: #fafafa;
-        border-radius: 6px;
-        border-left: 4px solid #1890ff;
-    }
-
-    .step-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-
-    .step-number {
-        width: 24px;
-        height: 24px;
-        background: #1890ff;
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 14px;
-        flex-shrink: 0;
-    }
-
-    .step-content {
-        margin-left: 36px;
-    }
-
-    .command-example {
-        background: #f6f8fa;
-        border: 1px solid #e1e4e8;
-        border-radius: 6px;
-        padding: 12px;
-        margin: 8px 0;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    }
-
-    .highlight-command {
-        color: #0366d6 !important;
-        font-weight: 600 !important;
-    }
-
-    .download-buttons {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin: 12px 0;
-    }
-</style>
-
 @code {
-    private async Task DownloadDesktopApp()
+    private void DownloadDesktopApp()
     {
         NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
     }
+}
 
-    private async Task CopyToClipboard(string text)
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
-            await MessageService.SuccessAsync("Command copied to clipboard");
-        }
-        catch
-        {
-            await MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
+<style>
+    .path-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 24px;
+        margin: 32px 0;
+    }
+
+    .path-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .path-card.recommended {
+        border: 2px solid #1890ff;
+        position: relative;
+    }
+
+    .path-card.desktop {
+        border: 1px solid #d9d9d9;
+    }
+
+    .recommended-badge {
+        background: #1890ff;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .recommended-card-content,
+    .desktop-card-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 8px;
+    }
+
+    .recommended-main-content,
+    .desktop-main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-intro {
+        margin-bottom: 16px;
+    }
+
+    .runner-subtitle,
+    .desktop-subtitle {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1890ff;
+        margin: 0 0 8px 0;
+    }
+
+    .desktop-subtitle {
+        color: #52c41a;
+    }
+
+    .card-description {
+        color: #666;
+        margin-bottom: 16px !important;
+        line-height: 1.6;
+    }
+
+    .runner-features,
+    .desktop-features {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 16px 0;
+        padding: 20px 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        flex: 1;
+    }
+
+    .desktop-features {
+        background: #f6ffed;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        color: #595959;
+        font-weight: 500;
+    }
+
+    .runner-download-btn,
+    .desktop-download-btn {
+        width: 100%;
+        margin-top: 16px;
+        border-radius: 8px;
+        height: 48px;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .runner-download-btn {
+        background: #1890ff;
+        border-color: #1890ff;
+    }
+
+    .runner-download-btn:hover {
+        background: #40a9ff;
+        border-color: #40a9ff;
+    }
+
+    .desktop-download-btn {
+        background: #722ed1;
+        border-color: #722ed1;
+        color: white;
+    }
+
+    .desktop-download-btn:hover {
+        background: #9254de;
+        border-color: #9254de;
+    }
+
+    @@media (max-width: 768px) {
+        .path-container {
+            grid-template-columns: 1fr;
+            gap: 16px;
         }
     }
-}
+</style>

@@ -50,42 +50,51 @@
                         <Icon Type="download" Style="font-size: 48px; color: white;" />
                     </div>
                     <div class="downloads-header-text">
-                        <Title Level="1" Style="margin-bottom: 8px;">Download Automaton Runner</Title>
+                        <Title Level="1" Style="margin-bottom: 8px;">Download & Install Agent</Title>
                         <Paragraph Class="downloads-subtitle">
-                            Cross-platform console runner for your automation workflows
+                            Get the Automaton Console Runner installed and running on your system
                         </Paragraph>
                     </div>
                 </div>
             </div>
 
-            <!-- Quick Install Section -->
+            <!-- One-Command Install Section -->
             <Card Class="quick-install-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="rocket" Style="margin-right: 8px;" />
-                    <span>Quick Install (Recommended)</span>
+                    <span>Complete Setup (One Command) - Recommended</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Paragraph>One-command installation with automatic setup:</Paragraph>
+                    <Paragraph>Download, install, authenticate, register, and start your runner with a single command:</Paragraph>
                     
                     <Row Gutter="16">
                         <Col Span="12">
                             <Card Size="@CardSize.Small" Class="install-command-card">
                                 <TitleTemplate>
                                     <Icon Type="windows" Style="margin-right: 8px; color: #0078d4;" />
-                                    <span>Windows</span>
+                                    <span>Windows (PowerShell)</span>
                                 </TitleTemplate>
                                 <ChildContent>
-                                    <Paragraph>Run in PowerShell as Administrator:</Paragraph>
+                                    <Paragraph><strong>Step 1:</strong> Run as Administrator:</Paragraph>
                                     <div class="code-container">
                                         <div class="command-display">
-                                            <Text Code Class="code-block">@windowsCommand</Text>
-                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsCommand, "Windows command"))" Style="margin-left: 8px;">
+                                            <Text Code Class="code-block">@windowsInstallCommand</Text>
+                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsInstallCommand, "Windows install command"))" Style="margin-left: 8px;">
+                                                Copy
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <Paragraph><strong>Step 2:</strong> Complete setup with your API key:</Paragraph>
+                                    <div class="code-container">
+                                        <div class="command-display">
+                                            <Text Code Class="code-block">@windowsSetupCommand</Text>
+                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsSetupCommand, "Windows setup command"))" Style="margin-left: 8px;">
                                                 Copy
                                             </Button>
                                         </div>
                                     </div>
                                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
-                                        Installs, configures, and can optionally create a Windows service
+                                        ✅ Installs as Windows Service • ✅ Auto-starts on boot
                                     </Paragraph>
                                 </ChildContent>
                             </Card>
@@ -95,20 +104,29 @@
                             <Card Size="@CardSize.Small" Class="install-command-card">
                                 <TitleTemplate>
                                     <Icon Type="code" Style="margin-right: 8px; color: #ff6b35;" />
-                                    <span>Linux / macOS</span>
+                                    <span>Linux / macOS (Terminal)</span>
                                 </TitleTemplate>
                                 <ChildContent>
-                                    <Paragraph>Run in Terminal:</Paragraph>
+                                    <Paragraph><strong>Step 1:</strong> Download and install:</Paragraph>
                                     <div class="code-container">
                                         <div class="command-display">
-                                            <Text Code Class="code-block">@unixCommand</Text>
-                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixCommand, "Unix command"))" Style="margin-left: 8px;">
+                                            <Text Code Class="code-block">@unixInstallCommand</Text>
+                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixInstallCommand, "Unix install command"))" Style="margin-left: 8px;">
+                                                Copy
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <Paragraph><strong>Step 2:</strong> Complete setup with your API key:</Paragraph>
+                                    <div class="code-container">
+                                        <div class="command-display">
+                                            <Text Code Class="code-block">@unixSetupCommand</Text>
+                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixSetupCommand, "Unix setup command"))" Style="margin-left: 8px;">
                                                 Copy
                                             </Button>
                                         </div>
                                     </div>
                                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
-                                        Installs, configures, and can create systemd service (Linux)
+                                        ✅ Creates systemd service (Linux) • ✅ Auto-starts on boot
                                     </Paragraph>
                                 </ChildContent>
                             </Card>
@@ -117,14 +135,17 @@
 
                     <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
                         <MessageTemplate>
-                            <strong>Pro Tip:</strong> Add your API key during installation:
-                            <br />
-                            <div class="command-display" Style="margin-top: 8px;">
-                                <Text Code>@advancedCommand</Text>
-                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(advancedCommand, "Advanced command"))" Style="margin-left: 8px;">
-                                    Copy
-                                </Button>
-                            </div>
+                            <Row>
+                                <Col Span="16">
+                                    <strong>Need an API Key?</strong> Create one in Settings → API Keys with "Runner" scope.
+                                </Col>
+                                <Col Span="8" Style="text-align: right;">
+                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))" Size="@ButtonSize.Small">
+                                        <Icon Type="key" />
+                                        Get API Key
+                                    </Button>
+                                </Col>
+                            </Row>
                         </MessageTemplate>
                     </Alert>
                 </ChildContent>
@@ -293,14 +314,69 @@
                     </Row>
                 </ChildContent>
             </Card>
+
+            <!-- Manual Step-by-Step Section -->
+            <Card Class="manual-steps-card" Style="margin-bottom: 24px;">
+                <TitleTemplate>
+                    <Icon Type="ordered-list" Style="margin-right: 8px;" />
+                    <span>Manual Step-by-Step Installation</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Paragraph>Prefer to do it step by step? Here's the manual process:</Paragraph>
+                    
+                    <Row Gutter="24">
+                        <Col Span="8">
+                            <div class="step-container">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <Title Level="4">Download Runner</Title>
+                                    <Paragraph>Get the Console Runner for your platform from the downloads section below.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        
+                        <Col Span="8">
+                            <div class="step-container">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <Title Level="4">Get API Key</Title>
+                                    <Paragraph>Create an API key with "Runner" scope:</Paragraph>
+                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))" Style="padding: 0;">
+                                        <Icon Type="key" />
+                                        Go to API Keys
+                                    </Button>
+                                </div>
+                            </div>
+                        </Col>
+
+                        <Col Span="8">
+                            <div class="step-container">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <Title Level="4">Configure & Run</Title>
+                                    <div class="code-example">
+                                        <Text Code># Authenticate</Text><br/>
+                                        <Text Code>automaton-runner auth --api-key YOUR_KEY</Text><br/><br/>
+                                        <Text Code># Register</Text><br/>
+                                        <Text Code>automaton-runner register --name "My-Runner"</Text><br/><br/>
+                                        <Text Code># Run</Text><br/>
+                                        <Text Code>automaton-runner run --name "My-Runner"</Text>
+                                    </div>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                </ChildContent>
+            </Card>
         </div>
     </Content>
 </Layout>
 
 @code {
-    private string windowsCommand = "";
-    private string unixCommand = "";
-    private string advancedCommand = "";
+    private string windowsInstallCommand = "";
+    private string windowsSetupCommand = "";
+    private string unixInstallCommand = "";
+    private string unixSetupCommand = "";
     private string windowsX64Url = "";
     private string windowsArm64Url = "";
     private string linuxX64Url = "";
@@ -310,9 +386,13 @@
 
     protected override void OnInitialized()
     {
-        windowsCommand = $"iwr -useb {ConfigService.BaseUrl}/downloads/install.ps1 | iex";
-        unixCommand = $"curl -sSL {ConfigService.BaseUrl}/downloads/install.sh | bash";
-        advancedCommand = $"curl -sSL {ConfigService.BaseUrl}/downloads/install.sh | bash -s -- --api-key \"YOUR_API_KEY\" --runner-name \"my-runner\"";
+        // One-command install scripts
+        windowsInstallCommand = $"iwr -useb {ConfigService.BaseUrl}/downloads/install.ps1 | iex";
+        unixInstallCommand = $"curl -sSL {ConfigService.BaseUrl}/downloads/install.sh | bash";
+        
+        // Setup commands with API key
+        windowsSetupCommand = "automaton-runner auth --api-key \"YOUR_API_KEY\" && automaton-runner register --name \"My-Runner\" && automaton-runner run --name \"My-Runner\" --service";
+        unixSetupCommand = "automaton-runner auth --api-key \"YOUR_API_KEY\" && automaton-runner register --name \"My-Runner\" && automaton-runner run --name \"My-Runner\" --daemon";
         
         // Build download URLs
         var baseUrl = ConfigService.BaseUrl;
@@ -330,12 +410,6 @@
         {
             await JSRuntime.InvokeVoidAsync("detectPlatform");
         }
-    }
-
-    private async Task OnCommandCopied(string command)
-    {
-        // You could add a notification here
-        await Task.CompletedTask;
     }
 
     private async Task CopyToClipboard(string text, string description)
@@ -527,6 +601,7 @@
 
     .getting-started-card,
     .manual-downloads-card,
+    .manual-steps-card,
     .recommended-download-card,
     .quick-install-card {
         margin-bottom: 24px;
@@ -534,6 +609,7 @@
 
     .getting-started-card .ant-card-head-title,
     .manual-downloads-card .ant-card-head-title,
+    .manual-steps-card .ant-card-head-title,
     .recommended-download-card .ant-card-head-title {
         color: #1890ff;
         font-weight: 600;
