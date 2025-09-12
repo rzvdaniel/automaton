@@ -41,6 +41,8 @@ API keys are the **primary and only** authentication method for console runners.
 - ? Scoped permissions
 - ? Perfect for automation and CI/CD
 
+### Getting Started
+
 #### Step 1: Create an API Key
 
 1. Login to Automaton Studio Web Interface
@@ -52,116 +54,151 @@ API keys are the **primary and only** authentication method for console runners.
    - **Description**: Optional description
    - **Expiration**: Optional expiration date
 
-#### Step 2: Use the API Key
+#### Step 2: Run the Interactive Setup
 
 ```bash
-# Set API key for authentication
-automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
-
-# Register and run the runner
-automaton-runner register --name "Production-Runner"
-automaton-runner run --name "Production-Runner"
+# Start the runner - it will guide you through everything
+automaton-runner
 ```
 
-#### Environment Variable Method (Best for Automation)
+**That's it!** The runner will interactively prompt you for:
+- ? Your API key (when needed)
+- ? Server URL (if different from default)
+- ? Runner name (with smart defaults)
+- ? Automatic connection and startup
+
+#### Alternative: Environment Variable Method (Best for Automation)
+
+For automated deployments, you can set the API key as an environment variable:
 
 ```bash
 # Set environment variable
 export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
 
-# Run directly without auth command
-automaton-runner run --name "Production-Runner" --server https://localhost:7091
+# Start directly - no prompts needed
+automaton-runner
+```
+
+#### Advanced: Explicit Command Usage
+
+For scripted workflows or advanced users, you can use explicit commands (see Commands section below):
+
+```bash
+# Set API key explicitly
+automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
+
+# Register runner explicitly  
+automaton-runner register --name "Production-Runner"
+
+# Start runner
+automaton-runner
 ```
 
 ## Usage
 
-### Quick Start
+### ?? Quick Start (Recommended)
 
-1. **Get an API key from Automaton Studio**
-2. **Authenticate:**
-   ```bash
-   automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
-   ```
+**The easiest way to get started:**
 
-3. **Register the runner:**
+1. **Get an API key from Automaton Studio** (see Step 1 above)
+2. **Run the interactive setup:**
    ```bash
-   automaton-runner register --name "My-Runner" --server https://localhost:7091
+   automaton-runner
    ```
+3. **Follow the prompts** - the runner will guide you through authentication, registration, and startup automatically!
 
-4. **Start the runner:**
-   ```bash
-   automaton-runner run --name "My-Runner"
-   ```
+### ?? Alternative Approaches
+
+#### **For Automation/CI-CD:**
+```bash
+# Set your API key as environment variable
+export AUTOMATON_API_KEY="ak_runner_xxxxxxxxxxxx"
+
+# Run directly - fully automated
+automaton-runner
+```
+
+#### **For Advanced Users:**
+```bash
+# Configure step-by-step with explicit commands
+automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
+automaton-runner register --name "My-Runner"
+automaton-runner
+```
 
 ### Commands
 
+#### Default - Start the Runner
+
+```bash
+automaton-runner
+```
+
+**Interactive setup**: Guides through authentication and registration if needed.
+**Interactive Commands (while running):**
+- `q`: Quit the runner
+- `s`: Show status information
+- `r`: Manual reconnection attempt
+
 #### `auth` - Authenticate with API Key
+
+Use this command to explicitly set your API key and server URL.
 
 ```bash
 automaton-runner auth --api-key <api-key> [--server <url>]
 ```
 
 **Options:**
-- `--api-key`: API key for authentication (required)
-- `--server`: Server URL (optional, uses config default if not specified)
+- `--api-key`: API key for authentication (optional - will prompt if not provided)
+- `--server`: Server URL (optional - will prompt if not provided)
 
-**Example:**
+**Examples:**
 ```bash
+# With all parameters
 automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
+
+# Interactive mode - will prompt for missing values
+automaton-runner auth
+
+# Just set the API key, use default server
+automaton-runner auth --api-key ak_runner_1234567890abcdef
 ```
 
 #### `register` - Register Runner with Server
 
+Use this command to explicitly register your runner with a specific name.
+
 **?? Authentication Required**: This command requires an API key to be set via `auth` command or `AUTOMATON_API_KEY` environment variable.
 
 ```bash
-automaton-runner register --name <runner-name> [--server <url>]
+automaton-runner register --name <runner-name> [--force]
 ```
 
 **Options:**
-- `--name`: Runner name (required) - will appear in the Automaton Studio UI
-- `--server`: Server URL (optional)
+- `--name`: Runner name (optional if already configured) - will appear in the Automaton Studio UI
+- `--force`: Force re-registration even if already registered
+
+**Examples:**
+```bash
+# Register with specific name
+automaton-runner register --name "Production-Server-01"
+
+# Interactive registration - will prompt for name
+automaton-runner register
+
+# Force re-registration with new name
+automaton-runner register --name "New-Runner-Name" --force
+```
 
 **Prerequisites:**
-1. **Set API key first** (one of these methods):
-   ```bash
-   # Method 1: Use auth command (stores key locally)
-   automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx --server https://localhost:7091
-   
-   # Method 2: Set environment variable (good for automation)
-   export AUTOMATON_API_KEY="ak_runner_xxxxxxxxxxxx"
-   ```
-
-2. **Then register the runner**:
-   ```bash
-   automaton-runner register --name "Production-Server-01" --server https://localhost:7091
-   ```
-
-**Example:**
+Set API key first using one of these methods:
 ```bash
-# Complete registration flow
-automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
-automaton-runner register --name "Production-Server-01"
+# Method 1: Use auth command
+automaton-runner auth --api-key ak_runner_xxxxxxxxxxxx
+
+# Method 2: Set environment variable
+export AUTOMATON_API_KEY="ak_runner_xxxxxxxxxxxx"
 ```
-
-#### `run` - Start the Runner
-
-```bash
-automaton-runner run --name <runner-name> [--server <url>]
-```
-
-**Options:**
-- `--name`: Runner name (required)
-- `--server`: Server URL (optional)
-
-**Example:**
-```bash
-automaton-runner run --name "Production-Server-01"
-```
-
-**Interactive Commands (while running):**
-- `q`: Quit the runner
-- `s`: Show status information
 
 #### `status` - Show Configuration and Status
 
@@ -170,6 +207,15 @@ automaton-runner status
 ```
 
 Shows current runner configuration, authentication status, and registration status.
+
+#### `server` - Configure Server URL
+
+```bash
+automaton-runner server [--url <url>]
+```
+
+**Options:**
+- `--url`: Server URL to configure (optional - will prompt if not provided)
 
 #### `cleanup` - Cleanup Stored Data
 
@@ -232,8 +278,8 @@ You can override configuration using environment variables:
 export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
 export AUTOMATON_SERVER_URL="https://automaton.company.com"
 
-# Deploy and run
-./automaton-runner run --name "Production-Server-01" --server $AUTOMATON_SERVER_URL
+# Deploy and start
+./automaton-runner
 ```
 
 ### Method 2: Containerized Deployment
@@ -244,7 +290,7 @@ COPY . /app
 WORKDIR /app
 ENV AUTOMATON_API_KEY=""
 ENV AUTOMATON_SERVER_URL="https://localhost:7091"
-ENTRYPOINT ["./automaton-runner", "run", "--name", "Container-Runner"]
+ENTRYPOINT ["./automaton-runner"]
 ```
 
 ```bash
@@ -263,7 +309,7 @@ Type=simple
 User=automaton
 WorkingDirectory=/opt/automaton-runner
 Environment=AUTOMATON_API_KEY=ak_runner_1234567890abcdef
-ExecStart=/opt/automaton-runner/automaton-runner run --name "Production-Server-Linux-01"
+ExecStart=/opt/automaton-runner/automaton-runner
 Restart=always
 RestartSec=10
 
@@ -274,8 +320,8 @@ WantedBy=multi-user.target
 ## Logging
 
 Logs are written to:
-- Console (with colored output)
-- `logs/automaton-runner-YYYY-MM-DD.log` files (rotated daily, kept for 7 days)
+- Console (with user-friendly output for WARNING level and above)
+- `logs/automaton-runner-YYYY-MM-DD.log` files (with full technical details, rotated daily, kept for 7 days)
 
 Log levels can be configured in `appsettings.json` under the `Serilog` section.
 
@@ -299,8 +345,8 @@ jobs:
         env:
           AUTOMATON_API_KEY: ${{ secrets.AUTOMATON_API_KEY }}
         run: |
-          ./automaton-runner register --name "CI-Runner-${{ github.run_number }}" --server https://automaton.company.com
-          ./automaton-runner run --name "CI-Runner-${{ github.run_number }}" --server https://automaton.company.com
+          ./automaton-runner register --name "CI-Runner-${{ github.run_number }}"
+          ./automaton-runner
 ```
 
 ### Docker Compose Example
@@ -313,7 +359,6 @@ services:
     environment:
       - AUTOMATON_API_KEY=ak_runner_1234567890abcdef
       - AUTOMATON_SERVER_URL=https://automaton.company.com
-    command: ["run", "--name", "Docker-Runner", "--server", "${AUTOMATON_SERVER_URL}"]
     restart: unless-stopped
 ```
 
@@ -348,6 +393,9 @@ services:
 To start fresh:
 ```bash
 # Remove all stored authentication and runner data
+automaton-runner cleanup
+
+# Or manually remove files:
 rm -rf ~/.config/AutomatonRunner/  # Linux/macOS
 # or
 rmdir /s %APPDATA%\AutomatonRunner  # Windows
