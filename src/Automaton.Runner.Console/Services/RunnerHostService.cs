@@ -337,22 +337,50 @@ public class RunnerHostService
     /// </summary>
     private async Task StartRunnerAsync()
     {
-        // Connect to hub
+        WriteLine("?? Starting runner...");
+        WriteLine();
+        
+        // Attempt to connect to hub with better error handling
+        WriteLine("?? Establishing connection to server...");
         var connected = await hubService.ConnectAsync();
+        
         if (!connected)
         {
-            WriteLine("? Failed to connect to server. Cannot start runner.");
-            return;
+            WriteLine();
+            WriteLine("?? Unable to establish initial connection to server.");
+            WriteLine("   The runner will continue attempting to connect in the background.");
+            WriteLine("   You can monitor the connection status by pressing 's' for status.");
+            WriteLine();
+            WriteLine("? Would you like to:");
+            WriteLine("   • Wait for connection (press Enter to continue)");
+            WriteLine("   • Exit and fix connection issues (press 'q' to quit)");
+            WriteLine();
+            
+            Write("Your choice (Enter to continue, 'q' to quit): ");
+            var choice = ReadLine()?.Trim().ToLower();
+            
+            if (choice == "q" || choice == "quit")
+            {
+                WriteLine("?? Exiting runner...");
+                return;
+            }
+            
+            WriteLine("? Continuing in disconnected mode - will connect when server becomes available.");
         }
 
-        // Start the runner
+        // Start the runner regardless of initial connection status
         cancellationTokenSource = new CancellationTokenSource();
         
-        WriteLine("?? Runner is now active and waiting for workflows...");
+        WriteLine();
+        WriteLine("?? Runner is now active and will execute workflows when connected...");
         WriteLine($"?? Runner: {configService.ApplicationName} (ID: {configService.RunnerId})");
         WriteLine($"?? Server: {configService.BaseUrl}");
+        WriteLine($"?? Connection Status: {(hubService.IsConnected() ? "Connected" : "Attempting to connect...")}");
         WriteLine();
-        WriteLine("Press 'q' to quit, 's' for status");
+        WriteLine("??  Controls:");
+        WriteLine("   • Press 'q' to quit");
+        WriteLine("   • Press 's' for detailed status");
+        WriteLine("   • Press 'r' to retry connection");
         WriteLine();
 
         // Handle console input
@@ -369,6 +397,10 @@ public class RunnerHostService
                         break;
                     case "s":
                         await ShowStatusAsync();
+                        break;
+                    case "r":
+                        WriteLine("?? Attempting to reconnect...");
+                        await AttemptReconnection();
                         break;
                 }
 
@@ -387,7 +419,32 @@ public class RunnerHostService
         }
 
         await hubService.DisconnectAsync();
-        WriteLine("? Runner stopped");
+        WriteLine("?? Runner stopped");
+    }
+
+    private async Task AttemptReconnection()
+    {
+        try
+        {
+            WriteLine("?? Attempting manual reconnection...");
+            var connected = await hubService.ConnectAsync();
+            
+            if (connected)
+            {
+                WriteLine("? Reconnection successful!");
+            }
+            else
+            {
+                WriteLine("? Reconnection failed - automatic retry will continue in background.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Manual reconnection attempt failed");
+            WriteLine($"? Manual reconnection failed: {ex.Message}");
+        }
+        
+        WriteLine();
     }
 
     private async Task SetupHttpClientAuth()
@@ -471,22 +528,61 @@ public class RunnerHostService
     private async Task ShowStatusAsync()
     {
         WriteLine();
-        WriteLine("=== Runner Status ===");
-        WriteLine($"Runner ID: {configService.RunnerId}");
-        WriteLine($"Runner Name: {configService.ApplicationName}");
-        WriteLine($"Server: {configService.BaseUrl}");
-        WriteLine($"Connected: {hubService.IsConnected()}");
+        WriteLine("???????????????????????????????????????");
+        WriteLine("         ?? RUNNER STATUS REPORT         ");
+        WriteLine("???????????????????????????????????????");
+        WriteLine();
         
+        // Runner Information
+        WriteLine("?? Runner Information:");
+        WriteLine($"   • ID: {configService.RunnerId}");
+        WriteLine($"   • Name: {configService.ApplicationName}");
+        WriteLine($"   • Machine: {Environment.MachineName}");
+        WriteLine();
+        
+        // Connection Status
+        var isConnected = hubService.IsConnected();
+        WriteLine("?? Connection Status:");
+        WriteLine($"   • Server: {configService.BaseUrl}");
+        WriteLine($"   • Status: {(isConnected ? "? Connected" : "? Disconnected")}");
+        
+        if (!isConnected)
+        {
+            WriteLine("   • The runner will automatically attempt to reconnect");
+            WriteLine("   • Press 'r' to manually retry connection");
+        }
+        WriteLine();
+        
+        // Authentication Status
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
         var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
         var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
         
-        WriteLine($"Authenticated: {!string.IsNullOrEmpty(apiKey)}");
+        WriteLine("?? Authentication Status:");
+        WriteLine($"   • Authenticated: {(!string.IsNullOrEmpty(apiKey) ? "? Yes" : "? No")}");
+        
         if (!string.IsNullOrEmpty(apiKey))
         {
-            WriteLine($"Auth Source: {(hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown")}");
+            var authSource = hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown";
+            WriteLine($"   • Auth Source: {authSource}");
+            WriteLine($"   • Key Preview: {apiKey[..Math.Min(15, apiKey.Length)]}...");
         }
-        WriteLine("==================");
+        WriteLine();
+        
+        // Runtime Information
+        WriteLine("??  Runtime Information:");
+        WriteLine($"   • Process ID: {Environment.ProcessId}");
+        WriteLine($"   • Working Directory: {Environment.CurrentDirectory}");
+        WriteLine($"   • .NET Version: {Environment.Version}");
+        WriteLine();
+        
+        // Available Commands
+        WriteLine("??  Available Commands:");
+        WriteLine("   • Press 's' to refresh this status");
+        WriteLine("   • Press 'r' to retry server connection"); 
+        WriteLine("   • Press 'q' to quit the runner");
+        
+        WriteLine("???????????????????????????????????????");
         WriteLine();
     }
 

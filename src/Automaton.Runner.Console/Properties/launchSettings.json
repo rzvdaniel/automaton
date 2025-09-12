@@ -1,5 +1,20 @@
 {
   "profiles": {
+    "Console Runner - Interactive Run": {
+      "commandName": "Project",
+      "commandLineArgs": "run",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Interactive Run (with API Key)": {
+      "commandName": "Project",
+      "commandLineArgs": "run",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
+      }
+    },
     "Console Runner - Status": {
       "commandName": "Project",
       "commandLineArgs": "status",
@@ -7,41 +22,48 @@
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Auth (API Key)": {
+    "Console Runner - Auth (Interactive)": {
+      "commandName": "Project",
+      "commandLineArgs": "auth",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Console Runner - Auth (with API Key)": {
       "commandName": "Project",
       "commandLineArgs": "auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Register (after auth)": {
+    "Console Runner - Register (Interactive)": {
       "commandName": "Project",
-      "commandLineArgs": "register --name \"Debug-Runner\" --server https://localhost:7091",
+      "commandLineArgs": "register",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
       }
     },
-    "Console Runner - Register (with env var)": {
+    "Console Runner - Register (with Name)": {
       "commandName": "Project",
-      "commandLineArgs": "register --name \"Debug-Runner\" --server https://localhost:7091",
+      "commandLineArgs": "register --name \"Debug-Runner\"",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
       }
     },
-    "Console Runner - Run (after registration)": {
+    "Console Runner - Register (Force)": {
       "commandName": "Project",
-      "commandLineArgs": "run --name \"Debug-Runner\" --server https://localhost:7091",
-      "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
-    },
-    "Console Runner - Run (with env var)": {
-      "commandName": "Project",
-      "commandLineArgs": "run --name \"Debug-Runner\" --server https://localhost:7091",
+      "commandLineArgs": "register --name \"Debug-Runner-New\" --force",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "AUTOMATON_API_KEY": "ak_runner_1234567890abcdef"
+      }
+    },
+    "Console Runner - Configure Server": {
+      "commandName": "Project",
+      "commandLineArgs": "server --url https://localhost:7091",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
       }
     },
     "Console Runner - Help": {
