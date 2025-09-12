@@ -1,4 +1,4 @@
-@page "/downloads-hub"
+﻿@page "/downloads-hub"
 @using Microsoft.AspNetCore.Components
 @using Automaton.Studio.Services
 @inject NavigationManager NavigationManager
@@ -102,7 +102,7 @@
                             </div>
 
                             <div class="option-actions">
-                                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))">
+                                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/downloads-runner"))">
                                     <Icon Type="download" />
                                     Download Console Runner
                                 </Button>
@@ -155,7 +155,7 @@
                             </div>
 
                             <div class="option-actions">
-                                <Button Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/desktop"))">
+                                <Button Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/downloads-desktop"))">
                                     <Icon Type="download" />
                                     Download Desktop App
                                 </Button>
@@ -172,7 +172,7 @@
             <Card Class="comparison-section-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="compare" Style="margin-right: 8px;" />
-                    <span>?? Feature Comparison</span>
+                    <span>📊 Feature Comparison</span>
                 </TitleTemplate>
                 <ChildContent>
                     <div class="comparison-table">
@@ -220,13 +220,13 @@
             <Card Class="help-section-card">
                 <TitleTemplate>
                     <Icon Type="question-circle" Style="margin-right: 8px;" />
-                    <span>?? Need Help Choosing?</span>
+                    <span>💡 Need Help Choosing?</span>
                 </TitleTemplate>
                 <ChildContent>
                     <Row Gutter="24">
                         <Col Span="12">
                             <div class="help-content">
-                                <Title Level="4">?? Use Console Runner if you:</Title>
+                                <Title Level="4">📋 Use Console Runner if you:</Title>
                                 <ul class="help-list">
                                     <li>Need cross-platform support (Linux, macOS, Windows)</li>
                                     <li>Are deploying to production servers</li>
@@ -238,7 +238,7 @@
                         </Col>
                         <Col Span="12">
                             <div class="help-content">
-                                <Title Level="4">??? Use Desktop App if you:</Title>
+                                <Title Level="4">🖥️ Use Desktop App if you:</Title>
                                 <ul class="help-list">
                                     <li>Want a visual workflow designer</li>
                                     <li>Are developing workflows locally</li>
@@ -252,7 +252,7 @@
 
                     <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
                         <MessageTemplate>
-                            <strong>?? Pro Tip:</strong> You can use both! Many users design workflows with the Desktop App and deploy them with the Console Runner for production.
+                            <strong>💡 Pro Tip:</strong> You can use both! Many users design workflows with the Desktop App and deploy them with the Console Runner for production.
                         </MessageTemplate>
                     </Alert>
                 </ChildContent>
