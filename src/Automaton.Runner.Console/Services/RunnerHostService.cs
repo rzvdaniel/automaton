@@ -130,8 +130,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error in interactive runner setup");
-            WriteLine($"? Error: {ex.Message}");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error in interactive runner setup. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
+            WriteLine($"? Setup error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -198,8 +202,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error in interactive authentication");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error in interactive authentication. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
             WriteLine($"? Authentication error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -281,8 +289,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error in interactive registration");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error in interactive registration. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
             WriteLine($"? Registration error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -327,8 +339,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error configuring server");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error configuring server. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
             WriteLine($"? Server configuration error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -440,8 +456,11 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Warning(ex, "Manual reconnection attempt failed");
-            WriteLine($"? Manual reconnection failed: {ex.Message}");
+            // Log technical details to file logs only
+            logger.Warning(ex, "Manual reconnection attempt failed. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
+            WriteLine($"? Manual reconnection failed - automatic retry will continue in background.");
         }
         
         WriteLine();
@@ -519,8 +538,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error during runner registration");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error during runner registration. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
             WriteLine($"? Registration error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
             return false;
         }
     }
@@ -680,8 +703,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error in runner host service");
-            WriteLine($"? Error: {ex.Message}");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error in runner host service. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
+            WriteLine($"? Runner error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -727,8 +754,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error registering runner");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error registering runner. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
             WriteLine($"? Registration error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
         }
     }
 
@@ -747,8 +778,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error clearing all data");
-            WriteLine($"? Error clearing all data: {ex.Message}");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error clearing all data. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
+            WriteLine($"? Error clearing data: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
             return false;
         }
     }
@@ -810,8 +845,12 @@ public class RunnerHostService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error during cleanup");
-            WriteLine($"? Error during cleanup: {ex.Message}");
+            // Log technical details to file logs only
+            logger.Error(ex, "Error during cleanup. Error: {ErrorType}", ex.GetType().Name);
+            
+            // Show friendly message to user
+            WriteLine($"? Cleanup error: {ex.Message}");
+            WriteLine("Check the log files for detailed technical information.");
             return false;
         }
     }

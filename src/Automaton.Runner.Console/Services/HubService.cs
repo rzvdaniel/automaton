@@ -137,7 +137,8 @@ public class HubService
             {
                 if (error != null)
                 {
-                    logger.Warning("Connection closed with error: {Error}", error.Message);
+                    // Log full technical details to file logs only
+                    logger.Warning(error, "Connection closed with error during operation");
                     WriteLine($"⚠️ Connection lost: {GetFriendlyErrorMessage(error)}");
                     
                     if (!isReconnecting)
@@ -155,8 +156,15 @@ public class HubService
             connection.Reconnecting += (error) =>
             {
                 isReconnecting = true;
-                var errorMsg = error?.Message ?? "Unknown error";
-                logger.Information("Reconnecting to server: {Error}", errorMsg);
+                if (error != null)
+                {
+                    // Log technical details to file logs only
+                    logger.Information(error, "Connection reconnecting due to error");
+                }
+                else
+                {
+                    logger.Information("Connection reconnecting");
+                }
                 WriteLine($"🔄 Reconnecting to server: {GetFriendlyErrorMessage(error)}");
                 return Task.CompletedTask;
             };
@@ -176,14 +184,18 @@ public class HubService
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Failed to connect to hub");
+            // Log full technical details with stack trace to file logs only
+            logger.Error(ex, "Connection attempt failed to hub {HubUrl}. Error type: {ErrorType}, Message: {ErrorMessage}", 
+                hubUrl, ex.GetType().Name, ex.Message);
             throw; // Re-throw to let the retry policy handle it
         }
     }
 
     private async Task HandleConnectionError(Exception ex)
     {
-        logger.Error(ex, "Failed to connect to hub");
+        // Log full technical details with stack trace to file logs only
+        logger.Error(ex, "Final connection failure after all retry attempts. Server: {Server}, Error: {ErrorType}", 
+            configService.BaseUrl, ex.GetType().Name);
         
         var friendlyMessage = GetFriendlyErrorMessage(ex);
         WriteLine($"❌ Connection failed: {friendlyMessage}");
