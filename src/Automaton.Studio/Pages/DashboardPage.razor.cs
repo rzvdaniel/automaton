@@ -140,25 +140,13 @@ namespace Automaton.Studio.Pages
             NavigationManager.NavigateTo("/customsteps");
         }
 
-        // Add the missing SkipOnboardingForNow method
-        private async Task SkipOnboardingForNow()
+        // Removed the skip functionality since we're using a simplified approach
+        // Users can simply not visit the onboarding page if they don't want to complete setup
+        private void SkipOnboardingForNow()
         {
-            try
-            {
-                // Skip onboarding for 72 hours (3 days)
-                await OnboardingService.SkipOnboardingTemporarilyAsync(72);
-                
-                // Update the local state to hide the onboarding alert immediately
-                shouldShowOnboarding = false;
-                StateHasChanged();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error skipping onboarding: {ex.Message}");
-                // Even if there's an error, hide the alert to avoid user frustration
-                shouldShowOnboarding = false;
-                StateHasChanged();
-            }
+            // Update the local state to hide the onboarding alert for this session only
+            shouldShowOnboarding = false;
+            StateHasChanged();
         }
 
         private string GetActivityTagColor(ActivityType activityType)

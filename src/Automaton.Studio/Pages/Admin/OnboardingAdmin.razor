@@ -78,10 +78,10 @@
 
         try
         {
-            var isCompleted = await OnboardingService.IsOnboardingCompletedAsync();
+            var hasRunners = await OnboardingService.HasRegisteredRunnersAsync();
             var shouldShow = await OnboardingService.ShouldShowOnboardingAsync();
             
-            statusMessage = $"Onboarding Completed: {isCompleted} | Should Show: {shouldShow}";
+            statusMessage = $"Has Registered Runners: {hasRunners} | Should Show Onboarding: {shouldShow}";
         }
         catch (Exception ex)
         {
@@ -101,12 +101,11 @@
 
         try
         {
-            await OnboardingService.ResetOnboardingAsync();
-            statusMessage = "Onboarding has been reset. User will see onboarding on next page load.";
+            statusMessage = "Onboarding reset is no longer applicable - now based on registered runners only.";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error resetting onboarding: {ex.Message}";
+            statusMessage = $"Error: {ex.Message}";
         }
         finally
         {
@@ -122,12 +121,11 @@
 
         try
         {
-            await OnboardingService.MarkOnboardingCompletedAsync();
-            statusMessage = "Onboarding marked as completed. User will not see onboarding automatically.";
+            statusMessage = "Onboarding completion is no longer applicable - automatically complete when runners are registered.";
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error marking onboarding complete: {ex.Message}";
+            statusMessage = $"Error: {ex.Message}";
         }
         finally
         {

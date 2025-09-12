@@ -1,4 +1,4 @@
-@page "/settings"
+﻿@page "/settings"
 @using Automaton.Studio.Services
 @inject OnboardingService OnboardingService
 @inject NavigationManager NavigationManager
@@ -65,12 +65,6 @@
                                             <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
                                                 <Icon Type="play-circle" />
                                                 Get Started
-                                            </Button>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button OnClick="@ResetSetupGuide">
-                                                <Icon Type="reload" />
-                                                Reset Setup Status
                                             </Button>
                                         </SpaceItem>
                                     </Space>
@@ -177,35 +171,28 @@
     {
         try
         {
-            var isCompleted = await OnboardingService.IsOnboardingCompletedAsync();
+            var hasRunners = await OnboardingService.HasRegisteredRunnersAsync();
             var shouldShow = await OnboardingService.ShouldShowOnboardingAsync();
             
-            if (isCompleted)
+            if (hasRunners)
             {
-                setupStatusMessage = "? Setup completed! You can still access the guide for reference or troubleshooting.";
+                setupStatusMessage = "✅ Setup completed! You have registered runners and can create workflows.";
             }
             else if (shouldShow)
             {
-                setupStatusMessage = "?? Setup is incomplete. Please complete the setup guide to get started.";
+                setupStatusMessage = "⚠️ Setup incomplete. No runners registered yet. Complete the setup guide to get started.";
             }
             else
             {
-                setupStatusMessage = "? Setup was skipped temporarily. You can resume it anytime.";
+                setupStatusMessage = "ℹ️ No runners registered. Visit the setup guide when you're ready.";
             }
         }
         catch
         {
-            setupStatusMessage = "? Unable to check setup status. LocalStorage may not be available.";
+            setupStatusMessage = "❓ Unable to check runner status. Please try again later.";
         }
         
         StateHasChanged();
-    }
-
-    private async Task ResetSetupGuide()
-    {
-        await OnboardingService.ResetOnboardingAsync();
-        await CheckSetupStatus(); // Refresh status
-        NavigationManager.NavigateTo("/onboarding");
     }
 
     private void OpenExternalLink(string path)

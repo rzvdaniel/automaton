@@ -1,12 +1,9 @@
 @page "/onboarding"
 @using Automaton.Studio.Services
-@inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigService
-@inject OnboardingService OnboardingService
 @inject MessageService MessageService
 @inject IJSRuntime JSRuntime
-@implements IDisposable
 
 <Layout>
     <Header Class="header">
@@ -30,13 +27,9 @@
             <Col Class="right-actions">
                 <Space>
                     <SpaceItem>
-                        <Button Type="@ButtonType.Text" OnClick="@SkipOnboarding">
-                            Skip for now
-                        </Button>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Button Type="@ButtonType.Text" OnClick="@GoToFlows">
-                            Already set up? Go to Flows ?
+                        <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/"))">
+                            <Icon Type="home" />
+                            Back to Dashboard
                         </Button>
                     </SpaceItem>
                 </Space>
@@ -56,7 +49,7 @@
                     <div class="onboarding-header-text">
                         <Title Level="1" Style="margin-bottom: 8px;">Get Started with Automaton</Title>
                         <Paragraph Class="onboarding-subtitle">
-                            Let's get you set up to automate your first workflow in just a few minutes.
+                            Follow these steps to set up your first runner and start automating workflows.
                         </Paragraph>
                     </div>
                 </div>
@@ -66,95 +59,107 @@
             <div class="description-section">
                 <div class="description-content">
                     <Paragraph Class="description-text">
-                        Because your workflows are executed securely on your computer, we need you to install a small 
-                        <strong class="highlight-text">Agent</strong> or our dedicated <strong class="highlight-text">Desktop App</strong> 
-                        to get started. You have two paths to success!
+                        To execute workflows, you need either our lightweight <strong class="highlight-text">Console Runner</strong> 
+                        or the full-featured <strong class="highlight-text">Desktop App</strong>. Choose the option that best fits your needs.
                     </Paragraph>
                 </div>
             </div>
 
             <!-- Two Path Grid -->
             <div class="path-container">
-                <!-- Path A: Web App + Local Agent -->
-                <Card Title="Web App + Agent" Class="path-card recommended" Bordered="true">
+                <!-- Path A: Console Runner (Recommended) -->
+                <Card Title="Console Runner" Class="path-card recommended" Bordered="true">
                     <Extra>
                         <span class="recommended-badge">Recommended</span>
                     </Extra>
                     <ChildContent>
                         <div class="recommended-card-content">
-                            <div class="recommended-main-content">
-                                <div class="card-intro">
-                                    <Paragraph Class="card-description">
-                                        Use our powerful web interface to manage your workflows from anywhere, executed securely on your machines via a lightweight local agent.
-                                    </Paragraph>
+                            <div class="card-intro">
+                                <Paragraph Class="card-description">
+                                    Cross-platform console application that runs your workflows. Perfect for servers, CI/CD, and automation.
+                                </Paragraph>
+                            </div>
+
+                            <div class="setup-steps">
+                                <Title Level="4">Quick Setup:</Title>
+                                
+                                <div class="step-group">
+                                    <div class="step-header">
+                                        <span class="step-number">1</span>
+                                        <strong>Download & Install</strong>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="download-buttons">
+                                            <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))" Size="@ButtonSize.Large">
+                                                Download for Your Platform
+                                            </Button>
+                                        </div>
+                                        <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px;">
+                                            Or use the quick install commands on the Downloads page
+                                        </Paragraph>
+                                    </div>
                                 </div>
 
-                                <Steps Direction="StepsDirection.Vertical" Current="@currentStep">
-                                    <Step Title="Download and Install the Agent" Status="@step1Status">
-                                        <DescriptionTemplate>
-                                            <div>
-                                                <p>This small program runs in the background on your computer to execute flows from the web app.</p>
-                                                <div class="download-buttons">
-                                                    <Button Type="@ButtonType.Primary" Icon="windows" OnClick="@(() => DownloadAgent("windows"))">Windows</Button>
-                                                    <Button Icon="apple" OnClick="@(() => DownloadAgent("macos"))">macOS</Button>
-                                                    <Button Icon="linux" OnClick="@(() => DownloadAgent("linux"))">Linux</Button>
-                                                </div>
-                                                <div class="installation-instructions">
-                                                    <Collapse>
-                                                        <Panel Header="Installation Instructions">
-                                                            <ol>
-                                                                <li>Run the downloaded installer</li>
-                                                                <li>Follow the prompts to complete installation</li>
-                                                                <li>Launch the Automaton Agent from your start menu/applications folder</li>
-                                                            </ol>
-                                                        </Panel>
-                                                    </Collapse>
-                                                </div>
+                                <div class="step-group">
+                                    <div class="step-header">
+                                        <span class="step-number">2</span>
+                                        <strong>Get API Key</strong>
+                                    </div>
+                                    <div class="step-content">
+                                        <Paragraph>Create an API key with "Runner" scope:</Paragraph>
+                                        <Button Icon="key" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))">
+                                            Go to API Keys
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div class="step-group">
+                                    <div class="step-header">
+                                        <span class="step-number">3</span>
+                                        <strong>Authenticate & Register</strong>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="command-example">
+                                            <div class="command-display">
+                                                <Text Code># Authenticate with your API key</Text><br/>
+                                                <Text Code Class="highlight-command">automaton-runner auth --api-key YOUR_API_KEY</Text>
+                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner auth --api-key YOUR_API_KEY"))" Style="margin-left: 8px;">
+                                                    Copy
+                                                </Button>
                                             </div>
-                                        </DescriptionTemplate>
-                                    </Step>
-                                    <Step Title="Connect your Agent" Status="@step2Status">
-                                        <DescriptionTemplate>
-                                            <div>
-                                                <p>Run this command on your local machine to start the agent:</p>
-                                                @if (!agentConnected)
-                                                {
-                                                    <div class="connection-waiting">
-                                                        <div class="command-display">
-                                                            <Text Code>automaton-agent --connect @ConfigService.BaseUrl</Text>
-                                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyCommand($"automaton-agent --connect {ConfigService.BaseUrl}", "Agent connection command"))" Style="margin-left: 8px;">
-                                                                Copy
-                                                            </Button>
-                                                        </div>
-                                                        <div class="connection-status">
-                                                            <Spin /> Waiting for Agent to connect...
-                                                            <div style="margin-top: 8px;">
-                                                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" OnClick="@RefreshConnectionStatus" Loading="@isRefreshing">
-                                                                    <Icon Type="reload" Style="margin-right: 4px;" />
-                                                                    Refresh Status
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                }
-                                                else
-                                                {
-                                                    <div class="connection-success">
-                                                        <div class="connection-status">
-                                                            <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" /> Success! Your Agent is connected.
-                                                        </div>
-                                                    </div>
-                                                }
+                                        </div>
+                                        <div class="command-example">
+                                            <div class="command-display">
+                                                <Text Code># Register your runner</Text><br/>
+                                                <Text Code Class="highlight-command">automaton-runner register --name "My-Runner"</Text>
+                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner register --name \"My-Runner\""))" Style="margin-left: 8px;">
+                                                    Copy
+                                                </Button>
                                             </div>
-                                        </DescriptionTemplate>
-                                    </Step>
-                                </Steps>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="step-group">
+                                    <div class="step-header">
+                                        <span class="step-number">4</span>
+                                        <strong>Start Running</strong>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="command-example">
+                                            <div class="command-display">
+                                                <Text Code Class="highlight-command">automaton-runner run --name "My-Runner"</Text>
+                                                <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("automaton-runner run --name \"My-Runner\""))" Style="margin-left: 8px;">
+                                                    Copy
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <Paragraph Type="@TextElementType.Secondary">
+                                            Your runner will appear in the Runners page once registered and connected.
+                                        </Paragraph>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            @if (agentConnected)
-                            {
-                                <Button Type="@ButtonType.Primary" OnClick="@CompleteOnboarding" Size="@ButtonSize.Large" Class="run-sample-btn">Get Started with Flows</Button>
-                            }
                         </div>
                     </ChildContent>
                 </Card>
@@ -166,28 +171,25 @@
                     </Extra>
                     <ChildContent>
                         <div class="desktop-card-content">
-                            <div class="desktop-main-content">
-                                <div class="card-intro">
-                                    <h3 class="desktop-subtitle">The All-in-One Solution</h3>
-                                    <Paragraph Class="card-description">
-                                        For a fully local experience with no agent to manage, download our standalone desktop application. 
-                                        It includes everything you need in a single package.
-                                    </Paragraph>
+                            <div class="card-intro">
+                                <h3 class="desktop-subtitle">All-in-One Solution</h3>
+                                <Paragraph Class="card-description">
+                                    Full desktop application with built-in workflow designer, runner, and management interface.
+                                </Paragraph>
+                            </div>
+                            
+                            <div class="desktop-features">
+                                <div class="feature-item">
+                                    <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                    <span>Fully Local</span>
                                 </div>
-                                
-                                <div class="desktop-features">
-                                    <div class="feature-item">
-                                        <Icon Type="safety-certificate" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                        <span>Fully Local</span>
-                                    </div>
-                                    <div class="feature-item">
-                                        <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                        <span>No Setup Required</span>
-                                    </div>
-                                    <div class="feature-item">
-                                        <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
-                                        <span>Instant Start</span>
-                                    </div>
+                                <div class="feature-item">
+                                    <Icon Type="tool" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                    <span>No Setup Required</span>
+                                </div>
+                                <div class="feature-item">
+                                    <Icon Type="thunderbolt" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                    <span>Instant Start</span>
                                 </div>
                             </div>
                             
@@ -212,6 +214,10 @@
                             <Icon Type="customer-service" />
                             <span>Support</span>
                         </a>
+                        <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/runners"))" Style="padding: 0;">
+                            <Icon Type="play-square" />
+                            <span>View Runners</span>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -240,246 +246,81 @@
         margin-bottom: 0 !important;
     }
 
-    .connection-status {
-        color: #666;
-        font-style: italic;
+    .setup-steps {
+        margin-top: 16px;
+    }
+
+    .step-group {
+        margin-bottom: 24px;
+        padding: 16px;
+        background: #fafafa;
+        border-radius: 6px;
+        border-left: 4px solid #1890ff;
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .step-number {
+        width: 24px;
+        height: 24px;
+        background: #1890ff;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        margin-left: 36px;
+    }
+
+    .command-example {
+        background: #f6f8fa;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 12px;
+        margin: 8px 0;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    .highlight-command {
+        color: #0366d6 !important;
+        font-weight: 600 !important;
+    }
+
+    .download-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 12px 0;
     }
 </style>
 
-<script>
-    window.setupPageVisibilityDetection = (dotNetRef) => {
-        const handleVisibilityChange = () => {
-            const isVisible = !document.hidden;
-            dotNetRef.invokeMethodAsync('OnPageVisibilityChanged', isVisible);
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        // Cleanup function (called when page unloads)
-        window.addEventListener('beforeunload', () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            dotNetRef.dispose();
-        });
-    };
-</script>
-
 @code {
-    private int currentStep = 0;
-    private StepsStatus step1Status = StepsStatus.Process;
-    private StepsStatus step2Status = StepsStatus.Wait;
-    private bool agentConnected = false;
-    private bool isRefreshing = false;
-    
-    // Smart polling with exponential backoff - much better than 3-second fixed interval
-    private System.Timers.Timer? connectionCheckTimer;
-    private int pollingAttempts = 0;
-    private readonly int[] pollingIntervals = { 5000, 10000, 20000, 30000, 60000, 120000 }; // 5s, 10s, 20s, 30s, 60s, 120s
-    private bool isPageVisible = true;
-
-    protected override async Task OnInitializedAsync()
-    {
-        // Set up page visibility detection to pause polling when tab inactive
-        await SetupPageVisibilityDetection();
-        
-        // Start with initial check
-        await CheckAgentConnectionOnce();
-        
-        // Set up intelligent polling as fallback
-        StartSmartPolling();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Do initial check immediately
-            await CheckAgentConnectionOnce();
-        }
-    }
-
-    private async Task CheckAgentConnectionOnce()
-    {
-        try
-        {
-            var agentSetupComplete = await OnboardingService.CheckAndCompleteAgentSetupAsync();
-            
-            if (agentSetupComplete && !agentConnected)
-            {
-                agentConnected = true;
-                currentStep = 1;
-                step1Status = StepsStatus.Finish;
-                step2Status = StepsStatus.Finish;
-                StopPolling(); // Stop polling once connected
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch
-        {
-            // Connection failed or service unavailable, continue checking
-        }
-    }
-
-    private void StartSmartPolling()
-    {
-        if (agentConnected) return; // Don't poll if already connected
-        
-        var interval = GetNextPollingInterval();
-        connectionCheckTimer = new System.Timers.Timer(interval);
-        connectionCheckTimer.Elapsed += async (sender, e) =>
-        {
-            if (!isPageVisible) return; // Don't poll when page is not visible
-            
-            await CheckAgentConnectionOnce();
-            
-            if (!agentConnected)
-            {
-                // Restart timer with longer interval (exponential backoff)
-                connectionCheckTimer.Stop();
-                connectionCheckTimer.Interval = GetNextPollingInterval();
-                connectionCheckTimer.Start();
-            }
-        };
-        connectionCheckTimer.AutoReset = false; // Manual restart for interval changes
-        connectionCheckTimer.Start();
-    }
-
-    private int GetNextPollingInterval()
-    {
-        // Use exponential backoff - starts fast, then slows down
-        if (pollingAttempts < pollingIntervals.Length)
-        {
-            return pollingIntervals[pollingAttempts++];
-        }
-        return pollingIntervals[^1]; // Use longest interval (2 minutes) after all attempts
-    }
-
-    private void StopPolling()
-    {
-        connectionCheckTimer?.Stop();
-        connectionCheckTimer?.Dispose();
-        connectionCheckTimer = null;
-    }
-
-    private async Task RefreshConnectionStatus()
-    {
-        if (isRefreshing) return;
-        
-        isRefreshing = true;
-        StateHasChanged();
-        
-        try
-        {
-            // Reset polling attempts for more frequent checks after manual refresh
-            pollingAttempts = Math.Max(0, pollingAttempts - 2);
-            await CheckAgentConnectionOnce();
-            
-            // Restart polling with faster interval after manual refresh
-            if (!agentConnected)
-            {
-                StopPolling();
-                StartSmartPolling();
-            }
-        }
-        finally
-        {
-            isRefreshing = false;
-            StateHasChanged();
-        }
-    }
-
-    // Page Visibility API - pause polling when tab is not active
-    private async Task SetupPageVisibilityDetection()
-    {
-        await JSRuntime.InvokeVoidAsync("setupPageVisibilityDetection", 
-            DotNetObjectReference.Create(this));
-    }
-
-    [JSInvokable]
-    public void OnPageVisibilityChanged(bool visible)
-    {
-        isPageVisible = visible;
-        if (visible && !agentConnected && connectionCheckTimer == null)
-        {
-            // Restart polling when page becomes visible
-            StartSmartPolling();
-        }
-        else if (!visible)
-        {
-            // Stop polling when page is hidden to save resources
-            StopPolling();
-        }
-    }
-
-    private async Task DownloadAgent(string platform)
-    {
-        // Mark step 1 as completed when user clicks download
-        step1Status = StepsStatus.Finish;
-        step2Status = StepsStatus.Process;
-        StateHasChanged();
-
-        string downloadUrl = platform switch
-        {
-            "windows" => $"{ConfigService.BaseUrl}/downloads/automaton-agent-setup.exe",
-            "macos" => $"{ConfigService.BaseUrl}/downloads/automaton-agent.dmg",
-            "linux" => $"{ConfigService.BaseUrl}/downloads/automaton-agent.deb",
-            _ => ""
-        };
-        
-        // Track the download action
-        await OnboardingService.HandleDownloadActionAsync($"agent-{platform}");
-        
-        if (!string.IsNullOrEmpty(downloadUrl))
-        {
-            NavigationManager.NavigateTo(downloadUrl, true);
-        }
-    }
-
     private async Task DownloadDesktopApp()
     {
-        // Track the download action and mark onboarding as completed
-        await OnboardingService.HandleDownloadActionAsync("desktop-app");
-        
         NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
-        
-        // Navigate to flows after a short delay to allow download to start
-        await Task.Delay(1000);
-        NavigationManager.NavigateTo("/flows");
     }
 
-    private async Task CompleteOnboarding()
-    {
-        await OnboardingService.MarkOnboardingCompletedAsync();
-        NavigationManager.NavigateTo("/");
-    }
-
-    private async Task SkipOnboarding()
-    {
-        await OnboardingService.SkipOnboardingTemporarilyAsync(24); // Skip for 24 hours
-        NavigationManager.NavigateTo("/");
-    }
-
-    private async Task GoToFlows()
-    {
-        await OnboardingService.MarkOnboardingCompletedAsync();
-        NavigationManager.NavigateTo("/flows");
-    }
-
-    private async Task CopyCommand(string command, string description)
+    private async Task CopyToClipboard(string text)
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", command);
-            await MessageService.SuccessAsync($"{description} copied to clipboard");
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            await MessageService.SuccessAsync("Command copied to clipboard");
         }
         catch
         {
             await MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
         }
-    }
-
-    public void Dispose()
-    {
-        // Stop polling and clean up resources
-        StopPolling();
     }
 }

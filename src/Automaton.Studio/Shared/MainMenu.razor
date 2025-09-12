@@ -1,6 +1,5 @@
 ﻿@using Automaton.Studio.Services
 @inject OnboardingService OnboardingService
-@implements IDisposable
 
 <Menu Mode="MenuMode.Vertical" 
       Theme="MenuTheme.Dark" 
@@ -47,7 +46,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        OnboardingService.OnboardingStatusChanged += RefreshOnboardingStatus;
         await CheckOnboardingStatus();
     }
 
@@ -71,24 +69,4 @@
             shouldShowOnboarding = false;
         }
     }
-
-    private async void RefreshOnboardingStatus()
-    {
-        await CheckOnboardingStatus();
-    }
-
-    public void Dispose()
-    {
-        OnboardingService.OnboardingStatusChanged -= RefreshOnboardingStatus;
-    }
-}
-
-/* Style the get started item to stand out */
-.get-started-item {
-    background-color: rgba(24, 144, 255, 0.1) !important;
-    border-left: 3px solid #1890ff !important;
-}
-
-.get-started-item:hover {
-    background-color: rgba(24, 144, 255, 0.2) !important;
 }
