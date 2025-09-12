@@ -6,7 +6,7 @@
 @inject NavigationManager NavigationManager
 @inject MessageService MessageService
 
-<PageTitle>Downloads - Automaton Studio</PageTitle>
+<PageTitle>Download Console Runner - Automaton Studio</PageTitle>
 
 <Layout>
     <Header Class="header">
@@ -23,6 +23,10 @@
                                 <Icon Type="download" Width="16" Height="16" />
                                 <span>Downloads</span>
                             </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="code" Width="16" Height="16" />
+                                <span>Console Runner</span>
+                            </BreadcrumbItem>
                         </Breadcrumb>
                     </SpaceItem>
                 </Space>
@@ -33,6 +37,12 @@
                         <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
                             <Icon Type="question-circle" />
                             Get Started
+                        </Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Default" OnClick="@(() => NavigationManager.NavigateTo("/desktop"))">
+                            <Icon Type="appstore" />
+                            Desktop App
                         </Button>
                     </SpaceItem>
                 </Space>
@@ -47,25 +57,27 @@
             <div class="downloads-header">
                 <div class="downloads-header-content">
                     <div class="downloads-header-icon">
-                        <Icon Type="download" Style="font-size: 48px; color: white;" />
+                        <Icon Type="code" Style="font-size: 48px; color: white;" />
                     </div>
                     <div class="downloads-header-text">
-                        <Title Level="1" Style="margin-bottom: 8px;">Download & Install Agent</Title>
+                        <Title Level="1" Style="margin-bottom: 8px;">Download Console Runner</Title>
                         <Paragraph Class="downloads-subtitle">
-                            Get the Automaton Console Runner installed and running on your system
+                            Cross-platform command-line runner with interactive setup
                         </Paragraph>
                     </div>
                 </div>
             </div>
 
-            <!-- One-Command Install Section -->
-            <Card Class="quick-install-card" Style="margin-bottom: 24px;">
+            <!-- Installation Scripts Section - PRIMARY -->
+            <Card Class="installation-scripts-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="rocket" Style="margin-right: 8px;" />
-                    <span>Complete Setup (One Command) - Recommended</span>
+                    <span>🚀 Quick Installation (Recommended)</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Paragraph>Download, install, authenticate, register, and start your runner with a single command:</Paragraph>
+                    <Paragraph Style="font-size: 16px; margin-bottom: 16px;">
+                        <strong>Download and install the runner automatically:</strong>
+                    </Paragraph>
                     
                     <Row Gutter="16">
                         <Col Span="12">
@@ -75,7 +87,7 @@
                                     <span>Windows (PowerShell)</span>
                                 </TitleTemplate>
                                 <ChildContent>
-                                    <Paragraph><strong>Step 1:</strong> Run as Administrator:</Paragraph>
+                                    <Paragraph><strong>Run as Administrator:</strong></Paragraph>
                                     <div class="code-container">
                                         <div class="command-display">
                                             <Text Code Class="code-block">@windowsInstallCommand</Text>
@@ -84,17 +96,9 @@
                                             </Button>
                                         </div>
                                     </div>
-                                    <Paragraph><strong>Step 2:</strong> Complete setup with your API key:</Paragraph>
-                                    <div class="code-container">
-                                        <div class="command-display">
-                                            <Text Code Class="code-block">@windowsSetupCommand</Text>
-                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsSetupCommand, "Windows setup command"))" Style="margin-left: 8px;">
-                                                Copy
-                                            </Button>
-                                        </div>
-                                    </div>
                                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
-                                        ✅ Installs as Windows Service • ✅ Auto-starts on boot
+                                        ✅ Downloads, installs, and adds to PATH<br/>
+                                        ✅ Creates automaton-runner command globally
                                     </Paragraph>
                                 </ChildContent>
                             </Card>
@@ -107,7 +111,7 @@
                                     <span>Linux / macOS (Terminal)</span>
                                 </TitleTemplate>
                                 <ChildContent>
-                                    <Paragraph><strong>Step 1:</strong> Download and install:</Paragraph>
+                                    <Paragraph><strong>Install command:</strong></Paragraph>
                                     <div class="code-container">
                                         <div class="command-display">
                                             <Text Code Class="code-block">@unixInstallCommand</Text>
@@ -116,62 +120,20 @@
                                             </Button>
                                         </div>
                                     </div>
-                                    <Paragraph><strong>Step 2:</strong> Complete setup with your API key:</Paragraph>
-                                    <div class="code-container">
-                                        <div class="command-display">
-                                            <Text Code Class="code-block">@unixSetupCommand</Text>
-                                            <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixSetupCommand, "Unix setup command"))" Style="margin-left: 8px;">
-                                                Copy
-                                            </Button>
-                                        </div>
-                                    </div>
                                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
-                                        ✅ Creates systemd service (Linux) • ✅ Auto-starts on boot
+                                        ✅ Downloads and installs to /usr/local/bin<br/>
+                                        ✅ Creates automaton-runner command globally
                                     </Paragraph>
                                 </ChildContent>
                             </Card>
                         </Col>
                     </Row>
 
-                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
+                    <Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
                         <MessageTemplate>
-                            <Row>
-                                <Col Span="16">
-                                    <strong>Need an API Key?</strong> Create one in Settings → API Keys with "Runner" scope.
-                                </Col>
-                                <Col Span="8" Style="text-align: right;">
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))" Size="@ButtonSize.Small">
-                                        <Icon Type="key" />
-                                        Get API Key
-                                    </Button>
-                                </Col>
-                            </Row>
+                            <strong>After installation:</strong> Run <code>automaton-runner</code> and it will guide you through setup with your API key!
                         </MessageTemplate>
                     </Alert>
-                </ChildContent>
-            </Card>
-
-            <!-- Platform Detection Section -->
-            <Card Class="recommended-download-card" Style="margin-bottom: 24px; display: none;" Id="recommended-card">
-                <TitleTemplate>
-                    <Icon Type="star" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" Style="margin-right: 8px;" />
-                    <span>Recommended for Your System</span>
-                </TitleTemplate>
-                <ChildContent>
-                    <Row>
-                        <Col Span="16">
-                            <div id="detected-info">
-                                <Title Level="4" Style="margin: 0;" Id="detected-platform">Detecting...</Title>
-                                <Paragraph Type="@TextElementType.Secondary" Style="margin: 0;">We detected your operating system</Paragraph>
-                            </div>
-                        </Col>
-                        <Col Span="8" Style="text-align: right;">
-                            <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" Id="recommended-download-btn">
-                                <Icon Type="download" />
-                                Download Now
-                            </Button>
-                        </Col>
-                    </Row>
                 </ChildContent>
             </Card>
 
@@ -179,7 +141,7 @@
             <Card Class="manual-downloads-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="inbox" Style="margin-right: 8px;" />
-                    <span>Manual Downloads</span>
+                    <span>📦 Manual Downloads</span>
                 </TitleTemplate>
                 <ChildContent>
                     <Paragraph>Download specific platform binaries directly:</Paragraph>
@@ -267,7 +229,7 @@
             </Card>
 
             <!-- Getting Started Section -->
-            <Card Class="getting-started-card">
+            <Card Class="getting-started-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="play-circle" Style="margin-right: 8px;" />
                     <span>Getting Started</span>
@@ -278,8 +240,8 @@
                             <div class="step-container">
                                 <div class="step-number">1</div>
                                 <div class="step-content">
-                                    <Title Level="4">Get an API Key</Title>
-                                    <Paragraph>Create an API key in your Automaton Studio:</Paragraph>
+                                    <Title Level="4">Get Your API Key</Title>
+                                    <Paragraph>Create an API key in Automaton Studio:</Paragraph>
                                     <ol>
                                         <li>Go to <strong>Settings → API Keys</strong></li>
                                         <li>Click <strong>Create API Key</strong></li>
@@ -298,16 +260,14 @@
                             <div class="step-container">
                                 <div class="step-number">2</div>
                                 <div class="step-content">
-                                    <Title Level="4">Configure & Run</Title>
-                                    <Paragraph>Set up your runner with the API key:</Paragraph>
+                                    <Title Level="4">Run Interactive Setup</Title>
+                                    <Paragraph>Start the runner - it will guide you:</Paragraph>
                                     <div class="code-example">
-                                        <Text Code># Authenticate</Text><br/>
-                                        <Text Code>automaton-runner auth --api-key YOUR_KEY</Text><br/><br/>
-                                        <Text Code># Register</Text><br/>
-                                        <Text Code>automaton-runner register --name "My-Runner"</Text><br/><br/>
-                                        <Text Code># Run</Text><br/>
-                                        <Text Code>automaton-runner run --name "My-Runner"</Text>
+                                        <Text Code>automaton-runner</Text>
                                     </div>
+                                    <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px;">
+                                        The runner will prompt for your API key, server URL, and runner name.
+                                    </Paragraph>
                                 </div>
                             </div>
                         </Col>
@@ -315,57 +275,91 @@
                 </ChildContent>
             </Card>
 
-            <!-- Manual Step-by-Step Section -->
-            <Card Class="manual-steps-card" Style="margin-bottom: 24px;">
+            <!-- Advanced Commands Section -->
+            <Card Class="advanced-commands-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
-                    <Icon Type="ordered-list" Style="margin-right: 8px;" />
-                    <span>Manual Step-by-Step Installation</span>
+                    <Icon Type="code" Style="margin-right: 8px;" />
+                    <span>Advanced Commands</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Paragraph>Prefer to do it step by step? Here's the manual process:</Paragraph>
+                    <Paragraph>For scripting and advanced usage, individual commands are available:</Paragraph>
                     
-                    <Row Gutter="24">
-                        <Col Span="8">
-                            <div class="step-container">
-                                <div class="step-number">1</div>
-                                <div class="step-content">
-                                    <Title Level="4">Download Runner</Title>
-                                    <Paragraph>Get the Console Runner for your platform from the downloads section below.</Paragraph>
+                    <Row Gutter="16">
+                        <Col Span="12">
+                            <div class="command-section">
+                                <Title Level="5">Authentication</Title>
+                                <div class="code-example">
+                                    <Text Code># Interactive authentication</Text><br/>
+                                    <Text Code>automaton-runner auth</Text><br/><br/>
+                                    <Text Code># With parameters</Text><br/>
+                                    <Text Code>automaton-runner auth --api-key ak_xxx --server https://server.com</Text>
                                 </div>
                             </div>
                         </Col>
-                        
-                        <Col Span="8">
-                            <div class="step-container">
-                                <div class="step-number">2</div>
-                                <div class="step-content">
-                                    <Title Level="4">Get API Key</Title>
-                                    <Paragraph>Create an API key with "Runner" scope:</Paragraph>
-                                    <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/apikeys"))" Style="padding: 0;">
-                                        <Icon Type="key" />
-                                        Go to API Keys
-                                    </Button>
-                                </div>
-                            </div>
-                        </Col>
-
-                        <Col Span="8">
-                            <div class="step-container">
-                                <div class="step-number">3</div>
-                                <div class="step-content">
-                                    <Title Level="4">Configure & Run</Title>
-                                    <div class="code-example">
-                                        <Text Code># Authenticate</Text><br/>
-                                        <Text Code>automaton-runner auth --api-key YOUR_KEY</Text><br/><br/>
-                                        <Text Code># Register</Text><br/>
-                                        <Text Code>automaton-runner register --name "My-Runner"</Text><br/><br/>
-                                        <Text Code># Run</Text><br/>
-                                        <Text Code>automaton-runner run --name "My-Runner"</Text>
-                                    </div>
+                        <Col Span="12">
+                            <div class="command-section">
+                                <Title Level="5">Registration</Title>
+                                <div class="code-example">
+                                    <Text Code># Interactive registration</Text><br/>
+                                    <Text Code>automaton-runner register</Text><br/><br/>
+                                    <Text Code># With name</Text><br/>
+                                    <Text Code>automaton-runner register --name "My-Runner"</Text><br/><br/>
+                                    <Text Code># Force re-registration</Text><br/>
+                                    <Text Code>automaton-runner register --force</Text>
                                 </div>
                             </div>
                         </Col>
                     </Row>
+                    
+                    <Row Gutter="16" Style="margin-top: 16px;">
+                        <Col Span="12">
+                            <div class="command-section">
+                                <Title Level="5">Configuration</Title>
+                                <div class="code-example">
+                                    <Text Code># Configure server URL</Text><br/>
+                                    <Text Code>automaton-runner server --url https://server.com</Text><br/><br/>
+                                    <Text Code># Show status</Text><br/>
+                                    <Text Code>automaton-runner status</Text>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="12">
+                            <div class="command-section">
+                                <Title Level="5">Maintenance</Title>
+                                <div class="code-example">
+                                    <Text Code># Clean up stored data</Text><br/>
+                                    <Text Code>automaton-runner cleanup</Text><br/><br/>
+                                    <Text Code># Show help</Text><br/>
+                                    <Text Code>automaton-runner --help</Text>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                </ChildContent>
+            </Card>
+
+            <!-- Environment Variables Section -->
+            <Card Class="env-vars-card">
+                <TitleTemplate>
+                    <Icon Type="setting" Style="margin-right: 8px;" />
+                    <span>Automation & Environment Variables</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Paragraph>For automated deployments and CI/CD:</Paragraph>
+                    
+                    <div class="code-example" Style="margin: 16px 0;">
+                        <Text Code># Set API key via environment variable</Text><br/>
+                        <Text Code>export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"</Text><br/><br/>
+                        <Text Code># Runner starts with no prompts</Text><br/>
+                        <Text Code>automaton-runner</Text>
+                    </div>
+
+                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
+                        <MessageTemplate>
+                            <strong>Perfect for Docker, CI/CD, and server deployments!</strong><br/>
+                            The runner automatically detects environment variables and skips interactive prompts.
+                        </MessageTemplate>
+                    </Alert>
                 </ChildContent>
             </Card>
         </div>
@@ -374,9 +368,7 @@
 
 @code {
     private string windowsInstallCommand = "";
-    private string windowsSetupCommand = "";
     private string unixInstallCommand = "";
-    private string unixSetupCommand = "";
     private string windowsX64Url = "";
     private string windowsArm64Url = "";
     private string linuxX64Url = "";
@@ -386,13 +378,9 @@
 
     protected override void OnInitialized()
     {
-        // One-command install scripts
+        // Installation scripts
         windowsInstallCommand = $"iwr -useb {ConfigService.BaseUrl}/downloads/install.ps1 | iex";
         unixInstallCommand = $"curl -sSL {ConfigService.BaseUrl}/downloads/install.sh | bash";
-        
-        // Setup commands with API key
-        windowsSetupCommand = "automaton-runner auth --api-key \"YOUR_API_KEY\" && automaton-runner register --name \"My-Runner\" && automaton-runner run --name \"My-Runner\" --service";
-        unixSetupCommand = "automaton-runner auth --api-key \"YOUR_API_KEY\" && automaton-runner register --name \"My-Runner\" && automaton-runner run --name \"My-Runner\" --daemon";
         
         // Build download URLs
         var baseUrl = ConfigService.BaseUrl;
@@ -516,43 +504,28 @@
         margin-bottom: 0;
     }
 
-    /* Cards styling */
-    .quick-install-card .ant-card-head-title {
-        color: #1890ff;
+    /* Installation Scripts Card - PRIMARY */
+    .installation-scripts-card {
+        border: 2px solid #52c41a;
+        background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+    }
+
+    .installation-scripts-card .ant-card-head-title {
+        color: #52c41a;
         font-weight: 600;
     }
 
-    .install-command-card {
-        height: 100%;
+    /* Cards styling */
+    .installation-scripts-card,
+    .getting-started-card,
+    .manual-downloads-card,
+    .advanced-commands-card,
+    .env-vars-card {
+        margin-bottom: 24px;
     }
 
-    .install-command-card .ant-card-head-title {
-        font-weight: 500;
-    }
-
-    .code-container {
-        background: #f6f8fa;
-        border: 1px solid #e1e4e8;
-        border-radius: 6px;
-        padding: 12px;
-        margin: 8px 0;
-    }
-
-    .command-display {
-        display: flex;
-        align-items: center;
-        width: 100%;
-    }
-
-    .code-block {
-        background: transparent !important;
-        border: none !important;
-        padding: 0 !important;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 13px;
-        line-height: 1.4;
-        flex: 1;
-        word-break: break-all;
+    .command-section {
+        margin-bottom: 16px;
     }
 
     .platform-card {
@@ -599,19 +572,11 @@
         line-height: 1.6;
     }
 
-    .getting-started-card,
-    .manual-downloads-card,
-    .manual-steps-card,
-    .recommended-download-card,
-    .quick-install-card {
-        margin-bottom: 24px;
-    }
-
-    .getting-started-card .ant-card-head-title,
-    .manual-downloads-card .ant-card-head-title,
-    .manual-steps-card .ant-card-head-title,
-    .recommended-download-card .ant-card-head-title {
-        color: #1890ff;
-        font-weight: 600;
+    /* Responsive design */
+    @@media (max-width: 768px) {
+        .downloads-header-content {
+            flex-direction: column;
+            text-align: center;
+        }
     }
 </style>

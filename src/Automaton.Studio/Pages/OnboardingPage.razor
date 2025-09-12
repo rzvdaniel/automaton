@@ -143,7 +143,7 @@
                                 </div>
                             </div>
                             
-                            <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
+                            <Button Type="@ButtonType.Default" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/desktop"))" Class="desktop-download-btn">
                                 <Icon Type="download" />
                                 Download Desktop App
                             </Button>

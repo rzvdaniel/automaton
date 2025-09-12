@@ -1,0 +1,473 @@
+@page "/desktop"
+@using Microsoft.AspNetCore.Components
+@using Automaton.Studio.Services
+@inject IJSRuntime JSRuntime
+@inject ConfigurationService ConfigService
+@inject NavigationManager NavigationManager
+@inject MessageService MessageService
+
+<PageTitle>Download Desktop App - Automaton Studio</PageTitle>
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb>
+                            <BreadcrumbItem Href="/">
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="appstore" Width="16" Height="16" />
+                                <span>Desktop App</span>
+                            </BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+            <Col Class="right-actions">
+                <Space>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                            <Icon Type="question-circle" />
+                            Get Started
+                        </Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Default" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))">
+                            <Icon Type="code" />
+                            Console Runner
+                        </Button>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Class="content-padding home-content content-background">
+        <div class="home-container">
+            
+            <!-- Header Section -->
+            <div class="desktop-header">
+                <div class="desktop-header-content">
+                    <div class="desktop-header-icon">
+                        <Icon Type="appstore" Style="font-size: 48px; color: white;" />
+                    </div>
+                    <div class="desktop-header-text">
+                        <Title Level="1" Style="margin-bottom: 8px;">Automaton Desktop App</Title>
+                        <Paragraph Class="desktop-subtitle">
+                            All-in-one solution with workflow designer, runner, and management interface
+                        </Paragraph>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Features Section -->
+            <Card Class="features-card" Style="margin-bottom: 24px;">
+                <TitleTemplate>
+                    <Icon Type="star" Style="margin-right: 8px;" />
+                    <span>? Key Features</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Row Gutter="24">
+                        <Col Span="12">
+                            <div class="feature-highlight">
+                                <div class="feature-icon">
+                                    <Icon Type="edit" Style="font-size: 32px; color: #722ed1;" />
+                                </div>
+                                <div class="feature-content">
+                                    <Title Level="4">Built-in Designer</Title>
+                                    <Paragraph>Create and edit workflows with a visual drag-and-drop interface. No need for external tools.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="12">
+                            <div class="feature-highlight">
+                                <div class="feature-icon">
+                                    <Icon Type="safety-certificate" Style="font-size: 32px; color: #722ed1;" />
+                                </div>
+                                <div class="feature-content">
+                                    <Title Level="4">Fully Local</Title>
+                                    <Paragraph>All workflows execute locally on your machine. Complete control over your automation environment.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                    <Row Gutter="24" Style="margin-top: 16px;">
+                        <Col Span="12">
+                            <div class="feature-highlight">
+                                <div class="feature-icon">
+                                    <Icon Type="thunderbolt" Style="font-size: 32px; color: #722ed1;" />
+                                </div>
+                                <div class="feature-content">
+                                    <Title Level="4">Instant Start</Title>
+                                    <Paragraph>No complex setup required. Download, install, and start creating workflows immediately.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="12">
+                            <div class="feature-highlight">
+                                <div class="feature-icon">
+                                    <Icon Type="tool" Style="font-size: 32px; color: #722ed1;" />
+                                </div>
+                                <div class="feature-content">
+                                    <Title Level="4">Integrated Management</Title>
+                                    <Paragraph>Manage workflows, view execution history, and monitor performance all in one application.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                </ChildContent>
+            </Card>
+
+            <!-- Download Section -->
+            <Card Class="download-card" Style="margin-bottom: 24px;">
+                <TitleTemplate>
+                    <Icon Type="download" Style="margin-right: 8px;" />
+                    <span>?? Download & Install</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Row Gutter="24" Align="RowAlign.Middle">
+                        <Col Span="16">
+                            <div class="download-info">
+                                <Title Level="3" Style="margin-bottom: 8px;">Windows Desktop Application</Title>
+                                <Paragraph Style="font-size: 16px; margin-bottom: 16px;">
+                                    Complete desktop experience with workflow designer and local execution engine.
+                                </Paragraph>
+                                
+                                <div class="download-features">
+                                    <div class="download-feature">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Visual workflow designer</span>
+                                    </div>
+                                    <div class="download-feature">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Local workflow execution</span>
+                                    </div>
+                                    <div class="download-feature">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Integrated management interface</span>
+                                    </div>
+                                    <div class="download-feature">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>No server connection required</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="8" Style="text-align: center;">
+                            <div class="download-section">
+                                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
+                                    <Icon Type="download" />
+                                    Download Desktop App
+                                </Button>
+                                <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
+                                    Windows 10/11 • .NET 8 included
+                                </Paragraph>
+                            </div>
+                        </Col>
+                    </Row>
+                </ChildContent>
+            </Card>
+
+            <!-- Installation Guide -->
+            <Card Class="installation-card" Style="margin-bottom: 24px;">
+                <TitleTemplate>
+                    <Icon Type="setting" Style="margin-right: 8px;" />
+                    <span>?? Installation Guide</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Row Gutter="24">
+                        <Col Span="8">
+                            <div class="install-step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <Title Level="4">Download</Title>
+                                    <Paragraph>Click the download button above to get the installer.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="8">
+                            <div class="install-step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <Title Level="4">Install</Title>
+                                    <Paragraph>Run the installer and follow the setup wizard. Administrator permissions may be required.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="8">
+                            <div class="install-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <Title Level="4">Launch</Title>
+                                    <Paragraph>Start the application and begin creating workflows immediately.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                </ChildContent>
+            </Card>
+
+            <!-- Comparison Section -->
+            <Card Class="comparison-card">
+                <TitleTemplate>
+                    <Icon Type="compare" Style="margin-right: 8px;" />
+                    <span>?? Desktop App vs Console Runner</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <div class="comparison-table">
+                        <Row>
+                            <Col Span="8"><strong>Feature</strong></Col>
+                            <Col Span="8" Style="text-align: center;"><strong>Desktop App</strong></Col>
+                            <Col Span="8" Style="text-align: center;"><strong>Console Runner</strong></Col>
+                        </Row>
+                        <Divider Style="margin: 12px 0;" />
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Visual Workflow Designer</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="close" Style="color: #ff4d4f;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Local Execution</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="close" Style="color: #ff4d4f;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Server Integration</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Cross-Platform</Col>
+                            <Col Span="8" Style="text-align: center;"><Text Type="@TextElementType.Secondary">Windows only</Text></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Headless/Service Mode</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="close" Style="color: #ff4d4f;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Best For</Col>
+                            <Col Span="8" Style="text-align: center;"><Text Type="@TextElementType.Secondary">Development & Design</Text></Col>
+                            <Col Span="8" Style="text-align: center;"><Text Type="@TextElementType.Secondary">Production & CI/CD</Text></Col>
+                        </Row>
+                    </div>
+                    
+                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
+                        <MessageTemplate>
+                            <strong>Need both?</strong> You can use the Desktop App for workflow design and the Console Runner for production execution.
+                        </MessageTemplate>
+                    </Alert>
+                </ChildContent>
+            </Card>
+        </div>
+    </Content>
+</Layout>
+
+@code {
+    private void DownloadDesktopApp()
+    {
+        NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
+    }
+}
+
+<style>
+    /* Main content structure */
+    .home-content {
+        min-height: auto;
+        padding-bottom: 40px;
+    }
+
+    .home-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 40px 24px;
+    }
+
+    /* Header section */
+    .desktop-header {
+        margin-bottom: 24px;
+        padding: 24px 0;
+    }
+
+    .desktop-header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .desktop-header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: #722ed1;
+        border-radius: 16px;
+    }
+
+    .desktop-header-text {
+        flex: 1;
+    }
+
+    .desktop-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    /* Feature highlights */
+    .feature-highlight {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .feature-icon {
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(114, 46, 209, 0.1);
+        border-radius: 12px;
+    }
+
+    .feature-content {
+        flex: 1;
+    }
+
+    .feature-content h4 {
+        margin-bottom: 8px;
+        color: #722ed1;
+    }
+
+    /* Download section */
+    .download-card {
+        background: linear-gradient(135deg, #f9f0ff 0%, #ffffff 100%);
+        border: 2px solid #722ed1;
+    }
+
+    .download-card .ant-card-head-title {
+        color: #722ed1;
+        font-weight: 600;
+    }
+
+    .download-features {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .download-feature {
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+    }
+
+    .desktop-download-btn {
+        background: #722ed1;
+        border-color: #722ed1;
+        color: white;
+        width: 100%;
+        height: 56px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 8px;
+    }
+
+    .desktop-download-btn:hover {
+        background: #9254de;
+        border-color: #9254de;
+    }
+
+    /* Installation steps */
+    .install-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        background: #722ed1;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+    }
+
+    .step-content h4 {
+        margin-bottom: 8px;
+    }
+
+    /* Comparison table */
+    .comparison-table {
+        font-size: 14px;
+    }
+
+    .comparison-row {
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .comparison-row:last-child {
+        border-bottom: none;
+    }
+
+    /* Card styling */
+    .features-card,
+    .download-card,
+    .installation-card,
+    .comparison-card {
+        margin-bottom: 24px;
+    }
+
+    .features-card .ant-card-head-title,
+    .installation-card .ant-card-head-title,
+    .comparison-card .ant-card-head-title {
+        color: #722ed1;
+        font-weight: 600;
+    }
+
+    /* Responsive design */
+    @@media (max-width: 768px) {
+        .desktop-header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .feature-highlight,
+        .install-step {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .comparison-table {
+            font-size: 12px;
+        }
+    }
+</style>
