@@ -1,0 +1,444 @@
+@page "/downloads-hub"
+@using Microsoft.AspNetCore.Components
+@using Automaton.Studio.Services
+@inject NavigationManager NavigationManager
+
+<PageTitle>Downloads - Automaton Studio</PageTitle>
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb>
+                            <BreadcrumbItem Href="/">
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="download" Width="16" Height="16" />
+                                <span>Downloads</span>
+                            </BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+            <Col Class="right-actions">
+                <Space>
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                            <Icon Type="question-circle" />
+                            Get Started
+                        </Button>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Class="content-padding home-content content-background">
+        <div class="home-container">
+            
+            <!-- Header Section -->
+            <div class="downloads-header">
+                <div class="downloads-header-content">
+                    <div class="downloads-header-icon">
+                        <Icon Type="download" Style="font-size: 48px; color: white;" />
+                    </div>
+                    <div class="downloads-header-text">
+                        <Title Level="1" Style="margin-bottom: 8px;">Downloads</Title>
+                        <Paragraph Class="downloads-subtitle">
+                            Choose the right solution for your automation needs
+                        </Paragraph>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Options Grid -->
+            <Row Gutter="24" Style="margin-bottom: 24px;">
+                <!-- Console Runner Card -->
+                <Col Span="12">
+                    <Card Class="download-option-card recommended" Bordered="true" Hoverable="true">
+                        <div class="download-option-content">
+                            <div class="option-header">
+                                <div class="option-icon">
+                                    <Icon Type="code" Style="font-size: 32px; color: #1890ff;" />
+                                </div>
+                                <div class="option-info">
+                                    <Title Level="3" Style="margin-bottom: 4px;">Console Runner</Title>
+                                    <Text Type="@TextElementType.Secondary">Cross-platform automation agent</Text>
+                                    <div class="recommended-tag">
+                                        <Icon Type="star" Style="margin-right: 4px;" />
+                                        <span>Recommended</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-description">
+                                <Paragraph Style="margin: 16px 0;">
+                                    Lightweight, cross-platform command-line runner perfect for production environments, 
+                                    CI/CD pipelines, and server deployments.
+                                </Paragraph>
+
+                                <div class="feature-list">
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Windows, Linux, macOS support</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Interactive setup wizard</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>Headless/service mode</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                        <span>CI/CD friendly</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-actions">
+                                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/downloads"))">
+                                    <Icon Type="download" />
+                                    Download Console Runner
+                                </Button>
+                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px; margin-top: 8px; display: block; text-align: center;">
+                                    Best for: Production, CI/CD, Server deployments
+                                </Text>
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+
+                <!-- Desktop App Card -->
+                <Col Span="12">
+                    <Card Class="download-option-card" Bordered="true" Hoverable="true">
+                        <div class="download-option-content">
+                            <div class="option-header">
+                                <div class="option-icon">
+                                    <Icon Type="appstore" Style="font-size: 32px; color: #722ed1;" />
+                                </div>
+                                <div class="option-info">
+                                    <Title Level="3" Style="margin-bottom: 4px;">Desktop App</Title>
+                                    <Text Type="@TextElementType.Secondary">All-in-one development suite</Text>
+                                </div>
+                            </div>
+
+                            <div class="option-description">
+                                <Paragraph Style="margin: 16px 0;">
+                                    Complete desktop application with built-in workflow designer, local execution engine, 
+                                    and integrated management interface.
+                                </Paragraph>
+
+                                <div class="feature-list">
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #722ed1; margin-right: 8px;" />
+                                        <span>Visual workflow designer</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #722ed1; margin-right: 8px;" />
+                                        <span>Local workflow execution</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #722ed1; margin-right: 8px;" />
+                                        <span>No server setup required</span>
+                                    </div>
+                                    <div class="feature-item">
+                                        <Icon Type="check-circle" Style="color: #722ed1; margin-right: 8px;" />
+                                        <span>Instant development start</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-actions">
+                                <Button Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/desktop"))">
+                                    <Icon Type="download" />
+                                    Download Desktop App
+                                </Button>
+                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px; margin-top: 8px; display: block; text-align: center;">
+                                    Best for: Development, Design, Local workflows
+                                </Text>
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+            </Row>
+
+            <!-- Comparison Section -->
+            <Card Class="comparison-section-card" Style="margin-bottom: 24px;">
+                <TitleTemplate>
+                    <Icon Type="compare" Style="margin-right: 8px;" />
+                    <span>?? Feature Comparison</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <div class="comparison-table">
+                        <Row Class="comparison-header">
+                            <Col Span="8"><strong>Feature</strong></Col>
+                            <Col Span="8" Style="text-align: center;"><strong>Console Runner</strong></Col>
+                            <Col Span="8" Style="text-align: center;"><strong>Desktop App</strong></Col>
+                        </Row>
+                        <Divider Style="margin: 12px 0;" />
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Cross-Platform</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Text Type="@TextElementType.Secondary">Windows only</Text></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Visual Workflow Designer</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="close" Style="color: #ff4d4f;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Production Ready</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Server Integration</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                        </Row>
+                        
+                        <Row Class="comparison-row">
+                            <Col Span="8">Headless/Service Mode</Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="check" Style="color: #52c41a;" /></Col>
+                            <Col Span="8" Style="text-align: center;"><Icon Type="close" Style="color: #ff4d4f;" /></Col>
+                        </Row>
+                    </div>
+                </ChildContent>
+            </Card>
+
+            <!-- Help Section -->
+            <Card Class="help-section-card">
+                <TitleTemplate>
+                    <Icon Type="question-circle" Style="margin-right: 8px;" />
+                    <span>?? Need Help Choosing?</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Row Gutter="24">
+                        <Col Span="12">
+                            <div class="help-content">
+                                <Title Level="4">?? Use Console Runner if you:</Title>
+                                <ul class="help-list">
+                                    <li>Need cross-platform support (Linux, macOS, Windows)</li>
+                                    <li>Are deploying to production servers</li>
+                                    <li>Want to integrate with CI/CD pipelines</li>
+                                    <li>Need headless/service mode operation</li>
+                                    <li>Are running in Docker containers</li>
+                                </ul>
+                            </div>
+                        </Col>
+                        <Col Span="12">
+                            <div class="help-content">
+                                <Title Level="4">??? Use Desktop App if you:</Title>
+                                <ul class="help-list">
+                                    <li>Want a visual workflow designer</li>
+                                    <li>Are developing workflows locally</li>
+                                    <li>Need all-in-one solution with no server setup</li>
+                                    <li>Prefer GUI over command-line tools</li>
+                                    <li>Are on Windows and want instant start</li>
+                                </ul>
+                            </div>
+                        </Col>
+                    </Row>
+
+                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
+                        <MessageTemplate>
+                            <strong>?? Pro Tip:</strong> You can use both! Many users design workflows with the Desktop App and deploy them with the Console Runner for production.
+                        </MessageTemplate>
+                    </Alert>
+                </ChildContent>
+            </Card>
+        </div>
+    </Content>
+</Layout>
+
+<style>
+    .home-content {
+        min-height: auto;
+        padding-bottom: 40px;
+    }
+
+    .home-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 40px 24px;
+    }
+
+    .downloads-header {
+        margin-bottom: 32px;
+        padding: 24px 0;
+    }
+
+    .downloads-header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .downloads-header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: #1890ff;
+        border-radius: 16px;
+    }
+
+    .downloads-header-text {
+        flex: 1;
+    }
+
+    .downloads-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    .download-option-card.recommended {
+        border: 2px solid #1890ff;
+        background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+    }
+
+    .download-option-content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+    }
+
+    .option-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .option-icon {
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border-radius: 12px;
+    }
+
+    .option-info {
+        flex: 1;
+        position: relative;
+    }
+
+    .recommended-tag {
+        position: absolute;
+        top: -4px;
+        right: 0;
+        background: #1890ff;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .option-description {
+        flex: 1;
+        margin-bottom: 24px;
+    }
+
+    .feature-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+    }
+
+    .option-actions {
+        margin-top: auto;
+    }
+
+    .comparison-table {
+        font-size: 14px;
+    }
+
+    .comparison-header {
+        font-weight: 600;
+        background: #fafafa;
+        padding: 12px 0;
+        border-radius: 4px;
+    }
+
+    .comparison-row {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .comparison-row:last-child {
+        border-bottom: none;
+    }
+
+    .help-content {
+        padding: 8px;
+    }
+
+    .help-list {
+        margin: 12px 0;
+        padding-left: 20px;
+    }
+
+    .help-list li {
+        margin-bottom: 8px;
+        line-height: 1.5;
+    }
+
+    .comparison-section-card,
+    .help-section-card {
+        margin-bottom: 24px;
+    }
+
+    .comparison-section-card .ant-card-head-title,
+    .help-section-card .ant-card-head-title {
+        color: #1890ff;
+        font-weight: 600;
+    }
+
+    @@media (max-width: 768px) {
+        .downloads-header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .option-header {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .recommended-tag {
+            position: static;
+            margin-top: 8px;
+            align-self: center;
+        }
+        
+        .comparison-table {
+            font-size: 12px;
+        }
+    }
+</style>

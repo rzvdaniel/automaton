@@ -21,19 +21,22 @@
     <MenuItem Key="4" Icon="key" RouterLink="/apikeys">
         <b>API Keys</b>
     </MenuItem>
-    <MenuItem Key="5" Icon="setting" RouterLink="/settings">
+    <MenuItem Key="5" Icon="download" RouterLink="/downloads-hub">
+        <b>Downloads</b>
+    </MenuItem>
+    <MenuItem Key="6" Icon="setting" RouterLink="/settings">
         <b>Settings</b>
     </MenuItem>
     @if (shouldShowOnboarding)
     {
-        <MenuItem Key="6" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
+        <MenuItem Key="7" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
             <b>Get Started</b>
         </MenuItem>
     }
-    <MenuItem Key="7" Icon="user" RouterLink="/account/">
+    <MenuItem Key="8" Icon="user" RouterLink="/account/">
         <b>Account</b>
     </MenuItem>
-    <MenuItem Key="8" Icon="poweroff" OnClick="Logout">
+    <MenuItem Key="9" Icon="poweroff" OnClick="Logout">
         <b>Logout</b>
     </MenuItem>
 </Menu>
