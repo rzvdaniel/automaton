@@ -20,7 +20,6 @@ public class HubService
     private readonly FlowExecutionService flowExecutionService;
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
-    private readonly string hubUrl;
     private bool isReconnecting = false;
 
     public HubService(
@@ -32,7 +31,6 @@ public class HubService
         this.apiKeyAuthService = apiKeyAuthService;
         this.flowExecutionService = flowExecutionService;
         this.logger = Log.ForContext<HubService>();
-        this.hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
         
         // Configure resilient connection policy
         this.resilientConnectionPolicy = new ResilientPolicy(
@@ -60,12 +58,15 @@ public class HubService
                 return false;
             }
 
+            // Get the hub URL dynamically to ensure we use the current BaseUrl
+            var hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
+            
             WriteLine($"🔗 Connecting to {hubUrl}...");
             WriteLine($"🔍 API Key: {apiKey[..Math.Min(15, apiKey.Length)]}...");
             WriteLine($"🔍 Runner ID: {configService.RunnerId}");
             WriteLine($"🔍 Runner Name: {configService.ApplicationName}");
             
-            await BuildAndConnectWithRetry(apiKey);
+            await BuildAndConnectWithRetry(apiKey, hubUrl);
             return true;
         }
         catch (Exception ex)
@@ -75,15 +76,15 @@ public class HubService
         }
     }
 
-    private async Task BuildAndConnectWithRetry(string apiKey)
+    private async Task BuildAndConnectWithRetry(string apiKey, string hubUrl)
     {
         await resilientConnectionPolicy.GetPolicy().ExecuteAsync(async () =>
         {
-            await BuildAndConnect(apiKey);
+            await BuildAndConnect(apiKey, hubUrl);
         });
     }
 
-    private async Task BuildAndConnect(string apiKey)
+    private async Task BuildAndConnect(string apiKey, string hubUrl)
     {
         try
         {
@@ -193,9 +194,12 @@ public class HubService
 
     private async Task HandleConnectionError(Exception ex)
     {
+        // Get current hub URL for error reporting
+        var hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
+        
         // Log full technical details with stack trace to file logs only
-        logger.Error(ex, "Final connection failure after all retry attempts. Server: {Server}, Error: {ErrorType}", 
-            configService.BaseUrl, ex.GetType().Name);
+        logger.Error(ex, "Final connection failure after all retry attempts. Server: {Server}, HubUrl: {HubUrl}, Error: {ErrorType}", 
+            configService.BaseUrl, hubUrl, ex.GetType().Name);
         
         var friendlyMessage = GetFriendlyErrorMessage(ex);
         WriteLine($"❌ Connection failed: {friendlyMessage}");

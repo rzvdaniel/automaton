@@ -23,7 +23,18 @@ public class ConfigurationService
     public string ApplicationName => storageService.GetRunnerName() ?? "Console-Runner";
     public string ApplicationType => appConfig.ApplicationType;
 
-    public string BaseUrl => appConfig.BaseUrl;
+    public string BaseUrl 
+    { 
+        get 
+        {
+            if (string.IsNullOrEmpty(appConfig.BaseUrl))
+            {
+                throw new InvalidOperationException(
+                    "Server URL is not configured. Please run 'automaton-runner auth --server <url>' or set it during interactive setup.");
+            }
+            return appConfig.BaseUrl;
+        }
+    }
     public string WorkflowHubUrl => appConfig.WorkflowHubUrl;
     public string FlowsUrl => appConfig.FlowsUrl;
     public string RunnersUrl => appConfig.RunnersUrl;
@@ -35,6 +46,8 @@ public class ConfigurationService
     public string RefreshAccessTokenUrl => authConfig.RefreshAccessTokenUrl;
 
     public bool IsRunnerRegistered() => storageService.IsRunnerRegistered();
+
+    public bool IsServerConfigured() => !string.IsNullOrEmpty(appConfig.BaseUrl);
 
     public void UpdateServerUrl(string serverUrl)
     {

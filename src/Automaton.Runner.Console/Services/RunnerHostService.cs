@@ -42,10 +42,10 @@ public class RunnerHostService
             WriteLine();
 
             // Step 1: Check/Configure Server
-            if (string.IsNullOrEmpty(configService.BaseUrl) || configService.BaseUrl.Contains("localhost"))
+            if (!configService.IsServerConfigured())
             {
-                WriteLine("?? Server configuration needed...");
-                WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+                WriteLine("?? Server configuration required...");
+                WriteLine("No server URL configured.");
                 WriteLine();
                 
                 Write("Enter server URL (or press Enter for default https://localhost:7091): ");
@@ -155,9 +155,9 @@ public class RunnerHostService
                 configService.UpdateServerUrl(serverUrl);
                 WriteLine($"? Server configured: {configService.BaseUrl}");
             }
-            else if (string.IsNullOrEmpty(configService.BaseUrl) || configService.BaseUrl.Contains("localhost"))
+            else if (!configService.IsServerConfigured())
             {
-                WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+                WriteLine("Server URL is required for authentication.");
                 Write("Enter server URL (or press Enter for https://localhost:7091): ");
                 var inputServerUrl = ReadLine();
                 
@@ -219,7 +219,16 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Registration ===");
-            WriteLine($"Server: {configService.BaseUrl}");
+            
+            try
+            {
+                WriteLine($"Server: {configService.BaseUrl}");
+            }
+            catch (InvalidOperationException)
+            {
+                WriteLine("? Server URL not configured. Please run 'automaton-runner auth --server <url>' first.");
+                return;
+            }
             WriteLine();
 
             // Check if already registered and not forcing
@@ -306,7 +315,15 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Server Configuration ===");
-            WriteLine($"Current server: {configService.BaseUrl ?? "Not configured"}");
+            
+            try
+            {
+                WriteLine($"Current server: {configService.BaseUrl}");
+            }
+            catch (InvalidOperationException)
+            {
+                WriteLine("Current server: Not configured");
+            }
             WriteLine();
 
             if (!string.IsNullOrEmpty(serverUrl))
@@ -566,7 +583,16 @@ public class RunnerHostService
         // Connection Status
         var isConnected = hubService.IsConnected();
         WriteLine("?? Connection Status:");
-        WriteLine($"   • Server: {configService.BaseUrl}");
+        
+        try
+        {
+            WriteLine($"   • Server: {configService.BaseUrl}");
+        }
+        catch (InvalidOperationException)
+        {
+            WriteLine("   • Server: ? Not configured");
+        }
+        
         WriteLine($"   • Status: {(isConnected ? "? Connected" : "? Disconnected")}");
         
         if (!isConnected)
