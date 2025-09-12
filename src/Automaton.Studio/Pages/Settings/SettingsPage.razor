@@ -59,22 +59,53 @@
                                         Access the setup guide to configure Automaton or troubleshoot your installation.
                                     </Paragraph>
                                 </SpaceItem>
-                                <SpaceItem>
-                                    <Space>
-                                        <SpaceItem>
-                                            <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
-                                                <Icon Type="play-circle" />
-                                                Get Started
-                                            </Button>
-                                        </SpaceItem>
-                                    </Space>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Alert Type="@AlertType.Info" 
-                                           Message="Setup Status" 
-                                           Description="@setupStatusMessage"
-                                           ShowIcon="true" />
-                                </SpaceItem>
+                                
+                                @if (!hasRunners)
+                                {
+                                    <!-- Setup Incomplete Alert with Action -->
+                                    <SpaceItem>
+                                        <Alert Type="@AlertType.Warning" ShowIcon="true" Closable="false" Style="border: 2px solid #faad14;">
+                                            <MessageTemplate>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                                    <div>
+                                                        <Text Strong>⚡ Setup Required to Create Workflows</Text>
+                                                        <br />
+                                                        <Text Type="@TextElementType.Secondary">No runners registered yet. Complete the setup guide to unlock automation features.</Text>
+                                                    </div>
+                                                    <div style="flex-shrink: 0; margin-left: 16px;">
+                                                        <Button Type="@ButtonType.Primary" Size="@ButtonSize.Small" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                                                            <Icon Type="play-circle" />
+                                                            Complete Setup
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </MessageTemplate>
+                                        </Alert>
+                                    </SpaceItem>
+                                }
+                                else
+                                {
+                                    <!-- Setup Complete Info -->
+                                    <SpaceItem>
+                                        <Alert Type="@AlertType.Success" ShowIcon="true" Closable="false">
+                                            <MessageTemplate>
+                                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                                    <div>
+                                                        <Text Strong>✅ Setup Complete!</Text>
+                                                        <br />
+                                                        <Text Type="@TextElementType.Secondary">You have registered runners and can create workflows. Need help? Access the setup guide for troubleshooting.</Text>
+                                                    </div>
+                                                    <div style="flex-shrink: 0; margin-left: 16px;">
+                                                        <Button Size="@ButtonSize.Small" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+                                                            <Icon Type="book" />
+                                                            View Guide
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </MessageTemplate>
+                                        </Alert>
+                                    </SpaceItem>
+                                }
                             </Space>
                         </ChildContent>
                     </Card>
@@ -112,39 +143,17 @@
                                         API Keys
                                     </Button>
                                 </SpaceItem>
-                            </Space>
-                        </ChildContent>
-                    </Card>
-                </div>
-
-                <!-- System Information Section -->
-                <div class="section">
-                    <Card Title="System Information" Class="settings-card" Bordered="true">
-                        <Extra>
-                            <Icon Type="info-circle" Style="color: #722ed1;" />
-                        </Extra>
-                        <ChildContent>
-                            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
                                 <SpaceItem>
-                                    <Paragraph>
-                                        View system information and application details.
-                                    </Paragraph>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/downloads"))">
+                                        <Icon Type="download" />
+                                        Downloads
+                                    </Button>
                                 </SpaceItem>
                                 <SpaceItem>
-                                    <Space>
-                                        <SpaceItem>
-                                            <Button OnClick="@(() => NavigationManager.NavigateTo("/debug/onboarding"))">
-                                                <Icon Type="bug" />
-                                                Debug Onboarding
-                                            </Button>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button OnClick="@(() => NavigationManager.NavigateTo("/admin/onboarding"))">
-                                                <Icon Type="crown" />
-                                                Admin Tools
-                                            </Button>
-                                        </SpaceItem>
-                                    </Space>
+                                    <Button OnClick="@(() => NavigationManager.NavigateTo("/account"))">
+                                        <Icon Type="user" />
+                                        Account Settings
+                                    </Button>
                                 </SpaceItem>
                             </Space>
                         </ChildContent>
@@ -157,7 +166,7 @@
 </Layout>
 
 @code {
-    private string setupStatusMessage = "Checking setup status...";
+    private bool hasRunners = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -171,32 +180,14 @@
     {
         try
         {
-            var hasRunners = await OnboardingService.HasRegisteredRunnersAsync();
-            var shouldShow = await OnboardingService.ShouldShowOnboardingAsync();
-            
-            if (hasRunners)
-            {
-                setupStatusMessage = "✅ Setup completed! You have registered runners and can create workflows.";
-            }
-            else if (shouldShow)
-            {
-                setupStatusMessage = "⚠️ Setup incomplete. No runners registered yet. Complete the setup guide to get started.";
-            }
-            else
-            {
-                setupStatusMessage = "ℹ️ No runners registered. Visit the setup guide when you're ready.";
-            }
+            hasRunners = await OnboardingService.HasRegisteredRunnersAsync();
         }
         catch
         {
-            setupStatusMessage = "❓ Unable to check runner status. Please try again later.";
+            // On error, assume setup is complete to avoid showing unnecessary warnings
+            hasRunners = true;
         }
         
         StateHasChanged();
-    }
-
-    private void OpenExternalLink(string path)
-    {
-        NavigationManager.NavigateTo(path, true);
     }
 }
