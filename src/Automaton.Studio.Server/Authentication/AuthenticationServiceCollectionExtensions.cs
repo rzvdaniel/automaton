@@ -59,7 +59,7 @@ namespace Common.Authentication
                             if (authenticationFailedContext.Exception.GetType() ==
                                 typeof(SecurityTokenExpiredException))
                             {
-                                authenticationFailedContext.Response.Headers.Add("Token-Expired", "true");
+                                authenticationFailedContext.Response.Headers["Token-Expired"] = "true";
                             }
 
                             return Task.CompletedTask;
