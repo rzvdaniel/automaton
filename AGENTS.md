@@ -6,13 +6,60 @@ This document provides a comprehensive summary of the Automaton project, intende
 
 Automaton is a lightweight, cross-platform automation platform designed to streamline and orchestrate software tasks. It provides a visual interface for creating and managing task flows, while supporting extensibility through Python scripting and modular logic components.
 
-### Key Features
-- **Flow Builder**: A visual interface for designing automation pipelines.
-- **Python Integration**: Create and embed custom steps using Python code.
-- **Remote Execution**: Run flows on any connected system with a compatible runner.
-- **Logic Blocks**: Conditionals, loops, and HTTP request steps.
-- **Self-Hosted**: Deploy on any web server supporting .NET 7 and Blazor.
-- **Persistent Storage**: Built-in support for MySQL-backed state and flow management.
+### Site Map and Key Features
+
+This section provides a sitemap of the Automaton Studio application and a map of its key features.
+
+#### Sitemap
+
+*   `/`: Dashboard / Home
+*   `/flows`: Flows
+    *   `/flow/designer/{flowid}/{flowname}`: Flow Designer
+    *   `/flow/logs/{flowid}/{flowname}`: Flow Logs
+    *   `/flow/activity/{flowid}/{flowname}`: Flow Activity
+    *   `/flow/schedule/{flowid}/{flowname}`: Flow Schedule
+    *   `/flow/settings/{flowid}/{flowname}`: Flow Settings
+*   `/runners`: Runners
+*   `/customsteps`: Custom Steps
+    *   `/stepdesigner/{stepId}`: Custom Step Designer
+*   `/apikeys`: API Keys
+*   `/downloads-hub`: Downloads Hub
+    *   `/downloads`: Runner Downloads
+    *   `/desktop`: Desktop App Download
+*   `/settings`: Settings
+*   `/onboarding`: Onboarding
+*   `/account`: Account
+*   `/notavailable`: Page Not Available
+*   `/404`: Not Found
+*   Logout (Action)
+
+#### Key Features
+
+*   **Dashboard:** The main landing page.
+*   **Flows Management:**
+    *   List, create, and manage automation flows.
+    *   **Flow Designer:** A visual editor to design and build flows.
+    *   **Flow Logs:** View logs for a specific flow.
+    *   **Flow Activity:** View the activity and history of a flow.
+    *   **Flow Schedule:** Schedule flows to run at specific times.
+    *   **Flow Settings:** Configure settings for a specific flow.
+*   **Runners Management:**
+    *   List and manage connected runners.
+*   **Custom Steps Management:**
+    *   List, create, and manage custom steps.
+    *   **Custom Step Designer:** A designer to create new custom steps.
+*   **API Keys Management:**
+    *   Create, manage, and revoke API keys for authentication.
+*   **Downloads:**
+    *   A hub for downloading different versions of the runner and the desktop application.
+*   **Settings:**
+    *   Configure application settings.
+*   **Onboarding:**
+    *   A "Get Started" guide for new users.
+*   **User Account Management:**
+    *   Manage user account details.
+*   **Authentication:**
+    *   Login/Logout functionality.
 
 The project is inspired by [Workflow Core](https://github.com/danielgerlag/workflow-core).
 
