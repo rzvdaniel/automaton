@@ -429,14 +429,20 @@ main() {
     
     print_step "Installation completed successfully!"
     echo
-    echo -e "${GREEN}Next steps:${NC}"
+    echo -e "${GREEN}?? Next Steps:${NC}"
     if [[ -z "$API_KEY" ]]; then
+        echo
+        echo -e "${BLUE}EASY START (Recommended):${NC}"
         echo "1. Get an API key from your Automaton Studio (Settings ? API Keys)"
-        echo "2. Configure: $INSTALL_DIR/automaton-runner auth --api-key YOUR_KEY --server $SERVER_URL"
-        echo "3. Register: $INSTALL_DIR/automaton-runner register --name YOUR_RUNNER_NAME"
-        echo "4. Run: $INSTALL_DIR/automaton-runner run --name YOUR_RUNNER_NAME"
+        echo "2. Run: $INSTALL_DIR/automaton-runner"
+        echo "   ? The runner will interactively guide you through setup!"
+        echo
+        echo -e "${YELLOW}ADVANCED (For Scripting):${NC}"
+        echo "1. Configure: $INSTALL_DIR/automaton-runner auth --api-key YOUR_KEY --server $SERVER_URL"
+        echo "2. Register: $INSTALL_DIR/automaton-runner register --name YOUR_RUNNER_NAME"
+        echo "3. Run: $INSTALL_DIR/automaton-runner"
     else
-        echo "1. Start the runner: $INSTALL_DIR/automaton-runner run --name '$RUNNER_NAME'"
+        echo "1. Start the runner: $INSTALL_DIR/automaton-runner"
         if [[ "$CREATE_SERVICE" == true ]]; then
             case "$(uname -s)" in
                 Linux*)  echo "2. Or start as service: sudo systemctl start $SERVICE_NAME" ;;

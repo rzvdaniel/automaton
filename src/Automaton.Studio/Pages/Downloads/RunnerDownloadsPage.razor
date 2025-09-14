@@ -62,7 +62,7 @@
                     <div class="downloads-header-text">
                         <Title Level="1" Style="margin-bottom: 8px;">Download Console Runner</Title>
                         <Paragraph Class="downloads-subtitle">
-                            Cross-platform command-line runner with interactive setup
+                            Cross-platform command-line runner with one-command interactive setup
                         </Paragraph>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
             <Card Class="installation-scripts-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="rocket" Style="margin-right: 8px;" />
-                    <span>🚀 Quick Installation (Recommended)</span>
+                    <span>Quick Installation (Recommended)</span>
                 </TitleTemplate>
                 <ChildContent>
                     <Paragraph Style="font-size: 16px; margin-bottom: 16px;">
@@ -131,7 +131,8 @@
 
                     <Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
                         <MessageTemplate>
-                            <strong>After installation:</strong> Run <code>automaton-runner</code> and it will guide you through setup with your API key!
+                            <strong>After installation:</strong> Just run <code>automaton-runner</code> and it will guide you through complete setup! <br/>
+                            <strong>One Command Setup:</strong> The runner will interactively prompt for your API key, server URL, and runner name, then start automatically.
                         </MessageTemplate>
                     </Alert>
                 </ChildContent>
@@ -232,9 +233,15 @@
             <Card Class="getting-started-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="play-circle" Style="margin-right: 8px;" />
-                    <span>Getting Started</span>
+                    <span>Quick Start (Recommended)</span>
                 </TitleTemplate>
                 <ChildContent>
+                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 16px;">
+                        <MessageTemplate>
+                            <strong>✨ Interactive Setup:</strong> Just run <code>automaton-runner</code> once and it handles everything!
+                        </MessageTemplate>
+                    </Alert>
+                    
                     <Row Gutter="24">
                         <Col Span="12">
                             <div class="step-container">
@@ -261,13 +268,22 @@
                                 <div class="step-number">2</div>
                                 <div class="step-content">
                                     <Title Level="4">Run Interactive Setup</Title>
-                                    <Paragraph>Start the runner - it will guide you:</Paragraph>
+                                    <Paragraph><strong>That's it! Just run:</strong></Paragraph>
                                     <div class="code-example">
                                         <Text Code>automaton-runner</Text>
                                     </div>
                                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px;">
-                                        The runner will prompt for your API key, server URL, and runner name.
+                                        The runner will automatically:
+                                        <br/>• Ask for your API key
+                                        <br/>• Configure server URL 
+                                        <br/>• Set runner name with smart defaults
+                                        <br/>• Start running workflows immediately
                                     </Paragraph>
+                                    <Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 12px;">
+                                        <MessageTemplate>
+                                            <strong>No complex setup needed!</strong> Everything is handled interactively.
+                                        </MessageTemplate>
+                                    </Alert>
                                 </div>
                             </div>
                         </Col>
@@ -279,15 +295,22 @@
             <Card Class="advanced-commands-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="code" Style="margin-right: 8px;" />
-                    <span>Advanced Commands</span>
+                    <span>⚙️ Advanced Commands (Optional)</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Paragraph>For scripting and advanced usage, individual commands are available:</Paragraph>
+                    <Alert Type="@AlertType.Warning" ShowIcon="true" Style="margin-bottom: 16px;">
+                        <MessageTemplate>
+                            <strong>Most users don't need these!</strong> The interactive <code>automaton-runner</code> command handles everything automatically. 
+                            These commands are for scripting and advanced scenarios.
+                        </MessageTemplate>
+                    </Alert>
+                    
+                    <Paragraph>For scripting, automation, and advanced usage scenarios:</Paragraph>
                     
                     <Row Gutter="16">
                         <Col Span="12">
                             <div class="command-section">
-                                <Title Level="5">Authentication</Title>
+                                <Title Level="5">Manual Authentication</Title>
                                 <div class="code-example">
                                     <Text Code># Interactive authentication</Text><br/>
                                     <Text Code>automaton-runner auth</Text><br/><br/>
@@ -298,7 +321,7 @@
                         </Col>
                         <Col Span="12">
                             <div class="command-section">
-                                <Title Level="5">Registration</Title>
+                                <Title Level="5">Manual Registration</Title>
                                 <div class="code-example">
                                     <Text Code># Interactive registration</Text><br/>
                                     <Text Code>automaton-runner register</Text><br/><br/>
@@ -314,19 +337,21 @@
                     <Row Gutter="16" Style="margin-top: 16px;">
                         <Col Span="12">
                             <div class="command-section">
-                                <Title Level="5">Configuration</Title>
+                                <Title Level="5">Configuration & Status</Title>
                                 <div class="code-example">
                                     <Text Code># Configure server URL</Text><br/>
                                     <Text Code>automaton-runner server --url https://server.com</Text><br/><br/>
-                                    <Text Code># Show status</Text><br/>
+                                    <Text Code># Show detailed status</Text><br/>
                                     <Text Code>automaton-runner status</Text>
                                 </div>
                             </div>
                         </Col>
                         <Col Span="12">
                             <div class="command-section">
-                                <Title Level="5">Maintenance</Title>
+                                <Title Level="5">Service & Maintenance</Title>
                                 <div class="code-example">
+                                    <Text Code># Install as system service</Text><br/>
+                                    <Text Code>automaton-runner service install</Text><br/><br/>
                                     <Text Code># Clean up stored data</Text><br/>
                                     <Text Code>automaton-runner cleanup</Text><br/><br/>
                                     <Text Code># Show help</Text><br/>
@@ -342,22 +367,29 @@
             <Card Class="env-vars-card">
                 <TitleTemplate>
                     <Icon Type="setting" Style="margin-right: 8px;" />
-                    <span>Automation & Environment Variables</span>
+                    <span>🤖 Automation & CI/CD (Skip Interactive Prompts)</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Paragraph>For automated deployments and CI/CD:</Paragraph>
+                    <Paragraph>For automated deployments where you want to skip all interactive prompts:</Paragraph>
                     
                     <div class="code-example" Style="margin: 16px 0;">
                         <Text Code># Set API key via environment variable</Text><br/>
-                        <Text Code>export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"</Text><br/><br/>
-                        <Text Code># Runner starts with no prompts</Text><br/>
+                        <Text Code>export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"</Text><br/>
+                        <Text Code>export AppConfig__BaseUrl="https://automaton.company.com"</Text><br/><br/>
+                        <Text Code># Runner starts with no prompts - fully automated</Text><br/>
                         <Text Code>automaton-runner</Text>
                     </div>
 
                     <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
                         <MessageTemplate>
                             <strong>Perfect for Docker, CI/CD, and server deployments!</strong><br/>
-                            The runner automatically detects environment variables and skips interactive prompts.
+                            When environment variables are set, the runner automatically detects them and skips all interactive prompts.
+                        </MessageTemplate>
+                    </Alert>
+                    
+                    <Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 12px;">
+                        <MessageTemplate>
+                            <strong>All set!</strong> Your runner is configured to start automatically with the provided settings.
                         </MessageTemplate>
                     </Alert>
                 </ChildContent>

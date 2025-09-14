@@ -321,15 +321,21 @@ function Show-CompletionMessage {
     Write-Host ""
     Write-Step "Installation completed successfully!"
     Write-Host ""
-    Write-Host "Next steps:" -ForegroundColor $ColorInfo
+    Write-Host "?? Next Steps:" -ForegroundColor $ColorInfo
     
     if (!$ApiKey) {
+        Write-Host ""
+        Write-Host "EASY START (Recommended):" -ForegroundColor $ColorHeader
         Write-Host "1. Get an API key from your Automaton Studio (Settings ? API Keys)" -ForegroundColor Cyan
-        Write-Host "2. Configure: $ExecutablePath auth --api-key YOUR_KEY --server $ServerUrl" -ForegroundColor Cyan
-        Write-Host "3. Register: $ExecutablePath register --name YOUR_RUNNER_NAME" -ForegroundColor Cyan
-        Write-Host "4. Run: $ExecutablePath run --name YOUR_RUNNER_NAME" -ForegroundColor Cyan
+        Write-Host "2. Run: $ExecutablePath" -ForegroundColor Cyan
+        Write-Host "   ? The runner will interactively guide you through setup!" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "ADVANCED (For Scripting):" -ForegroundColor $ColorWarning
+        Write-Host "1. Configure: $ExecutablePath auth --api-key YOUR_KEY --server $ServerUrl" -ForegroundColor Yellow
+        Write-Host "2. Register: $ExecutablePath register --name YOUR_RUNNER_NAME" -ForegroundColor Yellow
+        Write-Host "3. Run: $ExecutablePath" -ForegroundColor Yellow
     } else {
-        Write-Host "1. Start the runner: $ExecutablePath run --name '$RunnerName'" -ForegroundColor Cyan
+        Write-Host "1. Start the runner: $ExecutablePath" -ForegroundColor Cyan
         if ($CreateService) {
             Write-Host "2. Or start as service: Start-Service 'AutomatonRunner'" -ForegroundColor Cyan
             Write-Host "3. Check service status: Get-Service 'AutomatonRunner'" -ForegroundColor Cyan
