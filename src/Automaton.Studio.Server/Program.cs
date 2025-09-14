@@ -249,10 +249,8 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseRouting();
 app.UseAuthorization();
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapControllers();
-});
+
+app.MapControllers();
 
 app.MapBlazorHub();
 app.MapHub<AutomatonHub>("/api/workflow/hub");
