@@ -1,6 +1,7 @@
 using Automaton.Studio.Config;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -42,7 +43,17 @@ public class Startup
         }
 
         app.UseHttpsRedirection();
-        app.UseStaticFiles();
+
+        // Configure static files with custom content type provider to allow .ps1 and .sh files
+        var provider = new FileExtensionContentTypeProvider();
+        // Add MIME type mappings for installation script files
+        provider.Mappings[".ps1"] = "text/plain";  // PowerShell scripts
+        provider.Mappings[".sh"] = "text/plain";   // Shell scripts
+
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            ContentTypeProvider = provider
+        });
 
         app.UseRouting();
 

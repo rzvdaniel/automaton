@@ -204,9 +204,7 @@ function Configure-Runner {
             return $false
         }
     } else {
-        Write-Warning "No API key provided. You'll need to configure manually:"
-        Write-Host "  $ExecutablePath auth --api-key YOUR_KEY --server $ServerUrl" -ForegroundColor Cyan
-        Write-Host "  $ExecutablePath register --name YOUR_RUNNER_NAME" -ForegroundColor Cyan
+        Write-Warning "No API key provided. You'll need to configure manually."
         return $true
     }
 }
