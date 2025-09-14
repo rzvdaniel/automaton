@@ -410,18 +410,20 @@
 
     protected override void OnInitialized()
     {
-        // Installation scripts
-        windowsInstallCommand = $"iwr -useb {ConfigService.BaseUrl}/downloads/install.ps1 | iex";
-        unixInstallCommand = $"curl -sSL {ConfigService.BaseUrl}/downloads/install.sh | bash";
+        // Get the client application base URL (where the Blazor app is running)
+        var clientBaseUrl = NavigationManager.BaseUri.TrimEnd('/');
         
-        // Build download URLs
-        var baseUrl = ConfigService.BaseUrl;
-        windowsX64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-win-x64.zip";
-        windowsArm64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-win-arm64.zip";
-        linuxX64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-linux-x64.tar.gz";
-        linuxArm64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-linux-arm64.tar.gz";
-        macosX64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-macos-x64.tar.gz";
-        macosArm64Url = $"{baseUrl}/downloads/runner/latest/automaton-runner-macos-arm64.tar.gz";
+        // Installation scripts - these are served from the Blazor client app
+        windowsInstallCommand = $"iwr -useb {clientBaseUrl}/downloads/install.ps1 | iex";
+        unixInstallCommand = $"curl -sSL {clientBaseUrl}/downloads/install.sh | bash";
+        
+        // Build download URLs - these are also served from the Blazor client app
+        windowsX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-x64.zip";
+        windowsArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-arm64.zip";
+        linuxX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-linux-x64.tar.gz";
+        linuxArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-linux-arm64.tar.gz";
+        macosX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-x64.tar.gz";
+        macosArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-arm64.tar.gz";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -465,6 +467,7 @@
         let detectedArch = 'x64';
         let downloadUrl = '';
         
+        // Use relative URLs since we're on the same client app
         if (platform.includes('win')) {
             detectedOS = 'Windows';
             downloadUrl = '/downloads/runner/latest/automaton-runner-win-x64.zip';
