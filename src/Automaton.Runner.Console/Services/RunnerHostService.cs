@@ -631,6 +631,8 @@ public class RunnerHostService
         WriteLine("   • automaton-runner status (show this status)");
         WriteLine("   • automaton-runner auth (authenticate)");
         WriteLine("   • automaton-runner register (register runner)");
+        WriteLine("   • automaton-runner server (configure server)");
+        WriteLine("   • automaton-runner service (service management)");
         WriteLine("   • automaton-runner cleanup (clear stored data)");
         
         WriteLine("???????????????????????????????????????????????");

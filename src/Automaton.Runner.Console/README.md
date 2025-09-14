@@ -128,6 +128,30 @@ automaton-runner
 
 ### Commands
 
+All available commands for the automaton-runner:
+
+```bash
+automaton-runner [command] [options]
+```
+
+**Available Commands:**
+- [`(default)`](#default---start-the-runner) - Start the interactive runner
+- [`auth`](#auth---authenticate-with-api-key) - Authenticate with API key  
+- [`register`](#register---register-runner-with-server) - Register runner with server
+- [`status`](#status---show-configuration-and-status) - Show runner status
+- [`server`](#server---configure-server-url) - Configure server URL
+- [`service`](#service---service-management-optional-convenience-commands) - Service management
+- [`cleanup`](#cleanup---cleanup-stored-data) - Clean up stored data
+
+**Quick Reference:**
+```bash
+# Most common usage patterns
+automaton-runner                    # Interactive setup and start
+automaton-runner status             # Show current status
+automaton-runner service status     # Show service status
+automaton-runner cleanup            # Clear stored configuration
+```
+
 #### Default - Start the Runner
 
 ```bash
@@ -230,217 +254,160 @@ Removes stored API key and runner registration data from local storage. Useful f
 
 **Note**: This command does not affect environment variables.
 
-## Configuration
+#### `service` - Service Management (Optional Convenience Commands)
 
-### Configuration File
-
-The runner uses `appsettings.json` for configuration:
-
-```json
-{
-  "AppConfig": {
-    "ApplicationType": "ConsoleRunner",
-    "BaseUrl": "https://localhost:7091",
-    "WorkflowHubUrl": "api/workflow/hub",
-    "FlowsUrl": "api/flows",
-    "RunnersUrl": "api/runners",
-    "LogsUrl": "api/logs",
-    "FlowExecutionUrl": "api/flowexecutions"
-  }
-}
-```
-
-### Storage Locations
-
-The runner stores configuration in:
-
-- **Windows**: `%APPDATA%\AutomatonRunner\`
-- **Linux/macOS**: `~/.config/AutomatonRunner/` or `$XDG_CONFIG_HOME/AutomatonRunner/`
-
-Files stored:
-- `apikey.json`: API key credentials
-- `runner.json`: Runner registration information
-
-## Environment Variables
-
-You can override configuration using environment variables:
-
-- `AUTOMATON_API_KEY`: API key for authentication
-- `AppConfig__BaseUrl`: Server base URL
-- `AppConfig__ApplicationType`: Application type identifier
-
-## Production Deployment
-
-### Method 1: API Key with Environment Variables (Recommended)
+Manage the runner as a system service. **Note**: For new installations, we recommend using the installation scripts which provide better service setup.
 
 ```bash
-# Set environment variables
-export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
-export AUTOMATON_SERVER_URL="https://automaton.company.com"
-
-# Deploy and start
-./automaton-runner
+automaton-runner service <subcommand>
 ```
 
-### Method 2: Containerized Deployment
+**Subcommands:**
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/runtime:8.0
-COPY . /app
-WORKDIR /app
-ENV AUTOMATON_API_KEY=""
-ENV AUTOMATON_SERVER_URL="https://localhost:7091"
-ENTRYPOINT ["./automaton-runner"]
-```
-
+##### `install` - Install as System Service
 ```bash
-docker run -e AUTOMATON_API_KEY="ak_runner_xxx" -e AUTOMATON_SERVER_URL="https://server.com" automaton-runner
+automaton-runner service install [--name <runner-name>] [--no-start]
 ```
 
-### Method 3: Systemd Service (Linux)
+**Options:**
+- `--name`: Runner name for the service (optional)
+- `--no-start`: Install service but don't start it immediately
 
-```ini
-[Unit]
-Description=Automaton Runner
-After=network.target
+**Examples:**
+```bash
+# Install and start service
+automaton-runner service install
 
-[Service]
-Type=simple
-User=automaton
-WorkingDirectory=/opt/automaton-runner
-Environment=AUTOMATON_API_KEY=ak_runner_1234567890abcdef
-ExecStart=/opt/automaton-runner/automaton-runner
-Restart=always
-RestartSec=10
+# Install with custom name
+automaton-runner service install --name "Production-Runner"
 
-[Install]
-WantedBy=multi-user.target
+# Install but don't start
+automaton-runner service install --no-start
 ```
 
-## Logging
+**Requirements by Platform:**
+- **Windows**: Administrator privileges, NSSM recommended
+- **Linux**: sudo privileges, systemd
+- **macOS**: sudo privileges, launchd
 
-Logs are written to:
-- Console (with user-friendly output for WARNING level and above)
-- `logs/automaton-runner-YYYY-MM-DD.log` files (with full technical details, rotated daily, kept for 7 days)
+##### `uninstall` - Remove System Service
+```bash
+automaton-runner service uninstall
+```
 
-Log levels can be configured in `appsettings.json` under the `Serilog` section.
+Stops and removes the system service.
+
+##### `status` - Show Service Status
+```bash
+automaton-runner service status
+```
+
+Shows the current status of the system service and available management commands.
+
+**Platform-Specific Service Commands:**
+
+| Platform | Start Service | Stop Service | Status |
+|----------|---------------|--------------|---------|
+| **Windows** | `net start AutomatonRunner` | `net stop AutomatonRunner` | `automaton-runner service status` |
+| **Linux** | `sudo systemctl start AutomatonRunner` | `sudo systemctl stop AutomatonRunner` | `systemctl status AutomatonRunner` |
+| **macOS** | `launchctl start com.automaton.runner` | `launchctl stop com.automaton.runner` | `automaton-runner service status` |
 
 ## Examples
 
-### CI/CD Pipeline Example
+### Basic Usage Examples
 
-```yaml
-# GitHub Actions example
-name: Deploy Automaton Runner
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy Runner
-        env:
-          AUTOMATON_API_KEY: ${{ secrets.AUTOMATON_API_KEY }}
-        run: |
-          ./automaton-runner register --name "CI-Runner-${{ github.run_number }}"
-          ./automaton-runner
-```
-
-### Docker Compose Example
-
-```yaml
-version: '3.8'
-services:
-  automaton-runner:
-    image: automaton-runner:latest
-    environment:
-      - AUTOMATON_API_KEY=ak_runner_1234567890abcdef
-      - AUTOMATON_SERVER_URL=https://automaton.company.com
-    restart: unless-stopped
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Authentication Failed**
-   - Verify API key is correct and not expired
-   - Check API key scope (should be "Runner" for console runner)
-   - Ensure server URL is correct
-   - Check that the key starts with `ak_` and is at least 10 characters long
-
-2. **Connection Failed**
-   - Check network connectivity to server
-   - Verify SignalR hub is enabled on server
-   - Check firewall settings
-
-3. **Runner Not Appearing in Studio**
-   - Ensure runner is registered successfully
-   - Check that runner is connected (use `s` command while running)
-   - Verify user has permission to see runners
-
-### API Key Issues
-- **Invalid format**: API keys should start with `ak_` and be at least 10 characters long
-- **Expired key**: Check expiration date in Automaton Studio
-- **Revoked key**: Verify the key is still active in the API Keys page
-- **Wrong scope**: Ensure the key has "Runner" scope for console runner operations
-
-### Reset Configuration
-
-To start fresh:
+#### Interactive Setup (Recommended)
 ```bash
-# Remove all stored authentication and runner data
+# Start the runner - it will guide you through everything
+automaton-runner
+
+# The runner will prompt for:
+# 1. Server URL (if not configured)
+# 2. API key (if not authenticated) 
+# 3. Runner name (if not registered)
+# 4. Automatically start the runner
+```
+
+#### Pre-configured Environment
+```bash
+# Set environment variables for fully automated operation
+export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
+export AppConfig__BaseUrl="https://automaton.company.com"
+
+# Start directly with no prompts
+automaton-runner
+```
+
+#### Step-by-Step Configuration
+```bash
+# Configure each component separately
+automaton-runner auth --api-key ak_runner_xxx --server https://server.com
+automaton-runner register --name "Production-Runner-01"
+automaton-runner  # Start the runner
+```
+
+#### Service Management Examples
+```bash
+# Install runner as a system service
+automaton-runner service install --name "Production-Runner"
+
+# Check service status
+automaton-runner service status
+
+# Remove the service
+automaton-runner service uninstall
+```
+
+#### Troubleshooting Examples
+```bash
+# Check current configuration and status
+automaton-runner status
+
+# Reset all stored configuration
 automaton-runner cleanup
 
-# Or manually remove files:
-rm -rf ~/.config/AutomatonRunner/  # Linux/macOS
-# or
-rmdir /s %APPDATA%\AutomatonRunner  # Windows
+# Reconfigure server URL
+automaton-runner server --url https://new-server.com
+
+# Force re-registration with new name
+automaton-runner register --name "New-Runner-Name" --force
 ```
 
-## API Key Scopes
+### Advanced Usage Scenarios
 
-Different API key formats may be used depending on your Automaton Studio configuration:
+#### CI/CD Pipeline Integration
+```bash
+#!/bin/bash
+# Automated deployment script
 
-| Example Format | Description | Use Case |
-|----------------|-------------|----------|
-| **ak_runner_xxx** | Traditional runner keys | Console runners, automation agents |
-| **ak_execute_xxx** | Traditional execution keys | CI/CD pipelines, external integrations |
-| **ak_readonly_xxx** | Traditional read-only keys | Monitoring, reporting tools |
-| **ak_xxxxxxxxx** | Flexible format keys | Any scope (determined by server configuration) |
+# Set credentials
+export AUTOMATON_API_KEY="$RUNNER_API_KEY"  # From CI secrets
+export AppConfig__BaseUrl="https://automaton.company.com"
 
-**Note**: The console runner now accepts any API key starting with `ak_` and at least 10 characters long. The specific scope and permissions are determined by your Automaton Studio server configuration.
+# Deploy and register
+automaton-runner register --name "CI-Runner-$BUILD_ID"
 
-## Architecture
+# Install as service for permanent deployment
+sudo automaton-runner service install --name "CI-Runner-$BUILD_ID"
+```
 
-The console runner consists of:
+#### Container Deployment
+```dockerfile
+FROM mcr.microsoft.com/dotnet/runtime:8.0
+COPY automaton-runner /app/
+WORKDIR /app
 
-- **API Key Authentication Service**: Handles API key validation and management
-- **Hub Service**: SignalR connection to receive workflow execution requests  
-- **Flow Execution Service**: Executes received workflows using Automaton.Core
-- **Storage Service**: File-based storage for runner configuration
-- **Configuration Service**: Manages application configuration
+# Set environment variables
+ENV AUTOMATON_API_KEY=""
+ENV AppConfig__BaseUrl=""
 
-## Comparison with GUI Runner
+# Run the interactive setup on container start
+ENTRYPOINT ["./automaton-runner"]
+```
 
-| Feature | GUI Runner | Console Runner |
-|---------|------------|----------------|
-| Platform | Windows only (WPF) | Cross-platform |
-| Dependencies | WPF, Blazor WebView | None (console only) |
-| Deployment | Interactive installation | Copy and run |
-| Automation | Manual start | Scriptable/Service |
-| Resource Usage | Higher (UI overhead) | Minimal |
-| Configuration | UI-based | Command-line/Config files |
-| Authentication | API keys | API keys |
-
-The console runner is ideal for:
-- Server deployments
-- Docker containers
-- Automated deployments
-- CI/CD pipelines
-- Linux/macOS environments
-- Headless servers
-- Production automation
+#### Development Environment
+```bash
+# Quick setup for development
+automaton-runner auth --api-key ak_dev_xxx --server https://localhost:7091
+automaton-runner register --name "Dev-$(whoami)-$(hostname)"
+automaton-runner  # Start and keep running
