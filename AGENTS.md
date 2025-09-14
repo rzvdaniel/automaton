@@ -61,8 +61,6 @@ This section provides a sitemap of the Automaton Studio application and a map of
 *   **Authentication:**
     *   Login/Logout functionality.
 
-The project is inspired by [Workflow Core](https://github.com/danielgerlag/workflow-core).
-
 ## Project Structure
 
 The Automaton project is a .NET solution composed of several key components:
