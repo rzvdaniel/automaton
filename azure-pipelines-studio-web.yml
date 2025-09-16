@@ -56,6 +56,13 @@ jobs:
       arguments: '--no-restore --no-build'
     displayName: 'Run Tests'
 
+  - task: PowerShell@2
+    displayName: 'Update Installer URLs for Production'
+    inputs:
+      filePath: 'scripts/Update-InstallerUrls.ps1'
+      arguments: '-ProductionUrl "https://api.automaton.monster"'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
   - task: DotNetCoreCLI@2
     inputs:
       command: 'publish'
@@ -72,13 +79,6 @@ jobs:
       folderPath: '$(build.artifactStagingDirectory)'
       fileType: 'json'
       targetFiles: '**/appsettings.json'
-
-  - task: PowerShell@2
-    displayName: 'Update Installer URLs for Production'
-    inputs:
-      filePath: 'scripts/Update-InstallerUrls.ps1'
-      arguments: '-ProductionUrl "https://api.automaton.monster"'
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Studio Web artifact
