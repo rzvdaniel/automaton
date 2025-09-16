@@ -59,7 +59,7 @@ USAGE:
 
 OPTIONS:
     --api-key KEY           API key for authentication
-    --server-url URL        Server URL (default: https://localhost:7091)
+    --server-url URL        Server URL (default: https://api.automaton.monster)
     --runner-name NAME      Runner name (default: hostname-runner)
     --install-dir DIR       Installation directory (default: /usr/local/bin)
     --create-service        Create system service (systemd/launchd)

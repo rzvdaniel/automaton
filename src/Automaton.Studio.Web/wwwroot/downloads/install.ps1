@@ -52,7 +52,7 @@ USAGE:
 
 OPTIONS:
     -ApiKey KEY             API key for authentication
-    -ServerUrl URL          Server URL (default: https://localhost:7091)
+    -ServerUrl URL          Server URL (default: https://api.automaton.monster)
     -RunnerName NAME        Runner name (default: COMPUTERNAME-Runner)
     -InstallPath PATH       Installation directory (default: Program Files\AutomatonRunner)
     -CreateService          Create Windows service using NSSM
