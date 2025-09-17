@@ -62,7 +62,7 @@ public class StudioFlowExecuteService
                     Finished = DateTime.UtcNow,
                     Status = WorkflowStatus.Error
                 };
-                workflowExecution.AddLog("Error", $"Workflow execution failed: {ex.Message}", exception: ex);
+                await AddLogWithNotification(workflowExecution, "Error", $"Workflow execution failed: {ex.Message}", exception: ex, cancellationToken: cancellationToken);
             }
         }
 
@@ -94,8 +94,7 @@ public class StudioFlowExecuteService
         LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
 
         var startMessage = $"Start workflow: {workflow.Name}";
-        logger.Information(startMessage);
-        workflowExecution.AddLog("Information", startMessage);
+        await AddLogWithNotification(workflowExecution, "Information", startMessage, cancellationToken: cancellationToken);
 
         while (step != null && !cancellationToken.IsCancellationRequested)
         {
@@ -114,35 +113,92 @@ public class StudioFlowExecuteService
                 await SendStepExecutionNotification(step, cancellationToken);
 
                 var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
-                logger.Information(stepStartMessage);
-                workflowExecution.AddLog("Information", stepStartMessage, step.Id, step.Name);
+                await AddLogWithNotification(workflowExecution, "Information", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
 
                 await step.ExecuteAsync(context);
 
                 var stepCompleteMessage = $"Completed step: {step.Name}";
-                logger.Information(stepCompleteMessage);
-                workflowExecution.AddLog("Information", stepCompleteMessage, step.Id, step.Name);
+                await AddLogWithNotification(workflowExecution, "Information", stepCompleteMessage, step.Id, step.Name, cancellationToken: cancellationToken);
             }
             catch (OperationCanceledException)
             {
                 var cancelMessage = "Workflow execution was canceled";
-                logger.Information(cancelMessage);
-                workflowExecution.AddLog("Warning", cancelMessage);
+                await AddLogWithNotification(workflowExecution, "Warning", cancelMessage, cancellationToken: cancellationToken);
             }
             catch (Exception ex)
             {
                 var errorMessage = $"Step {step.Name} with Id {step.Id} encountered an error. Message: {ex.Message}";
-                logger.Error(ex, errorMessage);
-                workflowExecution.AddLog("Error", errorMessage, step.Id, step.Name, ex);
+                await AddLogWithNotification(workflowExecution, "Error", errorMessage, step.Id, step.Name, ex, cancellationToken);
                 workflowExecution.HasErrors();
             }
 
             step = step.GetNextStep();
         }
 
-        logger.Information("End workflow: {0}", workflow.Name);
+        var endMessage = $"End workflow: {workflow.Name}";
+        await AddLogWithNotification(workflowExecution, "Information", endMessage, cancellationToken: cancellationToken);
 
         return workflowExecution;
+    }
+
+    /// <summary>
+    /// Unified logging method that:
+    /// 1. Adds log to workflowExecution for persistence
+    /// 2. Logs to ILogger/Serilog for server-side logging 
+    /// 3. Sends notification to UI for real-time updates
+    /// </summary>
+    private async Task AddLogWithNotification(
+        WorkflowExecution workflowExecution, 
+        string level, 
+        string message, 
+        string stepId = null, 
+        string stepName = null, 
+        Exception exception = null,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Add to workflow execution for database persistence
+        workflowExecution.AddLog(level, message, stepId, stepName, exception);
+
+        // 2. Log to Serilog/ILogger for server-side logging (with proper context)
+        switch (level.ToLowerInvariant())
+        {
+            case "error":
+                if (exception != null)
+                    logger.Error(exception, message);
+                else
+                    logger.Error(message);
+                break;
+            case "warning":
+                logger.Warning(message);
+                break;
+            case "debug":
+                logger.Debug(message);
+                break;
+            default:
+                logger.Information(message);
+                break;
+        }
+
+        // 3. Send notification to UI for real-time updates
+        try
+        {
+            var logEntry = new FlowExecutionLogEntry
+            {
+                Timestamp = DateTime.UtcNow,
+                Level = level,
+                Message = message,
+                StepId = stepId,
+                StepName = stepName,
+                Exception = exception?.ToString()
+            };
+
+            await mediator.Publish(new LogUpdateNotification(workflowExecution.FlowId, workflowExecution.Id, logEntry), cancellationToken);
+        }
+        catch (Exception notificationEx)
+        {
+            // Don't let notification failures break execution - just log it
+            logger.Warning(notificationEx, "Failed to send log update notification for execution {ExecutionId}", workflowExecution.Id);
+        }
     }
 
     private static async Task DelayStepExecution(int executeDelay, CancellationToken cancellationToken)

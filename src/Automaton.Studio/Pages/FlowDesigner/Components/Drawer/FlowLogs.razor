@@ -55,10 +55,10 @@
 
     <!-- Logs Content -->
     <div class="flow-logs-content">
-        @if (!string.IsNullOrEmpty(WorkflowSink?.Logs))
+        @if (!string.IsNullOrEmpty(WorkflowLogsManager?.Logs))
         {
             <TextArea @ref="logsTextArea"
-                     Value="@WorkflowSink.Logs"
+                     Value="@WorkflowLogsManager.Logs"
                      ReadOnly="true"
                      ShowCount="false"
                      AutoSize="false"

@@ -4,6 +4,7 @@ using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
 using Automaton.Studio.Pages.FlowDesigner.Components.NewDefinition;
 using Automaton.Studio.Resources;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.FlowDesigner;
@@ -30,12 +31,14 @@ partial class DesignerPage : ComponentBase
     [Inject] ICourier Courier { get; set; }
     [Inject] ModalService ModalService { get; set; } = default!;
     [Inject] DesignerViewModel DesignerViewModel { get; set; } = default!;
+    [Inject] WorkflowLogsManager WorkflowLogsManager { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
         Courier.Subscribe<ExecuteStepNotification>(HandleExecuteStepNotification);
         Courier.Subscribe<FlowUpdateNotification>(HandleFlowUpdateNotification);
         Courier.Subscribe<VariableUpdateNotification>(HandleVariableUpdateNotification);
+        Courier.Subscribe<LogUpdateNotification>(HandleLogUpdateNotification);
 
         await LoadFlow();
     }
@@ -53,7 +56,17 @@ partial class DesignerPage : ComponentBase
 
     public async Task RunFlow()
     {
-        await DesignerViewModel.RunFlow();
+        // Clear logs for new execution and set the execution ID for log tracking
+        WorkflowLogsManager.ClearLogs();
+        
+        // Get the workflow execution that will be created
+        var execution = await DesignerViewModel.RunFlow();
+        
+        // Set the current execution ID for log tracking
+        if (execution != null)
+        {
+            WorkflowLogsManager.SetCurrentExecution(execution.Id);
+        }
     }
 
     public void StopFlow()
@@ -205,6 +218,16 @@ partial class DesignerPage : ComponentBase
         InvokeAsync(StateHasChanged);
     }
 
+    private void HandleLogUpdateNotification(LogUpdateNotification notification, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return;
+
+        // The WorkflowLogsManager will be updated via the LogUpdateNotificationHandler
+        // We just need to trigger a UI refresh
+        InvokeAsync(StateHasChanged);
+    }
+
     private void OnTabChange(string key)
     {
         activeTabKey = key;
@@ -215,5 +238,6 @@ partial class DesignerPage : ComponentBase
         Courier.UnSubscribe<ExecuteStepNotification>(HandleExecuteStepNotification);
         Courier.UnSubscribe<FlowUpdateNotification>(HandleFlowUpdateNotification);
         Courier.UnSubscribe<VariableUpdateNotification>(HandleVariableUpdateNotification);
+        Courier.UnSubscribe<LogUpdateNotification>(HandleLogUpdateNotification);
     }
 }

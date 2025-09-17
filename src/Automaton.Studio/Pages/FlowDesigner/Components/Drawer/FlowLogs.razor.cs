@@ -1,5 +1,5 @@
-﻿using Automaton.Core.Logs;
-using Automaton.Studio.Domain;
+﻿using Automaton.Studio.Domain;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using AntDesign;
@@ -16,7 +16,7 @@ public partial class FlowLogs : ComponentBase, IDisposable
     private StudioFlow Flow { get; set; }
 
     [Inject]
-    public WorkflowLogsSink WorkflowSink { get; set; }
+    public WorkflowLogsManager WorkflowLogsManager { get; set; }
 
     [Inject]
     public IJSRuntime JSRuntime { get; set; }
@@ -26,6 +26,9 @@ public partial class FlowLogs : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        // Subscribe to logs updated events
+        WorkflowLogsManager.LogsUpdated += OnLogsUpdated;
+        
         await base.OnInitializedAsync();
     }
 
@@ -36,6 +39,18 @@ public partial class FlowLogs : ComponentBase, IDisposable
             await ScrollToBottom();
         }
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async void OnLogsUpdated(object sender, LogsUpdatedEventArgs e)
+    {
+        // Update UI when new logs arrive
+        await InvokeAsync(StateHasChanged);
+        
+        // Auto-scroll to bottom if enabled
+        if (autoScroll)
+        {
+            await InvokeAsync(async () => await ScrollToBottom());
+        }
     }
 
     private async Task ScrollToBottom()
@@ -52,7 +67,7 @@ public partial class FlowLogs : ComponentBase, IDisposable
 
     private void ClearLogs()
     {
-        WorkflowSink?.ClearLogs();
+        WorkflowLogsManager?.ClearLogs();
         StateHasChanged();
     }
 
@@ -60,9 +75,9 @@ public partial class FlowLogs : ComponentBase, IDisposable
     {
         try
         {
-            if (!string.IsNullOrEmpty(WorkflowSink?.Logs))
+            if (!string.IsNullOrEmpty(WorkflowLogsManager?.Logs))
             {
-                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", WorkflowSink.Logs);
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", WorkflowLogsManager.Logs);
                 MessageService.Success("Logs copied to clipboard", 2);
             }
             else
@@ -96,5 +111,11 @@ public partial class FlowLogs : ComponentBase, IDisposable
     public void Dispose()
     {
         scrollTimer?.Dispose();
+        
+        // Unsubscribe from events
+        if (WorkflowLogsManager != null)
+        {
+            WorkflowLogsManager.LogsUpdated -= OnLogsUpdated;
+        }
     }
 }

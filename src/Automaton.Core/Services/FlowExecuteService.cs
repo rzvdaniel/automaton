@@ -41,8 +41,7 @@ public class FlowExecuteService
         LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
 
         var startMessage = $"Start workflow: {workflow.Name}";
-        logger.Information(startMessage);
-        workflowExecution.AddLog("Information", startMessage);
+        AddLogWithSerilog(workflowExecution, "Information", startMessage);
 
         while (step != null)
         {
@@ -57,20 +56,17 @@ public class FlowExecuteService
             try
             {
                 var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
-                logger.Information(stepStartMessage);
-                workflowExecution.AddLog("Information", stepStartMessage, step.Id, step.Name);
+                AddLogWithSerilog(workflowExecution, "Information", stepStartMessage, step.Id, step.Name);
 
                 await step.ExecuteAsync(context);
 
                 var stepCompleteMessage = $"Completed step: {step.Name}";
-                logger.Information(stepCompleteMessage);
-                workflowExecution.AddLog("Information", stepCompleteMessage, step.Id, step.Name);
+                AddLogWithSerilog(workflowExecution, "Information", stepCompleteMessage, step.Id, step.Name);
             }
             catch (Exception ex)
             {
                 var errorMessage = $"Step: {step.Id} encountered an error. Message: {ex.Message}";
-                logger.Error(ex, errorMessage);
-                workflowExecution.AddLog("Error", errorMessage, step.Id, step.Name, ex);
+                AddLogWithSerilog(workflowExecution, "Error", errorMessage, step.Id, step.Name, ex);
                 workflowExecution.HasErrors();
             }
 
@@ -78,9 +74,46 @@ public class FlowExecuteService
         }
 
         var endMessage = $"End workflow: {workflow.Name}";
-        logger.Information(endMessage);
-        workflowExecution.AddLog("Information", endMessage);
+        AddLogWithSerilog(workflowExecution, "Information", endMessage);
 
         return workflowExecution;
+    }
+
+    /// <summary>
+    /// Unified logging method for console runners that:
+    /// 1. Adds log to workflowExecution for persistence
+    /// 2. Logs to ILogger/Serilog for server-side logging 
+    /// (Note: Console runners don't need UI notifications)
+    /// </summary>
+    private void AddLogWithSerilog(
+        WorkflowExecution workflowExecution, 
+        string level, 
+        string message, 
+        string stepId = null, 
+        string stepName = null, 
+        Exception exception = null)
+    {
+        // 1. Add to workflow execution for database persistence
+        workflowExecution.AddLog(level, message, stepId, stepName, exception);
+
+        // 2. Log to Serilog/ILogger for server-side logging (with proper context)
+        switch (level.ToLowerInvariant())
+        {
+            case "error":
+                if (exception != null)
+                    logger.Error(exception, message);
+                else
+                    logger.Error(message);
+                break;
+            case "warning":
+                logger.Warning(message);
+                break;
+            case "debug":
+                logger.Debug(message);
+                break;
+            default:
+                logger.Information(message);
+                break;
+        }
     }
 }

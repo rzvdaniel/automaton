@@ -122,10 +122,12 @@ public static class SeviceCollection
         // Javascript
         services.AddScoped<JsInterop>();
 
+        services.AddSingleton<WorkflowLogsManager>();
+        services.AddTransient<Handlers.LogUpdateNotificationHandler>();
+
         // Other
         services.AddSingleton(sp => new HttpClient { BaseAddress = new Uri(configService.BaseUrl) });
         services.AddSingleton(sp => new SerilogHttpClient(new HttpClient { BaseAddress = new Uri(configService.BaseUrl) }));
-        services.AddSingleton(sp => new WorkflowLogsSink());
         services.AddSingleton<KeyboardService>();
 
         services.AddScoped(typeof(DragDropService));

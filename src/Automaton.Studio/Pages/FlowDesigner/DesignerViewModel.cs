@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Factories;
@@ -69,7 +70,7 @@ public class DesignerViewModel
         await flowService.Update(Flow);
     }
 
-    public async Task RunFlow()
+    public async Task<WorkflowExecution> RunFlow()
     {
         if (!CanExecuteFlow)
         {
@@ -82,7 +83,8 @@ public class DesignerViewModel
 
         try
         {
-            await workflowExecuteService.Execute(Flow, FlowDelay, cancelFlowTokenSource.Token);
+            var workflowExecution = await workflowExecuteService.Execute(Flow, FlowDelay, cancelFlowTokenSource.Token);
+            return workflowExecution;
         }
         finally
         {

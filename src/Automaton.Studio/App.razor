@@ -46,7 +46,6 @@
     [Inject] public HttpClient HttpClient { get; set; }
     [Inject] public SerilogHttpClient SerilogHttpClient { get; set; }
     [Inject] public ConfigurationService ConfigurationService { get; set; }
-    [Inject] public WorkflowLogsSink WorkflowSink { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,7 +67,6 @@
                     requestUri: $"{ConfigurationService.BaseUrl}/{ConfigurationService.LogsUrl}",
                     httpClient: new SerilogHttpClient(HttpClient),
                     queueLimitBytes: null)
-                .WriteTo.Sink(WorkflowSink)
                 .CreateLogger());
     }
 }
