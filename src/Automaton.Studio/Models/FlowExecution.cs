@@ -21,6 +21,7 @@ public class FlowExecution
     public DateTime Finished { get; set; }
     public WorkflowStatus Status { get; set; }
     public string Application { get; set; }
+    public List<FlowExecutionLogEntry> Logs { get; set; } = new();
 
     public string LogsText { get; set; } = string.Empty;
 

@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Pages.Runners;
@@ -7,7 +6,6 @@ namespace Automaton.Studio.Pages.Runners;
 public class FlowActivityViewModel
 {
     private readonly FlowExecutionsService flowExecutionService;
-    private readonly IMapper mapper;
 
     public IEnumerable<FlowExecution> Executions { get; set; } = new List<FlowExecution>();
     public int Total { get; set; }
@@ -15,12 +13,10 @@ public class FlowActivityViewModel
     public FlowActivityViewModel
     (
         FlowExecutionsService flowExecutionService,
-        FlowService flowService,
-        IMapper mapper
+        FlowService flowService
     )
     {
         this.flowExecutionService = flowExecutionService;
-        this.mapper = mapper;
     }
 
     public async Task GetFlowActivity(string flowIdString, int startIndex, int pageSize)
@@ -32,7 +28,7 @@ public class FlowActivityViewModel
         Total = result.Total;
     }
 
-    public async Task<IEnumerable<LogModel>> GetLogs(string flowIdString, Guid flowExecutionId)
+    public async Task<IEnumerable<FlowExecutionLogEntry>> GetLogs(string flowIdString, Guid flowExecutionId)
     {
         Guid.TryParse(flowIdString, out var flowId);
         var logs = await flowExecutionService.GetLogsActivity(flowId, flowExecutionId);
@@ -46,5 +42,13 @@ public class FlowActivityViewModel
         var logsText = await flowExecutionService.GetLogsActivityText(flowId, flowExecutionId);
 
         return logsText;
+    }
+
+    public async Task<string> GetLogsJson(string flowIdString, Guid flowExecutionId)
+    {
+        Guid.TryParse(flowIdString, out var flowId);
+        var logsJson = await flowExecutionService.GetLogsActivityJson(flowId, flowExecutionId);
+
+        return logsJson;
     }
 }

@@ -10,5 +10,6 @@ namespace Automaton.Studio.Server.Models
         public DateTime Finished { get; set; }
         public string Status { get; set; }
         public string Application { get; set; }
+        public List<FlowExecutionLogEntry> Logs { get; set; } = new();
     }
 }

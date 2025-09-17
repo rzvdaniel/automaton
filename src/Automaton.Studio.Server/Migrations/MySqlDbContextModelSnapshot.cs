@@ -19,6 +19,67 @@ namespace Automaton.Studio.Server.Migrations
                 .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("HashedKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("KeyPrefix")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Scope")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(3);
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HashedKey")
+                        .IsUnique();
+
+                    b.HasIndex("LastUsedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("ApiKeys");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -241,6 +302,33 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowExecutions");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("FlowExecutionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("LogsJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FlowExecutionId")
+                        .IsUnique();
+
+                    b.ToTable("FlowExecutionLogs");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionUser", b =>
                 {
                     b.Property<Guid>("FlowExecutionId")
@@ -429,7 +517,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 9, 2, 0, 47, 41, 643, DateTimeKind.Local).AddTicks(5060));
+                        .HasDefaultValue(new DateTime(2025, 9, 17, 16, 36, 40, 404, DateTimeKind.Local).AddTicks(1481));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -533,6 +621,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", "Role")
@@ -559,6 +658,17 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("CustomStepId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionLog", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.FlowExecution", "FlowExecution")
+                        .WithMany()
+                        .HasForeignKey("FlowExecutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FlowExecution");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionUser", b =>

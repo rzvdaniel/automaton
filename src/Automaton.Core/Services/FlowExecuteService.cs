@@ -40,7 +40,9 @@ public class FlowExecuteService
         LogContext.PushProperty(LogContextProperties.WorkflowExecutionId, workflowExecution.Id);
         LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
 
-        logger.Information("Start workflow: {0}", workflow.Name);
+        var startMessage = $"Start workflow: {workflow.Name}";
+        logger.Information(startMessage);
+        workflowExecution.AddLog("Information", startMessage);
 
         while (step != null)
         {
@@ -54,18 +56,30 @@ public class FlowExecuteService
 
             try
             {
+                var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
+                logger.Information(stepStartMessage);
+                workflowExecution.AddLog("Information", stepStartMessage, step.Id, step.Name);
+
                 await step.ExecuteAsync(context);
+
+                var stepCompleteMessage = $"Completed step: {step.Name}";
+                logger.Information(stepCompleteMessage);
+                workflowExecution.AddLog("Information", stepCompleteMessage, step.Id, step.Name);
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Step: {0} encountered an error. Message: {1}", step.Id, ex.Message);
+                var errorMessage = $"Step: {step.Id} encountered an error. Message: {ex.Message}";
+                logger.Error(ex, errorMessage);
+                workflowExecution.AddLog("Error", errorMessage, step.Id, step.Name, ex);
                 workflowExecution.HasErrors();
             }
 
             step = step.GetNextStep();
         }
 
-        logger.Information("End workflow: {0}", workflow.Name);
+        var endMessage = $"End workflow: {workflow.Name}";
+        logger.Information(endMessage);
+        workflowExecution.AddLog("Information", endMessage);
 
         return workflowExecution;
     }

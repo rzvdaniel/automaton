@@ -22,6 +22,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<FlowUser> FlowUsers { get; set; }
         public virtual DbSet<FlowExecution> FlowExecutions { get; set; }
         public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
+        public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
         public virtual DbSet<Runner> Runners { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
@@ -157,7 +158,13 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-                entity.Property(e => e.Scope).IsRequired().HasDefaultValue(ApiKeyScope.Runner);
+                
+                // Configure Scope property with sentinel value to avoid EF Core warning
+                entity.Property(e => e.Scope)
+                    .IsRequired()
+                    .HasDefaultValue(ApiKeyScope.Runner)
+                    .HasSentinel((ApiKeyScope)0); // Use 0 as sentinel - if value is 0, use database default
+                
                 entity.Property(e => e.Description).HasMaxLength(500);
 
                 entity.HasOne(e => e.User)
@@ -169,6 +176,23 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => new { e.UserId, e.IsActive });
                 entity.HasIndex(e => e.LastUsedAt);
+            });
+
+            modelBuilder.Entity<FlowExecutionLog>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.FlowExecutionId).IsRequired();
+                entity.Property(e => e.LogsJson).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                entity.HasOne(e => e.FlowExecution)
+                    .WithMany()
+                    .HasForeignKey(e => e.FlowExecutionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Unique index to ensure one log entry per execution
+                entity.HasIndex(e => e.FlowExecutionId).IsUnique();
             });
         }
 

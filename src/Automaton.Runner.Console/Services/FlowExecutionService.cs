@@ -126,7 +126,16 @@ public class FlowExecutionService
                 Started = workflowExecution.Started,
                 Finished = workflowExecution.Finished,
                 Status = workflowExecution.Status.ToString(),
-                Application = workflowExecution.Application
+                Application = workflowExecution.Application,
+                Logs = workflowExecution.Logs.Select(log => new
+                {
+                    Timestamp = log.Timestamp,
+                    Level = log.Level,
+                    Message = log.Message,
+                    StepId = log.StepId,
+                    StepName = log.StepName,
+                    Exception = log.Exception
+                }).ToArray()
             };
 
             var json = JsonSerializer.Serialize(flowExecution);
@@ -136,7 +145,8 @@ public class FlowExecutionService
             
             if (response.IsSuccessStatusCode)
             {
-                logger.Information("Execution result saved successfully for workflow {WorkflowId}", workflowExecution.FlowId);
+                logger.Information("Execution result saved successfully for workflow {WorkflowId} with {LogCount} log entries", 
+                    workflowExecution.FlowId, workflowExecution.Logs.Count);
             }
             else
             {

@@ -140,7 +140,7 @@ namespace Automaton.Studio.Server.Migrations
                     Id = table.Column<Guid>(type: "char(36)", nullable: false),
                     UserId = table.Column<Guid>(type: "char(36)", nullable: false),
                     Token = table.Column<string>(type: "longtext", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValue: new DateTime(2025, 3, 11, 9, 34, 45, 188, DateTimeKind.Local).AddTicks(6573)),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValue: new DateTime(2025, 9, 17, 16, 36, 40, 404, DateTimeKind.Local).AddTicks(1481)),
                     RevokedAt = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     Expires = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
@@ -197,6 +197,34 @@ namespace Automaton.Studio.Server.Migrations
                         name: "FK_AspNetRoleClaims_AspNetRoles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "AspNetRoles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySQL:Charset", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "ApiKeys",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    Name = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false),
+                    HashedKey = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false),
+                    KeyPrefix = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false),
+                    UserId = table.Column<Guid>(type: "char(36)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    LastUsedAt = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: true),
+                    Scope = table.Column<int>(type: "int", nullable: false, defaultValue: 3),
+                    Description = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiKeys", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiKeys_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -292,6 +320,30 @@ namespace Automaton.Studio.Server.Migrations
                 .Annotation("MySQL:Charset", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "RecentActivities",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    ActivityType = table.Column<int>(type: "int", nullable: false),
+                    EntityName = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false),
+                    EntityId = table.Column<Guid>(type: "char(36)", nullable: true),
+                    Description = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    UserId = table.Column<Guid>(type: "char(36)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RecentActivities", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RecentActivities_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySQL:Charset", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "CustomStepUsers",
                 columns: table => new
                 {
@@ -305,6 +357,28 @@ namespace Automaton.Studio.Server.Migrations
                         name: "FK_CustomStepUsers_CustomSteps_CustomStepId",
                         column: x => x.CustomStepId,
                         principalTable: "CustomSteps",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySQL:Charset", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "FlowExecutionLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "char(36)", nullable: false),
+                    FlowExecutionId = table.Column<Guid>(type: "char(36)", nullable: false),
+                    LogsJson = table.Column<string>(type: "longtext", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FlowExecutionLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_FlowExecutionLogs_FlowExecutions_FlowExecutionId",
+                        column: x => x.FlowExecutionId,
+                        principalTable: "FlowExecutions",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -387,6 +461,27 @@ namespace Automaton.Studio.Server.Migrations
                 .Annotation("MySQL:Charset", "utf8mb4");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_HashedKey",
+                table: "ApiKeys",
+                column: "HashedKey",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_LastUsedAt",
+                table: "ApiKeys",
+                column: "LastUsedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_UserId",
+                table: "ApiKeys",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_UserId_IsActive",
+                table: "ApiKeys",
+                columns: new[] { "UserId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
                 column: "RoleId");
@@ -429,6 +524,12 @@ namespace Automaton.Studio.Server.Migrations
                 column: "CustomStepId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_FlowExecutionLogs_FlowExecutionId",
+                table: "FlowExecutionLogs",
+                column: "FlowExecutionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_FlowExecutionUser_FlowExecutionId",
                 table: "FlowExecutionUsers",
                 column: "FlowExecutionId");
@@ -437,6 +538,21 @@ namespace Automaton.Studio.Server.Migrations
                 name: "IX_FlowUser_FlowId",
                 table: "FlowUsers",
                 column: "FlowId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RecentActivities_CreatedAt",
+                table: "RecentActivities",
+                column: "CreatedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RecentActivities_UserId",
+                table: "RecentActivities",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RecentActivities_UserId_CreatedAt",
+                table: "RecentActivities",
+                columns: new[] { "UserId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_RunnerUser_RunnerId",
@@ -452,6 +568,9 @@ namespace Automaton.Studio.Server.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "ApiKeys");
+
             migrationBuilder.DropTable(
                 name: "AspNetRoleClaims");
 
@@ -471,6 +590,9 @@ namespace Automaton.Studio.Server.Migrations
                 name: "CustomStepUsers");
 
             migrationBuilder.DropTable(
+                name: "FlowExecutionLogs");
+
+            migrationBuilder.DropTable(
                 name: "FlowExecutionUsers");
 
             migrationBuilder.DropTable(
@@ -478,6 +600,9 @@ namespace Automaton.Studio.Server.Migrations
 
             migrationBuilder.DropTable(
                 name: "Logs");
+
+            migrationBuilder.DropTable(
+                name: "RecentActivities");
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
@@ -492,9 +617,6 @@ namespace Automaton.Studio.Server.Migrations
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
-
-            migrationBuilder.DropTable(
                 name: "CustomSteps");
 
             migrationBuilder.DropTable(
@@ -502,6 +624,9 @@ namespace Automaton.Studio.Server.Migrations
 
             migrationBuilder.DropTable(
                 name: "Flows");
+
+            migrationBuilder.DropTable(
+                name: "AspNetUsers");
 
             migrationBuilder.DropTable(
                 name: "Runners");

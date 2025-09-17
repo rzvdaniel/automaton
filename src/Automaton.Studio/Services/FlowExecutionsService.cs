@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 
 namespace Automaton.Studio.Services;
 
@@ -7,20 +6,17 @@ public class FlowExecutionsService
 {
     private HttpClient httpClient;
     private readonly ConfigurationService configService;
-    private readonly IMapper mapper;
     private readonly ILogger logger;
 
     public FlowExecutionsService
     (
         ConfigurationService configService,
-        IMapper mapper,
         HttpClient httpClient
     )
     {
         this.logger = Log.ForContext<FlowExecutionsService>(); ;
         this.configService = configService;
         this.httpClient = httpClient;
-        this.mapper = mapper;
     }
 
     public async Task<FlowExecutionResult> GetFlowExecutionResult(Guid flowId, int startIndex, int pageSize)
@@ -43,7 +39,7 @@ public class FlowExecutionsService
         }
     }
 
-    public async Task<IEnumerable<LogModel>> GetLogsActivity(Guid flowId, Guid flowExecutionId)
+    public async Task<IEnumerable<FlowExecutionLogEntry>> GetLogsActivity(Guid flowId, Guid flowExecutionId)
     {
         try
         {
@@ -51,7 +47,7 @@ public class FlowExecutionsService
 
             response.EnsureSuccessStatusCode();
 
-            var logs = await response.Content.ReadAsAsync<IEnumerable<LogModel>>();
+            var logs = await response.Content.ReadAsAsync<IEnumerable<FlowExecutionLogEntry>>();
 
             return logs;
 
@@ -71,9 +67,11 @@ public class FlowExecutionsService
     {
         try
         {
-            var logs = await GetLogsActivity(flowId, flowExecutionId);
+            var response = await httpClient.GetAsync($"{configService.FlowExecutionUrl}/logs/{flowExecutionId}/text");
 
-            var logsText = string.Join(Environment.NewLine, logs.Select(x => $"{x.Timestamp:s} {x.Level} {x.Message}"));
+            response.EnsureSuccessStatusCode();
+
+            var logsText = await response.Content.ReadAsStringAsync();
 
             return logsText;
         }
@@ -88,6 +86,29 @@ public class FlowExecutionsService
         }
     }
 
+    public async Task<string> GetLogsActivityJson(Guid flowId, Guid flowExecutionId)
+    {
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.FlowExecutionUrl}/logs/{flowExecutionId}/json");
+
+            response.EnsureSuccessStatusCode();
+
+            var logsJson = await response.Content.ReadAsStringAsync();
+
+            return logsJson;
+        }
+        catch (Exception ex)
+        {
+            logger
+                .ForContext("FlowId", flowId)
+                .ForContext("FlowExecutionId", flowExecutionId)
+                .Error(ex, "Failed to load flow execution logs JSON");
+
+            throw;
+        }
+    }
+
     public async Task Add(FlowExecution flowExecution)
     {
         var flowExecutionModel = new 
@@ -97,7 +118,16 @@ public class FlowExecutionsService
             flowExecution.Started,
             flowExecution.Finished,
             Status = flowExecution.Status.ToString(),
-            flowExecution.Application
+            flowExecution.Application,
+            Logs = flowExecution.Logs?.Select(log => new
+            {
+                log.Timestamp,
+                log.Level,
+                log.Message,
+                log.StepId,
+                log.StepName,
+                log.Exception
+            }).ToArray()
         };
 
         var response = await httpClient.PostAsJsonAsync(configService.FlowExecutionUrl, flowExecutionModel);

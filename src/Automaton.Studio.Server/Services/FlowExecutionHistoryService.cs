@@ -72,6 +72,31 @@ public class FlowExecutionHistoryService
 
         dbContext.FlowExecutionUsers.Add(executionUser);
 
+        // Add execution logs as single JSON entry
+        if (executionModel.Logs != null && executionModel.Logs.Any())
+        {
+            var logEntries = executionModel.Logs.Select(log => new Entities.LogEntry
+            {
+                Timestamp = log.Timestamp,
+                Level = log.Level,
+                Message = log.Message,
+                StepId = log.StepId,
+                StepName = log.StepName,
+                Exception = log.Exception
+            }).ToList();
+
+            var executionLog = new FlowExecutionLog
+            {
+                Id = Guid.NewGuid(),
+                FlowExecutionId = execution.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            executionLog.SetLogEntries(logEntries);
+            dbContext.FlowExecutionLogs.Add(executionLog);
+        }
+
         var result = dbContext.SaveChanges();
 
         return result;
@@ -97,25 +122,24 @@ public class FlowExecutionHistoryService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<IEnumerable<FlowExecution>> GetListAsync(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
+    private async Task<IEnumerable<Entities.FlowExecution>> GetListAsync(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
     {
-        var execution = await dbContext.FlowExecutions
-            .Where(x => x.FlowId == flowId && x.FlowExecutionUsers.Any(x => x.UserId == userId))
+        var executions = await dbContext.FlowExecutions
+            .Include(x => x.FlowExecutionUsers)
+            .Where(x => x.FlowId == flowId && x.FlowExecutionUsers.Any(u => u.UserId == userId))
             .OrderByDescending(x => x.Started)
             .Skip(startIndex)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return execution;
+        return executions;
     }
 
     private async Task<int> GetTotalAsync(Guid flowId, CancellationToken cancellationToken)
     {
-        var total = await dbContext.FlowExecutions
-            .Where(x => x.FlowId == flowId && x.FlowExecutionUsers.Any(x => x.UserId == userId))
+        return await dbContext.FlowExecutions
+            .Where(x => x.FlowId == flowId && x.FlowExecutionUsers.Any(u => u.UserId == userId))
             .CountAsync(cancellationToken);
-
-        return total;
     }
 
     private static Models.FlowExecution MapToModel(Entities.FlowExecution entity)
@@ -124,9 +148,9 @@ public class FlowExecutionHistoryService
         {
             Id = entity.Id,
             FlowId = entity.FlowId,
-            Status = entity.Status,
             Started = entity.Started,
             Finished = entity.Finished,
+            Status = entity.Status,
             Application = entity.Application
         };
     }

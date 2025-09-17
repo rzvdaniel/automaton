@@ -9,11 +9,16 @@ public class FlowExecutionsController : BaseController
 {
     private readonly FlowExecutionHistoryService flowExecutionService;
     private readonly FlowLogsService logsService;
+    private readonly FlowExecutionLogService flowExecutionLogService;
 
-    public FlowExecutionsController(FlowExecutionHistoryService flowExecutionService, FlowLogsService logsService)
+    public FlowExecutionsController(
+        FlowExecutionHistoryService flowExecutionService, 
+        FlowLogsService logsService,
+        FlowExecutionLogService flowExecutionLogService)
     {
         this.flowExecutionService = flowExecutionService;
         this.logsService = logsService;
+        this.flowExecutionLogService = flowExecutionLogService;
     }
 
     [HttpGet("flow/{flowId}/{startIndex}/{pageSize}")]
@@ -32,9 +37,24 @@ public class FlowExecutionsController : BaseController
     }
 
     [HttpGet("logs/{flowExecutionId}")]
-    public ActionResult<IEnumerable<Entities.Log>> GetLogs(Guid flowExecutionId)
+    public async Task<ActionResult<IEnumerable<FlowExecutionLogEntry>>> GetLogs(Guid flowExecutionId, CancellationToken cancellationToken = default)
     {
-        return Ok(logsService.GetFlowExecutionLogs(flowExecutionId));
+        var logs = await flowExecutionLogService.GetExecutionLogsAsync(flowExecutionId, cancellationToken);
+        return Ok(logs);
+    }
+
+    [HttpGet("logs/{flowExecutionId}/text")]
+    public async Task<ActionResult<string>> GetLogsText(Guid flowExecutionId, CancellationToken cancellationToken = default)
+    {
+        var logsText = await flowExecutionLogService.GetExecutionLogsTextAsync(flowExecutionId, cancellationToken);
+        return Ok(logsText);
+    }
+
+    [HttpGet("logs/{flowExecutionId}/json")]
+    public async Task<ActionResult<string>> GetLogsJson(Guid flowExecutionId, CancellationToken cancellationToken = default)
+    {
+        var logsJson = await flowExecutionLogService.GetExecutionLogsJsonAsync(flowExecutionId, cancellationToken);
+        return Ok(logsJson);
     }
 
     [HttpPost]

@@ -31,7 +31,8 @@ public class ApiKey
 
     public bool IsActive { get; set; } = true;
 
-    public ApiKeyScope Scope { get; set; } = ApiKeyScope.FullAccess;
+    // Set default to Runner to match database configuration
+    public ApiKeyScope Scope { get; set; } = ApiKeyScope.Runner;
 
     [MaxLength(500)]
     public string? Description { get; set; }

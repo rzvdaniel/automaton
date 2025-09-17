@@ -177,6 +177,7 @@ services.AddScoped<CustomStepsService>();
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
+services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();

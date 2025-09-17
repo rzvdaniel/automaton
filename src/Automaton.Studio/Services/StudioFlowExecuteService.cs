@@ -59,7 +59,9 @@ public class StudioFlowExecuteService
         LogContext.PushProperty(LogContextProperties.WorkflowExecutionId, workflowExecution.Id);
         LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
 
-        logger.Information("Start workflow: {0}", workflow.Name);
+        var startMessage = $"Start workflow: {workflow.Name}";
+        logger.Information(startMessage);
+        workflowExecution.AddLog("Information", startMessage);
 
         while (step != null && !cancellationToken.IsCancellationRequested)
         {
@@ -77,15 +79,27 @@ public class StudioFlowExecuteService
 
                 await SendStepExecutionNotification(step, cancellationToken);
 
+                var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
+                logger.Information(stepStartMessage);
+                workflowExecution.AddLog("Information", stepStartMessage, step.Id, step.Name);
+
                 await step.ExecuteAsync(context);
+
+                var stepCompleteMessage = $"Completed step: {step.Name}";
+                logger.Information(stepCompleteMessage);
+                workflowExecution.AddLog("Information", stepCompleteMessage, step.Id, step.Name);
             }
             catch (OperationCanceledException)
             {
-                logger.Information("Workflow execution was canceled");
+                var cancelMessage = "Workflow execution was canceled";
+                logger.Information(cancelMessage);
+                workflowExecution.AddLog("Warning", cancelMessage);
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Step {0} with Id {1} encountered an error. Message: {2}", step.Name, step.Id, ex.Message);
+                var errorMessage = $"Step {step.Name} with Id {step.Id} encountered an error. Message: {ex.Message}";
+                logger.Error(ex, errorMessage);
+                workflowExecution.AddLog("Error", errorMessage, step.Id, step.Name, ex);
                 workflowExecution.HasErrors();
             }
 
@@ -109,7 +123,25 @@ public class StudioFlowExecuteService
 
     private async Task SaveWorkflowExecution(WorkflowExecution workflowExecution)
     {
-        var flowExecution = mapper.Map<FlowExecution>(workflowExecution);
+        var flowExecution = new Models.FlowExecution
+        {
+            Id = workflowExecution.Id,
+            FlowId = workflowExecution.FlowId,
+            Started = workflowExecution.Started,
+            Finished = workflowExecution.Finished,
+            Status = workflowExecution.Status,
+            Application = workflowExecution.Application,
+            Logs = workflowExecution.Logs?.Select(log => new Models.FlowExecutionLogEntry
+            {
+                Timestamp = log.Timestamp,
+                Level = log.Level,
+                Message = log.Message,
+                StepId = log.StepId,
+                StepName = log.StepName,
+                Exception = log.Exception
+            }).ToList() ?? new List<Models.FlowExecutionLogEntry>()
+        };
+
         await flowExecutionsService.Add(flowExecution);
     }
 }

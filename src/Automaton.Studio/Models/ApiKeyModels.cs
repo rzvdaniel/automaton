@@ -20,7 +20,7 @@ public class CreateApiKeyRequest
     public required string Name { get; set; }
     public string? Description { get; set; }
     public DateTime? ExpiresAt { get; set; }
-    public ApiKeyScope Scope { get; set; } = ApiKeyScope.FullAccess;
+    public ApiKeyScope Scope { get; set; } = ApiKeyScope.Runner; // Default to Runner for consistency
 }
 
 public class CreateApiKeyResponse
