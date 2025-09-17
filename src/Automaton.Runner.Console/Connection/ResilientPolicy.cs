@@ -1,7 +1,4 @@
 using Polly;
-using Polly.CircuitBreaker;
-using Polly.Retry;
-using System.Net.Http;
 using System.Net.Sockets;
 using Serilog;
 using static System.Console;
