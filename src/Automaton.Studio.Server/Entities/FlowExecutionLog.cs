@@ -1,5 +1,6 @@
 #nullable disable
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Studio.Server.Entities
 {
@@ -32,7 +33,8 @@ namespace Automaton.Studio.Server.Entities
         {
             LogsJson = JsonSerializer.Serialize(logEntries, new JsonSerializerOptions 
             { 
-                WriteIndented = false // Compact JSON for storage
+                WriteIndented = false, // Compact JSON for storage
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull // Exclude null optional properties
             });
             UpdatedAt = DateTime.UtcNow;
         }
@@ -40,11 +42,26 @@ namespace Automaton.Studio.Server.Entities
     
     public class LogEntry
     {
+        [JsonPropertyName("timestamp")]
         public DateTime Timestamp { get; set; }
+        
+        [JsonPropertyName("level")]
         public string Level { get; set; } // Info, Warning, Error, Debug  
+        
+        [JsonPropertyName("message")]
         public string Message { get; set; }
-        public string Exception { get; set; } // Serialized exception details if any
-        public string StepId { get; set; } // Optional - which step generated this log
-        public string StepName { get; set; } // Optional - step name for easier reading
+        
+        // Optional properties - excluded when null or empty
+        [JsonPropertyName("exception")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Exception { get; set; } // Serialized exception details if any
+        
+        [JsonPropertyName("stepId")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? StepId { get; set; } // Optional - which step generated this log
+        
+        [JsonPropertyName("stepName")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? StepName { get; set; } // Optional - step name for easier reading
     }
 }

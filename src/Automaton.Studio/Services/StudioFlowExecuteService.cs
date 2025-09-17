@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Automaton.Core.Logs;
 using Automaton.Core.Models;
+using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Models;
@@ -42,9 +43,42 @@ public class StudioFlowExecuteService
             await mediator.Publish(new VariableUpdateNotification(e.Variable), cancellationToken);
         };
 
-        var workflowExecution = await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
+        WorkflowExecution workflowExecution = null;
+        
+        try
+        {
+            workflowExecution = await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Workflow execution failed for workflow {WorkflowId}", workflow.Id);
+            
+            // Create error execution if workflow execution failed completely
+            if (workflowExecution == null)
+            {
+                workflowExecution = new WorkflowExecution(workflow.Id, configurationService.ApplicationName)
+                {
+                    Started = DateTime.UtcNow,
+                    Finished = DateTime.UtcNow,
+                    Status = WorkflowStatus.Error
+                };
+                workflowExecution.AddLog("Error", $"Workflow execution failed: {ex.Message}", exception: ex);
+            }
+        }
 
-        await SaveWorkflowExecution(workflowExecution);
+        // Always attempt to save execution results, but don't let save failures break the flow
+        try 
+        {
+            await SaveWorkflowExecution(workflowExecution);
+            logger.Information("Successfully saved workflow execution {ExecutionId}", workflowExecution.Id);
+        }
+        catch (Exception saveEx)
+        {
+            logger.Error(saveEx, "Failed to save workflow execution {ExecutionId}. Execution completed but results not persisted.", workflowExecution.Id);
+            
+            // Don't throw - the workflow executed, we just couldn't save the results
+            // This prevents the UI from hanging and allows user to see the execution completed
+        }
 
         return workflowExecution;
     }

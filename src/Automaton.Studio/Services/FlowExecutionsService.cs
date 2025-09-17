@@ -111,26 +111,63 @@ public class FlowExecutionsService
 
     public async Task Add(FlowExecution flowExecution)
     {
-        var flowExecutionModel = new 
+        try
         {
-            flowExecution.Id,
-            flowExecution.FlowId,
-            flowExecution.Started,
-            flowExecution.Finished,
-            Status = flowExecution.Status.ToString(),
-            flowExecution.Application,
-            Logs = flowExecution.Logs?.Select(log => new
+            var flowExecutionModel = new 
             {
-                log.Timestamp,
-                log.Level,
-                log.Message,
-                log.StepId,
-                log.StepName,
-                log.Exception
-            }).ToArray()
-        };
+                flowExecution.Id,
+                flowExecution.FlowId,
+                flowExecution.Started,
+                flowExecution.Finished,
+                Status = flowExecution.Status.ToString(),
+                flowExecution.Application,
+                Logs = flowExecution.Logs?.Select(log => new
+                {
+                    log.Timestamp,
+                    log.Level,
+                    log.Message,
+                    // Only include optional properties if they have meaningful values
+                    StepId = string.IsNullOrEmpty(log.StepId) ? null : log.StepId,
+                    StepName = string.IsNullOrEmpty(log.StepName) ? null : log.StepName,
+                    Exception = string.IsNullOrEmpty(log.Exception) ? null : log.Exception
+                }).ToArray() ?? Array.Empty<object>() // Ensure Logs is never null
+            };
 
-        var response = await httpClient.PostAsJsonAsync(configService.FlowExecutionUrl, flowExecutionModel);
-        response.EnsureSuccessStatusCode();
+            logger.Debug("Sending flow execution to server: {ExecutionId} for Flow {FlowId} with {LogCount} log entries", 
+                flowExecution.Id, flowExecution.FlowId, flowExecution.Logs?.Count ?? 0);
+
+            // Log the first few log entries for debugging validation issues
+            if (flowExecution.Logs?.Any() == true)
+            {
+                var firstLog = flowExecution.Logs.First();
+                logger.Debug("First log entry - StepId: '{StepId}', StepName: '{StepName}', Exception: '{Exception}'", 
+                    firstLog.StepId ?? "NULL", firstLog.StepName ?? "NULL", firstLog.Exception ?? "NULL");
+            }
+
+            var response = await httpClient.PostAsJsonAsync(configService.FlowExecutionUrl, flowExecutionModel);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                logger.Error("Failed to save flow execution {ExecutionId}. Server responded with {StatusCode}: {ErrorContent}", 
+                    flowExecution.Id, response.StatusCode, errorContent);
+                    
+                // Create a more informative exception
+                throw new HttpRequestException($"Failed to save flow execution. Server returned {response.StatusCode}: {errorContent}", 
+                    null, response.StatusCode);
+            }
+            
+            logger.Information("Successfully saved flow execution {ExecutionId} to server", flowExecution.Id);
+        }
+        catch (HttpRequestException)
+        {
+            // Re-throw HTTP exceptions as-is (already logged above)
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Unexpected error while saving flow execution {ExecutionId}", flowExecution.Id);
+            throw;
+        }
     }
 }

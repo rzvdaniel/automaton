@@ -52,54 +52,63 @@ public class FlowExecutionHistoryService
 
     public int Add(Models.FlowExecution executionModel)
     {
-        var execution = new FlowExecution()
+        try
         {
-            Id = executionModel.Id,
-            FlowId = executionModel.FlowId,
-            Status = executionModel.Status,
-            Started = executionModel.Started,
-            Finished = executionModel.Finished,
-            Application = executionModel.Application
-        };
-
-        dbContext.FlowExecutions.Add(execution);
-
-        var executionUser = new FlowExecutionUser
-        {
-            FlowExecutionId = execution.Id,
-            UserId = userId
-        };
-
-        dbContext.FlowExecutionUsers.Add(executionUser);
-
-        // Add execution logs as single JSON entry
-        if (executionModel.Logs != null && executionModel.Logs.Any())
-        {
-            var logEntries = executionModel.Logs.Select(log => new Entities.LogEntry
+            var execution = new FlowExecution()
             {
-                Timestamp = log.Timestamp,
-                Level = log.Level,
-                Message = log.Message,
-                StepId = log.StepId,
-                StepName = log.StepName,
-                Exception = log.Exception
-            }).ToList();
-
-            var executionLog = new FlowExecutionLog
-            {
-                Id = Guid.NewGuid(),
-                FlowExecutionId = execution.Id,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                Id = executionModel.Id,
+                FlowId = executionModel.FlowId,
+                Status = executionModel.Status,
+                Started = executionModel.Started,
+                Finished = executionModel.Finished,
+                Application = executionModel.Application
             };
-            
-            executionLog.SetLogEntries(logEntries);
-            dbContext.FlowExecutionLogs.Add(executionLog);
+
+            dbContext.FlowExecutions.Add(execution);
+
+            var executionUser = new FlowExecutionUser
+            {
+                FlowExecutionId = execution.Id,
+                UserId = userId
+            };
+
+            dbContext.FlowExecutionUsers.Add(executionUser);
+
+            // Add execution logs as single JSON entry
+            if (executionModel.Logs != null && executionModel.Logs.Any())
+            {
+                var logEntries = executionModel.Logs.Select(log => new Entities.LogEntry
+                {
+                    Timestamp = log.Timestamp,
+                    Level = log.Level,
+                    Message = log.Message,
+                    // Only set optional properties if they have meaningful values
+                    StepId = string.IsNullOrWhiteSpace(log.StepId) ? null : log.StepId,
+                    StepName = string.IsNullOrWhiteSpace(log.StepName) ? null : log.StepName,
+                    Exception = string.IsNullOrWhiteSpace(log.Exception) ? null : log.Exception
+                }).ToList();
+
+                var executionLog = new FlowExecutionLog
+                {
+                    Id = Guid.NewGuid(),
+                    FlowExecutionId = execution.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                
+                executionLog.SetLogEntries(logEntries);
+                dbContext.FlowExecutionLogs.Add(executionLog);
+            }
+
+            var result = dbContext.SaveChanges();
+
+            return result;
         }
-
-        var result = dbContext.SaveChanges();
-
-        return result;
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to add execution for user {UserId}", userId);
+            throw;
+        }
     }
 
     public async Task Update(Guid id, Models.FlowExecution flowExecution, CancellationToken cancellationToken)

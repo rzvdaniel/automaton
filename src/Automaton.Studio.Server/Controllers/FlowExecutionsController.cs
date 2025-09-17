@@ -59,9 +59,49 @@ public class FlowExecutionsController : BaseController
 
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
-    public ActionResult Post(FlowExecution flowExecution, CancellationToken cancellationToken)
+    public async Task<ActionResult> Post([FromBody] FlowExecution flowExecution, CancellationToken cancellationToken = default)
     {
-        return Ok(flowExecutionService.Add(flowExecution));
+        try
+        {
+            // Basic model validation
+            if (flowExecution == null)
+            {
+                return BadRequest("Flow execution data is required.");
+            }
+
+            if (flowExecution.Id == Guid.Empty)
+            {
+                return BadRequest("Flow execution ID is required.");
+            }
+
+            if (flowExecution.FlowId == Guid.Empty)
+            {
+                return BadRequest("Flow ID is required.");
+            }
+
+            // Log the incoming request for debugging
+            var logger = HttpContext.RequestServices.GetService<ILogger<FlowExecutionsController>>();
+            logger?.LogInformation("Received flow execution save request for {ExecutionId} of flow {FlowId} with {LogCount} logs", 
+                flowExecution.Id, flowExecution.FlowId, flowExecution.Logs?.Count ?? 0);
+
+            var result = await Task.Run(() => flowExecutionService.Add(flowExecution), cancellationToken);
+            
+            logger?.LogInformation("Successfully saved flow execution {ExecutionId}", flowExecution.Id);
+            return Ok(new { Success = true, Message = "Flow execution saved successfully", ExecutionId = flowExecution.Id });
+        }
+        catch (Exception ex)
+        {
+            var logger = HttpContext.RequestServices.GetService<ILogger<FlowExecutionsController>>();
+            logger?.LogError(ex, "Failed to save flow execution {ExecutionId}", flowExecution?.Id);
+            
+            return StatusCode(500, new
+            {
+                Success = false,
+                Message = "An error occurred while saving the flow execution",
+                Error = ex.Message,
+                ExecutionId = flowExecution?.Id
+            });
+        }
     }
 
     [HttpPut("{id}")]
