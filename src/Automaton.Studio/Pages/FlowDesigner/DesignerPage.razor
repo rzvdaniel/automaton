@@ -4,6 +4,7 @@
 @using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer
 @using Automaton.Studio.Pages.FlowDesigner.Components;
 @using Automaton.Studio.Domain;
+@using Automaton.Studio.Models;
 
 <Layout>
     <Header Class="header">
@@ -88,9 +89,13 @@
                                 <Select Mode="SelectMode.Multiple"
                                         Placeholder="Select runners..."
                                         DataSource="availableRunners"
+                                        TItem="RunnerModel"
+                                        TItemValue="Guid"
                                         ValueProperty="r => r.Id"
                                         LabelProperty="r => r.Name"
                                         DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                        Values="@selectedRunners"
+                                        OnSelectedItemsChanged="@OnRunnersSelectionChanged"
                                         AllowClear
                                         Style="width: 200px">
                                     <ItemTemplate Context="runnerContext">

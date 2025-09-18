@@ -57,18 +57,6 @@ public class DesignerViewModel
     public bool CanExecuteLocally => IsDesktopMode || IsDevelopmentEnvironment;
 
     /// <summary>
-    /// Determines if the run button should be visible at all
-    /// - Always show the button to maintain consistent UI
-    /// - Better UX than hiding it completely
-    /// </summary>
-    public bool ShouldShowRunButton(bool hasSelectedRunners)
-    {
-        // Always show the button for consistent UX
-        // Instead of hiding it, we'll disable it with helpful messages
-        return true;
-    }
-
-    /// <summary>
     /// Gets the message to show when the run button is disabled
     /// </summary>
     public string GetRunButtonDisabledMessage(bool hasSelectedRunners, bool hasAvailableRunners)
@@ -125,8 +113,7 @@ public class DesignerViewModel
         return new ExecutionCapabilities
         {
             CanRunLocally = CanExecuteLocally,
-            CanRunOnRunners = hasSelectedRunners,
-            ShouldRunBoth = CanExecuteLocally && hasSelectedRunners
+            HasSelectedRunners = hasSelectedRunners
         };
     }
 

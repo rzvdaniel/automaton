@@ -31,7 +31,6 @@ partial class DesignerPage : ComponentBase
     private bool HasSelectedRunners => selectedRunners.Any();
     private bool HasAvailableRunners => availableRunners.Any();
     private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
-    private bool ShouldShowRunButton => DesignerViewModel.ShouldShowRunButton(HasSelectedRunners);
     private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
 
     private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
@@ -87,25 +86,17 @@ partial class DesignerPage : ComponentBase
 
         try
         {
-            var tasks = new List<Task<object>>();
-
-            // Execute locally if capable and should
-            if (capabilities.CanRunLocally)
+            // Execute mutually exclusively - either locally OR on runners, not both
+            if (capabilities.ShouldRunLocally)
             {
-                tasks.Add(ExecuteLocally());
+                var localExecution = await ExecuteLocally();
+                await ShowLocalExecutionResult(localExecution);
             }
-
-            // Execute on runners if selected
-            if (capabilities.CanRunOnRunners)
+            else if (capabilities.ShouldRunOnRunners)
             {
-                tasks.Add(ExecuteOnRunners());
+                var runnerResults = await ExecuteOnRunners();
+                await ShowRunnerExecutionResults(runnerResults);
             }
-
-            // Wait for all executions to complete
-            var results = await Task.WhenAll(tasks);
-
-            // Show appropriate success message
-            await ShowExecutionResults(capabilities, results);
         }
         catch (Exception ex)
         {
@@ -118,7 +109,7 @@ partial class DesignerPage : ComponentBase
         DesignerViewModel.StopFlow();
     }
 
-    private async Task<object> ExecuteLocally()
+    private async Task<WorkflowExecution> ExecuteLocally()
     {
         var execution = await DesignerViewModel.RunFlow();
         if (execution != null)
@@ -128,39 +119,29 @@ partial class DesignerPage : ComponentBase
         return execution;
     }
 
-    private async Task<object> ExecuteOnRunners()
+    private async Task<IEnumerable<RunnerFlowResult>> ExecuteOnRunners()
     {
         Guid.TryParse(FlowId, out var flowId);
         var results = await FlowService.Run(flowId, selectedRunners);
         return results;
     }
 
-    private async Task ShowExecutionResults(ExecutionCapabilities capabilities, object[] results)
+    private async Task ShowLocalExecutionResult(WorkflowExecution execution)
     {
-        var messages = new List<string>();
-
-        if (capabilities.CanRunLocally)
+        if (execution != null)
         {
-            var localExecution = results[0] as WorkflowExecution;
-            if (localExecution != null)
-            {
-                messages.Add($"Local execution completed with status: {localExecution.Status}");
-            }
+            MessageService.Success($"Local execution completed with status: {execution.Status}", 5);
         }
+        await Task.CompletedTask;
+    }
 
-        if (capabilities.CanRunOnRunners)
+    private async Task ShowRunnerExecutionResults(IEnumerable<RunnerFlowResult> results)
+    {
+        if (results != null)
         {
-            var runnerResults = results[capabilities.CanRunLocally ? 1 : 0] as IEnumerable<RunnerFlowResult>;
-            if (runnerResults != null)
-            {
-                var message = GetExecutionResultMessage(runnerResults);
-                messages.Add(message);
-            }
+            var message = GetExecutionResultMessage(results);
+            MessageService.Success(message, 5);
         }
-
-        var combinedMessage = string.Join("\n", messages);
-        MessageService.Success(combinedMessage, 5);
-
         await Task.CompletedTask;
     }
 
@@ -185,9 +166,9 @@ partial class DesignerPage : ComponentBase
         }
     }
 
-    private void OnRunnersSelectionChanged(IEnumerable<Guid> runners)
+    private void OnRunnersSelectionChanged(IEnumerable<RunnerModel> runners)
     {
-        selectedRunners = runners ?? new List<Guid>();
+        selectedRunners = runners?.Select(x => x.Id) ?? [];
         StateHasChanged();
     }
 
