@@ -9,7 +9,6 @@
   <PropertyGroup>
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
-    <UserSecretsId>3e45528d-1c8f-46d1-bcef-91a0c99bb913</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Icon.ico" />
@@ -25,7 +24,6 @@
   <ItemGroup>
     <PackageReference Include="BlazorMonaco" Version="3.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="8.0.100" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>

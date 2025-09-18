@@ -17,7 +17,6 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         var builder = new ConfigurationBuilder()
-             .AddUserSecrets<App>(optional: true, reloadOnChange: true)
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile(AppSettings, false, true);
 
