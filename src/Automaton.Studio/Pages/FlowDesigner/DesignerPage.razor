@@ -48,14 +48,51 @@
                     <SpaceItem>
                         @if (DesignerViewModel.CanExecuteFlow)
                         {
-                            if (DesignerViewModel.IsFlowNotRunning())
-                            {
-                                <Button Icon="caret-right" Class="header-button" OnClick="RunFlow">Run</Button>
-                            }
-                            else
-                            {
-                                <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
-                            }
+                            <!-- Execution Mode Selection -->
+                            <Space Size="SpaceSize.Small" Class="execution-controls">
+
+                                <!-- Runner Selection (only show when runner mode is selected) -->
+                                @if (executionMode == "runner")
+                                {
+                                    <SpaceItem>
+                                        <Select Mode="SelectMode.Multiple"
+                                                Placeholder="Select runners..."
+                                                DataSource="availableRunners"
+                                                ValueProperty="r => r.Id"
+                                                LabelProperty="r => r.Name"
+                                                DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                                AllowClear>
+                                            <ItemTemplate Context="runnerContext">
+                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                                @runnerContext.Name
+                                            </ItemTemplate>
+                                            <LabelTemplate Context="runnerContext">
+                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                                @runnerContext.Name
+                                            </LabelTemplate>
+                                        </Select>
+                                    </SpaceItem>
+                                }
+                                
+                                <!-- Run/Stop Button -->
+                                <SpaceItem>
+                                    @if (DesignerViewModel.IsFlowNotRunning())
+                                    {
+                                        <Button Icon="caret-right" 
+                                                Class="header-button" 
+                                                Type="@ButtonType.Primary"
+                                                OnClick="RunFlow">
+                                            @(executionMode == "debug" ? "Debug" : "Run")
+                                        </Button>
+                                    }
+                                    else
+                                    {
+                                        <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
+                                    }
+                                </SpaceItem>
+                            </Space>
                         }
                     </SpaceItem>
                 </Space>
@@ -391,6 +428,22 @@
     .runners-select {
         min-width: 140px;
         max-width: 140px;
+    }
+
+    .execution-controls {
+        align-items: center;
+        display: flex;
+        flex-wrap: nowrap;
+    }
+
+    .runner-online {
+        color: #52c41a !important; /* Green for online */
+        margin-right: 4px;
+    }
+
+    .runner-offline {
+        color: #ff4d4f !important; /* Red for offline */
+        margin-right: 4px;
     }
 
     .explorer-tabs {

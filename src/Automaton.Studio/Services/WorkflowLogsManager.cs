@@ -6,8 +6,8 @@ namespace Automaton.Studio.Services
 {
     public class WorkflowLogsManager
     {
-        private readonly ConcurrentDictionary<Guid, List<FlowExecutionLogEntry>> _executionLogs = new();
-        private Guid? _currentExecutionId;
+        private readonly ConcurrentDictionary<Guid, List<FlowExecutionLogEntry>> executionLogs = new();
+        private Guid? currentExecutionId;
         
         public event EventHandler<LogsUpdatedEventArgs>? LogsUpdated;
 
@@ -18,7 +18,7 @@ namespace Automaton.Studio.Services
         { 
             get 
             {
-                if (!_currentExecutionId.HasValue || !_executionLogs.TryGetValue(_currentExecutionId.Value, out var logs))
+                if (!currentExecutionId.HasValue || !executionLogs.TryGetValue(currentExecutionId.Value, out var logs))
                     return string.Empty;
 
                 return FormatLogs(logs);
@@ -30,7 +30,7 @@ namespace Automaton.Studio.Services
         /// </summary>
         public void SetCurrentExecution(Guid executionId)
         {
-            _currentExecutionId = executionId;
+            currentExecutionId = executionId;
             NotifyLogsUpdated();
         }
 
@@ -39,7 +39,7 @@ namespace Automaton.Studio.Services
         /// </summary>
         public async Task AddLogEntry(Guid workflowId, Guid executionId, FlowExecutionLogEntry logEntry)
         {
-            _executionLogs.AddOrUpdate(
+            executionLogs.AddOrUpdate(
                 executionId,
                 new List<FlowExecutionLogEntry> { logEntry },
                 (key, existing) => 
@@ -49,7 +49,7 @@ namespace Automaton.Studio.Services
                 });
 
             // If this is the current execution being displayed, notify UI
-            if (_currentExecutionId == executionId)
+            if (currentExecutionId == executionId)
             {
                 NotifyLogsUpdated();
             }
@@ -62,7 +62,7 @@ namespace Automaton.Studio.Services
         /// </summary>
         public IEnumerable<FlowExecutionLogEntry> GetLogsForExecution(Guid executionId)
         {
-            if (_executionLogs.TryGetValue(executionId, out var logs))
+            if (executionLogs.TryGetValue(executionId, out var logs))
                 return logs.ToList();
                 
             return Enumerable.Empty<FlowExecutionLogEntry>();
@@ -73,9 +73,9 @@ namespace Automaton.Studio.Services
         /// </summary>
         public void ClearLogs()
         {
-            if (_currentExecutionId.HasValue)
+            if (currentExecutionId.HasValue)
             {
-                _executionLogs.TryRemove(_currentExecutionId.Value, out _);
+                executionLogs.TryRemove(currentExecutionId.Value, out _);
                 NotifyLogsUpdated();
             }
         }
@@ -85,9 +85,9 @@ namespace Automaton.Studio.Services
         /// </summary>
         public void ClearLogsForExecution(Guid executionId)
         {
-            _executionLogs.TryRemove(executionId, out _);
+            executionLogs.TryRemove(executionId, out _);
             
-            if (_currentExecutionId == executionId)
+            if (currentExecutionId == executionId)
             {
                 NotifyLogsUpdated();
             }
@@ -98,13 +98,13 @@ namespace Automaton.Studio.Services
         /// </summary>
         public void ClearAllLogs()
         {
-            _executionLogs.Clear();
+            executionLogs.Clear();
             NotifyLogsUpdated();
         }
 
         private void NotifyLogsUpdated()
         {
-            LogsUpdated?.Invoke(this, new LogsUpdatedEventArgs(_currentExecutionId, Logs));
+            LogsUpdated?.Invoke(this, new LogsUpdatedEventArgs(currentExecutionId, Logs));
         }
 
         private static string FormatLogs(IEnumerable<FlowExecutionLogEntry> logs)

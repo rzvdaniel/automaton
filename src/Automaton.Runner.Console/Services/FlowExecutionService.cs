@@ -71,9 +71,7 @@ public class FlowExecutionService
 
     private async Task<WorkflowExecution> ExecuteAsync(Flow flow, CancellationToken cancellationToken = default)
     {
-        var workflow = flowConvertService.ConvertFlow(flow);
-
-        var workflowExecution = await flowExecuteService.Execute(workflow, cancellationToken);
+        var workflowExecution = await flowExecuteService.Execute(flow, cancellationToken);
 
         return workflowExecution;
     }

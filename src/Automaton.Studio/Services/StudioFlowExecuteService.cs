@@ -2,6 +2,7 @@
 using Automaton.Core.Logs;
 using Automaton.Core.Models;
 using Automaton.Core.Enums;
+using Automaton.Core.Services;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Models;
@@ -10,37 +11,43 @@ namespace Automaton.Studio.Services;
 
 public class StudioFlowExecuteService
 {
-    private readonly IMediator mediator;
     private readonly IMapper mapper;
+    private readonly IMediator mediator;
     private readonly ILogger logger;
     private readonly ConfigurationService configurationService;
-    private readonly StudioFlowConvertService flowConvertService;
+    private readonly StudioFlowConvertService studioFlowConvertService;
     private readonly FlowExecutionsService flowExecutionsService;
+    private readonly MediatRExecutionNotificationService notificationService;
     
     public StudioFlowExecuteService
     (
-        StudioFlowConvertService flowConvertService, 
+        StudioFlowConvertService studioFlowConvertService, 
         FlowExecutionsService flowExecutionsService,
         ConfigurationService configurationService, 
         IMediator mediator, 
         IMapper mapper
-    ) 
+    )
     {
-        this.mediator = mediator;
         this.mapper = mapper;
+        this.mediator = mediator;
         this.configurationService = configurationService;
-        this.flowConvertService = flowConvertService;
+        this.studioFlowConvertService = studioFlowConvertService;
         this.flowExecutionsService = flowExecutionsService;
-        logger = Log.ForContext<StudioFlowExecuteService>();
+        this.notificationService = new MediatRExecutionNotificationService(mediator);
+        this.logger = Log.ForContext<StudioFlowExecuteService>();
     }
 
+    /// <summary>
+    /// Studio-specific execute method that accepts StudioFlow
+    /// </summary>
     public async Task<WorkflowExecution> Execute(StudioFlow flow, int executeDelay = 0, CancellationToken cancellationToken = default)
     {
-        var workflow = flowConvertService.ConvertFlow(flow);
+        var workflow = studioFlowConvertService.ConvertFlow(flow);
 
+        // Handle variable updates
         workflow.SetWorkflowVariable += async (sender, e) =>
         {
-            await mediator.Publish(new VariableUpdateNotification(e.Variable), cancellationToken);
+            await notificationService.SendVariableUpdate(e.Variable);
         };
 
         WorkflowExecution workflowExecution = null;
@@ -89,6 +96,7 @@ public class StudioFlowExecuteService
         var definition = workflow.GetStartupDefinition();
         var step = definition.GetFirstStep();
 
+        // Set up logging context
         LogContext.PushProperty(LogContextProperties.WorkflowId, workflow.Id);
         LogContext.PushProperty(LogContextProperties.WorkflowExecutionId, workflowExecution.Id);
         LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
@@ -108,9 +116,13 @@ public class StudioFlowExecuteService
 
             try
             {
-                await DelayStepExecution(executeDelay, cancellationToken);
+                if (executeDelay > 0)
+                {
+                    await Task.Delay(executeDelay, cancellationToken);
+                }
 
-                await SendStepExecutionNotification(step, cancellationToken);
+                // Notify step execution start
+                await notificationService.SendStepExecution(step.Id);
 
                 var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
                 await AddLogWithNotification(workflowExecution, "Information", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
@@ -124,6 +136,7 @@ public class StudioFlowExecuteService
             {
                 var cancelMessage = "Workflow execution was canceled";
                 await AddLogWithNotification(workflowExecution, "Warning", cancelMessage, cancellationToken: cancellationToken);
+                break;
             }
             catch (Exception ex)
             {
@@ -142,24 +155,43 @@ public class StudioFlowExecuteService
     }
 
     /// <summary>
-    /// Unified logging method that:
-    /// 1. Adds log to workflowExecution for persistence
-    /// 2. Logs to ILogger/Serilog for server-side logging 
-    /// 3. Sends notification to UI for real-time updates
+    /// Unified logging method that handles persistence, Serilog, and notifications
     /// </summary>
     private async Task AddLogWithNotification(
-        WorkflowExecution workflowExecution, 
-        string level, 
-        string message, 
-        string stepId = null, 
-        string stepName = null, 
+        WorkflowExecution workflowExecution,
+        string level,
+        string message,
+        string stepId = null,
+        string stepName = null,
         Exception exception = null,
         CancellationToken cancellationToken = default)
     {
-        // 1. Add to workflow execution for database persistence
+        // 1. Add to workflow execution for persistence
         workflowExecution.AddLog(level, message, stepId, stepName, exception);
 
-        // 2. Log to Serilog/ILogger for server-side logging (with proper context)
+        // 2. Log to Serilog for server-side logging
+        LogToSerilog(level, message, exception);
+
+        // 3. Send real-time notification
+        try
+        {
+            await notificationService.SendLogUpdate(
+                workflowExecution.FlowId,
+                workflowExecution.Id,
+                level,
+                message,
+                stepId,
+                stepName,
+                exception?.ToString());
+        }
+        catch (Exception notificationEx)
+        {
+            logger.Warning(notificationEx, "Failed to send log update notification for execution {ExecutionId}", workflowExecution.Id);
+        }
+    }
+
+    private void LogToSerilog(string level, string message, Exception exception = null)
+    {
         switch (level.ToLowerInvariant())
         {
             case "error":
@@ -178,37 +210,6 @@ public class StudioFlowExecuteService
                 logger.Information(message);
                 break;
         }
-
-        // 3. Send notification to UI for real-time updates
-        try
-        {
-            var logEntry = new FlowExecutionLogEntry
-            {
-                Timestamp = DateTime.UtcNow,
-                Level = level,
-                Message = message,
-                StepId = stepId,
-                StepName = stepName,
-                Exception = exception?.ToString()
-            };
-
-            await mediator.Publish(new LogUpdateNotification(workflowExecution.FlowId, workflowExecution.Id, logEntry), cancellationToken);
-        }
-        catch (Exception notificationEx)
-        {
-            // Don't let notification failures break execution - just log it
-            logger.Warning(notificationEx, "Failed to send log update notification for execution {ExecutionId}", workflowExecution.Id);
-        }
-    }
-
-    private static async Task DelayStepExecution(int executeDelay, CancellationToken cancellationToken)
-    {
-        await Task.Delay(executeDelay, cancellationToken);
-    }
-
-    private async Task SendStepExecutionNotification(WorkflowStep step, CancellationToken cancellationToken)
-    {
-        await mediator.Publish(new ExecuteStepNotification(step.Id), cancellationToken);
     }
 
     private async Task SaveWorkflowExecution(WorkflowExecution workflowExecution)

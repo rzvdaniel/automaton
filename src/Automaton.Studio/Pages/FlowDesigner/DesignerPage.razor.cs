@@ -1,7 +1,9 @@
 ﻿using AntDesign;
+using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
+using Automaton.Studio.Models;
 using Automaton.Studio.Pages.FlowDesigner.Components.NewDefinition;
 using Automaton.Studio.Resources;
 using Automaton.Studio.Services;
@@ -20,6 +22,10 @@ partial class DesignerPage : ComponentBase
     private string activeTabKey = "designer";
     private bool isStepCreatedHandlerAttached;
     private StudioStep selectedStep;
+    private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
+    private IEnumerable<Guid> selectedRunners = new List<Guid>();
+    private bool isLoadingRunners = false;
+    private string executionMode = "debug"; // "debug" or "runner"
 
     private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
     private string BottomSplitterPercentage => selectedStep != null ? ThirtyPercent : ZeroPercent;
@@ -32,6 +38,9 @@ partial class DesignerPage : ComponentBase
     [Inject] ModalService ModalService { get; set; } = default!;
     [Inject] DesignerViewModel DesignerViewModel { get; set; } = default!;
     [Inject] WorkflowLogsManager WorkflowLogsManager { get; set; } = default!;
+    [Inject] RunnerService RunnerService { get; set; } = default!;
+    [Inject] FlowService FlowService { get; set; } = default!;
+    [Inject] IMessageService MessageService { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -41,6 +50,7 @@ partial class DesignerPage : ComponentBase
         Courier.Subscribe<LogUpdateNotification>(HandleLogUpdateNotification);
 
         await LoadFlow();
+        await LoadRunners();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -56,22 +66,98 @@ partial class DesignerPage : ComponentBase
 
     public async Task RunFlow()
     {
-        // Clear logs for new execution and set the execution ID for log tracking
+        // Clear logs for new execution
         WorkflowLogsManager.ClearLogs();
-        
-        // Get the workflow execution that will be created
-        var execution = await DesignerViewModel.RunFlow();
-        
-        // Set the current execution ID for log tracking
-        if (execution != null)
+
+        try
         {
-            WorkflowLogsManager.SetCurrentExecution(execution.Id);
+            if (executionMode == "debug")
+            {
+                // Debug mode - execute locally in Studio
+                var execution = await DesignerViewModel.RunFlow();
+                if (execution != null)
+                {
+                    WorkflowLogsManager.SetCurrentExecution(execution.Id);
+                }
+            }
+            else
+            {
+                // Runner mode - execute on selected runners
+                if (!selectedRunners.Any())
+                {
+                    MessageService.Warning("Please select at least one runner to execute the flow.");
+                    return;
+                }
+
+                Guid.TryParse(FlowId, out var flowId);
+                var results = await FlowService.Run(flowId, selectedRunners);
+
+                // Show execution results
+                var message = GetExecutionResultMessage(results);
+                MessageService.Success(message, 5);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to execute flow: {ex.Message}", 5);
         }
     }
 
     public void StopFlow()
     {
         DesignerViewModel.StopFlow();
+    }
+
+    private async Task LoadRunners()
+    {
+        try
+        {
+            isLoadingRunners = true;
+            StateHasChanged();
+            
+            availableRunners = await RunnerService.List();
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to load runners: {ex.Message}");
+            availableRunners = new List<RunnerModel>();
+        }
+        finally
+        {
+            isLoadingRunners = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnExecutionModeChange(string mode)
+    {
+        executionMode = mode;
+        StateHasChanged();
+    }
+
+    private void OnRunnersSelectionChanged(IEnumerable<Guid> runners)
+    {
+        selectedRunners = runners ?? new List<Guid>();
+        StateHasChanged();
+    }
+
+    private string GetExecutionResultMessage(IEnumerable<RunnerFlowResult> results)
+    {
+        var successCount = results.Count(r => r.Status == Core.Enums.WorkflowStatus.Success);
+        var totalCount = results.Count();
+        
+        if (successCount == totalCount)
+        {
+            return $"Flow executed successfully on all {totalCount} runner(s)";
+        }
+        else if (successCount > 0)
+        {
+            return $"Flow executed successfully on {successCount} of {totalCount} runner(s)";
+        }
+        else
+        {
+            return $"Flow execution failed on all {totalCount} runner(s)";
+        }
     }
 
     private void OnStepCreated(object sender, StepEventArgs e)
@@ -231,6 +317,21 @@ partial class DesignerPage : ComponentBase
     private void OnTabChange(string key)
     {
         activeTabKey = key;
+    }
+
+    private string GetRunnerStatusIcon(RunnerStatus status)
+    {
+        return status switch
+        {
+            RunnerStatus.Online => "check-circle",
+            RunnerStatus.Offline => "close-circle",
+            _ => "question-circle"
+        };
+    }
+
+    private string GetRunnerStatusClass(RunnerStatus status)
+    {
+        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
     }
 
     public void Dispose()
