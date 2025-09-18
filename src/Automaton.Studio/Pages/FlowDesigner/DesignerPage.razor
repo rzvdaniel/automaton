@@ -48,27 +48,6 @@
                     <SpaceItem>
                         <!-- Execution Controls - Always show runner selection and run button -->
                         <Space Size="SpaceSize.Small" Class="execution-controls">
-                            <!-- Runner Selection -->
-                            <SpaceItem>
-                                <Select Mode="SelectMode.Multiple"
-                                        Placeholder="Select runners..."
-                                        DataSource="availableRunners"
-                                        ValueProperty="r => r.Id"
-                                        LabelProperty="r => r.Name"
-                                        DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-                                        AllowClear>
-                                    <ItemTemplate Context="runnerContext">
-                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                        @runnerContext.Name
-                                    </ItemTemplate>
-                                    <LabelTemplate Context="runnerContext">
-                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                        @runnerContext.Name
-                                    </LabelTemplate>
-                                </Select>
-                            </SpaceItem>
                             
                             <!-- Run/Stop Button with Enhanced UX -->
                             <SpaceItem>
@@ -105,6 +84,28 @@
                                     <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
                                 }
                             </SpaceItem>
+
+                            <!-- Runner Selection -->
+                            <SpaceItem>
+                                <Select Mode="SelectMode.Multiple"
+                                        Placeholder="Select runners..."
+                                        DataSource="availableRunners"
+                                        ValueProperty="r => r.Id"
+                                        LabelProperty="r => r.Name"
+                                        DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                        AllowClear>
+                                    <ItemTemplate Context="runnerContext">
+                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                        @runnerContext.Name
+                                    </ItemTemplate>
+                                    <LabelTemplate Context="runnerContext">
+                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                        @runnerContext.Name
+                                    </LabelTemplate>
+                                </Select>
+                            </SpaceItem>
                             
                             <!-- Enhanced Help Section -->
                             @if (!ExecutionCapabilities.CanExecute)
@@ -114,56 +115,23 @@
                                     {
                                         <!-- No Runners Available - Show Download Link -->
                                         <div style="display: flex; align-items: center; gap: 8px;">
-                                            <Icon Type="info-circle" Style="color: #faad14;" />
-                                            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                                                <span>No runners installed.</span>
-                                                <Button Type="@ButtonType.Link" 
-                                                        Size="@ButtonSize.Small" 
-                                                        Style="padding: 0; height: auto; font-size: 12px;"
-                                                        OnClick="NavigateToDownloadRunner">
-                                                    Download Runner
-                                                </Button>
-                                            </Text>
+                                            <Tooltip Title="No runners installed. Please install a runner first from Downloads page">
+                                            <Icon Type="info-circle" Style="color: #faad14;" Width="16" Height="16" />
+                                            </Tooltip>
                                         </div>
                                     }
                                     else if (!HasSelectedRunners)
                                     {
                                         <!-- Runners Available but None Selected -->
-                                        <div style="display: flex; align-items: center; gap: 8px;">
-                                            <Icon Type="info-circle" Style="color: #1890ff;" />
-                                            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                                                Select runners above to execute this workflow
-                                            </Text>
+                                        <div style="display: flex; align-items: center; gap: 8px;" Width="16" Height="16">
+                                            <Tooltip Title="Select runners above to execute this workflow">
+                                                <Icon Type="info-circle" Style="color: #1890ff;" />
+                                            </Tooltip>
                                         </div>
                                     }
                                 </SpaceItem>
                             }
-                            else if (HasSelectedRunners && ExecutionCapabilities.CanExecute)
-                            {
-                                <!-- Execution Info (when runners are selected and can execute) -->
-                                <SpaceItem>
-                                    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                                        @if (ExecutionCapabilities.ShouldRunBoth)
-                                        {
-                                            <span>Local + @selectedRunners.Count() runner(s)</span>
-                                        }
-                                        else if (ExecutionCapabilities.CanRunOnRunners)
-                                        {
-                                            <span>@selectedRunners.Count() runner(s) selected</span>
-                                        }
-                                    </Text>
-                                </SpaceItem>
-                            }
                             
-                            <!-- Help Text for Web Users -->
-                            @if (!DesignerViewModel.CanExecuteLocally && !HasSelectedRunners)
-                            {
-                                <SpaceItem>
-                                    <Text Type="@TextElementType.Secondary" Style="font-size: 12px; font-style: italic;">
-                                        Select runners to enable execution
-                                    </Text>
-                                </SpaceItem>
-                            }
                         </Space>
                     </SpaceItem>
                 </Space>
