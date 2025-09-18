@@ -34,13 +34,13 @@
             <Col Class="right-actions" Span="14">
                 <Space Class="right-header-items">
                     <SpaceItem>
-                        <Button Icon="thunderbolt" Class="header-button" Type="@ButtonType.Primary">
+                        <Button Icon="thunderbolt" Type="@ButtonType.Primary">
                             Create Flow with AI ✨
                         </Button>
                     </SpaceItem>
 
                     <SpaceItem>
-                        <Button Icon="save" Class="header-button" OnClick="SaveFlow">
+                        <Button Icon="save" OnClick="SaveFlow">
                             Save
                         </Button>
                     </SpaceItem>
@@ -58,7 +58,6 @@
                                         <!-- Enabled Run Button -->
                                         <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
                                             <Button Icon="caret-right" 
-                                                    Class="header-button" 
                                                     Type="@ButtonType.Primary"
                                                     OnClick="RunFlow">
                                                 @ExecutionCapabilities.GetButtonText()
@@ -70,7 +69,6 @@
                                         <!-- Disabled Run Button with Helpful Message -->
                                         <Tooltip Title="@RunButtonDisabledMessage">
                                             <Button Icon="caret-right" 
-                                                    Class="header-button" 
                                                     Type="@ButtonType.Primary"
                                                     Disabled="true"
                                                     OnClick="OnRunButtonClickWhenDisabled">
@@ -81,7 +79,7 @@
                                 }
                                 else
                                 {
-                                    <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
+                                    <Button Icon="stop" OnClick="StopFlow">Stop</Button>
                                 }
                             </SpaceItem>
 
@@ -93,7 +91,8 @@
                                         ValueProperty="r => r.Id"
                                         LabelProperty="r => r.Name"
                                         DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-                                        AllowClear>
+                                        AllowClear
+                                        Style="width: 200px">
                                     <ItemTemplate Context="runnerContext">
                                         <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
                                               class="@(GetRunnerStatusClass(runnerContext.Status))" />
@@ -462,11 +461,6 @@
         box-shadow: none;
         border: none;
         height: 100%;
-    }
-
-    .runners-select {
-        min-width: 180px;
-        max-width: 180px;
     }
 
     .execution-controls {
