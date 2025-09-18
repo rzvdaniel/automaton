@@ -46,9 +46,15 @@ public class DesignerViewModel
     public bool IsDesktopMode => configurationService.IsDesktop;
 
     /// <summary>
-    /// Determines if local execution is allowed (debug or desktop)
+    /// Determines if we're in a development environment (regardless of platform)
     /// </summary>
-    public bool CanExecuteLocally => IsDebugMode || IsDesktopMode;
+    public bool IsDevelopmentEnvironment => IsDebugMode;
+
+    /// <summary>
+    /// Determines if local execution should be allowed
+    /// Priority: Desktop always allowed, then development mode for testing
+    /// </summary>
+    public bool CanExecuteLocally => IsDesktopMode || IsDevelopmentEnvironment;
 
     /// <summary>
     /// Determines if the run button should be visible at all
