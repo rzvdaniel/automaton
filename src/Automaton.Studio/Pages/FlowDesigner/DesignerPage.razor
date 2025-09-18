@@ -46,54 +46,77 @@
                     </SpaceItem>
 
                     <SpaceItem>
-                        @if (DesignerViewModel.CanExecuteFlow)
-                        {
-                            <!-- Execution Mode Selection -->
-                            <Space Size="SpaceSize.Small" Class="execution-controls">
-
-                                <!-- Runner Selection (only show when runner mode is selected) -->
-                                @if (executionMode == "runner")
+                        <!-- Execution Controls - Always show runner selection and run button -->
+                        <Space Size="SpaceSize.Small" Class="execution-controls">
+                            <!-- Runner Selection -->
+                            <SpaceItem>
+                                <Select Mode="SelectMode.Multiple"
+                                        Placeholder="Select runners..."
+                                        DataSource="availableRunners"
+                                        ValueProperty="r => r.Id"
+                                        LabelProperty="r => r.Name"
+                                        DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                        AllowClear>
+                                    <ItemTemplate Context="runnerContext">
+                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                        @runnerContext.Name
+                                    </ItemTemplate>
+                                    <LabelTemplate Context="runnerContext">
+                                        <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                              class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                        @runnerContext.Name
+                                    </LabelTemplate>
+                                </Select>
+                            </SpaceItem>
+                            
+                            <!-- Run/Stop Button with Dynamic Behavior -->
+                            <SpaceItem>
+                                @if (DesignerViewModel.IsFlowNotRunning())
                                 {
-                                    <SpaceItem>
-                                        <Select Mode="SelectMode.Multiple"
-                                                Placeholder="Select runners..."
-                                                DataSource="availableRunners"
-                                                ValueProperty="r => r.Id"
-                                                LabelProperty="r => r.Name"
-                                                DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-                                                AllowClear>
-                                            <ItemTemplate Context="runnerContext">
-                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                                @runnerContext.Name
-                                            </ItemTemplate>
-                                            <LabelTemplate Context="runnerContext">
-                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                                @runnerContext.Name
-                                            </LabelTemplate>
-                                        </Select>
-                                    </SpaceItem>
-                                }
-                                
-                                <!-- Run/Stop Button -->
-                                <SpaceItem>
-                                    @if (DesignerViewModel.IsFlowNotRunning())
-                                    {
+                                    <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
                                         <Button Icon="caret-right" 
                                                 Class="header-button" 
                                                 Type="@ButtonType.Primary"
+                                                Disabled="@(!ExecutionCapabilities.CanExecute)"
                                                 OnClick="RunFlow">
-                                            @(executionMode == "debug" ? "Debug" : "Run")
+                                            @ExecutionCapabilities.GetButtonText()
                                         </Button>
-                                    }
-                                    else
-                                    {
-                                        <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
-                                    }
+                                    </Tooltip>
+                                }
+                                else
+                                {
+                                    <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
+                                }
+                            </SpaceItem>
+                                
+                            <!-- Execution Info (when runners are selected) -->
+                            @if (HasSelectedRunners && ExecutionCapabilities.CanExecute)
+                            {
+                                <SpaceItem>
+                                    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                        @if (ExecutionCapabilities.ShouldRunBoth)
+                                        {
+                                            <span>Local + @selectedRunners.Count() runner(s)</span>
+                                        }
+                                        else if (ExecutionCapabilities.CanRunOnRunners)
+                                        {
+                                            <span>@selectedRunners.Count() runner(s) selected</span>
+                                        }
+                                    </Text>
                                 </SpaceItem>
-                            </Space>
-                        }
+                            }
+                            
+                            <!-- Help Text for Web Users -->
+                            @if (!DesignerViewModel.CanExecuteFlow && !HasSelectedRunners)
+                            {
+                                <SpaceItem>
+                                    <Text Type="@TextElementType.Secondary" Style="font-size: 12px; font-style: italic;">
+                                        Select runners to enable execution
+                                    </Text>
+                                </SpaceItem>
+                            }
+                        </Space>
                     </SpaceItem>
                 </Space>
             </Col>
@@ -426,14 +449,15 @@
     }
 
     .runners-select {
-        min-width: 140px;
-        max-width: 140px;
+        min-width: 180px;
+        max-width: 180px;
     }
 
     .execution-controls {
         align-items: center;
         display: flex;
         flex-wrap: nowrap;
+        gap: 8px;
     }
 
     .runner-online {

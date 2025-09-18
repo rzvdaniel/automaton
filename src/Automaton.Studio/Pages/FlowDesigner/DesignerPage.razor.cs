@@ -1,5 +1,6 @@
 ﻿using AntDesign;
 using Automaton.Core.Enums;
+using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Extensions;
@@ -25,7 +26,10 @@ partial class DesignerPage : ComponentBase
     private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
-    private string executionMode = "debug"; // "debug" or "runner"
+
+    // Computed properties for Razor UI binding
+    private bool HasSelectedRunners => selectedRunners.Any();
+    private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
 
     private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
     private string BottomSplitterPercentage => selectedStep != null ? ThirtyPercent : ZeroPercent;
@@ -66,36 +70,38 @@ partial class DesignerPage : ComponentBase
 
     public async Task RunFlow()
     {
+        var capabilities = ExecutionCapabilities;
+
+        if (!capabilities.CanExecute)
+        {
+            MessageService.Warning("Please select at least one runner to execute the flow.");
+            return;
+        }
+
         // Clear logs for new execution
         WorkflowLogsManager.ClearLogs();
 
         try
         {
-            if (executionMode == "debug")
-            {
-                // Debug mode - execute locally in Studio
-                var execution = await DesignerViewModel.RunFlow();
-                if (execution != null)
-                {
-                    WorkflowLogsManager.SetCurrentExecution(execution.Id);
-                }
-            }
-            else
-            {
-                // Runner mode - execute on selected runners
-                if (!selectedRunners.Any())
-                {
-                    MessageService.Warning("Please select at least one runner to execute the flow.");
-                    return;
-                }
+            var tasks = new List<Task<object>>();
 
-                Guid.TryParse(FlowId, out var flowId);
-                var results = await FlowService.Run(flowId, selectedRunners);
-
-                // Show execution results
-                var message = GetExecutionResultMessage(results);
-                MessageService.Success(message, 5);
+            // Execute locally if capable and should
+            if (capabilities.CanRunLocally)
+            {
+                tasks.Add(ExecuteLocally());
             }
+
+            // Execute on runners if selected
+            if (capabilities.CanRunOnRunners)
+            {
+                tasks.Add(ExecuteOnRunners());
+            }
+
+            // Wait for all executions to complete
+            var results = await Task.WhenAll(tasks);
+
+            // Show appropriate success message
+            await ShowExecutionResults(capabilities, results);
         }
         catch (Exception ex)
         {
@@ -106,6 +112,52 @@ partial class DesignerPage : ComponentBase
     public void StopFlow()
     {
         DesignerViewModel.StopFlow();
+    }
+
+    private async Task<object> ExecuteLocally()
+    {
+        var execution = await DesignerViewModel.RunFlow();
+        if (execution != null)
+        {
+            WorkflowLogsManager.SetCurrentExecution(execution.Id);
+        }
+        return execution;
+    }
+
+    private async Task<object> ExecuteOnRunners()
+    {
+        Guid.TryParse(FlowId, out var flowId);
+        var results = await FlowService.Run(flowId, selectedRunners);
+        return results;
+    }
+
+    private async Task ShowExecutionResults(ExecutionCapabilities capabilities, object[] results)
+    {
+        var messages = new List<string>();
+
+        if (capabilities.CanRunLocally)
+        {
+            var localExecution = results[0] as WorkflowExecution;
+            if (localExecution != null)
+            {
+                messages.Add($"Local execution completed with status: {localExecution.Status}");
+            }
+        }
+
+        if (capabilities.CanRunOnRunners)
+        {
+            var runnerResults = results[capabilities.CanRunLocally ? 1 : 0] as IEnumerable<RunnerFlowResult>;
+            if (runnerResults != null)
+            {
+                var message = GetExecutionResultMessage(runnerResults);
+                messages.Add(message);
+            }
+        }
+
+        var combinedMessage = string.Join("\n", messages);
+        MessageService.Success(combinedMessage, 5);
+
+        await Task.CompletedTask;
     }
 
     private async Task LoadRunners()
@@ -129,12 +181,6 @@ partial class DesignerPage : ComponentBase
         }
     }
 
-    private void OnExecutionModeChange(string mode)
-    {
-        executionMode = mode;
-        StateHasChanged();
-    }
-
     private void OnRunnersSelectionChanged(IEnumerable<Guid> runners)
     {
         selectedRunners = runners ?? new List<Guid>();
@@ -143,7 +189,7 @@ partial class DesignerPage : ComponentBase
 
     private string GetExecutionResultMessage(IEnumerable<RunnerFlowResult> results)
     {
-        var successCount = results.Count(r => r.Status == Core.Enums.WorkflowStatus.Success);
+        var successCount = results.Count(r => r.Status == WorkflowStatus.Success);
         var totalCount = results.Count();
         
         if (successCount == totalCount)
@@ -206,7 +252,6 @@ partial class DesignerPage : ComponentBase
     private async Task LoadFlow()
     {
         Guid.TryParse(FlowId, out var flowId);
-
         await DesignerViewModel.LoadFlow(flowId);
     }
 
@@ -220,26 +265,21 @@ partial class DesignerPage : ComponentBase
         if (!step.HasProperties)
         {
             designer.CompleteStep(step);
-
             await InvokeAsync(StateHasChanged);
-
             return;
         }
 
-        // For new steps, still use modal dialog during creation
         var result = await step.DisplayPropertiesDialog(ModalService);
 
         result.OnOk = async () =>
         {
             designer.CompleteStep(step);
-
             await InvokeAsync(StateHasChanged);
         };
 
         result.OnCancel = async () =>
         {
             DesignerViewModel.DeleteStep(step);
-
             await InvokeAsync(StateHasChanged);
         };
     }
@@ -260,9 +300,7 @@ partial class DesignerPage : ComponentBase
         {
             var definition = DesignerViewModel.CreateDefinition(newDefinitionModel.Name);
             DesignerViewModel.SetActiveDefinition(definition);
-
             StateHasChanged();
-
             return Task.CompletedTask;
         };
     }
@@ -282,7 +320,6 @@ partial class DesignerPage : ComponentBase
             return;
 
         DesignerViewModel.SetExecutingStep(notification.StepId);
-
         InvokeAsync(StateHasChanged);
     }
 
@@ -300,7 +337,6 @@ partial class DesignerPage : ComponentBase
             return;
 
         DesignerViewModel.Flow.Variables[notification.Variable.Id] = notification.Variable;
-
         InvokeAsync(StateHasChanged);
     }
 
@@ -309,8 +345,6 @@ partial class DesignerPage : ComponentBase
         if (cancellationToken.IsCancellationRequested)
             return;
 
-        // The WorkflowLogsManager will be updated via the LogUpdateNotificationHandler
-        // We just need to trigger a UI refresh
         InvokeAsync(StateHasChanged);
     }
 

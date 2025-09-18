@@ -3,6 +3,7 @@ using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Factories;
+using Automaton.Studio.Models;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Services;
 
@@ -29,11 +30,37 @@ public class DesignerViewModel
         get
         {
 #if DEBUG
-            return true;
+            return true; // Debug mode: always allow (for development)
 #else
-            return configurationService.IsDesktop;
+            return configurationService.IsDesktop; // Desktop: always allow local execution
 #endif
         }
+    }
+
+    /// <summary>
+    /// Determines if the run button should be enabled based on execution options available
+    /// </summary>
+    public bool CanRunFlow(bool hasSelectedRunners)
+    {
+        // Desktop or Debug: Can always run (locally), regardless of runner selection
+        if (CanExecuteFlow)
+            return true;
+
+        // Web version: Can only run if runners are selected
+        return hasSelectedRunners;
+    }
+
+    /// <summary>
+    /// Determines what execution modes are available
+    /// </summary>
+    public ExecutionCapabilities GetExecutionCapabilities(bool hasSelectedRunners)
+    {
+        return new ExecutionCapabilities
+        {
+            CanRunLocally = CanExecuteFlow,
+            CanRunOnRunners = hasSelectedRunners,
+            ShouldRunBoth = CanExecuteFlow && hasSelectedRunners
+        };
     }
 
     public event EventHandler<StepEventArgs> StepCreated;
