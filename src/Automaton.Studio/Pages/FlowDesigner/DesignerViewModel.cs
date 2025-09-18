@@ -25,28 +25,89 @@ public class DesignerViewModel
     public StudioFlow Flow { get; set; }
     public StudioDefinition ActiveDefinition { get; set; }
 
-    public bool CanExecuteFlow
+    /// <summary>
+    /// Determines if running in debug mode (development)
+    /// </summary>
+    public bool IsDebugMode
     {
         get
         {
 #if DEBUG
-            return true; // Debug mode: always allow (for development)
+            return true;
 #else
-            return configurationService.IsDesktop; // Desktop: always allow local execution
+            return false;
 #endif
         }
     }
 
     /// <summary>
-    /// Determines if the run button should be enabled based on execution options available
+    /// Determines if running on desktop platform
+    /// </summary>
+    public bool IsDesktopMode => configurationService.IsDesktop;
+
+    /// <summary>
+    /// Determines if local execution is allowed (debug or desktop)
+    /// </summary>
+    public bool CanExecuteLocally => IsDebugMode || IsDesktopMode;
+
+    /// <summary>
+    /// Determines if the run button should be visible at all
+    /// - Always show the button to maintain consistent UI
+    /// - Better UX than hiding it completely
+    /// </summary>
+    public bool ShouldShowRunButton(bool hasSelectedRunners)
+    {
+        // Always show the button for consistent UX
+        // Instead of hiding it, we'll disable it with helpful messages
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the message to show when the run button is disabled
+    /// </summary>
+    public string GetRunButtonDisabledMessage(bool hasSelectedRunners, bool hasAvailableRunners)
+    {
+        // Debug and desktop modes - should always be enabled
+        if (CanExecuteLocally)
+            return string.Empty;
+
+        // Web release mode needs runners
+        if (!hasAvailableRunners)
+            return "No runners available - Install a runner to execute workflows";
+        
+        if (!hasSelectedRunners)
+            return "Select one or more runners to execute this workflow";
+        
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Determines what action to take when run button is clicked while disabled
+    /// </summary>
+    public string GetRunButtonAction(bool hasSelectedRunners, bool hasAvailableRunners)
+    {
+        if (CanExecuteLocally)
+            return "run";
+
+        if (!hasAvailableRunners)
+            return "download-runner";
+        
+        if (!hasSelectedRunners)
+            return "select-runners";
+        
+        return "run";
+    }
+
+    /// <summary>
+    /// Determines if the run button should be enabled
     /// </summary>
     public bool CanRunFlow(bool hasSelectedRunners)
     {
-        // Desktop or Debug: Can always run (locally), regardless of runner selection
-        if (CanExecuteFlow)
+        // Can run locally (desktop/debug) regardless of runner selection
+        if (CanExecuteLocally)
             return true;
 
-        // Web version: Can only run if runners are selected
+        // Web release mode: can only run if runners are selected
         return hasSelectedRunners;
     }
 
@@ -57,9 +118,9 @@ public class DesignerViewModel
     {
         return new ExecutionCapabilities
         {
-            CanRunLocally = CanExecuteFlow,
+            CanRunLocally = CanExecuteLocally,
             CanRunOnRunners = hasSelectedRunners,
-            ShouldRunBoth = CanExecuteFlow && hasSelectedRunners
+            ShouldRunBoth = CanExecuteLocally && hasSelectedRunners
         };
     }
 
@@ -99,9 +160,9 @@ public class DesignerViewModel
 
     public async Task<WorkflowExecution> RunFlow()
     {
-        if (!CanExecuteFlow)
+        if (!CanExecuteLocally)
         {
-            throw new Exception("Can not execute flow from designer");
+            throw new Exception("Can not execute flow locally from designer");
         }
 
         cancelFlowTokenSource = new CancellationTokenSource();

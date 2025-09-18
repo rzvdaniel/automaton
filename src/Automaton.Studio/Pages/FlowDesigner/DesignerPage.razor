@@ -70,29 +70,77 @@
                                 </Select>
                             </SpaceItem>
                             
-                            <!-- Run/Stop Button with Dynamic Behavior -->
+                            <!-- Run/Stop Button with Enhanced UX -->
                             <SpaceItem>
                                 @if (DesignerViewModel.IsFlowNotRunning())
                                 {
-                                    <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
-                                        <Button Icon="caret-right" 
-                                                Class="header-button" 
-                                                Type="@ButtonType.Primary"
-                                                Disabled="@(!ExecutionCapabilities.CanExecute)"
-                                                OnClick="RunFlow">
-                                            @ExecutionCapabilities.GetButtonText()
-                                        </Button>
-                                    </Tooltip>
+                                    @if (ExecutionCapabilities.CanExecute)
+                                    {
+                                        <!-- Enabled Run Button -->
+                                        <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
+                                            <Button Icon="caret-right" 
+                                                    Class="header-button" 
+                                                    Type="@ButtonType.Primary"
+                                                    OnClick="RunFlow">
+                                                @ExecutionCapabilities.GetButtonText()
+                                            </Button>
+                                        </Tooltip>
+                                    }
+                                    else
+                                    {
+                                        <!-- Disabled Run Button with Helpful Message -->
+                                        <Tooltip Title="@RunButtonDisabledMessage">
+                                            <Button Icon="caret-right" 
+                                                    Class="header-button" 
+                                                    Type="@ButtonType.Primary"
+                                                    Disabled="true"
+                                                    OnClick="OnRunButtonClickWhenDisabled">
+                                                Run Flow
+                                            </Button>
+                                        </Tooltip>
+                                    }
                                 }
                                 else
                                 {
                                     <Button Icon="stop" Class="header-button" OnClick="StopFlow">Stop</Button>
                                 }
                             </SpaceItem>
-                                
-                            <!-- Execution Info (when runners are selected) -->
-                            @if (HasSelectedRunners && ExecutionCapabilities.CanExecute)
+                            
+                            <!-- Enhanced Help Section -->
+                            @if (!ExecutionCapabilities.CanExecute)
                             {
+                                <SpaceItem>
+                                    @if (!HasAvailableRunners)
+                                    {
+                                        <!-- No Runners Available - Show Download Link -->
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <Icon Type="info-circle" Style="color: #faad14;" />
+                                            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                <span>No runners installed.</span>
+                                                <Button Type="@ButtonType.Link" 
+                                                        Size="@ButtonSize.Small" 
+                                                        Style="padding: 0; height: auto; font-size: 12px;"
+                                                        OnClick="NavigateToDownloadRunner">
+                                                    Download Runner
+                                                </Button>
+                                            </Text>
+                                        </div>
+                                    }
+                                    else if (!HasSelectedRunners)
+                                    {
+                                        <!-- Runners Available but None Selected -->
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <Icon Type="info-circle" Style="color: #1890ff;" />
+                                            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                Select runners above to execute this workflow
+                                            </Text>
+                                        </div>
+                                    }
+                                </SpaceItem>
+                            }
+                            else if (HasSelectedRunners && ExecutionCapabilities.CanExecute)
+                            {
+                                <!-- Execution Info (when runners are selected and can execute) -->
                                 <SpaceItem>
                                     <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
                                         @if (ExecutionCapabilities.ShouldRunBoth)
@@ -108,7 +156,7 @@
                             }
                             
                             <!-- Help Text for Web Users -->
-                            @if (!DesignerViewModel.CanExecuteFlow && !HasSelectedRunners)
+                            @if (!DesignerViewModel.CanExecuteLocally && !HasSelectedRunners)
                             {
                                 <SpaceItem>
                                     <Text Type="@TextElementType.Secondary" Style="font-size: 12px; font-style: italic;">

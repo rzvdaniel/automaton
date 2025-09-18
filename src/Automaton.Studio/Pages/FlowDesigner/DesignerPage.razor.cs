@@ -29,7 +29,10 @@ partial class DesignerPage : ComponentBase
 
     // Computed properties for Razor UI binding
     private bool HasSelectedRunners => selectedRunners.Any();
+    private bool HasAvailableRunners => availableRunners.Any();
     private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
+    private bool ShouldShowRunButton => DesignerViewModel.ShouldShowRunButton(HasSelectedRunners);
+    private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
 
     private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
     private string BottomSplitterPercentage => selectedStep != null ? ThirtyPercent : ZeroPercent;
@@ -45,6 +48,7 @@ partial class DesignerPage : ComponentBase
     [Inject] RunnerService RunnerService { get; set; } = default!;
     [Inject] FlowService FlowService { get; set; } = default!;
     [Inject] IMessageService MessageService { get; set; } = default!;
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -206,49 +210,6 @@ partial class DesignerPage : ComponentBase
         }
     }
 
-    private void OnStepCreated(object sender, StepEventArgs e)
-    {
-        designer.SetActiveStep(e.Step);
-    }
-
-    private async Task OnItemDrop(StudioStep step)
-    {
-        if (step.IsNew)
-        {
-            await AddStepDialog(step);
-        }
-        else
-        {
-            DesignerViewModel.UpdateStepConnections();
-        }
-    }
-
-    private async Task OnItemDoubleClick(StudioStep step)
-    {
-        if (!step.HasProperties)
-        {
-            return;
-        }
-
-        selectedStep = step;
-        StateHasChanged();
-    }
-
-    private void ClosePropertiesPanel()
-    {
-        selectedStep = null;
-        StateHasChanged();
-    }
-
-    private void OnStepDeleted(object sender, StepEventArgs e)
-    {
-        if (selectedStep?.Id == e.Step.Id)
-        {
-            selectedStep = null;
-        }
-        StateHasChanged();
-    }
-
     private async Task LoadFlow()
     {
         Guid.TryParse(FlowId, out var flowId);
@@ -374,5 +335,92 @@ partial class DesignerPage : ComponentBase
         Courier.UnSubscribe<FlowUpdateNotification>(HandleFlowUpdateNotification);
         Courier.UnSubscribe<VariableUpdateNotification>(HandleVariableUpdateNotification);
         Courier.UnSubscribe<LogUpdateNotification>(HandleLogUpdateNotification);
+    }
+
+    private void OnStepCreated(object sender, StepEventArgs e)
+    {
+        designer.SetActiveStep(e.Step);
+    }
+
+    private async Task OnItemDrop(StudioStep step)
+    {
+        if (step.IsNew)
+        {
+            await AddStepDialog(step);
+        }
+        else
+        {
+            DesignerViewModel.UpdateStepConnections();
+        }
+    }
+
+    private async Task OnItemDoubleClick(StudioStep step)
+    {
+        if (!step.HasProperties)
+        {
+            return;
+        }
+
+        selectedStep = step;
+        StateHasChanged();
+    }
+
+    private void ClosePropertiesPanel()
+    {
+        selectedStep = null;
+        StateHasChanged();
+    }
+
+    private void OnStepDeleted(object sender, StepEventArgs e)
+    {
+        if (selectedStep?.Id == e.Step.Id)
+        {
+            selectedStep = null;
+        }
+        StateHasChanged();
+    }
+
+    private void OnRunButtonClickWhenDisabled()
+    {
+        var action = DesignerViewModel.GetRunButtonAction(HasSelectedRunners, HasAvailableRunners);
+        
+        switch (action)
+        {
+            case "download-runner":
+                NavigateToDownloadRunner();
+                break;
+            case "select-runners":
+                MessageService.Info("Please select one or more runners from the dropdown above to execute this workflow.", 3);
+                break;
+            default:
+                MessageService.Warning(RunButtonDisabledMessage, 3);
+                break;
+        }
+    }
+
+    private void NavigateToDownloadRunner()
+    {
+        // Show informative modal with option to navigate to runner download
+        var modal = ModalService.Info(new ConfirmOptions()
+        {
+            Title = "Install a Runner",
+            Content = @"
+                <div style='margin: 16px 0;'>
+                    <p>To execute workflows from the web interface, you need to install and run an Automaton Runner on your local machine or server.</p>
+                    <p><strong>The runner will:</strong></p>
+                    <ul style='margin: 12px 0 12px 24px;'>
+                        <li>Connect securely to your Automaton Studio</li>
+                        <li>Execute workflows on your behalf</li>
+                        <li>Provide access to local files and applications</li>
+                    </ul>
+                </div>",
+            OkText = "Download Runner",
+            CancelText = "Later",
+            OnOk = (args) => 
+            {
+                NavigationManager.NavigateTo("/downloads-runner", true);
+                return Task.CompletedTask;
+            }
+        });
     }
 }
