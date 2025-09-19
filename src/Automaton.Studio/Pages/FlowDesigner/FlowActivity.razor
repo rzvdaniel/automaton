@@ -19,7 +19,8 @@
             Class="autoscroll-list"
             EnableVirtualization
             OnChange="OnChange"
-            Total="FlowActivityViewModel.Total"           
+            Total="FlowActivityViewModel.Total"
+            PageSize="100"
             RemoteDataSource>
             <ColumnDefinitions>
                 <Column Title="Application" @bind-Field="@context.Application">
