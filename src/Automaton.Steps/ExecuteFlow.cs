@@ -36,7 +36,8 @@ public class ExecuteFlow : WorkflowStep
 
             SetFlowInputVariables(flow, inputVariables);
 
-            await flowExecuteService.Execute(flow);
+            // Be explicit about which overload to use to avoid ambiguity
+            await flowExecuteService.Execute(flow, CancellationToken.None);
 
             SetStepOutputVariables(flow.OutputVariables, context);
         });

@@ -7,15 +7,19 @@ using Serilog.Context;
 
 namespace Automaton.Core.Services
 {
-    public abstract class BaseFlowExecuteService : IFlowExecuteService
+    /// <summary>
+    /// Generic base class for flow execution services that can work with different flow model types
+    /// </summary>
+    /// <typeparam name="TFlow">The flow model type this service can execute</typeparam>
+    public abstract class BaseFlowExecuteService<TFlow> : IFlowExecuteService<TFlow> where TFlow : class
     {
         protected readonly ILogger logger;
-        protected readonly FlowConvertService flowConvertService;
+        protected readonly IFlowConvertService<TFlow> flowConvertService;
         protected readonly IExecutionNotificationService notificationService;
         protected readonly string applicationName;
 
         protected BaseFlowExecuteService(
-            FlowConvertService flowConvertService,
+            IFlowConvertService<TFlow> flowConvertService,
             IExecutionNotificationService notificationService,
             string applicationName)
         {
@@ -25,13 +29,79 @@ namespace Automaton.Core.Services
             this.logger = Log.ForContext(GetType());
         }
 
-        public virtual async Task<WorkflowExecution> Execute(Flow flow, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Executes a domain-specific flow by converting it to a workflow first
+        /// </summary>
+        public virtual async Task<WorkflowExecution> Execute(TFlow flow, int executeDelay = 0, CancellationToken cancellationToken = default)
         {
             var workflow = flowConvertService.ConvertFlow(flow);
-            return await Execute(workflow, 0, cancellationToken);
+
+            // Handle variable updates
+            workflow.SetWorkflowVariable += async (sender, e) =>
+            {
+                await notificationService.SendVariableUpdate(e.Variable);
+            };
+
+            WorkflowExecution workflowExecution = null;
+            
+            try
+            {
+                workflowExecution = await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Workflow execution failed for workflow {WorkflowId}", workflow.Id);
+                
+                // Create error execution if workflow execution failed completely
+                if (workflowExecution == null)
+                {
+                    workflowExecution = new WorkflowExecution(workflow.Id, applicationName)
+                    {
+                        Started = DateTime.UtcNow,
+                        Finished = DateTime.UtcNow,
+                        Status = WorkflowStatus.Error
+                    };
+                    await AddLogWithNotification(workflowExecution, "Error", $"Workflow execution failed: {ex.Message}", exception: ex, cancellationToken: cancellationToken);
+                }
+            }
+
+            // Allow derived classes to perform additional actions after execution
+            try
+            {
+                await OnExecutionCompleted(workflowExecution);
+                logger.Information("Successfully completed post-execution processing for execution {ExecutionId}", workflowExecution.Id);
+            }
+            catch (Exception postEx)
+            {
+                logger.Error(postEx, "Post-execution processing failed for execution {ExecutionId}. Execution completed but additional processing failed.", workflowExecution.Id);
+                // Don't throw - the workflow executed successfully, we just couldn't do post-processing
+            }
+
+            return workflowExecution;
         }
 
+        /// <summary>
+        /// IFlowExecuteService implementation - works with Workflow directly
+        /// </summary>
         public virtual async Task<WorkflowExecution> Execute(Workflow workflow, int executeDelay = 0, CancellationToken cancellationToken = default)
+        {
+            return await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
+        }
+
+        /// <summary>
+        /// IFlowExecuteService implementation - works with Flow (needs to be implemented by derived classes if supported)
+        /// For backward compatibility - should be overridden to avoid ambiguous calls
+        /// </summary>
+        public virtual async Task<WorkflowExecution> Execute(Flow flow, CancellationToken cancellationToken = default)
+        {
+            // Base implementation throws - derived classes can override if they support Flow conversion
+            throw new NotSupportedException($"{GetType().Name} does not support direct Flow execution. Use the domain-specific Execute method instead.");
+        }
+
+        /// <summary>
+        /// Core workflow execution logic
+        /// </summary>
+        protected virtual async Task<WorkflowExecution> ExecuteWorkflow(Workflow workflow, int executeDelay = 0, CancellationToken cancellationToken = default)
         {
             using var workflowExecution = new WorkflowExecution(workflow.Id, applicationName);
             var definition = workflow.GetStartupDefinition();
@@ -41,12 +111,6 @@ namespace Automaton.Core.Services
             LogContext.PushProperty(LogContextProperties.WorkflowId, workflow.Id);
             LogContext.PushProperty(LogContextProperties.WorkflowExecutionId, workflowExecution.Id);
             LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
-
-            // Handle variable updates
-            workflow.SetWorkflowVariable += async (sender, e) =>
-            {
-                await notificationService.SendVariableUpdate(e.Variable);
-            };
 
             var startMessage = $"Start workflow: {workflow.Name}";
             await AddLogWithNotification(workflowExecution, "Information", startMessage, cancellationToken: cancellationToken);
@@ -97,9 +161,6 @@ namespace Automaton.Core.Services
 
             var endMessage = $"End workflow: {workflow.Name}";
             await AddLogWithNotification(workflowExecution, "Information", endMessage, cancellationToken: cancellationToken);
-
-            // Allow derived classes to perform additional actions after execution
-            await OnExecutionCompleted(workflowExecution);
 
             return workflowExecution;
         }
@@ -164,6 +225,7 @@ namespace Automaton.Core.Services
 
         /// <summary>
         /// Override this method in derived classes to perform additional actions after execution
+        /// (e.g., persist execution results, send notifications, etc.)
         /// </summary>
         protected virtual async Task OnExecutionCompleted(WorkflowExecution workflowExecution)
         {

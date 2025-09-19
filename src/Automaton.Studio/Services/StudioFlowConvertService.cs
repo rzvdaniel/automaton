@@ -1,11 +1,12 @@
 ﻿using Automaton.Core.Extensions;
+using Automaton.Core.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Extensions;
 
 namespace Automaton.Studio.Services;
 
-public class StudioFlowConvertService
+public class StudioFlowConvertService : IFlowConvertService<StudioFlow>
 {
     private readonly IServiceProvider serviceProvider;
 
@@ -47,6 +48,12 @@ public class StudioFlowConvertService
         foreach (var step in steps)
         {
             var workflowStep = serviceProvider.GetService(step.FindType()) as WorkflowStep;
+            
+            if (workflowStep == null)
+            {
+                throw new InvalidOperationException($"Could not resolve WorkflowStep for type {step.FindType()?.Name ?? "null"}. Make sure the step is registered in the service container.");
+            }
+
             UpdateStep(ref workflowStep, step, workflowDefinition);
             workflowSteps.Add(step.Id, workflowStep);
         }

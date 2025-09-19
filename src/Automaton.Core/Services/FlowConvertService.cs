@@ -1,9 +1,10 @@
-﻿using Automaton.Core.Models;
+﻿using Automaton.Core.Interfaces;
+using Automaton.Core.Models;
 using Automaton.Studio.Extensions;
 
 namespace Automaton.Core.Services;
 
-public class FlowConvertService
+public class FlowConvertService : IFlowConvertService<Flow>
 {
     private readonly IServiceProvider serviceProvider;
 
@@ -45,6 +46,12 @@ public class FlowConvertService
         foreach (var step in steps)
         {
             var workflowStep = serviceProvider.GetService(step.FindType()) as WorkflowStep;
+            
+            if (workflowStep == null)
+            {
+                throw new InvalidOperationException($"Could not resolve WorkflowStep for type {step.FindType()?.Name ?? "null"}. Make sure the step is registered in the service container.");
+            }
+
             workflowStep.Setup(step, workflowDefinition);
             workflowSteps.Add(step.Id, workflowStep);
         }
