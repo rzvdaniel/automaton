@@ -7,12 +7,14 @@ public class FileStorageService
     private readonly string configDirectory;
     private readonly string apiKeyFile;
     private readonly string runnerConfigFile;
+    private readonly string serverConfigFile;
 
     public FileStorageService()
     {
         configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
         apiKeyFile = Path.Combine(configDirectory, "apikey.json");
         runnerConfigFile = Path.Combine(configDirectory, "runner.json");
+        serverConfigFile = Path.Combine(configDirectory, "server.json");
 
         EnsureConfigDirectoryExists();
     }
@@ -108,6 +110,45 @@ public class FileStorageService
     public bool IsRunnerRegistered()
     {
         return !string.IsNullOrEmpty(GetRunnerId()) && !string.IsNullOrEmpty(GetRunnerName());
+    }
+
+    // Server configuration methods
+    public async Task SaveServerConfigAsync(string serverUrl)
+    {
+        var config = new
+        {
+            ServerUrl = serverUrl,
+            SavedAt = DateTime.UtcNow
+        };
+
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(serverConfigFile, json);
+    }
+
+    public async Task<string?> LoadServerUrlAsync()
+    {
+        if (!File.Exists(serverConfigFile))
+            return null;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(serverConfigFile);
+            var config = JsonSerializer.Deserialize<JsonElement>(json);
+            return config.TryGetProperty("ServerUrl", out var url) ? url.GetString() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public Task DeleteServerConfigAsync()
+    {
+        if (File.Exists(serverConfigFile))
+        {
+            File.Delete(serverConfigFile);
+        }
+        return Task.CompletedTask;
     }
 
     public bool IsLoggedIn()

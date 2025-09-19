@@ -56,8 +56,8 @@ public class RunnerHostService
                     serverUrl = "https://localhost:7091";
                 }
                 
-                configService.UpdateServerUrl(serverUrl);
-                WriteLine($"? Server configured: {configService.BaseUrl}");
+                await configService.UpdateServerUrlAsync(serverUrl);
+                WriteLine($"? Server configured and saved: {configService.BaseUrl}");
                 WriteLine();
             }
             else
@@ -152,8 +152,8 @@ public class RunnerHostService
             // Configure server if provided or prompt
             if (!string.IsNullOrEmpty(serverUrl))
             {
-                configService.UpdateServerUrl(serverUrl);
-                WriteLine($"? Server configured: {configService.BaseUrl}");
+                await configService.UpdateServerUrlAsync(serverUrl);
+                WriteLine($"? Server configured and saved: {configService.BaseUrl}");
             }
             else if (!configService.IsServerConfigured())
             {
@@ -166,8 +166,12 @@ public class RunnerHostService
                     inputServerUrl = "https://localhost:7091";
                 }
                 
-                configService.UpdateServerUrl(inputServerUrl);
-                WriteLine($"? Server configured: {configService.BaseUrl}");
+                await configService.UpdateServerUrlAsync(inputServerUrl);
+                WriteLine($"? Server configured and saved: {configService.BaseUrl}");
+            }
+            else
+            {
+                WriteLine($"? Using saved server: {configService.BaseUrl}");
             }
 
             // Handle API key authentication
@@ -328,8 +332,8 @@ public class RunnerHostService
 
             if (!string.IsNullOrEmpty(serverUrl))
             {
-                configService.UpdateServerUrl(serverUrl);
-                WriteLine($"? Server configured: {configService.BaseUrl}");
+                await configService.UpdateServerUrlAsync(serverUrl);
+                WriteLine($"? Server configured and saved: {configService.BaseUrl}");
             }
             else
             {
@@ -342,8 +346,8 @@ public class RunnerHostService
                     return;
                 }
                 
-                configService.UpdateServerUrl(inputServerUrl);
-                WriteLine($"? Server configured: {configService.BaseUrl}");
+                await configService.UpdateServerUrlAsync(inputServerUrl);
+                WriteLine($"? Server configured and saved: {configService.BaseUrl}");
             }
 
             // Check if we need to re-register due to server change
@@ -353,6 +357,9 @@ public class RunnerHostService
                 WriteLine("?? Note: Server URL changed. You may need to re-register your runner.");
                 WriteLine("Run: automaton-runner register --force");
             }
+            
+            WriteLine();
+            WriteLine("?? The server URL has been saved and will be remembered for future runs.");
         }
         catch (Exception ex)
         {
@@ -568,13 +575,13 @@ public class RunnerHostService
     public async Task ShowStatusAsync()
     {
         WriteLine();
-        WriteLine("???????????????????????????????????????????????");
+        WriteLine("???????????????????????????????????????????");
         WriteLine("         ?? RUNNER STATUS REPORT         ");
-        WriteLine("???????????????????????????????????????????????");
+        WriteLine("???????????????????????????????????????????");
         WriteLine();
         
         // Runner Information
-        WriteLine("???  Runner Information:");
+        WriteLine("?? Runner Information:");
         WriteLine($"   • ID: {configService.RunnerId}");
         WriteLine($"   • Name: {configService.ApplicationName}");
         WriteLine($"   • Machine: {Environment.MachineName}");
@@ -586,7 +593,15 @@ public class RunnerHostService
         
         try
         {
-            WriteLine($"   • Server: {configService.BaseUrl}");
+            var serverUrl = configService.BaseUrl;
+            WriteLine($"   • Server: {serverUrl}");
+            
+            // Show server configuration source
+            var storedServerUrl = await storageService.LoadServerUrlAsync();
+            var isFromStorage = !string.IsNullOrEmpty(storedServerUrl);
+            
+            string serverSource = isFromStorage ? "Saved Locally" : "Configuration";
+            WriteLine($"   • Source: {serverSource}");
         }
         catch (InvalidOperationException)
         {
@@ -618,6 +633,15 @@ public class RunnerHostService
         }
         WriteLine();
         
+        // Configuration Storage Status
+        WriteLine("?? Stored Configuration:");
+        WriteLine($"   • API Key: {(hasStoredKey ? "? Saved" : "? Not saved")}");
+        WriteLine($"   • Runner Config: {(storageService.IsRunnerRegistered() ? "? Saved" : "? Not saved")}");
+        
+        var hasStoredServerUrl = !string.IsNullOrEmpty(await storageService.LoadServerUrlAsync());
+        WriteLine($"   • Server URL: {(hasStoredServerUrl ? "? Saved" : "? Not saved")}");
+        WriteLine();
+        
         // Runtime Information
         WriteLine("??  Runtime Information:");
         WriteLine($"   • Process ID: {Environment.ProcessId}");
@@ -635,7 +659,7 @@ public class RunnerHostService
         WriteLine("   • automaton-runner service (service management)");
         WriteLine("   • automaton-runner cleanup (clear stored data)");
         
-        WriteLine("???????????????????????????????????????????????");
+        WriteLine("???????????????????????????????????????????");
         WriteLine();
     }
 
@@ -673,6 +697,7 @@ public class RunnerHostService
 
             var apiKeyCleared = false;
             var runnerConfigCleared = false;
+            var serverConfigCleared = false;
 
             // Clear API key if it exists
             var hasApiKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
@@ -691,7 +716,16 @@ public class RunnerHostService
                 runnerConfigCleared = true;
             }
 
-            if (!apiKeyCleared && !runnerConfigCleared)
+            // Clear server configuration if it exists
+            var hasServerConfig = !string.IsNullOrEmpty(await storageService.LoadServerUrlAsync());
+            if (hasServerConfig)
+            {
+                await storageService.DeleteServerConfigAsync();
+                WriteLine("? Server configuration removed");
+                serverConfigCleared = true;
+            }
+
+            if (!apiKeyCleared && !runnerConfigCleared && !serverConfigCleared)
             {
                 WriteLine("??  No stored data found to cleanup");
             }
@@ -708,12 +742,17 @@ public class RunnerHostService
                 {
                     WriteLine("   - Runner registration cleared");
                 }
+                if (serverConfigCleared)
+                {
+                    WriteLine("   - Server URL configuration cleared");
+                }
                 
                 WriteLine();
                 WriteLine("?? Note: Environment variable AUTOMATON_API_KEY (if set) is not affected");
             }
 
-            logger.Information("Runner cleanup completed. API key cleared: {ApiKeyCleared}, Runner config cleared: {RunnerConfigCleared}", apiKeyCleared, runnerConfigCleared);
+            logger.Information("Runner cleanup completed. API key cleared: {ApiKeyCleared}, Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}", 
+                apiKeyCleared, runnerConfigCleared, serverConfigCleared);
             return true;
         }
         catch (Exception ex)

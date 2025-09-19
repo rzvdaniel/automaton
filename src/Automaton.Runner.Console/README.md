@@ -1,4 +1,4 @@
-# Automaton Runner Console
+﻿# Automaton Runner Console
 
 A cross-platform command-line runner for the Automaton workflow automation system with **API Key authentication**.
 
@@ -29,24 +29,25 @@ The executable will be located in `bin/Release/net8.0/publish/automaton-runner.e
 
 ## Authentication
 
-### ?? API Key Authentication
+### 🔐 API Key Authentication
 
 API keys are the **primary and only** authentication method for console runners.
 
 **Benefits:**
-- ? No interactive login required
-- ? Long-lived credentials
-- ? Easy credential rotation
-- ? Environment variable friendly
-- ? Scoped permissions
-- ? Perfect for automation and CI/CD
+- ✅ No interactive login required
+- ✅ Long-lived credentials
+- ✅ Easy credential rotation
+- ✅ Environment variable friendly
+- ✅ Scoped permissions
+- ✅ Perfect for automation and CI/CD
+- ✅ **Server URL is automatically saved**
 
 ### Getting Started
 
 #### Step 1: Create an API Key
 
 1. Login to Automaton Studio Web Interface
-2. Go to **Settings ? API Keys**
+2. Go to **Settings → API Keys**
 3. Click **Create API Key**
 4. Fill in the details:
    - **Name**: Descriptive name (e.g., "Production Runner")
@@ -57,15 +58,20 @@ API keys are the **primary and only** authentication method for console runners.
 #### Step 2: Run the Interactive Setup
 
 ```bash
-# Start the runner - it will guide you through everything
+# Start the runner - it will guide you through everything ONCE
 automaton-runner
 ```
 
 **That's it!** The runner will interactively prompt you for:
-- ? Your API key (when needed)
-- ? Server URL (if different from default)
-- ? Runner name (with smart defaults)
-- ? Automatic connection and startup
+- ✅ Your API key (when needed) - **saved securely**
+- ✅ Server URL (if different from default) - **remembered for future runs**
+- ✅ Runner name (with smart defaults) - **saved automatically**
+- ✅ Automatic connection and startup
+
+**💡 Smart Memory**: After the first setup, future runs of `automaton-runner` will remember:
+- Your server URL
+- Your API key (if not using environment variable)
+- Your runner registration
 
 #### Alternative: Environment Variable Method (Best for Automation)
 
@@ -75,7 +81,10 @@ For automated deployments, you can set the API key as an environment variable:
 # Set environment variable
 export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
 
-# Start directly - no prompts needed
+# Optionally set server URL to avoid any prompts
+export AppConfig__BaseUrl="https://your-server.com"
+
+# Start directly - no prompts needed at all
 automaton-runner
 ```
 
@@ -84,13 +93,13 @@ automaton-runner
 For scripted workflows or advanced users, you can use explicit commands (see Commands section below):
 
 ```bash
-# Set API key explicitly
+# Set API key and server URL explicitly (both will be saved)
 automaton-runner auth --api-key ak_runner_1234567890abcdef --server https://localhost:7091
 
 # Register runner explicitly  
 automaton-runner register --name "Production-Runner"
 
-# Start runner
+# Start runner - everything remembered from previous commands
 automaton-runner
 ```
 
@@ -141,7 +150,7 @@ automaton-runner [command] [options]
 - [`status`](#status---show-configuration-and-status) - Show runner status
 - [`server`](#server---configure-server-url) - Configure server URL
 - [`service`](#service---service-management-optional-convenience-commands) - Service management
-- [`cleanup`](#cleanup---cleanup-stored-data) - Clean up stored data
+- [`cleanup`](#cleanup---cleanup-stored-data)
 
 **Quick Reference:**
 ```bash
@@ -241,18 +250,36 @@ automaton-runner server [--url <url>]
 **Options:**
 - `--url`: Server URL to configure (optional - will prompt if not provided)
 
+**Examples:**
+```bash
+# Set server URL explicitly (will be saved for future use)
+automaton-runner server --url https://your-server.com
+
+# Interactive server configuration (will be saved)
+automaton-runner server
+```
+
+**💾 Persistent Storage**: The server URL is automatically saved to local storage and will be remembered for all future runs. You only need to configure it once per machine/user.
+
 #### `cleanup` - Cleanup Stored Data
 
 ```bash
 automaton-runner cleanup
 ```
 
-Removes stored API key and runner registration data from local storage. Useful for:
-- Switching between different API keys
+Removes stored API key, runner registration data, and server URL configuration from local storage. Useful for:
+- Switching between different API keys or servers
 - Clearing cached runner registrations
 - Preparing for fresh deployment
+- Resetting all configuration to start over
 
-**Note**: This command does not affect environment variables.
+**What gets cleared:**
+- ✅ Stored API key authentication
+- ✅ Runner registration (ID and name)
+- ✅ Server URL configuration
+- ❌ Environment variables (not affected)
+
+**Note**: After cleanup, the next run of `automaton-runner` will prompt for configuration again, just like a fresh installation.
 
 #### `service` - Service Management (Optional Convenience Commands)
 
