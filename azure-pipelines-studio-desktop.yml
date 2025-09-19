@@ -32,7 +32,6 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.0.x'
-  solutionPath: 'Automaton.Client.sln'
   desktopProjectPath: 'src/Automaton.Studio.Desktop/Automaton.Studio.Desktop.csproj'
   artifactName: 'automaton-studio-desktop'
   majorVersion: 1
@@ -62,31 +61,24 @@ stages:
               echo "Build version: $buildNumber"
             displayName: 'Set Build Version'
 
-          # List solution contents for debugging
-          - script: |
-              echo "Using Client solution: $(solutionPath)"
-              echo "Solution contents:"
-              dotnet sln $(solutionPath) list
-            displayName: 'Show Solution Contents'
-
-          # Restore dependencies using the client solution
+          # Restore dependencies for desktop project only
           - task: DotNetCoreCLI@2
-            displayName: 'Restore Client Solution'
+            displayName: 'Restore Desktop Project'
             inputs:
               command: 'restore'
-              projects: $(solutionPath)
+              projects: '$(desktopProjectPath)'
               feedsToUse: 'select'
               verbosityRestore: 'minimal'
 
-          # Build using the client solution
+          # Build desktop project
           - task: DotNetCoreCLI@2
-            displayName: 'Build Client Solution'
+            displayName: 'Build Desktop Project'
             inputs:
               command: 'build'
-              projects: $(solutionPath)
+              projects: '$(desktopProjectPath)'
               arguments: '--configuration $(buildConfiguration) --no-restore -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber)'
 
-          # Run tests (if any)
+          # Run tests (if any exist for desktop)
           - task: DotNetCoreCLI@2
             displayName: 'Run Desktop Tests'
             inputs:
