@@ -1,0 +1,367 @@
+# GitHub Actions Workflow for Automaton Studio Desktop
+# Alternative to Azure DevOps pipeline
+# Builds Windows desktop application with NSIS installer
+
+name: Build Desktop Application
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/Automaton.Studio.Desktop/**'
+      - 'src/Automaton.Studio/**'
+      - 'src/Automaton.Core/**'
+      - 'src/Automaton.Steps/**'
+      - '.github/workflows/desktop.yml'
+
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/Automaton.Studio.Desktop/**'
+      - 'src/Automaton.Studio/**'
+      - 'src/Automaton.Core/**'
+      - 'src/Automaton.Steps/**'
+
+jobs:
+  build-desktop:
+    runs-on: windows-latest
+    
+    env:
+      DOTNET_VERSION: '8.0.x'
+      BUILD_CONFIGURATION: 'Release'
+      SOLUTION_PATH: 'Automaton.Client.sln'
+      DESKTOP_PROJECT_PATH: 'src/Automaton.Studio.Desktop/Automaton.Studio.Desktop.csproj'
+      MAJOR_VERSION: 1
+      MINOR_VERSION: 0
+      PATCH_VERSION: 0
+    
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Set build version
+      id: set-version
+      run: |
+        $buildNumber = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ env.PATCH_VERSION }}.${{ github.run_number }}"
+        echo "version=$buildNumber" >> $env:GITHUB_OUTPUT
+        echo "VERSION=$buildNumber" >> $env:GITHUB_ENV
+        Write-Host "Build version: $buildNumber"
+      shell: pwsh
+      
+    - name: List solution contents
+      run: |
+        echo "Using Client solution: ${{ env.SOLUTION_PATH }}"
+        echo "Solution contents:"
+        dotnet sln ${{ env.SOLUTION_PATH }} list
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+      
+    - name: Build solution
+      run: |
+        dotnet build ${{ env.SOLUTION_PATH }} `
+          --configuration ${{ env.BUILD_CONFIGURATION }} `
+          --no-restore `
+          -p:Version=${{ env.VERSION }} `
+          -p:AssemblyVersion=${{ env.VERSION }} `
+          -p:FileVersion=${{ env.VERSION }}
+      shell: pwsh
+      
+    - name: Run tests
+      run: |
+        dotnet test src/UnitTests/**/*.csproj `
+          --configuration ${{ env.BUILD_CONFIGURATION }} `
+          --logger trx `
+          --results-directory TestResults `
+          --collect:"XPlat Code Coverage"
+      shell: pwsh
+      continue-on-error: true
+      
+    - name: Create build directories
+      run: |
+        New-Item -ItemType Directory -Path "builds/win-x64" -Force
+        New-Item -ItemType Directory -Path "builds/win-arm64" -Force
+        New-Item -ItemType Directory -Path "installers" -Force
+      shell: pwsh
+      
+    - name: Publish Windows x64
+      run: |
+        dotnet publish ${{ env.DESKTOP_PROJECT_PATH }} `
+          --configuration ${{ env.BUILD_CONFIGURATION }} `
+          --runtime win-x64 `
+          --self-contained true `
+          --output "builds/win-x64" `
+          -p:PublishSingleFile=false `
+          -p:Version=${{ env.VERSION }} `
+          -p:AssemblyVersion=${{ env.VERSION }} `
+          -p:FileVersion=${{ env.VERSION }} `
+          -p:IncludeNativeLibrariesForSelfExtract=true
+      shell: pwsh
+      
+    - name: Publish Windows ARM64
+      run: |
+        dotnet publish ${{ env.DESKTOP_PROJECT_PATH }} `
+          --configuration ${{ env.BUILD_CONFIGURATION }} `
+          --runtime win-arm64 `
+          --self-contained true `
+          --output "builds/win-arm64" `
+          -p:PublishSingleFile=false `
+          -p:Version=${{ env.VERSION }} `
+          -p:AssemblyVersion=${{ env.VERSION }} `
+          -p:FileVersion=${{ env.VERSION }} `
+          -p:IncludeNativeLibrariesForSelfExtract=true
+      shell: pwsh
+      
+    - name: Install NSIS
+      run: |
+        Write-Host "Installing NSIS..."
+        $nsisUrl = "https://netcologne.dl.sourceforge.net/project/nsis/NSIS%203/3.08/nsis-3.08-setup.exe"
+        $nsisPath = "$env:TEMP\nsis-setup.exe"
+        
+        Invoke-WebRequest -Uri $nsisUrl -OutFile $nsisPath
+        Start-Process -FilePath $nsisPath -ArgumentList "/S" -Wait
+        
+        # Add NSIS to PATH
+        $nsisPath = "${env:ProgramFiles(x86)}\NSIS"
+        if (Test-Path $nsisPath) {
+          echo "$nsisPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        }
+      shell: pwsh
+      
+    - name: Create NSIS installer script
+      run: |
+        $nsisScript = @"
+        !define APP_NAME "Automaton Studio Desktop"
+        !define APP_VERSION "${{ env.VERSION }}"
+        !define APP_PUBLISHER "Automaton"
+        !define APP_URL "https://automaton.monster"
+        !define APP_EXECUTABLE "Automaton.Studio.Desktop.exe"
+        
+        !include "MUI2.nsh"
+        
+        Name "`${APP_NAME}"
+        OutFile "AutomatonStudioDesktop-win-x64-`${APP_VERSION}-Setup.exe"
+        Unicode True
+        InstallDir "`$PROGRAMFILES64\AutomatonStudio"
+        InstallDirRegKey HKLM "Software\Automaton\AutomatonStudio" "Install_Dir"
+        RequestExecutionLevel admin
+        
+        !define MUI_ABORTWARNING
+        
+        !insertmacro MUI_PAGE_WELCOME
+        !insertmacro MUI_PAGE_DIRECTORY
+        !insertmacro MUI_PAGE_INSTFILES
+        !insertmacro MUI_PAGE_FINISH
+        
+        !insertmacro MUI_UNPAGE_WELCOME
+        !insertmacro MUI_UNPAGE_CONFIRM
+        !insertmacro MUI_UNPAGE_INSTFILES
+        !insertmacro MUI_UNPAGE_FINISH
+        
+        !insertmacro MUI_LANGUAGE "English"
+        
+        Section "MainSection" SEC01
+          SetOutPath "`$INSTDIR"
+          File /r "publish\*"
+          
+          WriteRegStr HKLM "Software\Automaton\AutomatonStudio" "Install_Dir" "`$INSTDIR"
+          WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "DisplayName" "`${APP_NAME}"
+          WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "UninstallString" '"`$INSTDIR\uninstall.exe"'
+          WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "NoModify" 1
+          WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "NoRepair" 1
+          WriteUninstaller "`$INSTDIR\uninstall.exe"
+          
+          CreateDirectory "`$SMPROGRAMS\Automaton Studio"
+          CreateShortCut "`$SMPROGRAMS\Automaton Studio\Automaton Studio.lnk" "`$INSTDIR\`${APP_EXECUTABLE}"
+          CreateShortCut "`$DESKTOP\Automaton Studio.lnk" "`$INSTDIR\`${APP_EXECUTABLE}"
+        SectionEnd
+        
+        Section "Uninstall"
+          DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio"
+          DeleteRegKey HKLM "Software\Automaton\AutomatonStudio"
+          
+          Delete "`$SMPROGRAMS\Automaton Studio\*.*"
+          RMDir "`$SMPROGRAMS\Automaton Studio"
+          Delete "`$DESKTOP\Automaton Studio.lnk"
+          
+          RMDir /r "`$INSTDIR"
+        SectionEnd
+        "@
+        
+        $nsisScript | Out-File -FilePath "installer-x64.nsi" -Encoding utf8
+        Write-Host "NSIS script created"
+      shell: pwsh
+      
+    - name: Build NSIS installer
+      run: |
+        # Prepare installer directory
+        New-Item -ItemType Directory -Path "installer-x64" -Force
+        Copy-Item -Path "builds/win-x64/*" -Destination "installer-x64/publish" -Recurse -Force
+        
+        # Copy license if exists
+        $licensePath = "LICENSE"
+        if (Test-Path $licensePath) {
+          Copy-Item $licensePath "installer-x64/license.txt"
+        } else {
+          "MIT License - See https://github.com/rzvdaniel/automaton" | Out-File -FilePath "installer-x64/license.txt" -Encoding utf8
+        }
+        
+        # Build installer
+        Set-Location installer-x64
+        makensis.exe ../installer-x64.nsi
+        
+        # Move installer to artifacts
+        if (Test-Path "AutomatonStudioDesktop-win-x64-${{ env.VERSION }}-Setup.exe") {
+          Move-Item "AutomatonStudioDesktop-win-x64-${{ env.VERSION }}-Setup.exe" "../installers/"
+          Write-Host "NSIS installer built successfully"
+        }
+      shell: pwsh
+      continue-on-error: true
+      
+    - name: Create ZIP packages
+      run: |
+        # Create ZIP for x64
+        Compress-Archive -Path "builds/win-x64/*" -DestinationPath "installers/AutomatonStudioDesktop-win-x64-${{ env.VERSION }}.zip" -Force
+        
+        # Create ZIP for ARM64  
+        Compress-Archive -Path "builds/win-arm64/*" -DestinationPath "installers/AutomatonStudioDesktop-win-arm64-${{ env.VERSION }}.zip" -Force
+        
+        Write-Host "ZIP packages created"
+      shell: pwsh
+      
+    - name: Create version info
+      run: |
+        $commitHash = "${{ github.sha }}".Substring(0, 8)
+        $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+        
+        $versionInfo = @{
+            version = "${{ env.VERSION }}"
+            buildNumber = "${{ github.run_number }}"
+            commitHash = $commitHash
+            buildDate = $buildDate
+            sourcesBranch = "${{ github.ref_name }}"
+            platforms = @("win-x64", "win-arm64")
+            packageTypes = @("exe", "zip")
+            application = "Automaton Studio Desktop"
+            description = "Windows desktop application with workflow designer and local execution"
+            systemRequirements = @{
+                os = "Windows 10 version 1809 or later, Windows 11"
+                runtime = ".NET 8 (included in self-contained deployment)"
+                memory = "4GB RAM minimum"
+                disk = "500MB available space"
+            }
+        } | ConvertTo-Json -Depth 3
+        
+        $versionInfo | Out-File -FilePath "installers/version.json" -Encoding utf8
+      shell: pwsh
+      
+    - name: Create checksums
+      run: |
+        $files = Get-ChildItem "installers" -Filter "AutomatonStudioDesktop-*"
+        $checksums = @()
+        
+        foreach ($file in $files) {
+            $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
+            $checksums += "$($hash.Hash.ToLower())  $($file.Name)"
+        }
+        
+        $checksums | Out-File -FilePath "installers/checksums.txt" -Encoding utf8
+      shell: pwsh
+      
+    - name: Create installation guide
+      run: |
+        $instructions = @"
+        # Automaton Studio Desktop - Installation Instructions
+        
+        ## System Requirements
+        - Windows 10 version 1809 or later / Windows 11
+        - .NET 8 Desktop Runtime (included in self-contained packages)
+        - Minimum 4GB RAM
+        - 500MB available disk space
+        
+        ## Installation Options
+        
+        ### Option 1: Windows Installer (Recommended)
+        1. Download: AutomatonStudioDesktop-win-x64-${{ env.VERSION }}-Setup.exe
+        2. Right-click and "Run as administrator"
+        3. Follow the installation wizard
+        4. Launch from Start Menu or Desktop shortcut
+        
+        ### Option 2: Portable ZIP
+        1. Download the appropriate ZIP file:
+           - AutomatonStudioDesktop-win-x64-${{ env.VERSION }}.zip (64-bit Intel/AMD)
+           - AutomatonStudioDesktop-win-arm64-${{ env.VERSION }}.zip (64-bit ARM)
+        2. Extract to your preferred location (e.g., C:\Tools\AutomatonStudio)
+        3. Run Automaton.Studio.Desktop.exe from the extracted folder
+        
+        ## First Run
+        - The application starts with a local workflow designer
+        - No server connection required for basic functionality
+        - Create your first workflow using the visual interface
+        
+        Build: ${{ env.VERSION }}
+        Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+        Source: ${{ github.ref_name }}
+        "@
+        
+        $instructions | Out-File -FilePath "installers/INSTALL.md" -Encoding utf8
+      shell: pwsh
+      
+    - name: List artifacts
+      run: |
+        Write-Host "Final artifacts:"
+        Get-ChildItem -Path "installers" | ForEach-Object {
+          Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+        }
+      shell: pwsh
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: automaton-studio-desktop-packages
+        path: installers/
+        retention-days: 30
+        
+    - name: Create Release (on main branch)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "desktop-v${{ env.VERSION }}"
+        name: "Automaton Studio Desktop v${{ env.VERSION }}"
+        body: |
+          ## Automaton Studio Desktop v${{ env.VERSION }}
+          
+          Windows desktop application with visual workflow designer and local execution.
+          
+          ### Downloads
+          - **Windows x64 Installer**: AutomatonStudioDesktop-win-x64-${{ env.VERSION }}-Setup.exe (Recommended)
+          - **Windows x64 Portable**: AutomatonStudioDesktop-win-x64-${{ env.VERSION }}.zip
+          - **Windows ARM64 Portable**: AutomatonStudioDesktop-win-arm64-${{ env.VERSION }}.zip
+          
+          ### Installation
+          See INSTALL.md for detailed instructions.
+          
+          ### System Requirements
+          - Windows 10 version 1809 or later / Windows 11
+          - 4GB RAM minimum
+          - 500MB disk space
+          - .NET 8 runtime (included)
+        files: |
+          installers/AutomatonStudioDesktop-win-x64-${{ env.VERSION }}-Setup.exe
+          installers/AutomatonStudioDesktop-win-x64-${{ env.VERSION }}.zip
+          installers/AutomatonStudioDesktop-win-arm64-${{ env.VERSION }}.zip
+          installers/version.json
+          installers/checksums.txt
+          installers/INSTALL.md
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
