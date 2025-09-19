@@ -1,4 +1,5 @@
 using Automaton.Runner.Console.Services;
+using Automaton.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -272,6 +273,8 @@ public class Program
                 services.AddSingleton<FlowExecutionService>();
                 services.AddSingleton<RunnerHostService>();
                 services.AddSingleton<ServiceManagementService>();
+                services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
+                services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
 
                 // Add HTTP client
                 services.AddHttpClient();

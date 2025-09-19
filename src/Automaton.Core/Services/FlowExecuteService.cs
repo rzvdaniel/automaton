@@ -10,10 +10,12 @@ public class FlowExecuteService : BaseFlowExecuteService<Flow>
 {
     public FlowExecuteService(
         FlowConvertService flowConvertService, 
-        IExecutionNotificationService notificationService = null)
+        IExecutionNotificationService notificationService = null,
+        IWorkflowExecutionPersistenceService persistenceService = null)
         : base(flowConvertService, 
                notificationService ?? new NullExecutionNotificationService(), 
-               string.Empty)
+               string.Empty,
+               persistenceService ?? new NullWorkflowExecutionPersistenceService())
     {
     }
 
@@ -25,6 +27,18 @@ public class FlowExecuteService : BaseFlowExecuteService<Flow>
     {
         // Use the typed execute method with 0 delay
         return await Execute(flow, 0, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runner-specific post-execution processing override
+    /// Note: Execution persistence is handled by the base class automatically if a persistence service is provided
+    /// This method is available for any additional runner-specific processing if needed in the future
+    /// </summary>
+    protected override async Task OnExecutionCompleted(WorkflowExecution workflowExecution)
+    {
+        // Execution is saved by the base class if a persistence service was provided
+        // This method is left available for future runner-specific post-processing needs
+        await base.OnExecutionCompleted(workflowExecution);
     }
 }
 

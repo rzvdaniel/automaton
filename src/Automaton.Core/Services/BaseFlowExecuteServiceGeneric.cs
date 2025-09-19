@@ -16,16 +16,19 @@ namespace Automaton.Core.Services
         protected readonly ILogger logger;
         protected readonly IFlowConvertService<TFlow> flowConvertService;
         protected readonly IExecutionNotificationService notificationService;
+        protected readonly IWorkflowExecutionPersistenceService persistenceService;
         protected readonly string applicationName;
 
         protected BaseFlowExecuteService(
             IFlowConvertService<TFlow> flowConvertService,
             IExecutionNotificationService notificationService,
-            string applicationName)
+            string applicationName,
+            IWorkflowExecutionPersistenceService persistenceService = null)
         {
             this.flowConvertService = flowConvertService;
             this.notificationService = notificationService;
             this.applicationName = applicationName;
+            this.persistenceService = persistenceService ?? new NullWorkflowExecutionPersistenceService();
             this.logger = Log.ForContext(GetType());
         }
 
@@ -63,6 +66,18 @@ namespace Automaton.Core.Services
                     };
                     await AddLogWithNotification(workflowExecution, "Error", $"Workflow execution failed: {ex.Message}", exception: ex, cancellationToken: cancellationToken);
                 }
+            }
+
+            // Save execution results using the common persistence mechanism
+            try
+            {
+                await SaveWorkflowExecution(workflowExecution);
+                logger.Information("Successfully saved workflow execution {ExecutionId}", workflowExecution.Id);
+            }
+            catch (Exception saveEx)
+            {
+                logger.Error(saveEx, "Failed to save workflow execution {ExecutionId}. Execution completed but results not persisted.", workflowExecution.Id);
+                // Don't throw - the workflow executed successfully, we just couldn't save the results
             }
 
             // Allow derived classes to perform additional actions after execution
@@ -166,6 +181,14 @@ namespace Automaton.Core.Services
         }
 
         /// <summary>
+        /// Common workflow execution persistence logic - saves execution results
+        /// </summary>
+        protected virtual async Task SaveWorkflowExecution(WorkflowExecution workflowExecution)
+        {
+            await persistenceService.SaveWorkflowExecutionAsync(workflowExecution);
+        }
+
+        /// <summary>
         /// Unified logging method that handles persistence, Serilog, and notifications
         /// </summary>
         protected virtual async Task AddLogWithNotification(
@@ -225,7 +248,8 @@ namespace Automaton.Core.Services
 
         /// <summary>
         /// Override this method in derived classes to perform additional actions after execution
-        /// (e.g., persist execution results, send notifications, etc.)
+        /// (e.g., custom notifications, additional processing, etc.)
+        /// Note: Execution persistence is now handled by the base class automatically
         /// </summary>
         protected virtual async Task OnExecutionCompleted(WorkflowExecution workflowExecution)
         {

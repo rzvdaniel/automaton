@@ -4,6 +4,7 @@ using Automaton.App.Authentication.Config;
 using Automaton.Client.Auth.Extensions;
 using Automaton.Client.Auth.Interfaces;
 using Automaton.Client.Auth.Services;
+using Automaton.Core.Interfaces;
 using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
 using Automaton.Studio.Domain;
@@ -76,13 +77,18 @@ public static class SeviceCollection
         services.AddScoped<FlowExecutionsService>();
         services.AddScoped<CustomStepsService>();
         services.AddScoped<StudioFlowExecuteService>();
-        services.AddScoped<StudioFlowConvertService>();
+        services.AddScoped<StudioFlowConvertService>(); // Keep concrete for backwards compatibility
+        services.AddScoped<IFlowConvertService<StudioFlow>, StudioFlowConvertService>(); // Add interface registration
         services.AddScoped<FlowLogsService>();
         services.AddScoped<FlowScheduleService>();
         services.AddScoped<CustomStepExecuteService>();
         services.AddScoped<FlowSettingsService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<RecentActivityService>();
+
+        // Add Studio-specific persistence service
+        services.AddScoped<StudioWorkflowExecutionPersistenceService>();
+        services.AddScoped<IWorkflowExecutionPersistenceService, StudioWorkflowExecutionPersistenceService>();
 
         // ViewModels
         services.AddScoped<FlowsViewModel>();

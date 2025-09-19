@@ -8,7 +8,16 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddAutomatonCore(this IServiceCollection services)
     {
-        services.AddTransient<FlowExecuteService>();
+        // Register factory function for FlowExecuteService that can optionally use persistence
+        services.AddTransient<FlowExecuteService>(provider =>
+        {
+            var flowConvertService = provider.GetRequiredService<FlowConvertService>();
+            var notificationService = provider.GetService<IExecutionNotificationService>();
+            var persistenceService = provider.GetService<IWorkflowExecutionPersistenceService>();
+
+            return new FlowExecuteService(flowConvertService, notificationService, persistenceService);
+        });
+
         services.AddTransient<FlowConvertService>(); // Keep concrete for backwards compatibility
         services.AddTransient<IFlowConvertService<Flow>, FlowConvertService>(); // Add interface registration
 

@@ -48,7 +48,8 @@ public class FlowExecutionService
             logger.Information("Completed execution of workflow {WorkflowId} with status {Status}", 
                 workflowId, workflowExecution.Status);
 
-            await SaveWorkflowExecutionAsync(workflowExecution);
+            // Note: SaveWorkflowExecutionAsync is now handled automatically by the base FlowExecuteService
+            // if a persistence service was registered during dependency injection
 
             return workflowExecution;
         }
@@ -63,8 +64,8 @@ public class FlowExecutionService
                 Status = WorkflowStatus.Error
             };
             
-            await SaveWorkflowExecutionAsync(errorExecution);
-
+            // Note: Error execution persistence is also handled automatically by the base service
+            
             throw;
         }
     }
@@ -108,53 +109,6 @@ public class FlowExecutionService
         {
             logger.Error(ex, "Error loading flow {WorkflowId}", workflowId);
             return null;
-        }
-    }
-
-    private async Task SaveWorkflowExecutionAsync(WorkflowExecution workflowExecution)
-    {
-        try
-        {
-            await SetupHttpClientAuthAsync();
-
-            var flowExecution = new
-            {
-                Id = workflowExecution.Id,
-                FlowId = workflowExecution.FlowId,
-                Started = workflowExecution.Started,
-                Finished = workflowExecution.Finished,
-                Status = workflowExecution.Status.ToString(),
-                Application = workflowExecution.Application,
-                Logs = workflowExecution.Logs.Select(log => new
-                {
-                    Timestamp = log.Timestamp,
-                    Level = log.Level,
-                    Message = log.Message,
-                    StepId = log.StepId,
-                    StepName = log.StepName,
-                    Exception = log.Exception
-                }).ToArray()
-            };
-
-            var json = JsonSerializer.Serialize(flowExecution);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-            var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.FlowExecutionUrl}", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                logger.Information("Execution result saved successfully for workflow {WorkflowId} with {LogCount} log entries", 
-                    workflowExecution.FlowId, workflowExecution.Logs.Count);
-            }
-            else
-            {
-                logger.Warning("Failed to save execution result for workflow {WorkflowId}: {StatusCode}", 
-                    workflowExecution.FlowId, response.StatusCode);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Error saving execution result for workflow {WorkflowId}", workflowExecution.FlowId);
         }
     }
 
