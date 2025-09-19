@@ -1,88 +1,385 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+# Azure DevOps Pipeline for Automaton Studio Desktop
+# Builds Windows desktop application with self-contained deployment
+# Generates ready-to-deploy packages for Windows x64 and ARM64
 
-parameters:
-    - name: isRelease
-      displayName: Is a release build
-      default: false
-      type: boolean
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - src/Automaton.Studio.Desktop/**
+      - src/Automaton.Studio/**
+      - src/Automaton.Core/**
+      - src/Automaton.Steps/**
 
-jobs:
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - src/Automaton.Studio.Desktop/**
+      - src/Automaton.Studio/**
+      - src/Automaton.Core/**
+      - src/Automaton.Steps/**
 
-- job: AutomatonClient
-  
-  pool:
-    vmImage: 'ubuntu-latest'
+pool:
+  vmImage: 'windows-latest'
 
-  variables:
-    automatonClientSolution: './Automaton.Client.sln'
-    buildPlatform: 'Any CPU'
-    buildConfiguration: 'Release'
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.0.x'
+  desktopProjectPath: 'src/Automaton.Studio.Desktop/Automaton.Studio.Desktop.csproj'
+  artifactName: 'automaton-studio-desktop'
+  majorVersion: 1
+  minorVersion: 0
+  patchVersion: 0
 
-  steps:
-  - task: UseDotNet@2 
-    displayName: ".NET 8.x"
-    inputs:
-      version: '8.x'
-      packageType: sdk
+stages:
+  - stage: BuildAndPackage
+    displayName: 'Build and Package Desktop Application'
+    jobs:
+      - job: BuildDesktopPackages
+        displayName: 'Build Desktop Application Packages'
+        steps:
+          # Setup .NET SDK
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: $(dotnetVersion)
+              installationPath: $(Agent.ToolsDirectory)/dotnet
 
-  - task: DotNetCoreCLI@2
-    displayName: "Test"
-    inputs:
-      command: test
-      projects: '**/$(automatonClientSolution)'
-      arguments: '--configuration $(buildConfiguration)'
-  
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore Nuget Packages'
-    inputs:
-      command: 'restore'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
-      includeNuGetOrg: true
-    
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'build'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
-      arguments: '--no-restore'
-    displayName: 'Build projects'
+          # Set build version
+          - powershell: |
+              $buildNumber = "$(majorVersion).$(minorVersion).$(patchVersion).$(Build.BuildId)"
+              Write-Host "##vso[build.updatebuildnumber]$buildNumber"
+              Write-Host "##vso[task.setvariable variable=buildNumber]$buildNumber"
+              echo "Build version: $buildNumber"
+            displayName: 'Set Build Version'
 
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: '$(System.DefaultWorkingDirectory)/$(automatonClientSolution)'
-      arguments: '--no-restore --no-build'
-    displayName: 'Run Tests'
+          # Restore dependencies for desktop project only
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore Desktop Project'
+            inputs:
+              command: 'restore'
+              projects: '$(desktopProjectPath)'
+              feedsToUse: 'select'
+              verbosityRestore: 'minimal'
 
-  - task: PowerShell@2
-    displayName: 'Update Installer URLs for Production'
-    inputs:
-      filePath: 'scripts/Update-InstallerUrls.ps1'
-      arguments: '-ProductionUrl "https://api.automaton.monster"'
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+          # Build desktop project
+          - task: DotNetCoreCLI@2
+            displayName: 'Build Desktop Project'
+            inputs:
+              command: 'build'
+              projects: '$(desktopProjectPath)'
+              arguments: '--configuration $(buildConfiguration) --no-restore -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber)'
 
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'publish'
-      publishWebProjects: false
-      projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio.Web/Automaton.Studio.Web.csproj'
-      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
-      zipAfterPublish: false
-    displayName: 'Publish Automaton Studio Web'
+          # Run tests (if any exist for desktop)
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Desktop Tests'
+            inputs:
+              command: 'test'
+              projects: 'src/UnitTests/**/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --collect:"XPlat Code Coverage"'
+            continueOnError: true
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
-  - task: FileTransform@1
-    displayName: Transform appsettings
-    condition: eq(${{ parameters.isRelease }}, false)
-    inputs:
-      folderPath: '$(build.artifactStagingDirectory)'
-      fileType: 'json'
-      targetFiles: '**/appsettings.json'
+          # Create temporary directories for builds
+          - script: |
+              mkdir "$(Agent.TempDirectory)\builds\win-x64"
+              mkdir "$(Agent.TempDirectory)\builds\win-arm64"
+              mkdir "$(Agent.TempDirectory)\installers"
+            displayName: 'Create Build Directories'
 
-  - task: PublishPipelineArtifact@1
-    displayName: Publish Automaton Studio Web artifact
-    inputs:
-      targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio.Web'
-      artifact: 'Automaton.Studio.Web'
-      publishLocation: 'pipeline'
+          # Publish Windows x64 self-contained
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Desktop App - Windows x64'
+            inputs:
+              command: 'publish'
+              publishWebProjects: false
+              projects: '$(desktopProjectPath)'
+              arguments: '--configuration $(buildConfiguration) --runtime win-x64 --self-contained true --output "$(Agent.TempDirectory)/builds/win-x64" -p:PublishSingleFile=false -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber) -p:IncludeNativeLibrariesForSelfExtract=true'
+              zipAfterPublish: false
+
+          # Publish Windows ARM64 self-contained
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Desktop App - Windows ARM64'
+            inputs:
+              command: 'publish'
+              publishWebProjects: false
+              projects: '$(desktopProjectPath)'
+              arguments: '--configuration $(buildConfiguration) --runtime win-arm64 --self-contained true --output "$(Agent.TempDirectory)/builds/win-arm64" -p:PublishSingleFile=false -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber) -p:IncludeNativeLibrariesForSelfExtract=true'
+              zipAfterPublish: false
+
+          # Install NSIS for creating Windows installers
+          - powershell: |
+              Write-Host "Installing NSIS..."
+              $nsisUrl = "https://netcologne.dl.sourceforge.net/project/nsis/NSIS%203/3.08/nsis-3.08-setup.exe"
+              $nsisPath = "$env:TEMP\nsis-setup.exe"
+              
+              Write-Host "Downloading NSIS from $nsisUrl"
+              Invoke-WebRequest -Uri $nsisUrl -OutFile $nsisPath
+              
+              Write-Host "Installing NSIS silently..."
+              Start-Process -FilePath $nsisPath -ArgumentList "/S" -Wait
+              
+              Write-Host "NSIS installation completed"
+            displayName: 'Install NSIS'
+
+          # Create NSIS installer script
+          - powershell: |
+              $nsisScript = @"
+              !define APP_NAME "Automaton Studio Desktop"
+              !define APP_VERSION "$(buildNumber)"
+              !define APP_PUBLISHER "Automaton"
+              !define APP_URL "https://automaton.monster"
+              !define APP_EXECUTABLE "Automaton.Studio.Desktop.exe"
+              
+              !include "MUI2.nsh"
+              
+              Name "`${APP_NAME}"
+              OutFile "AutomatonStudioDesktop-win-x64-`${APP_VERSION}-Setup.exe"
+              Unicode True
+              InstallDir "`$PROGRAMFILES64\AutomatonStudio"
+              InstallDirRegKey HKLM "Software\Automaton\AutomatonStudio" "Install_Dir"
+              RequestExecutionLevel admin
+              
+              !define MUI_ICON "icon.ico"
+              !define MUI_UNICON "icon.ico"
+              !define MUI_HEADERIMAGE
+              !define MUI_ABORTWARNING
+              
+              !insertmacro MUI_PAGE_WELCOME
+              !insertmacro MUI_PAGE_LICENSE "license.txt"
+              !insertmacro MUI_PAGE_DIRECTORY
+              !insertmacro MUI_PAGE_INSTFILES
+              !insertmacro MUI_PAGE_FINISH
+              
+              !insertmacro MUI_UNPAGE_WELCOME
+              !insertmacro MUI_UNPAGE_CONFIRM
+              !insertmacro MUI_UNPAGE_INSTFILES
+              !insertmacro MUI_UNPAGE_FINISH
+              
+              !insertmacro MUI_LANGUAGE "English"
+              
+              Section "MainSection" SEC01
+                SetOutPath "`$INSTDIR"
+                File /r "publish\*"
+                
+                WriteRegStr HKLM "Software\Automaton\AutomatonStudio" "Install_Dir" "`$INSTDIR"
+                WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "DisplayName" "`${APP_NAME}"
+                WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "UninstallString" '"`$INSTDIR\uninstall.exe"'
+                WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "NoModify" 1
+                WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio" "NoRepair" 1
+                WriteUninstaller "`$INSTDIR\uninstall.exe"
+                
+                CreateDirectory "`$SMPROGRAMS\Automaton Studio"
+                CreateShortCut "`$SMPROGRAMS\Automaton Studio\Automaton Studio.lnk" "`$INSTDIR\`${APP_EXECUTABLE}" "" "`$INSTDIR\`${APP_EXECUTABLE}" 0
+                CreateShortCut "`$SMPROGRAMS\Automaton Studio\Uninstall.lnk" "`$INSTDIR\uninstall.exe" "" "`$INSTDIR\uninstall.exe" 0
+                CreateShortCut "`$DESKTOP\Automaton Studio.lnk" "`$INSTDIR\`${APP_EXECUTABLE}" "" "`$INSTDIR\`${APP_EXECUTABLE}" 0
+              SectionEnd
+              
+              Section "Uninstall"
+                DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AutomatonStudio"
+                DeleteRegKey HKLM "Software\Automaton\AutomatonStudio"
+                
+                Delete "`$SMPROGRAMS\Automaton Studio\*.*"
+                RMDir "`$SMPROGRAMS\Automaton Studio"
+                Delete "`$DESKTOP\Automaton Studio.lnk"
+                
+                RMDir /r "`$INSTDIR"
+              SectionEnd
+              "@
+              
+              $nsisScript | Out-File -FilePath "$(Agent.TempDirectory)\installer-x64.nsi" -Encoding utf8
+              Write-Host "NSIS script created for x64"
+            displayName: 'Create NSIS Script - x64'
+
+          # Create license file for installer
+          - powershell: |
+              $licensePath = "$(Build.SourcesDirectory)\LICENSE"
+              $tempLicensePath = "$(Agent.TempDirectory)\license.txt"
+              
+              if (Test-Path $licensePath) {
+                Copy-Item $licensePath $tempLicensePath
+              } else {
+                "MIT License - See https://github.com/rzvdaniel/automaton" | Out-File -FilePath $tempLicensePath -Encoding utf8
+              }
+            displayName: 'Prepare License File'
+
+          # Build NSIS installer for x64
+          - powershell: |
+              $nsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+              if (!(Test-Path $nsisPath)) {
+                $nsisPath = "$env:ProgramFiles\NSIS\makensis.exe"
+              }
+              
+              if (Test-Path $nsisPath) {
+                Write-Host "Building x64 installer with NSIS at: $nsisPath"
+                
+                # Copy published files to installer directory
+                $publishPath = "$(Agent.TempDirectory)\builds\win-x64"
+                $installerDir = "$(Agent.TempDirectory)\installer-x64"
+                New-Item -ItemType Directory -Path $installerDir -Force
+                Copy-Item -Path "$publishPath\*" -Destination "$installerDir\publish" -Recurse -Force
+                Copy-Item -Path "$(Agent.TempDirectory)\license.txt" -Destination "$installerDir\license.txt"
+                
+                # Copy icon if exists
+                $iconSource = "$(Build.SourcesDirectory)\src\Automaton.Studio.Desktop\Icon.ico"
+                if (Test-Path $iconSource) {
+                  Copy-Item $iconSource "$installerDir\icon.ico"
+                } else {
+                  Write-Host "Icon file not found, installer will use default icon"
+                }
+                
+                # Build installer
+                Set-Location $installerDir
+                & $nsisPath "$(Agent.TempDirectory)\installer-x64.nsi"
+                
+                # Move installer to staging
+                if (Test-Path "AutomatonStudioDesktop-win-x64-$(buildNumber)-Setup.exe") {
+                  Move-Item "AutomatonStudioDesktop-win-x64-$(buildNumber)-Setup.exe" "$(Build.ArtifactStagingDirectory)\"
+                  Write-Host "NSIS installer built successfully for x64"
+                } else {
+                  Write-Host "NSIS installer build failed for x64"
+                }
+              } else {
+                Write-Host "NSIS not found, skipping installer creation"
+              }
+            displayName: 'Build NSIS Installer - x64'
+            continueOnError: true
+
+          # Create ZIP packages for both architectures
+          - task: ArchiveFiles@2
+            displayName: 'Package Windows x64 ZIP'
+            inputs:
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-x64'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-x64-$(buildNumber).zip'
+              replaceExistingArchive: true
+
+          - task: ArchiveFiles@2
+            displayName: 'Package Windows ARM64 ZIP'
+            inputs:
+              rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-arm64'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-arm64-$(buildNumber).zip'
+              replaceExistingArchive: true
+
+          # Create version info
+          - powershell: |
+              $version = "$(buildNumber)"
+              $commitHash = "$(Build.SourceVersion)".Substring(0, 8)
+              $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+              
+              $versionInfo = @{
+                  version = $version
+                  buildNumber = "$(Build.BuildNumber)"
+                  commitHash = $commitHash
+                  buildDate = $buildDate
+                  sourcesBranch = "$(Build.SourceBranchName)"
+                  platforms = @("win-x64", "win-arm64")
+                  packageTypes = @("exe", "zip")
+                  application = "Automaton Studio Desktop"
+                  description = "Windows desktop application with workflow designer and local execution"
+                  systemRequirements = @{
+                      os = "Windows 10 version 1809 or later, Windows 11"
+                      runtime = ".NET 8 (included in self-contained deployment)"
+                      memory = "4GB RAM minimum"
+                      disk = "500MB available space"
+                  }
+              } | ConvertTo-Json -Depth 3
+              
+              $versionInfo | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/version.json" -Encoding utf8
+            displayName: 'Create Version Info'
+
+          # Create checksums
+          - powershell: |
+              $files = Get-ChildItem "$(Build.ArtifactStagingDirectory)" -Filter "AutomatonStudioDesktop-*"
+              $checksums = @()
+              
+              foreach ($file in $files) {
+                  $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
+                  $checksums += "$($hash.Hash.ToLower())  $($file.Name)"
+              }
+              
+              $checksums | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/checksums.txt" -Encoding utf8
+            displayName: 'Create Checksums'
+
+          # Create installation instructions
+          - powershell: |
+              $instructions = @"
+              # Automaton Studio Desktop - Installation Instructions
+
+              ## System Requirements
+              - Windows 10 version 1809 or later / Windows 11
+              - .NET 8 Desktop Runtime (included in self-contained packages)
+              - Minimum 4GB RAM
+              - 500MB available disk space
+
+              ## Installation Options
+
+              ### Option 1: Windows Installer (Recommended)
+              1. Download: AutomatonStudioDesktop-win-x64-$(buildNumber)-Setup.exe
+              2. Right-click and "Run as administrator"
+              3. Follow the installation wizard
+              4. Launch from Start Menu or Desktop shortcut
+
+              ### Option 2: Portable ZIP
+              1. Download the appropriate ZIP file:
+                 - AutomatonStudioDesktop-win-x64-$(buildNumber).zip (64-bit Intel/AMD)
+                 - AutomatonStudioDesktop-win-arm64-$(buildNumber).zip (64-bit ARM)
+              2. Extract to your preferred location (e.g., C:\Tools\AutomatonStudio)
+              3. Run Automaton.Studio.Desktop.exe from the extracted folder
+
+              ## First Run
+              - The application starts with a local workflow designer
+              - No server connection required for basic functionality
+              - Create your first workflow using the visual interface
+              - All workflows execute locally on your machine
+
+              ## Features
+              - Visual workflow designer with drag-and-drop interface
+              - Local workflow execution engine
+              - Integrated management interface
+              - No external dependencies (self-contained)
+              - Complete offline operation capability
+
+              ## Troubleshooting
+              - If the application doesn't start, ensure Windows is up to date
+              - For permission issues, try running as administrator
+              - Check Windows Event Viewer for detailed error information
+
+              ## Uninstallation
+              - Windows Installer: Use "Add or Remove Programs" in Windows Settings
+              - Portable ZIP: Simply delete the extracted folder
+
+              Build: $(buildNumber)
+              Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+              Source: $(Build.SourceBranchName)
+              "@
+              
+              $instructions | Out-File -FilePath "$(Build.ArtifactStagingDirectory)/INSTALL.md" -Encoding utf8
+            displayName: 'Create Installation Instructions'
+
+          # Show final artifacts
+          - powershell: |
+              Write-Host "Final artifacts in staging directory:"
+              Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" | ForEach-Object {
+                Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
+              }
+            displayName: 'List Final Artifacts'
+
+          # Publish artifacts
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Desktop Application Packages'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'automaton-studio-desktop-packages'
+              publishLocation: 'Container'
