@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v5/wxs">
+  <Package 
+    Id="*"
+    Name="!(bind.property.ProductName)"
+    Language="1033" 
+    Version="!(bind.property.ProductVersion)"
+    Manufacturer="!(bind.property.Manufacturer)"
+    UpgradeCode="!(bind.property.UpgradeCode)"
+    InstallerVersion="500"
+    Compressed="yes">
+
+    <SummaryInformation 
+      Keywords="!(bind.property.PackageKeywords)"
+      Description="!(bind.property.PackageDescription)"
+      Manufacturer="!(bind.property.Manufacturer)" />
+
+    <!-- Upgrade configuration -->
+    <MajorUpgrade 
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+      AllowSameVersionUpgrades="yes" />
+
+    <!-- Media configuration -->
+    <Media Id="1" Cabinet="automaton.cab" EmbedCab="yes" />
+
+    <!-- Prerequisites - .NET 8 Desktop Runtime -->
+    <Launch 
+      Condition="WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED OR NETFRAMEWORK48"
+      Message="This application requires .NET Framework 4.8 or later. Please install .NET 8 Desktop Runtime from https://dotnet.microsoft.com/download/dotnet/8.0" />
+
+    <!-- Installation directory structure -->
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="AutomatonStudio">
+        <Directory Id="BinFolder" Name="bin" />
+        <Directory Id="WwwrootFolder" Name="wwwroot" />
+        <Directory Id="DataFolder" Name="data" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start menu shortcuts -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Automaton Studio" />
+    </StandardDirectory>
+
+    <!-- Desktop shortcuts -->
+    <StandardDirectory Id="DesktopFolder" />
+
+    <!-- Feature definitions -->
+    <Feature Id="ProductFeature" Title="Automaton Studio Desktop" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ProgramMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- Application files -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <!-- Main executable -->
+      <Component Id="MainExecutable">
+        <File 
+          Id="AutomatonStudioDesktopExe"
+          Source="$(var.Automaton.Studio.Desktop.TargetPath)"
+          KeyPath="yes">
+          <Shortcut
+            Id="MainExeShortcut"
+            Directory="ApplicationProgramsFolder"
+            Name="Automaton Studio"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AutomatonIcon.exe"
+            IconIndex="0"
+            Description="Launch Automaton Studio Desktop"
+            Advertise="yes" />
+        </File>
+      </Component>
+
+      <!-- Application configuration -->
+      <Component Id="AppConfig">
+        <File 
+          Id="AppSettingsJson"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)appsettings.json" />
+      </Component>
+
+      <!-- Application icon -->
+      <Component Id="AppIcon">
+        <File 
+          Id="AppIconFile"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)Icon.ico" />
+      </Component>
+
+      <!-- Runtime dependencies - auto-harvest from build output -->
+      <Component Id="RuntimeDependencies">
+        <File 
+          Id="AutomatonStudioDll"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)Automaton.Studio.dll" />
+        <File 
+          Id="AutomatonCoreDll"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)Automaton.Core.dll" />
+        <File 
+          Id="AutomatonStepsDll"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)Automaton.Steps.dll" />
+      </Component>
+
+      <!-- Web UI files -->
+      <Component Id="WebUIFiles" Directory="WwwrootFolder">
+        <File 
+          Id="IndexHtml"
+          Source="$(var.Automaton.Studio.Desktop.TargetDir)wwwroot\index.html" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Desktop shortcut component -->
+    <Component Id="DesktopShortcut" Directory="DesktopFolder">
+      <Shortcut
+        Id="DesktopShortcut"
+        Name="Automaton Studio"
+        Description="Launch Automaton Studio Desktop"
+        Target="[INSTALLFOLDER]Automaton.Studio.Desktop.exe"
+        WorkingDirectory="INSTALLFOLDER"
+        Icon="AutomatonIcon.exe"
+        IconIndex="0" />
+      <RemoveFolder Id="RemoveDesktopShortcut" Directory="DesktopFolder" On="uninstall" />
+      <RegistryValue 
+        Root="HKCU" 
+        Key="Software\Automaton\AutomatonStudio" 
+        Name="DesktopShortcut" 
+        Type="integer" 
+        Value="1" 
+        KeyPath="yes" />
+    </Component>
+
+    <!-- Program menu shortcut component -->
+    <Component Id="ProgramMenuShortcut" Directory="ApplicationProgramsFolder">
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue 
+        Root="HKCU" 
+        Key="Software\Automaton\AutomatonStudio" 
+        Name="ProgramMenuShortcut" 
+        Type="integer" 
+        Value="1" 
+        KeyPath="yes" />
+    </Component>
+
+    <!-- Icon definition -->
+    <Icon Id="AutomatonIcon.exe" SourceFile="$(var.Automaton.Studio.Desktop.TargetPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AutomatonIcon.exe" />
+
+    <!-- Custom properties -->
+    <Property Id="INSTALLFOLDER">
+      <RegistrySearch
+        Id="InstallFolderRegistry"
+        Root="HKLM"
+        Key="Software\Automaton\AutomatonStudio"
+        Name="InstallFolder"
+        Type="raw" />
+    </Property>
+
+    <!-- Save installation path to registry -->
+    <Component Id="RegistryEntries" Directory="INSTALLFOLDER">
+      <RegistryKey Root="HKLM" Key="Software\Automaton\AutomatonStudio">
+        <RegistryValue Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
+        <RegistryValue Name="Version" Type="string" Value="!(bind.property.ProductVersion)" />
+      </RegistryKey>
+      <CreateFolder />
+    </Component>
+
+    <!-- Add registry component to feature -->
+    <ComponentRef Id="RegistryEntries" />
+
+    <!-- Uninstall information -->
+    <Property Id="ARPURLINFOABOUT" Value="https://automaton.monster" />
+    <Property Id="ARPHELPTELEPHONE" Value="https://github.com/rzvdaniel/automaton/issues" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+  </Package>
+</Wix>

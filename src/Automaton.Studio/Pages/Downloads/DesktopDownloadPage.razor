@@ -130,10 +130,10 @@
             <Card Class="download-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="download" Style="margin-right: 8px;" />
-                    <span>?? Download & Install</span>
+                    <span>🖥️ Download & Install</span>
                 </TitleTemplate>
                 <ChildContent>
-                    <Row Gutter="24" Align="RowAlign.Middle">
+                    <Row Gutter="24" Align="RowAlign.Middle" Style="margin-bottom: 24px;">
                         <Col Span="16">
                             <div class="download-info">
                                 <Title Level="3" Style="margin-bottom: 8px;">Windows Desktop Application</Title>
@@ -165,12 +165,75 @@
                             <div class="download-section">
                                 <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" OnClick="@DownloadDesktopApp" Class="desktop-download-btn">
                                     <Icon Type="download" />
-                                    Download Desktop App
+                                    Download Installer
                                 </Button>
                                 <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
-                                    Windows 10/11 � .NET 8 included
+                                    Windows 10/11 • .NET 8 included
                                 </Paragraph>
                             </div>
+                        </Col>
+                    </Row>
+
+                    <!-- Additional Download Options -->
+                    <Divider>Alternative Downloads</Divider>
+                    <Row Gutter="16">
+                        <Col Span="8">
+                            <Card Size="@CardSize.Small" Class="download-option-small">
+                                <TitleTemplate>
+                                    <Icon Type="windows" Style="margin-right: 8px; color: #0078d4;" />
+                                    <span>Windows x64</span>
+                                </TitleTemplate>
+                                <ChildContent>
+                                    <div style="text-align: center;">
+                                        <Button Type="@ButtonType.Default" Block OnClick="@DownloadWindowsX64Installer">
+                                            <Icon Type="setting" />
+                                            Installer (EXE)
+                                        </Button>
+                                        <Button Type="@ButtonType.Link" Block OnClick="@DownloadWindowsX64" Style="margin-top: 8px;">
+                                            <Icon Type="file-zip" />
+                                            Portable (ZIP)
+                                        </Button>
+                                    </div>
+                                </ChildContent>
+                            </Card>
+                        </Col>
+                        <Col Span="8">
+                            <Card Size="@CardSize.Small" Class="download-option-small">
+                                <TitleTemplate>
+                                    <Icon Type="windows" Style="margin-right: 8px; color: #0078d4;" />
+                                    <span>Windows ARM64</span>
+                                </TitleTemplate>
+                                <ChildContent>
+                                    <div style="text-align: center;">
+                                        <Button Type="@ButtonType.Default" Block OnClick="@DownloadWindowsArm64">
+                                            <Icon Type="file-zip" />
+                                            Portable (ZIP)
+                                        </Button>
+                                        <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 11px;">
+                                            For ARM-based PCs
+                                        </Paragraph>
+                                    </div>
+                                </ChildContent>
+                            </Card>
+                        </Col>
+                        <Col Span="8">
+                            <Card Size="@CardSize.Small" Class="download-option-small">
+                                <TitleTemplate>
+                                    <Icon Type="info-circle" Style="margin-right: 8px; color: #1890ff;" />
+                                    <span>Help Choosing</span>
+                                </TitleTemplate>
+                                <ChildContent>
+                                    <div style="text-align: center;">
+                                        <Paragraph Style="font-size: 12px; margin-bottom: 8px;">
+                                            Not sure which version?
+                                        </Paragraph>
+                                        <Button Type="@ButtonType.Link" OnClick="@DownloadDesktopApp">
+                                            <Icon Type="bulb" />
+                                            Auto-detect
+                                        </Button>
+                                    </div>
+                                </ChildContent>
+                            </Card>
                         </Col>
                     </Row>
                 </ChildContent>
@@ -180,38 +243,55 @@
             <Card Class="installation-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="setting" Style="margin-right: 8px;" />
-                    <span>?? Installation Guide</span>
+                    <span>🔧 Installation Guide</span>
                 </TitleTemplate>
                 <ChildContent>
                     <Row Gutter="24">
-                        <Col Span="8">
+                        <Col Span="12">
                             <div class="install-step">
                                 <div class="step-number">1</div>
                                 <div class="step-content">
                                     <Title Level="4">Download</Title>
-                                    <Paragraph>Click the download button above to get the installer.</Paragraph>
+                                    <Paragraph>Choose the installer (.exe) for automatic installation or the portable (.zip) for manual setup.</Paragraph>
                                 </div>
                             </div>
                         </Col>
-                        <Col Span="8">
+                        <Col Span="12">
                             <div class="install-step">
                                 <div class="step-number">2</div>
                                 <div class="step-content">
                                     <Title Level="4">Install</Title>
-                                    <Paragraph>Run the installer and follow the setup wizard. Administrator permissions may be required.</Paragraph>
-                                </div>
-                            </div>
-                        </Col>
-                        <Col Span="8">
-                            <div class="install-step">
-                                <div class="step-number">3</div>
-                                <div class="step-content">
-                                    <Title Level="4">Launch</Title>
-                                    <Paragraph>Start the application and begin creating workflows immediately.</Paragraph>
+                                    <Paragraph>Run the installer as administrator or extract the ZIP to your preferred location.</Paragraph>
                                 </div>
                             </div>
                         </Col>
                     </Row>
+                    <Row Gutter="24" Style="margin-top: 16px;">
+                        <Col Span="12">
+                            <div class="install-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <Title Level="4">Launch</Title>
+                                    <Paragraph>Start from the Desktop shortcut or Start Menu. The application runs completely offline.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="12">
+                            <div class="install-step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <Title Level="4">Create Workflows</Title>
+                                    <Paragraph>Use the visual designer to build your first automation workflow locally.</Paragraph>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                    
+                    <Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 16px;">
+                        <MessageTemplate>
+                            <strong>💡 System Requirements:</strong> Windows 10 (1809+) or Windows 11, 4GB RAM, 500MB disk space. .NET 8 runtime is included.
+                        </MessageTemplate>
+                    </Alert>
                 </ChildContent>
             </Card>
 
@@ -279,9 +359,40 @@
 </Layout>
 
 @code {
+    private string windowsX64Url = "";
+    private string windowsArm64Url = "";
+    private string windowsX64InstallerUrl = "";
+
+    protected override void OnInitialized()
+    {
+        // Get the client application base URL (where the Blazor app is running)
+        var clientBaseUrl = NavigationManager.BaseUri.TrimEnd('/');
+        
+        // Desktop download URLs - these would be served from your hosting provider
+        windowsX64InstallerUrl = $"{clientBaseUrl}/downloads/desktop/AutomatonStudioDesktop-win-x64-Setup.exe";
+        windowsX64Url = $"{clientBaseUrl}/downloads/desktop/AutomatonStudioDesktop-win-x64.zip";
+        windowsArm64Url = $"{clientBaseUrl}/downloads/desktop/AutomatonStudioDesktop-win-arm64.zip";
+    }
+
     private void DownloadDesktopApp()
     {
-        NavigationManager.NavigateTo($"{ConfigService.BaseUrl}/downloads/desktop", true);
+        // Detect user's architecture and download appropriate installer
+        NavigationManager.NavigateTo(windowsX64InstallerUrl, true);
+    }
+
+    private void DownloadWindowsX64()
+    {
+        NavigationManager.NavigateTo(windowsX64Url, true);
+    }
+
+    private void DownloadWindowsArm64()
+    {
+        NavigationManager.NavigateTo(windowsArm64Url, true);
+    }
+
+    private void DownloadWindowsX64Installer()
+    {
+        NavigationManager.NavigateTo(windowsX64InstallerUrl, true);
     }
 }
 
@@ -396,6 +507,21 @@
     .desktop-download-btn:hover {
         background: #9254de;
         border-color: #9254de;
+    }
+
+    /* Download option cards */
+    .download-option-small {
+        margin-bottom: 16px;
+        text-align: center;
+    }
+
+    .download-option-small .ant-card-head-title {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .download-option-small .ant-btn {
+        margin-bottom: 4px;
     }
 
     /* Installation steps */

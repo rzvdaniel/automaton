@@ -1,0 +1,49 @@
+<Project>
+  <PropertyGroup>
+    <ProjectGuid>{B8D35A89-F7D5-4A8F-88CF-123456789ABC}</ProjectGuid>
+    <ProjectTypeGuids>{30D016F9-3734-4E09-88B6-5A9C82F2D4D8}</ProjectTypeGuids>
+    <OutputType>Package</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <OutputName>AutomatonStudioDesktop</OutputName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Automaton.Studio.Desktop.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\README.md">
+      <Link>README.md</Link>
+    </Content>
+    <Content Include="..\..\LICENSE">
+      <Link>LICENSE</Link>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Automaton.Studio.Desktop\Automaton.Studio.Desktop.csproj">
+      <Name>Automaton.Studio.Desktop</Name>
+      <Project>{78D35D37-92D8-4760-AE5F-F467AE59B501}</Project>
+      <Private>True</Private>
+      <DoNotHarvest>True</DoNotHarvest>
+      <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
+      <RefTargetDir>INSTALLFOLDER</RefTargetDir>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Import Project="$(WixTargetsPath)" Condition=" '$(WixTargetsPath)' != '' " />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets" Condition=" '$(WixTargetsPath)' == '' AND Exists('$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets') " />
+
+  <Target Name="EnsureWixToolsetInstalled" Condition=" '$(WixTargetsImported)' != 'true' ">
+    <Error Text="The WiX Toolset v3.11 (or newer) build tools must be installed to build this project." />
+  </Target>
+</Project>
