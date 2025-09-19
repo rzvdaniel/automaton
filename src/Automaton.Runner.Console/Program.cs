@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.CommandLine;
 using Automaton.Core.Scripting;
+using Automaton.Core.Services;
 
 namespace Automaton.Runner.Console;
 
@@ -286,9 +287,24 @@ public class Program
                     cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
                 });
 
-                // Register Automaton services
+                // Register Automaton services (this includes default FlowExecuteService)
                 services.AddScripting();
                 services.AddAutomatonCore();
                 services.AddAutomatonSteps();
+
+                // Override FlowExecuteService with proper application name for console runner
+                services.AddTransient<FlowExecuteService>(provider =>
+                {
+                    var flowConvertService = provider.GetRequiredService<FlowConvertService>();
+                    var configService = provider.GetRequiredService<ConfigurationService>();
+                    var notificationService = provider.GetService<IExecutionNotificationService>();
+                    var persistenceService = provider.GetService<IWorkflowExecutionPersistenceService>();
+
+                    return new FlowExecuteService(
+                        flowConvertService, 
+                        configService.ApplicationName, // Use the proper application name from config
+                        notificationService, 
+                        persistenceService);
+                });
             });
 }
