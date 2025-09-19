@@ -28,7 +28,7 @@ public class ConfigurationService
     { 
         get 
         {
-            // Configuration Priority Order (Corrected Logic):
+            // Configuration Priority Order:
             // 1. Cached value - Highest priority for current session changes
             // 2. User's stored preference - User's explicit choice should override defaults
             // 3. AppConfig defaults - Fallback values from appsettings.json/command line
@@ -102,12 +102,6 @@ public class ConfigurationService
             // Persist to storage for future sessions (user preference)
             await storageService.SaveServerConfigAsync(cleanUrl);
         }
-    }
-
-    // Maintain backwards compatibility
-    public void UpdateServerUrl(string serverUrl)
-    {
-        UpdateServerUrlAsync(serverUrl).Wait();
     }
 }
 

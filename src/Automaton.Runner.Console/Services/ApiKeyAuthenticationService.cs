@@ -21,15 +21,10 @@ public class ApiKeyAuthenticationService
         this.logger = Log.ForContext<ApiKeyAuthenticationService>();
     }
 
-    public async Task<bool> SetApiKeyAsync(string apiKey, string? serverUrl = null)
+    public async Task<bool> SetApiKeyAsync(string apiKey)
     {
         try
         {
-            if (!string.IsNullOrEmpty(serverUrl))
-            {
-                configService.UpdateServerUrl(serverUrl);
-            }
-
             // Validate API key format
             if (!IsValidApiKeyFormat(apiKey))
             {
