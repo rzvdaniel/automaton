@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.CommandLine;
 using Automaton.Core.Scripting;
-using MediatR;
 
 namespace Automaton.Runner.Console;
 
@@ -281,10 +280,12 @@ public class Program
                 services.AddMediatR(cfg => 
                 {
                     cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
-                    cfg.RegisterServicesFromAssembly(typeof(Automaton.Core.Services.FlowExecuteService).Assembly);
+                    cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
                 });
 
-                // Register Automaton Core services
+                // Register Automaton services
+                services.AddScripting();
                 services.AddAutomatonCore();
+                services.AddAutomatonSteps();
             });
 }
