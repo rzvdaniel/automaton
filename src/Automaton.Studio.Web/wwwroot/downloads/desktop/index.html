@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Automaton Studio Desktop</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 40px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: #722ed1;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 18px;
+        }
+        .download-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #722ed1;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f9f0ff 0%, #ffffff 100%);
+        }
+        .download-section h3 {
+            color: #722ed1;
+            margin-top: 0;
+        }
+        .download-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .download-option {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            background: white;
+        }
+        .download-option h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 5px;
+            background: #722ed1;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background: #9254de;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .install-script {
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .install-script h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        .code {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .requirements {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .requirements h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .requirements ul {
+            margin-bottom: 0;
+            color: #856404;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #722ed1;
+        }
+        .feature h5 {
+            margin-top: 0;
+            color: #722ed1;
+        }
+        .feature p {
+            margin-bottom: 0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Automaton Studio Desktop</h1>
+            <p>Complete desktop solution for workflow design, execution, and management</p>
+        </div>
+
+        <div class="download-section">
+            <h3>⚡ Quick Install (Recommended)</h3>
+            <p>Run this command in PowerShell as Administrator for automatic installation:</p>
+            <div class="code">
+                iwr -useb https://studio.automaton.monster/downloads/install-desktop.ps1 | iex
+            </div>
+            <p><small>This script will automatically detect your system and install the appropriate version.</small></p>
+        </div>
+
+        <div class="download-options">
+            <div class="download-option">
+                <h4>🪟 Windows x64</h4>
+                <p>For Intel/AMD 64-bit processors</p>
+                <a href="AutomatonStudioDesktop-win-x64-Setup.exe" class="btn">Download Installer</a>
+                <a href="AutomatonStudioDesktop-win-x64.zip" class="btn btn-secondary">Portable ZIP</a>
+            </div>
+            
+            <div class="download-option">
+                <h4>🪟 Windows ARM64</h4>
+                <p>For ARM-based PCs (Surface Pro X, etc.)</p>
+                <a href="AutomatonStudioDesktop-win-arm64.zip" class="btn">Download ZIP</a>
+                <p><small>Portable version only</small></p>
+            </div>
+        </div>
+
+        <div class="requirements">
+            <h4>📋 System Requirements</h4>
+            <ul>
+                <li>Windows 10 version 1809 or later / Windows 11</li>
+                <li>4GB RAM minimum (8GB recommended)</li>
+                <li>500MB available disk space</li>
+                <li>.NET 8 Desktop Runtime (included in packages)</li>
+            </ul>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h5>✨ Visual Designer</h5>
+                <p>Drag-and-drop workflow creation with intuitive interface</p>
+            </div>
+            <div class="feature">
+                <h5>🏠 Local Execution</h5>
+                <p>All workflows run locally on your machine</p>
+            </div>
+            <div class="feature">
+                <h5>🔒 Fully Offline</h5>
+                <p>No server connection or account required</p>
+            </div>
+            <div class="feature">
+                <h5>⚡ Instant Start</h5>
+                <p>Ready to use immediately after installation</p>
+            </div>
+        </div>
+
+        <div class="install-script">
+            <h4>🔧 Installation Options</h4>
+            <p><strong>Option 1: Installer (Recommended)</strong></p>
+            <ol>
+                <li>Download the appropriate installer for your architecture</li>
+                <li>Right-click and "Run as administrator"</li>
+                <li>Follow the installation wizard</li>
+                <li>Launch from Desktop shortcut or Start Menu</li>
+            </ol>
+            
+            <p><strong>Option 2: Portable</strong></p>
+            <ol>
+                <li>Download the ZIP file for your architecture</li>
+                <li>Extract to your preferred location (e.g., C:\Tools\AutomatonStudio)</li>
+                <li>Run Automaton.Studio.Desktop.exe from the extracted folder</li>
+            </ol>
+
+            <p><strong>Option 3: PowerShell Script</strong></p>
+            <p>For automated installations or custom configurations:</p>
+            <div class="code">
+                # Basic installation
+iwr -useb https://studio.automaton.monster/downloads/install-desktop.ps1 | iex
+
+# Portable installation to custom directory
+.\install-desktop.ps1 -InstallPath "C:\Tools\AutomatonStudio" -Portable
+
+# Installation without desktop shortcut
+.\install-desktop.ps1 -CreateDesktopShortcut:$false
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; color: #666;">
+            <p>
+                <a href="https://github.com/rzvdaniel/automaton" style="color: #722ed1;">GitHub Repository</a> | 
+                <a href="https://github.com/rzvdaniel/automaton/wiki" style="color: #722ed1;">Documentation</a> | 
+                <a href="https://github.com/rzvdaniel/automaton/issues" style="color: #722ed1;">Support</a>
+            </p>
+            <p><small>Automaton Studio Desktop - Free and Open Source</small></p>
+        </div>
+    </div>
+</body>
+</html>
