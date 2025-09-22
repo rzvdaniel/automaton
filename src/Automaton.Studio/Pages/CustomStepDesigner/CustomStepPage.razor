@@ -54,104 +54,113 @@
             <ChildContent>
                 <Tabs>
                     <TabPane Tab="Code" Key="1">
-                        <Form @ref="codeForm"
-                              Model="@StepDesignerViewModel.CustomStep"
-                              Class="code-form"
-                              Layout="@FormLayout.Vertical"
-                              LabelColSpan="24"
-                              WrapperColSpan="24">
-                            <Validator>
-                                <FluentValidationValidator />
-                                <ValidationSummary />
-                            </Validator>
-                            <ChildContent Context="codeContext">
-                                <div class="code-toolbar">
-                                    <Space Direction="SpaceDirection.Horizontal">
-                                        <SpaceItem>
-                                            <Select @bind-Value="codeContext.Definition.Language"
-                                                    Placeholder="Select Language..."
-                                                    TItemValue="string"
-                                                    TItem="string">
-                                                <SelectOptions>
-                                                    @foreach (var lang in CustomStepLanguages)
-                                                    {
-                                                        <SelectOption TItemValue="string" TItem="string" Value=@lang Label=@lang />
-                                                    }
-                                                </SelectOptions>
-                                            </Select>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button Icon="robot" Type="@ButtonType.Default" OnClick="GenerateWithAi">
-                                                Generate with AI ✨
-                                            </Button>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
-                                                Run
-                                            </Button>
-                                        </SpaceItem>
-                                    </Space>
-                                </div>
-                                <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
-                                <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="ai-feedback-panel">
-                                    <Panel Key="1">
-                                        <HeaderTemplate>
-                                            <b>AI Feedback</b>
-                                        </HeaderTemplate>
-                                        <ChildContent>
-                                            @if (aiGeneratedCode != null)
-                                            {
-                                                <div>
-                                                    <TextArea Rows="6" Id="ai-feedback" Value="@aiGeneratedCode" />
-                                                    <Button Type="@ButtonType.Primary" OnClick="ApplyAiCode" Style="margin-top:10px;">
-                                                        Apply to Editor
+                        <div class="split-layout">
+                            <div class="split-left">
+                                <Form @ref="codeForm"
+                                      Model="@StepDesignerViewModel.CustomStep"
+                                      Class="code-form"
+                                      Layout="@FormLayout.Vertical"
+                                      LabelColSpan="24"
+                                      WrapperColSpan="24">
+                                    <Validator>
+                                        <FluentValidationValidator />
+                                        <ValidationSummary />
+                                    </Validator>
+                                    <ChildContent Context="codeContext">
+                                        <div class="code-toolbar">
+                                            <Space Direction="SpaceDirection.Horizontal">
+                                                <SpaceItem>
+                                                    <Select @bind-Value="codeContext.Definition.Language"
+                                                            Placeholder="Select Language..."
+                                                            TItemValue="string"
+                                                            TItem="string">
+                                                        <SelectOptions>
+                                                            @foreach (var lang in CustomStepLanguages)
+                                                            {
+                                                                <SelectOption TItemValue="string" TItem="string" Value=@lang Label=@lang />
+                                                            }
+                                                        </SelectOptions>
+                                                    </Select>
+                                                </SpaceItem>
+                                                <SpaceItem>
+                                                    <Button Icon="robot" Type="@ButtonType.Default" OnClick="GenerateWithAi">
+                                                        Generate with AI ✨
                                                     </Button>
+                                                </SpaceItem>
+                                                <SpaceItem>
+                                                    <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
+                                                        Run
+                                                    </Button>
+                                                </SpaceItem>
+                                            </Space>
+                                        </div>
+                                        <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+                                        <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="ai-feedback-panel">
+                                            <Panel Key="1">
+                                                <HeaderTemplate>
+                                                    <b>AI Feedback</b>
+                                                </HeaderTemplate>
+                                                <ChildContent>
+                                                    @if (aiGeneratedCode != null)
+                                                    {
+                                                        <div>
+                                                            <TextArea Rows="6" Id="ai-feedback" Value="@aiGeneratedCode" />
+                                                            <Button Type="@ButtonType.Primary" OnClick="ApplyAiCode" Style="margin-top:10px;">
+                                                                Apply to Editor
+                                                            </Button>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>No AI code generated yet.</span>
+                                                    }
+                                                </ChildContent>
+                                            </Panel>
+                                        </Collapse>
+                                        <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
+                                    </ChildContent>
+                                </Form>
+                            </div>
+                            <div class="split-divider"></div>
+                            <div class="split-right">
+                                <div class="variables-panel">
+                                    <Collapse DefaultActiveKey="@(new[]{"input"})" Bordered="false" Class="variables-collapse-panel">
+                                        <Panel Key="input">
+                                            <HeaderTemplate>
+                                                <b>Test Input Variables</b>
+                                            </HeaderTemplate>
+                                            <ChildContent>
+                                                <div class="scrollable-list">
+                                                    @foreach(var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
+                                                    {
+                                                        <div class="variable">
+                                                            <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                        </div>
+                                                    }
                                                 </div>
-                                            }
-                                            else
-                                            {
-                                                <span>No AI code generated yet.</span>
-                                            }
-                                        </ChildContent>
-                                    </Panel>
-                                </Collapse>
-                                <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-                                    <Panel Key="1">
-                                        <HeaderTemplate>
-                                            <b>Test Input Variables</b>
-                                        </HeaderTemplate>
-                                        <ChildContent>
-                                            <div class="scrollable-list">
-                                                @foreach(var inputVariable in @codeContext.Definition.CodeInputVariables)
-                                                {
-                                                    <div class="variable">
-                                                        <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
-                                                    </div>
-                                                }
-                                            </div>
-                                        </ChildContent>
-                                    </Panel>
-                                </Collapse>
-                                <Collapse DefaultActiveKey="@(new[]{"1"})" Bordered="false" Class="variables-collapse-panel">
-                                    <Panel Key="1">
-                                        <HeaderTemplate>
-                                            <b>Test Output Variables</b>
-                                        </HeaderTemplate>
-                                        <ChildContent>
-                                            <div class="scrollable-list">
-                                                @foreach (var outputVariable in @codeContext.Definition.CodeOutputVariables)
-                                                {
-                                                    <div class="variable">
-                                                        <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
-                                                    </div>
-                                                }
-                                            </div>
-                                        </ChildContent>
-                                    </Panel>
-                                </Collapse>
-                            </ChildContent>
-                        </Form>
+                                            </ChildContent>
+                                        </Panel>
+                                    </Collapse>
+                                    <Collapse DefaultActiveKey="@(new[]{"output"})" Bordered="false" Class="variables-collapse-panel">
+                                        <Panel Key="output">
+                                            <HeaderTemplate>
+                                                <b>Test Output Variables</b>
+                                            </HeaderTemplate>
+                                            <ChildContent>
+                                                <div class="scrollable-list">
+                                                    @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
+                                                    {
+                                                        <div class="variable">
+                                                            <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </ChildContent>
+                                        </Panel>
+                                    </Collapse>
+                                </div>
+                            </div>
+                        </div>
                     </TabPane>
                     <TabPane Tab="Input Variables" Key="2">
                         <Space Direction="SpaceDirection.Vertical">
@@ -335,6 +344,36 @@
         padding: 20px;
         height: calc(100vh - 117px);
     }
+    .split-layout {
+        display: flex;
+        flex-direction: row;
+        height: calc(100vh - 180px);
+        min-height: 400px;
+    }
+    .split-left {
+        flex: 1 1 0;
+        min-width: 0;
+        padding-right: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .split-divider {
+        width: 8px;
+        background: #eee;
+        cursor: col-resize;
+        border-radius: 4px;
+        margin: 0 4px;
+    }
+    .split-right {
+        width: 340px;
+        min-width: 260px;
+        max-width: 400px;
+        background: #fafbfc;
+        border-left: 1px solid #eee;
+        padding-left: 16px;
+        display: flex;
+        flex-direction: column;
+    }
     #step-code {
         height: calc(100vh - 300px) !important;
         margin: 10px 0 5px 0;
@@ -347,6 +386,9 @@
     }
     .ai-feedback-panel {
         margin-top: 10px;
+    }
+    .variables-panel {
+        height: 100%;
     }
     .variables-collapse-panel {
         background-color: #efefef;
