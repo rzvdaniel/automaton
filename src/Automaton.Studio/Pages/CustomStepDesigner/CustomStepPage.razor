@@ -54,8 +54,8 @@
             <ChildContent>
                 <Tabs>
                     <TabPane Tab="Code" Key="1">
-                        <div class="split-layout">
-                            <div class="split-left vertical-flex">
+                        <Splitter Layout="@SplitterLayout.Horizontal" Class="main-splitter">
+                            <SplitterPanel Size="70%">
                                 <div class="editor-panel">
                                     <Form @ref="codeForm"
                                           Model="@StepDesignerViewModel.CustomStep"
@@ -125,9 +125,9 @@
                                         </TabPane>
                                     </Tabs>
                                 </div>
-                            </div>
-                            <div class="split-divider"></div>
-                            <div class="split-right">
+                            </SplitterPanel>
+                            
+                            <SplitterPanel Size="30%">
                                 <div class="variables-panel">
                                     <Collapse DefaultActiveKey="@(new[]{"input"})" Bordered="false" Class="variables-collapse-panel">
                                         <Panel Key="input">
@@ -164,8 +164,8 @@
                                         </Panel>
                                     </Collapse>
                                 </div>
-                            </div>
-                        </div>
+                            </SplitterPanel>
+                            </Splitter>
                     </TabPane>
                     <TabPane Tab="Input Variables" Key="2">
                         <Space Direction="SpaceDirection.Vertical">
@@ -352,26 +352,6 @@
         padding: 20px;
         height: calc(100vh - 117px);
     }
-    .split-layout {
-        display: flex;
-        flex-direction: row;
-        height: calc(100vh - 180px);
-        min-height: 400px;
-    }
-    .split-left {
-        flex: 1 1 0;
-        min-width: 0;
-        padding-right: 0;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-    }
-    .vertical-flex {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 400px;
-    }
     .editor-panel {
         flex: 1 1 auto;
         min-height: 200px;
@@ -413,23 +393,6 @@
         justify-content: flex-end;
         align-items: center;
         margin-top: 8px;
-    }
-    .split-divider {
-        width: 8px;
-        background: #eee;
-        cursor: col-resize;
-        border-radius: 4px;
-        margin: 0 4px;
-    }
-    .split-right {
-        width: 340px;
-        min-width: 260px;
-        max-width: 400px;
-        background: #fafbfc;
-        border-left: 1px solid #eee;
-        padding-left: 16px;
-        display: flex;
-        flex-direction: column;
     }
     .code-toolbar {
         background-color:#EEE; 
