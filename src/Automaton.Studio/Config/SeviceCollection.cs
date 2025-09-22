@@ -86,6 +86,11 @@ public static class SeviceCollection
         services.AddScoped<DashboardService>();
         services.AddScoped<RecentActivityService>();
 
+        // AI Services
+        services.AddScoped<Services.AI.AiStepGenerationService>();
+        services.AddTransient<Services.AI.IAiStepGenerationProvider, Services.AI.OpenAiStepGenerationProvider>();
+        services.AddScoped<IAiConfigurationService, AiConfigurationService>();
+
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
         services.AddScoped<IWorkflowExecutionPersistenceService, StudioWorkflowExecutionPersistenceService>();

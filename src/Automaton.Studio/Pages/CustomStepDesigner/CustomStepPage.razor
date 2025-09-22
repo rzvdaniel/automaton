@@ -64,6 +64,7 @@
             <ChildContent>
                 <Tabs>
                     <TabPane Tab="Code" Key="1">
+                        <!-- Existing Code tab content -->
                         <Form @ref="codeForm"
                               Model="@StepDesignerViewModel.CustomStep"
                               Class="code-form"
@@ -94,6 +95,13 @@
                                                         }
                                                     </SelectOptions>
                                                 </Select>
+                                            </SpaceItem>
+                                            <SpaceItem>
+                                                <Button Icon="robot" 
+                                                        Type="@ButtonType.Default" 
+                                                        OnClick="@(() => SwitchToAiTab())">
+                                                    Generate with AI ✨
+                                                </Button>
                                             </SpaceItem>                                      
                                         </Space>
                                     </div>
@@ -150,10 +158,307 @@
                                  </Row>
                              </ChildContent>
                          </Form>
-
                      </TabPane>
 
+                    <TabPane Tab="🤖 AI Generator" Key="ai">
+                        <div class="ai-generator-tab">
+                            <Card Title="Generate Custom Step with AI" Class="ai-generator-card">
+                                @if (checkingAiConfiguration)
+                                {
+                                    <div class="ai-loading-section">
+                                        <div style="text-align: center; padding: 40px;">
+                                            <Spin Size="SpinSize.Large" />
+                                            <div style="margin-top: 16px;">
+                                                <Text>Checking AI configuration...</Text>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else if (!isAiConfigured)
+                                {
+                                    <div class="ai-config-required-section">
+                                        <Alert Type="@AlertType.Warning" 
+                                               Message="AI Configuration Required" 
+                                               Description="To use AI-powered step generation, you need to configure at least one AI provider."
+                                               ShowIcon="true" 
+                                               Style="margin-bottom: 24px;" />
+
+                                        <Card Class="ai-config-help-card">
+                                            <div class="ai-config-help">
+                                                <Title Level="4">
+                                                    <Icon Type="robot" Style="margin-right: 8px;" />
+                                                    Get Started with AI
+                                                </Title>
+                                                
+                                                <div class="ai-config-steps">
+                                                    <div class="config-step">
+                                                        <div class="step-number">1</div>
+                                                        <div class="step-content">
+                                                            <Text Strong>Configure AI Provider</Text>
+                                                            <div>Set up your OpenAI API key to enable AI features</div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="config-step">
+                                                        <div class="step-number">2</div>
+                                                        <div class="step-content">
+                                                            <Text Strong>Generate Custom Steps</Text>
+                                                            <div>Describe what you want in plain English, and AI will generate the code</div>
+                                                        </div>
+                                                    </div>
+                                                
+                                                    <div class="config-step">
+                                                        <div class="step-number">3</div>
+                                                        <div class="step-content">
+                                                            <Text Strong>Review & Apply</Text>
+                                                            <div>Review the generated code and variables, then apply to your step</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="config-actions" style="text-align: center; margin-top: 32px;">
+                                                    <Space Size="SpaceSize.Large">
+                                                        <SpaceItem>
+                                                            <Button Type="@ButtonType.Primary" 
+                                                                    Size="@ButtonSize.Large"
+                                                                    Icon="setting"
+                                                                    OnClick="@(() => NavigateToAiSettings())">
+                                                                Configure AI Settings
+                                                            </Button>
+                                                        </SpaceItem>
+                                                        <SpaceItem>
+                                                            <Button Icon="reload" 
+                                                                    OnClick="@RefreshAiConfiguration">
+                                                                Check Again
+                                                            </Button>
+                                                        </SpaceItem>
+                                                    </Space>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                }
+                                else if (!generatingWithAi && currentAiProgress?.IsComplete != true)
+                                {
+                                    <div class="ai-input-section">
+                                        <Alert Type="@AlertType.Info" 
+                                               Message="AI Step Generator" 
+                                               Description="Describe what your custom step should do in plain English, and AI will generate the code, variables, and configuration for you."
+                                               ShowIcon="true" 
+                                               Style="margin-bottom: 24px;" />
+
+                                        <AntDesign.Row Gutter="24">
+                                            <AntDesign.Col Span="16">
+                                                <FormItem Label="What should this custom step do?" Required>
+                                                    <TextArea @bind-Value="aiDescription" 
+                                                             Rows="5" 
+                                                             Placeholder="Examples:&#10;• Read a CSV file and convert it to JSON format&#10;• Send an email notification with file attachments&#10;• Process image files and resize them to specific dimensions&#10;• Connect to a database and execute a query&#10;• Parse XML data and extract specific elements"
+                                                             Disabled="generatingWithAi"
+                                                             ShowCount
+                                                             MaxLength="1000" />
+                                                </FormItem>
+                                            </AntDesign.Col>
+                                            
+                                            <AntDesign.Col Span="8">
+                                                <FormItem Label="Programming Language">
+                                                    <Select @bind-Value="aiSelectedLanguage" 
+                                                            Style="width: 100%;" 
+                                                            Disabled="generatingWithAi"
+                                                            TItem="string"
+                                                            TItemValue="string">
+                                                        <SelectOptions>
+                                                            @foreach (var lang in CustomStepLanguages)
+                                                            {
+                                                                <SelectOption TItem="string" TItemValue="string" Value="@lang" Label="@lang" />
+                                                            }
+                                                        </SelectOptions>
+                                                    </Select>
+                                                </FormItem>
+
+                                                <FormItem Label="Step Name (Optional)">
+                                                    <Input @bind-Value="aiStepName" 
+                                                           Placeholder="Leave blank for auto-generation"
+                                                           Disabled="generatingWithAi" />
+                                                </FormItem>
+
+                                                <div style="margin-top: 24px;">
+                                                    <Button Type="@ButtonType.Primary" 
+                                                            Size="@ButtonSize.Large"
+                                                            Icon="magic"
+                                                            Block="true"
+                                                            OnClick="GenerateWithAi"
+                                                            Loading="generatingWithAi"
+                                                            Disabled="@(string.IsNullOrWhiteSpace(aiDescription) || generatingWithAi)">
+                                                        @if (generatingWithAi)
+                                                        {
+                                                            <span>Generating...</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>Generate with AI ✨</span>
+                                                        }
+                                                    </Button>
+                                                </div>
+                                            </AntDesign.Col>
+                                        </AntDesign.Row>
+                                    </div>
+                                }
+
+                                @if (generatingWithAi && currentAiProgress != null)
+                                {
+                                    <div class="ai-generation-section">
+                                        <Alert Type="@AlertType.Info" 
+                                               Message="AI is working on your custom step..." 
+                                               Description="This usually takes 10-30 seconds depending on the complexity."
+                                               ShowIcon="true" 
+                                               Style="margin-bottom: 24px;" />
+
+                                        <div class="ai-progress-container">
+                                            <Progress Percent="currentAiProgress.PercentageComplete" 
+                                                      Status="@(currentAiProgress.IsComplete ? ProgressStatus.Success : ProgressStatus.Active)"
+                                                      ShowInfo="true"
+                                                      StrokeWidth="8" />
+                                            
+                                            <div class="ai-progress-details">
+                                                <div class="ai-progress-stage">
+                                                    <Tag Color="@GetActivityTagColor()" Style="margin-right: 12px;">@currentAiProgress.Stage</Tag>
+                                                    <Text Strong>@currentAiProgress.Message</Text>
+                                                </div>
+                                                
+                                                @if (!string.IsNullOrEmpty(currentAiProgress.IntermediateContent))
+                                                {
+                                                    <div class="ai-thinking-content">
+                                                        <Title Level="5">AI is thinking:</Title>
+                                                        <div class="ai-intermediate-display">
+                                                            <Text Code>@currentAiProgress.IntermediateContent</Text>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div style="text-align: center; margin-top: 16px;">
+                                            <Button OnClick="CancelAiGeneration" Danger Type="@ButtonType.Text">
+                                                Cancel Generation
+                                            </Button>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (currentAiProgress?.IsComplete == true && lastAiResult?.IsSuccess == true)
+                                {
+                                    <div class="ai-success-section">
+                                        <Alert Type="@AlertType.Success" 
+                                               Message="Custom step generated successfully!" 
+                                               Description="Review the generated code and variables below. Click 'Apply to Step' to use this generation."
+                                               ShowIcon="true" 
+                                               Style="margin-bottom: 24px;" />
+
+                                        <AntDesign.Row Gutter="24">
+                                            <AntDesign.Col Span="12">
+                                                <Card Size="@CardSize.Small" Title="Generated Code Preview">
+                                                    <div class="generated-code-preview">
+                                                        <Text Code>@lastAiResult.Code</Text>
+                                                    </div>
+                                                </Card>
+                                            </AntDesign.Col>
+                                            
+                                            <AntDesign.Col Span="12">
+                                                <Card Size="@CardSize.Small" Title="Generated Variables">
+                                                    <div class="generated-variables-preview">
+                                                        @if (lastAiResult.InputVariables?.Any() == true)
+                                                        {
+                                                            <div class="variable-group">
+                                                                <Text Strong>Input Variables:</Text>
+                                                                <ul>
+                                                                    @foreach (var variable in lastAiResult.InputVariables)
+                                                                    {
+                                                                        <li><Text Code>@variable.Name</Text> (@variable.Type) - @variable.Description</li>
+                                                                    }
+                                                                </ul>
+                                                            </div>
+                                                        }
+                                                        
+                                                        @if (lastAiResult.OutputVariables?.Any() == true)
+                                                        {
+                                                            <div class="variable-group">
+                                                                <Text Strong>Output Variables:</Text>
+                                                                <ul>
+                                                                    @foreach (var variable in lastAiResult.OutputVariables)
+                                                                    {
+                                                                        <li><Text Code>@variable.Name</Text> (@variable.Type) - @variable.Description</li>
+                                                                    }
+                                                                </ul>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </Card>
+                                            </AntDesign.Col>
+                                        </AntDesign.Row>
+
+                                        <div class="ai-actions" style="text-align: center; margin-top: 24px;">
+                                            <Space Size="SpaceSize.Large">
+                                                <SpaceItem>
+                                                    <Button Type="@ButtonType.Primary" 
+                                                            Size="@ButtonSize.Large"
+                                                            Icon="check"
+                                                            OnClick="ApplyAiGeneration">
+                                                        Apply to Step
+                                                    </Button>
+                                                </SpaceItem>
+                                                <SpaceItem>
+                                                    <Button OnClick="ResetAiGeneration">
+                                                        Generate Different Version
+                                                    </Button>
+                                                </SpaceItem>
+                                            </Space>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (lastAiResult?.IsSuccess == false)
+                                {
+                                    <div class="ai-error-section">
+                                        @if (lastAiResult.ErrorMessage?.Contains("No AI providers are available") == true)
+                                        {
+                                            <Alert Type="@AlertType.Warning" 
+                                                   Message="AI Not Configured" 
+                                                   ShowIcon="true" 
+                                                   Style="margin-bottom: 24px;">
+                                                <DescriptionTemplate>
+                                                    <p>To use AI-powered step generation, you need to configure at least one AI provider.</p>
+                                                    <p>
+                                                        <a href="/ai-settings" target="_blank">
+                                                            <Button Type="@ButtonType.Primary" Icon="robot" Size="@ButtonSize.Small">
+                                                                Configure AI Settings
+                                                            </Button>
+                                                        </a>
+                                                    </p>
+                                                </DescriptionTemplate>
+                                            </Alert>
+                                        }
+                                        else
+                                        {
+                                            <Alert Type="@AlertType.Error" 
+                                                   Message="Generation failed" 
+                                                   Description="@lastAiResult.ErrorMessage"
+                                                   ShowIcon="true" 
+                                                   Style="margin-bottom: 24px;" />
+                                        }
+
+                                        <div style="text-align: center;">
+                                            <Button Type="@ButtonType.Primary" OnClick="ResetAiGeneration">
+                                                Try Again
+                                            </Button>
+                                        </div>
+                                    </div>
+                                }
+                            </Card>
+                        </div>
+                    </TabPane>
+
                     <TabPane Tab="Input Variables" Key="2">
+                        <!-- Existing Input Variables tab content -->
                         <Space Direction="SpaceDirection.Vertical">
                             <SpaceItem>
                                 <Tooltip Title="Add input variable">
@@ -163,7 +468,7 @@
                                 </Tooltip>
                             </SpaceItem>
                             <SpaceItem>
-                                <Table DataSource="@context.Definition.CodeInputVariables"
+                                <Table DataSource="@StepDesignerViewModel.CustomStep.Definition.CodeInputVariables"
                                        RowExpandable="@((record)=>true)"
                                        ScrollY="calc(100vh - 310px);"
                                        ScrollBarWidth="5"
@@ -216,6 +521,7 @@
                     </TabPane>
 
                     <TabPane Tab="Output Variables" Key="3">
+                        <!-- Existing Output Variables tab content -->
                         <Space Direction="SpaceDirection.Vertical" Style="width: 100%">
                             <SpaceItem>
                                 <Tooltip Title="Add output variable">
@@ -225,7 +531,7 @@
                                 </Tooltip>
                             </SpaceItem>
                             <SpaceItem>
-                                <Table DataSource="context.Definition.CodeOutputVariables"
+                                <Table DataSource="StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables"
                                        RowExpandable="@((record)=>true)"
                                        ScrollY="calc(100vh - 310px);"
                                        ScrollBarWidth="5"
@@ -282,12 +588,12 @@
                         <Row Gutter="(16, 0)" Justify="RowJustify.Start">
                             <Col Xs="24" Md="6">
                             <FormItem Label="Name">
-                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
+                                <Input @bind-Value="@StepDesignerViewModel.CustomStep.Name" Placeholder="Enter name" />
                             </FormItem>
                             </Col>
                             <Col Xs="24" Md="6">
                             <FormItem Label="Display Name">
-                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
+                                <Input @bind-Value="@StepDesignerViewModel.CustomStep.DisplayName" Placeholder="Enter display name" />
                             </FormItem>
                             </Col>
                         </Row>
@@ -295,12 +601,12 @@
                         <Row Gutter="(16, 0)" Justify="RowJustify.Start">
                             <Col Xs="24" Md="6">
                             <FormItem Label="Description">
-                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
+                                <Input @bind-Value="@StepDesignerViewModel.CustomStep.Description" Placeholder="Enter description" />
                             </FormItem>
                             </Col>
                             <Col Xs="24" Md="6">
                             <FormItem Label="More info URL">
-                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter more info" />
+                                <Input @bind-Value="@StepDesignerViewModel.CustomStep.MoreInfo" Placeholder="Enter more info" />
                             </FormItem>
                             </Col>
                         </Row>
@@ -378,4 +684,147 @@
         width: 300px;
     }
 
+    /* AI Generator Tab Styles */
+    .ai-generator-tab {
+        padding: 24px;
+        background: #f8f9fa;
+        min-height: 600px;
+    }
+
+    .ai-generator-card {
+        background: white;
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .ai-generator-card .ant-card-head {
+        border-bottom: 2px solid #f0f0f0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px 12px 0 0;
+    }
+
+    .ai-generator-card .ant-card-head-title {
+        color: white;
+        font-weight: 600;
+        font-size: 18px;
+    }
+
+    .ai-loading-section,
+    .ai-config-required-section,
+    .ai-input-section,
+    .ai-generation-section,
+    .ai-success-section,
+    .ai-error-section {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .ai-config-help-card {
+        background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+        border: 2px solid #e6f7ff;
+        border-radius: 12px;
+        margin-top: 16px;
+    }
+
+    .ai-config-help {
+        padding: 24px;
+    }
+
+    .ai-config-steps {
+        margin: 24px 0;
+    }
+
+    .config-step {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        padding: 16px;
+        background: white;
+        border-radius: 8px;
+        border-left: 4px solid #1890ff;
+    }
+
+    .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: #1890ff;
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+    }
+
+    .step-content div {
+        color: #666;
+        margin-top: 4px;
+        font-size: 14px;
+    }
+
+    .config-actions {
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 8px;
+        border: 2px dashed #d9d9d9;
+    }
+
+    /* Tab enhancement */
+    .ant-tabs-tab:has([href*="ai"]) {
+        background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+        border-radius: 6px 6px 0 0;
+    }
+
+    .ant-tabs-tab-active:has([href*="ai"]) {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    /* Animations */
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    .ai-progress-container.generating {
+        animation: pulse 2s infinite;
+    }
+
+    /* Responsive design */
+    @@media (max-width: 768px) {
+        .ai-generator-tab {
+            padding: 16px;
+        }
+        
+        .ai-input-section .ant-col-16,
+        .ai-input-section .ant-col-8 {
+            width: 100%;
+        }
+        
+        .ai-success-section .ant-col-12 {
+            width: 100%;
+            margin-bottom: 16px;
+        }
+    }
 </style>
