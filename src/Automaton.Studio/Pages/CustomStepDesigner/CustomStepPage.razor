@@ -57,6 +57,9 @@
                         <Splitter Layout="@SplitterLayout.Horizontal" Class="main-splitter">
                             <SplitterPanel Size="70%">
                                 <div class="left-panel">
+
+                                    <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
+                                    <SplitterPanel Size="70%">
                                     <div class="editor-panel">
                                         <Form @ref="codeForm"
                                               Model="@StepDesignerViewModel.CustomStep"
@@ -102,6 +105,8 @@
                                             </ChildContent>
                                         </Form>
                                     </div>
+                                    </SplitterPanel>
+                                    <SplitterPanel Size="30%">
                                     <div class="bottom-panel">
                                         <Tabs @bind-ActiveKey="bottomTabKey" Size="TabSize.Small">
                                             <TabPane Tab="Logs" Key="logs">
@@ -126,6 +131,8 @@
                                             </TabPane>
                                         </Tabs>
                                     </div>
+                                    </SplitterPanel>
+                                    </Splitter>
                                 </div>
                             </SplitterPanel>
                             <SplitterPanel Size="30%">
