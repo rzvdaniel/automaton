@@ -363,7 +363,6 @@
     }
     .main-splitter {
         height: calc(100vh - 180px);
-        min-height: 400px;
         width: 100%;
         display: flex;
     }
@@ -379,12 +378,11 @@
         width: 100%;
         height: 100%;
         display: flex;
-        background-color: red;
+        overflow:hidden;
     }
     #step-code {
         width: 100% !important;
         height: 100% !important;
-        min-height: 200px;
         box-sizing: border-box;
         display: block;
     }
@@ -394,8 +392,6 @@
         border-radius: 6px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         padding: 0 8px 8px 8px;
-        min-height: 180px;
-        max-height: 260px;
         overflow-y: auto;
         width: 100%;
     }
@@ -434,5 +430,21 @@
     }
     .scrollable-list .variable {
         margin: 6px 0 0 0;
+    }
+
+    .ant-splitter-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+    }
+    .code-toolbar {
+        flex-shrink: 0;
+    }
+    .editor-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
     }
 </style>
