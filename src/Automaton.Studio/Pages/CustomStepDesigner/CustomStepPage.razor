@@ -59,80 +59,80 @@
                                 <div class="left-panel">
 
                                     <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
-                                    <SplitterPanel Size="70%">
-                                    <div class="editor-panel">
-                                        <Form @ref="codeForm"
-                                              Model="@StepDesignerViewModel.CustomStep"
-                                              Class="code-form"
-                                              Layout="@FormLayout.Vertical"
-                                              LabelColSpan="24"
-                                              WrapperColSpan="24">
-                                            <Validator>
-                                                <FluentValidationValidator />
-                                                <ValidationSummary />
-                                            </Validator>
-                                            <ChildContent Context="codeContext">
-                                                <div class="code-toolbar">
-                                                    <Space Direction="SpaceDirection.Horizontal">
-                                                        <SpaceItem>
-                                                            <Select @bind-Value="codeContext.Definition.Language"
-                                                                    Placeholder="Select Language..."
-                                                                    TItemValue="string"
-                                                                    TItem="string">
-                                                                <SelectOptions>
-                                                                    @foreach (var lang in CustomStepLanguages)
-                                                                    {
-                                                                        <SelectOption TItemValue="string" TItem="string" Value=@lang Label=@lang />
-                                                                    }
-                                                                </SelectOptions>
-                                                            </Select>
-                                                        </SpaceItem>
-                                                        <SpaceItem>
-                                                            <Button Icon="robot" Type="@ButtonType.Default" OnClick="GenerateWithAi">
-                                                                Generate with AI ✨
-                                                            </Button>
-                                                        </SpaceItem>
-                                                        <SpaceItem>
-                                                            <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
-                                                                Run
-                                                            </Button>
-                                                        </SpaceItem>
-                                                    </Space>
-                                                </div>
-                                                <div class="monaco-container">
-                                                    @* <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" /> *@
-                                                    <div id="step-code">Text</div>
-                                                </div>
-                                            </ChildContent>
-                                        </Form>
-                                    </div>
-                                    </SplitterPanel>
-                                    <SplitterPanel Size="30%">
-                                    <div class="bottom-panel">
-                                        <Tabs @bind-ActiveKey="bottomTabKey" Size="TabSize.Small">
-                                            <TabPane Tab="Logs" Key="logs">
-                                                <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                            </TabPane>
-                                            <TabPane Tab="AI Result" Key="ai">
-                                                <div class="ai-result-panel">
-                                                    @if (aiGeneratedCode != null)
-                                                    {
-                                                        <TextArea Rows="6" Id="ai-feedback" Value="@aiGeneratedCode" />
-                                                        <div class="ai-status-bar">
-                                                            <Button Type="@ButtonType.Primary" OnClick="ApplyAiCode">
-                                                                Apply to Editor
-                                                            </Button>
+                                        <SplitterPanel Size="70%">
+                                            <div class="code-toolbar">
+                                                 <Form @ref="codeForm"
+                                                  Model="@StepDesignerViewModel.CustomStep"
+                                                  Class="code-form"
+                                                  Layout="@FormLayout.Vertical"
+                                                  LabelColSpan="24"
+                                                  WrapperColSpan="24">
+                                                    <Validator>
+                                                        <FluentValidationValidator />
+                                                        <ValidationSummary />
+                                                    </Validator>
+                                                        <ChildContent Context="codeContext">
+                                                            <Space Direction="SpaceDirection.Horizontal">
+                                                                <SpaceItem>
+                                                                    <Select @bind-Value="@StepDesignerViewModel.CustomStep.Definition.Language"
+                                                                            Placeholder="Select Language..."
+                                                                            TItemValue="string"
+                                                                            TItem="string">
+                                                                        <SelectOptions>
+                                                                            @foreach (var lang in CustomStepLanguages)
+                                                                            {
+                                                                                <SelectOption TItemValue="string" TItem="string" Value=@lang Label=@lang />
+                                                                            }
+                                                                        </SelectOptions>
+                                                                    </Select>
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Button Icon="robot" Type="@ButtonType.Default" OnClick="GenerateWithAi">
+                                                                        Generate with AI ✨
+                                                                    </Button>
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
+                                                                        Run
+                                                                    </Button>
+                                                                </SpaceItem>
+                                                            </Space>
+                                                        </ChildContent>
+                                                    </Form>
+                                            </div>
+                                       
+                                            <div class="monaco-container">
+                                                <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+                                            </div>
+                                          
+                                        </SplitterPanel>
+
+                                        <SplitterPanel Size="30%">
+                                            <div class="bottom-panel">
+                                                <Tabs @bind-ActiveKey="bottomTabKey" Size="TabSize.Small">
+                                                    <TabPane Tab="Logs" Key="logs">
+                                                        <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
+                                                    </TabPane>
+                                                    <TabPane Tab="AI Result" Key="ai">
+                                                        <div class="ai-result-panel">
+                                                            @if (aiGeneratedCode != null)
+                                                            {
+                                                                <TextArea Rows="6" Id="ai-feedback" Value="@aiGeneratedCode" />
+                                                                <div class="ai-status-bar">
+                                                                    <Button Type="@ButtonType.Primary" OnClick="ApplyAiCode">
+                                                                        Apply to Editor
+                                                                    </Button>
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span>No AI code generated yet.</span>
+                                                            }
                                                         </div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span>No AI code generated yet.</span>
-                                                    }
-                                                </div>
-                                            </TabPane>
-                                        </Tabs>
-                                    </div>
-                                    </SplitterPanel>
+                                                    </TabPane>
+                                                </Tabs>
+                                            </div>
+                                        </SplitterPanel>
                                     </Splitter>
                                 </div>
                             </SplitterPanel>
@@ -373,29 +373,6 @@
         height: 100%;
         width: 100%;
     }
-    .editor-panel {
-        flex: 1 1 auto;
-        min-height: 200px;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        height: 100%;
-    }
-
-        .editor-panel > .ant-form-spin-wrapper,
-        .editor-panel > .ant-form-spin-wrapper > div,
-        .editor-panel > .ant-form-spin-wrapper > div > .ant-spin-container {
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 auto;
-            height: 100%;
-            width: 100%;
-            min-height: 0;
-        }
-
-    .code-form {
-        height: 100%;
-    }
 
     .monaco-container {
         flex: 1 1 auto;
@@ -410,7 +387,6 @@
         min-height: 200px;
         box-sizing: border-box;
         display: block;
-        background-color: blue;
     }
     .bottom-panel {
         margin-top: 8px;
