@@ -87,11 +87,6 @@
                                                                     </Select>
                                                                 </SpaceItem>
                                                                 <SpaceItem>
-                                                                    <Button Icon="robot" Type="@ButtonType.Default" OnClick="GenerateWithAi">
-                                                                        Generate with AI ✨
-                                                                    </Button>
-                                                                </SpaceItem>
-                                                                <SpaceItem>
                                                                     <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
                                                                         Run
                                                                     </Button>
@@ -109,26 +104,9 @@
 
                                         <SplitterPanel Size="30%">
                                             <div class="bottom-panel">
-                                                <Tabs @bind-ActiveKey="bottomTabKey" Size="TabSize.Small">
+                                                <Tabs Size="TabSize.Small">
                                                     <TabPane Tab="Logs" Key="logs">
                                                         <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                                    </TabPane>
-                                                    <TabPane Tab="AI Result" Key="ai">
-                                                        <div class="ai-result-panel">
-                                                            @if (aiGeneratedCode != null)
-                                                            {
-                                                                <TextArea Rows="6" Id="ai-feedback" Value="@aiGeneratedCode" />
-                                                                <div class="ai-status-bar">
-                                                                    <Button Type="@ButtonType.Primary" OnClick="ApplyAiCode">
-                                                                        Apply to Editor
-                                                                    </Button>
-                                                                </div>
-                                                            }
-                                                            else
-                                                            {
-                                                                <span>No AI code generated yet.</span>
-                                                            }
-                                                        </div>
                                                     </TabPane>
                                                 </Tabs>
                                             </div>
@@ -136,43 +114,52 @@
                                     </Splitter>
                                 </div>
                             </SplitterPanel>
+
                             <SplitterPanel Size="30%">
-                                <div class="variables-panel">
-                                    <Collapse DefaultActiveKey="@(new[]{"input"})" Bordered="false" Class="variables-collapse-panel">
-                                        <Panel Key="input">
-                                            <HeaderTemplate>
-                                                <b>Test Input Variables</b>
-                                            </HeaderTemplate>
-                                            <ChildContent>
-                                                <div class="scrollable-list">
-                                                    @foreach(var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
-                                                    {
-                                                        <div class="variable">
-                                                            <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+
+                                <Tabs Size="TabSize.Small" Class="right-panel">
+                                    <TabPane Tab="Variables" Key="logs">
+                                        <div class="variables-panel">
+                                            <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
+                                                <Panel Key="input">
+                                                    <HeaderTemplate>
+                                                        <b>Test Input Variables</b>
+                                                    </HeaderTemplate>
+                                                    <ChildContent>
+                                                        <div class="scrollable-list">
+                                                            @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
+                                                            {
+                                                                <div class="variable">
+                                                                    <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                                </div>
+                                                            }
                                                         </div>
-                                                    }
-                                                </div>
-                                            </ChildContent>
-                                        </Panel>
-                                    </Collapse>
-                                    <Collapse DefaultActiveKey="@(new[]{"output"})" Bordered="false" Class="variables-collapse-panel">
-                                        <Panel Key="output">
-                                            <HeaderTemplate>
-                                                <b>Test Output Variables</b>
-                                            </HeaderTemplate>
-                                            <ChildContent>
-                                                <div class="scrollable-list">
-                                                    @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
-                                                    {
-                                                        <div class="variable">
-                                                            <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                    </ChildContent>
+                                                </Panel>
+                                            </Collapse>
+                                            <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
+                                                <Panel Key="output">
+                                                    <HeaderTemplate>
+                                                        <b>Test Output Variables</b>
+                                                    </HeaderTemplate>
+                                                    <ChildContent>
+                                                        <div class="scrollable-list">
+                                                            @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
+                                                            {
+                                                                <div class="variable">
+                                                                    <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                                </div>
+                                                            }
                                                         </div>
-                                                    }
-                                                </div>
-                                            </ChildContent>
-                                        </Panel>
-                                    </Collapse>
-                                </div>
+                                                    </ChildContent>
+                                                </Panel>
+                                            </Collapse>
+                                        </div>
+                                    </TabPane>
+                                    <TabPane Tab="AI Chat" Key="ai">
+                                               
+                                    </TabPane>
+                                </Tabs>
                             </SplitterPanel>
                         </Splitter>
                     </TabPane>
@@ -393,7 +380,6 @@
         height: 100%;
         width: 100%;
         overflow-y: auto;
-        padding-left: 16px;
         box-sizing: border-box;
     }
     .variables-collapse-panel {
@@ -426,5 +412,9 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+    }
+
+    .right-panel { 
+        padding: 0 0 0 10px;
     }
 </style>

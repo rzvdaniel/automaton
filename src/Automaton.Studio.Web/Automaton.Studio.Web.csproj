@@ -6,9 +6,6 @@
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
     <UserSecretsId>01ebaacb-ff1e-48d5-8fc1-90716a5376a1</UserSecretsId>
   </PropertyGroup>
-    <PropertyGroup>
-		<HotReloadAutoRestart>true</HotReloadAutoRestart>
-	</PropertyGroup>
 	<ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="8.0.11" />
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />

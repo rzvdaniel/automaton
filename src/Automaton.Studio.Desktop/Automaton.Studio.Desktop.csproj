@@ -7,9 +7,6 @@
 	  <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 	<PropertyGroup>
-		<HotReloadAutoRestart>true</HotReloadAutoRestart>
-	</PropertyGroup>
-	<PropertyGroup>
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>

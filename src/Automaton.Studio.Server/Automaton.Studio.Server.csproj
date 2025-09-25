@@ -5,10 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-Automaton.Studio.Server-73B302BA-8B66-4371-B2F7-55537435EA1F</UserSecretsId>
   </PropertyGroup>
-	<PropertyGroup>
-		<HotReloadAutoRestart>true</HotReloadAutoRestart>
-	</PropertyGroup>
-
 	<ItemGroup>
     <PackageReference Include="AutoMapper" Version="15.0.1" />
     <PackageReference Include="Destructurama.Attributed" Version="4.0.0" />
