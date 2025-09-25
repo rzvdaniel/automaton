@@ -158,7 +158,10 @@
                                         </div>
                                     </TabPane>
                                     <TabPane Tab="AI Chat" Key="ai">
-                                        <AiChatPanel />  
+                                        <AiChatPanel OnCodeGenerated="OnCodeGenerated"
+                                                   CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
+                                                   InputVariables="@GetInputVariablesForAI()"
+                                                   OutputVariables="@GetOutputVariablesForAI()" />  
                                     </TabPane>
                                 </Tabs>
                             </SplitterPanel>

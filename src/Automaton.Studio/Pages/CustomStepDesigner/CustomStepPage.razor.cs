@@ -2,8 +2,10 @@
 using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Steps.Custom.Variables;
+using Automaton.Studio.Models;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
+using System.Linq;
 
 namespace Automaton.Studio.Pages.CustomStepDesigner;
 
@@ -108,6 +110,48 @@ partial class CustomStepPage : ComponentBase
     private async Task RefreshCode()
     {
         StepDesignerViewModel.CustomStep.Definition.Code = await codeEditor.GetValue();
+    }
+
+    private async Task OnCodeGenerated(string generatedCode)
+    {
+        try
+        {
+            // Set the generated code in the Monaco editor
+            await codeEditor.SetValue(generatedCode);
+            
+            // Update the view model
+            StepDesignerViewModel.CustomStep.Definition.Code = generatedCode;
+            
+            // Show success message
+            await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
+        }
+    }
+
+    // Convert StepVariable to VariableInfo for AI chat panel
+    private List<VariableInfo> GetInputVariablesForAI()
+    {
+        return StepDesignerViewModel.CustomStep.Definition.CodeInputVariables?
+            .Select(v => new VariableInfo
+            {
+                Name = v.Name ?? string.Empty,
+                Type = v.Type.ToString(),
+                Description = v.Description ?? string.Empty
+            }).ToList() ?? new List<VariableInfo>();
+    }
+
+    private List<VariableInfo> GetOutputVariablesForAI()
+    {
+        return StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables?
+            .Select(v => new VariableInfo
+            {
+                Name = v.Name ?? string.Empty,
+                Type = v.Type.ToString(),
+                Description = v.Description ?? string.Empty
+            }).ToList() ?? new List<VariableInfo>();
     }
 
     private Type GetVariableComponent(VariableType type)
