@@ -1,5 +1,6 @@
 ﻿@page "/stepdesigner/{stepId}"
 @using AntDesign
+@using Automaton.Studio.Pages.CustomStepDesigner.Components
 @using Blazored.FluentValidation;
 @using Automaton.Core.Enums;
 
@@ -157,7 +158,7 @@
                                         </div>
                                     </TabPane>
                                     <TabPane Tab="AI Chat" Key="ai">
-                                               
+                                        <AiChatPanel />  
                                     </TabPane>
                                 </Tabs>
                             </SplitterPanel>
