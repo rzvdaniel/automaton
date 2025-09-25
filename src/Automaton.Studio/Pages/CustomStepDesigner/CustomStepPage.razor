@@ -335,26 +335,6 @@
     </Content>
 </Layout>
 
-@code {
-    private string bottomTabKey = "logs";
-    private string aiGeneratedCode;
-    private async Task GenerateWithAi()
-    {
-        // TODO: Call your AI service and set aiGeneratedCode
-        aiGeneratedCode = "# AI generated code goes here";
-        bottomTabKey = "ai";
-        StateHasChanged();
-    }
-    private async Task ApplyAiCode()
-    {
-        if (codeEditor != null && !string.IsNullOrEmpty(aiGeneratedCode))
-        {
-            await codeEditor.SetValue(aiGeneratedCode);
-            bottomTabKey = "logs";
-        }
-    }
-}
-
 <style>
     .step-form {
         background-color: #fff;

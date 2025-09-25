@@ -7,20 +7,20 @@ public class ConfigurationService
 {
     private readonly IConfiguration configuration;
     private readonly AuthenticationSettings authenticationSettings = new();
-    private readonly AppConfig appConfig = new();
+    public readonly AppConfig AppConfig = new();
     public readonly EmailConfig EmailConfig = new();
     private readonly UserPasswordConfig userPasswordConfig = new();
 
     public const string MsSqlDatabaseType = "MsSql";
     public const string MySqlDatabaseType = "MySql";
 
-    public string DatabaseType => appConfig.DatabaseType;
-    public int RefreshTokenLifetime => appConfig.RefreshTokenLifetime;
-    public int RunnerRefreshTokenLifetime => appConfig.RunnerRefreshTokenLifetime;
-    public string WebsiteUrl => appConfig.WebsiteUrl;
-    public string AutoMapperLicence => appConfig.AutoMapperLicence;
+    public string DatabaseType => AppConfig.DatabaseType;
+    public int RefreshTokenLifetime => AppConfig.RefreshTokenLifetime;
+    public int RunnerRefreshTokenLifetime => AppConfig.RunnerRefreshTokenLifetime;
+    public string WebsiteUrl => AppConfig.WebsiteUrl;
+    public string AutoMapperLicence => AppConfig.AutoMapperLicence;
 
-    public bool NoUserSignUp => !appConfig.UserSignUp;
+    public bool NoUserSignUp => !AppConfig.UserSignUp;
 
     public bool RequireDigit => userPasswordConfig.RequireDigit;
     public bool RequireLowercase => userPasswordConfig.RequireLowercase;
@@ -33,7 +33,7 @@ public class ConfigurationService
         this.configuration = configuration;
         
         this.configuration.GetSection(nameof(AuthenticationSettings)).Bind(authenticationSettings);
-        this.configuration.GetSection(nameof(AppConfig)).Bind(appConfig);
+        this.configuration.GetSection(nameof(AppConfig)).Bind(AppConfig);
         this.configuration.GetSection(nameof(UserPasswordConfig)).Bind(userPasswordConfig);
         this.configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
     }

@@ -187,8 +187,9 @@ services.AddTransient<UsersService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();
 
-// Add API Key service
 services.AddScoped<ApiKeyService>();
+services.AddScoped<AiApiKeyService>();
+services.AddScoped<AiCodeGenerationService>();
 
 services.AddScoped(service => configurationService);
 

@@ -8,4 +8,5 @@ public class AppConfig
     public int RunnerRefreshTokenLifetime { get; set; }
     public string WebsiteUrl { get; set; }
     public string AutoMapperLicence {  get; set; }
+    public string AiApiEncryptionKey { get; set; }
 }

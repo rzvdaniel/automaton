@@ -16,6 +16,9 @@ partial class CustomStepPage : ComponentBase
     private Form<CustomStep> codeForm;
     private StandaloneCodeEditor codeEditor;
 
+    private string bottomTabKey = "logs";
+    private string aiGeneratedCode;
+    
     public IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
 
     private static readonly List<string> CustomStepLanguages =
@@ -141,6 +144,21 @@ partial class CustomStepPage : ComponentBase
             Language = StepDesignerViewModel.CustomStep.Definition.Language.ToLower(),
             Value = StepDesignerViewModel.CustomStep.Definition.Code
         };
+    }
+    private async Task GenerateWithAi()
+    {
+        // TODO: Call your AI service and set aiGeneratedCode
+        aiGeneratedCode = "# AI generated code goes here";
+        bottomTabKey = "ai";
+        StateHasChanged();
+    }
+    private async Task ApplyAiCode()
+    {
+        if (codeEditor != null && !string.IsNullOrEmpty(aiGeneratedCode))
+        {
+            await codeEditor.SetValue(aiGeneratedCode);
+            bottomTabKey = "logs";
+        }
     }
 
     public void Dispose()
