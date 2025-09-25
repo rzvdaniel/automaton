@@ -36,7 +36,6 @@ public class AiApiKeysController : ControllerBase
             Id = ak.Id,
             Name = ak.Name,
             Provider = ak.Provider,
-            Model = ak.Model,
             Description = ak.Description,
             CreatedAt = ak.CreatedAt,
             LastUsedAt = ak.LastUsedAt,
@@ -64,15 +63,13 @@ public class AiApiKeysController : ControllerBase
             request.Name, 
             request.Provider, 
             request.ApiKey,
-            request.Description,
-            request.Model);
+            request.Description);
 
         var response = new AiApiKeyResponse
         {
             Id = aiApiKey.Id,
             Name = aiApiKey.Name,
             Provider = aiApiKey.Provider,
-            Model = aiApiKey.Model,
             Description = aiApiKey.Description,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
@@ -96,7 +93,6 @@ public class AiApiKeysController : ControllerBase
             Id = aiApiKey.Id,
             Name = aiApiKey.Name,
             Provider = aiApiKey.Provider,
-            Model = aiApiKey.Model,
             Description = aiApiKey.Description,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
@@ -110,7 +106,7 @@ public class AiApiKeysController : ControllerBase
     public async Task<IActionResult> UpdateAiApiKey(Guid id, [FromBody] UpdateAiApiKeyRequest request)
     {
         var userId = GetUserId();
-        var success = await aiApiKeyService.UpdateAiApiKeyAsync(id, userId, request.Name, request.Description, request.Model);
+        var success = await aiApiKeyService.UpdateAiApiKeyAsync(id, userId, request.Name, request.Description);
         
         if (!success)
             return NotFound();
@@ -172,14 +168,12 @@ public class CreateAiApiKeyRequest
     public AiProvider Provider { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? Model { get; set; }
 }
 
 public class UpdateAiApiKeyRequest
 {
     public string? Name { get; set; }
     public string? Description { get; set; }
-    public string? Model { get; set; }
 }
 
 public class AiApiKeyResponse
@@ -187,7 +181,6 @@ public class AiApiKeyResponse
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public AiProvider Provider { get; set; }
-    public string? Model { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }

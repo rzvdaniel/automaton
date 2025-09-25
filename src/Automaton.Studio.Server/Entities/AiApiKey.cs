@@ -35,10 +35,6 @@ public class AiApiKey
     [MaxLength(500)]
     public string? Description { get; set; }
 
-    [MaxLength(100)]
-    public string? Model { get; set; } // e.g., "gpt-4", "claude-3-sonnet", "gemini-pro"
-
-    // Navigation properties
     public virtual ApplicationUser User { get; set; } = null!;
 }
 

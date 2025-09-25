@@ -19,7 +19,7 @@ public class AiApiKeyService
         this.configuration = configuration;
     }
 
-    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null, string? model = null)
+    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null)
     {
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
@@ -33,7 +33,6 @@ public class AiApiKeyService
             UserId = userId,
             CreatedAt = DateTime.UtcNow,
             Description = description,
-            Model = model,
             IsActive = true
         };
 
@@ -78,14 +77,13 @@ public class AiApiKeyService
         }
     }
 
-    public async Task<bool> UpdateAiApiKeyAsync(Guid id, Guid userId, string? name = null, string? description = null, string? model = null, bool? isActive = null)
+    public async Task<bool> UpdateAiApiKeyAsync(Guid id, Guid userId, string? name = null, string? description = null, bool? isActive = null)
     {
         var aiApiKey = await GetAiApiKeyAsync(id, userId);
         if (aiApiKey == null) return false;
 
         if (name != null) aiApiKey.Name = name;
         if (description != null) aiApiKey.Description = description;
-        if (model != null) aiApiKey.Model = model;
         if (isActive != null) aiApiKey.IsActive = isActive.Value;
 
         await dbContext.SaveChangesAsync();

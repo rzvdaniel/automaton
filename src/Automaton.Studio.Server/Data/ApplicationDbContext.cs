@@ -189,7 +189,6 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Description).HasMaxLength(500);
-                entity.Property(e => e.Model).HasMaxLength(100);
 
                 entity.HasOne(e => e.User)
                     .WithMany()

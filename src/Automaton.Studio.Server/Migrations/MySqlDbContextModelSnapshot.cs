@@ -45,10 +45,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("Model")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
