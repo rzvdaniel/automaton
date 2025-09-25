@@ -27,26 +27,33 @@
     </div>
 
     <div class="ai-chat-input">
+        <Space Style="flex:1">
+            <Input @bind-Value="promptText" Placeholder="Ask the AI or request code generation..." />
+        </Space>
+
         <div class="controls">
-            @* <Select @bind-Value="selectedAgent" Style="width: 140px; margin-right: 8px;">
+            <Select @bind-Value="selectedAgent"
+                    TItemValue="string"
+                    TItem="string"
+                    Style="width: 140px; margin-right: 8px;">
                 <SelectOptions>
-                    <SelectOption Value="DefaultAgent" Label="Agent" />
-                    <SelectOption Value="Assistant" Label="Assistant" />
+                    <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
+                    <SelectOption Value="@Assistant" Label="Assistant" />
                 </SelectOptions>
             </Select>
 
-            <Select @bind-Value="selectedModel" Style="width: 160px; margin-right: 8px;">
+            <Select @bind-Value="selectedModel" 
+                    TItemValue="string"
+                    TItem="string" Style="width: 160px; margin-right: 8px;">
                 <SelectOptions>
-                    <SelectOption Value="gpt-4" Label="GPT-4" />
-                    <SelectOption Value="gpt-4o" Label="GPT-4o" />
-                    <SelectOption Value="gpt-3.5" Label="GPT-3.5" />
+                    @foreach (var model in AiModels)
+                    {
+                        <SelectOption TItemValue="string" TItem="string" Value=@model Label=@model />
+                    }
                 </SelectOptions>
-            </Select> *@
+            </Select>
 
-            <Space Style="flex:1">
-                <Input @bind-Value="promptText" Placeholder="Ask the AI or request code generation..." />
-            </Space>
-
+           
             <Space>
                 <Button Icon="paper-clip" OnClick="AttachFile" />
                 <Button Type="ButtonType.Primary" Icon="caret-right" OnClick="SendPrompt">Send</Button>
@@ -104,6 +111,11 @@
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private record ChatMessage(string Role, string Content, DateTime Time);
+
+    private const string Agent = "Agent";
+    private const string Assistant = "Assistant";
+
+    private List<string> AiModels => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" };
 }
 
 <style>
