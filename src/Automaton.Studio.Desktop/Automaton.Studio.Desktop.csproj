@@ -6,7 +6,10 @@
     <IsShippingPackage>false</IsShippingPackage>
 	  <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
-  <PropertyGroup>
+	<PropertyGroup>
+		<HotReloadAutoRestart>true</HotReloadAutoRestart>
+	</PropertyGroup>
+	<PropertyGroup>
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
