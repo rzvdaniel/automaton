@@ -55,7 +55,8 @@ public static class SeviceCollection
         services.AddScoped<StepFactory>();
 
         // Scripting
-        services.AddScripting();
+        // services.AddScripting();
+        services.AddScriptingWithPythonNet();
 
         // Authentication & Authorization
         services.AddBlazoredLocalStorage();
