@@ -23,6 +23,7 @@ using Serilog.Events;
 using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Transactions;
+using Automaton.Studio.Server.Services.AiProviders;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -190,6 +191,12 @@ services.AddTransient<ScheduleService>();
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiCodeGenerationService>();
+
+services.AddScoped<OpenAiProvider>();
+services.AddScoped<AnthropicProvider>();
+services.AddScoped<GoogleProvider>();
+services.AddScoped<AzureOpenAiProvider>();
+services.AddScoped<AiProviderFactory>();
 
 services.AddScoped(service => configurationService);
 

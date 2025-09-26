@@ -1,18 +1,21 @@
 using Automaton.Studio.Server.Entities;
-using System.Text.Json;
+using Automaton.Studio.Server.Services.AiProviders;
 
 namespace Automaton.Studio.Server.Services;
 
 public class AiCodeGenerationService
 {
     private readonly AiApiKeyService aiApiKeyService;
-    private readonly HttpClient httpClient;
+    private readonly AiProviderFactory aiProviderFactory;
     private readonly ILogger<AiCodeGenerationService> logger;
 
-    public AiCodeGenerationService(AiApiKeyService aiApiKeyService, HttpClient httpClient, ILogger<AiCodeGenerationService> logger)
+    public AiCodeGenerationService(
+        AiApiKeyService aiApiKeyService, 
+        AiProviderFactory aiProviderFactory,
+        ILogger<AiCodeGenerationService> logger)
     {
         this.aiApiKeyService = aiApiKeyService;
-        this.httpClient = httpClient;
+        this.aiProviderFactory = aiProviderFactory;
         this.logger = logger;
     }
 
@@ -30,15 +33,10 @@ public class AiCodeGenerationService
             // Generate the appropriate prompt
             var prompt = BuildPrompt(request);
 
-            // Call the appropriate AI service
-            var generatedCode = request.Provider switch
-            {
-                AiProvider.OpenAI => await CallOpenAIAsync(apiKey, prompt, request.Model ?? "gpt-4"),
-                AiProvider.Anthropic => await CallAnthropicAsync(apiKey, prompt, request.Model ?? "claude-3-sonnet"),
-                AiProvider.Google => await CallGoogleAsync(apiKey, prompt, request.Model ?? "gemini-pro"),
-                AiProvider.Azure => await CallAzureOpenAIAsync(apiKey, prompt, request.Model ?? "gpt-4"),
-                _ => throw new NotSupportedException($"Provider {request.Provider} is not supported yet.")
-            };
+            // Get the appropriate AI provider and call it
+            var provider = aiProviderFactory.CreateProvider(request.Provider);
+            var model = request.Model ?? provider.DefaultModel;
+            var generatedCode = await provider.GenerateCodeAsync(apiKey, prompt, model);
 
             return CodeGenerationResult.Success(generatedCode);
         }
@@ -116,110 +114,6 @@ public class AiCodeGenerationService
             """;
 
         return prompt;
-    }
-
-    private async Task<string> CallOpenAIAsync(string apiKey, string prompt, string model)
-    {
-        var request = new
-        {
-            model = model,
-            messages = new[]
-            {
-                new { role = "user", content = prompt }
-            },
-            max_tokens = 2000,
-            temperature = 0.7
-        };
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-        httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
-        httpRequest.Content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
-
-        var response = await httpClient.SendAsync(httpRequest);
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var responseJson = JsonDocument.Parse(responseContent);
-        
-        return responseJson.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString() ?? string.Empty;
-    }
-
-    private async Task<string> CallAnthropicAsync(string apiKey, string prompt, string model)
-    {
-        var request = new
-        {
-            model = model,
-            max_tokens = 2000,
-            messages = new[]
-            {
-                new { role = "user", content = prompt }
-            }
-        };
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
-        httpRequest.Headers.Add("x-api-key", apiKey);
-        httpRequest.Headers.Add("anthropic-version", "2023-06-01");
-        httpRequest.Content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
-
-        var response = await httpClient.SendAsync(httpRequest);
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var responseJson = JsonDocument.Parse(responseContent);
-        
-        return responseJson.RootElement
-            .GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
-    }
-
-    private async Task<string> CallGoogleAsync(string apiKey, string prompt, string model)
-    {
-        var request = new
-        {
-            contents = new[]
-            {
-                new
-                {
-                    parts = new[]
-                    {
-                        new { text = prompt }
-                    }
-                }
-            },
-            generationConfig = new
-            {
-                maxOutputTokens = 2000,
-                temperature = 0.7
-            }
-        };
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}");
-        httpRequest.Content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
-
-        var response = await httpClient.SendAsync(httpRequest);
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var responseJson = JsonDocument.Parse(responseContent);
-        
-        return responseJson.RootElement
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
-    }
-
-    private async Task<string> CallAzureOpenAIAsync(string apiKey, string prompt, string model)
-    {
-        // Note: Azure OpenAI requires endpoint configuration
-        // This is a simplified implementation - in production, you'd need endpoint configuration per key
-        throw new NotImplementedException("Azure OpenAI integration requires endpoint configuration. Please implement based on your Azure setup.");
     }
 }
 
