@@ -117,53 +117,58 @@
                             </SplitterPanel>
 
                             <SplitterPanel Size="30%">
-
-                                <Tabs Size="TabSize.Small" Class="right-panel">
-                                    <TabPane Tab="AI Chat" Key="ai">
-                                        <AiChatPanel OnCodeGenerated="OnCodeGenerated"
-                                                     CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
-                                                     InputVariables="@GetInputVariablesForAI()"
-                                                     OutputVariables="@GetOutputVariablesForAI()" />
-                                    </TabPane>
-                                    <TabPane Tab="Variables" Key="variables">
-                                        <div class="variables-panel">
-                                            <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
-                                                <Panel Key="input">
-                                                    <HeaderTemplate>
-                                                        <b>Test Input Variables</b>
-                                                    </HeaderTemplate>
-                                                    <ChildContent>
-                                                        <div class="scrollable-list">
-                                                            @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
-                                                            {
-                                                                <div class="variable">
-                                                                    <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                <div class="right-panel-container">
+                                    <Tabs Size="TabSize.Small" Class="right-panel">
+                                        <TabPane Tab="AI Chat" Key="ai">
+                                            <div class="tab-content-scrollable">
+                                                <AiChatPanel OnCodeGenerated="OnCodeGenerated"
+                                                             CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
+                                                             InputVariables="@GetInputVariablesForAI()"
+                                                             OutputVariables="@GetOutputVariablesForAI()" />
+                                            </div>
+                                        </TabPane>
+                                        <TabPane Tab="Variables" Key="variables">
+                                            <div class="tab-content-scrollable">
+                                                <div class="variables-panel">
+                                                    <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
+                                                        <Panel Key="input">
+                                                            <HeaderTemplate>
+                                                                <b>Test Input Variables</b>
+                                                            </HeaderTemplate>
+                                                            <ChildContent>
+                                                                <div class="scrollable-list">
+                                                                    @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
+                                                                    {
+                                                                        <div class="variable">
+                                                                            <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                                        </div>
+                                                                    }
                                                                 </div>
-                                                            }
-                                                        </div>
-                                                    </ChildContent>
-                                                </Panel>
-                                            </Collapse>
-                                            <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
-                                                <Panel Key="output">
-                                                    <HeaderTemplate>
-                                                        <b>Test Output Variables</b>
-                                                    </HeaderTemplate>
-                                                    <ChildContent>
-                                                        <div class="scrollable-list">
-                                                            @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
-                                                            {
-                                                                <div class="variable">
-                                                                    <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                            </ChildContent>
+                                                        </Panel>
+                                                    </Collapse>
+                                                    <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
+                                                        <Panel Key="output">
+                                                            <HeaderTemplate>
+                                                                <b>Test Output Variables</b>
+                                                            </HeaderTemplate>
+                                                            <ChildContent>
+                                                                <div class="scrollable-list">
+                                                                    @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
+                                                                    {
+                                                                        <div class="variable">
+                                                                            <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
+                                                                        </div>
+                                                                    }
                                                                 </div>
-                                                            }
-                                                        </div>
-                                                    </ChildContent>
-                                                </Panel>
-                                            </Collapse>
-                                        </div>
-                                    </TabPane>
-                                </Tabs>
+                                                            </ChildContent>
+                                                        </Panel>
+                                                    </Collapse>
+                                                </div>
+                                            </div>
+                                        </TabPane>
+                                    </Tabs>
+                                </div>
                             </SplitterPanel>
                         </Splitter>
                     </TabPane>
@@ -420,5 +425,58 @@
 
     .right-panel { 
         padding: 0 0 0 10px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Fix for right panel tabs scrolling */
+    .right-panel-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .right-panel .ant-tabs {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .right-panel .ant-tabs-nav {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+    }
+
+    .right-panel .ant-tabs-content-holder {
+        flex: 1 1 auto;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .right-panel .ant-tabs-content {
+        height: 100%;
+    }
+
+    .right-panel .ant-tabs-tabpane {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .tab-content-scrollable {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Ensure AiChatPanel takes full height */
+    .tab-content-scrollable .ai-chat-panel {
+        height: 100%;
+        min-height: 0;
     }
 </style>
