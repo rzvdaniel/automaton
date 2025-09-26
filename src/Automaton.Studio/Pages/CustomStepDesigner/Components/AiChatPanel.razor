@@ -389,6 +389,7 @@
     padding: 10px;
     background: #fff;
     min-height: 0;
+    max-height: calc(100% - 200px); /* Reserve space for input controls */
 }
 
 .messages { 
@@ -401,6 +402,8 @@
     padding: 8px; 
     border-radius: 6px; 
     background: #f6f8fa; 
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .message .meta { 
@@ -419,6 +422,9 @@
     flex-direction: column;
     gap: 8px;
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
 }
 
 .input-row {
@@ -449,5 +455,9 @@
 .no-providers-message {
     border-top: 1px solid #e8e8e8;
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: #fafafa;
+    z-index: 10;
 }
 </style>
