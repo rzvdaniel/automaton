@@ -1,4 +1,6 @@
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Entities;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services.AiProviders;
@@ -7,14 +9,37 @@ public class GoogleProvider : IAiProvider
 {
     private readonly HttpClient httpClient;
     private readonly ILogger<GoogleProvider> logger;
+    private readonly AiProvidersConfig aiProvidersConfig;
 
     public AiProvider ProviderType => AiProvider.Google;
-    public string DefaultModel => "gemini-pro";
 
-    public GoogleProvider(HttpClient httpClient, ILogger<GoogleProvider> logger)
+    private static readonly List<string> DefaultSupportedModels = new()
+    {
+        "gemini-1.5-pro",                // Latest pro model - most capable
+        "gemini-1.5-flash",              // Fast and efficient
+        "gemini-1.5-pro-exp-0827",      // Experimental pro version
+        "gemini-pro",                    // Legacy model
+        "gemini-pro-vision"              // Vision-capable legacy model
+    };
+
+    private const string DefaultModelName = "gemini-1.5-pro";
+
+    public string DefaultModel => aiProvidersConfig.GetProviderConfig(ProviderType)?.DefaultModel ?? DefaultModelName;
+    
+    public IReadOnlyList<string> SupportedModels
+    {
+        get
+        {
+            var configModels = aiProvidersConfig.GetProviderConfig(ProviderType)?.SupportedModels;
+            return configModels?.Count > 0 ? configModels : DefaultSupportedModels;
+        }
+    }
+
+    public GoogleProvider(HttpClient httpClient, ILogger<GoogleProvider> logger, IOptions<AiProvidersConfig> aiProvidersConfig)
     {
         this.httpClient = httpClient;
         this.logger = logger;
+        this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
     public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)

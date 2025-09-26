@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Services.AiProviders;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,12 +12,14 @@ public class AiApiKeyService
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiApiKeyService> logger;
     private readonly ConfigurationService configuration;
+    private readonly AiProviderFactory aiProviderFactory;
 
-    public AiApiKeyService(ApplicationDbContext dbContext, ILogger<AiApiKeyService> logger, ConfigurationService configuration)
+    public AiApiKeyService(ApplicationDbContext dbContext, ILogger<AiApiKeyService> logger, ConfigurationService configuration, AiProviderFactory aiProviderFactory)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.configuration = configuration;
+        this.aiProviderFactory = aiProviderFactory;
     }
 
     public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null)
@@ -218,23 +221,31 @@ public class AiApiKeyService
 
     private static string GetProviderDisplayName(AiProvider provider) => provider switch
     {
-        AiProvider.OpenAI => "OpenAI (GPT)",
-        AiProvider.Anthropic => "Anthropic (Claude)", 
-        AiProvider.Google => "Google (Gemini)",
-        AiProvider.Azure => "Azure OpenAI",
+        AiProvider.OpenAI => "OpenAI",
+        AiProvider.Anthropic => "Anthropic", 
+        AiProvider.Google => "Google",
+        AiProvider.Azure => "Azure",
         AiProvider.Custom => "Custom Provider",
         _ => provider.ToString()
     };
 
-    private static List<string> GetSupportedModels(AiProvider provider) => provider switch
+    private List<string> GetSupportedModels(AiProvider provider)
     {
-        AiProvider.OpenAI => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" },
-        AiProvider.Anthropic => new List<string> { "claude-3-sonnet", "claude-3-haiku", "claude-3-opus" },
-        AiProvider.Google => new List<string> { "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro" },
-        AiProvider.Azure => new List<string> { "gpt-4", "gpt-35-turbo" },
-        AiProvider.Custom => new List<string> { "custom-model" },
-        _ => new List<string>()
-    };
+        try
+        {
+            if (provider == AiProvider.Custom)
+            {
+                return new List<string> { "custom-model" };
+            }
+            
+            return aiProviderFactory.GetSupportedModels(provider).ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to get supported models for provider {Provider}, falling back to empty list", provider);
+            return new List<string>();
+        }
+    }
 }
 
 public class AiProviderInfo

@@ -24,6 +24,7 @@ using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Transactions;
 using Automaton.Studio.Server.Services.AiProviders;
+using Automaton.Studio.Server.Config;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -40,6 +41,10 @@ var services = applicationBuilder.Services;
 services.AddDbContext<ApplicationDbContext, MySqlDbContext>();
 
 services.AddDatabaseDeveloperPageExceptionFilter();
+
+// Register AI Providers Configuration
+services.Configure<AiProvidersConfig>(
+    applicationBuilder.Configuration.GetSection("AiProviders"));
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {

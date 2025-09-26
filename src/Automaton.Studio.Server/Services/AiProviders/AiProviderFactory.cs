@@ -24,4 +24,16 @@ public class AiProviderFactory
             _ => throw new NotSupportedException($"Provider {providerType} is not supported yet.")
         };
     }
+
+    public IReadOnlyList<string> GetSupportedModels(AiProvider providerType)
+    {
+        var provider = CreateProvider(providerType);
+        return provider.SupportedModels;
+    }
+
+    public string GetDefaultModel(AiProvider providerType)
+    {
+        var provider = CreateProvider(providerType);
+        return provider.DefaultModel;
+    }
 }
