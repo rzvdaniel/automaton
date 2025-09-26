@@ -3,10 +3,10 @@ using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Steps.Custom.Variables;
 using Automaton.Studio.Models;
+using Automaton.Studio.Services;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Automaton.Studio.Pages.CustomStepDesigner;
 
@@ -29,6 +29,7 @@ partial class CustomStepPage : ComponentBase
 
     [Inject] private CustomStepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
+    [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
 
     [Parameter] public string StepId { get; set; }
 
@@ -118,7 +119,7 @@ partial class CustomStepPage : ComponentBase
         try
         {
             // Clean up the generated code by removing markdown code block syntax
-            var cleanedCode = CleanupGeneratedCode(generatedCode);
+            var cleanedCode = CodeCleanupService.CleanupGeneratedCode(generatedCode);
             
             // Set the cleaned code in the Monaco editor
             await codeEditor.SetValue(cleanedCode);
@@ -133,48 +134,6 @@ partial class CustomStepPage : ComponentBase
         {
             await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// Removes markdown code block syntax from generated code
-    /// </summary>
-    /// <param name="generatedCode">The raw generated code that may contain markdown formatting</param>
-    /// <returns>Clean code without markdown formatting</returns>
-    private static string CleanupGeneratedCode(string generatedCode)
-    {
-        if (string.IsNullOrWhiteSpace(generatedCode))
-            return string.Empty;
-
-        // Pattern to match code blocks like ```python ... ``` or ```batch ... ```
-        // This matches:
-        // - Opening: ``` followed by optional language name
-        // - Content: anything (non-greedy)
-        // - Closing: ```
-        var codeBlockPattern = @"```(?:\w+)?\s*\n?(.*?)\n?```";
-        
-        var match = Regex.Match(generatedCode, codeBlockPattern, RegexOptions.Singleline | RegexOptions.IgnoreCase);
-        
-        if (match.Success && match.Groups.Count > 1)
-        {
-            // Extract the code content between the markdown markers
-            var extractedCode = match.Groups[1].Value;
-            
-            // Trim any extra whitespace and return
-            return extractedCode.Trim();
-        }
-        
-        // If no code block pattern found, check if the entire content is wrapped in backticks
-        // Handle cases like: ```code here``` (without language specifier)
-        var simpleCodeBlockPattern = @"^```\s*\n?(.*?)\n?```$";
-        var simpleMatch = Regex.Match(generatedCode.Trim(), simpleCodeBlockPattern, RegexOptions.Singleline);
-        
-        if (simpleMatch.Success && simpleMatch.Groups.Count > 1)
-        {
-            return simpleMatch.Groups[1].Value.Trim();
-        }
-        
-        // If no markdown patterns found, return the original code as-is
-        return generatedCode.Trim();
     }
 
     // Convert StepVariable to VariableInfo for AI chat panel

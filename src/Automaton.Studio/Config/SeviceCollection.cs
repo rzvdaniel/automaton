@@ -87,6 +87,7 @@ public static class SeviceCollection
         services.AddScoped<FlowSettingsService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<RecentActivityService>();
+        services.AddScoped<AiCodeCleanupService>();
 
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
