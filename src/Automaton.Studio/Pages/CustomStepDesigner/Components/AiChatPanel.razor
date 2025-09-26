@@ -13,8 +13,8 @@
         </div>
     </div>
 
-    <div class="ai-chat-body">
-        <div class="messages" @ref="messagesContainer">
+    <div class="ai-chat-body" @ref="messagesContainer" id="ai-chat-messages">
+        <div class="messages">
             @foreach (var msg in messages)
             {
                 <div class="message">
@@ -29,12 +29,12 @@
     </div>
 
     <div class="ai-chat-input">
-        <Space Style="flex:1">
+        <div class="input-row">
             <Input @bind-Value="promptText" 
                    Placeholder="Describe the code you want to generate..." 
                    Disabled="@isGeneratingCode"
                    OnPressEnter="@(async () => await SendPrompt())" />
-        </Space>
+        </div>
 
         <div class="controls">
             <Select @bind-Value="selectedAgent"
@@ -82,30 +82,6 @@
                     }
                 </SelectOptions>
             </Select>
-
-            @if (!string.IsNullOrEmpty(selectedProviderModel) && GetSelectedProvider() != null)
-            {
-                var selectedProvider = GetSelectedProvider();
-                @if (selectedProvider.StoredKeys?.Any() == true)
-                {
-                    <Select @bind-Value="selectedApiKeyId"
-                            TItemValue="string"
-                            TItem="string" 
-                            Style="width: 120px; margin-right: 8px;"
-                            Placeholder="API Key"
-                            AllowClear="false"
-                            Disabled="@isGeneratingCode">
-                        <SelectOptions>
-                            @foreach (var apiKey in selectedProvider.StoredKeys)
-                            {
-                                <SelectOption TItemValue="string" TItem="string" 
-                                            Value="@apiKey.Id.ToString()" 
-                                            Label="@apiKey.Name" />
-                            }
-                        </SelectOptions>
-                    </Select>
-                }
-            }
 
             <Space>
                 <Button Icon="paper-clip" OnClick="AttachFile" Disabled="@isGeneratingCode" />
@@ -156,7 +132,6 @@
 
     private string selectedAgent = "DefaultAgent";
     private string selectedProviderModel = string.Empty;
-    private string selectedApiKeyId = string.Empty;
     private string promptText = string.Empty;
     private bool showNoProvidersMessage = false;
     private bool isGeneratingCode = false;
@@ -188,12 +163,6 @@
                 if (firstAvailableProvider != null && firstAvailableProvider.SupportedModels?.Any() == true)
                 {
                     selectedProviderModel = $"{firstAvailableProvider.Provider}:{firstAvailableProvider.SupportedModels.First()}";
-
-                    // Auto-select first API key if available
-                    if (firstAvailableProvider.StoredKeys?.Any() == true)
-                    {
-                        selectedApiKeyId = firstAvailableProvider.StoredKeys.First().Id.ToString();
-                    }
                 }
             }
 
@@ -227,6 +196,23 @@
         return selectedProviderModel.Split(':')[1];
     }
 
+    private string? GetSelectedApiKeyId()
+    {
+        var selectedProvider = GetSelectedProvider();
+        if (selectedProvider == null) return null;
+
+        // Auto-select the most recently used key, or first available key
+        if (selectedProvider.StoredKeys?.Any() == true)
+        {
+            var mostRecentKey = selectedProvider.StoredKeys
+                .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
+                .First();
+            return mostRecentKey.Id.ToString();
+        }
+
+        return null;
+    }
+
     private bool IsReadyToSend
     {
         get
@@ -238,10 +224,8 @@
             if (selectedProvider == null)
                 return false;
 
-            // If provider has stored keys, we need one selected
-            if (selectedProvider.StoredKeys?.Any() == true && string.IsNullOrEmpty(selectedApiKeyId))
-                return false;
-
+            // If provider has stored keys, we need at least one available
+            // If provider has environment key, it's ready
             return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
         }
     }
@@ -266,6 +250,7 @@
 
             var selectedProvider = GetSelectedProvider();
             var selectedModel = GetSelectedModel();
+            var selectedApiKeyId = GetSelectedApiKeyId();
 
             // Add context about selected provider/model
             var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel}";
@@ -361,9 +346,12 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("blazorHelpers.scrollToBottom", messagesContainer);
+            await JSRuntime.InvokeVoidAsync("eval", "var element = document.getElementById('ai-chat-messages'); if(element) { element.scrollTop = element.scrollHeight; }");
         }
-        catch { }
+        catch
+        {
+            // Ignore JS interop errors
+        }
     }
 
     private record ChatMessage(string Role, string Content, DateTime Time);
@@ -379,6 +367,7 @@
     height: 100%;
     border-left: 1px solid #f0f0f0;
 }
+
 .ai-chat-header {
     display: flex;
     align-items: center;
@@ -386,32 +375,67 @@
     padding: 8px 12px;
     border-bottom: 1px solid #e8e8e8;
     background: #fafafa;
+    flex-shrink: 0;
 }
-.ai-chat-header .title { font-weight: 600; }
+
+.ai-chat-header .title { 
+    font-weight: 600; 
+}
+
 .ai-chat-body {
     flex: 1 1 auto;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 10px;
     background: #fff;
+    min-height: 0; /* Important for flex child to be scrollable */
 }
-.messages { display: flex; flex-direction: column; gap: 8px; }
-.message { padding: 8px; border-radius: 6px; background: #f6f8fa; }
-.message .meta { font-size: 11px; color: #666; margin-bottom: 6px; display:flex; gap:8px }
-.ai-chat-input { 
+
+.messages { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+}
+
+.message { 
     padding: 8px; 
+    border-radius: 6px; 
+    background: #f6f8fa; 
+}
+
+.message .meta { 
+    font-size: 11px; 
+    color: #666; 
+    margin-bottom: 6px; 
+    display: flex; 
+    gap: 8px;
+}
+
+.ai-chat-input { 
+    padding: 12px; 
     border-top: 1px solid #e8e8e8; 
     background: #fafafa; 
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex-shrink: 0; /* Keep input area fixed at bottom */
 }
+
+.input-row {
+    display: flex;
+    width: 100%;
+}
+
+.input-row input { 
+    width: 100%; 
+}
+
 .ai-chat-input .controls { 
-    display:flex; 
-    align-items:center; 
-    gap:8px;
+    display: flex; 
+    align-items: center; 
+    gap: 8px;
     flex-wrap: wrap;
 }
-.ai-chat-input input { width:100%; }
 
 .language-info {
     padding: 4px 0;
@@ -424,5 +448,6 @@
 
 .no-providers-message {
     border-top: 1px solid #e8e8e8;
+    flex-shrink: 0;
 }
 </style>

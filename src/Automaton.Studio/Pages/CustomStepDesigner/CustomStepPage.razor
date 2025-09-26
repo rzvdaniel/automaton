@@ -119,7 +119,13 @@
                             <SplitterPanel Size="30%">
 
                                 <Tabs Size="TabSize.Small" Class="right-panel">
-                                    <TabPane Tab="Variables" Key="logs">
+                                    <TabPane Tab="AI Chat" Key="ai">
+                                        <AiChatPanel OnCodeGenerated="OnCodeGenerated"
+                                                     CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
+                                                     InputVariables="@GetInputVariablesForAI()"
+                                                     OutputVariables="@GetOutputVariablesForAI()" />
+                                    </TabPane>
+                                    <TabPane Tab="Variables" Key="variables">
                                         <div class="variables-panel">
                                             <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
                                                 <Panel Key="input">
@@ -156,12 +162,6 @@
                                                 </Panel>
                                             </Collapse>
                                         </div>
-                                    </TabPane>
-                                    <TabPane Tab="AI Chat" Key="ai">
-                                        <AiChatPanel OnCodeGenerated="OnCodeGenerated"
-                                                   CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
-                                                   InputVariables="@GetInputVariablesForAI()"
-                                                   OutputVariables="@GetOutputVariablesForAI()" />  
                                     </TabPane>
                                 </Tabs>
                             </SplitterPanel>
