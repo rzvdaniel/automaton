@@ -187,6 +187,17 @@ public partial class FlowSchedule : ComponentBase
         };
     }
 
+    private List<string> GetScheduleActionCardBullets()
+    {
+        return new List<string>
+        {
+            "Cron expressions and simple patterns",
+            "Recurring and one-time schedules",
+            "Execution history and monitoring",
+            "Failure notifications and retries"
+        };
+    }
+
     private List<EnhancedEmpty.HelpLinkModel> GetScheduleHelpLinks()
     {
         return new List<EnhancedEmpty.HelpLinkModel>

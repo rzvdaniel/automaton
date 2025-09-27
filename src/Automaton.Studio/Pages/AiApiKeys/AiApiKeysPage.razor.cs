@@ -20,6 +20,17 @@ partial class AiApiKeysPage : ComponentBase
         };
     }
 
+    private List<string> GetAiApiKeyActionCardBullets()
+    {
+        return new List<string>
+        {
+            "Connect to OpenAI, Anthropic, Google",
+            "Text generation and image analysis",
+            "Intelligent decision making",
+            "Cost tracking and usage analytics"
+        };
+    }
+
     private List<EnhancedEmpty.FeatureCardModel> GetAiApiKeyFeatureCards()
     {
         return new List<EnhancedEmpty.FeatureCardModel>

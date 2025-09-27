@@ -20,6 +20,17 @@ public partial class ApiKeysPage
         };
     }
 
+    private List<string> GetApiKeyActionCardBullets()
+    {
+        return new List<string>
+        {
+            "Authenticate console runners",
+            "Connect external applications",
+            "Configurable access scopes",
+            "Usage monitoring and analytics"
+        };
+    }
+
     private List<EnhancedEmpty.FeatureCardModel> GetApiKeyFeatureCards()
     {
         return new List<EnhancedEmpty.FeatureCardModel>

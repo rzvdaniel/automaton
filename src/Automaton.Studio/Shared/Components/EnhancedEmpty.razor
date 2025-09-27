@@ -24,6 +24,19 @@
                                 <p class="action-card-description">@ActionCardDescription</p>
                             }
                             
+                            @if (ActionCardBulletPoints?.Any() == true)
+                            {
+                                <div class="action-card-bullets">
+                                    @foreach (var bulletPoint in ActionCardBulletPoints)
+                                    {
+                                        <div class="bullet-point">
+                                            <Icon Type="check" Style="color: #52c41a; margin-right: 8px;" />
+                                            <span>@bulletPoint</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            
                             @if (PrimaryAction != null)
                             {
                                 <div class="primary-action">
@@ -129,6 +142,7 @@
     [Parameter] public string BackgroundImageUrl { get; set; } = "https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80";
     [Parameter] public string ActionCardTitle { get; set; } = "";
     [Parameter] public string ActionCardDescription { get; set; } = "";
+    [Parameter] public List<string>? ActionCardBulletPoints { get; set; }
     [Parameter] public string FeatureSectionTitle { get; set; } = "";
     [Parameter] public string FeatureSectionSubtitle { get; set; } = "";
     [Parameter] public string HelpSectionTitle { get; set; } = "";
@@ -250,6 +264,27 @@
         color: #666;
         margin: 0 0 24px 0;
         line-height: 1.5;
+    }
+
+    .action-card-bullets {
+        margin: 0 0 24px 0;
+    }
+
+    .bullet-point {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #262626;
+        line-height: 1.4;
+    }
+
+    .bullet-point:last-child {
+        margin-bottom: 0;
+    }
+
+    .bullet-point span {
+        flex: 1;
     }
 
     .primary-action {

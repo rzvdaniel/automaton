@@ -79,6 +79,17 @@ namespace Automaton.Studio.Pages.CustomSteps
             };
         }
 
+        private List<string> GetCustomStepActionCardBullets()
+        {
+            return new List<string>
+            {
+                "Support for Python, PowerShell, and Batch",
+                "Built-in code editor with syntax highlighting",
+                "Reusable across multiple workflows",
+                "Version control and testing capabilities"
+            };
+        }
+
         private List<EnhancedEmpty.FeatureCardModel> GetCustomStepFeatureCards()
         {
             return new List<EnhancedEmpty.FeatureCardModel>

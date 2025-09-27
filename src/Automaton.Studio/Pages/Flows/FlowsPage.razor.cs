@@ -101,6 +101,17 @@ namespace Automaton.Studio.Pages.Flows
             };
         }
 
+        private List<string> GetFlowActionCardBullets()
+        {
+            return new List<string>
+            {
+                "Drag-and-drop workflow designer",
+                "Connect to APIs and external services",
+                "Automated task execution",
+                "Real-time monitoring and logging"
+            };
+        }
+
         private List<EnhancedEmpty.FeatureCardModel> GetFlowFeatureCards()
         {
             return new List<EnhancedEmpty.FeatureCardModel>
