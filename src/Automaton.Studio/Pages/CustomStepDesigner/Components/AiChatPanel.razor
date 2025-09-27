@@ -50,8 +50,8 @@
                         Style="width: 80px;"
                         Disabled="@isGeneratingCode">
                     <SelectOptions>
+                        <SelectOption Value="@Ask" Label="Assistant" />
                         <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
-                        <SelectOption Value="@Assistant" Label="Assistant" />
                     </SelectOptions>
                 </Select>
 
@@ -140,7 +140,7 @@
 
     protected ElementReference messagesContainer;
 
-    private string selectedAgent = @Assistant;
+    private string selectedAgent = Ask;
     private string selectedProviderModel = string.Empty;
     private string promptText = string.Empty;
     private bool showNoProvidersMessage = false;
@@ -393,7 +393,7 @@
     private record ChatMessage(string Role, string Content, DateTime Time);
 
     private const string Agent = "Agent";
-    private const string Assistant = "Assistant";
+    private const string Ask = "Ask";
 }
 
 <style>
