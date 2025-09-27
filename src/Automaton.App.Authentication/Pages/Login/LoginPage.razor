@@ -3,80 +3,91 @@
 
 <Layout>
     <Content>
-        <GridRow Justify="RowJustify.Center" Align="RowAlign.Middle" Class="grid-container">
-            <GridCol>
-
-                <Form Loading="loading"
-                      Model="@Model"
-                      Layout="@FormLayout.Vertical"
-                      OnFinish="OnFinish"
-                      OnFinishFailed="OnFinishFailed"
-                      Style="width: 400px">
-
-                    <ChildContent>
-                        <Title Level="1">Sign in</Title>
-
-                        @if (ConfigurationService.UserSignUp)
-                        {
-                            <FormItem>
-                                Don't have an account? <a href="/register">Sign up</a>
-                            </FormItem>
-                        }
-                       
-                        <FormItem Label="Email">
-                            <Input @bind-Value="@context.Email" />
-                        </FormItem>
-                        <FormItem Label="Password">
-                            <InputPassword @bind-Value="@context.Password" />
-                        </FormItem>
-                        <FormItem>
-                            <div class="remember-me-container">
-                                <Checkbox @bind-Value="context.RememberMe">Remember me</Checkbox>
-                                <div class="forgot-password">
-                                    <a href="Account/ForgotPassword">Forgot your password?</a>
-                                </div>
+        <div class="auth-container">
+            <div class="auth-content">
+                <!-- Information Panel -->
+                <div class="info-panel">
+                    <div class="info-content">
+                        <div class="brand-section">
+                            <div class="brand-icon">
+                                <Icon Type="robot" Style="font-size: 48px; color: #1890ff;" />
                             </div>
-                        </FormItem>
-                        <FormItem WrapperColSpan="16">
-                            <Button Type="ButtonType.Primary" HtmlType="submit">
-                                Submit
-                            </Button>
-                        </FormItem>
-                    </ChildContent>
+                            <h1 class="brand-title">Automaton</h1>
+                            <p class="brand-subtitle">Streamline your workflow automation</p>
+                        </div>
+                        
+                        <div class="features-section">
+                            <div class="feature-item">
+                                <Icon Type="thunderbolt" Style="color: #1890ff;" />
+                                <span>Lightning-fast workflow execution</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="cloud" Style="color: #1890ff;" />
+                                <span>Cross-platform automation</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="api" Style="color: #1890ff;" />
+                                <span>Powerful API integration</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="team" Style="color: #1890ff;" />
+                                <span>Collaborative workflow design</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                </Form>
+                <!-- Form Panel -->
+                <div class="form-panel">
+                    <div class="form-content">
+                        <Form Loading="loading"
+                              Model="@Model"
+                              Layout="@FormLayout.Vertical"
+                              OnFinish="OnFinish"
+                              OnFinishFailed="OnFinishFailed"
+                              Class="auth-form">
 
-            </GridCol>
-        </GridRow>
+                            <ChildContent>
+                                <div class="form-header">
+                                    <Title Level="1" Class="form-title">Sign in</Title>
+                                    @if (ConfigurationService.UserSignUp)
+                                    {
+                                        <p class="form-subtitle">
+                                            Don't have an account? <a href="/register" class="signup-link">Sign up</a>
+                                        </p>
+                                    }
+                                </div>
+                               
+                                <FormItem Label="Email">
+                                    <Input @bind-Value="@context.Email" Size="@InputSize.Large" />
+                                </FormItem>
+                                <FormItem Label="Password">
+                                    <InputPassword @bind-Value="@context.Password" Size="@InputSize.Large" />
+                                </FormItem>
+                                <FormItem>
+                                    <div class="remember-me-container">
+                                        <Checkbox @bind-Value="context.RememberMe">Remember me</Checkbox>
+                                        <div class="forgot-password">
+                                            <a href="Account/ForgotPassword">Forgot your password?</a>
+                                        </div>
+                                    </div>
+                                </FormItem>
+                                <FormItem>
+                                    <Button Type="ButtonType.Primary" HtmlType="submit" Size="@ButtonSize.Large" Block>
+                                        Sign in
+                                    </Button>
+                                </FormItem>
+                            </ChildContent>
+
+                        </Form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </Content>
 </Layout>
 
 
-<style>
-    .grid-container {
-        height: 100%;
-        background-color: white;
-        align-items: center
-    }
-
-    .site-layout-content {
-        height: 100%;
-    }
-
-    .ant-layout {
-        height: 100%;
-    }
-
-    .remember-me-container {
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center;
-    }
-
-    .forgot-password {
-        margin-left: auto;
-    }
-</style>
 
 
 

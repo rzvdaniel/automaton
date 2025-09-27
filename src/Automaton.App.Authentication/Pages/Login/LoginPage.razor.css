@@ -1,1 +1,214 @@
-﻿
+/* Main container */
+.auth-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.auth-content {
+    width: 100%;
+    max-width: 1200px;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 600px;
+}
+
+/* Desktop layout - two columns */
+@media (min-width: 1024px) {
+    .auth-content {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Information Panel */
+.info-panel {
+    background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+.info-panel::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.info-content {
+    z-index: 1;
+    text-align: center;
+    max-width: 400px;
+}
+
+.brand-section {
+    margin-bottom: 48px;
+}
+
+.brand-icon {
+    margin-bottom: 24px;
+}
+
+.brand-title {
+    font-size: 48px;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    color: white;
+    letter-spacing: -0.02em;
+}
+
+.brand-subtitle {
+    font-size: 18px;
+    opacity: 0.9;
+    margin: 0;
+    font-weight: 300;
+}
+
+.features-section {
+    text-align: left;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.feature-item span {
+    flex: 1;
+}
+
+/* Form Panel */
+.form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+}
+
+.form-content {
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-form {
+    width: 100%;
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.form-title {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #1f2937;
+}
+
+.form-subtitle {
+    color: #6b7280;
+    margin: 0;
+    font-size: 16px;
+}
+
+.signup-link {
+    color: #1890ff;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.signup-link:hover {
+    color: #40a9ff;
+    text-decoration: underline;
+}
+
+/* Form styling improvements */
+.remember-me-container {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.forgot-password a {
+    color: #1890ff;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile adjustments */
+@media (max-width: 1023px) {
+    .info-panel {
+        padding: 32px 24px;
+        text-align: center;
+    }
+
+    .brand-title {
+        font-size: 36px;
+    }
+
+    .features-section {
+        text-align: center;
+    }
+
+    .feature-item {
+        justify-content: center;
+        margin-bottom: 16px;
+    }
+
+    .form-panel {
+        padding: 32px 24px;
+    }
+
+    .auth-container {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .auth-content {
+        margin: 0;
+        border-radius: 8px;
+    }
+
+    .brand-title {
+        font-size: 28px;
+    }
+
+    .form-title {
+        font-size: 24px;
+    }
+}
+
+/* Legacy compatibility */
+.site-layout-content {
+    height: 100%;
+}
+
+.ant-layout {
+    height: 100%;
+}

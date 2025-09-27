@@ -3,71 +3,95 @@
 
 <Layout>
     <Content Id="register-user">
-        <GridRow Justify="RowJustify.Center" Align="RowAlign.Middle" Class="grid-container">
-            <GridCol>
-                <Form Loading="loading"
-                      Model="@UserRegisterViewModel"
-                      Layout="@FormLayout.Vertical"
-                      OnFinish="OnFinish"
-                      OnFinishFailed="OnFinishFailed"
-                      Style="width: 400px">
+        <div class="auth-container">
+            <div class="auth-content">
+                <!-- Information Panel -->
+                <div class="info-panel">
+                    <div class="info-content">
+                        <div class="brand-section">
+                            <div class="brand-icon">
+                                <Icon Type="robot" Style="font-size: 48px; color: white;" />
+                            </div>
+                            <h1 class="brand-title">Join Automaton</h1>
+                            <p class="brand-subtitle">Start automating your workflows today</p>
+                        </div>
+                        
+                        <div class="features-section">
+                            <div class="feature-item">
+                                <Icon Type="rocket" Style="color: white;" />
+                                <span>Get started in minutes</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="setting" Style="color: white;" />
+                                <span>Visual workflow designer</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="deployment-unit" Style="color: white;" />
+                                <span>Deploy anywhere</span>
+                            </div>
+                            <div class="feature-item">
+                                <Icon Type="safety-certificate" Style="color: white;" />
+                                <span>Enterprise-grade security</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                    <ChildContent>
-                        <Title Level="1">Sign up</Title>
+                <!-- Form Panel -->
+                <div class="form-panel">
+                    <div class="form-content">
+                        <Form Loading="loading"
+                              Model="@UserRegisterViewModel"
+                              Layout="@FormLayout.Vertical"
+                              OnFinish="OnFinish"
+                              OnFinishFailed="OnFinishFailed"
+                              Class="auth-form">
 
-                        <FormItem Label="Name">
-                            <Input @bind-Value="@context.Name" />
-                        </FormItem>
+                            <ChildContent>
+                                <div class="form-header">
+                                    <Title Level="1" Class="form-title">Create Account</Title>
+                                    <p class="form-subtitle">
+                                        Already have an account? <a href="/login" class="signin-link">Sign in</a>
+                                    </p>
+                                </div>
 
-                        <FormItem Label="Email">
-                            <Input @bind-Value="@context.Email" />
-                        </FormItem>
+                                <FormItem Label="Name">
+                                    <Input @bind-Value="@context.Name" Size="@InputSize.Large" />
+                                </FormItem>
 
-                        <FormItem Label="Password">
-                            <InputPassword @bind-Value="@context.Password" />
-                        </FormItem>
+                                <FormItem Label="Email">
+                                    <Input @bind-Value="@context.Email" Size="@InputSize.Large" />
+                                </FormItem>
 
-                        <FormItem Label="Confirm Password">
-                            <InputPassword @bind-Value="@context.ConfirmPassword" />
-                        </FormItem>
+                                <FormItem Label="Password">
+                                    <InputPassword @bind-Value="@context.Password" Size="@InputSize.Large" />
+                                </FormItem>
 
-                        <FormItem>
-                            <Checkbox @bind-Value="@context.AgreeWithTermsPrivacyPolicy">I agree with <a href="/#">Terms</a> and <a href="/#">Privacy Policy</a> </Checkbox>
-                        </FormItem>
+                                <FormItem Label="Confirm Password">
+                                    <InputPassword @bind-Value="@context.ConfirmPassword" Size="@InputSize.Large" />
+                                </FormItem>
 
-                        <FormItem WrapperColSpan="16">
-                            <Button Type="ButtonType.Primary" HtmlType="submit">
-                                Submit
-                            </Button>
-                        </FormItem>
-                    </ChildContent>
-                </Form>
-            </GridCol>
-        </GridRow>
+                                <FormItem>
+                                    <Checkbox @bind-Value="@context.AgreeWithTermsPrivacyPolicy">
+                                        I agree with <a href="/#" class="terms-link">Terms</a> and <a href="/#" class="terms-link">Privacy Policy</a>
+                                    </Checkbox>
+                                </FormItem>
+
+                                <FormItem>
+                                    <Button Type="ButtonType.Primary" HtmlType="submit" Size="@ButtonSize.Large" Block>
+                                        Create Account
+                                    </Button>
+                                </FormItem>
+                            </ChildContent>
+                        </Form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </Content>
 </Layout>
 
-<style>
-    #register-user {
-        height: 100%;
-        background-color: white;
-    }
 
-    .grid-container {
-        height: 100%;
-        background-color: white;
-        align-items: center
-    }
-
-    .site-layout-content {
-        height: 100%;
-    }
-
-    .ant-layout {
-        height: 100%;
-    }
-
-</style>
 
 
 
