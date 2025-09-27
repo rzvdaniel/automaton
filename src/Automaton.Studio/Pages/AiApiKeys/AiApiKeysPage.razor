@@ -109,16 +109,20 @@
             }
             else
             {
-                <Empty>
-                    <DescriptionTemplate>
-                        <span>No AI API keys found</span>
-                    </DescriptionTemplate>
-                    <ChildContent>
-                        <Button Type="@ButtonType.Primary" OnClick="@ViewModel.ShowCreateModal">
-                            Add Your First AI API Key
-                        </Button>
-                    </ChildContent>
-                </Empty>
+                <EnhancedEmpty Title="AI API Keys in minutes." 
+                              Description="AI API Keys connect your workflows to powerful AI services like OpenAI, Anthropic, and Google. Each key you add enables AI-powered automation capabilities."
+                              BackgroundImageUrl="https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                              GradientOverlay="linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(79, 70, 229, 0.8) 100%)"
+                              ActionCardTitle="AI Integration"
+                              ActionCardDescription="Connect to leading AI providers and enhance your workflows with intelligent automation."
+                              ActionCardBulletPoints="@GetAiApiKeyActionCardBullets()"
+                              FeatureSectionTitle="AI-powered automation anyone can setup in seconds!"
+                              FeatureSectionSubtitle="Connect to leading AI providers and enhance your workflows with intelligence"
+                              HelpSectionTitle="Learn more about AI Integration"
+                              PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Add AI API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
+                              SecondaryActions="@GetAiApiKeySecondaryActions()"
+                              FeatureCards="@GetAiApiKeyFeatureCards()"
+                              HelpLinks="@GetAiApiKeyHelpLinks()" />
             }
         }
         

@@ -36,15 +36,35 @@
     </Header>
 
     <Content Class="content-padding content-background">
-        <Table TItem="RunnerModel" DataSource="@RunnersViewModel.Runners" Loading="@loading" Class="autoscroll-list">
-            <Column Title="Name" @bind-Field="@context.Name">
-                @context.Name
-            </Column>
+        @if (!loading && RunnersViewModel.Runners?.Any() != true)
+        {
+            <EnhancedEmpty Title="Runners in minutes." 
+                          Description="Runners execute your workflows on different environments. Each runner you connect extends your automation capabilities to new systems and platforms."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          GradientOverlay="linear-gradient(135deg, rgba(16, 185, 129, 0.8) 0%, rgba(5, 150, 105, 0.8) 100%)"
+                          ActionCardTitle="Connect Runners"
+                          ActionCardDescription="Download and connect runners to execute workflows across different environments and platforms."
+                          ActionCardBulletPoints="@GetRunnerActionCardBullets()"
+                          FeatureSectionTitle="Distributed automation anyone can setup in seconds!"
+                          FeatureSectionSubtitle="Connect runners to different environments and scale your automation infrastructure"
+                          HelpSectionTitle="Learn more about Runners"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Download Runner", Icon = "download", OnClick = () => { NavigationManager.NavigateTo("/downloads-runner"); return Task.CompletedTask; } })"
+                          SecondaryActions="@GetRunnerSecondaryActions()"
+                          FeatureCards="@GetRunnerFeatureCards()"
+                          HelpLinks="@GetRunnerHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="RunnerModel" DataSource="@RunnersViewModel.Runners" Loading="@loading" Class="autoscroll-list">
+                <Column Title="Name" @bind-Field="@context.Name">
+                    @context.Name
+                </Column>
 
-            <Column Title="Status" @bind-Field="@context.Status">
-                <span class="@context.StatusClass">@context.Status</span>
-            </Column>
-        </Table>
+                <Column Title="Status" @bind-Field="@context.Status">
+                    <span class="@context.StatusClass">@context.Status</span>
+                </Column>
+            </Table>
+        }
     </Content>
 </Layout>
 
