@@ -1,6 +1,7 @@
 ﻿using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.CustomSteps.Components.NewCustomStepDialog;
+using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using System.Threading.Tasks;
 
@@ -67,6 +68,53 @@ namespace Automaton.Studio.Pages.CustomSteps
                 {
                     await MessageService.ErrorAsync($"Custom step {model.Name} could not be created");
                 }
+            };
+        }
+
+        private List<EnhancedEmpty.EmptyActionModel> GetCustomStepSecondaryActions()
+        {
+            return new List<EnhancedEmpty.EmptyActionModel>
+            {
+                new() { Text = "Browse Templates", Icon = "eye", OnClick = () => Task.FromResult(0) },
+                new() { Text = "View Documentation", Icon = "book", OnClick = () => Task.FromResult(0) }
+            };
+        }
+
+        private List<EnhancedEmpty.FeatureCardModel> GetCustomStepFeatureCards()
+        {
+            return new List<EnhancedEmpty.FeatureCardModel>
+            {
+                new() 
+                { 
+                    Title = "Python Scripts", 
+                    Description = "Write powerful automation scripts in Python", 
+                    Icon = "code",
+                    IconColor = "#52c41a"
+                },
+                new() 
+                { 
+                    Title = "PowerShell Commands", 
+                    Description = "Execute Windows PowerShell commands and scripts", 
+                    Icon = "console-sql",
+                    IconColor = "#1890ff"
+                },
+                new() 
+                { 
+                    Title = "Batch Processing", 
+                    Description = "Run batch files and command-line utilities", 
+                    Icon = "file-text",
+                    IconColor = "#722ed1"
+                }
+            };
+        }
+
+        private List<EnhancedEmpty.HelpLinkModel> GetCustomStepHelpLinks()
+        {
+            return new List<EnhancedEmpty.HelpLinkModel>
+            {
+                new() { Text = "Scripting Guide", Url = "#", Icon = "code" },
+                new() { Text = "Step Templates", Url = "#", Icon = "file-copy" },
+                new() { Text = "API Reference", Url = "#", Icon = "api" }
             };
         }
     }

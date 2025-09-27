@@ -36,7 +36,19 @@
     </Header>
 
     <Content Class="content-padding content-background">
-        <Table TItem="FlowModel" DataSource="@FlowsViewModel.Flows" Loading="@loading" Class="autoscroll-list">
+        @if (!loading && FlowsViewModel.Flows?.Any() != true)
+        {
+            <EnhancedEmpty IconType="profile" 
+                          Title="No Workflows Yet" 
+                          Description="Workflows are sequences of automated tasks that help streamline your processes. Create your first workflow to get started with automation."
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Your First Flow", Icon = "plus", OnClick = () => NewFlowDialog() })"
+                          SecondaryActions="@GetSecondaryActions()"
+                          FeatureCards="@GetFlowFeatureCards()"
+                          HelpLinks="@GetFlowHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="FlowModel" DataSource="@FlowsViewModel.Flows" Loading="@loading" Class="autoscroll-list">
 
             <Column Title="Name" @bind-Field="@context.Name">
                 @context.Name
@@ -111,6 +123,7 @@
                 </div>
             </ActionColumn>
         </Table>
+        }
     </Content>
 </Layout>
 

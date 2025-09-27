@@ -3,6 +3,7 @@ using AntDesign.TableModels;
 using Automaton.Studio.Enums;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Runners;
+using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -163,5 +164,35 @@ public partial class FlowSchedule : ComponentBase
             cronType == CronType.Daily || 
             cronType == CronType.Weekly ||
             cronType == CronType.Monthly;
+    }
+
+    private List<EnhancedEmpty.FeatureCardModel> GetScheduleFeatureCards()
+    {
+        return new List<EnhancedEmpty.FeatureCardModel>
+        {
+            new() 
+            { 
+                Title = "Recurring Schedules", 
+                Description = "Run workflows daily, weekly, or monthly", 
+                Icon = "calendar",
+                IconColor = "#52c41a"
+            },
+            new() 
+            { 
+                Title = "Custom Intervals", 
+                Description = "Set precise timing with cron expressions", 
+                Icon = "field-time",
+                IconColor = "#1890ff"
+            }
+        };
+    }
+
+    private List<EnhancedEmpty.HelpLinkModel> GetScheduleHelpLinks()
+    {
+        return new List<EnhancedEmpty.HelpLinkModel>
+        {
+            new() { Text = "Scheduling Guide", Url = "#", Icon = "clock-circle" },
+            new() { Text = "Cron Expressions", Url = "#", Icon = "code" }
+        };
     }
 }

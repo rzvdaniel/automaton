@@ -1,6 +1,7 @@
 ﻿using AntDesign;
 using Automaton.Core.Enums;
 using Automaton.Studio.Pages.Flows.Components.NewFlow;
+using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Flows
@@ -90,6 +91,56 @@ namespace Automaton.Studio.Pages.Flows
         private string GetRunnerStatusClass(RunnerStatus status)
         {
             return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
+        }
+
+        private List<EnhancedEmpty.EmptyActionModel> GetSecondaryActions()
+        {
+            return new List<EnhancedEmpty.EmptyActionModel>
+            {
+                new() { Text = "Browse Examples", Icon = "eye", OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding")) },
+                new() { Text = "View Documentation", Icon = "book", OnClick = () => Task.FromResult(0) }
+            };
+        }
+
+        private List<EnhancedEmpty.FeatureCardModel> GetFlowFeatureCards()
+        {
+            return new List<EnhancedEmpty.FeatureCardModel>
+            {
+                new() 
+                { 
+                    Title = "Automate File Tasks", 
+                    Description = "Move, copy, and process files automatically", 
+                    Icon = "folder",
+                    IconColor = "#52c41a",
+                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                },
+                new() 
+                { 
+                    Title = "API Integration", 
+                    Description = "Connect to REST APIs and web services", 
+                    Icon = "api",
+                    IconColor = "#722ed1",
+                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                },
+                new() 
+                { 
+                    Title = "Data Processing", 
+                    Description = "Transform and analyze data automatically", 
+                    Icon = "bar-chart",
+                    IconColor = "#1890ff",
+                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                }
+            };
+        }
+
+        private List<EnhancedEmpty.HelpLinkModel> GetFlowHelpLinks()
+        {
+            return new List<EnhancedEmpty.HelpLinkModel>
+            {
+                new() { Text = "Getting Started Guide", Url = "/onboarding", Icon = "play-circle" },
+                new() { Text = "Workflow Examples", Url = "/onboarding", Icon = "experiment" },
+                new() { Text = "Documentation", Url = "#", Icon = "book" }
+            };
         }
     }
 }

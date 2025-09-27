@@ -37,7 +37,19 @@
     </Header>
 
     <Content Class="content-padding content-background">
-        <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
+        @if (!loading && CustomStepsViewModel.CustomSteps?.Any() != true)
+        {
+            <EnhancedEmpty IconType="experiment" 
+                          Title="No Custom Steps Yet" 
+                          Description="Custom steps are reusable building blocks for your workflows. Create powerful automation components using Python, PowerShell, or Batch scripts."
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Your First Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() })"
+                          SecondaryActions="@GetCustomStepSecondaryActions()"
+                          FeatureCards="@GetCustomStepFeatureCards()"
+                          HelpLinks="@GetCustomStepHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
             <Column Title="Name" @bind-Field="@context.Name">
                 @context.Name
             </Column>
@@ -84,6 +96,7 @@
                 </div>
             </ActionColumn>
         </Table>
+        }
     </Content>
 </Layout>
 

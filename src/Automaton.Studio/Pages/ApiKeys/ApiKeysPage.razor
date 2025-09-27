@@ -115,16 +115,13 @@
             }
             else
             {
-                <Empty>
-                    <DescriptionTemplate>
-                        <span>No API keys found</span>
-                    </DescriptionTemplate>
-                    <ChildContent>
-                        <Button Type="@ButtonType.Primary" OnClick="@ViewModel.ShowCreateModal">
-                            Create Your First API Key
-                        </Button>
-                    </ChildContent>
-                </Empty>
+                <EnhancedEmpty IconType="key" 
+                              Title="No API Keys Yet" 
+                              Description="API keys are used to authenticate console runners and external integrations. Create your first API key to get started with automation."
+                              PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Your First API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
+                              SecondaryActions="@GetApiKeySecondaryActions()"
+                              FeatureCards="@GetApiKeyFeatureCards()"
+                              HelpLinks="@GetApiKeyHelpLinks()" />
             }
         }
         

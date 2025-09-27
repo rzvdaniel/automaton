@@ -24,13 +24,24 @@
     </div>
     
     <div class="flow-tab-table">
-        <Table TItem="FlowScheduleModel" 
-            DataSource="@FlowScheduleViewModel.Schedules"
-            RowExpandable="@((record)=>true)"
-            Loading="@loading" 
-            Class="autoscroll-list"
-            OnRow="OnRow"
-            OnChange="OnChange">
+        @if (!loading && FlowScheduleViewModel.Schedules?.Any() != true)
+        {
+            <EnhancedEmpty IconType="clock-circle" 
+                          Title="No Schedules Yet" 
+                          Description="Schedules allow your workflows to run automatically at specific times or intervals. Create your first schedule to automate your processes."
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Schedule", Icon = "plus", OnClick = () => { NewSchedule(); return Task.CompletedTask; } })"
+                          FeatureCards="@GetScheduleFeatureCards()"
+                          HelpLinks="@GetScheduleHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="FlowScheduleModel" 
+                DataSource="@FlowScheduleViewModel.Schedules"
+                RowExpandable="@((record)=>true)"
+                Loading="@loading" 
+                Class="autoscroll-list"
+                OnRow="OnRow"
+                OnChange="OnChange">
             <ColumnDefinitions>
                 <Column Title="Name" @bind-Field="@context.Name">
                     @context.Name
@@ -201,6 +212,7 @@
                 </div>
             </ExpandTemplate>
         </Table>
+        }
     </div>
 </div>
 

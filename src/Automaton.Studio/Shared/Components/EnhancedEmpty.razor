@@ -1,0 +1,217 @@
+@using AntDesign
+@using Microsoft.AspNetCore.Components
+
+<div class="enhanced-empty">
+    <div class="empty-content">
+        <div class="empty-icon">
+            <Icon Type="@IconType" Style="@($"font-size: {IconSize}; color: #d9d9d9;")" />
+        </div>
+        <div class="empty-text">
+            <Title Level="@TitleLevel" Style="color: #595959; margin-bottom: 8px;">@Title</Title>
+            <Paragraph Style="color: #8c8c8c; margin-bottom: 24px; font-size: 14px;">
+                @Description
+            </Paragraph>
+        </div>
+        @if (PrimaryAction != null || SecondaryActions?.Any() == true || HelpLinks?.Any() == true)
+        {
+            <div class="empty-actions">
+                @if (PrimaryAction != null)
+                {
+                    <div class="primary-action">
+                        <Button Type="@ButtonType.Primary" 
+                                Size="@ButtonSize.Large" 
+                                Icon="@PrimaryAction.Icon"
+                                OnClick="@PrimaryAction.OnClick">
+                            @PrimaryAction.Text
+                        </Button>
+                    </div>
+                }
+                
+                @if (SecondaryActions?.Any() == true)
+                {
+                    <div class="secondary-actions">
+                        <Space>
+                            @foreach (var action in SecondaryActions)
+                            {
+                                <SpaceItem>
+                                    <Button Type="@ButtonType.Default"
+                                            Icon="@action.Icon"
+                                            OnClick="@action.OnClick">
+                                        @action.Text
+                                    </Button>
+                                </SpaceItem>
+                            }
+                        </Space>
+                    </div>
+                }
+            </div>
+        }
+        
+        @if (FeatureCards?.Any() == true)
+        {
+            <div class="feature-cards">
+                <Row Gutter="16">
+                    @foreach (var card in FeatureCards)
+                    {
+                        <AntDesign.Col Span="@(24 / FeatureCards.Count())">
+                            <div class="feature-card-wrapper" @onclick="@card.OnClick" style="@(card.OnClick != null ? "cursor: pointer;" : "")">
+                                <Card Class="feature-card" Hoverable="@(card.OnClick != null)">
+                                    <div class="card-icon">
+                                        <Icon Type="@card.Icon" Style="@($"font-size: 24px; color: {card.IconColor};")" />
+                                    </div>
+                                    <CardMeta Title="@card.Title" Description="@card.Description" />
+                                </Card>
+                            </div>
+                        </AntDesign.Col>
+                    }
+                </Row>
+            </div>
+        }
+        
+        @if (HelpLinks?.Any() == true)
+        {
+            <div class="help-section">
+                <Title Level="5" Style="color: #8c8c8c; text-align: center; margin-bottom: 16px;">Need Help?</Title>
+                <div class="help-links">
+                    @foreach (var link in HelpLinks)
+                    {
+                        <a href="@link.Url" target="_blank" class="help-link">
+                            <Icon Type="@link.Icon" />
+                            <span>@link.Text</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string IconType { get; set; } = "file-unknown";
+    [Parameter] public string IconSize { get; set; } = "64px";
+    [Parameter] public string Title { get; set; } = "No Items Yet";
+    [Parameter] public string Description { get; set; } = "Get started by creating your first item.";
+    [Parameter] public int TitleLevel { get; set; } = 3;
+    [Parameter] public EmptyActionModel? PrimaryAction { get; set; }
+    [Parameter] public List<EmptyActionModel>? SecondaryActions { get; set; }
+    [Parameter] public List<FeatureCardModel>? FeatureCards { get; set; }
+    [Parameter] public List<HelpLinkModel>? HelpLinks { get; set; }
+    
+    public class EmptyActionModel
+    {
+        public string Text { get; set; } = "";
+        public string? Icon { get; set; }
+        public Func<Task>? OnClick { get; set; }
+    }
+    
+    public class FeatureCardModel
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Icon { get; set; } = "info-circle";
+        public string IconColor { get; set; } = "#1890ff";
+        public Func<Task>? OnClick { get; set; }
+    }
+    
+    public class HelpLinkModel
+    {
+        public string Text { get; set; } = "";
+        public string Url { get; set; } = "";
+        public string Icon { get; set; } = "link";
+    }
+}
+
+<style>
+    .enhanced-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        padding: 40px 20px;
+    }
+
+    .empty-content {
+        text-align: center;
+        max-width: 600px;
+        width: 100%;
+    }
+
+    .empty-icon {
+        margin-bottom: 24px;
+    }
+
+    .empty-text {
+        margin-bottom: 32px;
+    }
+
+    .empty-actions {
+        margin-bottom: 40px;
+    }
+
+    .primary-action {
+        margin-bottom: 16px;
+    }
+
+    .secondary-actions {
+        display: flex;
+        justify-content: center;
+    }
+
+    .feature-cards {
+        margin-bottom: 40px;
+    }
+
+    .feature-card-wrapper {
+        transition: all 0.2s ease;
+    }
+
+    .feature-card {
+        height: 100%;
+        text-align: left;
+        border: 1px solid #f0f0f0;
+        transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+        border-color: #1890ff;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+    }
+
+    .card-icon {
+        margin-bottom: 12px;
+    }
+
+    .help-section {
+        border-top: 1px solid #f0f0f0;
+        padding-top: 32px;
+    }
+
+    .help-links {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    .help-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #666;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 8px 16px;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .help-link:hover {
+        color: #1890ff;
+        border-color: #1890ff;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+        text-decoration: none;
+    }
+</style>
