@@ -1,29 +1,21 @@
 /* Main container */
 .auth-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-}
-
-.auth-content {
-    width: 100%;
-    max-width: 1200px;
-    background: white;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
     display: grid;
     grid-template-columns: 1fr;
-    min-height: 600px;
 }
 
 /* Desktop layout - two columns */
 @media (min-width: 1024px) {
-    .auth-content {
+    .auth-container {
         grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Mobile layout - hide info panel */
+@media (max-width: 1023px) {
+    .info-panel {
+        display: none;
     }
 }
 
@@ -37,6 +29,7 @@
     padding: 48px 40px;
     position: relative;
     overflow: hidden;
+    min-height: 100vh;
 }
 
 .info-panel::before {
@@ -102,6 +95,8 @@
     align-items: center;
     justify-content: center;
     padding: 48px 40px;
+    background: white;
+    min-height: 100vh;
 }
 
 .form-content {
@@ -162,43 +157,13 @@
 
 /* Mobile adjustments */
 @media (max-width: 1023px) {
-    .info-panel {
-        padding: 32px 24px;
-        text-align: center;
-    }
-
-    .brand-title {
-        font-size: 36px;
-    }
-
-    .features-section {
-        text-align: center;
-    }
-
-    .feature-item {
-        justify-content: center;
-        margin-bottom: 16px;
-    }
-
     .form-panel {
         padding: 32px 24px;
-    }
-
-    .auth-container {
-        padding: 16px;
+        min-height: 100vh;
     }
 }
 
 @media (max-width: 768px) {
-    .auth-content {
-        margin: 0;
-        border-radius: 8px;
-    }
-
-    .brand-title {
-        font-size: 28px;
-    }
-
     .form-title {
         font-size: 24px;
     }
