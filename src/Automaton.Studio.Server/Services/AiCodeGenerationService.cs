@@ -75,23 +75,38 @@ public class AiCodeGenerationService
 
     private string BuildPrompt(CodeGenerationRequest request)
     {
-        var prompt = $"""
+        var prompt = $$"""
             You are an expert automation developer. Generate {request.Language} code for a custom step in an automation workflow.
 
             Step Description: {request.Description}
 
+            Execution environment and integration rules:
+            - The host injects all input variables as top-level globals before execution. Read them directly by name.
+            - Do not rename input variables. Treat them as already defined; only use defaults if explicitly required.
+            - You MUST assign the expected output variables by exactly the given names at module/global scope (not just returned from a function).
+            - Initialize all expected output variables with sensible defaults at the top of the script, then overwrite them on success. Keep defaults if an error occurs.
+            - Use only JSON-serializable primitive types for outputs: strings, numbers (int/float), booleans, lists of primitives/strings, or dicts with string keys and primitive values.
+            - Avoid using or redefining reserved names used by the host: sys, StringIO, _original_stdout, _original_stderr, _captured_output, _output_content.
+            - Do not include any explanatory text, comments about the environment, or markdown; return CODE ONLY.
+            - Do not read from stdin or prompt the user; the inputs are provided by the host.
+            - On Windows paths use raw strings (r'C\\...') or escaped backslashes.
+
+            Logging and error reporting:
+            - Use standardized log level prefixes so the host can parse streams: INFO: <message>, WARN: <message>, ERROR: <message>.
+            - Catch exceptions, log an ERROR line, and do not rethrow; preserve default outputs.
+            - Prefer language-native console APIs, but keep the prefix format consistent.
+
             Requirements:
-            - Generate clean, well-commented code
+            - Generate clean, robust code with proper error handling
             - Use the specified language: {request.Language}
             - The code should be suitable for automation workflows
-            - Include error handling where appropriate
             - Follow best practices for the chosen language
-
+            - Ensure all declared output variables are assigned even on error (use sensible defaults like empty string, 0, false, empty list/dict, or None/null as appropriate)
             """;
 
         if (request.InputVariables?.Any() == true)
         {
-            prompt += "\nInput Variables:\n";
+            prompt += "\nInput Variables (pre-injected by host, read by exact name):\n";
             foreach (var variable in request.InputVariables)
             {
                 prompt += $"- {variable.Name} ({variable.Type}): {variable.Description}\n";
@@ -100,11 +115,64 @@ public class AiCodeGenerationService
 
         if (request.OutputVariables?.Any() == true)
         {
-            prompt += "\nExpected Output Variables:\n";
+            prompt += "\nExpected Output Variables (assign by exact name at module/global scope):\n";
             foreach (var variable in request.OutputVariables)
             {
                 prompt += $"- {variable.Name} ({variable.Type}): {variable.Description}\n";
             }
+        }
+
+        // Language-specific guidance
+        if (string.Equals(request.Language, "Python", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            Python-specific guidance:
+            - Access inputs by name. For optional values, use: value = globals().get('VarName', <default>)
+            - Do not wrap the entire logic under if __name__ == '__main__':; just write top-level script.
+            - Assign outputs as plain variables at the end of the script.
+            - Log with prefixes using print(); send errors to stderr when possible: print(f"ERROR: ...", file=sys.stderr); print("INFO: ...") and print("WARN: ...").
+            """;
+        }
+        else if (string.Equals(request.Language, "PowerShell", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            PowerShell-specific guidance:
+            - Read inputs as already defined variables.
+            - Initialize outputs upfront and set them at the end.
+            - Use Write-Host "INFO: ..." for info, Write-Warning "WARN: ..." for warnings, Write-Error "ERROR: ..." for errors; avoid throwing.
+            """;
+        }
+        else if (string.Equals(request.Language, "Bash", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            Bash-specific guidance:
+            - Treat inputs as environment variables or pre-set shell variables.
+            - Initialize outputs and export them if required by the host.
+            - Use echo "INFO: ..." for info, echo "WARN: ..." for warnings, and echo "ERROR: ..." 1>&2 for errors; avoid exiting non-zero on handled errors.
+            """;
+        }
+        else if (string.Equals(request.Language, "Batch", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            Windows Batch-specific guidance:
+            - Treat inputs as already defined variables (%VarName%).
+            - Initialize outputs and set them at the end with SET.
+            - Use echo INFO: ... for info, echo WARN: ... for warnings, and echo ERROR: ... 1>&2 for errors; avoid EXIT /B non-zero on handled errors.
+            """;
+        }
+        else if (string.Equals(request.Language, "JavaScript", StringComparison.OrdinalIgnoreCase) || string.Equals(request.Language, "Node.js", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            JavaScript/Node.js-specific guidance:
+            - Access inputs from provided globals.
+            - Initialize outputs and assign them on success.
+            - Use console.log("INFO: ..."), console.warn("WARN: ..."), console.error("ERROR: ..."); avoid throwing uncaught errors.
+            """;
         }
 
         prompt += """
