@@ -4,7 +4,7 @@ from openai import OpenAI
 
 # Inițializare client OpenAI - ia cheia proprie de aici: 
 # https://openai.com/api/
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 
 # O funcție care returnează data calculatorului - atenție data poate fi greșită, dacă ceasul computerului nu e setat corect. 
 # Next tutorial, cum să apelezi un API extern care dă timpul.
