@@ -37,7 +37,26 @@
     </Header>
 
     <Content Class="content-padding content-background">
-        <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
+        @if (!loading && CustomStepsViewModel.CustomSteps?.Any() != true)
+        {
+            <EnhancedEmpty Title="Custom Steps in minutes." 
+                          Description="Custom Steps are reusable building blocks for your workflows. Each step you create is a new automation component you can use, either standalone or as part of larger workflows."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          GradientOverlay="linear-gradient(135deg, rgba(34, 193, 195, 0.8) 0%, rgba(45, 134, 89, 0.8) 100%)"
+                          ActionCardTitle="Build Custom Steps"
+                          ActionCardDescription="Create powerful automation components using your preferred scripting language."
+                          ActionCardBulletPoints="@GetCustomStepActionCardBullets()"
+                          FeatureSectionTitle="Powerful automation steps anyone can create in seconds!"
+                          FeatureSectionSubtitle="Create custom steps using Python, PowerShell, or Batch scripts"
+                          HelpSectionTitle="Learn more about Custom Steps"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() })"
+                          SecondaryActions="@GetCustomStepSecondaryActions()"
+                          FeatureCards="@GetCustomStepFeatureCards()"
+                          HelpLinks="@GetCustomStepHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
             <Column Title="Name" @bind-Field="@context.Name">
                 @context.Name
             </Column>
@@ -84,6 +103,7 @@
                 </div>
             </ActionColumn>
         </Table>
+        }
     </Content>
 </Layout>
 

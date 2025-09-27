@@ -115,16 +115,20 @@
             }
             else
             {
-                <Empty>
-                    <DescriptionTemplate>
-                        <span>No API keys found</span>
-                    </DescriptionTemplate>
-                    <ChildContent>
-                        <Button Type="@ButtonType.Primary" OnClick="@ViewModel.ShowCreateModal">
-                            Create Your First API Key
-                        </Button>
-                    </ChildContent>
-                </Empty>
+                <EnhancedEmpty Title="API Keys in minutes." 
+                              Description="API Keys provide secure authentication for console runners and external integrations. Each API key you create enables automated access to your automation infrastructure."
+                              BackgroundImageUrl="https://images.unsplash.com/photo-1563013544-824ae1b704d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                              GradientOverlay="linear-gradient(135deg, rgba(251, 146, 60, 0.8) 0%, rgba(217, 119, 6, 0.8) 100%)"
+                              ActionCardTitle="Secure Authentication"
+                              ActionCardDescription="Generate secure API keys for runners and integrations with configurable permissions."
+                              ActionCardBulletPoints="@GetApiKeyActionCardBullets()"
+                              FeatureSectionTitle="Secure authentication anyone can setup in seconds!"
+                              FeatureSectionSubtitle="Create API keys with different scopes and permissions for various use cases"
+                              HelpSectionTitle="Learn more about API Keys"
+                              PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
+                              SecondaryActions="@GetApiKeySecondaryActions()"
+                              FeatureCards="@GetApiKeyFeatureCards()"
+                              HelpLinks="@GetApiKeyHelpLinks()" />
             }
         }
         

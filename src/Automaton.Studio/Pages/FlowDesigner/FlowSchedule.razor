@@ -24,13 +24,31 @@
     </div>
     
     <div class="flow-tab-table">
-        <Table TItem="FlowScheduleModel" 
-            DataSource="@FlowScheduleViewModel.Schedules"
-            RowExpandable="@((record)=>true)"
-            Loading="@loading" 
-            Class="autoscroll-list"
-            OnRow="OnRow"
-            OnChange="OnChange">
+        @if (!loading && FlowScheduleViewModel.Schedules?.Any() != true)
+        {
+            <EnhancedEmpty Title="Schedules in minutes." 
+                          Description="Schedules allow your workflows to run automatically at specific times or intervals. Each schedule you create enables automated execution of your workflows."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          GradientOverlay="linear-gradient(135deg, rgba(75, 85, 99, 0.8) 0%, rgba(107, 114, 128, 0.8) 100%)"
+                          ActionCardTitle="Automated Scheduling"
+                          ActionCardDescription="Create reliable schedules that keep your workflows running on time, every time."
+                          ActionCardBulletPoints="@GetScheduleActionCardBullets()"
+                          FeatureSectionTitle="Automated scheduling anyone can setup in seconds!"
+                          FeatureSectionSubtitle="Create schedules with cron expressions or simple recurring patterns"
+                          HelpSectionTitle="Learn more about Scheduling"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Schedule", Icon = "plus", OnClick = () => { NewSchedule(); return Task.CompletedTask; } })"
+                          FeatureCards="@GetScheduleFeatureCards()"
+                          HelpLinks="@GetScheduleHelpLinks()" />
+        }
+        else
+        {
+            <Table TItem="FlowScheduleModel" 
+                DataSource="@FlowScheduleViewModel.Schedules"
+                RowExpandable="@((record)=>true)"
+                Loading="@loading" 
+                Class="autoscroll-list"
+                OnRow="OnRow"
+                OnChange="OnChange">
             <ColumnDefinitions>
                 <Column Title="Name" @bind-Field="@context.Name">
                     @context.Name
@@ -201,6 +219,7 @@
                 </div>
             </ExpandTemplate>
         </Table>
+        }
     </div>
 </div>
 
