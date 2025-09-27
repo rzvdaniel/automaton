@@ -38,11 +38,16 @@
     <Content Class="content-padding content-background">
         @if (!loading && FlowsViewModel.Flows?.Any() != true)
         {
-            <EnhancedEmpty IconType="profile" 
-                          Title="No Workflows Yet" 
-                          Description="Workflows are sequences of automated tasks that help streamline your processes. Create your first workflow to get started with automation."
-                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Your First Flow", Icon = "plus", OnClick = () => NewFlowDialog() })"
-                          SecondaryActions="@GetSecondaryActions()"
+            <EnhancedEmpty Title="Workflows in minutes." 
+                          Description="Workflows are automated sequences of tasks that streamline your processes. Each workflow you create is a new automation you can use, either standalone or as part of a larger, integrated infrastructure."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1518186285589-2f7649de83e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          ActionCardTitle="Starting at $0/mo"
+                          ActionCardDescription="Build your first automation workflow and start streamlining your processes today."
+                          FeatureSectionTitle="Automated workflows anyone can setup in seconds!"
+                          FeatureSectionSubtitle="Create powerful automation flows with our intuitive drag-and-drop interface"
+                          HelpSectionTitle="Learn more about Workflows"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Flow", Icon = "plus", OnClick = () => NewFlowDialog() })"
+                          SecondaryActions="@GetFlowSecondaryActions()"
                           FeatureCards="@GetFlowFeatureCards()"
                           HelpLinks="@GetFlowHelpLinks()" />
         }

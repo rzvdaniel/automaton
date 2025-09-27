@@ -26,9 +26,14 @@
     <div class="flow-tab-table">
         @if (!loading && FlowScheduleViewModel.Schedules?.Any() != true)
         {
-            <EnhancedEmpty IconType="clock-circle" 
-                          Title="No Schedules Yet" 
-                          Description="Schedules allow your workflows to run automatically at specific times or intervals. Create your first schedule to automate your processes."
+            <EnhancedEmpty Title="Schedules in minutes." 
+                          Description="Schedules allow your workflows to run automatically at specific times or intervals. Each schedule you create enables automated execution of your workflows."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          ActionCardTitle="Starting at $0/mo"
+                          ActionCardDescription="Create automated schedules and keep your workflows running on time."
+                          FeatureSectionTitle="Automated scheduling anyone can setup in seconds!"
+                          FeatureSectionSubtitle="Create schedules with cron expressions or simple recurring patterns"
+                          HelpSectionTitle="Learn more about Scheduling"
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Schedule", Icon = "plus", OnClick = () => { NewSchedule(); return Task.CompletedTask; } })"
                           FeatureCards="@GetScheduleFeatureCards()"
                           HelpLinks="@GetScheduleHelpLinks()" />

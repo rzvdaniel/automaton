@@ -109,10 +109,15 @@
             }
             else
             {
-                <EnhancedEmpty IconType="robot" 
-                              Title="No AI API Keys Yet" 
-                              Description="AI API keys connect your workflows to powerful AI services like OpenAI, Anthropic, and Google. Add your first key to unlock AI-powered automation."
-                              PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Add Your First AI API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
+                <EnhancedEmpty Title="AI API Keys in minutes." 
+                              Description="AI API Keys connect your workflows to powerful AI services like OpenAI, Anthropic, and Google. Each key you add enables AI-powered automation capabilities."
+                              BackgroundImageUrl="https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                              ActionCardTitle="Starting at $0/mo"
+                              ActionCardDescription="Connect AI services and unlock intelligent automation capabilities."
+                              FeatureSectionTitle="AI-powered automation anyone can setup in seconds!"
+                              FeatureSectionSubtitle="Connect to leading AI providers and enhance your workflows with intelligence"
+                              HelpSectionTitle="Learn more about AI Integration"
+                              PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Add AI API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
                               SecondaryActions="@GetAiApiKeySecondaryActions()"
                               FeatureCards="@GetAiApiKeyFeatureCards()"
                               HelpLinks="@GetAiApiKeyHelpLinks()" />

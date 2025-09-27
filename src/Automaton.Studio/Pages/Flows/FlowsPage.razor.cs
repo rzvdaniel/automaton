@@ -93,12 +93,11 @@ namespace Automaton.Studio.Pages.Flows
             return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
         }
 
-        private List<EnhancedEmpty.EmptyActionModel> GetSecondaryActions()
+        private List<EnhancedEmpty.EmptyActionModel> GetFlowSecondaryActions()
         {
             return new List<EnhancedEmpty.EmptyActionModel>
             {
-                new() { Text = "Browse Examples", Icon = "eye", OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding")) },
-                new() { Text = "View Documentation", Icon = "book", OnClick = () => Task.FromResult(0) }
+                new() { Text = "Browse Templates", Icon = "eye", OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding")) }
             };
         }
 
@@ -108,27 +107,24 @@ namespace Automaton.Studio.Pages.Flows
             {
                 new() 
                 { 
-                    Title = "Automate File Tasks", 
-                    Description = "Move, copy, and process files automatically", 
-                    Icon = "folder",
-                    IconColor = "#52c41a",
-                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                    Title = "Easily design and manage your Workflows", 
+                    Description = "Interact with your Workflows how you want. Our intuitive UI, CLI, API, and Terraform Provider make it simple to manage your automated processes.", 
+                    Icon = "setting",
+                    IconColor = "#722ed1"
                 },
                 new() 
                 { 
-                    Title = "API Integration", 
-                    Description = "Connect to REST APIs and web services", 
-                    Icon = "api",
-                    IconColor = "#722ed1",
-                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                    Title = "Reliably scale as your demand shifts", 
+                    Description = "Resize a Workflow or scale horizontally with many of them. Deploy across globally distributed execution environments with our 99.99% uptime SLA.", 
+                    Icon = "thunderbolt",
+                    IconColor = "#fa8c16"
                 },
                 new() 
                 { 
-                    Title = "Data Processing", 
-                    Description = "Transform and analyze data automatically", 
-                    Icon = "bar-chart",
-                    IconColor = "#1890ff",
-                    OnClick = () => Task.Run(() => NavigationManager.NavigateTo("/onboarding"))
+                    Title = "Build and monitor, and secure your automations for less", 
+                    Description = "Get exceptional performance with pricing starting at $0/month for outbound data transfer - plus monitoring and reporting - for free with every Workflow.", 
+                    Icon = "safety-certificate",
+                    IconColor = "#52c41a"
                 }
             };
         }
@@ -137,9 +133,10 @@ namespace Automaton.Studio.Pages.Flows
         {
             return new List<EnhancedEmpty.HelpLinkModel>
             {
-                new() { Text = "Getting Started Guide", Url = "/onboarding", Icon = "play-circle" },
-                new() { Text = "Workflow Examples", Url = "/onboarding", Icon = "experiment" },
-                new() { Text = "Documentation", Url = "#", Icon = "book" }
+                new() { Text = "Workflows overview", Url = "/onboarding", Icon = "profile", Description = "Detailed information covering all aspects of workflows." },
+                new() { Text = "Monitoring your Workflows", Url = "/onboarding", Icon = "bar-chart", Description = "A guide about how to monitor execution performance on Workflows." },
+                new() { Text = "Resource Center", Url = "/onboarding", Icon = "book", Description = "Discover how-to resources for managing your Workflows." },
+                new() { Text = "Workflows API Docs", Url = "#", Icon = "api", Description = "Use the API to automate workflow creation and updates." }
             };
         }
     }

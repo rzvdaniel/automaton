@@ -16,8 +16,7 @@ partial class AiApiKeysPage : ComponentBase
     {
         return new List<EnhancedEmpty.EmptyActionModel>
         {
-            new() { Text = "Provider Setup Guide", Icon = "setting", OnClick = () => Task.FromResult(0) },
-            new() { Text = "AI Documentation", Icon = "book", OnClick = () => Task.FromResult(0) }
+            new() { Text = "Provider Setup Guide", Icon = "setting", OnClick = () => Task.FromResult(0) }
         };
     }
 
@@ -27,24 +26,24 @@ partial class AiApiKeysPage : ComponentBase
         {
             new() 
             { 
-                Title = "OpenAI Integration", 
-                Description = "Connect to GPT-4, ChatGPT, and DALL-E", 
-                Icon = "openai",
-                IconColor = "#10a37f"
+                Title = "Easily connect to leading AI providers", 
+                Description = "Integrate with OpenAI, Anthropic, Google, and Azure OpenAI services. Our unified interface makes it simple to manage multiple AI providers.", 
+                Icon = "robot",
+                IconColor = "#722ed1"
             },
             new() 
             { 
-                Title = "Anthropic Claude", 
-                Description = "Access powerful Claude AI models", 
-                Icon = "anthropic",
-                IconColor = "#d4822a"
+                Title = "Intelligent automation at scale", 
+                Description = "Enhance your workflows with AI capabilities like text processing, image analysis, and decision making. Scale across multiple models and providers.", 
+                Icon = "thunderbolt",
+                IconColor = "#fa8c16"
             },
             new() 
             { 
-                Title = "Google Gemini", 
-                Description = "Integrate with Google's AI services", 
-                Icon = "google",
-                IconColor = "#4285f4"
+                Title = "Secure and monitor AI usage", 
+                Description = "Track AI API usage with detailed analytics and cost monitoring. Secure your keys and monitor performance across all your AI integrations.", 
+                Icon = "safety-certificate",
+                IconColor = "#52c41a"
             }
         };
     }
@@ -53,9 +52,10 @@ partial class AiApiKeysPage : ComponentBase
     {
         return new List<EnhancedEmpty.HelpLinkModel>
         {
-            new() { Text = "OpenAI API Keys", Url = "https://platform.openai.com/api-keys", Icon = "link" },
-            new() { Text = "Anthropic Console", Url = "https://console.anthropic.com/", Icon = "link" },
-            new() { Text = "Google AI Studio", Url = "https://aistudio.google.com/app/apikey", Icon = "link" }
+            new() { Text = "OpenAI API Keys", Url = "https://platform.openai.com/api-keys", Icon = "openai", Description = "Get your OpenAI API key for GPT and DALL-E access." },
+            new() { Text = "Anthropic Console", Url = "https://console.anthropic.com/", Icon = "anthropic", Description = "Access Anthropic's Claude AI models and API keys." },
+            new() { Text = "Google AI Studio", Url = "https://aistudio.google.com/app/apikey", Icon = "google", Description = "Generate API keys for Google's Gemini AI models." },
+            new() { Text = "AI Integration Guide", Url = "#", Icon = "robot", Description = "Learn how to integrate AI capabilities into your workflows." }
         };
     }
 }

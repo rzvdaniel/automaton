@@ -172,17 +172,17 @@ public partial class FlowSchedule : ComponentBase
         {
             new() 
             { 
-                Title = "Recurring Schedules", 
-                Description = "Run workflows daily, weekly, or monthly", 
+                Title = "Easily create and manage schedules", 
+                Description = "Set up recurring schedules with simple patterns or advanced cron expressions. Our intuitive interface makes scheduling accessible to everyone.", 
                 Icon = "calendar",
-                IconColor = "#52c41a"
+                IconColor = "#722ed1"
             },
             new() 
             { 
-                Title = "Custom Intervals", 
-                Description = "Set precise timing with cron expressions", 
-                Icon = "field-time",
-                IconColor = "#1890ff"
+                Title = "Reliable automated execution", 
+                Description = "Your workflows run exactly when scheduled with our robust scheduling engine. Monitor execution history and get notifications for any issues.", 
+                Icon = "thunderbolt",
+                IconColor = "#fa8c16"
             }
         };
     }
@@ -191,8 +191,10 @@ public partial class FlowSchedule : ComponentBase
     {
         return new List<EnhancedEmpty.HelpLinkModel>
         {
-            new() { Text = "Scheduling Guide", Url = "#", Icon = "clock-circle" },
-            new() { Text = "Cron Expressions", Url = "#", Icon = "code" }
+            new() { Text = "Scheduling Guide", Url = "#", Icon = "clock-circle", Description = "Learn how to create and manage automated schedules." },
+            new() { Text = "Cron Expressions", Url = "#", Icon = "code", Description = "Master cron syntax for advanced scheduling patterns." },
+            new() { Text = "Best Practices", Url = "#", Icon = "bulb", Description = "Discover scheduling best practices and optimization tips." },
+            new() { Text = "Monitoring Schedules", Url = "#", Icon = "bar-chart", Description = "Track execution history and monitor schedule performance." }
         };
     }
 }

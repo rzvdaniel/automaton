@@ -16,8 +16,7 @@ public partial class ApiKeysPage
     {
         return new List<EnhancedEmpty.EmptyActionModel>
         {
-            new() { Text = "Runner Setup Guide", Icon = "setting", OnClick = () => Task.FromResult(0) },
-            new() { Text = "View Documentation", Icon = "book", OnClick = () => Task.FromResult(0) }
+            new() { Text = "Runner Setup Guide", Icon = "setting", OnClick = () => Task.FromResult(0) }
         };
     }
 
@@ -27,24 +26,24 @@ public partial class ApiKeysPage
         {
             new() 
             { 
-                Title = "Console Runners", 
-                Description = "Authenticate desktop and server runners", 
+                Title = "Easily authenticate and manage your Runners", 
+                Description = "Use API keys to securely connect console runners and desktop applications. Our scoped authentication system makes it simple to manage access.", 
                 Icon = "desktop",
-                IconColor = "#52c41a"
-            },
-            new() 
-            { 
-                Title = "External Integration", 
-                Description = "Connect third-party applications and services", 
-                Icon = "api",
-                IconColor = "#1890ff"
-            },
-            new() 
-            { 
-                Title = "Scoped Access", 
-                Description = "Control permissions with different scope levels", 
-                Icon = "safety-certificate",
                 IconColor = "#722ed1"
+            },
+            new() 
+            { 
+                Title = "Reliably integrate external services", 
+                Description = "Connect third-party applications and CI/CD pipelines. Secure API access with configurable scopes and expiration dates for enhanced security.", 
+                Icon = "api",
+                IconColor = "#fa8c16"
+            },
+            new() 
+            { 
+                Title = "Monitor usage and secure your infrastructure", 
+                Description = "Track API key usage with detailed logging and analytics. Revoke keys instantly and monitor access patterns for enhanced security.", 
+                Icon = "safety-certificate",
+                IconColor = "#52c41a"
             }
         };
     }
@@ -53,9 +52,10 @@ public partial class ApiKeysPage
     {
         return new List<EnhancedEmpty.HelpLinkModel>
         {
-            new() { Text = "Authentication Guide", Url = "#", Icon = "safety" },
-            new() { Text = "Scope Permissions", Url = "#", Icon = "team" },
-            new() { Text = "Runner Setup", Url = "#", Icon = "desktop" }
+            new() { Text = "API Keys overview", Url = "#", Icon = "key", Description = "Detailed information covering all aspects of API authentication." },
+            new() { Text = "Authenticating your Runners", Url = "#", Icon = "desktop", Description = "A guide about how to set up and authenticate console runners." },
+            new() { Text = "Security Best Practices", Url = "#", Icon = "safety", Description = "Learn how to securely manage and rotate your API keys." },
+            new() { Text = "Authentication API Docs", Url = "#", Icon = "api", Description = "Use the API to programmatically manage authentication keys." }
         };
     }
 }
