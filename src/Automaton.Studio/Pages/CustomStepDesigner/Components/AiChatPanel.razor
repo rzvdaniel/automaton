@@ -29,93 +29,103 @@
     </div>
 
     <div class="ai-chat-input">
-        <div class="input-row">
-            <Input @bind-Value="promptText" 
-                   Placeholder="Describe the code you want to generate..." 
-                   Disabled="@isGeneratingCode"
-                   OnPressEnter="@(async () => await SendPrompt())" />
+        <div class="input-area">
+            <TextArea @bind-Value="promptText" 
+                      Placeholder="Ask Copilot a question or type / for topics" 
+                      Disabled="@isGeneratingCode"
+                      ShowCount="false"
+                      AutoSize="false"
+                      Rows="3"
+                      Style="resize: none; border: none; box-shadow: none; padding: 12px;"
+                      @oninput="OnInputChange"
+                      @onkeydown="OnKeyDown" />
         </div>
 
-        <div class="controls">
-            <Select @bind-Value="selectedAgent"
-                    TItemValue="string"
-                    TItem="string"
-                    Style="width: 140px; margin-right: 8px;"
-                    Disabled="@isGeneratingCode">
-                <SelectOptions>
-                    <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
-                    <SelectOption Value="@Assistant" Label="Assistant" />
-                </SelectOptions>
-            </Select>
+        <div class="input-controls">
+            <div class="left-controls">
+                <Select @bind-Value="selectedAgent"
+                        TItemValue="string"
+                        TItem="string"
+                        Size="@InputSize.Small"
+                        Style="width: 80px;"
+                        Disabled="@isGeneratingCode">
+                    <SelectOptions>
+                        <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
+                        <SelectOption Value="@Assistant" Label="Assistant" />
+                    </SelectOptions>
+                </Select>
 
-            <Select @bind-Value="selectedProviderModel" 
-                    TItemValue="string"
-                    TItem="string" 
-                    Style="width: 220px; margin-right: 8px;"
-                    Placeholder="Select AI Provider & Model"
-                    AllowClear="false"
-                    Disabled="@isGeneratingCode">
-                <SelectOptions>
-                    @if (availableProviders?.Any() != true)
-                    {
-                        <SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
-                    }
-                    else
-                    {
-                        @foreach (var provider in availableProviders)
+                <Select @bind-Value="selectedProviderModel" 
+                        TItemValue="string"
+                        TItem="string" 
+                        Size="@InputSize.Small"
+                        Style="width: 180px;"
+                        Placeholder="Select model"
+                        AllowClear="false"
+                        Disabled="@isGeneratingCode">
+                    <SelectOptions>
+                        @if (availableProviders?.Any() != true)
                         {
-                            @if (provider.SupportedModels?.Any() == true)
+                            <SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
+                        }
+                        else
+                        {
+                            @foreach (var provider in availableProviders)
                             {
-                                @foreach (var model in provider.SupportedModels)
+                                @if (provider.SupportedModels?.Any() == true)
                                 {
-                                    var value = $"{provider.Provider}:{model}";
-                                    var label = $"{provider.ProviderName} - {model}";
-                                    var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
-                                    
-                                    <SelectOption TItemValue="string" TItem="string" 
-                                                Value="@value" 
-                                                Label="@label"
-                                                Disabled="@isDisabled" />
+                                    @foreach (var model in provider.SupportedModels)
+                                    {
+                                        var value = $"{provider.Provider}:{model}";
+                                        var label = $"{provider.ProviderName} - {model}";
+                                        var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
+                                        
+                                        <SelectOption TItemValue="string" TItem="string" 
+                                                    Value="@value" 
+                                                    Label="@label"
+                                                    Disabled="@isDisabled" />
+                                    }
                                 }
                             }
                         }
-                    }
-                </SelectOptions>
-            </Select>
+                    </SelectOptions>
+                </Select>
 
-            <Space>
-                <Button Icon="paper-clip" OnClick="AttachFile" Disabled="@isGeneratingCode" />
-                <Button Type="ButtonType.Primary" 
-                        Icon="@(isGeneratingCode ? "loading" : "caret-right")" 
+                @if (!string.IsNullOrEmpty(CurrentLanguage))
+                {
+                    <div class="language-badge">
+                        <Text Type="@TextElementType.Secondary" Style="font-size: 11px;">
+                            <Icon Type="code" Style="margin-right: 2px; font-size: 10px;" />
+                            @CurrentLanguage
+                        </Text>
+                    </div>
+                }
+            </div>
+
+            <div class="right-controls">
+                <Button Icon="@(isGeneratingCode ? "loading" : "caret-right")" 
+                        Type="@ButtonType.Primary" 
+                        Size="@ButtonSize.Small"
+                        Shape="@ButtonShape.Circle"
                         OnClick="SendPrompt" 
-                        Disabled="@(!IsReadyToSend)"
-                        Loading="@isGeneratingCode">
-                    @(isGeneratingCode ? "Generating..." : "Generate Code")
+                        Disabled="@(!IsReadyToSendRealtime)"
+                        Loading="@isGeneratingCode"
+                        Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
                 </Button>
-            </Space>
+            </div>
         </div>
 
-        @if (!string.IsNullOrEmpty(CurrentLanguage))
+        @if (showNoProvidersMessage)
         {
-            <div class="language-info">
-                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                    <Icon Type="code" Style="margin-right: 4px;" />
-                    Target Language: @CurrentLanguage
-                </Text>
+            <div class="no-providers-message">
+                <Alert Type="@AlertType.Warning" 
+                       Message="No AI providers configured" 
+                       Description="Configure your API keys in Settings to start using AI code generation."
+                       ShowIcon="true"
+                       Style="margin: 8px 0 0 0;" />
             </div>
         }
     </div>
-
-    @if (showNoProvidersMessage)
-    {
-        <div class="no-providers-message">
-            <Alert Type="@AlertType.Warning" 
-                   Message="No AI providers configured" 
-                   Description="Configure your API keys in Settings to start using AI code generation."
-                   ShowIcon="true"
-                   Style="margin: 8px;" />
-        </div>
-    }
 </div>
 
 @code {
@@ -230,9 +240,35 @@
         }
     }
 
-    private void AttachFile()
+    private bool IsReadyToSendRealtime
     {
-        // placeholder for attach action
+        get
+        {
+            if (string.IsNullOrEmpty(promptText?.Trim()) || string.IsNullOrEmpty(selectedProviderModel) || isGeneratingCode)
+                return false;
+
+            var selectedProvider = GetSelectedProvider();
+            if (selectedProvider == null)
+                return false;
+
+            // If provider has stored keys, we need at least one available
+            // If provider has environment key, it's ready
+            return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
+        }
+    }
+
+    private void OnInputChange(ChangeEventArgs e)
+    {
+        promptText = e.Value?.ToString() ?? string.Empty;
+        StateHasChanged(); // Trigger re-render to update button state
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && (e.CtrlKey || e.ShiftKey))
+        {
+            await SendPrompt();
+        }
     }
 
     private async Task SendPrompt()
@@ -389,7 +425,7 @@
     padding: 10px;
     background: #fff;
     min-height: 0;
-    max-height: calc(100% - 200px); /* Reserve space for input controls */
+    max-height: calc(100% - 140px); /* Reserve space for input controls */
 }
 
 .messages { 
@@ -415,49 +451,100 @@
 }
 
 .ai-chat-input { 
-    padding: 12px; 
     border-top: 1px solid #e8e8e8; 
-    background: #fafafa; 
+    background: #ffffff; 
     display: flex;
     flex-direction: column;
-    gap: 8px;
     flex-shrink: 0;
     position: sticky;
     bottom: 0;
     z-index: 10;
 }
 
-.input-row {
-    display: flex;
-    width: 100%;
+.input-area {
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
 }
 
-.input-row input { 
-    width: 100%; 
+.input-area .ant-input {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    resize: none !important;
 }
 
-.ai-chat-input .controls { 
+.input-area .ant-input:focus,
+.input-area .ant-input:hover {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.input-controls { 
     display: flex; 
     align-items: center; 
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.left-controls {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
 }
 
-.language-info {
-    padding: 4px 0;
+.right-controls {
+    display: flex;
+    align-items: center;
 }
 
-.model-disabled {
-    color: #999;
-    font-style: italic;
+.language-badge {
+    padding: 2px 6px;
+    background: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #1565c0;
 }
 
 .no-providers-message {
-    border-top: 1px solid #e8e8e8;
     flex-shrink: 0;
     position: sticky;
     bottom: 0;
     background: #fafafa;
     z-index: 10;
+}
+
+/* VS-style send button */
+.right-controls .ant-btn-circle {
+    min-width: 28px !important;
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.right-controls .ant-btn-circle .anticon {
+    font-size: 12px;
+}
+
+/* Small select styling to match VS */
+.left-controls .ant-select-small {
+    font-size: 11px;
+}
+
+.left-controls .ant-select-small .ant-select-selector {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    height: 24px !important;
+    min-height: 24px !important;
+}
+
+.left-controls .ant-select-small .ant-select-selection-item {
+    line-height: 22px !important;
+    font-size: 11px;
 }
 </style>
