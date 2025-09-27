@@ -1,5 +1,4 @@
 ﻿using Microsoft.Scripting.Hosting;
-using System.Collections.Generic;
 
 namespace Automaton.Core.Scripting
 {
