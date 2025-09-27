@@ -104,12 +104,81 @@
                                         </SplitterPanel>
 
                                         <SplitterPanel Size="30%">
-                                            <div class="bottom-panel">
-                                                <Tabs Size="TabSize.Small">
-                                                    <TabPane Tab="Logs" Key="logs">
-                                                        <TextArea Rows="6" Id="code-log" Value="@StepDesignerViewModel.ScriptOutput.ToString()" />
-                                                    </TabPane>
-                                                </Tabs>
+                                            <div class="step-logs-container">
+                                                <!-- Logs Toolbar -->
+                                                <div class="step-logs-toolbar">
+                                                    <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+                                                        <SpaceItem>
+                                                            <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
+                                                                <SpaceItem>
+                                                                    <Icon Type="file-text" Theme="IconThemeType.Outline" Style="color: #666;" />
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Text Strong Style="color: #666; font-size: 12px;">Script Execution Logs</Text>
+                                                                </SpaceItem>
+                                                            </Space>
+                                                        </SpaceItem>
+                                                        <SpaceItem>
+                                                            <Space Direction="SpaceDirection.Horizontal" Size="SpaceSize.Small">
+                                                                <SpaceItem>
+                                                                    <Tooltip Placement="@Placement.TopRight" Title="Auto-scroll to bottom">
+                                                                        <Button Icon="@(autoScroll ? "pause-circle" : "play-circle")"
+                                                                                Size="@ButtonSize.Small"
+                                                                                Type="@ButtonType.Text"
+                                                                                Class="@(autoScroll ? "toolbar-btn-active" : "toolbar-btn")"
+                                                                                OnClick="ToggleAutoScroll">
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Tooltip Placement="@Placement.TopRight" Title="Copy logs to clipboard">
+                                                                        <Button Icon="copy"
+                                                                                Size="@ButtonSize.Small"
+                                                                                Type="@ButtonType.Text"
+                                                                                Class="toolbar-btn"
+                                                                                OnClick="CopyLogs">
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Tooltip Placement="@Placement.TopRight" Title="Clear logs">
+                                                                        <Button Icon="delete"
+                                                                                Size="@ButtonSize.Small"
+                                                                                Type="@ButtonType.Text"
+                                                                                Class="toolbar-btn"
+                                                                                OnClick="ClearLogs">
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </SpaceItem>
+                                                            </Space>
+                                                        </SpaceItem>
+                                                    </Space>
+                                                </div>
+
+                                                <!-- Logs Content -->
+                                                <div class="step-logs-content">
+                                                    @if (!string.IsNullOrEmpty(StepDesignerViewModel.ScriptOutput?.ToString()))
+                                                    {
+                                                        <TextArea @ref="logsTextArea"
+                                                                 Value="@StepDesignerViewModel.ScriptOutput.ToString()"
+                                                                 ReadOnly="true"
+                                                                 ShowCount="false"
+                                                                 AutoSize="false"
+                                                                 Class="step-logs-textarea"
+                                                                 Id="step-logs-textarea"
+                                                                 Style="height: 100%; resize: none; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="step-logs-empty">
+                                                            <div class="step-logs-empty-content">
+                                                                <Icon Type="file-text" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                                                <div class="step-logs-empty-title">No logs available</div>
+                                                                <div class="step-logs-empty-subtitle">Logs will appear here when you run the script.</div>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
                                             </div>
                                         </SplitterPanel>
                                     </Splitter>
@@ -362,29 +431,120 @@
         box-sizing: border-box;
         display: block;
     }
-    .bottom-panel {
-        margin-top: 8px;
-        background: #f8f8f8;
-        border-radius: 6px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        padding: 0 8px 8px 8px;
-        overflow-y: auto;
-        width: 100%;
-    }
-    .ai-result-panel {
-        padding: 8px 0;
-    }
-    .ai-status-bar {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        margin-top: 8px;
-    }
+    
     .code-toolbar {
         background-color:#EEE; 
         padding: 4px;
         margin-bottom: 10px;
+        flex-shrink: 0;
     }
+
+    /* Step Logs Styling - Following FlowLogs pattern */
+    .step-logs-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #ffffff;
+        overflow: hidden;
+        flex: 1;
+        min-height: 0;
+        margin-top: 8px;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    .step-logs-toolbar {
+        background-color: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 6px 12px;
+        flex-shrink: 0;
+        min-height: 32px;
+    }
+
+    .step-logs-content {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        background-color: #ffffff;
+    }
+
+    .step-logs-textarea {
+        border: none !important;
+        box-shadow: none !important;
+        background-color: #ffffff !important;
+        padding: 12px !important;
+        line-height: 1.4 !important;
+        font-size: 12px !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    .step-logs-textarea:focus {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .step-logs-empty {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ffffff;
+        flex: 1;
+        padding: 16px;
+    }
+
+    .step-logs-empty-content {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 280px;
+    }
+
+    .step-logs-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .step-logs-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
+        text-align: center;
+    }
+
+    .toolbar-btn {
+        color: #666 !important;
+        border: none !important;
+        background: transparent !important;
+        transition: all 0.2s ease;
+    }
+
+    .toolbar-btn:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.08) !important;
+    }
+
+    .toolbar-btn-active {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.12) !important;
+        border: none !important;
+    }
+
+    .toolbar-btn-active:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.16) !important;
+    }
+
     .variables-panel {
         height: 100%;
         width: 100%;
@@ -413,9 +573,7 @@
         min-height: 0;
         height: 100%;
     }
-    .code-toolbar {
-        flex-shrink: 0;
-    }
+    
     .editor-panel {
         flex: 1 1 auto;
         min-height: 0;

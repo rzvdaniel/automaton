@@ -40,7 +40,11 @@ public class CustomStepViewModel : IDisposable
 
     public void Execute()
     {
-        ClearScriptOutputText();
+        if (ScriptOutput.Length > 0)
+        {
+            ScriptOutput.AppendLine();
+        }
+        ScriptOutput.AppendLine($"=== Execution started at {DateTime.Now:HH:mm:ss} ===");
 
         customStepExecuteService.Execute(CustomStep);
     }

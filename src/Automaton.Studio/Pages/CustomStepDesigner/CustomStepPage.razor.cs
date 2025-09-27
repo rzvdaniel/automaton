@@ -6,18 +6,21 @@ using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Linq;
 
 namespace Automaton.Studio.Pages.CustomStepDesigner;
 
-partial class CustomStepPage : ComponentBase
+partial class CustomStepPage : ComponentBase, IDisposable
 {
     private bool loading = false;
     private bool runningCode = false;
+    private bool autoScroll = true;
 
     private Form<CustomStep> form;
     private Form<CustomStep> codeForm;
     private StandaloneCodeEditor codeEditor;
+    private TextArea logsTextArea;
     
     public IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
 
@@ -30,6 +33,7 @@ partial class CustomStepPage : ComponentBase
     [Inject] private CustomStepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
+    [Inject] private IJSRuntime JSRuntime { get; set; }
 
     [Parameter] public string StepId { get; set; }
 
@@ -39,7 +43,19 @@ partial class CustomStepPage : ComponentBase
 
         await StepDesignerViewModel.Load(Guid.Parse(StepId));
 
+        // Clear logs when entering the step
+        StepDesignerViewModel.ClearScriptOutputText();
+
         await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && autoScroll && !string.IsNullOrEmpty(StepDesignerViewModel.ScriptOutput?.ToString()))
+        {
+            await ScrollToBottom();
+        }
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     public void AddInputVariable()
@@ -60,6 +76,62 @@ partial class CustomStepPage : ComponentBase
     public void DeleteOutputVariable(string name)
     {
         StepDesignerViewModel.DeleteOutputVariable(name);
+    }
+
+    private void ClearLogs()
+    {
+        StepDesignerViewModel.ClearScriptOutputText();
+        MessageService.Info("Logs cleared", 2);
+    }
+
+    private async Task CopyLogs()
+    {
+        try
+        {
+            var logs = StepDesignerViewModel.ScriptOutput?.ToString();
+            if (!string.IsNullOrEmpty(logs))
+            {
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", logs);
+                MessageService.Success("Logs copied to clipboard", 2);
+            }
+            else
+            {
+                MessageService.Info("No logs to copy", 2);
+            }
+        }
+        catch
+        {
+            MessageService.Error("Failed to copy logs to clipboard", 3);
+        }
+    }
+
+    private async Task ToggleAutoScroll()
+    {
+        autoScroll = !autoScroll;
+        
+        if (autoScroll)
+        {
+            await ScrollToBottom();
+            MessageService.Info("Auto-scroll enabled", 2);
+        }
+        else
+        {
+            MessageService.Info("Auto-scroll disabled", 2);
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", "var element = document.getElementById('step-logs-textarea'); if(element) { element.scrollTop = element.scrollHeight; }");
+        }
+        catch
+        {
+            // Ignore JS interop errors
+        }
     }
 
     private async Task Save()
@@ -95,6 +167,7 @@ partial class CustomStepPage : ComponentBase
 
             await RefreshCode();
 
+            // Don't clear logs here - let them accumulate
             StepDesignerViewModel.Execute();
 
             await MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
@@ -177,9 +250,15 @@ partial class CustomStepPage : ComponentBase
         return new Dictionary<string, object>() { { "Variable", customStepVariable } };
     }
 
-    private void OnScriptOutputWritten(object sender, EventArgs e)
+    private async void OnScriptOutputWritten(object sender, EventArgs e)
     {
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
+        
+        // Auto-scroll to bottom if enabled
+        if (autoScroll)
+        {
+            await InvokeAsync(async () => await ScrollToBottom());
+        }
     }
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
