@@ -145,11 +145,15 @@ partial class CustomStepPage : ComponentBase, IDisposable
                 await RefreshCode();
 
                 await StepDesignerViewModel.Save();
+                
+                // Show success notification without awaiting (fire and forget)
+                _ = MessageService.SuccessAsync("Step saved successfully");
             }
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.CustomStepUpdateFailed);
+            // Show error notification without awaiting (fire and forget)
+            _ = MessageService.ErrorAsync(Resources.Errors.CustomStepUpdateFailed);
         }
         finally
         {
@@ -170,15 +174,18 @@ partial class CustomStepPage : ComponentBase, IDisposable
             // Don't clear logs here - let them accumulate
             StepDesignerViewModel.Execute();
 
-            await MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
+            // Enable the button immediately after execution completes
+            runningCode = false;
+
+            // Show notification without awaiting it (fire and forget)
+            _ = MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"{Resources.Errors.CustomStepExecutionFailed}. Error: {ex.Message}");
-        }
-        finally
-        {
-            runningCode = false;
+            runningCode = false; // Also enable button immediately on error
+            
+            // Show error notification without awaiting it
+            _ = MessageService.ErrorAsync($"{Resources.Errors.CustomStepExecutionFailed}. Error: {ex.Message}");
         }
     }
 
