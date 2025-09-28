@@ -33,6 +33,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
+        public virtual DbSet<AiConversation> AiConversations { get; set; }
+        public virtual DbSet<AiConversationMessage> AiConversationMessages { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -199,6 +201,46 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.UserId, e.IsActive });
                 entity.HasIndex(e => e.LastUsedAt);
                 entity.HasIndex(e => new { e.UserId, e.Provider });
+            });
+
+            modelBuilder.Entity<AiConversation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.Language).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.UserId, e.IsActive });
+                entity.HasIndex(e => e.UpdatedAt);
+            });
+
+            modelBuilder.Entity<AiConversationMessage>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ConversationId).IsRequired();
+                entity.Property(e => e.Role).IsRequired();
+                entity.Property(e => e.Content).IsRequired();
+                entity.Property(e => e.HasError).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.Model).HasMaxLength(100);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasOne(e => e.Conversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(e => e.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.ConversationId);
+                entity.HasIndex(e => e.CreatedAt);
             });
 
             modelBuilder.Entity<FlowExecutionLog>(entity =>
