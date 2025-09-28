@@ -26,6 +26,15 @@
       text-align: right;
       z-index: 10;
     }
+    /* Fallback styles in case CDN is blocked */
+    .app-name-link {
+      color: var(--theme-color);
+      font-size: 1.5em;
+      font-weight: 600;
+    }
+    .content {
+      padding-top: 60px;
+    }
   </style>
 </head>
 <body>
@@ -43,12 +52,16 @@
         errorText: 'Error',
         successText: 'Copied'
       },
+      executeScript: true,
       plugins: [
         function (hook, vm) {
           hook.beforeEach(function (html) {
-            var url = 'https://github.com/rzvdaniel/automaton/blob/main/docs/' + vm.route.file;
-            var editHtml = '[:memo: Edit Document](' + url + ')\n';
-            return html + '\n\n----\n\n' + editHtml;
+            if (vm.route.file && vm.route.file !== 'README.md') {
+              var url = 'https://github.com/rzvdaniel/automaton/blob/main/src/Automaton.Studio.Web/wwwroot/docs/' + vm.route.file;
+              var editHtml = '[:memo: Edit Document](' + url + ')\n';
+              return html + '\n\n----\n\n' + editHtml;
+            }
+            return html;
           });
         }
       ]
