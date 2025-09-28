@@ -20,7 +20,12 @@ partial class CustomStepPage : ComponentBase, IDisposable
     private Form<CustomStep> form;
     private Form<CustomStep> codeForm;
     private StandaloneCodeEditor codeEditor;
+    private DiffEditor diffEditor;
     private TextArea logsTextArea;
+    
+    // Diff editor state
+    private bool showDiffEditor = false;
+    private string pendingGeneratedCode = string.Empty;
     
     public IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
 
@@ -55,6 +60,24 @@ partial class CustomStepPage : ComponentBase, IDisposable
         {
             await ScrollToBottom();
         }
+        
+        // Initialize diff editor with original and modified content when shown
+        if (showDiffEditor && diffEditor != null && !string.IsNullOrEmpty(pendingGeneratedCode))
+        {
+            try
+            {
+                var originalCode = StepDesignerViewModel.CustomStep.Definition.Code ?? string.Empty;
+                var language = StepDesignerViewModel.CustomStep.Definition.Language.ToLower();
+                
+                // Use JSRuntime to set diff content
+                await JSRuntime.InvokeVoidAsync("setDiffEditorContent", "step-diff", originalCode, pendingGeneratedCode, language);
+            }
+            catch (Exception ex)
+            {
+                await MessageService.ErrorAsync($"Failed to initialize diff editor: {ex.Message}");
+            }
+        }
+        
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -201,19 +224,52 @@ partial class CustomStepPage : ComponentBase, IDisposable
             // Clean up the generated code by removing markdown code block syntax
             var cleanedCode = CodeCleanupService.CleanupGeneratedCode(generatedCode);
             
-            // Set the cleaned code in the Monaco editor
-            await codeEditor.SetValue(cleanedCode);
+            // Store the pending code and show diff editor instead of directly applying
+            pendingGeneratedCode = cleanedCode;
+            showDiffEditor = true;
+            await InvokeAsync(StateHasChanged);
             
-            // Update the view model
-            StepDesignerViewModel.CustomStep.Definition.Code = cleanedCode;
-            
-            // Show success message
-            await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+            // Show informational message
+            await MessageService.InfoAsync("Code generated! Review the changes and click 'Accept Changes' to apply them.");
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
+            await MessageService.ErrorAsync($"Failed to generate code diff: {ex.Message}");
         }
+    }
+
+    private async Task AcceptCodeChanges()
+    {
+        try
+        {
+            // Apply the pending code to the Monaco editor
+            await codeEditor.SetValue(pendingGeneratedCode);
+            
+            // Update the view model
+            StepDesignerViewModel.CustomStep.Definition.Code = pendingGeneratedCode;
+            
+            // Hide diff editor and reset state
+            showDiffEditor = false;
+            pendingGeneratedCode = string.Empty;
+            await InvokeAsync(StateHasChanged);
+            
+            // Show success message
+            await MessageService.SuccessAsync("Code changes applied successfully!");
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Failed to apply code changes: {ex.Message}");
+        }
+    }
+
+    private async Task RejectCodeChanges()
+    {
+        // Hide diff editor and reset state without applying changes
+        showDiffEditor = false;
+        pendingGeneratedCode = string.Empty;
+        await InvokeAsync(StateHasChanged);
+        
+        await MessageService.InfoAsync("Code changes rejected. Original code preserved.");
     }
 
     // Convert StepVariable to VariableInfo for AI chat panel
@@ -275,6 +331,17 @@ partial class CustomStepPage : ComponentBase, IDisposable
             AutomaticLayout = true,
             Language = StepDesignerViewModel.CustomStep.Definition.Language.ToLower(),
             Value = StepDesignerViewModel.CustomStep.Definition.Code
+        };
+    }
+
+    private DiffEditorConstructionOptions DiffEditorConstructionOptions(DiffEditor editor)
+    {
+        return new DiffEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            ReadOnly = true,
+            RenderSideBySide = true,
+            OriginalEditable = false
         };
     }
 

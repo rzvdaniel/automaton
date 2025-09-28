@@ -92,13 +92,33 @@
                                                                         Run
                                                                     </Button>
                                                                 </SpaceItem>
+                                                                @if (showDiffEditor)
+                                                                {
+                                                                    <SpaceItem>
+                                                                        <Button Icon="check" OnClick="AcceptCodeChanges" Type="@ButtonType.Primary" Style="background-color: #52c41a; border-color: #52c41a;">
+                                                                            Accept Changes
+                                                                        </Button>
+                                                                    </SpaceItem>
+                                                                    <SpaceItem>
+                                                                        <Button Icon="close" OnClick="RejectCodeChanges" Danger>
+                                                                            Reject Changes
+                                                                        </Button>
+                                                                    </SpaceItem>
+                                                                }
                                                             </Space>
                                                         </ChildContent>
                                                     </Form>
                                             </div>
                                        
                                             <div class="monaco-container">
-                                                <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+                                                @if (showDiffEditor)
+                                                {
+                                                    <DiffEditor Id="step-diff" ConstructionOptions="DiffEditorConstructionOptions" @ref="diffEditor" />
+                                                }
+                                                else
+                                                {
+                                                    <StandaloneCodeEditor Id="step-code" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+                                                }
                                             </div>
                                           
                                         </SplitterPanel>
@@ -432,6 +452,13 @@
         display: block;
     }
     
+    #step-diff {
+        width: 100% !important;
+        height: 100% !important;
+        box-sizing: border-box;
+        display: block;
+    }
+    
     .code-toolbar {
         background-color:#EEE; 
         padding: 4px;
@@ -638,3 +665,29 @@
         min-height: 0;
     }
 </style>
+
+<script>
+    window.setDiffEditorContent = function(editorId, originalContent, modifiedContent, language) {
+        // Wait for Monaco to be available and the editor to be initialized
+        setTimeout(() => {
+            const editorElement = document.getElementById(editorId);
+            if (editorElement && editorElement._monacoEditor) {
+                const editor = editorElement._monacoEditor;
+                
+                // Create models for original and modified content
+                const originalModel = monaco.editor.createModel(originalContent, language);
+                const modifiedModel = monaco.editor.createModel(modifiedContent, language);
+                
+                // Set the models
+                editor.setModel({
+                    original: originalModel,
+                    modified: modifiedModel
+                });
+            } else {
+                console.warn('Diff editor not ready, retrying in 100ms');
+                // Retry if editor isn't ready
+                setTimeout(() => window.setDiffEditorContent(editorId, originalContent, modifiedContent, language), 100);
+            }
+        }, 50);
+    };
+</script>
