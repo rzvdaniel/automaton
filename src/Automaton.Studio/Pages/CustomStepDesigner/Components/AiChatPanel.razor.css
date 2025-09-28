@@ -1,0 +1,150 @@
+.ai-chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.ai-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e8e8e8;
+    background: #fafafa;
+    flex-shrink: 0;
+}
+
+.ai-chat-header .title { 
+    font-weight: 600; 
+}
+
+.ai-chat-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px;
+    background: #fff;
+    min-height: 0;
+    max-height: calc(100% - 140px); /* Reserve space for input controls */
+}
+
+.messages { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+}
+
+.message { 
+    padding: 8px; 
+    border-radius: 6px; 
+    background: #f6f8fa; 
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.message .meta { 
+    font-size: 11px; 
+    color: #666; 
+    margin-bottom: 6px; 
+    display: flex; 
+    gap: 8px;
+}
+
+.ai-chat-input { 
+    border-top: 1px solid #e8e8e8; 
+    background: #ffffff; 
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.input-area {
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.input-area .ant-input {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    resize: none !important;
+}
+
+.input-area .ant-input:focus,
+.input-area .ant-input:hover {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.input-controls { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.left-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.right-controls {
+    display: flex;
+    align-items: center;
+}
+
+.language-badge {
+    padding: 2px 6px;
+    background: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #1565c0;
+}
+
+.no-providers-message {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: #fafafa;
+    z-index: 10;
+}
+
+/* VS-style send button */
+.right-controls .ant-btn-circle {
+    min-width: 28px !important;
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.right-controls .ant-btn-circle .anticon {
+    font-size: 12px;
+}
+
+/* Small select styling to match VS */
+.left-controls .ant-select-small {
+    font-size: 11px;
+}
+
+.left-controls .ant-select-small .ant-select-selector {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    height: 24px !important;
+    min-height: 24px !important;
+}
+
+.left-controls .ant-select-small .ant-select-selection-item {
+    line-height: 22px !important;
+    font-size: 11px;
+}
