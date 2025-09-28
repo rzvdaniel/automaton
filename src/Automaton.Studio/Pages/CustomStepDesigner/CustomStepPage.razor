@@ -669,25 +669,65 @@
 <script>
     window.setDiffEditorContent = function(editorId, originalContent, modifiedContent, language) {
         // Wait for Monaco to be available and the editor to be initialized
-        setTimeout(() => {
+        let retryCount = 0;
+        const maxRetries = 50; // 5 seconds max wait time
+        
+        const trySetContent = () => {
             const editorElement = document.getElementById(editorId);
-            if (editorElement && editorElement._monacoEditor) {
+            
+            if (!editorElement) {
+                console.warn(`Diff editor element ${editorId} not found`);
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(trySetContent, 100);
+                }
+                return;
+            }
+            
+            // Check if Monaco is available
+            if (typeof monaco === 'undefined') {
+                console.warn('Monaco editor not yet available, retrying...');
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(trySetContent, 100);
+                }
+                return;
+            }
+            
+            // Check if the BlazorMonaco diff editor is initialized
+            if (!editorElement._monacoEditor) {
+                console.warn('Diff editor not yet initialized, retrying...');
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(trySetContent, 100);
+                }
+                return;
+            }
+            
+            try {
                 const editor = editorElement._monacoEditor;
                 
                 // Create models for original and modified content
-                const originalModel = monaco.editor.createModel(originalContent, language);
-                const modifiedModel = monaco.editor.createModel(modifiedContent, language);
+                const originalModel = monaco.editor.createModel(originalContent || '', language || 'python');
+                const modifiedModel = monaco.editor.createModel(modifiedContent || '', language || 'python');
                 
-                // Set the models
+                // Set the models for the diff editor
                 editor.setModel({
                     original: originalModel,
                     modified: modifiedModel
                 });
-            } else {
-                console.warn('Diff editor not ready, retrying in 100ms');
-                // Retry if editor isn't ready
-                setTimeout(() => window.setDiffEditorContent(editorId, originalContent, modifiedContent, language), 100);
+                
+                console.log('Diff editor content set successfully');
+            } catch (error) {
+                console.error('Error setting diff editor content:', error);
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(trySetContent, 200);
+                }
             }
-        }, 50);
+        };
+        
+        // Start the retry process
+        setTimeout(trySetContent, 50);
     };
 </script>

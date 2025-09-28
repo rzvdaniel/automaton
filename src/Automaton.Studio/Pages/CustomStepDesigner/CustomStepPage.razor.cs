@@ -221,8 +221,22 @@ partial class CustomStepPage : ComponentBase, IDisposable
     {
         try
         {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(generatedCode))
+            {
+                await MessageService.WarningAsync("No code was generated. Please try again.");
+                return;
+            }
+            
             // Clean up the generated code by removing markdown code block syntax
             var cleanedCode = CodeCleanupService.CleanupGeneratedCode(generatedCode);
+            
+            // Validate cleaned code
+            if (string.IsNullOrWhiteSpace(cleanedCode))
+            {
+                await MessageService.WarningAsync("Generated code is empty after cleanup. Please try again.");
+                return;
+            }
             
             // Store the pending code and show diff editor instead of directly applying
             pendingGeneratedCode = cleanedCode;
@@ -242,8 +256,18 @@ partial class CustomStepPage : ComponentBase, IDisposable
     {
         try
         {
+            // Validate pending code
+            if (string.IsNullOrWhiteSpace(pendingGeneratedCode))
+            {
+                await MessageService.WarningAsync("No pending code changes to accept.");
+                return;
+            }
+            
             // Apply the pending code to the Monaco editor
-            await codeEditor.SetValue(pendingGeneratedCode);
+            if (codeEditor != null)
+            {
+                await codeEditor.SetValue(pendingGeneratedCode);
+            }
             
             // Update the view model
             StepDesignerViewModel.CustomStep.Definition.Code = pendingGeneratedCode;
@@ -264,12 +288,19 @@ partial class CustomStepPage : ComponentBase, IDisposable
 
     private async Task RejectCodeChanges()
     {
-        // Hide diff editor and reset state without applying changes
-        showDiffEditor = false;
-        pendingGeneratedCode = string.Empty;
-        await InvokeAsync(StateHasChanged);
-        
-        await MessageService.InfoAsync("Code changes rejected. Original code preserved.");
+        try
+        {
+            // Hide diff editor and reset state without applying changes
+            showDiffEditor = false;
+            pendingGeneratedCode = string.Empty;
+            await InvokeAsync(StateHasChanged);
+            
+            await MessageService.InfoAsync("Code changes rejected. Original code preserved.");
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Failed to reject code changes: {ex.Message}");
+        }
     }
 
     // Convert StepVariable to VariableInfo for AI chat panel
