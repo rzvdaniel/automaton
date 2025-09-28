@@ -24,7 +24,51 @@
                         <span class="role">@msg.Role</span>
                         <span class="time">@msg.Time.ToString("HH:mm")</span>
                     </div>
-                    <div class="content">@((MarkupString)msg.Content)</div>
+                    <div class="content">
+                        @switch (msg.Type)
+                        {
+                            case MessageType.Generating:
+                                <div>
+                                    <p><em>@msg.Content</em></p>
+                                    <p><Icon Type="sync" Spin="true" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" Style="margin-right: 6px;" /> Generating code...</p>
+                                </div>
+                                break;
+
+                            case MessageType.CodeSuccess:
+                                <div style="background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;">
+                                    <strong>✅ @msg.Content</strong><br/><br/>
+                                    <pre style="background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;"><code>@msg.GeneratedCode</code></pre>
+                                    @if (!string.IsNullOrEmpty(msg.CodeId))
+                                    {
+                                        <Button Type="@ButtonType.Primary" 
+                                                Size="@ButtonSize.Small" 
+                                                OnClick="() => ApplyCodeFromButton(msg.CodeId!)"
+                                                Style="font-size: 12px;">
+                                            Apply Code
+                                        </Button>
+                                    }
+                                </div>
+                                break;
+
+                            case MessageType.CodeError:
+                                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;">
+                                    <strong>❌ @msg.Content</strong><br/>
+                                    <span style="color: #dc3545;">@msg.Content</span>
+                                </div>
+                                break;
+
+                            case MessageType.System:
+                                <div style="color: #666; font-style: italic;">
+                                    ✅ @msg.Content
+                                </div>
+                                break;
+
+                            case MessageType.Text:
+                            default:
+                                @((MarkupString)msg.Content)
+                                break;
+                        }
+                    </div>
                 </div>
             }
         </div>

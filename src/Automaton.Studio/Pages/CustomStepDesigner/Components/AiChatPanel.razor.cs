@@ -6,6 +6,15 @@ using Microsoft.JSInterop;
 
 namespace Automaton.Studio.Pages.CustomStepDesigner.Components;
 
+public enum MessageType
+{
+    Text,
+    Generating,
+    CodeSuccess,
+    CodeError,
+    System
+}
+
 public partial class AiChatPanel : ComponentBase, IDisposable
 {
     [Parameter] public EventCallback<string> OnSend { get; set; }
@@ -30,7 +39,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
     private List<ChatMessage> messages = new()
     {
-        new ChatMessage("System", "AI code panel ready. Select a provider and model to start generating code.", DateTime.Now)
+        new ChatMessage("System", "AI code panel ready. Select a provider and model to start generating code.", DateTime.Now) 
+        { 
+            Type = MessageType.System 
+        }
     };
 
     protected override async Task OnInitializedAsync()
@@ -60,7 +72,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            messages.Add(new ChatMessage("System", $"Error loading AI providers: {ex.Message}", DateTime.Now));
+            messages.Add(new ChatMessage("System", $"Error loading AI providers: {ex.Message}", DateTime.Now)
+            {
+                Type = MessageType.CodeError
+            });
             StateHasChanged();
         }
     }
@@ -183,7 +198,12 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             }
 
             // Add generating message
-            messages.Add(new ChatMessage("AI", $"<p><em>{contextMessage}</em></p><p>?? Generating code...</p>", DateTime.Now));
+            var generatingMessage = new ChatMessage("AI", contextMessage, DateTime.Now) 
+            { 
+                IsGenerating = true, 
+                Type = MessageType.Generating 
+            };
+            messages.Add(generatingMessage);
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
 
@@ -212,26 +232,30 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 {
                     // Ask mode: Show code with apply button, don't auto-apply
                     var codeId = Guid.NewGuid().ToString();
-                    var formattedCode = $"<div style='background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;'>" +
-                                      $"<strong>✅ Code generated successfully:</strong><br/><br/>" +
-                                      $"<pre style='background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;'><code>{System.Net.WebUtility.HtmlEncode(response.GeneratedCode)}</code></pre>" +
-                                      $"<button onclick='applyCode(\"{codeId}\")' style='background: #1890ff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 12px;'>Apply Code</button>" +
-                                      $"</div>";
-
-                    messages.Add(new ChatMessage("AI", formattedCode, DateTime.Now));
-
+                    var codeMessage = new ChatMessage("AI", "Code generated successfully:", DateTime.Now)
+                    {
+                        Type = MessageType.CodeSuccess,
+                        CodeId = codeId,
+                        GeneratedCode = response.GeneratedCode,
+                        IsSuccess = true
+                    };
+                    
+                    messages.Add(codeMessage);
+                    
                     // Store the code for later application with unique ID
                     pendingCodes[codeId] = response.GeneratedCode;
                 }
                 else
                 {
                     // Agent mode: Show code and auto-apply (existing behavior)
-                    var formattedCode = $"<div style='background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;'>" +
-                                      $"<strong>✅ Code generated and applied:</strong><br/><br/>" +
-                                      $"<pre style='background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto;'><code>{System.Net.WebUtility.HtmlEncode(response.GeneratedCode)}</code></pre>" +
-                                      $"</div>";
-
-                    messages.Add(new ChatMessage("AI", formattedCode, DateTime.Now));
+                    var codeMessage = new ChatMessage("AI", "Code generated and applied:", DateTime.Now)
+                    {
+                        Type = MessageType.CodeSuccess,
+                        GeneratedCode = response.GeneratedCode,
+                        IsSuccess = true
+                    };
+                    
+                    messages.Add(codeMessage);
 
                     // Auto-apply code in Agent mode
                     if (OnCodeGenerated.HasDelegate)
@@ -243,12 +267,14 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             else
             {
                 // Add error response to chat
-                var errorMessage = $"<div style='background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;'>" +
-                                  $"<strong>? Code generation failed:</strong><br/>" +
-                                  $"<span style='color: #dc3545;'>{System.Net.WebUtility.HtmlEncode(response.ErrorMessage)}</span>" +
-                                  $"</div>";
-
-                messages.Add(new ChatMessage("AI", errorMessage, DateTime.Now));
+                var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
+                {
+                    Type = MessageType.CodeError,
+                    Content = response.ErrorMessage,
+                    IsSuccess = false
+                };
+                
+                messages.Add(errorMessage);
             }
 
             // Emit event for legacy compatibility if needed
@@ -260,17 +286,19 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         catch (Exception ex)
         {
             // Remove generating message if it exists
-            if (messages.LastOrDefault()?.Content?.Contains("?? Generating code") == true)
+            if (messages.LastOrDefault()?.Type == MessageType.Generating)
             {
                 messages.RemoveAt(messages.Count - 1);
             }
 
-            var errorMessage = $"<div style='background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;'>" +
-                              $"<strong>? Unexpected error:</strong><br/>" +
-                              $"<span style='color: #dc3545;'>{System.Net.WebUtility.HtmlEncode(ex.Message)}</span>" +
-                              $"</div>";
-
-            messages.Add(new ChatMessage("AI", errorMessage, DateTime.Now));
+            var errorMessage = new ChatMessage("AI", "Unexpected error:", DateTime.Now)
+            {
+                Type = MessageType.CodeError,
+                Content = ex.Message,
+                IsSuccess = false
+            };
+            
+            messages.Add(errorMessage);
         }
         finally
         {
@@ -292,7 +320,14 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private record ChatMessage(string Role, string Content, DateTime Time);
+    private record ChatMessage(string Role, string Content, DateTime Time)
+    {
+        public bool IsGenerating { get; init; } = false;
+        public string? CodeId { get; init; }
+        public bool IsSuccess { get; init; } = true;
+        public string? GeneratedCode { get; init; }
+        public MessageType Type { get; init; } = MessageType.Text;
+    }
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -323,6 +358,11 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     [JSInvokable]
     public async Task ApplyCode(string codeId)
     {
+        await ApplyCodeFromButton(codeId);
+    }
+
+    private async Task ApplyCodeFromButton(string codeId)
+    {
         if (pendingCodes.TryGetValue(codeId, out var code) && OnCodeGenerated.HasDelegate)
         {
             await OnCodeGenerated.InvokeAsync(code);
@@ -331,7 +371,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             pendingCodes.Remove(codeId);
 
             // Add confirmation message
-            messages.Add(new ChatMessage("System", "✅ Code applied to editor", DateTime.Now));
+            messages.Add(new ChatMessage("System", "Code applied to editor", DateTime.Now) 
+            { 
+                Type = MessageType.System 
+            });
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
         }
