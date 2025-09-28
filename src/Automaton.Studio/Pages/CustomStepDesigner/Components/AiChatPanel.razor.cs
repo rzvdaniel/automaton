@@ -22,6 +22,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     [Parameter] public string CurrentLanguage { get; set; } = "Python";
     [Parameter] public List<VariableInfo>? InputVariables { get; set; }
     [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
+    [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
@@ -34,6 +35,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private bool showNoProvidersMessage = false;
     private bool isGeneratingCode = false;
     private Dictionary<string, string> pendingCodes = new();
+    private List<CodeVersion> codeHistory = new();
 
     private List<AiProviderInfo>? availableProviders;
 
@@ -217,7 +219,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 Model = selectedModel,
                 InputVariables = InputVariables?.ToList(),
                 OutputVariables = OutputVariables?.ToList(),
-                ConversationHistory = BuildConversationHistory()
+                ConversationHistory = await BuildConversationHistoryAsync()
             };
 
             // Call the code generation service
@@ -245,6 +247,13 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     
                     // Store the code for later application with unique ID
                     pendingCodes[codeId] = response.GeneratedCode;
+                    
+                    // Track in version history
+                    codeHistory.Add(new CodeVersion(
+                        response.GeneratedCode, 
+                        DateTime.Now, 
+                        userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
+                        false));
                 }
                 else
                 {
@@ -330,6 +339,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         public MessageType Type { get; init; } = MessageType.Text;
     }
 
+    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
+
     private const string Agent = "Agent";
     private const string Ask = "Ask";
 
@@ -381,11 +392,35 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private List<ConversationMessage> BuildConversationHistory()
+    private async Task<List<ConversationMessage>> BuildConversationHistoryAsync()
     {
         var conversationHistory = new List<ConversationMessage>();
         
-        foreach (var message in messages)
+        // Add current code context as system message if available
+        if (GetCurrentCode != null)
+        {
+            try
+            {
+                var currentCode = await GetCurrentCode();
+                if (!string.IsNullOrEmpty(currentCode))
+                {
+                    conversationHistory.Add(new ConversationMessage("system", 
+                        $"Current code in the editor ({CurrentLanguage ?? "python"}):\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{currentCode}\n```\n\n" +
+                        "When the user asks for modifications, improvements, or changes, please consider this existing code as the starting point. " +
+                        "If the user wants to add functionality, build upon this existing code. If they want to fix issues, modify the relevant parts. " +
+                        "Always provide complete, working code that includes both the existing functionality and the requested changes."));
+                }
+            }
+            catch
+            {
+                // If getting current code fails, continue without code context
+            }
+        }
+        
+        // Apply smart conversation history filtering
+        var relevantMessages = FilterConversationHistory();
+        
+        foreach (var message in relevantMessages)
         {
             // Skip system messages and generating messages
             if (message.Type == MessageType.System || message.Type == MessageType.Generating)
@@ -402,10 +437,18 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             else if (message.Role == "AI")
             {
                 role = "assistant";
-                // For successful code generation, include the generated code in the conversation
+                // For successful code generation, include intent but not always full code
                 if (message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode))
                 {
-                    content = $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
+                    // Include code only for recent messages or when explicitly referenced
+                    if (ShouldIncludeCodeInHistory(message))
+                    {
+                        content = $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
+                    }
+                    else
+                    {
+                        content = $"{message.Content} [Code generated - {message.GeneratedCode.Length} chars]";
+                    }
                 }
                 // For errors, include the error message
                 else if (message.Type == MessageType.CodeError)
@@ -426,6 +469,66 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
 
         return conversationHistory;
+    }
+
+    private List<ChatMessage> FilterConversationHistory()
+    {
+        const int maxMessages = 10; // Keep last 10 exchanges
+        const int maxTokens = 8000; // Rough token limit
+        
+        var allMessages = messages.Where(m => 
+            m.Type != MessageType.System && 
+            m.Type != MessageType.Generating).ToList();
+            
+        // If we have few messages, return all
+        if (allMessages.Count <= maxMessages)
+        {
+            return allMessages;
+        }
+        
+        // Take recent messages and estimate token usage
+        var recentMessages = allMessages.TakeLast(maxMessages).ToList();
+        var estimatedTokens = EstimateTokenCount(recentMessages);
+        
+        // If still too long, reduce further
+        while (estimatedTokens > maxTokens && recentMessages.Count > 4)
+        {
+            recentMessages.RemoveAt(0); // Remove oldest
+            estimatedTokens = EstimateTokenCount(recentMessages);
+        }
+        
+        return recentMessages;
+    }
+    
+    private bool ShouldIncludeCodeInHistory(ChatMessage message)
+    {
+        // Include code in history only for:
+        // 1. Last 3 AI responses
+        // 2. Messages from last 5 minutes
+        // 3. When code is small (< 500 chars)
+        
+        var recentMessages = messages.Where(m => 
+            m.Type == MessageType.CodeSuccess && 
+            m.Role == "AI").TakeLast(3);
+            
+        if (recentMessages.Contains(message))
+            return true;
+            
+        if (DateTime.Now - message.Time < TimeSpan.FromMinutes(5))
+            return true;
+            
+        if (message.GeneratedCode?.Length < 500)
+            return true;
+            
+        return false;
+    }
+    
+    private int EstimateTokenCount(List<ChatMessage> messages)
+    {
+        // Rough estimation: 1 token ≈ 4 characters
+        return messages.Sum(m => 
+            (m.Content?.Length ?? 0) + 
+            (m.GeneratedCode?.Length ?? 0)) / 4;
     }
 
     private async Task ClearConversationHistory()

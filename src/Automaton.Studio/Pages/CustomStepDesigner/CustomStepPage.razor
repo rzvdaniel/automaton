@@ -193,7 +193,8 @@
                                                 <AiChatPanel OnCodeGenerated="OnCodeGenerated"
                                                              CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
                                                              InputVariables="@GetInputVariablesForAI()"
-                                                             OutputVariables="@GetOutputVariablesForAI()" />
+                                                             OutputVariables="@GetOutputVariablesForAI()"
+                                                             GetCurrentCode="@GetCurrentCodeForAI" />
                                             </div>
                                         </TabPane>
                                         <TabPane Tab="Variables" Key="variables">

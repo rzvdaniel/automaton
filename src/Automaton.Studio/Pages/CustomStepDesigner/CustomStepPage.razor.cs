@@ -239,6 +239,25 @@ partial class CustomStepPage : ComponentBase, IDisposable
             }).ToList() ?? new List<VariableInfo>();
     }
 
+    private async Task<string> GetCurrentCodeForAI()
+    {
+        try
+        {
+            // Get current code from Monaco editor
+            if (codeEditor != null)
+            {
+                return await codeEditor.GetValue() ?? string.Empty;
+            }
+            // Fallback to view model if editor not available
+            return StepDesignerViewModel.CustomStep.Definition.Code ?? string.Empty;
+        }
+        catch
+        {
+            // Fallback to view model code if Monaco editor fails
+            return StepDesignerViewModel.CustomStep.Definition.Code ?? string.Empty;
+        }
+    }
+
     private Type GetVariableComponent(VariableType type)
     {
         return type switch
