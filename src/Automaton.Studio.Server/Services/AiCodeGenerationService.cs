@@ -33,10 +33,10 @@ public class AiCodeGenerationService
             // Generate the appropriate prompt
             var prompt = BuildPrompt(request);
 
-            // Get the appropriate AI provider and call it
+            // Get the appropriate AI provider and call it with conversation history
             var provider = aiProviderFactory.CreateProvider(request.Provider);
             var model = request.Model ?? provider.DefaultModel;
-            var generatedCode = await provider.GenerateCodeAsync(apiKey, prompt, model);
+            var generatedCode = await provider.GenerateCodeAsync(apiKey, prompt, model, request.ConversationHistory);
 
             return CodeGenerationResult.Success(generatedCode);
         }
@@ -194,6 +194,7 @@ public class CodeGenerationRequest
     public string? Model { get; set; }
     public List<VariableInfo>? InputVariables { get; set; }
     public List<VariableInfo>? OutputVariables { get; set; }
+    public List<ConversationMessage>? ConversationHistory { get; set; }
 }
 
 public class VariableInfo

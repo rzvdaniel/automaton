@@ -10,6 +10,11 @@
     <div class="ai-chat-header">
         <div class="title">AI Code Generation</div>
         <div class="header-actions">
+            <Button Type="ButtonType.Text" 
+                    Icon="delete" 
+                    Title="Clear conversation history"
+                    OnClick="ClearConversationHistory" 
+                    Disabled="@isGeneratingCode" />
             <Button Type="ButtonType.Text" Icon="pushpin" />
             <Button Type="ButtonType.Text" Icon="close" />
         </div>

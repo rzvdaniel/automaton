@@ -42,17 +42,28 @@ public class OpenAiProvider : IAiProvider
         this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
-    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model, List<ConversationMessage>? conversationHistory = null)
     {
         try
         {
+            var messages = new List<object>();
+            
+            // Add conversation history if provided
+            if (conversationHistory?.Any() == true)
+            {
+                foreach (var historyMessage in conversationHistory)
+                {
+                    messages.Add(new { role = historyMessage.Role.ToLowerInvariant(), content = historyMessage.Content });
+                }
+            }
+            
+            // Add the current prompt
+            messages.Add(new { role = "user", content = prompt });
+
             var request = new
             {
                 model = model,
-                messages = new[]
-                {
-                    new { role = "user", content = prompt }
-                },
+                messages = messages.ToArray(),
                 max_tokens = 2000,
                 temperature = 0.7
             };
@@ -78,5 +89,11 @@ public class OpenAiProvider : IAiProvider
             logger.LogError(ex, "Error calling OpenAI API with model {Model}", model);
             throw;
         }
+    }
+
+    // Legacy method for backward compatibility
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    {
+        return await GenerateCodeAsync(apiKey, prompt, model, null);
     }
 }

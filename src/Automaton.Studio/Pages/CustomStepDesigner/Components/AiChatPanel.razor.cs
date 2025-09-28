@@ -216,7 +216,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 SelectedAiApiKeyId = string.IsNullOrEmpty(selectedApiKeyId) ? null : Guid.Parse(selectedApiKeyId),
                 Model = selectedModel,
                 InputVariables = InputVariables?.ToList(),
-                OutputVariables = OutputVariables?.ToList()
+                OutputVariables = OutputVariables?.ToList(),
+                ConversationHistory = BuildConversationHistory()
             };
 
             // Call the code generation service
@@ -378,6 +379,73 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
         }
+    }
+
+    private List<ConversationMessage> BuildConversationHistory()
+    {
+        var conversationHistory = new List<ConversationMessage>();
+        
+        foreach (var message in messages)
+        {
+            // Skip system messages and generating messages
+            if (message.Type == MessageType.System || message.Type == MessageType.Generating)
+                continue;
+
+            string role;
+            string content;
+
+            if (message.Role == "User")
+            {
+                role = "user";
+                content = message.Content;
+            }
+            else if (message.Role == "AI")
+            {
+                role = "assistant";
+                // For successful code generation, include the generated code in the conversation
+                if (message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode))
+                {
+                    content = $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
+                }
+                // For errors, include the error message
+                else if (message.Type == MessageType.CodeError)
+                {
+                    content = $"I encountered an error: {message.Content}";
+                }
+                else
+                {
+                    content = message.Content;
+                }
+            }
+            else
+            {
+                continue; // Skip unknown roles
+            }
+
+            conversationHistory.Add(new ConversationMessage(role, content));
+        }
+
+        return conversationHistory;
+    }
+
+    private async Task ClearConversationHistory()
+    {
+        if (isGeneratingCode) return;
+
+        // Clear all messages except for system messages
+        messages.RemoveAll(m => m.Type != MessageType.System);
+        
+        // Clear pending codes
+        pendingCodes.Clear();
+
+        // Add a system message about the cleared history
+        messages.Add(new ChatMessage("System", "Conversation history cleared. Starting fresh.", DateTime.Now) 
+        { 
+            Type = MessageType.System 
+        });
+
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
     }
 
     public void Dispose()
