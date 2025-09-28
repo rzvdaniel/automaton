@@ -42,22 +42,45 @@ public class GoogleProvider : IAiProvider
         this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
-    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model, List<ConversationMessage>? conversationHistory = null)
     {
         try
         {
-            var request = new
+            var contents = new List<object>();
+            
+            // Add conversation history if provided
+            if (conversationHistory?.Any() == true)
             {
-                contents = new[]
+                foreach (var historyMessage in conversationHistory)
                 {
-                    new
+                    var role = historyMessage.Role.ToLowerInvariant();
+                    // Google uses "model" instead of "assistant"
+                    if (role == "assistant" || role == "ai") role = "model";
+                    
+                    contents.Add(new
                     {
+                        role = role,
                         parts = new[]
                         {
-                            new { text = prompt }
+                            new { text = historyMessage.Content }
                         }
-                    }
-                },
+                    });
+                }
+            }
+            
+            // Add the current prompt
+            contents.Add(new
+            {
+                role = "user",
+                parts = new[]
+                {
+                    new { text = prompt }
+                }
+            });
+
+            var request = new
+            {
+                contents = contents.ToArray(),
                 generationConfig = new
                 {
                     maxOutputTokens = 2000,
@@ -86,5 +109,11 @@ public class GoogleProvider : IAiProvider
             logger.LogError(ex, "Error calling Google API with model {Model}", model);
             throw;
         }
+    }
+
+    // Legacy method for backward compatibility
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    {
+        return await GenerateCodeAsync(apiKey, prompt, model, null);
     }
 }

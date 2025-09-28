@@ -41,6 +41,7 @@ public class CodeGenerationRequest
     public string? Model { get; set; }
     public List<VariableInfo>? InputVariables { get; set; }
     public List<VariableInfo>? OutputVariables { get; set; }
+    public List<ConversationMessage>? ConversationHistory { get; set; }
 }
 
 public class VariableInfo

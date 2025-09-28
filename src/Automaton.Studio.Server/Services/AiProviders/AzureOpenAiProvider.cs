@@ -42,11 +42,17 @@ public class AzureOpenAiProvider : IAiProvider
         this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
-    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model, List<ConversationMessage>? conversationHistory = null)
     {
         // Note: Azure OpenAI requires endpoint configuration
         // This is a simplified implementation - in production, you'd need endpoint configuration per key
         logger.LogError("Azure OpenAI integration requires endpoint configuration. Please implement based on your Azure setup.");
         throw new NotImplementedException("Azure OpenAI integration requires endpoint configuration. Please implement based on your Azure setup.");
+    }
+
+    // Legacy method for backward compatibility
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    {
+        return await GenerateCodeAsync(apiKey, prompt, model, null);
     }
 }

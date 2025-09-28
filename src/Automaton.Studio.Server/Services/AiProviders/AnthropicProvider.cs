@@ -42,18 +42,32 @@ public class AnthropicProvider : IAiProvider
         this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
-    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model, List<ConversationMessage>? conversationHistory = null)
     {
         try
         {
+            var messages = new List<object>();
+            
+            // Add conversation history if provided
+            if (conversationHistory?.Any() == true)
+            {
+                foreach (var historyMessage in conversationHistory)
+                {
+                    var role = historyMessage.Role.ToLowerInvariant();
+                    // Anthropic uses "assistant" instead of "ai"
+                    if (role == "ai") role = "assistant";
+                    messages.Add(new { role = role, content = historyMessage.Content });
+                }
+            }
+            
+            // Add the current prompt
+            messages.Add(new { role = "user", content = prompt });
+
             var request = new
             {
                 model = model,
                 max_tokens = 2000,
-                messages = new[]
-                {
-                    new { role = "user", content = prompt }
-                }
+                messages = messages.ToArray()
             };
 
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
@@ -77,5 +91,11 @@ public class AnthropicProvider : IAiProvider
             logger.LogError(ex, "Error calling Anthropic API with model {Model}", model);
             throw;
         }
+    }
+
+    // Legacy method for backward compatibility
+    public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model)
+    {
+        return await GenerateCodeAsync(apiKey, prompt, model, null);
     }
 }
