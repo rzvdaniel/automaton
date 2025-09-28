@@ -1,125 +1,105 @@
-# Getting Started with Automaton
+# Quick Start Guide
 
-Welcome to Automaton! This guide will help you get up and running with the automation platform quickly.
+Welcome to Automaton! This guide will help you get started with the automation platform quickly.
 
 ## What is Automaton?
 
 Automaton is a lightweight, cross-platform automation platform that helps you streamline and orchestrate software tasks. With its visual flow builder and extensible architecture, you can create powerful automation workflows without deep programming knowledge.
 
-## Quick Start Checklist
+## Quick Start Steps
 
-- [ ] **Install Automaton Studio** - Set up the main application
-- [ ] **Deploy a Runner** - Set up an execution agent  
+- [ ] **Register/Login** - Create your account or sign in
+- [ ] **Install Automaton Desktop** (Optional) - For a native desktop experience  
+- [ ] **Install a Runner** - Set up an execution agent
 - [ ] **Create your first Flow** - Build a simple automation
 - [ ] **Execute and Monitor** - Run your automation and view results
 
-## Installation Options
+## Getting Started
 
-### Option 1: Web-based Studio (Recommended)
+### 1. Register or Login
 
-The web-based studio runs in your browser and provides the complete Automaton experience:
+Visit the Automaton platform and either:
+- **Register**: Create a new account with your email
+- **Login**: Sign in with your existing credentials
 
-1. **Download the latest release** from [GitHub Releases](https://github.com/rzvdaniel/automaton/releases)
-2. **Extract and run** the Automaton Studio Web server
-3. **Open your browser** to `https://localhost:7091`
-4. **Complete the setup wizard** to configure your installation
+### 2. Install Applications (Optional)
 
-### Option 2: Desktop Application
-
+#### Automaton Desktop
 For a native desktop experience on Windows:
+1. Go to **Downloads Hub** in the platform
+2. Navigate to **Desktop** section
+3. Download and install **Automaton Studio Desktop**
+4. Launch and login with your credentials
 
-1. **Download the desktop application** from the Downloads Hub
-2. **Install and launch** the Automaton Studio Desktop
-3. **Follow the onboarding wizard** to get started
+#### Automaton Runner
+Runners execute your automation flows. To set up your first runner:
+1. Go to **Downloads Hub** in the platform  
+2. Navigate to **Downloads** section for runners
+3. Download the appropriate version for your platform (Windows, macOS, Linux)
+4. Follow the installation instructions provided on the download page
 
-## Setting Up Your First Runner
+### 3. Setting Up Authentication for Runners
 
-Runners are agents that execute your automation flows. Here's how to set up your first one:
-
-### Console Runner (Cross-platform)
-
-1. **Download the runner** from the Downloads Hub or build from source:
-   ```bash
-   cd src/Automaton.Runner.Console
-   dotnet build -c Release
-   dotnet publish -c Release --self-contained false
-   ```
-
-2. **Get an API Key**:
-   - Go to **Settings > API Keys** in Automaton Studio
-   - Click **Create New Key**
-   - Copy the generated key (starts with `ak_`)
-
-3. **Configure and start the runner**:
-   ```bash
-   # Interactive setup (recommended for first-time setup)
-   automaton-runner
-   
-   # Or set API key as environment variable
-   export AUTOMATON_API_KEY="your_api_key"
-   automaton-runner
-   ```
-
-4. **Verify connection**: The runner should appear in the **Runners** section of your studio
-
-## Creating Your First Flow
+Runners need an API key to connect:
+1. Go to **API Keys** in the platform
+2. Click **Create New Key**
+3. Copy the generated key (starts with `ak_`)
+4. Use this key when configuring your runner
+### 4. Creating Your First Flow
 
 Let's create a simple "Hello World" automation:
 
-### Step 1: Navigate to Flows
+#### Navigate to Flows
 - Click **Flows** in the left navigation menu
 - Click **Create New Flow**
 
-### Step 2: Design Your Flow
+#### Design Your Flow
 - Drag a **Display Message** step onto the canvas
 - Configure the message text: "Hello, World!"
 - Connect the Start node to your Display Message step
 
-### Step 3: Configure Execution
+#### Configure Execution
 - Click **Settings** in the flow designer
 - Select your runner from the dropdown
 - Save your flow
 
-### Step 4: Execute
+#### Execute Your Flow
 - Click **Run Flow** in the designer
 - Monitor execution in the **Logs** tab
 - View the result in the **Activity** tab
 
-## Key Concepts
+## Understanding the Platform
 
-### Flows
-**Flows** are your automation workflows - visual representations of tasks that need to be executed in sequence or parallel.
+### Key Concepts
 
-### Steps  
-**Steps** are individual actions within a flow, such as:
+**Flows** are your automation workflows - visual representations of tasks executed in sequence or parallel.
+
+**Steps** are individual actions within a flow:
 - Display messages
 - HTTP requests  
 - File operations
 - Python scripts
 - Conditional logic
 
-### Runners
-**Runners** are execution agents that run your flows. They can be:
-- Local console applications
-- Remote agents on different machines
-- Containerized instances
+**Runners** are execution agents that run your flows on different machines.
 
-### Variables
-**Variables** store data that flows between steps, making your automations dynamic and reusable.
+**Variables** store data that flows between steps, making automations dynamic and reusable.
+
+### Platform Pages
+
+- **Dashboard**: Overview of your flows and runners
+- **Flows**: Create and manage automation workflows
+- **Runners**: View and manage connected execution agents  
+- **Custom Steps**: Build your own reusable automation components
+- **API Keys**: Manage authentication keys for runners and integrations
+- **Downloads Hub**: Download Automaton Desktop and Runner applications
+- **Settings**: Configure your account and preferences
 
 ## Next Steps
 
 Now that you have Automaton running:
+- Explore the **Flow Designer** to create more complex automations
+- Visit **Downloads Hub** to set up additional runners
+- Learn about the [Platform Pages](user-guide/platform-pages.md) for detailed interface guidance
 
-- **Explore the [User Guide](user-guide/flows.md)** for detailed feature documentation
-- **Check out sample flows** in the Onboarding section
-- **Read about [Custom Steps](user-guide/custom-steps.md)** to extend functionality
-- **Learn about [Runner deployment](deployment/runners.md)** for production use
-
-## Need Help?
-
-- 📖 Browse this documentation for comprehensive guides
-- 🐛 [Report issues](https://github.com/rzvdaniel/automaton/issues) on GitHub  
-- 💡 [Request features](https://github.com/rzvdaniel/automaton/issues/new) to help shape Automaton's future
-
-Welcome to the world of automated workflows with Automaton! 🚀
+Welcome to automated workflows with Automaton! 🚀
