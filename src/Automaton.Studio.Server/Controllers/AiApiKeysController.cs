@@ -12,16 +12,13 @@ namespace Automaton.Studio.Server.Controllers;
 public class AiApiKeysController : ControllerBase
 {
     private readonly AiApiKeyService aiApiKeyService;
-    private readonly AiCodeGenerationService aiCodeGenerationService;
     private readonly ILogger<AiApiKeysController> logger;
 
     public AiApiKeysController(
         AiApiKeyService aiApiKeyService,
-        AiCodeGenerationService aiCodeGenerationService,
         ILogger<AiApiKeysController> logger)
     {
         this.aiApiKeyService = aiApiKeyService;
-        this.aiCodeGenerationService = aiCodeGenerationService;
         this.logger = logger;
     }
 
@@ -126,30 +123,6 @@ public class AiApiKeysController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("generate-code")]
-    public async Task<ActionResult<CodeGenerationResponse>> GenerateCode([FromBody] CodeGenerationRequest request)
-    {
-        var userId = GetUserId();
-        var result = await aiCodeGenerationService.GenerateCodeAsync(userId, request);
-
-        if (result.IsSuccess)
-        {
-            return Ok(new CodeGenerationResponse 
-            { 
-                GeneratedCode = result.GeneratedCode,
-                IsSuccess = true 
-            });
-        }
-        else
-        {
-            return BadRequest(new CodeGenerationResponse 
-            { 
-                ErrorMessage = result.ErrorMessage,
-                IsSuccess = false 
-            });
-        }
-    }
-
     private Guid GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -185,11 +158,4 @@ public class AiApiKeyResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
     public bool IsActive { get; set; }
-}
-
-public class CodeGenerationResponse
-{
-    public bool IsSuccess { get; set; }
-    public string GeneratedCode { get; set; } = string.Empty;
-    public string ErrorMessage { get; set; } = string.Empty;
 }

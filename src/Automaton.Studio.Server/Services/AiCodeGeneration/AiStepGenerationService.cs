@@ -1,25 +1,25 @@
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services.AiProviders;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Studio.Server.Services.AiCodeGeneration;
 
-public class AiCodeGenerationService
+public class AiStepGenerationService
 {
     private readonly AiApiKeyService aiApiKeyService;
     private readonly AiProviderFactory aiProviderFactory;
-    private readonly ILogger<AiCodeGenerationService> logger;
+    private readonly ILogger<AiStepGenerationService> logger;
 
-    public AiCodeGenerationService(
+    public AiStepGenerationService(
         AiApiKeyService aiApiKeyService, 
         AiProviderFactory aiProviderFactory,
-        ILogger<AiCodeGenerationService> logger)
+        ILogger<AiStepGenerationService> logger)
     {
         this.aiApiKeyService = aiApiKeyService;
         this.aiProviderFactory = aiProviderFactory;
         this.logger = logger;
     }
 
-    public async Task<CodeGenerationResult> GenerateCodeAsync(Guid userId, CodeGenerationRequest request)
+    public async Task<CodeGenerationResult> GenerateCodeAsync(Guid userId, StepGenerationRequest request)
     {
         try
         {
@@ -73,7 +73,7 @@ public class AiCodeGenerationService
         return null;
     }
 
-    private string BuildPrompt(CodeGenerationRequest request)
+    private string BuildPrompt(StepGenerationRequest request)
     {
         var prompt = $$"""
             You are an expert automation developer. Generate {request.Language} code for a custom step in an automation workflow.
@@ -185,7 +185,7 @@ public class AiCodeGenerationService
     }
 }
 
-public class CodeGenerationRequest
+public class StepGenerationRequest
 {
     public string Description { get; set; } = string.Empty;
     public string Language { get; set; } = "Python";

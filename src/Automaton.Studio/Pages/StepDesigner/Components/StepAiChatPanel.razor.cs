@@ -25,6 +25,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
+    [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     protected ElementReference messagesContainer;
@@ -222,8 +223,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 ConversationHistory = await BuildConversationHistoryAsync()
             };
 
-            // Call the code generation service
-            var response = await AiApiKeyService.GenerateCodeAsync(codeGenRequest);
+            // Call the step generation service instead of the API key service
+            var response = await AiStepGenerationService.GenerateStepCodeAsync(codeGenRequest);
 
             // Remove the generating message
             messages.RemoveAt(messages.Count - 1);

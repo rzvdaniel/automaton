@@ -97,32 +97,4 @@ public class AiApiKeyService
             return false;
         }
     }
-
-    public async Task<CodeGenerationResponse> GenerateCodeAsync(CodeGenerationRequest request)
-    {
-        try
-        {
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-            var response = await httpClient.PostAsync("api/aiApiKeys/generate-code", content);
-            var responseJson = await response.Content.ReadAsStringAsync();
-
-            var result = JsonSerializer.Deserialize<CodeGenerationResponse>(responseJson, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            return result ?? new CodeGenerationResponse { IsSuccess = false, ErrorMessage = "Unknown error occurred" };
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error generating code with AI");
-            return new CodeGenerationResponse 
-            { 
-                IsSuccess = false, 
-                ErrorMessage = $"Code generation failed: {ex.Message}" 
-            };
-        }
-    }
 }

@@ -25,6 +25,7 @@ using System.Reflection;
 using System.Transactions;
 using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Services.AiCodeGeneration;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -195,7 +196,7 @@ services.AddTransient<ScheduleService>();
 
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
-services.AddScoped<AiCodeGenerationService>();
+services.AddScoped<AiStepGenerationService>();
 
 services.AddScoped<OpenAiProvider>();
 services.AddScoped<AnthropicProvider>();
