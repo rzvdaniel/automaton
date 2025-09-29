@@ -22,7 +22,7 @@ public class AiStepGenerationService
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync("api/AiStepGeneration/generate-step-code", content);
+            var response = await httpClient.PostAsync("api/aiStepGeneration/generate-step-code", content);
             var responseJson = await response.Content.ReadAsStringAsync();
 
             var result = JsonSerializer.Deserialize<CodeGenerationResponse>(responseJson, new JsonSerializerOptions

@@ -9,170 +9,391 @@
 @implements IDisposable
 
 <div class="flow-ai-chat-panel">
-    <PanelHeader Title="AI Flow Generation"
-                 ShowClearButton="true"
-                 OnClearClick="ClearConversationHistory"
-                 ClearDisabled="@isGeneratingFlow"
-                 ClearTooltip="Clear conversation history"
-                 ShowPinButton="true"
-                 ShowCloseButton="true"
-                 PinTooltip="Pin panel"
-                 CloseTooltip="Close panel" />
+	<PanelHeader Title="AI Flow Generation"
+				 ShowClearButton="true"
+				 OnClearClick="ClearConversationHistory"
+				 ClearDisabled="@isGeneratingFlow"
+				 ClearTooltip="Clear conversation history"
+				 ShowPinButton="true"
+				 ShowCloseButton="true"
+				 PinTooltip="Pin panel"
+				 CloseTooltip="Close panel" />
 
-    <div class="flow-ai-chat-body" @ref="messagesContainer" id="flow-ai-chat-messages">
-        <div class="messages">
-            @foreach (var msg in messages)
-            {
-                <div class="message">
-                    <div class="meta">
-                        <span class="role">@msg.Role</span>
-                        <span class="time">@msg.Time.ToString("HH:mm")</span>
-                    </div>
-                    <div class="content">
-                        @switch (msg.Type)
-                        {
-                            case FlowMessageType.Generating:
-                                <div>
-                                    <p><em>@msg.Content</em></p>
-                                    <Spin Size="SpinSize.Small" /> Generating flow...
-                                </div>
-                                break;
+	<div class="flow-ai-chat-body" @ref="messagesContainer" id="flow-ai-chat-messages">
+		<div class="messages">
+			@foreach (var msg in messages)
+			{
+				<div class="message">
+					<div class="meta">
+						<span class="role">@msg.Role</span>
+						<span class="time">@msg.Time.ToString("HH:mm")</span>
+					</div>
+					<div class="content">
+						@switch (msg.Type)
+						{
+							case FlowMessageType.Generating:
+								<div>
+									<p><em>@msg.Content</em></p>
+									<Spin Size="SpinSize.Small" /> Generating flow...
+								</div>
+								break;
 
-                            case FlowMessageType.FlowSuccess:
-                                <div style="background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;">
-                                    <strong>✅ @msg.Content</strong><br/><br/>
-                                    <div style="background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;">
-                                        <Text Code>@msg.GeneratedFlow</Text>
-                                    </div>
-                                    @if (!string.IsNullOrEmpty(msg.FlowId))
-                                    {
-                                        <Button Type="@ButtonType.Primary" 
-                                                Size="@ButtonSize.Small" 
-                                                OnClick="() => ApplyFlowFromButton(msg.FlowId!)"
-                                                Style="font-size: 12px;">
-                                            Apply Flow
-                                        </Button>
-                                    }
-                                </div>
-                                break;
+							case FlowMessageType.FlowSuccess:
+								<div style="background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;">
+									<strong>✅ @msg.Content</strong><br /><br />
+									<div style="background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;">
+										<Text Code>@msg.GeneratedFlow</Text>
+									</div>
+									@if (!string.IsNullOrEmpty(msg.FlowId))
+									{
+										<Button Type="@ButtonType.Primary"
+												Size="@ButtonSize.Small"
+												OnClick="() => ApplyFlowFromButton(msg.FlowId!)"
+												Style="font-size: 12px;">
+											Apply Flow
+										</Button>
+									}
+								</div>
+								break;
 
-                            case FlowMessageType.FlowError:
-                                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;">
-                                    <strong>❌ @msg.Content</strong><br/>
-                                    <span style="color: #dc3545;">@msg.Content</span>
-                                </div>
-                                break;
+							case FlowMessageType.FlowError:
+								<div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;">
+									<strong>❌ @msg.Content</strong><br />
+									<span style="color: #dc3545;">@msg.Content</span>
+								</div>
+								break;
 
-                            case FlowMessageType.System:
-                                <div style="color: #666; font-style: italic;">
-                                    ✅ @msg.Content
-                                </div>
-                                break;
+							case FlowMessageType.System:
+								<div style="color: #666; font-style: italic;">
+									✅ @msg.Content
+								</div>
+								break;
 
-                            case FlowMessageType.Text:
-                            default:
-                                @((MarkupString)msg.Content)
-                                break;
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
+							case FlowMessageType.Text:
+							default:
+								@((MarkupString)msg.Content)
+								break;
+						}
+					</div>
+				</div>
+			}
+		</div>
+	</div>
 
-    <div class="flow-ai-chat-input">
-        <div class="input-area">
-            <TextArea @bind-Value="promptText" 
-                      Placeholder="Ask Copilot to generate a flow or type / for topics" 
-                      Disabled="@isGeneratingFlow"
-                      ShowCount="false"
-                      AutoSize="false"
-                      Rows="3"
-                      Style="resize: none; border: none; box-shadow: none; padding: 12px;"
-                      @oninput="OnInputChange"
-                      @onkeydown="OnKeyDown" />
-        </div>
+	<div class="flow-ai-chat-input">
+		<div class="input-area">
+			<TextArea @bind-Value="promptText"
+					  Placeholder="Ask Copilot to generate a flow or type / for topics"
+					  Disabled="@isGeneratingFlow"
+					  ShowCount="false"
+					  AutoSize="false"
+					  Rows="3"
+					  Style="resize: none; border: none; box-shadow: none; padding: 12px;"
+					  @oninput="OnInputChange"
+					  @onkeydown="OnKeyDown" />
+		</div>
 
-        <div class="input-controls">
-            <div class="left-controls">
-                <Select @bind-Value="selectedAgent"
-                        TItemValue="string"
-                        TItem="string"
-                        Size="@InputSize.Small"
-                        Style="width: 80px;"
-                        Disabled="@isGeneratingFlow">
-                    <SelectOptions>
-                        <SelectOption Value="@Ask" Label="Ask" />
-                        <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
-                    </SelectOptions>
-                </Select>
+		<div class="input-controls">
+			<div class="left-controls">
+				<Select @bind-Value="selectedAgent"
+						TItemValue="string"
+						TItem="string"
+						Size="@InputSize.Small"
+						Style="width: 80px;"
+						Disabled="@isGeneratingFlow">
+					<SelectOptions>
+						<SelectOption Value="@Ask" Label="Ask" />
+						<SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
+					</SelectOptions>
+				</Select>
 
-                <Select @bind-Value="selectedProviderModel" 
-                        TItemValue="string"
-                        TItem="string" 
-                        Size="@InputSize.Small"
-                        Style="width: 180px;"
-                        Placeholder="Select model"
-                        AllowClear="false"
-                        Disabled="@isGeneratingFlow">
-                    <SelectOptions>
-                        @if (availableProviders?.Any() != true)
-                        {
-                            <SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
-                        }
-                        else
-                        {
-                            @foreach (var provider in availableProviders)
-                            {
-                                @if (provider.SupportedModels?.Any() == true)
-                                {
-                                    @foreach (var model in provider.SupportedModels)
-                                    {
-                                        var value = $"{provider.Provider}:{model}";
-                                        var label = $"{provider.ProviderName} - {model}";
-                                        var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
-                                        
-                                        <SelectOption TItemValue="string" TItem="string" 
-                                                    Value="@value" 
-                                                    Label="@label"
-                                                    Disabled="@isDisabled" />
-                                    }
-                                }
-                            }
-                        }
-                    </SelectOptions>
-                </Select>
-            </div>
+				<Select @bind-Value="selectedProviderModel"
+						TItemValue="string"
+						TItem="string"
+						Size="@InputSize.Small"
+						Style="width: 180px;"
+						Placeholder="Select model"
+						AllowClear="false"
+						Disabled="@isGeneratingFlow">
+					<SelectOptions>
+						@if (availableProviders?.Any() != true)
+						{
+							<SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
+						}
+						else
+						{
+							@foreach (var provider in availableProviders)
+							{
+								@if (provider.SupportedModels?.Any() == true)
+								{
+									@foreach (var model in provider.SupportedModels)
+									{
+										var value = $"{provider.Provider}:{model}";
+										var label = $"{provider.ProviderName} - {model}";
+										var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
 
-            <div class="right-controls">
-                <Button Icon="@(isGeneratingFlow ? "loading" : "caret-right")" 
-                        Type="@ButtonType.Primary" 
-                        Size="@ButtonSize.Small"
-                        Shape="@ButtonShape.Circle"
-                        OnClick="SendPrompt" 
-                        Disabled="@(!IsReadyToSendRealtime)"
-                        Loading="@isGeneratingFlow"
-                        Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-                </Button>
-            </div>
-        </div>
+										<SelectOption TItemValue="string" TItem="string"
+													  Value="@value"
+													  Label="@label"
+													  Disabled="@isDisabled" />
+									}
+								}
+							}
+						}
+					</SelectOptions>
+				</Select>
+			</div>
 
-        @if (showNoProvidersMessage)
-        {
-            <div class="no-providers-message">
-                <Alert Type="@AlertType.Warning" 
-                       Message="No AI providers configured" 
-                       Description="Configure your API keys in Settings to start using AI flow generation."
-                       ShowIcon="true"
-                       Style="margin: 8px 0 0 0;" />
-            </div>
-        }
-    </div>
+			<div class="right-controls">
+				<Button Icon="@(isGeneratingFlow ? "loading" : "caret-right")"
+						Type="@ButtonType.Primary"
+						Size="@ButtonSize.Small"
+						Shape="@ButtonShape.Circle"
+						OnClick="SendPrompt"
+						Disabled="@(!IsReadyToSendRealtime)"
+						Loading="@isGeneratingFlow"
+						Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+				</Button>
+			</div>
+		</div>
+
+		@if (showNoProvidersMessage)
+		{
+			<div class="no-providers-message">
+				<Alert Type="@AlertType.Warning"
+					   Message="No AI providers configured"
+					   Description="Configure your API keys in Settings to start using AI flow generation."
+					   ShowIcon="true"
+					   Style="margin: 8px 0 0 0;" />
+			</div>
+		}
+	</div>
 </div>
 
 <script>
-    // Simple function to set the flow ai chat component reference
-    window.setFlowAiChatPanelRef = function(componentRef) {
-        window.flowAiChatPanelInstance = componentRef;
-    };
+	// Simple function to set the flow ai chat component reference
+	window.setFlowAiChatPanelRef = function(componentRef) {
+		window.flowAiChatPanelInstance = componentRef;
+	};
 </script>
+
+<style>
+	/* Flow AI Chat Panel Styles */
+	.flow-ai-chat-panel {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		background-color: #ffffff;
+		border-radius: 0; /* Removed rounded corners */
+		overflow: hidden;
+		border: none; /* Removed border since it's inside a container */
+	}
+
+	.flow-ai-chat-body {
+		flex: 1;
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding: 10px;
+		min-height: 0;
+		background-color: #ffffff;
+	}
+
+
+	.messages {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.message {
+		padding: 8px;
+		border-radius: 6px;
+		background: #f6f8fa;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+	}
+
+		.message .meta {
+			font-size: 11px;
+			color: #666;
+			margin-bottom: 6px;
+			display: flex;
+			gap: 8px;
+		}
+
+	.flow-ai-chat-body .message .meta .role {
+		font-weight: 600;
+		color: #595959;
+	}
+
+	.flow-ai-chat-body .message .content {
+		font-size: 13px;
+		line-height: 1.5;
+		color: #262626;
+		word-wrap: break-word;
+	}
+
+	.flow-ai-chat-input {
+		border-top: 1px solid #f0f0f0;
+		background-color: #fafafa;
+		flex-shrink: 0;
+	}
+
+		.flow-ai-chat-input .input-area {
+			padding: 0;
+			border-bottom: 1px solid #f0f0f0;
+		}
+
+		.flow-ai-chat-input .input-controls {
+			padding: 8px 12px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.flow-ai-chat-input .left-controls {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			flex: 1;
+		}
+
+		.flow-ai-chat-input .right-controls {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.flow-ai-chat-input .flow-context-badge {
+			background-color: #f6f8fa;
+			padding: 2px 6px;
+			border-radius: 4px;
+			border: 1px solid #e1e4e8;
+			display: flex;
+			align-items: center;
+			gap: 2px;
+		}
+
+		.flow-ai-chat-input .no-providers-message {
+			padding: 0 12px 8px 12px;
+		}
+
+	/* Scrollbar styling */
+	.flow-ai-chat-body::-webkit-scrollbar {
+		width: 6px;
+	}
+
+	.flow-ai-chat-body::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.flow-ai-chat-body::-webkit-scrollbar-thumb {
+		background: #d9d9d9;
+		border-radius: 3px;
+	}
+
+		.flow-ai-chat-body::-webkit-scrollbar-thumb:hover {
+			background: #bfbfbf;
+		}
+
+	/* Message content styling */
+	.flow-ai-chat-body .message .content p {
+		margin: 0 0 8px 0;
+	}
+
+		.flow-ai-chat-body .message .content p:last-child {
+			margin-bottom: 0;
+		}
+
+	.flow-ai-chat-body .message .content pre {
+		background-color: #f8f9fa;
+		border: 1px solid #e1e4e8;
+		border-radius: 4px;
+		padding: 12px;
+		overflow-x: auto;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 12px;
+		line-height: 1.4;
+		margin: 8px 0;
+	}
+
+	.flow-ai-chat-body .message .content code {
+		background-color: #f8f9fa;
+		padding: 2px 4px;
+		border-radius: 3px;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 12px;
+	}
+
+	/* Loading animation */
+	@@keyframes flow-ai-thinking {
+		0%, 80%, 100% {
+			opacity: 0.4;
+		}
+
+		40% {
+			opacity: 1;
+		}
+	}
+
+	.flow-ai-chat-body .message .content .ant-spin {
+		margin-right: 8px;
+	}
+
+	/* Success and error message styling */
+	.flow-ai-chat-body .message .content > div[style*="border-left: 4px solid #28a745"] {
+		box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
+	}
+
+	.flow-ai-chat-body .message .content > div[style*="border-left: 4px solid #dc3545"] {
+		box-shadow: 0 2px 4px rgba(220, 53, 69, 0.1);
+	}
+
+	/* Button styling within messages */
+	.flow-ai-chat-body .message .content button {
+		margin-top: 8px;
+	}
+
+	/* Input area styling */
+	.flow-ai-chat-input .input-area .ant-input {
+		border: none !important;
+		box-shadow: none !important;
+		background-color: #ffffff !important;
+		padding: 12px !important;
+		resize: none !important;
+		font-size: 13px !important;
+		line-height: 1.4 !important;
+	}
+
+		.flow-ai-chat-input .input-area .ant-input:focus {
+			border: none !important;
+			box-shadow: none !important;
+		}
+
+		.flow-ai-chat-input .input-area .ant-input::placeholder {
+			color: #bfbfbf;
+			font-style: italic;
+		}
+
+	/* Responsive adjustments */
+	@@media (max-width: 768px) {
+		.flow-ai-chat-input .left-controls {
+			flex-wrap: wrap;
+			gap: 4px;
+		}
+
+			.flow-ai-chat-input .left-controls .ant-select {
+				min-width: 60px;
+			}
+
+		.flow-ai-chat-header {
+			padding: 8px 12px;
+		}
+
+		.flow-ai-chat-body .messages {
+			padding: 12px;
+			gap: 12px;
+		}
+	}
+</style>
