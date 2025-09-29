@@ -1,7 +1,7 @@
 ﻿using Automaton.Studio.Services;
 using FluentValidation;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner;
+namespace Automaton.Studio.Pages.StepDesigner;
 
 public class InputVariableValidator : AbstractValidator<InputVariableModel>
 {

@@ -7,11 +7,10 @@ using Automaton.Studio.Services;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using System.Linq;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner;
+namespace Automaton.Studio.Pages.StepDesigner;
 
-partial class CustomStepPage : ComponentBase, IDisposable
+partial class StepPage : ComponentBase, IDisposable
 {
     private bool loading = false;
     private bool runningCode = false;
@@ -30,7 +29,7 @@ partial class CustomStepPage : ComponentBase, IDisposable
         Automaton.Steps.CustomStepLanguage.Batch
     ];
 
-    [Inject] private CustomStepViewModel StepDesignerViewModel { get; set; }
+    [Inject] private StepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }

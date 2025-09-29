@@ -1,8 +1,7 @@
 ﻿using AntDesign;
 using Blazored.FluentValidation;
-using System.Threading.Tasks;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner;
+namespace Automaton.Studio.Pages.StepDesigner;
 
 public partial class InputVariableDialog : FeedbackComponent<InputVariableModel>
 {

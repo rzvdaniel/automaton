@@ -1,6 +1,6 @@
 ﻿using Automaton.Core.Enums;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner;
+namespace Automaton.Studio.Pages.StepDesigner;
 
 public class InputVariableModel
 {

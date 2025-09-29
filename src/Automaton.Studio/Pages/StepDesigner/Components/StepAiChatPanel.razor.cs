@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner.Components;
+namespace Automaton.Studio.Pages.StepDesigner.Components;
 
 public enum MessageType
 {

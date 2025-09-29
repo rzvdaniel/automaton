@@ -4,9 +4,9 @@ using Automaton.Studio.Factories;
 using Automaton.Studio.Services;
 using System.Text;
 
-namespace Automaton.Studio.Pages.CustomStepDesigner;
+namespace Automaton.Studio.Pages.StepDesigner;
 
-public class CustomStepViewModel : IDisposable
+public class StepViewModel : IDisposable
 {
     private StepFactory stepFactory;
     private readonly CustomStepsService customStepsService;
@@ -18,7 +18,7 @@ public class CustomStepViewModel : IDisposable
 
     public event EventHandler ScriptTextWritten;
 
-    public CustomStepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory)
+    public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory)
     {
         this.stepFactory = stepFactory;
         this.customStepsService = customStepsService;

@@ -12,7 +12,7 @@ using Automaton.Studio.Factories;
 using Automaton.Studio.Mapper;
 using Automaton.Studio.Pages.AiApiKeys;
 using Automaton.Studio.Pages.ApiKeys;
-using Automaton.Studio.Pages.CustomStepDesigner;
+using Automaton.Studio.Pages.StepDesigner;
 using Automaton.Studio.Pages.CustomSteps;
 using Automaton.Studio.Pages.FlowDesigner;
 using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
@@ -101,7 +101,7 @@ public static class SeviceCollection
         services.AddScoped<AiApiKeysViewModel>();
         services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
         services.AddScoped<DesignerViewModel>();
-        services.AddScoped<CustomStepViewModel>();
+        services.AddScoped<StepViewModel>();
         services.AddScoped<StepsViewModel>();
         services.AddScoped<CoreStepsViewModel>();
         services.AddScoped<Pages.FlowDesigner.Components.StepExplorer.CustomStepsViewModel>();
