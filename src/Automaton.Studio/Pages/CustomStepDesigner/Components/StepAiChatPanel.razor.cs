@@ -15,7 +15,7 @@ public enum MessageType
     System
 }
 
-public partial class AiChatPanel : ComponentBase, IDisposable
+public partial class StepAiChatPanel : ComponentBase, IDisposable
 {
     [Parameter] public EventCallback<string> OnSend { get; set; }
     [Parameter] public EventCallback<string> OnCodeGenerated { get; set; }
