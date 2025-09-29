@@ -35,12 +35,6 @@
             <Col Class="right-actions" Span="14">
                 <Space Class="right-header-items">
                     <SpaceItem>
-                        <Button Icon="thunderbolt" Type="@ButtonType.Primary">
-                            Create Flow with AI ✨
-                        </Button>
-                    </SpaceItem>
-
-                    <SpaceItem>
                         <Button Icon="save" OnClick="SaveFlow">
                             Save
                         </Button>
@@ -166,12 +160,6 @@
                                             <CustomStepsExplorer></CustomStepsExplorer>
                                         </TabPane>
                                     </Tabs>
-
-                                    <div class="create-step-ai-section">
-                                        <Button Icon="plus" Type="@ButtonType.Primary" Class="create-step-ai-button">
-                                            Create Step with AI ✨
-                                        </Button>
-                                    </div>
                                 </div>
                             </div>
                         </CascadingValue>
@@ -512,16 +500,6 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-    }
-
-    .create-step-ai-section {
-        padding: 8px 12px;
-        background-color: #f8f9fa;
-        flex-shrink: 0;
-    }
-
-    .create-step-ai-button {
-        width: 100%;
     }
 
     /* Fix main tabs to use full height */
