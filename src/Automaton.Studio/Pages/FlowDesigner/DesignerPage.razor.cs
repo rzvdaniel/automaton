@@ -29,9 +29,6 @@ partial class DesignerPage : ComponentBase
     private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
     private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
 
-    private string TopSplitterPercentage => "100%";
-    private string BottomSplitterPercentage => "40%";
-
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
 

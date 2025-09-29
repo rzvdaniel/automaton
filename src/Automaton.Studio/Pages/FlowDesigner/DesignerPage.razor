@@ -182,7 +182,7 @@
                     <SplitterPanel Size="80%">
 
                         <Splitter Layout="@SplitterLayout.Horizontal">
-                            <SplitterPanel Size="@TopSplitterPercentage">
+                            <SplitterPanel Size="100%">
                                 <Layout Class="main-content-layout">
 
                                     <Splitter Layout="@SplitterLayout.Vertical" Class="main-splitter">
@@ -235,7 +235,7 @@
                                 </Layout>
                             </SplitterPanel>
 
-                            <SplitterPanel Size="@BottomSplitterPercentage">
+                            <SplitterPanel Size="40%">
                                 <div class="right-panel-container">
                                     <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
                                         <TabPane Tab="AI Chat" Key="ai">
