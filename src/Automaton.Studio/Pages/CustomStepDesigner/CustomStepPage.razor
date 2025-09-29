@@ -200,6 +200,13 @@
                                         <TabPane Tab="Variables" Key="variables">
                                             <div class="tab-content-scrollable">
                                                 <div class="variables-panel">
+                                                    <PanelHeader Title="Variables"
+                                                                 ShowClearButton="false"
+                                                                 ShowPinButton="true"
+                                                                 ShowCloseButton="true"
+                                                                 PinTooltip="Pin panel"
+                                                                 CloseTooltip="Close" />
+
                                                     <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
                                                         <Panel Key="input">
                                                             <HeaderTemplate>

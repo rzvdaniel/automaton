@@ -14,15 +14,11 @@ namespace Automaton.Studio.Pages.FlowDesigner;
 
 partial class DesignerPage : ComponentBase
 {
-    private const string ZeroPercent = "0%";
-    private const string ThirtyPercent = "30%";
-    private const string SeventyPercent = "70%";
-    private const string HundredPercent = "100%";
-
     private Designer designer;
     private string activeTabKey = "designer";
     private bool isStepCreatedHandlerAttached;
     private StudioStep selectedStep;
+    private string rightPanelActiveTab = "ai"; // Default to AI Chat tab
     private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
@@ -33,8 +29,8 @@ partial class DesignerPage : ComponentBase
     private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
     private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
 
-    private string TopSplitterPercentage => selectedStep != null ? SeventyPercent : HundredPercent;
-    private string BottomSplitterPercentage => selectedStep != null ? ThirtyPercent : ZeroPercent;
+    private string TopSplitterPercentage => "100%";
+    private string BottomSplitterPercentage => "40%";
 
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
@@ -323,6 +319,15 @@ partial class DesignerPage : ComponentBase
         designer.SetActiveStep(e.Step);
     }
 
+    private void OnStepDeleted(object sender, StepEventArgs e)
+    {
+        if (selectedStep?.Id == e.Step.Id)
+        {
+            selectedStep = null;
+        }
+        StateHasChanged();
+    }
+
     private async Task OnItemDrop(StudioStep step)
     {
         if (step.IsNew)
@@ -343,21 +348,20 @@ partial class DesignerPage : ComponentBase
         }
 
         selectedStep = step;
+        rightPanelActiveTab = "properties"; // Switch to Properties tab when step is selected
         StateHasChanged();
     }
 
     private void ClosePropertiesPanel()
     {
         selectedStep = null;
+        rightPanelActiveTab = "ai"; // Switch back to AI Chat tab when properties are closed
         StateHasChanged();
     }
 
-    private void OnStepDeleted(object sender, StepEventArgs e)
+    private void OnRightPanelTabChange(string key)
     {
-        if (selectedStep?.Id == e.Step.Id)
-        {
-            selectedStep = null;
-        }
+        rightPanelActiveTab = key;
         StateHasChanged();
     }
 
@@ -403,5 +407,103 @@ partial class DesignerPage : ComponentBase
                 return Task.CompletedTask;
             }
         });
+    }
+
+    // AI Chat Panel methods
+    private async Task OnFlowGenerated(string generatedFlow)
+    {
+        try
+        {
+            // TODO: Parse and apply the generated flow to the current designer
+            MessageService.Success("Flow configuration generated successfully!");
+            
+            // For now, just log the generated flow
+            Console.WriteLine($"Generated Flow: {generatedFlow}");
+            
+            // In a real implementation, you would:
+            // 1. Parse the generated flow configuration (JSON)
+            // 2. Convert it to StudioStep objects
+            // 3. Add them to the current flow definition
+            // 4. Update the designer canvas
+            
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to apply generated flow: {ex.Message}");
+        }
+    }
+
+    private List<string> GetAvailableStepsForAI()
+    {
+        // TODO: Get actual list of available core steps from the system
+        return new List<string>
+        {
+            "Start", "End", "Decision", "Loop", "Delay", 
+            "Log", "SetVariable", "SendEmail", "FileOperation",
+            "HttpRequest", "DatabaseQuery", "Condition"
+        };
+    }
+
+    private List<string> GetAvailableCustomStepsForAI()
+    {
+        // TODO: Get actual list of available custom steps from the system
+        try
+        {
+            // This would typically query the database or service for custom steps
+            return new List<string>
+            {
+                "CustomPythonScript", "CustomDataProcessor", 
+                "CustomApiCall", "CustomFileHandler"
+            };
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    private async Task<string> GetCurrentFlowForAI()
+    {
+        try
+        {
+            // TODO: Serialize current flow to JSON format for AI context
+            if (DesignerViewModel?.ActiveDefinition?.Steps?.Any() == true)
+            {
+                var flowData = new
+                {
+                    FlowName = FlowName,
+                    FlowId = FlowId,
+                    Steps = DesignerViewModel.ActiveDefinition.Steps.Select(s => new
+                    {
+                        Id = s.Id,
+                        Name = s.Name,
+                        Type = s.GetType().Name,
+                        DisplayName = s.DisplayName,
+                        Description = s.Description
+                        // Note: Position properties (X, Y) are not available on StudioStep
+                    }),
+                    Variables = DesignerViewModel.Flow?.Variables?.Values?.Select(v => new
+                    {
+                        Id = v.Id,
+                        Name = v.Name,
+                        Type = v.Type.ToString(),
+                        Value = v.Value
+                    })
+                };
+
+                return System.Text.Json.JsonSerializer.Serialize(flowData, new System.Text.Json.JsonSerializerOptions 
+                { 
+                    WriteIndented = true 
+                });
+            }
+
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting current flow for AI: {ex.Message}");
+            return string.Empty;
+        }
     }
 }

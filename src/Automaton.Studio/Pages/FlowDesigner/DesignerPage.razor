@@ -72,7 +72,7 @@
                                             <Button Icon="caret-right" 
                                                     Type="@ButtonType.Primary"
                                                     Disabled="true"
-                                                    OnClick="OnRunButtonClickWhenDisabled">
+                                                    OnClick="@OnRunButtonClickWhenDisabled">
                                                 Run Flow
                                             </Button>
                                         </Tooltip>
@@ -236,26 +236,49 @@
                             </SplitterPanel>
 
                             <SplitterPanel Size="@BottomSplitterPercentage">
-                                @if (selectedStep != null)
-                                {
-                                    <div class="properties-container">
-                                        <div class="properties-header">
-                                            <Space Style="width: 100%; padding: 8px; justify-content: space-between;">
-                                                <SpaceItem>
-                                                    <Title Level="5">Step Details</Title>
-                                                </SpaceItem>
-                                                <SpaceItem>
-                                                    <Button Icon="close" Size="@ButtonSize.Small" Type="@ButtonType.Text" 
-                                                            OnClick="ClosePropertiesPanel" />
-                                                </SpaceItem>
-                                            </Space>
-                                        </div>
-                                        <div class="properties-content">
-                                            <StepPropertiesWrapper Step="selectedStep" />
-                                        </div>
-                                    </div>
-                                }
-            </SplitterPanel>
+                                <div class="right-panel-container">
+                                    <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
+                                        <TabPane Tab="AI Chat" Key="ai">
+                                            <div class="tab-content-scrollable">
+                                                <FlowAiChatPanel OnFlowGenerated="OnFlowGenerated"
+                                                                    AvailableSteps="@GetAvailableStepsForAI()"
+                                                                    AvailableCustomSteps="@GetAvailableCustomStepsForAI()"
+                                                                    GetCurrentFlow="@GetCurrentFlowForAI" />
+                                            </div>
+                                        </TabPane>
+                                        <TabPane Tab="Properties" Key="properties">
+                                            <div class="tab-content-scrollable">                                              
+                                                <div class="properties-container">
+                                                    <PanelHeader Title="Step Details"
+                                                        ShowClearButton="false"
+                                                        ShowPinButton="true"
+                                                        ShowCloseButton="true"
+                                                        OnCloseClick="ClosePropertiesPanel"
+                                                        PinTooltip="Pin properties panel"
+                                                        CloseTooltip="Close properties" />
+                                                        
+                                                    @if (selectedStep != null)
+                                                    {
+                                                        <div class="properties-content">
+                                                            <StepPropertiesWrapper Step="selectedStep" />
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="properties-empty">
+                                                            <div class="properties-empty-content">
+                                                                <Icon Type="edit" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                                                <div class="properties-empty-title">No step selected</div>
+                                                                <div class="properties-empty-subtitle">Double-click a step to view its properties.</div>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </TabPane>
+                                    </Tabs>
+                                </div> 
+                            </SplitterPanel>
                         </Splitter>
 
                     </SplitterPanel>
@@ -328,7 +351,6 @@
         display: flex;
         flex-direction: column;
         background-color: #fff;
-        border-left: 1px solid #f0f0f0;
     }
 
     .properties-header {
@@ -562,5 +584,100 @@
 
     .runner-status-icon.runner-status-none {
         color: #d9d9d9 !important; /* Gray for none/unknown */
+    }
+
+    /* Right panel tabs styling - reusing from CustomStepPage */
+    .right-panel { 
+        padding: 0 0 0 10px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Fix for right panel tabs scrolling */
+    .right-panel-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background-color: #fff;
+        border-left: 1px solid #f0f0f0;
+    }
+
+    .right-panel .ant-tabs {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .right-panel .ant-tabs-nav {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+    }
+
+    .right-panel .ant-tabs-content-holder {
+        flex: 1 1 auto;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .right-panel .ant-tabs-content {
+        height: 100%;
+    }
+
+    .right-panel .ant-tabs-tabpane {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .tab-content-scrollable {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Ensure FlowAiChatPanel takes full height */
+    .tab-content-scrollable .flow-ai-chat-panel {
+        height: 100%;
+        min-height: 0;
+    }
+
+    /* Properties empty state styling */
+    .properties-empty {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ffffff;
+        flex: 1;
+        padding: 16px;
+    }
+
+    .properties-empty-content {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 280px;
+    }
+
+    .properties-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .properties-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
+        text-align: center;
     }
 </style>

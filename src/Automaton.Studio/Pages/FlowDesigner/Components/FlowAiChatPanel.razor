@@ -1,0 +1,178 @@
+﻿@using AntDesign
+@using System.Collections.Generic
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using Automaton.Studio.Models
+@using Automaton.Studio.Services
+@using Automaton.Studio.Pages.FlowDesigner.Components
+@using Automaton.Studio.Shared.Components
+@implements IDisposable
+
+<div class="flow-ai-chat-panel">
+    <PanelHeader Title="AI Flow Generation"
+                 ShowClearButton="true"
+                 OnClearClick="ClearConversationHistory"
+                 ClearDisabled="@isGeneratingFlow"
+                 ClearTooltip="Clear conversation history"
+                 ShowPinButton="true"
+                 ShowCloseButton="true"
+                 PinTooltip="Pin panel"
+                 CloseTooltip="Close panel" />
+
+    <div class="flow-ai-chat-body" @ref="messagesContainer" id="flow-ai-chat-messages">
+        <div class="messages">
+            @foreach (var msg in messages)
+            {
+                <div class="message">
+                    <div class="meta">
+                        <span class="role">@msg.Role</span>
+                        <span class="time">@msg.Time.ToString("HH:mm")</span>
+                    </div>
+                    <div class="content">
+                        @switch (msg.Type)
+                        {
+                            case FlowMessageType.Generating:
+                                <div>
+                                    <p><em>@msg.Content</em></p>
+                                    <Spin Size="SpinSize.Small" /> Generating flow...
+                                </div>
+                                break;
+
+                            case FlowMessageType.FlowSuccess:
+                                <div style="background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;">
+                                    <strong>✅ @msg.Content</strong><br/><br/>
+                                    <div style="background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;">
+                                        <Text Code>@msg.GeneratedFlow</Text>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(msg.FlowId))
+                                    {
+                                        <Button Type="@ButtonType.Primary" 
+                                                Size="@ButtonSize.Small" 
+                                                OnClick="() => ApplyFlowFromButton(msg.FlowId!)"
+                                                Style="font-size: 12px;">
+                                            Apply Flow
+                                        </Button>
+                                    }
+                                </div>
+                                break;
+
+                            case FlowMessageType.FlowError:
+                                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; border-left: 4px solid #dc3545;">
+                                    <strong>❌ @msg.Content</strong><br/>
+                                    <span style="color: #dc3545;">@msg.Content</span>
+                                </div>
+                                break;
+
+                            case FlowMessageType.System:
+                                <div style="color: #666; font-style: italic;">
+                                    ✅ @msg.Content
+                                </div>
+                                break;
+
+                            case FlowMessageType.Text:
+                            default:
+                                @((MarkupString)msg.Content)
+                                break;
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="flow-ai-chat-input">
+        <div class="input-area">
+            <TextArea @bind-Value="promptText" 
+                      Placeholder="Ask Copilot to generate a flow or type / for topics" 
+                      Disabled="@isGeneratingFlow"
+                      ShowCount="false"
+                      AutoSize="false"
+                      Rows="3"
+                      Style="resize: none; border: none; box-shadow: none; padding: 12px;"
+                      @oninput="OnInputChange"
+                      @onkeydown="OnKeyDown" />
+        </div>
+
+        <div class="input-controls">
+            <div class="left-controls">
+                <Select @bind-Value="selectedAgent"
+                        TItemValue="string"
+                        TItem="string"
+                        Size="@InputSize.Small"
+                        Style="width: 80px;"
+                        Disabled="@isGeneratingFlow">
+                    <SelectOptions>
+                        <SelectOption Value="@Ask" Label="Ask" />
+                        <SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
+                    </SelectOptions>
+                </Select>
+
+                <Select @bind-Value="selectedProviderModel" 
+                        TItemValue="string"
+                        TItem="string" 
+                        Size="@InputSize.Small"
+                        Style="width: 180px;"
+                        Placeholder="Select model"
+                        AllowClear="false"
+                        Disabled="@isGeneratingFlow">
+                    <SelectOptions>
+                        @if (availableProviders?.Any() != true)
+                        {
+                            <SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
+                        }
+                        else
+                        {
+                            @foreach (var provider in availableProviders)
+                            {
+                                @if (provider.SupportedModels?.Any() == true)
+                                {
+                                    @foreach (var model in provider.SupportedModels)
+                                    {
+                                        var value = $"{provider.Provider}:{model}";
+                                        var label = $"{provider.ProviderName} - {model}";
+                                        var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
+                                        
+                                        <SelectOption TItemValue="string" TItem="string" 
+                                                    Value="@value" 
+                                                    Label="@label"
+                                                    Disabled="@isDisabled" />
+                                    }
+                                }
+                            }
+                        }
+                    </SelectOptions>
+                </Select>
+            </div>
+
+            <div class="right-controls">
+                <Button Icon="@(isGeneratingFlow ? "loading" : "caret-right")" 
+                        Type="@ButtonType.Primary" 
+                        Size="@ButtonSize.Small"
+                        Shape="@ButtonShape.Circle"
+                        OnClick="SendPrompt" 
+                        Disabled="@(!IsReadyToSendRealtime)"
+                        Loading="@isGeneratingFlow"
+                        Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+                </Button>
+            </div>
+        </div>
+
+        @if (showNoProvidersMessage)
+        {
+            <div class="no-providers-message">
+                <Alert Type="@AlertType.Warning" 
+                       Message="No AI providers configured" 
+                       Description="Configure your API keys in Settings to start using AI flow generation."
+                       ShowIcon="true"
+                       Style="margin: 8px 0 0 0;" />
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    // Simple function to set the flow ai chat component reference
+    window.setFlowAiChatPanelRef = function(componentRef) {
+        window.flowAiChatPanelInstance = componentRef;
+    };
+</script>

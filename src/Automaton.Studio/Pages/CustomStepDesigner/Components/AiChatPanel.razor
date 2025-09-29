@@ -4,20 +4,19 @@
 @using Microsoft.JSInterop
 @using Automaton.Studio.Models
 @using Automaton.Studio.Services
+@using Automaton.Studio.Shared.Components
 @implements IDisposable
 
 <div class="ai-chat-panel">
-    <div class="ai-chat-header">
-        <div class="title">AI Code Generation</div>
-        <div class="header-actions">
-            <Button Type="ButtonType.Text" 
-                    Icon="delete" 
-                    OnClick="ClearConversationHistory" 
-                    Disabled="@isGeneratingCode" />
-            <Button Type="ButtonType.Text" Icon="pushpin" />
-            <Button Type="ButtonType.Text" Icon="close" />
-        </div>
-    </div>
+    <PanelHeader Title="AI Code Generation"
+                 ShowClearButton="true"
+                 OnClearClick="ClearConversationHistory"
+                 ClearDisabled="@isGeneratingCode"
+                 ClearTooltip="Clear conversation history"
+                 ShowPinButton="true"
+                 ShowCloseButton="true"
+                 PinTooltip="Pin panel"
+                 CloseTooltip="Close panel" />
 
     <div class="ai-chat-body" @ref="messagesContainer" id="ai-chat-messages">
         <div class="messages">
