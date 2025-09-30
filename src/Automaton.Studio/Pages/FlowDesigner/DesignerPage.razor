@@ -211,9 +211,6 @@
                                                         <TabPane Key="logs" Tab="Logs">
                                                             <FlowLogs />
                                                         </TabPane>
-                                                        <TabPane Key="variables" Tab="Variables">
-                                                            <FlowVariables />
-                                                        </TabPane>
                                                     </Tabs>
                                                 </CascadingValue>
                                             </Footer>
@@ -225,46 +222,51 @@
 
                             <SplitterPanel Size="40%">
                                 <div class="right-panel-container">
-                                    <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
-                                        <TabPane Tab="AI Chat" Key="ai">
-                                            <div class="tab-content-scrollable">
-                                                <FlowAiChatPanel OnFlowGenerated="OnFlowGenerated"
-                                                                    AvailableSteps="@GetAvailableStepsForAI()"
-                                                                    AvailableCustomSteps="@GetAvailableCustomStepsForAI()"
-                                                                    GetCurrentFlow="@GetCurrentFlowForAI" />
-                                            </div>
-                                        </TabPane>
-                                        <TabPane Tab="Properties" Key="properties">
-                                            <div class="tab-content-scrollable">                                              
-                                                <div class="properties-container">
-                                                    <PanelHeader Title="Step Details"
-                                                        ShowClearButton="false"
-                                                        ShowPinButton="true"
-                                                        ShowCloseButton="true"
-                                                        OnCloseClick="ClosePropertiesPanel"
-                                                        PinTooltip="Pin properties panel"
-                                                        CloseTooltip="Close properties" />
-                                                        
-                                                    @if (selectedStep != null)
-                                                    {
-                                                        <div class="properties-content">
-                                                            <StepPropertiesWrapper Step="selectedStep" />
-                                                        </div>
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="properties-empty">
-                                                            <div class="properties-empty-content">
-                                                                <Icon Type="edit" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
-                                                                <div class="properties-empty-title">No step selected</div>
-                                                                <div class="properties-empty-subtitle">Double-click a step to view its properties.</div>
-                                                            </div>
-                                                        </div>
-                                                    }
+                                    <CascadingValue Value="DesignerViewModel.Flow">
+                                        <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
+                                            <TabPane Tab="AI Chat" Key="ai">
+                                                <div class="tab-content-scrollable">
+                                                    <FlowAiChatPanel OnFlowGenerated="OnFlowGenerated"
+                                                                        AvailableSteps="@GetAvailableStepsForAI()"
+                                                                        AvailableCustomSteps="@GetAvailableCustomStepsForAI()"
+                                                                        GetCurrentFlow="@GetCurrentFlowForAI" />
                                                 </div>
-                                            </div>
-                                        </TabPane>
-                                    </Tabs>
+                                            </TabPane>
+                                            <TabPane Tab="Properties" Key="properties">
+                                                <div class="tab-content-scrollable">                                              
+                                                    <div class="properties-container">
+                                                        <PanelHeader Title="Step Details"
+                                                            ShowClearButton="false"
+                                                            ShowPinButton="true"
+                                                            ShowCloseButton="true"
+                                                            OnCloseClick="ClosePropertiesPanel"
+                                                            PinTooltip="Pin properties panel"
+                                                            CloseTooltip="Close properties" />
+                                                        
+                                                        @if (selectedStep != null)
+                                                        {
+                                                            <div class="properties-content">
+                                                                <StepPropertiesWrapper Step="selectedStep" />
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="properties-empty">
+                                                                <div class="properties-empty-content">
+                                                                    <Icon Type="edit" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                                                    <div class="properties-empty-title">No step selected</div>
+                                                                    <div class="properties-empty-subtitle">Double-click a step to view its properties.</div>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </TabPane>
+                                            <TabPane Key="variables" Tab="Variables">
+                                                <FlowVariables />
+                                            </TabPane>
+                                        </Tabs>
+                                    </CascadingValue>
                                 </div> 
                             </SplitterPanel>
                         </Splitter>
