@@ -6,6 +6,9 @@
 @using AntDesign
 @inherits FeedbackComponent<CustomStep>
 
+@inject IMessageService MessageService
+@inject NavigationManager NavigationManager
+
 <StepProperties Step="@step">
 
     <Form @ref="form"
@@ -20,8 +23,33 @@
         <ChildContent>
             <Tabs>
                 <TabPane Tab="Code" Key="1">
-                    <div style="padding: 12px;">
-                        <TextArea Rows="8" @bind-Value="context.Code" AutoFocus Style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace;" />
+                    <div class="code-preview-section">
+                        <div class="code-preview-header">
+                            <div class="code-info">
+                                <Icon Type="code" Style="margin-right: 8px; color: #666;" />
+                                <span>Code Preview</span>
+                            </div>
+                            <Tooltip Title="Edit code with full editor, AI chat, and debugging tools">
+                                <Button Icon="edit" 
+                                        Type="@ButtonType.Primary" 
+                                        Size="@ButtonSize.Small"
+                                        OnClick="@NavigateToStepEditor">
+                                    Edit Code
+                                </Button>
+                            </Tooltip>
+                        </div>
+                        @if (!string.IsNullOrEmpty(context.Code))
+                        {
+                            <div class="code-display">@context.Code</div>
+                        }
+                        else
+                        {
+                            <div class="code-empty">
+                                <Icon Type="file-text" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                <div class="code-empty-title">No code written yet</div>
+                                <div class="code-empty-subtitle">Click "Edit Code" to start writing your custom step code with full editor support.</div>
+                            </div>
+                        }
                     </div>
                 </TabPane>
                 
@@ -347,6 +375,31 @@
     {
         return new Dictionary<string, object>() { { "Variable", customStepVariable } };
     }
+
+    private void NavigateToStepEditor()
+    {
+        // For custom steps in flows, we need to find the original custom step ID
+        // The step in the flow is an instance, but we need the template ID
+        
+        // If this is a custom step with a known template name, we can try to navigate
+        if (!string.IsNullOrEmpty(step.Name))
+        {
+            // Try to parse the step name as it might contain the custom step identifier
+            // This is a best-effort approach since custom steps in flows are instances
+            // In a real implementation, you might need to:
+            // 1. Add a SourceCustomStepId property to track the original custom step
+            // 2. Query the CustomStepsService to find the custom step by name
+            // 3. Navigate to the found custom step
+            
+            // For now, show a helpful message about the limitation
+            MessageService.Info("Code editing is optimized for the Step Designer.\n" +
+                               "Create or edit custom steps in the Steps section for the full development experience.", 5);
+        }
+        else
+        {
+            MessageService.Warning("Cannot navigate to step editor: Step name is not available.", 3);
+        }
+    }
 }
 
 <style>
@@ -538,5 +591,60 @@
 
     .ant-popconfirm-buttons {
         margin-top: 8px;
+    }
+
+    /* Code Preview Styling */
+    .code-preview-section {
+        padding: 12px;
+    }
+
+    .code-preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .code-info {
+        display: flex;
+        align-items: center;
+        font-weight: 500;
+    }
+
+    .code-display {
+        background-color: #fafafa;
+        border: 1px solid #f0f0f0;
+        border-radius: 4px;
+        padding: 12px;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        color: #666;
+        line-height: 1.4;
+    }
+
+    .code-empty {
+        text-align: center;
+        padding: 32px 16px;
+        background-color: #fafafa;
+        border-radius: 6px;
+        border: 1px dashed #d9d9d9;
+    }
+
+    .code-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+    }
+
+    .code-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
     }
 </style>
