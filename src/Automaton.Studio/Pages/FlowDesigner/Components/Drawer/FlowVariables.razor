@@ -24,45 +24,56 @@
                     </Space>
                 </HeaderTemplate>
                 <ChildContent>
-                    <div class="scrollable-list">
-                        @if (Variables.Any())
-                        {
-                            @foreach (var variable in Variables)
+                    <div class="variables-panel-content">
+                        <div class="scrollable-list">
+                            @if (Variables.Any())
                             {
-                                <div class="variable">
-                                    <div class="variable-item">
-                                        <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => ViewVariable(variable))">@variable.Name</Button>
-                                        <span class="ellipsis">@variable.Value?.ToString()</span>
-                                        <div class="designer-step-actions-icon">
-                                            <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
-                                                <Overlay>
-                                                    <Menu>
-                                                        <MenuItem Icon="eye" OnClick="@(() => ViewVariable(variable))">
-                                                            View
-                                                        </MenuItem>
-                                                        <MenuItem Icon="search">
-                                                            Find Usages
-                                                        </MenuItem>
-                                                    </Menu>
-                                                </Overlay>
-                                                <ChildContent>
-                                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                        <Icon Type="more" Theme="IconThemeType.Outline" />
-                                                    </a>
-                                                </ChildContent>
-                                            </Dropdown>
+                                @foreach (var variable in Variables)
+                                {
+                                    <div class="variable-card">
+                                        <div class="variable-header">
+                                            <div class="variable-info">
+                                                <div class="variable-name">@variable.Name</div>
+                                                <div class="variable-type">Runtime</div>
+                                            </div>
+                                            <div class="variable-actions">
+                                                <Tooltip Title="View variable">
+                                                    <Button Icon="eye" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text"
+                                                            OnClick="@(() => ViewVariable(variable))" />
+                                                </Tooltip>
+                                                <Tooltip Title="Find usages">
+                                                    <Button Icon="search" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text" />
+                                                </Tooltip>
+                                            </div>
                                         </div>
+                                        @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
+                                        {
+                                            <div class="variable-value">
+                                                <Text Code>@variable.Value.ToString()</Text>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(variable.Description))
+                                        {
+                                            <div class="variable-description">
+                                                <Text Type="@TextElementType.Secondary">@variable.Description</Text>
+                                            </div>
+                                        }
                                     </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="variables-empty">
+                                    <Icon Type="deployment-unit" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                    <div class="variables-empty-title">No flow variables available</div>
+                                    <div class="variables-empty-subtitle">Variables will appear here during workflow execution.</div>
                                 </div>
                             }
-                        }
-                        else
-                        {
-                            <div class="variables-empty-inline">
-                                <Icon Type="deployment-unit" Theme="IconThemeType.Outline" Style="font-size: 16px; color: #d9d9d9; margin-right: 8px;" />
-                                <span>No flow variables available</span>
-                            </div>
-                        }
+                        </div>
                     </div>
                 </ChildContent>
             </Panel>
@@ -72,68 +83,80 @@
         <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
             <Panel Key="input">
                 <HeaderTemplate>
-                    <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+                    <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
                         <SpaceItem>
-                            <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
-                                <SpaceItem>
-                                    <Icon Type="import" Theme="IconThemeType.Outline" Style="color: #666;" />
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <b>Input Variables</b>
-                                </SpaceItem>
-                            </Space>
+                            <Icon Type="import" Theme="IconThemeType.Outline" Style="color: #666;" />
                         </SpaceItem>
                         <SpaceItem>
-                            <Tooltip Title="Add input variable">
-                                <Button Icon="plus"
-                                        Size="@ButtonSize.Small"
-                                        Type="@ButtonType.Text"
-                                        Class="toolbar-btn"
-                                        OnClick="@AddInputVariable" />
-                            </Tooltip>
+                            <b>Input Variables</b>
                         </SpaceItem>
                     </Space>
                 </HeaderTemplate>
                 <ChildContent>
-                    <div class="scrollable-list">
-                        @if (InputVariables.Any())
-                        {
-                            @foreach (var variable in InputVariables)
+                    <div class="variables-panel-content">
+                        <!-- Add Button -->
+                        <div class="add-variable-section">
+                            <Button Icon="plus" 
+                                    Type="@ButtonType.Dashed" 
+                                    Size="@ButtonSize.Small" 
+                                    OnClick="@AddInputVariable"
+                                    Style="width: 100%; margin-bottom: 8px;">
+                                Add Input Variable
+                            </Button>
+                        </div>
+
+                        <!-- Variables List -->
+                        <div class="scrollable-list">
+                            @if (InputVariables.Any())
                             {
-                                <div class="variable">
-                                    <div class="variable-item">
-                                        <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => EditInputVariable(variable))">@variable.Name</Button>
-                                        <span class="ellipsis">@variable.Value?.ToString()</span>
-                                        <div class="designer-step-actions-icon">
-                                            <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
-                                                <Overlay>
-                                                    <Menu>
-                                                        <MenuItem Icon="edit" OnClick="@(() => EditInputVariable(variable))">
-                                                            Edit
-                                                        </MenuItem>
-                                                        <MenuItem Icon="delete" OnClick="@(() => DeleteInputVariable(variable))">
-                                                            Delete
-                                                        </MenuItem>
-                                                    </Menu>
-                                                </Overlay>
-                                                <ChildContent>
-                                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                        <Icon Type="more" Theme="IconThemeType.Outline" />
-                                                    </a>
-                                                </ChildContent>
-                                            </Dropdown>
+                                @foreach (var variable in InputVariables)
+                                {
+                                    <div class="variable-card">
+                                        <div class="variable-header">
+                                            <div class="variable-info">
+                                                <div class="variable-name">@variable.Name</div>
+                                                <div class="variable-type">@variable.Type</div>
+                                            </div>
+                                            <div class="variable-actions">
+                                                <Tooltip Title="Edit variable">
+                                                    <Button Icon="edit" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text"
+                                                            OnClick="@(() => EditInputVariable(variable))" />
+                                                </Tooltip>
+                                                <Tooltip Title="Delete variable">
+                                                    <Button Icon="delete" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text"
+                                                            Danger="true"
+                                                            OnClick="@(() => DeleteInputVariable(variable))" />
+                                                </Tooltip>
+                                            </div>
                                         </div>
+                                        @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
+                                        {
+                                            <div class="variable-value">
+                                                <Text Code>@variable.Value.ToString()</Text>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(variable.Description))
+                                        {
+                                            <div class="variable-description">
+                                                <Text Type="@TextElementType.Secondary">@variable.Description</Text>
+                                            </div>
+                                        }
                                     </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="variables-empty">
+                                    <Icon Type="import" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                    <div class="variables-empty-title">No input variables defined</div>
+                                    <div class="variables-empty-subtitle">Input variables allow you to pass data into your workflow.</div>
                                 </div>
                             }
-                        }
-                        else
-                        {
-                            <div class="variables-empty-inline">
-                                <Icon Type="import" Theme="IconThemeType.Outline" Style="font-size: 16px; color: #d9d9d9; margin-right: 8px;" />
-                                <span>No input variables defined</span>
-                            </div>
-                        }
+                        </div>
                     </div>
                 </ChildContent>
             </Panel>
@@ -143,68 +166,80 @@
         <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
             <Panel Key="output">
                 <HeaderTemplate>
-                    <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center" Style="width: 100%; justify-content: space-between;">
+                    <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
                         <SpaceItem>
-                            <Space Direction="SpaceDirection.Horizontal" Align="SpaceAlign.Center">
-                                <SpaceItem>
-                                    <Icon Type="export" Theme="IconThemeType.Outline" Style="color: #666;" />
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <b>Output Variables</b>
-                                </SpaceItem>
-                            </Space>
+                            <Icon Type="export" Theme="IconThemeType.Outline" Style="color: #666;" />
                         </SpaceItem>
                         <SpaceItem>
-                            <Tooltip Title="Add output variable">
-                                <Button Icon="plus"
-                                        Size="@ButtonSize.Small"
-                                        Type="@ButtonType.Text"
-                                        Class="toolbar-btn"
-                                        OnClick="@AddOutputVariable" />
-                            </Tooltip>
+                            <b>Output Variables</b>
                         </SpaceItem>
                     </Space>
                 </HeaderTemplate>
                 <ChildContent>
-                    <div class="scrollable-list">
-                        @if (OutputVariables.Any())
-                        {
-                            @foreach (var variable in OutputVariables)
+                    <div class="variables-panel-content">
+                        <!-- Add Button -->
+                        <div class="add-variable-section">
+                            <Button Icon="plus" 
+                                    Type="@ButtonType.Dashed" 
+                                    Size="@ButtonSize.Small" 
+                                    OnClick="@AddOutputVariable"
+                                    Style="width: 100%; margin-bottom: 8px;">
+                                Add Output Variable
+                            </Button>
+                        </div>
+
+                        <!-- Variables List -->
+                        <div class="scrollable-list">
+                            @if (OutputVariables.Any())
                             {
-                                <div class="variable">
-                                    <div class="variable-item">
-                                        <Button Type="ButtonType.Link" Size="@ButtonSize.Small" OnClick="@(() => EditOutputVariable(variable))">@variable.Name</Button>
-                                        <span class="ellipsis">@variable.Value?.ToString()</span>
-                                        <div class="designer-step-actions-icon">
-                                            <Dropdown Placement="@Placement.Left" Trigger="@(new Trigger[] { Trigger.Click })">
-                                                <Overlay>
-                                                    <Menu>
-                                                        <MenuItem Icon="edit" OnClick="@(() => EditOutputVariable(variable))">
-                                                            Edit
-                                                        </MenuItem>
-                                                        <MenuItem Icon="delete" OnClick="@(() => DeleteOutputVariable(variable))">
-                                                            Delete
-                                                        </MenuItem>
-                                                    </Menu>
-                                                </Overlay>
-                                                <ChildContent>
-                                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                                        <Icon Type="more" Theme="IconThemeType.Outline" />
-                                                    </a>
-                                                </ChildContent>
-                                            </Dropdown>
+                                @foreach (var variable in OutputVariables)
+                                {
+                                    <div class="variable-card">
+                                        <div class="variable-header">
+                                            <div class="variable-info">
+                                                <div class="variable-name">@variable.Name</div>
+                                                <div class="variable-type">@variable.Type</div>
+                                            </div>
+                                            <div class="variable-actions">
+                                                <Tooltip Title="Edit variable">
+                                                    <Button Icon="edit" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text"
+                                                            OnClick="@(() => EditOutputVariable(variable))" />
+                                                </Tooltip>
+                                                <Tooltip Title="Delete variable">
+                                                    <Button Icon="delete" 
+                                                            Size="@ButtonSize.Small" 
+                                                            Type="@ButtonType.Text"
+                                                            Danger="true"
+                                                            OnClick="@(() => DeleteOutputVariable(variable))" />
+                                                </Tooltip>
+                                            </div>
                                         </div>
+                                        @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
+                                        {
+                                            <div class="variable-value">
+                                                <Text Code>@variable.Value.ToString()</Text>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(variable.Description))
+                                        {
+                                            <div class="variable-description">
+                                                <Text Type="@TextElementType.Secondary">@variable.Description</Text>
+                                            </div>
+                                        }
                                     </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="variables-empty">
+                                    <Icon Type="export" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                    <div class="variables-empty-title">No output variables defined</div>
+                                    <div class="variables-empty-subtitle">Output variables capture results from your workflow.</div>
                                 </div>
                             }
-                        }
-                        else
-                        {
-                            <div class="variables-empty-inline">
-                                <Icon Type="export" Theme="IconThemeType.Outline" Style="font-size: 16px; color: #d9d9d9; margin-right: 8px;" />
-                                <span>No output variables defined</span>
-                            </div>
-                        }
+                        </div>
                     </div>
                 </ChildContent>
             </Panel>
@@ -239,76 +274,126 @@
         border-radius: 5px;
     }
 
+    .variables-panel-content {
+        padding: 12px;
+    }
+
+    .add-variable-section {
+        margin-bottom: 12px;
+    }
+
     .scrollable-list {
         overflow-x: hidden;
         overflow-y: auto;
         max-height: 250px;
-        padding-right: 30px;
     }
 
     .scrollable-list .variable {
         margin: 6px 0 0 0;
     }
 
-    .variable-item {
-        display: flex;
-        align-items: center;
-        padding: 4px 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    .variable-item:last-child {
-        border-bottom: none;
-    }
-
-    .variables-empty-inline {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        color: #999;
-        font-size: 12px;
-        text-align: center;
-    }
-
-    .designer-step-actions-icon {
-        padding: 0px 12px 0px 12px;
-        margin-left: auto;
-    }
-
-    .ellipsis {
-        display: inline-block;
-        overflow: hidden;
-        overflow-wrap: normal;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        width: 100px;
-        margin-left: 8px;
-        color: #666;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 12px;
-        flex: 1;
-    }
-
-    .toolbar-btn {
-        color: #666 !important;
-        border: none !important;
-        background: transparent !important;
+    /* Variable Card Styling */
+    .variable-card {
+        background-color: #ffffff;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
         transition: all 0.2s ease;
+        cursor: pointer;
     }
 
-    .toolbar-btn:hover {
-        color: #1890ff !important;
-        background-color: rgba(24, 144, 255, 0.08) !important;
+    .variable-card:hover {
+        border-color: #d9d9d9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
     }
 
-    /* Adjust collapse panel header to accommodate the button */
-    .ant-collapse-header {
-        padding: 8px 12px !important;
+    .variable-card:last-child {
+        margin-bottom: 0;
     }
 
-    .ant-collapse-content-box {
-        padding: 8px 12px !important;
+    .variable-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .variable-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .variable-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #262626;
+        margin-bottom: 4px;
+        word-break: break-word;
+    }
+
+    .variable-type {
+        font-size: 12px;
+        color: #8c8c8c;
+        background-color: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        display: inline-block;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    .variable-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+
+    .variable-value {
+        margin-bottom: 8px;
+        padding: 8px;
+        background-color: #fafafa;
+        border-radius: 4px;
+        border: 1px solid #f0f0f0;
+        word-break: break-all;
+        font-size: 12px;
+    }
+
+    .variable-description {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #666;
+        font-style: italic;
+    }
+
+    /* Enhanced Empty State */
+    .variables-empty {
+        text-align: center;
+        padding: 32px 16px;
+        background-color: #fafafa;
+        border-radius: 6px;
+        border: 1px dashed #d9d9d9;
+    }
+
+    .variables-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .variables-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
+    }
+
+    /* Tooltip style override */
+    .ant-tooltip-inner {
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 4px;
     }
 </style>
 
