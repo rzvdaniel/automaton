@@ -3,6 +3,7 @@
 @using Automaton.Studio.Steps.Custom.Variables
 @using Blazored.FluentValidation
 @using Automaton.Core.Models
+@using AntDesign
 @inherits FeedbackComponent<CustomStep>
 
 <StepProperties Step="@step">
@@ -19,69 +20,224 @@
         <ChildContent>
             <Tabs>
                 <TabPane Tab="Code" Key="1">
-                    <TextArea Rows="6" @bind-Value="context.Code" AutoFocus />
+                    <div style="padding: 12px;">
+                        <TextArea Rows="8" @bind-Value="context.Code" AutoFocus Style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace;" />
+                    </div>
                 </TabPane>
-                <TabPane Tab="Input Variables" Key="2">
-                    <Space Direction="SpaceDirection.Vertical">
-                        <SpaceItem>
-                            <Button OnClick="AddCodeInputVariable" Type="ButtonType.Primary">
-                                Add
+                
+                <TabPane Tab="Input" Key="2">
+                    <div class="variables-section">
+                        <!-- Add Button -->
+                        <div class="add-variable-section">
+                            <Button Icon="plus" 
+                                    Type="@ButtonType.Dashed" 
+                                    Size="@ButtonSize.Small" 
+                                    OnClick="AddCodeInputVariable"
+                                    Style="width: 100%; margin-bottom: 12px;">
+                                Add Input Variable
                             </Button>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Table DataSource="context.CodeInputVariables"
-                                   ScrollY="200"
-                                   ScrollBarWidth="5"
-                                   HidePagination>
-                                <ChildContent Context="inputVariable">
-                                    <Column Title="Name" TData="string">
-                                        <Input Type="InputType.Text" @bind-Value="inputVariable.Name" />
-                                    </Column>
-                                    <Column Title="Value" TData="string">
-                                        <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
-                                    </Column>
-                                    <ActionColumn Title="Action">
-                                        <Popconfirm Title="Sure to delete?"
-                                                    OnConfirm="()=> DeleteCodeInputVariable(inputVariable.Name)"
-                                                    OkText="Yes"
-                                                    CancelText="No">
-                                            <a>Delete</a>
-                                        </Popconfirm>
-                                    </ActionColumn>
-                                </ChildContent>
-                            </Table>
-                        </SpaceItem>
-                    </Space>
+                        </div>
+
+                        <!-- Variables List -->
+                        <div class="variables-list">
+                            @if (context.CodeInputVariables?.Any() == true)
+                            {
+                                @foreach (var inputVariable in context.CodeInputVariables)
+                                {
+                                    <div class="variable-card">
+                                        <div class="variable-header">
+                                            <div class="variable-info">
+                                                <div class="variable-name-input">
+                                                    <Input Type="InputType.Text" 
+                                                           @bind-Value="inputVariable.Name" 
+                                                           Placeholder="Variable name"
+                                                           BorderStyle="none" 
+                                                           Style="font-weight: 600; padding: 0; font-size: 14px;" />
+                                                </div>
+                                            </div>
+                                            <div class="variable-actions">
+                                                <Tooltip Title="Delete variable">
+                                                    <Popconfirm Title="Sure to delete?"
+                                                                OnConfirm="()=> DeleteCodeInputVariable(inputVariable.Name)"
+                                                                OkText="Yes"
+                                                                CancelText="No">
+                                                        <Button Icon="delete" 
+                                                                Size="@ButtonSize.Small" 
+                                                                Type="@ButtonType.Text"
+                                                                Danger="true" />
+                                                    </Popconfirm>
+                                                </Tooltip>
+                                            </div>
+                                        </div>
+                                        <div class="variable-value">
+                                            <div class="custom-variable-input">
+                                                @if (inputVariable.Type == VariableType.String)
+                                                {
+                                                    <div class="input-with-info">
+                                                        <div class="input-control">
+                                                            <Input Type="InputType.Text" 
+                                                                   TValue="string" 
+                                                                   Value="inputVariable.Value?.ToString()" 
+                                                                   OnChange="(x) => { inputVariable.Value = x; }" 
+                                                                   Placeholder="@inputVariable.Description" />
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
+                                                        {
+                                                            <div class="info-button">
+                                                                <Popover Content="@inputVariable.Description" 
+                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                    <Button Shape="@ButtonShape.Circle" 
+                                                                            Icon="info" 
+                                                                            Size="@ButtonSize.Small" />
+                                                                </Popover>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (inputVariable.Type == VariableType.Text)
+                                                {
+                                                    <div class="input-with-info">
+                                                        <div class="input-control">
+                                                            <TextArea Value="@inputVariable.Value?.ToString()" 
+                                                                      OnChange="(x) => { inputVariable.Value = x; }" 
+                                                                      Rows="3" />
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
+                                                        {
+                                                            <div class="info-button">
+                                                                <Popover Content="@inputVariable.Description" 
+                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                    <Button Shape="@ButtonShape.Circle" 
+                                                                            Icon="info" 
+                                                                            Size="@ButtonSize.Small" />
+                                                                </Popover>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (inputVariable.Type == VariableType.Number)
+                                                {
+                                                    <div class="input-with-info">
+                                                        <div class="input-control">
+                                                            <AntDesign.InputNumber OnChange="(decimal x) => { inputVariable.Value = x; }" 
+                                                                                   Style="width: 100%;" />
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
+                                                        {
+                                                            <div class="info-button">
+                                                                <Popover Content="@inputVariable.Description" 
+                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                    <Button Shape="@ButtonShape.Circle" 
+                                                                            Icon="info" 
+                                                                            Size="@ButtonSize.Small" />
+                                                                </Popover>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (inputVariable.Type == VariableType.Boolean)
+                                                {
+                                                    <div class="input-with-info">
+                                                        <div class="input-control">
+                                                            <Switch CheckedChildren="True" 
+                                                                    UnCheckedChildren="False" 
+                                                                    Checked="@(bool.Parse(inputVariable.Value?.ToString() ?? "false"))"
+                                                                    OnChange="(bool x) => { inputVariable.Value = x; }" />
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
+                                                        {
+                                                            <div class="info-button">
+                                                                <Popover Content="@inputVariable.Description" 
+                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                    <Button Shape="@ButtonShape.Circle" 
+                                                                            Icon="info" 
+                                                                            Size="@ButtonSize.Small" />
+                                                                </Popover>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" 
+                                                                      Parameters="GetVariableComponentParameters(inputVariable)" />
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="variables-empty">
+                                    <Icon Type="import" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                    <div class="variables-empty-title">No input variables defined</div>
+                                    <div class="variables-empty-subtitle">Add input variables to pass data into your custom step.</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
                 </TabPane>
 
-                <TabPane Tab="Output Variables" Key="3">
-                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%">
-                        <SpaceItem>
-                            <Button OnClick="AddCodeOutputVariable" Type="ButtonType.Primary">
-                                Add
+                <TabPane Tab="Output" Key="3">
+                    <div class="variables-section">
+                        <!-- Add Button -->
+                        <div class="add-variable-section">
+                            <Button Icon="plus" 
+                                    Type="@ButtonType.Dashed" 
+                                    Size="@ButtonSize.Small" 
+                                    OnClick="AddCodeOutputVariable"
+                                    Style="width: 100%; margin-bottom: 12px;">
+                                Add Output Variable
                             </Button>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Table DataSource="context.CodeOutputVariables"
-                                   ScrollY="200px"
-                                   ScrollBarWidth="5"
-                                   HidePagination>
-                                <ChildContent Context="outputVariable">
-                                    <Column Title="Name" TData="string">
-                                        <Input Type="InputType.Text" @bind-Value="outputVariable.Name" OnBlur="()=>StopEdit(outputVariable)" AutoFocus />
-                                    </Column>
-                                    <ActionColumn Title="Action">
-                                        <Popconfirm Title="Sure to delete?"
-                                                    OnConfirm="()=> DeleteCodeOutputVariable(outputVariable.Name)"
-                                                    OkText="Yes"
-                                                    CancelText="No">
-                                            <a>Delete</a>
-                                        </Popconfirm>
-                                    </ActionColumn>
-                                </ChildContent>
-                            </Table>
-                        </SpaceItem>
-                    </Space>
+                        </div>
+
+                        <!-- Variables List -->
+                        <div class="variables-list">
+                            @if (context.CodeOutputVariables?.Any() == true)
+                            {
+                                @foreach (var outputVariable in context.CodeOutputVariables)
+                                {
+                                    <div class="variable-card">
+                                        <div class="variable-header">
+                                            <div class="variable-info">
+                                                <div class="variable-name-input">
+                                                    <Input Type="InputType.Text" 
+                                                           @bind-Value="outputVariable.Name" 
+                                                           OnBlur="()=>StopEdit(outputVariable)"
+                                                           Placeholder="Variable name"
+                                                           BorderStyle="none" 
+                                                           Style="font-weight: 600; padding: 0; font-size: 14px;" />
+                                                </div>
+                                                <div class="variable-type">Output</div>
+                                            </div>
+                                            <div class="variable-actions">
+                                                <Tooltip Title="Delete variable">
+                                                    <Popconfirm Title="Sure to delete?"
+                                                                OnConfirm="()=> DeleteCodeOutputVariable(outputVariable.Name)"
+                                                                OkText="Yes"
+                                                                CancelText="No">
+                                                        <Button Icon="delete" 
+                                                                Size="@ButtonSize.Small" 
+                                                                Type="@ButtonType.Text"
+                                                                Danger="true" />
+                                                    </Popconfirm>
+                                                </Tooltip>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="variables-empty">
+                                    <Icon Type="export" Theme="IconThemeType.Outline" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
+                                    <div class="variables-empty-title">No output variables defined</div>
+                                    <div class="variables-empty-subtitle">Add output variables to capture results from your custom step.</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
                 </TabPane>
             </Tabs>
         </ChildContent>
@@ -177,3 +333,141 @@
         return new Dictionary<string, object>() { { "Variable", customStepVariable } };
     }
 }
+
+<style>
+    /* Variables Section Styling */
+    .variables-section {
+        padding: 12px;
+    }
+
+    .add-variable-section {
+        margin-bottom: 12px;
+    }
+
+    .variables-list {
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Variable Card Styling */
+    .variable-card {
+        background-color: #ffffff;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+    }
+
+    .variable-card:hover {
+        border-color: #d9d9d9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    .variable-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .variable-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .variable-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .variable-name-input {
+        margin-bottom: 0;
+    }
+
+    .variable-name-input .ant-input {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        background: transparent !important;
+    }
+
+    .variable-name-input .ant-input:focus {
+        border: 1px solid #d9d9d9 !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        background: #ffffff !important;
+    }
+
+    .variable-type {
+        font-size: 12px;
+        color: #8c8c8c;
+        background-color: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        display: inline-block;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    .variable-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+
+    .variable-value {
+        background-color: #fafafa;
+        border-radius: 4px;
+        border: 1px solid #f0f0f0;
+        padding: 8px;
+    }
+
+    .custom-variable-input {
+        width: 100%;
+    }
+
+    .input-with-info {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .input-control {
+        flex: 1;
+    }
+
+    .info-button {
+        flex-shrink: 0;
+        padding-top: 4px;
+    }
+
+    .variable-description {
+        padding: 4px 0px 0px 4px;
+    }
+
+    /* Enhanced Empty State */
+    .variables-empty {
+        text-align: center;
+        padding: 32px 16px;
+        background-color: #fafafa;
+        border-radius: 6px;
+        border: 1px dashed #d9d9d9;
+    }
+
+    .variables-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+
+    .variables-empty-subtitle {
+        font-size: 12px;
+        color: #999;
+        line-height: 1.4;
+    }
+</style>
