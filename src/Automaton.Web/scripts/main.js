@@ -10,6 +10,16 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             
             const targetId = this.getAttribute('href');
+            
+            // If href is just "#", scroll to top
+            if (targetId === '#') {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+                return;
+            }
+            
             const targetSection = document.querySelector(targetId);
             
             if (targetSection) {
