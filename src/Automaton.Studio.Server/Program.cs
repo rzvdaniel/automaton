@@ -7,6 +7,8 @@ using Automaton.Studio.Server.Extensions;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Middleware;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Mcp;
+using Automaton.Studio.Server.Services.Mcp.Tools;
 using Common.Authentication;
 using Destructurama;
 using FluentValidation.AspNetCore;
@@ -198,6 +200,9 @@ services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiStepGenerationService>();
 
+// MCP (Model Context Protocol) Services
+services.AddSingleton<McpService>();
+
 services.AddScoped<OpenAiProvider>();
 services.AddScoped<AnthropicProvider>();
 services.AddScoped<GoogleProvider>();
@@ -270,5 +275,10 @@ app.MapControllers();
 app.MapBlazorHub();
 app.MapHub<AutomatonHub>("/api/workflow/hub");
 app.MapFallbackToPage("/_Host");
+
+// Register MCP tools
+var mcpService = app.Services.GetRequiredService<McpService>();
+mcpService.RegisterTool<GetCustomStepCodeTool>();
+mcpService.RegisterTool<ExecuteCustomStepTool>();
 
 app.Run();

@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Services.Mcp;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -44,6 +45,16 @@ public class OpenAiProvider : IAiProvider
 
     public async Task<string> GenerateCodeAsync(string apiKey, string prompt, string model, List<ConversationMessage>? conversationHistory = null)
     {
+        return await GenerateCodeAsync(apiKey, prompt, model, conversationHistory, null);
+    }
+
+    public async Task<string> GenerateCodeAsync(
+        string apiKey, 
+        string prompt, 
+        string model, 
+        List<ConversationMessage>? conversationHistory = null,
+        List<McpToolDefinition>? tools = null)
+    {
         try
         {
             var messages = new List<object>();
@@ -65,7 +76,17 @@ public class OpenAiProvider : IAiProvider
                 model = model,
                 messages = messages.ToArray(),
                 max_tokens = 2000,
-                temperature = 0.7
+                temperature = 0.7,
+                tools = tools?.Select(t => new
+                {
+                    type = t.Type,
+                    function = new
+                    {
+                        name = t.Function.Name,
+                        description = t.Function.Description,
+                        parameters = t.Function.Parameters
+                    }
+                }).ToArray()
             };
 
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
@@ -76,13 +97,9 @@ public class OpenAiProvider : IAiProvider
             response.EnsureSuccessStatusCode();
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var responseJson = JsonDocument.Parse(responseContent);
             
-            return responseJson.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString() ?? string.Empty;
+            // Return the full response JSON so the caller can handle tool calls
+            return responseContent;
         }
         catch (Exception ex)
         {

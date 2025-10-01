@@ -1,5 +1,7 @@
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services.AiProviders;
+using Automaton.Studio.Server.Services.Mcp;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services.AiCodeGeneration;
 
@@ -7,15 +9,18 @@ public class AiStepGenerationService
 {
     private readonly AiApiKeyService aiApiKeyService;
     private readonly AiProviderFactory aiProviderFactory;
+    private readonly McpService mcpService;
     private readonly ILogger<AiStepGenerationService> logger;
 
     public AiStepGenerationService(
         AiApiKeyService aiApiKeyService, 
         AiProviderFactory aiProviderFactory,
+        McpService mcpService,
         ILogger<AiStepGenerationService> logger)
     {
         this.aiApiKeyService = aiApiKeyService;
         this.aiProviderFactory = aiProviderFactory;
+        this.mcpService = mcpService;
         this.logger = logger;
     }
 
@@ -33,12 +38,73 @@ public class AiStepGenerationService
             // Generate the appropriate prompt
             var prompt = BuildPrompt(request);
 
-            // Get the appropriate AI provider and call it with conversation history
+            // Get MCP tools if enabled
+            List<McpToolDefinition>? tools = null;
+            List<McpToolCall>? toolCalls = null;
+            if (request.EnableTools && request.Provider == AiProvider.OpenAI)
+            {
+                tools = mcpService.GetToolDefinitions();
+            }
+
+            // Get the appropriate AI provider and call it
             var provider = aiProviderFactory.CreateProvider(request.Provider);
             var model = request.Model ?? provider.DefaultModel;
-            var generatedCode = await provider.GenerateCodeAsync(apiKey, prompt, model, request.ConversationHistory);
-
-            return CodeGenerationResult.Success(generatedCode);
+            
+            string responseContent;
+            if (provider is OpenAiProvider openAiProvider && tools?.Any() == true)
+            {
+                // Call with tools support
+                responseContent = await openAiProvider.GenerateCodeAsync(apiKey, prompt, model, request.ConversationHistory, tools);
+                
+                // Parse the response to check for tool calls
+                var responseJson = JsonDocument.Parse(responseContent);
+                var choice = responseJson.RootElement.GetProperty("choices")[0];
+                var message = choice.GetProperty("message");
+                
+                // Check if there are tool calls
+                if (message.TryGetProperty("tool_calls", out var toolCallsElement))
+                {
+                    toolCalls = new List<McpToolCall>();
+                    foreach (var toolCall in toolCallsElement.EnumerateArray())
+                    {
+                        toolCalls.Add(new McpToolCall
+                        {
+                            Id = toolCall.GetProperty("id").GetString() ?? string.Empty,
+                            Name = toolCall.GetProperty("function").GetProperty("name").GetString() ?? string.Empty,
+                            Arguments = toolCall.GetProperty("function").GetProperty("arguments").GetString() ?? string.Empty
+                        });
+                    }
+                    
+                    // Execute tool calls and return with tool execution info
+                    var toolResults = new List<McpToolResult>();
+                    foreach (var toolCall in toolCalls)
+                    {
+                        var result = await mcpService.ExecuteToolAsync(toolCall.Name, toolCall.Arguments, userId);
+                        result.ToolCallId = toolCall.Id;
+                        toolResults.Add(result);
+                    }
+                    
+                    return CodeGenerationResult.SuccessWithTools(
+                        message.TryGetProperty("content", out var content) ? content.GetString() ?? string.Empty : string.Empty,
+                        toolCalls,
+                        toolResults);
+                }
+                
+                // No tool calls, extract content
+                if (message.TryGetProperty("content", out var contentProp))
+                {
+                    var generatedCode = contentProp.GetString() ?? string.Empty;
+                    return CodeGenerationResult.Success(generatedCode);
+                }
+                
+                return CodeGenerationResult.Failure("No content in AI response");
+            }
+            else
+            {
+                // Regular call without tools
+                responseContent = await provider.GenerateCodeAsync(apiKey, prompt, model, request.ConversationHistory);
+                return CodeGenerationResult.Success(responseContent);
+            }
         }
         catch (Exception ex)
         {
@@ -195,6 +261,8 @@ public class StepGenerationRequest
     public List<VariableInfo>? InputVariables { get; set; }
     public List<VariableInfo>? OutputVariables { get; set; }
     public List<ConversationMessage>? ConversationHistory { get; set; }
+    public bool EnableTools { get; set; } = true; // Enable MCP tools by default
+    public string? CurrentStepId { get; set; } // For context when using tools
 }
 
 public class VariableInfo
@@ -209,7 +277,11 @@ public class CodeGenerationResult
     public bool IsSuccess { get; set; }
     public string GeneratedCode { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;
+    public List<McpToolCall>? ToolCalls { get; set; }
+    public List<McpToolResult>? ToolResults { get; set; }
 
     public static CodeGenerationResult Success(string code) => new() { IsSuccess = true, GeneratedCode = code };
     public static CodeGenerationResult Failure(string error) => new() { IsSuccess = false, ErrorMessage = error };
+    public static CodeGenerationResult SuccessWithTools(string code, List<McpToolCall> toolCalls, List<McpToolResult> toolResults) => 
+        new() { IsSuccess = true, GeneratedCode = code, ToolCalls = toolCalls, ToolResults = toolResults };
 }

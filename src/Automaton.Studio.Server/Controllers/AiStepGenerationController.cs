@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Services.AiCodeGeneration;
+using Automaton.Studio.Server.Services.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -32,7 +33,9 @@ public class AiStepGenerationController : ControllerBase
             return Ok(new CodeGenerationResponse 
             { 
                 GeneratedCode = result.GeneratedCode,
-                IsSuccess = true 
+                IsSuccess = true,
+                ToolCalls = result.ToolCalls,
+                ToolResults = result.ToolResults
             });
         }
         else
@@ -62,4 +65,6 @@ public class CodeGenerationResponse
     public bool IsSuccess { get; set; }
     public string GeneratedCode { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;
+    public List<McpToolCall>? ToolCalls { get; set; }
+    public List<McpToolResult>? ToolResults { get; set; }
 }
