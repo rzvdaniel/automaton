@@ -2,6 +2,7 @@
 using AntDesign.TableModels;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Runners;
+using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.FlowDesigner
@@ -53,6 +54,36 @@ namespace Automaton.Studio.Pages.FlowDesigner
         private static bool LogIsLoading(string log)
         {
             return string.IsNullOrEmpty(log);
+        }
+
+        private List<string> GetActivityActionCardBullets()
+        {
+            return new List<string>
+            {
+                "Real-time execution tracking",
+                "Detailed logs for each run",
+                "Status and performance metrics",
+                "Historical execution data"
+            };
+        }
+
+        private List<EnhancedEmpty.FeatureCardModel> GetActivityFeatureCards()
+        {
+            return new List<EnhancedEmpty.FeatureCardModel>
+            {
+                new() { Title = "Live Monitoring", Description = "Track workflow executions in real-time", Icon = "eye", IconColor = "#3b82f6" },
+                new() { Title = "Detailed Logs", Description = "Access comprehensive execution logs", Icon = "file-text", IconColor = "#10b981" },
+                new() { Title = "Status Tracking", Description = "Monitor success, failures, and progress", Icon = "dashboard", IconColor = "#f59e0b" }
+            };
+        }
+
+        private List<EnhancedEmpty.HelpLinkModel> GetActivityHelpLinks()
+        {
+            return new List<EnhancedEmpty.HelpLinkModel>
+            {
+                new() { Text = "Monitoring Guide", Url = "#", Icon = "book", Description = "Learn about execution monitoring" },
+                new() { Text = "Troubleshooting", Url = "#", Icon = "tool", Description = "Debug failed executions" }
+            };
         }
     }
 }

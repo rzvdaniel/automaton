@@ -5,13 +5,22 @@
     <!-- Hero Section -->
     <div class="hero-section" style="background-image: url('@BackgroundImageUrl');">
         <div class="hero-overlay" style="background: @GradientOverlay;">
+            <!-- Animated gradient orbs background -->
+            <div class="hero-orbs"></div>
+            
             <div class="hero-content">
                 <div class="hero-text">
                     <h1 class="hero-title">@Title</h1>
                     <p class="hero-description">@Description</p>
                 </div>
                 
-                @if (PrimaryAction != null || SecondaryActions?.Any() == true)
+                @if (VisualMockup != null)
+                {
+                    <div class="hero-visual">
+                        @VisualMockup
+                    </div>
+                }
+                else if (PrimaryAction != null || SecondaryActions?.Any() == true)
                 {
                     <div class="hero-actions">
                         <div class="action-card">
@@ -147,6 +156,7 @@
     [Parameter] public string FeatureSectionTitle { get; set; } = "";
     [Parameter] public string FeatureSectionSubtitle { get; set; } = "";
     [Parameter] public string HelpSectionTitle { get; set; } = "";
+    [Parameter] public RenderFragment? VisualMockup { get; set; }
     [Parameter] public EmptyActionModel? PrimaryAction { get; set; }
     [Parameter] public List<EmptyActionModel>? SecondaryActions { get; set; }
     [Parameter] public List<FeatureCardModel>? FeatureCards { get; set; }
@@ -186,13 +196,14 @@
     /* Hero Section */
     .hero-section {
         position: relative;
-        min-height: 50vh;
+        min-height: 55vh;
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         display: flex;
         align-items: center;
         padding: 60px 0;
+        overflow: hidden;
     }
 
     .hero-overlay {
@@ -205,6 +216,26 @@
         align-items: center;
         padding: 0 24px;
     }
+    
+    /* Animated gradient orbs background - inspired by Automaton.Web */
+    .hero-orbs::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+        pointer-events: none;
+        animation: orbsPulse 8s ease-in-out infinite;
+    }
+
+    @@keyframes orbsPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
 
     .hero-content {
         width: 100%;
@@ -215,16 +246,41 @@
         align-items: center;
         gap: 48px;
         flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
     }
 
     .hero-text {
         flex: 1;
         min-width: 400px;
         color: white;
+        animation: fadeInUp 0.8s ease;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes fadeInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
 
     .hero-title {
-        font-size: 48px;
+        font-size: 3.5rem;
         font-weight: 700;
         margin: 0 0 24px 0;
         color: white;
@@ -232,17 +288,26 @@
     }
 
     .hero-description {
-        font-size: 20px;
+        font-size: 1.25rem;
         line-height: 1.6;
         margin: 0;
         opacity: 0.95;
-        max-width: 500px;
+        max-width: 600px;
+    }
+    
+    /* Hero Visual Mockups */
+    .hero-visual {
+        flex-shrink: 0;
+        min-width: 350px;
+        max-width: 450px;
+        animation: fadeInRight 0.8s ease;
     }
 
     .hero-actions {
         flex-shrink: 0;
         min-width: 280px;
         max-width: 320px;
+        animation: fadeInRight 0.8s ease 0.2s both;
     }
 
     .action-card {
@@ -327,8 +392,8 @@
 
     /* Content Section */
     .content-section {
-        background: #fafafa;
-        min-height: 50vh;
+        background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+        min-height: 45vh;
     }
 
     .feature-section {
@@ -343,14 +408,18 @@
     }
 
     .section-title h2 {
-        font-size: 36px;
-        font-weight: 600;
+        font-size: 2.5rem;
+        font-weight: 700;
         margin: 0 0 16px 0;
         color: #262626;
+        background: linear-gradient(135deg, #1890ff 0%, #722ed1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
 
     .section-subtitle {
-        font-size: 18px;
+        font-size: 1.125rem;
         color: #666;
         margin: 0;
         max-width: 600px;
@@ -387,7 +456,7 @@
     }
 
     .feature-card .ant-card-meta-title {
-        font-size: 18px;
+        font-size: 1.125rem;
         font-weight: 600;
         margin-bottom: 8px;
         color: #262626;
@@ -466,13 +535,14 @@
         }
         
         .hero-title {
-            font-size: 36px;
+            font-size: 2.5rem;
         }
         
         .hero-description {
-            font-size: 18px;
+            font-size: 1.125rem;
         }
         
+        .hero-visual,
         .hero-actions {
             min-width: auto;
             width: 100%;
@@ -480,7 +550,7 @@
         }
         
         .section-title h2 {
-            font-size: 28px;
+            font-size: 2rem;
         }
         
         .feature-section,
