@@ -21,7 +21,7 @@
 
 /* Information Panel */
 .info-panel {
-    background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -39,69 +39,118 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: url('https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    opacity: 0.3;
-    pointer-events: none;
-}
-
-.info-panel::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(82, 196, 26, 0.8) 0%, rgba(115, 209, 61, 0.8) 100%);
+    background: 
+        radial-gradient(circle at 25% 25%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
     pointer-events: none;
 }
 
 .info-content {
     z-index: 1;
     text-align: center;
-    max-width: 400px;
+    max-width: 500px;
 }
 
 .brand-section {
     margin-bottom: 48px;
 }
 
-.brand-icon {
-    margin-bottom: 24px;
-}
-
 .brand-title {
-    font-size: 48px;
+    font-size: 3rem;
     font-weight: 700;
     margin: 0 0 16px 0;
     color: white;
     letter-spacing: -0.02em;
+    line-height: 1.1;
 }
 
 .brand-subtitle {
-    font-size: 18px;
+    font-size: 1.125rem;
     opacity: 0.9;
     margin: 0;
     font-weight: 300;
+    color: #CBD5E1;
 }
 
-.features-section {
-    text-align: left;
+/* Hero Visual */
+.hero-visual {
+    position: relative;
+    margin-top: 2rem;
 }
 
-.feature-item {
+.workflow-diagram {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
-    font-size: 16px;
-    font-weight: 400;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: #1E293B;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    margin-bottom: 1.5rem;
 }
 
-.feature-item span {
-    flex: 1;
+.flow-node {
+    padding: 0.875rem 1.75rem;
+    border-radius: 12px;
+    font-weight: 500;
+    text-align: center;
+    min-width: 140px;
+    font-size: 0.9375rem;
+}
+
+.start-node {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+}
+
+.process-node {
+    background: linear-gradient(135deg, #3B82F6, #1E3A8A);
+    color: white;
+}
+
+.action-node {
+    background: linear-gradient(135deg, #06B6D4, #0891B2);
+    color: white;
+}
+
+.end-node {
+    background: linear-gradient(135deg, #6366F1, #4F46E5);
+    color: white;
+}
+
+.flow-connector {
+    width: 2px;
+    height: 1.5rem;
+    background: linear-gradient(180deg, #06B6D4, transparent);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.stat-card {
+    background: rgba(30, 41, 59, 0.5);
+    padding: 1.25rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.stat-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #06B6D4;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #CBD5E1;
 }
 
 /* Form Panel */
