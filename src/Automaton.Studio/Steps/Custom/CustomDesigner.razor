@@ -85,21 +85,8 @@
 
     private async Task CheckForUpdates()
     {
-        // Prevent concurrent calls to the same method
-        if (isUpdating)
-        {
-            return;
-        }
-
-        // Prevent excessive calls with cooldown and flag (but allow if step changed)
-        var stepChanged = lastStepId != Step?.Id;
-        if (hasCheckedForUpdates && !stepChanged && DateTime.Now - lastUpdateCheck < UpdateCheckCooldown)
-        {
-            return;
-        }
-
-        // Additional safety check - prevent multiple concurrent version checks
-        if (hasCheckedForUpdates && (DateTime.Now - lastUpdateCheck).TotalSeconds < 1)
+        // Use centralized validation to determine if we should proceed
+        if (!ShouldCheckForUpdates())
         {
             return;
         }
@@ -123,6 +110,36 @@
             // Silently fail - version checking is not critical for step display
             // Keep the flag set to prevent repeated attempts
         }
+    }
+
+    /// <summary>
+    /// Centralized validation logic to determine if version checking should proceed.
+    /// Handles concurrency protection, cooldown periods, and step change detection.
+    /// </summary>
+    /// <returns>True if version checking should proceed, false otherwise</returns>
+    private bool ShouldCheckForUpdates()
+    {
+        // Layer 1: Prevent concurrent calls within same instance
+        if (isUpdating)
+        {
+            return false;
+        }
+
+        // Layer 2: Respect cooldown period (but allow step changes)
+        var stepChanged = lastStepId != Step?.Id;
+        if (hasCheckedForUpdates && !stepChanged && DateTime.Now - lastUpdateCheck < UpdateCheckCooldown)
+        {
+            return false;
+        }
+
+        // Layer 3: Rapid-fire protection (prevent calls within 1 second)
+        if (hasCheckedForUpdates && (DateTime.Now - lastUpdateCheck).TotalSeconds < 1)
+        {
+            return false;
+        }
+
+        // All checks passed - safe to proceed
+        return true;
     }
 
     private async Task ForceCheckForUpdates()
