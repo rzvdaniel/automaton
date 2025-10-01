@@ -38,7 +38,11 @@
                           HelpSectionTitle="Learn more about Scheduling"
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Schedule", Icon = "plus", OnClick = () => { NewSchedule(); return Task.CompletedTask; } })"
                           FeatureCards="@GetScheduleFeatureCards()"
-                          HelpLinks="@GetScheduleHelpLinks()" />
+                          HelpLinks="@GetScheduleHelpLinks()">
+                <VisualMockup>
+                    <ScheduleVisualMockup />
+                </VisualMockup>
+            </EnhancedEmpty>
         }
         else
         {

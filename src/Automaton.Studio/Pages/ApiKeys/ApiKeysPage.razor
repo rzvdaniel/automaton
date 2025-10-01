@@ -128,7 +128,11 @@
                               PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
                               SecondaryActions="@GetApiKeySecondaryActions()"
                               FeatureCards="@GetApiKeyFeatureCards()"
-                              HelpLinks="@GetApiKeyHelpLinks()" />
+                              HelpLinks="@GetApiKeyHelpLinks()">
+                    <VisualMockup>
+                        <SecurityVisualMockup />
+                    </VisualMockup>
+                </EnhancedEmpty>
             }
         }
         

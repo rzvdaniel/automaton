@@ -122,7 +122,11 @@
                               PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Add AI API Key", Icon = "plus", OnClick = () => { ViewModel.ShowCreateModal(); return Task.CompletedTask; } })"
                               SecondaryActions="@GetAiApiKeySecondaryActions()"
                               FeatureCards="@GetAiApiKeyFeatureCards()"
-                              HelpLinks="@GetAiApiKeyHelpLinks()" />
+                              HelpLinks="@GetAiApiKeyHelpLinks()">
+                    <VisualMockup>
+                        <AIVisualMockup />
+                    </VisualMockup>
+                </EnhancedEmpty>
             }
         }
         
