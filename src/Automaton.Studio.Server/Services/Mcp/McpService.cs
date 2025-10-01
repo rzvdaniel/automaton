@@ -20,9 +20,21 @@ public class McpService
     /// </summary>
     public void RegisterTool<T>() where T : IMcpTool
     {
-        var tool = ActivatorUtilities.CreateInstance<T>(serviceProvider);
-        registeredTools[tool.Name] = typeof(T);
-        logger.LogInformation("Registered MCP tool: {ToolName}", tool.Name);
+        // Store the type without creating an instance during registration
+        var toolType = typeof(T);
+        var toolName = GetToolName(toolType);
+        registeredTools[toolName] = toolType;
+        logger.LogInformation("Registered MCP tool: {ToolName}", toolName);
+    }
+
+    /// <summary>
+    /// Get the tool name by creating a temporary instance with a service scope
+    /// </summary>
+    private string GetToolName(Type toolType)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var tool = (IMcpTool)ActivatorUtilities.CreateInstance(scope.ServiceProvider, toolType);
+        return tool.Name;
     }
 
     /// <summary>
@@ -32,9 +44,11 @@ public class McpService
     {
         var definitions = new List<McpToolDefinition>();
         
+        using var scope = serviceProvider.CreateScope();
+        
         foreach (var toolType in registeredTools.Values)
         {
-            var tool = (IMcpTool)ActivatorUtilities.CreateInstance(serviceProvider, toolType);
+            var tool = (IMcpTool)ActivatorUtilities.CreateInstance(scope.ServiceProvider, toolType);
             definitions.Add(new McpToolDefinition
             {
                 Type = "function",
@@ -67,7 +81,8 @@ public class McpService
                 };
             }
 
-            var tool = (IMcpTool)ActivatorUtilities.CreateInstance(serviceProvider, toolType);
+            using var scope = serviceProvider.CreateScope();
+            var tool = (IMcpTool)ActivatorUtilities.CreateInstance(scope.ServiceProvider, toolType);
             var result = await tool.ExecuteAsync(arguments, userId, cancellationToken);
 
             return new McpToolResult
