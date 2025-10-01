@@ -143,10 +143,13 @@ partial class StepPage : ComponentBase, IDisposable
             {
                 await RefreshCode();
 
+                // Increment version when saving changes to the custom step template
+                StepDesignerViewModel.CustomStep.Definition.Version++;
+
                 await StepDesignerViewModel.Save();
                 
                 // Show success notification without awaiting (fire and forget)
-                _ = MessageService.SuccessAsync("Step saved successfully");
+                _ = MessageService.SuccessAsync($"Step saved successfully (v{StepDesignerViewModel.CustomStep.Definition.Version})");
             }
         }
         catch (Exception ex)

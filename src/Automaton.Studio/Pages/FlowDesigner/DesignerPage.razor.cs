@@ -356,6 +356,21 @@ partial class DesignerPage : ComponentBase
         StateHasChanged();
     }
 
+    private async Task OnStepUpdated(bool success)
+    {
+        if (success)
+        {
+            // Refresh the designer to show updated step information
+            await InvokeAsync(StateHasChanged);
+            
+            // Also refresh the properties panel if it's open for this step
+            if (selectedStep != null)
+            {
+                // The properties panel will automatically refresh when StateHasChanged is called
+            }
+        }
+    }
+
     private void OnRightPanelTabChange(string key)
     {
         rightPanelActiveTab = key;

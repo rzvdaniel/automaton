@@ -1,4 +1,6 @@
-﻿namespace Automaton.Core.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace Automaton.Core.Models;
 
 public class Step
 {
@@ -27,4 +29,10 @@ public class Step
     public string? NextStepId { get; set; }
 
     public string? ParentId { get; set; }
+
+    /// <summary>
+    /// For custom steps - stores the complete definition including version tracking
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? StepDefinition { get; set; }
 }

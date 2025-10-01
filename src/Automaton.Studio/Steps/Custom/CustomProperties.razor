@@ -1,13 +1,15 @@
-﻿@using Automaton.Core.Enums
+@using Automaton.Core.Enums
 @using Automaton.Studio.Domain
 @using Automaton.Studio.Steps.Custom.Variables
 @using Blazored.FluentValidation
 @using Automaton.Core.Models
 @using AntDesign
-@inherits FeedbackComponent<CustomStep>
+@using Automaton.Studio.Services
+@inherits FeedbackComponent<Automaton.Studio.Steps.Custom.CustomStep>
 
 @inject IMessageService MessageService
 @inject NavigationManager NavigationManager
+@inject CustomStepVersionService VersionService
 
 <StepProperties Step="@step">
 
@@ -23,31 +25,99 @@
         <ChildContent>
             <Tabs>
                 <TabPane Tab="Code" Key="1">
-                    <div class="code-preview-section">
-                        <div class="code-preview-header">
-                            <div class="code-info">
-                                <Icon Type="code" Style="margin-right: 8px; color: #666;" />
-                                <span>Code Preview</span>
-                            </div>
-                            <Tooltip Title="Edit code with full editor, AI chat, and debugging tools">
-                                <Button Icon="edit" 
-                                        Type="@ButtonType.Primary" 
-                                        Size="@ButtonSize.Small"
-                                        OnClick="@NavigateToStepEditor">
-                                    Edit Code
-                                </Button>
-                            </Tooltip>
-                        </div>
-                        @if (!string.IsNullOrEmpty(context.Code))
+                    <div class="code-section">
+                        
+                        <!-- Update Available Notification (when update available) -->
+                        @if (versionInfo?.IsUpdateAvailable == true)
                         {
-                            <div class="code-display">@context.Code</div>
+                            <div class="update-notification">
+                                <Alert Type="@AlertType.Warning" 
+                                       ShowIcon="true"
+                                       Style="margin-bottom: 16px;">
+                                    <MessageTemplate>
+                                        <div class="update-card">
+                                            <div class="update-header">
+                                                <div class="update-content">
+                                                    <div class="update-title">
+                                                        <Text Strong>New version available</Text>
+                                                    </div>
+                                                    <div class="update-details">
+                                                       
+                                                        <Text Style="font-size: 13px; color: #666;">
+                                                            <span style="color: #096dd9">@LatestVersionText</span> contains updates to this step. You're using <span style="color: #d46b08">@CurrentVersionText</span>.
+                                                        </Text>
+                                                    </div>
+                                                </div>
+                                                <Button Type="@ButtonType.Text" 
+                                                        Size="@ButtonSize.Small"
+                                                        Icon="close"
+                                                        OnClick="DismissUpdateNotification"
+                                                        Class="dismiss-btn">
+                                                </Button>
+                                            </div>
+                                            
+                                            <div class="update-actions">
+                                                <Space Size="SpaceSize.Small">
+                                                    <SpaceItem>
+                                                        <Tooltip Title="Update to latest version">
+                                                            <Button Icon="cloud-download" 
+                                                                    Type="@ButtonType.Primary" 
+                                                                    Size="@ButtonSize.Small"
+                                                                    Loading="@isUpdating"
+                                                                    OnClick="@UpdateStepToLatest">
+                                                            </Button>
+                                                        </Tooltip>
+                                                    </SpaceItem>
+                                                    <SpaceItem>
+                                                        <Tooltip Title="Edit code with full editor, AI chat, and debugging tools">
+                                                            <Button Icon="edit" 
+                                                                    Type="@ButtonType.Default" 
+                                                                    Size="@ButtonSize.Small"
+                                                                    OnClick="@NavigateToStepEditor">
+                                                            </Button>
+                                                        </Tooltip>
+                                                    </SpaceItem>
+                                                </Space>
+                                            </div>
+                                        </div>
+                                    </MessageTemplate>
+                                </Alert>
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- Simple header when no update available -->
+                            <div class="code-header">
+                                <div class="code-info">
+                                    <Tag Color="@("blue")" Style="font-size: 12px; margin-right: 8px;">
+                                        @CurrentVersionText
+                                    </Tag>
+                                </div>
+                                <div class="code-actions">
+                                    <Tooltip Title="Edit code with full editor, AI chat, and debugging tools">
+                                        <Button Icon="edit" 
+                                                Type="@ButtonType.Default" 
+                                                Size="@ButtonSize.Small"
+                                                OnClick="@NavigateToStepEditor">
+                                        </Button>
+                                    </Tooltip>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Code Display -->
+                        @if (!string.IsNullOrEmpty(step.Code))
+                        {
+                            <div class="code-display-container">
+                                <div class="code-display">@step.Code</div>
+                            </div>
                         }
                         else
                         {
                             <div class="code-empty">
-                                <Icon Type="file-text" Style="font-size: 24px; color: #d9d9d9; margin-bottom: 8px;" />
-                                <div class="code-empty-title">No code written yet</div>
-                                <div class="code-empty-subtitle">Click "Edit Code" to start writing your custom step code with full editor support.</div>
+                                <Icon Type="file-text" Style="font-size: 32px; color: #d9d9d9; margin-bottom: 12px;" />
+                                <div class="code-empty-title">No code available</div>
+                                <div class="code-empty-subtitle">This custom step doesn't have any code to display.</div>
                             </div>
                         }
                     </div>
@@ -68,9 +138,9 @@
 
                         <!-- Variables List -->
                         <div class="variables-list">
-                            @if (context.CodeInputVariables?.Any() == true)
+                            @if (step.CodeInputVariables?.Any() == true)
                             {
-                                @foreach (var inputVariable in context.CodeInputVariables)
+                                @foreach (var inputVariable in step.CodeInputVariables)
                                 {
                                     <div class="variable-card">
                                         <div class="variable-header">
@@ -230,9 +300,9 @@
 
                         <!-- Variables List -->
                         <div class="variables-list">
-                            @if (context.CodeOutputVariables?.Any() == true)
+                            @if (step.CodeOutputVariables?.Any() == true)
                             {
-                                @foreach (var outputVariable in context.CodeOutputVariables)
+                                @foreach (var outputVariable in step.CodeOutputVariables)
                                 {
                                     <div class="variable-card">
                                         <div class="variable-header-output">
@@ -289,15 +359,144 @@
 </StepProperties>
 
 @code {
-    private CustomStep step;
-    private Form<CustomStep> form;
+    private Automaton.Studio.Steps.Custom.CustomStep step;
+    private Form<Automaton.Studio.Steps.Custom.CustomStep> form;
     private FluentValidationValidator fluentValidationValidator;
+    
+    private CustomStepVersionInfo? versionInfo;
+    private bool isUpdating = false;
+    private int currentVersion = 1;
+    private int latestVersion = 1;
+    private bool hasCheckedForUpdates = false;
+    private DateTime lastUpdateCheck = DateTime.MinValue;
+    private readonly TimeSpan UpdateCheckCooldown = TimeSpan.FromMinutes(5); // Instance-based, not static
+    private string? lastStepId = null; // Track if step changed
 
-    protected override void OnInitialized()
+    private string CurrentVersionText => $"V{currentVersion}";
+    private string LatestVersionText => $"V{latestVersion}";
+
+    protected override async Task OnInitializedAsync()
     {
         step = this.Options;
+        
+        // Only check for updates once during initialization
+        if (!hasCheckedForUpdates)
+        {
+            lastStepId = step?.Id;
+            await CheckForUpdates();
+        }
+        
+        await base.OnInitializedAsync();
+    }
 
-        base.OnInitialized();
+    private async Task CheckForUpdates()
+    {
+        // Use centralized validation to determine if we should proceed
+        if (!ShouldCheckForUpdates())
+        {
+            return;
+        }
+
+        try
+        {
+            // Mark as checking to prevent concurrent calls
+            hasCheckedForUpdates = true;
+            lastUpdateCheck = DateTime.Now;
+            lastStepId = step?.Id;
+
+            versionInfo = await VersionService.GetVersionInfoAsync(step);
+            currentVersion = versionInfo.CurrentVersion;
+            latestVersion = versionInfo.LatestVersion;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Silently fail - version checking is not critical for properties display
+            // Keep the flag set to prevent repeated attempts
+        }
+    }
+
+    /// <summary>
+    /// Centralized validation logic to determine if version checking should proceed.
+    /// Handles concurrency protection, cooldown periods, and step change detection.
+    /// </summary>
+    /// <returns>True if version checking should proceed, false otherwise</returns>
+    private bool ShouldCheckForUpdates()
+    {
+        // Layer 1: Prevent concurrent calls within same instance
+        if (isUpdating)
+        {
+            return false;
+        }
+
+        // Layer 2: Respect cooldown period (but allow step changes)
+        var stepChanged = lastStepId != step?.Id;
+        if (hasCheckedForUpdates && !stepChanged && DateTime.Now - lastUpdateCheck < UpdateCheckCooldown)
+        {
+            return false;
+        }
+
+        // Layer 3: Rapid-fire protection (prevent calls within 1 second)
+        if (hasCheckedForUpdates && (DateTime.Now - lastUpdateCheck).TotalSeconds < 1)
+        {
+            return false;
+        }
+
+        // All checks passed - safe to proceed
+        return true;
+    }
+
+    private async Task ForceCheckForUpdates()
+    {
+        // Force check (used after successful updates) - reset cooldown
+        hasCheckedForUpdates = false;
+        lastUpdateCheck = DateTime.MinValue;
+        await CheckForUpdates();
+    }
+
+    private async Task UpdateStepToLatest()
+    {
+        if (isUpdating) return;
+
+        try
+        {
+            isUpdating = true;
+            StateHasChanged();
+
+            var success = await VersionService.UpdateToLatestVersionAsync(step);
+
+            if (success)
+            {
+                // Force a fresh check after successful update
+                await ForceCheckForUpdates();
+                await MessageService.SuccessAsync($"Step updated to version {latestVersion}!");
+                
+                // Refresh the form to show updated data
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                await MessageService.ErrorAsync("Failed to update step. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Error updating step: {ex.Message}");
+        }
+        finally
+        {
+            isUpdating = false;
+            StateHasChanged();
+        }
+    }
+
+    private void DismissUpdateNotification()
+    {
+        if (versionInfo != null)
+        {
+            versionInfo.IsUpdateAvailable = false;
+            StateHasChanged();
+        }
     }
 
     public override async Task OnFeedbackOkAsync(ModalClosingEventArgs args)
@@ -403,6 +602,139 @@
 }
 
 <style>
+    /* Code Section Styling */
+    .code-section {
+        padding: 0;
+    }
+
+    /* Update Notification Styling */
+    .update-notification {
+        margin: 16px;
+        margin-bottom: 0;
+    }
+
+    .update-card {
+        width: 100%;
+    }
+
+    .update-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    .update-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .update-title {
+        margin-bottom: 4px;
+    }
+
+    .update-details {
+        line-height: 1.4;
+    }
+
+    .dismiss-btn {
+        flex-shrink: 0;
+        padding: 0 !important;
+        width: 20px !important;
+        height: 20px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 50% !important;
+        margin-left: 12px;
+        margin-top: 2px;
+    }
+
+    .dismiss-btn:hover {
+        background-color: rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .update-actions {
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    .update-notification .ant-alert {
+        border: 1px solid #ffe7ba;
+        background-color: #fffbf0;
+    }
+
+    .update-notification .ant-alert-icon {
+        color: #fa8c16;
+    }
+
+    /* Simple header when no update available */
+    .code-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #fafafa;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 0;
+    }
+
+    .code-info {
+        display: flex;
+        align-items: center;
+    }
+
+    .code-label {
+        font-size: 13px;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .code-actions {
+        display: flex;
+        align-items: center;
+    }
+
+    .code-display-container {
+        margin: 16px;
+    }
+
+    .code-display {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 16px;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        color: #495057;
+        line-height: 1.5;
+    }
+
+    .code-empty {
+        text-align: center;
+        padding: 48px 16px;
+        background-color: #fafafa;
+        border-radius: 6px;
+        border: 1px dashed #d9d9d9;
+        margin: 16px;
+    }
+
+    .code-empty-title {
+        font-size: 16px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .code-empty-subtitle {
+        font-size: 13px;
+        color: #999;
+        line-height: 1.4;
+    }
+
     /* Variables Section Styling */
     .variables-section {
         padding: 12px;
@@ -521,16 +853,6 @@
         box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
     }
 
-    .variable-type {
-        font-size: 12px;
-        color: #8c8c8c;
-        background-color: #f5f5f5;
-        padding: 2px 6px;
-        border-radius: 3px;
-        display: inline-block;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    }
-
     .variable-actions {
         display: flex;
         gap: 4px;
@@ -555,10 +877,6 @@
     .info-button {
         flex-shrink: 0;
         padding-top: 4px;
-    }
-
-    .variable-description {
-        padding: 4px 0px 0px 4px;
     }
 
     /* Enhanced Empty State */
@@ -591,60 +909,5 @@
 
     .ant-popconfirm-buttons {
         margin-top: 8px;
-    }
-
-    /* Code Preview Styling */
-    .code-preview-section {
-        padding: 12px;
-    }
-
-    .code-preview-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    .code-info {
-        display: flex;
-        align-items: center;
-        font-weight: 500;
-    }
-
-    .code-display {
-        background-color: #fafafa;
-        border: 1px solid #f0f0f0;
-        border-radius: 4px;
-        padding: 12px;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 12px;
-        max-height: 200px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        color: #666;
-        line-height: 1.4;
-    }
-
-    .code-empty {
-        text-align: center;
-        padding: 32px 16px;
-        background-color: #fafafa;
-        border-radius: 6px;
-        border: 1px dashed #d9d9d9;
-    }
-
-    .code-empty-title {
-        font-size: 14px;
-        font-weight: 500;
-        color: #666;
-        margin-bottom: 4px;
-    }
-
-    .code-empty-subtitle {
-        font-size: 12px;
-        color: #999;
-        line-height: 1.4;
     }
 </style>

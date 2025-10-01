@@ -1,8 +1,34 @@
 ﻿@using Automaton.Studio.Steps
+@using Automaton.Studio.Services
+@using AntDesign
 
 <StepDesigner Step=@Step>
+    
+    <!-- Update indicator badge -->
+    @if (isUpdateAvailable)
+    {
+        <div class="step-update-indicator">
+            <Tooltip Title="@($"Update available: {CurrentVersionText} → {LatestVersionText}. Click to update.")">
+                <Button Type="@ButtonType.Text" 
+                        Size="@ButtonSize.Small"
+                        Icon="cloud-download"
+                        OnClick="@UpdateStepToLatest"
+                        Loading="@isUpdating"
+                        Class="update-button">
+                </Button>
+            </Tooltip>
+        </div>
+    }
+
     <div>
         <b>@Step.DisplayName</b>
+        @if (currentVersion > 0)
+        {
+            <Tag Color="@(isUpdateAvailable ? "orange" : "blue")" 
+                 Style="margin-left: 8px; font-size: 11px;">
+                @CurrentVersionText
+            </Tag>
+        }
     </div>
     <div>
         @Step.Description <a href="" @onclick:preventDefault>@Step.Code</a>
@@ -13,9 +39,186 @@
     [Parameter]
     public CustomStep Step { get; set; }
 
-    protected override void OnInitialized()
+    [Parameter] 
+    public EventCallback<bool> OnStepUpdated { get; set; }
+
+    [Inject] private CustomStepVersionService VersionService { get; set; }
+    [Inject] private IMessageService MessageService { get; set; }
+
+    private bool isUpdateAvailable = false;
+    private bool isUpdating = false;
+    private int currentVersion = 1;
+    private int latestVersion = 1;
+    private bool hasCheckedForUpdates = false;
+    private DateTime lastUpdateCheck = DateTime.MinValue;
+    private readonly TimeSpan UpdateCheckCooldown = TimeSpan.FromMinutes(5); // Instance-based, not static
+    private string? lastStepId = null; // Track if step changed
+    
+    private string CurrentVersionText => $"v{currentVersion}";
+    private string LatestVersionText => $"v{latestVersion}";
+
+    protected override async Task OnInitializedAsync()
     {
-        base.OnInitialized();
+        // Only check for updates once during initialization
+        if (!hasCheckedForUpdates)
+        {
+            await CheckForUpdates();
+        }
+        
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Check if step changed or cooldown has passed
+        var stepChanged = lastStepId != Step?.Id;
+        var cooldownExpired = DateTime.Now - lastUpdateCheck > UpdateCheckCooldown;
+        
+        if (Step != null && (stepChanged || (!hasCheckedForUpdates && cooldownExpired)))
+        {
+            lastStepId = Step.Id; // Track current step
+            await CheckForUpdates();
+        }
+        
+        await base.OnParametersSetAsync();
+    }
+
+    private async Task CheckForUpdates()
+    {
+        // Use centralized validation to determine if we should proceed
+        if (!ShouldCheckForUpdates())
+        {
+            return;
+        }
+
+        try
+        {
+            // Mark as checking to prevent concurrent calls
+            var wasChecking = hasCheckedForUpdates;
+            hasCheckedForUpdates = true;
+            lastUpdateCheck = DateTime.Now;
+
+            var versionInfo = await VersionService.GetVersionInfoAsync(Step);
+            isUpdateAvailable = versionInfo.IsUpdateAvailable;
+            currentVersion = versionInfo.CurrentVersion;
+            latestVersion = versionInfo.LatestVersion;
+            
+            StateHasChanged();
+        }
+        catch
+        {
+            // Silently fail - version checking is not critical for step display
+            // Keep the flag set to prevent repeated attempts
+        }
+    }
+
+    /// <summary>
+    /// Centralized validation logic to determine if version checking should proceed.
+    /// Handles concurrency protection, cooldown periods, and step change detection.
+    /// </summary>
+    /// <returns>True if version checking should proceed, false otherwise</returns>
+    private bool ShouldCheckForUpdates()
+    {
+        // Layer 1: Prevent concurrent calls within same instance
+        if (isUpdating)
+        {
+            return false;
+        }
+
+        // Layer 2: Respect cooldown period (but allow step changes)
+        var stepChanged = lastStepId != Step?.Id;
+        if (hasCheckedForUpdates && !stepChanged && DateTime.Now - lastUpdateCheck < UpdateCheckCooldown)
+        {
+            return false;
+        }
+
+        // Layer 3: Rapid-fire protection (prevent calls within 1 second)
+        if (hasCheckedForUpdates && (DateTime.Now - lastUpdateCheck).TotalSeconds < 1)
+        {
+            return false;
+        }
+
+        // All checks passed - safe to proceed
+        return true;
+    }
+
+    private async Task ForceCheckForUpdates()
+    {
+        // Force check (used after successful updates) - reset cooldown
+        hasCheckedForUpdates = false;
+        lastUpdateCheck = DateTime.MinValue;
+        await CheckForUpdates();
+    }
+
+    private async Task UpdateStepToLatest()
+    {
+        if (isUpdating) return;
+
+        try
+        {
+            isUpdating = true;
+            StateHasChanged();
+
+            var success = await VersionService.UpdateToLatestVersionAsync(Step);
+
+            if (success)
+            {
+                // Force a fresh check after successful update
+                await ForceCheckForUpdates();
+                await MessageService.SuccessAsync($"Step updated to {LatestVersionText}!");
+                await OnStepUpdated.InvokeAsync(true);
+            }
+            else
+            {
+                await MessageService.ErrorAsync("Failed to update step. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Error updating step: {ex.Message}");
+        }
+        finally
+        {
+            isUpdating = false;
+            StateHasChanged();
+        }
     }
 }
+
+<style>
+    .step-update-indicator {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        z-index: 10;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .update-button {
+        color: #ff7a00 !important;
+        border: none !important;
+        background: white !important;
+        border-radius: 50% !important;
+        width: 24px !important;
+        height: 24px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .update-button:hover {
+        color: #ff7a00 !important;
+        background: #fff7e6 !important;
+        transform: scale(1.1) !important;
+    }
+
+    .update-button:active {
+        transform: scale(0.95) !important;
+    }
+</style>
 
