@@ -1,0 +1,148 @@
+@* Workflow Visual Mockup Component - Inspired by Automaton.Web *@
+
+<div class="workflow-visual-mockup">
+    <div class="workflow-diagram">
+        <div class="flow-node start-node">
+            <div class="node-icon">▶</div>
+            <div class="node-label">Start</div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-node process-node">
+            <div class="node-icon">⚙</div>
+            <div class="node-label">Process Data</div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-node action-node">
+            <div class="node-icon">📧</div>
+            <div class="node-label">Send Email</div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-node end-node">
+            <div class="node-icon">✓</div>
+            <div class="node-label">Complete</div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .workflow-visual-mockup {
+        position: relative;
+        animation: fadeIn 1s ease;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    .workflow-diagram {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .flow-node {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-weight: 500;
+        text-align: center;
+        min-width: 140px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        animation: slideIn 0.6s ease forwards;
+        opacity: 0;
+    }
+
+    .flow-node:nth-child(1) { animation-delay: 0.1s; }
+    .flow-node:nth-child(3) { animation-delay: 0.2s; }
+    .flow-node:nth-child(5) { animation-delay: 0.3s; }
+    .flow-node:nth-child(7) { animation-delay: 0.4s; }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .flow-node:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .node-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+
+    .node-label {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .start-node {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    .process-node {
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+        color: white;
+    }
+
+    .action-node {
+        background: linear-gradient(135deg, #06b6d4, #0891b2);
+        color: white;
+    }
+
+    .end-node {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+    }
+
+    .flow-connector {
+        width: 3px;
+        height: 20px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.3));
+        border-radius: 2px;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
+
+    @@media (max-width: 768px) {
+        .workflow-diagram {
+            padding: 16px;
+        }
+
+        .flow-node {
+            min-width: 120px;
+            padding: 12px 20px;
+        }
+
+        .node-icon {
+            font-size: 20px;
+        }
+
+        .node-label {
+            font-size: 12px;
+        }
+    }
+</style>

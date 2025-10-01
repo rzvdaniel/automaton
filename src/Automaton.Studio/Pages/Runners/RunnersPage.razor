@@ -51,7 +51,11 @@
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Download Runner", Icon = "download", OnClick = () => { NavigationManager.NavigateTo("/downloads-runner"); return Task.CompletedTask; } })"
                           SecondaryActions="@GetRunnerSecondaryActions()"
                           FeatureCards="@GetRunnerFeatureCards()"
-                          HelpLinks="@GetRunnerHelpLinks()" />
+                          HelpLinks="@GetRunnerHelpLinks()">
+                <VisualMockup>
+                    <RunnerVisualMockup />
+                </VisualMockup>
+            </EnhancedEmpty>
         }
         else
         {

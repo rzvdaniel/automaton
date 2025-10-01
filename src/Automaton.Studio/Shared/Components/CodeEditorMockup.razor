@@ -1,0 +1,182 @@
+@* Code Editor Visual Mockup Component - Inspired by Automaton.Web *@
+
+<div class="code-editor-visual-mockup">
+    <div class="editor-window">
+        <div class="editor-header">
+            <div class="editor-tabs">
+                <div class="tab active">@FileName</div>
+                <div class="tab">config.json</div>
+            </div>
+        </div>
+        <div class="editor-content">
+            @if (Language == "python")
+            {
+                <div class="code-line">
+                    <span class="line-number">1</span>
+                    <span class="code-text">
+                        <span class="keyword">def</span> 
+                        <span class="function">@FunctionName</span>(<span class="parameter">data</span>):
+                    </span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">2</span>
+                    <span class="code-text">
+                        &nbsp;&nbsp;<span class="comment"># @Comment</span>
+                    </span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">3</span>
+                    <span class="code-text">
+                        &nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"@ReturnValue"</span>
+                    </span>
+                </div>
+            }
+            else if (Language == "powershell")
+            {
+                <div class="code-line">
+                    <span class="line-number">1</span>
+                    <span class="code-text">
+                        <span class="keyword">function</span> 
+                        <span class="function">@FunctionName</span> {
+                    </span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">2</span>
+                    <span class="code-text">
+                        &nbsp;&nbsp;<span class="comment"># @Comment</span>
+                    </span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">3</span>
+                    <span class="code-text">
+                        &nbsp;&nbsp;<span class="keyword">Write-Output</span> <span class="string">"@ReturnValue"</span>
+                    </span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">4</span>
+                    <span class="code-text">}</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Language { get; set; } = "python";
+    [Parameter] public string FileName { get; set; } = "workflow.py";
+    [Parameter] public string FunctionName { get; set; } = "process_workflow";
+    [Parameter] public string Comment { get; set; } = "Automated workflow logic";
+    [Parameter] public string ReturnValue { get; set; } = "success";
+}
+
+<style>
+    .code-editor-visual-mockup {
+        position: relative;
+        animation: fadeInRight 0.8s ease;
+    }
+
+    .editor-window {
+        background: #1e293b;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .editor-header {
+        background: #1a1f36;
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .editor-tabs {
+        display: flex;
+        gap: 8px;
+    }
+
+    .tab {
+        padding: 6px 16px;
+        background: transparent;
+        color: #64748b;
+        font-size: 13px;
+        border-radius: 6px 6px 0 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    .tab.active {
+        background: #1e293b;
+        color: #f8fafc;
+    }
+
+    .editor-content {
+        padding: 16px;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .code-line {
+        display: flex;
+        margin-bottom: 4px;
+        animation: fadeIn 0.4s ease forwards;
+        opacity: 0;
+    }
+
+    .code-line:nth-child(1) { animation-delay: 0.2s; }
+    .code-line:nth-child(2) { animation-delay: 0.3s; }
+    .code-line:nth-child(3) { animation-delay: 0.4s; }
+    .code-line:nth-child(4) { animation-delay: 0.5s; }
+
+    @@keyframes fadeIn {
+        to { opacity: 1; }
+    }
+
+    .line-number {
+        width: 2.5rem;
+        color: #64748b;
+        text-align: right;
+        margin-right: 1rem;
+        user-select: none;
+    }
+
+    .code-text {
+        flex: 1;
+        color: #cbd5e1;
+    }
+
+    .keyword {
+        color: #c792ea;
+        font-weight: 500;
+    }
+
+    .function {
+        color: #82aaff;
+    }
+
+    .parameter {
+        color: #ffcb6b;
+    }
+
+    .string {
+        color: #c3e88d;
+    }
+
+    .comment {
+        color: #64748b;
+        font-style: italic;
+    }
+
+    @@media (max-width: 768px) {
+        .editor-content {
+            padding: 12px;
+            font-size: 12px;
+        }
+
+        .line-number {
+            width: 2rem;
+            margin-right: 0.5rem;
+        }
+    }
+</style>

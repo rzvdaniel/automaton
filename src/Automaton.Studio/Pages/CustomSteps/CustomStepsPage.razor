@@ -52,7 +52,15 @@
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() })"
                           SecondaryActions="@GetCustomStepSecondaryActions()"
                           FeatureCards="@GetCustomStepFeatureCards()"
-                          HelpLinks="@GetCustomStepHelpLinks()" />
+                          HelpLinks="@GetCustomStepHelpLinks()">
+                <VisualMockup>
+                    <CodeEditorMockup Language="python" 
+                                     FileName="custom_step.py" 
+                                     FunctionName="execute_step" 
+                                     Comment="Custom automation logic" 
+                                     ReturnValue="completed" />
+                </VisualMockup>
+            </EnhancedEmpty>
         }
         else
         {

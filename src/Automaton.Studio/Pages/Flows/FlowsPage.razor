@@ -51,7 +51,11 @@
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Flow", Icon = "plus", OnClick = () => NewFlowDialog() })"
                           SecondaryActions="@GetFlowSecondaryActions()"
                           FeatureCards="@GetFlowFeatureCards()"
-                          HelpLinks="@GetFlowHelpLinks()" />
+                          HelpLinks="@GetFlowHelpLinks()">
+                <VisualMockup>
+                    <WorkflowVisualMockup />
+                </VisualMockup>
+            </EnhancedEmpty>
         }
         else
         {
