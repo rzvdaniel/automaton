@@ -1,3 +1,27 @@
+<div class="doc-hero hero-getting-started">
+  <div class="doc-hero-content">
+    <div class="doc-hero-icon">🎯</div>
+    <h1>Quick Start Guide</h1>
+    <p class="hero-subtitle">
+      Get up and running with Automaton in minutes. This guide walks you through your first automation workflow, from setup to execution.
+    </p>
+    <div class="doc-hero-stats">
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">5</span>
+        <span class="doc-hero-stat-label">Minutes to First Flow</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">✓</span>
+        <span class="doc-hero-stat-label">Step-by-Step</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🎓</span>
+        <span class="doc-hero-stat-label">Beginner Friendly</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 # Quick Start Guide
 
 Welcome to Automaton! This guide will help you get started with the automation platform quickly.

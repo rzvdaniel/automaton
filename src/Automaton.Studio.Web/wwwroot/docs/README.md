@@ -1,3 +1,27 @@
+<div class="doc-hero hero-home">
+  <div class="doc-hero-content">
+    <div class="doc-hero-icon">🚀</div>
+    <h1>Automaton Documentation</h1>
+    <p class="hero-subtitle">
+      Your complete guide to building powerful automation workflows. From simple scripts to complex enterprise automation - all in one platform.
+    </p>
+    <div class="doc-hero-stats">
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🧩</span>
+        <span class="doc-hero-stat-label">Visual Flow Builder</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🐍</span>
+        <span class="doc-hero-stat-label">Python Integration</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🌐</span>
+        <span class="doc-hero-stat-label">Remote Execution</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 # Automaton Documentation
 
 Welcome to the Automaton automation platform.

@@ -1,3 +1,27 @@
+<div class="doc-hero hero-runners">
+  <div class="doc-hero-content">
+    <div class="doc-hero-icon">🏃</div>
+    <h1>Managing Runners</h1>
+    <p class="hero-subtitle">
+      Deploy and manage execution agents that bring your workflows to life. Run automations anywhere with flexible, scalable runners.
+    </p>
+    <div class="doc-hero-stats">
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🖥️</span>
+        <span class="doc-hero-stat-label">Cross-Platform</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">☁️</span>
+        <span class="doc-hero-stat-label">Remote Execution</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">📊</span>
+        <span class="doc-hero-stat-label">Real-Time Status</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 # Managing Runners
 
 Runners are the execution agents that run your automation flows. They connect to the Automaton platform and execute your workflows on different machines.
