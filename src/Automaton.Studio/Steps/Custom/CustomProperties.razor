@@ -367,6 +367,10 @@
     private bool isUpdating = false;
     private int currentVersion = 1;
     private int latestVersion = 1;
+    private bool hasCheckedForUpdates = false;
+    private DateTime lastUpdateCheck = DateTime.MinValue;
+    private readonly TimeSpan UpdateCheckCooldown = TimeSpan.FromMinutes(5); // Instance-based, not static
+    private string? lastStepId = null; // Track if step changed
 
     private string CurrentVersionText => $"V{currentVersion}";
     private string LatestVersionText => $"V{latestVersion}";
@@ -374,14 +378,45 @@
     protected override async Task OnInitializedAsync()
     {
         step = this.Options;
-        await CheckForUpdates();
+        
+        // Only check for updates once during initialization
+        if (!hasCheckedForUpdates)
+        {
+            lastStepId = step?.Id;
+            await CheckForUpdates();
+        }
+        
         await base.OnInitializedAsync();
     }
 
     private async Task CheckForUpdates()
     {
+        // Prevent concurrent calls to the same method
+        if (isUpdating)
+        {
+            return;
+        }
+
+        // Prevent excessive calls with cooldown and flag (but allow if step changed)
+        var stepChanged = lastStepId != step?.Id;
+        if (hasCheckedForUpdates && !stepChanged && DateTime.Now - lastUpdateCheck < UpdateCheckCooldown)
+        {
+            return;
+        }
+
+        // Additional safety check - prevent multiple concurrent version checks
+        if (hasCheckedForUpdates && (DateTime.Now - lastUpdateCheck).TotalSeconds < 1)
+        {
+            return;
+        }
+
         try
         {
+            // Mark as checking to prevent concurrent calls
+            hasCheckedForUpdates = true;
+            lastUpdateCheck = DateTime.Now;
+            lastStepId = step?.Id;
+
             versionInfo = await VersionService.GetVersionInfoAsync(step);
             currentVersion = versionInfo.CurrentVersion;
             latestVersion = versionInfo.LatestVersion;
@@ -390,7 +425,16 @@
         catch
         {
             // Silently fail - version checking is not critical for properties display
+            // Keep the flag set to prevent repeated attempts
         }
+    }
+
+    private async Task ForceCheckForUpdates()
+    {
+        // Force check (used after successful updates) - reset cooldown
+        hasCheckedForUpdates = false;
+        lastUpdateCheck = DateTime.MinValue;
+        await CheckForUpdates();
     }
 
     private async Task UpdateStepToLatest()
@@ -406,7 +450,8 @@
 
             if (success)
             {
-                await CheckForUpdates(); // Refresh version info
+                // Force a fresh check after successful update
+                await ForceCheckForUpdates();
                 await MessageService.SuccessAsync($"Step updated to version {latestVersion}!");
                 
                 // Refresh the form to show updated data
