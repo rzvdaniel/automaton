@@ -1,3 +1,27 @@
+<div class="doc-hero hero-platform">
+  <div class="doc-hero-content">
+    <div class="doc-hero-icon">🗺️</div>
+    <h1>Platform Pages</h1>
+    <p class="hero-subtitle">
+      Navigate the Automaton interface like a pro. Discover all features, tools, and management pages to make the most of your automation platform.
+    </p>
+    <div class="doc-hero-stats">
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">10+</span>
+        <span class="doc-hero-stat-label">Platform Pages</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">⚡</span>
+        <span class="doc-hero-stat-label">Power Features</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🎨</span>
+        <span class="doc-hero-stat-label">Intuitive Design</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 # Platform Pages
 
 This guide provides an overview of the Automaton platform interface and what you can accomplish on each page.

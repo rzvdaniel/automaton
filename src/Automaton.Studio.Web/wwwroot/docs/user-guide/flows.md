@@ -1,3 +1,27 @@
+<div class="doc-hero hero-flows">
+  <div class="doc-hero-content">
+    <div class="doc-hero-icon">🔄</div>
+    <h1>Working with Flows</h1>
+    <p class="hero-subtitle">
+      Master the art of automation workflows. Learn to design, connect, and execute powerful flows that streamline your business processes.
+    </p>
+    <div class="doc-hero-stats">
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">∞</span>
+        <span class="doc-hero-stat-label">Unlimited Possibilities</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">🔗</span>
+        <span class="doc-hero-stat-label">Visual Connections</span>
+      </div>
+      <div class="doc-hero-stat">
+        <span class="doc-hero-stat-number">💡</span>
+        <span class="doc-hero-stat-label">Smart Logic</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 # Working with Flows
 
 Flows are the heart of Automaton - they represent your automation workflows as visual, connected diagrams that are easy to understand and modify.
