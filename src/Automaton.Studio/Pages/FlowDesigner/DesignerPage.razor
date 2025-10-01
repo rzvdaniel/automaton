@@ -195,7 +195,7 @@
                                                                       ItemDrop="@((p)=>OnItemDrop(p))"
                                                                       ItemDoubleClick="@((p)=>OnItemDoubleClick(p))">
 
-                                                                <DesignerStep Step="@context" />
+                                                                <DesignerStep Step="@context" OnStepUpdated="@OnStepUpdated" />
 
                                                             </Designer>
                                                         </TabPane>

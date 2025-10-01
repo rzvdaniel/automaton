@@ -17,12 +17,35 @@ public class AutoMapperProfile : Profile
         this.serviceProvider = serviceProvider;
 
         CreateMap<StudioFlow, Flow>();
-        CreateMap<StudioStep, Step>();
+        
+        // Enhanced mapping for StudioStep to preserve custom step definitions
+        CreateMap<StudioStep, Step>()
+            .ForMember(dest => dest.StepDefinition, opt => opt.MapFrom(src => GetCustomStepDefinition(src)));
+        
         CreateMap<StudioDefinition, Definition>();
 
         CreateMap<FlowInfo, ExecuteFlowModel>();
         CreateMap<FlowInfo, FlowModel>();
         CreateMap<WorkflowExecution, FlowExecution>();
         CreateMap<CustomStep, CustomStepListItem>();   
+    }
+
+    private static object? GetCustomStepDefinition(StudioStep studioStep)
+    {
+        if (studioStep is not Steps.Custom.CustomStep customStep)
+        {
+            return null;
+        }
+
+        return new
+        {
+            Code = customStep.Code,
+            Language = customStep.Language,
+            CodeInputVariables = customStep.CodeInputVariables,
+            CodeOutputVariables = customStep.CodeOutputVariables,
+            SourceCustomStepId = customStep.SourceCustomStepId,
+            SourceVersion = customStep.SourceVersion,
+            Version = customStep.StepVersion
+        };
     }
 }

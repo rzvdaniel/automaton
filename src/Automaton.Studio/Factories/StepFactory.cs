@@ -77,6 +77,9 @@ public class StepFactory
             Icon = explorerStep.Icon,
             MoreInfo = explorerStep.MoreInfo,
             Definition = activeDefinition,
+            SourceCustomStepId = explorerStep.Id,
+            SourceVersion = explorerStep.Definition.Version,
+            StepVersion = 1
         };
 
         step.Created();
@@ -117,6 +120,30 @@ public class StepFactory
         studioStep.Inputs = step.Inputs;
         studioStep.Outputs = step.Outputs;
         studioStep.Definition = activeDefinition;
+
+        // Special handling for custom steps to restore version tracking
+        if (studioStep is Steps.Custom.CustomStep customStep && step.StepDefinition != null)
+        {
+            try
+            {
+                // Deserialize the step definition from the stored data
+                var jsonString = step.StepDefinition.ToString();
+                var customStepDefinition = System.Text.Json.JsonSerializer.Deserialize<CustomStepDefinition>(jsonString);
+                
+                if (customStepDefinition != null)
+                {
+                    // Restore version tracking properties
+                    customStep.SourceCustomStepId = customStepDefinition.SourceCustomStepId;
+                    customStep.SourceVersion = customStepDefinition.SourceVersion;
+                    customStep.StepVersion = customStepDefinition.Version;
+                }
+            }
+            catch
+            {
+                // If deserialization fails, continue with default values
+                // This ensures backward compatibility with existing flows
+            }
+        }
 
         // Note: Do not call Created() because this method is used
         // when loading a flow and we do no need all it's logic

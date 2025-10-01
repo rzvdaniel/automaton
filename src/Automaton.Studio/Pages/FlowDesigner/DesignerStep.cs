@@ -9,6 +9,9 @@ public class DesignerStep : ComponentBase
     [Parameter]
     public StudioStep Step { get; set; }
 
+    [Parameter]
+    public EventCallback<bool> OnStepUpdated { get; set; }
+
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
         if (Step == null)
@@ -24,6 +27,13 @@ public class DesignerStep : ComponentBase
         builder.OpenComponent(0, componentType);
         // set the `Step` attribute of the component
         builder.AddAttribute(1, "Step", Step);
+        
+        // Only add OnStepUpdated callback for CustomStep designers
+        if (Step is Steps.Custom.CustomStep)
+        {
+            builder.AddAttribute(2, "OnStepUpdated", OnStepUpdated);
+        }
+        
         // close
         builder.CloseComponent();
     }

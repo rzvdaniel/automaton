@@ -1,8 +1,34 @@
 ﻿@using Automaton.Studio.Steps
+@using Automaton.Studio.Services
+@using AntDesign
 
 <StepDesigner Step=@Step>
+    
+    <!-- Update indicator badge -->
+    @if (isUpdateAvailable)
+    {
+        <div class="step-update-indicator">
+            <Tooltip Title="@($"Update available: {CurrentVersionText} → {LatestVersionText}. Click to update.")">
+                <Button Type="@ButtonType.Text" 
+                        Size="@ButtonSize.Small"
+                        Icon="cloud-download"
+                        OnClick="@UpdateStepToLatest"
+                        Loading="@isUpdating"
+                        Class="update-button">
+                </Button>
+            </Tooltip>
+        </div>
+    }
+
     <div>
         <b>@Step.DisplayName</b>
+        @if (currentVersion > 0)
+        {
+            <Tag Color="@(isUpdateAvailable ? "orange" : "blue")" 
+                 Style="margin-left: 8px; font-size: 11px;">
+                @CurrentVersionText
+            </Tag>
+        }
     </div>
     <div>
         @Step.Description <a href="" @onclick:preventDefault>@Step.Code</a>
@@ -13,9 +39,115 @@
     [Parameter]
     public CustomStep Step { get; set; }
 
-    protected override void OnInitialized()
+    [Parameter] 
+    public EventCallback<bool> OnStepUpdated { get; set; }
+
+    [Inject] private CustomStepVersionService VersionService { get; set; }
+    [Inject] private IMessageService MessageService { get; set; }
+
+    private bool isUpdateAvailable = false;
+    private bool isUpdating = false;
+    private int currentVersion = 1;
+    private int latestVersion = 1;
+    private string CurrentVersionText => $"V{currentVersion}";
+    private string LatestVersionText => $"V{latestVersion}";
+
+    protected override async Task OnInitializedAsync()
     {
-        base.OnInitialized();
+        await CheckForUpdates();
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await CheckForUpdates();
+        await base.OnParametersSetAsync();
+    }
+
+    private async Task CheckForUpdates()
+    {
+        try
+        {
+            var versionInfo = await VersionService.GetVersionInfoAsync(Step);
+            isUpdateAvailable = versionInfo.IsUpdateAvailable;
+            currentVersion = versionInfo.CurrentVersion;
+            latestVersion = versionInfo.LatestVersion;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Silently fail - version checking is not critical for step display
+        }
+    }
+
+    private async Task UpdateStepToLatest()
+    {
+        if (isUpdating) return;
+
+        try
+        {
+            isUpdating = true;
+            StateHasChanged();
+
+            var success = await VersionService.UpdateToLatestVersionAsync(Step);
+
+            if (success)
+            {
+                await CheckForUpdates(); // Refresh version info
+                await MessageService.SuccessAsync($"Step updated to version {latestVersion}!");
+                await OnStepUpdated.InvokeAsync(true);
+            }
+            else
+            {
+                await MessageService.ErrorAsync("Failed to update step. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Error updating step: {ex.Message}");
+        }
+        finally
+        {
+            isUpdating = false;
+            StateHasChanged();
+        }
     }
 }
+
+<style>
+    .step-update-indicator {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        z-index: 10;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .update-button {
+        color: #ff7a00 !important;
+        border: none !important;
+        background: white !important;
+        border-radius: 50% !important;
+        width: 24px !important;
+        height: 24px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .update-button:hover {
+        color: #ff7a00 !important;
+        background: #fff7e6 !important;
+        transform: scale(1.1) !important;
+    }
+
+    .update-button:active {
+        transform: scale(0.95) !important;
+    }
+</style>
 
