@@ -42,6 +42,8 @@ public class CodeGenerationRequest
     public List<VariableInfo>? InputVariables { get; set; }
     public List<VariableInfo>? OutputVariables { get; set; }
     public List<ConversationMessage>? ConversationHistory { get; set; }
+    public bool EnableTools { get; set; } = true; // Enable MCP tools by default
+    public string? CurrentStepId { get; set; } // For context when using tools
 }
 
 public class VariableInfo
@@ -56,6 +58,24 @@ public class CodeGenerationResponse
     public bool IsSuccess { get; set; }
     public string GeneratedCode { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;
+    public List<McpToolCall>? ToolCalls { get; set; }
+    public List<McpToolResult>? ToolResults { get; set; }
+}
+
+// MCP Tool Models
+public class McpToolCall
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Arguments { get; set; } = string.Empty;
+}
+
+public class McpToolResult
+{
+    public string ToolCallId { get; set; } = string.Empty;
+    public string Result { get; set; } = string.Empty;
+    public bool IsSuccess { get; set; }
+    public string? ErrorMessage { get; set; }
 }
 
 public enum AiProvider

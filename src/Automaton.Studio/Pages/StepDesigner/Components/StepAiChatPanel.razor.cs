@@ -12,7 +12,9 @@ public enum MessageType
     Generating,
     CodeSuccess,
     CodeError,
-    System
+    System,
+    ToolCall,
+    ToolResult
 }
 
 public partial class StepAiChatPanel : ComponentBase, IDisposable
@@ -23,6 +25,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Parameter] public List<VariableInfo>? InputVariables { get; set; }
     [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
     [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
+    [Parameter] public string? CurrentStepId { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
@@ -220,7 +223,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 Model = selectedModel,
                 InputVariables = InputVariables?.ToList(),
                 OutputVariables = OutputVariables?.ToList(),
-                ConversationHistory = await BuildConversationHistoryAsync()
+                ConversationHistory = await BuildConversationHistoryAsync(),
+                CurrentStepId = CurrentStepId
             };
 
             // Call the step generation service instead of the API key service
@@ -228,6 +232,38 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
             // Remove the generating message
             messages.RemoveAt(messages.Count - 1);
+
+            // Handle tool calls if present
+            if (response.ToolCalls?.Any() == true && response.ToolResults?.Any() == true)
+            {
+                // Add tool call messages
+                for (int i = 0; i < response.ToolCalls.Count; i++)
+                {
+                    var toolCall = response.ToolCalls[i];
+                    var toolResult = response.ToolResults.FirstOrDefault(r => r.ToolCallId == toolCall.Id);
+                    
+                    // Show tool call
+                    messages.Add(new ChatMessage("AI", $"🔧 Using tool: {toolCall.Name}", DateTime.Now)
+                    {
+                        Type = MessageType.ToolCall,
+                        Content = $"Tool: {toolCall.Name}\nArguments: {toolCall.Arguments}"
+                    });
+                    
+                    // Show tool result
+                    if (toolResult != null)
+                    {
+                        messages.Add(new ChatMessage("System", $"📋 Tool result: {toolCall.Name}", DateTime.Now)
+                        {
+                            Type = MessageType.ToolResult,
+                            Content = toolResult.IsSuccess ? toolResult.Result : $"Error: {toolResult.ErrorMessage}",
+                            IsSuccess = toolResult.IsSuccess
+                        });
+                    }
+                }
+                
+                await InvokeAsync(StateHasChanged);
+                await ScrollToBottom();
+            }
 
             if (response.IsSuccess)
             {
