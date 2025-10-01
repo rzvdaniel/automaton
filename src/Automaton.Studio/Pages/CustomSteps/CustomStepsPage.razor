@@ -42,7 +42,7 @@
             <EnhancedEmpty Title="Custom Steps in minutes." 
                           Description="Custom Steps are reusable building blocks for your workflows. Each step you create is a new automation component you can use, either standalone or as part of larger workflows."
                           BackgroundImageUrl="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
-                          GradientOverlay="linear-gradient(135deg, rgba(34, 193, 195, 0.8) 0%, rgba(45, 134, 89, 0.8) 100%)"
+                          GradientOverlay="linear-gradient(135deg, rgba(139, 92, 246, 0.85) 0%, rgba(124, 58, 237, 0.85) 100%)"
                           ActionCardTitle="Build Custom Steps"
                           ActionCardDescription="Create powerful automation components using your preferred scripting language."
                           ActionCardBulletPoints="@GetCustomStepActionCardBullets()"
@@ -52,7 +52,15 @@
                           PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() })"
                           SecondaryActions="@GetCustomStepSecondaryActions()"
                           FeatureCards="@GetCustomStepFeatureCards()"
-                          HelpLinks="@GetCustomStepHelpLinks()" />
+                          HelpLinks="@GetCustomStepHelpLinks()">
+                <VisualMockup>
+                    <CodeEditorMockup Language="python" 
+                                     FileName="custom_step.py" 
+                                     FunctionName="execute_step" 
+                                     Comment="Custom automation logic" 
+                                     ReturnValue="completed" />
+                </VisualMockup>
+            </EnhancedEmpty>
         }
         else
         {

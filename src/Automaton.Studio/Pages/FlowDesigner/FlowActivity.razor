@@ -11,46 +11,69 @@
     </div>
     
     <div class="flow-tab-table">
-        <Table TItem="FlowExecution" 
-            DataSource="@FlowActivityViewModel.Executions"
-            RowExpandable="@((record)=>true)"
-            OnExpand="OnRowExpand"
-            Loading="@loading" 
-            Class="autoscroll-list"
-            EnableVirtualization
-            OnChange="OnChange"
-            Total="FlowActivityViewModel.Total"
-            PageSize="100"
-            RemoteDataSource>
-            <ColumnDefinitions>
-                <Column Title="Application" @bind-Field="@context.Application">
-                    @context.Application
-                </Column>
+        @if (!loading && FlowActivityViewModel.Executions?.Any() != true)
+        {
+            <EnhancedEmpty Title="Execution history in real-time." 
+                          Description="Track every execution of your workflow with detailed logs and status updates. Each run provides insights into performance, results, and any issues that may occur."
+                          BackgroundImageUrl="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                          GradientOverlay="linear-gradient(135deg, rgba(14, 165, 233, 0.85) 0%, rgba(59, 130, 246, 0.85) 100%)"
+                          ActionCardTitle="Monitor Executions"
+                          ActionCardDescription="Run your workflow to see execution history with detailed logs and status tracking."
+                          ActionCardBulletPoints="@GetActivityActionCardBullets()"
+                          FeatureSectionTitle="Real-time execution monitoring!"
+                          FeatureSectionSubtitle="Track workflow runs with detailed logs and status updates"
+                          HelpSectionTitle="Learn more about Activity Monitoring"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Run Workflow", Icon = "play-circle", OnClick = () => { NavigationManager.NavigateTo($"/flow/designer/{FlowId}/{FlowName}"); return Task.CompletedTask; } })"
+                          FeatureCards="@GetActivityFeatureCards()"
+                          HelpLinks="@GetActivityHelpLinks()">
+                <VisualMockup>
+                    <ActivityVisualMockup />
+                </VisualMockup>
+            </EnhancedEmpty>
+        }
+        else
+        {
+            <Table TItem="FlowExecution" 
+                DataSource="@FlowActivityViewModel.Executions"
+                RowExpandable="@((record)=>true)"
+                OnExpand="OnRowExpand"
+                Loading="@loading" 
+                Class="autoscroll-list"
+                EnableVirtualization
+                OnChange="OnChange"
+                Total="FlowActivityViewModel.Total"
+                PageSize="100"
+                RemoteDataSource>
+                <ColumnDefinitions>
+                    <Column Title="Application" @bind-Field="@context.Application">
+                        @context.Application
+                    </Column>
 
-                <Column Title="Started" @bind-Field="@context.Started">
-                    @context.Started
-                </Column>
+                    <Column Title="Started" @bind-Field="@context.Started">
+                        @context.Started
+                    </Column>
 
-                <Column Title="Finished" @bind-Field="@context.Finished">
-                    @context.Finished
-                </Column>
+                    <Column Title="Finished" @bind-Field="@context.Finished">
+                        @context.Finished
+                    </Column>
 
-                <Column Title="Status" @bind-Field="@context.Status">
-                    <span class="@context.StatusClass">@context.Status</span>
-                </Column>
-            </ColumnDefinitions>
+                    <Column Title="Status" @bind-Field="@context.Status">
+                        <span class="@context.StatusClass">@context.Status</span>
+                    </Column>
+                </ColumnDefinitions>
 
-            <ExpandTemplate Context="rowData">
-                @if (LogIsLoading(rowData.Data.LogsText))
-                {
-                    <div class="log-spin"><Spin /></div>
-                }
-                else
-                {
-                    <TextArea Id="flow-logs" Value="@rowData.Data.LogsText" />
-                }
-            </ExpandTemplate>
-        </Table>
+                <ExpandTemplate Context="rowData">
+                    @if (LogIsLoading(rowData.Data.LogsText))
+                    {
+                        <div class="log-spin"><Spin /></div>
+                    }
+                    else
+                    {
+                        <TextArea Id="flow-logs" Value="@rowData.Data.LogsText" />
+                    }
+                </ExpandTemplate>
+            </Table>
+        }
     </div>
 </div>
 
