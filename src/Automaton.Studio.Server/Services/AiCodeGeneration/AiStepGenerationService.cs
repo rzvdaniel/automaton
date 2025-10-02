@@ -83,7 +83,7 @@ public class AiStepGenerationService
                         });
                     }
                     
-                    // Execute tool calls and return with tool execution info
+                    // Execute tool calls
                     var toolResults = new List<McpToolResult>();
                     foreach (var toolCall in toolCalls)
                     {
@@ -92,8 +92,79 @@ public class AiStepGenerationService
                         toolResults.Add(result);
                     }
                     
+                    // Now send the tool results back to OpenAI to get the final response
+                    // We need to make a direct HTTP call since we need to include tool messages
+                    var messages = new List<object>();
+                    
+                    // Add original conversation history
+                    if (request.ConversationHistory?.Any() == true)
+                    {
+                        foreach (var historyMessage in request.ConversationHistory)
+                        {
+                            messages.Add(new { role = historyMessage.Role.ToLowerInvariant(), content = historyMessage.Content });
+                        }
+                    }
+                    
+                    // Add user prompt
+                    messages.Add(new { role = "user", content = prompt });
+                    
+                    // Add assistant message with tool calls (exactly as OpenAI sent it)
+                    messages.Add(new 
+                    { 
+                        role = "assistant",
+                        content = message.TryGetProperty("content", out var assistantContent) ? assistantContent.GetString() : null,
+                        tool_calls = toolCallsElement.EnumerateArray().Select(tc => new
+                        {
+                            id = tc.GetProperty("id").GetString(),
+                            type = tc.GetProperty("type").GetString(),
+                            function = new
+                            {
+                                name = tc.GetProperty("function").GetProperty("name").GetString(),
+                                arguments = tc.GetProperty("function").GetProperty("arguments").GetString()
+                            }
+                        }).ToArray()
+                    });
+                    
+                    // Add tool results as tool messages
+                    foreach (var toolResult in toolResults)
+                    {
+                        messages.Add(new 
+                        { 
+                            role = "tool",
+                            tool_call_id = toolResult.ToolCallId,
+                            content = toolResult.Result
+                        });
+                    }
+                    
+                    // Make another call to OpenAI with tool results
+                    var followUpRequest = new
+                    {
+                        model = model,
+                        messages = messages.ToArray(),
+                        max_tokens = 2000,
+                        temperature = 0.7
+                    };
+                    
+                    using var httpClient = new HttpClient();
+                    using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+                    httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+                    httpRequest.Content = new StringContent(JsonSerializer.Serialize(followUpRequest), System.Text.Encoding.UTF8, "application/json");
+                    
+                    var followUpResponse = await httpClient.SendAsync(httpRequest);
+                    followUpResponse.EnsureSuccessStatusCode();
+                    
+                    var finalResponseContent = await followUpResponse.Content.ReadAsStringAsync();
+                    var finalResponseJson = JsonDocument.Parse(finalResponseContent);
+                    var finalChoice = finalResponseJson.RootElement.GetProperty("choices")[0];
+                    var finalMessage = finalChoice.GetProperty("message");
+                    
+                    // Extract the final generated code
+                    var generatedCode = finalMessage.TryGetProperty("content", out var finalContent) 
+                        ? finalContent.GetString() ?? string.Empty 
+                        : string.Empty;
+                    
                     return CodeGenerationResult.SuccessWithTools(
-                        message.TryGetProperty("content", out var content) ? content.GetString() ?? string.Empty : string.Empty,
+                        generatedCode,
                         toolCalls,
                         toolResults);
                 }
