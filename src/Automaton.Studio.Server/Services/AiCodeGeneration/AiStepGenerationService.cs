@@ -44,6 +44,14 @@ public class AiStepGenerationService
             if (request.EnableTools && request.Provider == AiProvider.OpenAI)
             {
                 tools = mcpService.GetToolDefinitions();
+                logger.LogInformation("Tools enabled for request. Found {ToolCount} tools: {ToolNames}", 
+                    tools?.Count ?? 0, 
+                    tools?.Any() == true ? string.Join(", ", tools.Select(t => t.Function?.Name)) : "none");
+            }
+            else
+            {
+                logger.LogInformation("Tools not enabled. EnableTools: {EnableTools}, Provider: {Provider}", 
+                    request.EnableTools, request.Provider);
             }
 
             // Get the appropriate AI provider and call it
@@ -170,6 +178,21 @@ public class AiStepGenerationService
             - Ensure all declared output variables are assigned even on error (use sensible defaults like empty string, 0, false, empty list/dict, or None/null as appropriate)
             """;
 
+        // Add tool usage instructions if tools are enabled and available
+        if (request.EnableTools && request.Provider == AiProvider.OpenAI)
+        {
+            prompt += """
+
+            Tool Usage Guidelines:
+            - When the user asks you to "execute", "run", "test", or "try" the step code, use the available tools to:
+              1. First get the current step code using get_custom_step_code if needed
+              2. Then execute the step using execute_custom_step to test it
+            - When the user wants to see the current code in the editor, use get_custom_step_code
+            - When modifying existing code, first retrieve the current code, then provide the updated version
+            - Use tools proactively when they would be helpful for understanding the context or testing functionality
+            """;
+        }
+
         if (request.InputVariables?.Any() == true)
         {
             prompt += "\nInput Variables (pre-injected by host, read by exact name):\n";
@@ -186,6 +209,12 @@ public class AiStepGenerationService
             {
                 prompt += $"- {variable.Name} ({variable.Type}): {variable.Description}\n";
             }
+        }
+
+        // Add current step context if available
+        if (!string.IsNullOrEmpty(request.CurrentStepId))
+        {
+            prompt += $"\nCurrent Step Context: You are working on step ID {request.CurrentStepId}. You can use tools to get the current code or execute it for testing.";
         }
 
         // Language-specific guidance
