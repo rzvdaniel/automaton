@@ -97,4 +97,84 @@ public class AiApiKeyService
             return false;
         }
     }
+
+    /// <summary>
+    /// Get decrypted API key for MCP integration
+    /// </summary>
+    public async Task<string?> GetDecryptedApiKeyAsync(Guid id)
+    {
+        try
+        {
+            var response = await httpClient.PostAsync($"api/aiApiKeys/{id}/decrypt", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Failed to get decrypted API key {ApiKeyId}: {StatusCode}", id, response.StatusCode);
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<DecryptedApiKeyResponse>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return result?.ApiKey;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting decrypted API key {ApiKeyId}", id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Get environment API keys (for desktop scenarios)
+    /// </summary>
+    public async Task<Dictionary<AiProvider, string?>> GetEnvironmentApiKeysAsync()
+    {
+        try
+        {
+            var response = await httpClient.GetAsync("api/aiApiKeys/environment");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new Dictionary<AiProvider, string?>();
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<Dictionary<AiProvider, string?>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return result ?? new Dictionary<AiProvider, string?>();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting environment API keys");
+            return new Dictionary<AiProvider, string?>();
+        }
+    }
+
+    /// <summary>
+    /// Get API keys by provider for MCP integration
+    /// </summary>
+    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysByProviderAsync(AiProvider provider)
+    {
+        try
+        {
+            var allKeys = await GetAiApiKeysAsync();
+            return allKeys.Where(k => k.Provider == provider && k.IsActive);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting API keys for provider {Provider}", provider);
+            return new List<AiApiKeyModel>();
+        }
+    }
+}
+
+// Additional DTOs
+public class DecryptedApiKeyResponse
+{
+    public string ApiKey { get; set; } = string.Empty;
 }

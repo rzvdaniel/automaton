@@ -3,6 +3,9 @@ using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Automaton.Mcp.Client;
+using Automaton.Mcp.Client.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
@@ -12,7 +15,8 @@ public enum MessageType
     Generating,
     CodeSuccess,
     CodeError,
-    System
+    System,
+    ToolExecution  // NEW: For MCP tool executions
 }
 
 public partial class StepAiChatPanel : ComponentBase, IDisposable
@@ -23,26 +27,31 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Parameter] public List<VariableInfo>? InputVariables { get; set; }
     [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
     [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
+    [Parameter] public Func<string, Task<ExecutionResult>>? ExecuteCode { get; set; }  // NEW: Frontend execution
+    [Parameter] public string? CurrentStepId { get; set; }  // NEW: For MCP tools
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
+    [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;  // NEW: MCP client
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;  // NEW: Logger
 
     protected ElementReference messagesContainer;
 
-    private string selectedAgent = Ask;
+    private string selectedAgent = Agent;  // Default to Agent mode for MCP
     private string selectedProviderModel = string.Empty;
     private string promptText = string.Empty;
     private bool showNoProvidersMessage = false;
     private bool isGeneratingCode = false;
     private Dictionary<string, string> pendingCodes = new();
     private List<CodeVersion> codeHistory = new();
+    private string? _conversationId;  // NEW: Track MCP conversation
 
     private List<AiProviderInfo>? availableProviders;
 
     private List<ChatMessage> messages = new()
     {
-        new ChatMessage("System", "AI code panel ready. Select a provider and model to start generating code.", DateTime.Now) 
+        new ChatMessage("System", "AI code panel ready with MCP integration. AI can now see and test your code in real-time.", DateTime.Now) 
         { 
             Type = MessageType.System 
         }
@@ -50,7 +59,59 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        // Subscribe to real-time MCP conversation updates
+        McpClient.ConversationUpdated += OnConversationUpdated;
+        
         await LoadProvidersAsync();
+    }
+
+    // NEW: Handle real-time conversation updates from MCP client
+    private void OnConversationUpdated(object? sender, ConversationUpdatedEvent e)
+    {
+        if (e.ConversationId == _conversationId)
+        {
+            InvokeAsync(() =>
+            {
+                // Add tool execution messages
+                foreach (var toolResult in e.ToolResults)
+                {
+                    var toolCall = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
+                    var toolName = toolCall?.Name ?? "Unknown Tool";
+                    
+                    var toolMessage = new ChatMessage("Tool", FormatToolExecution(toolName, toolResult), DateTime.Now)
+                    {
+                        Type = MessageType.ToolExecution,
+                        IsSuccess = toolResult.IsSuccess,
+                        ToolName = toolName,
+                        ToolResult = toolResult.Result
+                    };
+                    
+                    // Check if this tool execution message already exists
+                    if (!messages.Any(m => m.Type == MessageType.ToolExecution && 
+                                          m.ToolName == toolName && 
+                                          m.ToolResult == toolResult.Result))
+                    {
+                        messages.Add(toolMessage);
+                    }
+                }
+
+                StateHasChanged();
+                ScrollToBottom();
+            });
+        }
+    }
+
+    private string FormatToolExecution(string toolName, ToolResult toolResult)
+    {
+        var status = toolResult.IsSuccess ? "✅" : "❌";
+        var summary = toolName switch
+        {
+            "get_current_code" => "Retrieved current code from editor",
+            "execute_code" => toolResult.IsSuccess ? "Code executed successfully" : "Code execution failed",
+            _ => "Tool executed"
+        };
+
+        return $"{status} {summary}";
     }
 
     private async Task LoadProvidersAsync()
@@ -89,7 +150,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
-        if (Enum.TryParse<AiProvider>(providerName, out var provider))
+        if (Enum.TryParse<Automaton.Studio.Models.AiProvider>(providerName, out var provider))
         {
             return availableProviders?.FirstOrDefault(p => p.Provider == provider);
         }
@@ -190,7 +251,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             var selectedApiKeyId = GetSelectedApiKeyId();
 
             // Add context about selected provider/model
-            var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel}";
+            var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel} with frontend tools";
             if (!string.IsNullOrEmpty(selectedApiKeyId) && selectedProvider?.StoredKeys?.Any() == true)
             {
                 var selectedKey = selectedProvider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == selectedApiKeyId);
@@ -210,48 +271,59 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
 
-            // Create code generation request
-            var codeGenRequest = new CodeGenerationRequest
+            // NEW: Use MCP client directly with frontend execution functions
+            var conversationRequest = new ConversationRequest
             {
-                Description = userPrompt,
-                Language = CurrentLanguage ?? "Python",
-                Provider = selectedProvider!.Provider,
-                SelectedAiApiKeyId = string.IsNullOrEmpty(selectedApiKeyId) ? null : Guid.Parse(selectedApiKeyId),
+                InitialMessage = userPrompt,
+                SystemPrompt = BuildSystemPrompt(),
+                Provider = MapToMcpProvider(selectedProvider!.Provider),
+                ApiKey = await GetApiKeyFromProvider(selectedProvider, selectedApiKeyId),
                 Model = selectedModel,
-                InputVariables = InputVariables?.ToList(),
-                OutputVariables = OutputVariables?.ToList(),
-                ConversationHistory = await BuildConversationHistoryAsync()
+                ConversationHistory = BuildMcpConversationHistory(),
+                Context = new Dictionary<string, object>
+                {
+                    ["language"] = CurrentLanguage,
+                    ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
+                    ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
+                    // Pass frontend functions to MCP tools
+                    ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
+                    ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
+                    { 
+                        IsSuccess = false, 
+                        ErrorMessage = "Execution not available" 
+                    }))
+                }
             };
 
-            // Call the step generation service instead of the API key service
-            var response = await AiStepGenerationService.GenerateStepCodeAsync(codeGenRequest);
+            var result = await McpClient.StartConversationAsync(conversationRequest);
+            _conversationId = result.ConversationId;
 
             // Remove the generating message
             messages.RemoveAt(messages.Count - 1);
 
-            if (response.IsSuccess)
+            if (result.IsSuccess)
             {
                 // Different behavior based on selected agent mode
                 if (selectedAgent == Ask)
                 {
                     // Ask mode: Show code with apply button, don't auto-apply
                     var codeId = Guid.NewGuid().ToString();
-                    var codeMessage = new ChatMessage("AI", "Code generated successfully:", DateTime.Now)
+                    var codeMessage = new ChatMessage("AI", "Code generated successfully with frontend tools:", DateTime.Now)
                     {
                         Type = MessageType.CodeSuccess,
                         CodeId = codeId,
-                        GeneratedCode = response.GeneratedCode,
+                        GeneratedCode = result.GeneratedCode,
                         IsSuccess = true
                     };
                     
                     messages.Add(codeMessage);
                     
                     // Store the code for later application with unique ID
-                    pendingCodes[codeId] = response.GeneratedCode;
+                    pendingCodes[codeId] = result.GeneratedCode ?? string.Empty;
                     
                     // Track in version history
                     codeHistory.Add(new CodeVersion(
-                        response.GeneratedCode, 
+                        result.GeneratedCode ?? string.Empty, 
                         DateTime.Now, 
                         userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
                         false));
@@ -259,19 +331,19 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 else
                 {
                     // Agent mode: Show code and auto-apply (existing behavior)
-                    var codeMessage = new ChatMessage("AI", "Code generated and applied:", DateTime.Now)
+                    var codeMessage = new ChatMessage("AI", "Code generated and applied with frontend tools:", DateTime.Now)
                     {
                         Type = MessageType.CodeSuccess,
-                        GeneratedCode = response.GeneratedCode,
+                        GeneratedCode = result.GeneratedCode,
                         IsSuccess = true
                     };
                     
                     messages.Add(codeMessage);
 
                     // Auto-apply code in Agent mode
-                    if (OnCodeGenerated.HasDelegate)
+                    if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(result.GeneratedCode))
                     {
-                        await OnCodeGenerated.InvokeAsync(response.GeneratedCode);
+                        await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
                     }
                 }
             }
@@ -281,7 +353,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
                 {
                     Type = MessageType.CodeError,
-                    Content = response.ErrorMessage,
+                    Content = result.ErrorMessage ?? "Unknown error",
                     IsSuccess = false
                 };
                 
@@ -319,6 +391,108 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
+    // NEW: Helper methods for MCP integration
+    private string BuildSystemPrompt()
+    {
+        return $"""
+            You are an expert automation developer. Generate {CurrentLanguage} code for a custom step in an automation workflow.
+
+            IMPORTANT WORKFLOW INSTRUCTIONS:
+            When tools are available, follow this process:
+            1. ALWAYS start by using get_current_code to retrieve the current code from the step editor
+            2. Analyze the user's request and the current code
+            3. Generate or modify the code as needed
+            4. Use execute_code to test the code and check if it works correctly
+            5. If the execution shows errors or issues, modify the code and test again
+            6. Only stop when the code executes successfully or when you're confident it meets the requirements
+            7. When finished, provide the final working code as your response
+
+            Requirements:
+            - Generate clean, robust code with proper error handling
+            - Use the specified language: {CurrentLanguage}
+            - The code should be suitable for automation workflows
+            - Follow best practices for the chosen language
+            """;
+    }
+
+    private static Automaton.Mcp.Client.Models.AiProvider MapToMcpProvider(Automaton.Studio.Models.AiProvider provider)
+    {
+        return provider switch
+        {
+            Automaton.Studio.Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
+            Automaton.Studio.Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
+            Automaton.Studio.Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
+            Automaton.Studio.Models.AiProvider.Azure => Automaton.Mcp.Client.Models.AiProvider.Azure,
+            Automaton.Studio.Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
+            _ => Automaton.Mcp.Client.Models.AiProvider.OpenAI
+        };
+    }
+
+    private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)
+    {
+        if (!string.IsNullOrEmpty(selectedApiKeyId) && provider.StoredKeys?.Any() == true)
+        {
+            var selectedKey = provider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == selectedApiKeyId);
+            if (selectedKey != null)
+            {
+                // Get decrypted key from server
+                var decryptedKey = await AiApiKeyService.GetDecryptedApiKeyAsync(selectedKey.Id);
+                if (!string.IsNullOrEmpty(decryptedKey))
+                {
+                    return decryptedKey;
+                }
+                else
+                {
+                    logger.LogWarning("Failed to decrypt API key {ApiKeyId}", selectedKey.Id);
+                }
+            }
+        }
+
+        // Fall back to environment keys (for desktop scenarios)
+        if (provider.HasEnvironmentKey)
+        {
+            var envKeys = await AiApiKeyService.GetEnvironmentApiKeysAsync();
+            if (envKeys.TryGetValue(provider.Provider, out var envKey) && !string.IsNullOrEmpty(envKey))
+            {
+                return envKey;
+            }
+        }
+
+        logger.LogWarning("No valid API key found for provider {Provider}", provider.Provider);
+        return string.Empty;
+    }
+
+    private async Task<Guid> GetCurrentUserIdAsync()
+    {
+        // TODO: Get from authentication context
+        // For now, return a placeholder - this needs to be implemented based on your auth system
+        return Guid.Empty;
+    }
+
+    private List<Automaton.Mcp.Client.Models.ConversationMessage> BuildMcpConversationHistory()
+    {
+        var conversationHistory = new List<Automaton.Mcp.Client.Models.ConversationMessage>();
+        
+        // Convert existing messages to MCP format
+        foreach (var message in messages.Where(m => m.Type != MessageType.System && m.Type != MessageType.Generating && m.Type != MessageType.ToolExecution))
+        {
+            string role = message.Role.ToLowerInvariant() switch
+            {
+                "user" => "user",
+                "ai" => "assistant",
+                _ => "user"
+            };
+
+            string content = message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode)
+                ? $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
+                : message.Content;
+
+            conversationHistory.Add(new Automaton.Mcp.Client.Models.ConversationMessage(role, content));
+        }
+
+        return conversationHistory;
+    }
+
     private async Task ScrollToBottom()
     {
         try
@@ -338,6 +512,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         public bool IsSuccess { get; init; } = true;
         public string? GeneratedCode { get; init; }
         public MessageType Type { get; init; } = MessageType.Text;
+        public string? ToolName { get; init; }  // NEW: For tool execution messages
+        public string? ToolResult { get; init; }  // NEW: For tool execution results
     }
 
     private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
@@ -393,9 +569,9 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private async Task<List<ConversationMessage>> BuildConversationHistoryAsync()
+    private async Task<List<Automaton.Studio.Models.ConversationMessage>> BuildConversationHistoryAsync()
     {
-        var conversationHistory = new List<ConversationMessage>();
+        var conversationHistory = new List<Automaton.Studio.Models.ConversationMessage>();
         
         // Add current code context as system message if available
         if (GetCurrentCode != null)
@@ -405,7 +581,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 var currentCode = await GetCurrentCode();
                 if (!string.IsNullOrEmpty(currentCode))
                 {
-                    conversationHistory.Add(new ConversationMessage("system", 
+                    conversationHistory.Add(new Automaton.Studio.Models.ConversationMessage("system", 
                         $"Current code in the editor ({CurrentLanguage ?? "python"}):\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{currentCode}\n```\n\n" +
                         "When the user asks for modifications, improvements, or changes, please consider this existing code as the starting point. " +
                         "If the user wants to add functionality, build upon this existing code. If they want to fix issues, modify the relevant parts. " +
@@ -466,7 +642,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 continue; // Skip unknown roles
             }
 
-            conversationHistory.Add(new ConversationMessage(role, content));
+            conversationHistory.Add(new Automaton.Studio.Models.ConversationMessage(role, content));
         }
 
         return conversationHistory;
@@ -536,6 +712,13 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         if (isGeneratingCode) return;
 
+        // End current MCP conversation if active
+        if (!string.IsNullOrEmpty(_conversationId))
+        {
+            await McpClient.EndConversationAsync(_conversationId);
+            _conversationId = null;
+        }
+
         // Clear all messages except for system messages
         messages.RemoveAll(m => m.Type != MessageType.System);
         
@@ -543,7 +726,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         pendingCodes.Clear();
 
         // Add a system message about the cleared history
-        messages.Add(new ChatMessage("System", "Conversation history cleared. Starting fresh.", DateTime.Now) 
+        messages.Add(new ChatMessage("System", "Conversation history cleared. AI can now see and test your code in real-time.", DateTime.Now) 
         { 
             Type = MessageType.System 
         });
@@ -554,6 +737,15 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        // Unsubscribe from MCP events
+        McpClient.ConversationUpdated -= OnConversationUpdated;
+
+        // End current conversation if active
+        if (!string.IsNullOrEmpty(_conversationId))
+        {
+            _ = Task.Run(() => McpClient.EndConversationAsync(_conversationId));
+        }
+
         // Clean up JavaScript references
         try
         {

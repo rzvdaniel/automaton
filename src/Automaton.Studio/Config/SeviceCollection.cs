@@ -36,6 +36,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
+using Automaton.Mcp.Client.Extensions;
 
 namespace Automaton.Studio.Config;
 
@@ -66,6 +67,9 @@ public static class SeviceCollection
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
         services.AddCourier(Assembly.GetExecutingAssembly());
         services.AddScoped<IAuthenticationStorage, WebAuthenticationStorage>();
+
+        // MCP Client Services (Frontend AI Integration)
+        services.AddAutomatonMcpClient();
 
         // Services
         services.AddScoped<Services.ConfigurationService>();

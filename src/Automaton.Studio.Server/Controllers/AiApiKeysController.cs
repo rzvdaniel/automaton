@@ -123,6 +123,40 @@ public class AiApiKeysController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Get decrypted API key for frontend use (MCP integration)
+    /// </summary>
+    [HttpPost("{id}/decrypt")]
+    public async Task<ActionResult<DecryptedApiKeyResponse>> GetDecryptedApiKey(Guid id)
+    {
+        var userId = GetUserId();
+        var decryptedKey = await aiApiKeyService.GetDecryptedApiKeyAsync(id, userId);
+        
+        if (string.IsNullOrEmpty(decryptedKey))
+            return NotFound("API key not found or could not be decrypted");
+
+        return Ok(new DecryptedApiKeyResponse 
+        { 
+            ApiKey = decryptedKey 
+        });
+    }
+
+    /// <summary>
+    /// Get environment API keys for desktop scenarios
+    /// </summary>
+    [HttpGet("environment")]
+    public ActionResult<Dictionary<AiProvider, string?>> GetEnvironmentApiKeys()
+    {
+        var environmentKeys = aiApiKeyService.GetEnvironmentApiKeys();
+        
+        // Filter out null/empty values for security
+        var filteredKeys = environmentKeys
+            .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            
+        return Ok(filteredKeys);
+    }
+
     private Guid GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -158,4 +192,9 @@ public class AiApiKeyResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
     public bool IsActive { get; set; }
+}
+
+public class DecryptedApiKeyResponse
+{
+    public string ApiKey { get; set; } = string.Empty;
 }

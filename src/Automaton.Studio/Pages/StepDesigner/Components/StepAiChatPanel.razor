@@ -5,10 +5,11 @@
 @using Automaton.Studio.Models
 @using Automaton.Studio.Services
 @using Automaton.Studio.Shared.Components
+@using Automaton.Mcp.Client
 @implements IDisposable
 
 <div class="ai-chat-panel">
-	<PanelHeader Title="AI Code Generation"
+	<PanelHeader Title="AI Code Generation (MCP)"
 				 ShowClearButton="true"
 				 OnClearClick="ClearConversationHistory"
 				 ClearDisabled="@isGeneratingCode"
@@ -33,7 +34,25 @@
 							case MessageType.Generating:
 								<div>
 									<p><em>@msg.Content</em></p>
-									<Spin Size="SpinSize.Small" /> Generating code...
+									<Spin Size="SpinSize.Small" /> Generating code with MCP tools...
+								</div>
+								break;
+
+							case MessageType.ToolExecution:
+								<div style="background: #f0f9ff; padding: 12px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+									<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+										<Icon Type="tool" Style="color: #3b82f6;" />
+										<strong style="color: #1e40af;">🔧 @msg.ToolName</strong>
+										<span style="font-size: 11px; color: #64748b;">@msg.Time.ToString("HH:mm:ss")</span>
+									</div>
+									<div style="color: #374151;">@msg.Content</div>
+									@if (!string.IsNullOrEmpty(msg.ToolResult))
+									{
+										<details style="margin-top: 8px;">
+											<summary style="cursor: pointer; color: #6b7280; font-size: 12px;">View details</summary>
+											<pre style="background: #f8fafc; padding: 8px; border-radius: 4px; font-size: 11px; margin-top: 4px; overflow-x: auto;">@msg.ToolResult</pre>
+										</details>
+									}
 								</div>
 								break;
 
@@ -62,7 +81,7 @@
 
 							case MessageType.System:
 								<div style="color: #666; font-style: italic;">
-									✅ @msg.Content
+									ℹ️ @msg.Content
 								</div>
 								break;
 
@@ -80,7 +99,7 @@
 	<div class="ai-chat-input">
 		<div class="input-area">
 			<TextArea @bind-Value="promptText"
-					  Placeholder="Ask Copilot a question or type / for topics"
+					  Placeholder="Describe what you want the AI to do... (MCP tools will be used automatically)"
 					  Disabled="@isGeneratingCode"
 					  ShowCount="false"
 					  AutoSize="false"
@@ -149,6 +168,16 @@
 						</Text>
 					</div>
 				}
+
+				@if (!string.IsNullOrEmpty(CurrentStepId))
+				{
+					<div class="step-badge">
+						<Text Type="@TextElementType.Secondary" Style="font-size: 11px;">
+							<Icon Type="experiment" Style="margin-right: 2px; font-size: 10px;" />
+							MCP Tools
+						</Text>
+					</div>
+				}
 			</div>
 
 			<div class="right-controls">
@@ -169,7 +198,7 @@
 			<div class="no-providers-message">
 				<Alert Type="@AlertType.Warning"
 					   Message="No AI providers configured"
-					   Description="Configure your API keys in Settings to start using AI code generation."
+					   Description="Configure your API keys in Settings to start using AI code generation with MCP tools."
 					   ShowIcon="true"
 					   Style="margin: 8px 0 0 0;" />
 			</div>
@@ -273,13 +302,19 @@
 		align-items: center;
 	}
 
-	.language-badge {
+	.language-badge, .step-badge {
 		padding: 2px 6px;
 		background: #e3f2fd;
 		border: 1px solid #bbdefb;
 		border-radius: 12px;
 		font-size: 11px;
 		color: #1565c0;
+	}
+
+	.step-badge {
+		background: #f0f9ff;
+		border: 1px solid #93c5fd;
+		color: #1e40af;
 	}
 
 	.no-providers-message {
@@ -321,4 +356,14 @@
 			line-height: 22px !important;
 			font-size: 11px;
 		}
+
+	/* Tool execution message styling */
+	.message[data-message-type="tool"] {
+		background: #f0f9ff;
+		border-left: 4px solid #3b82f6;
+	}
+
+	.tool-execution-new {
+		/* Animation removed for compatibility */
+	}
 </style>
