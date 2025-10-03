@@ -275,7 +275,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
 
             return new McpToolResult 
             { 
-                Success = true,
+                Success = executionResult.Success, // ?? FIX: Use actual execution result success status
                 Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
             };
         }

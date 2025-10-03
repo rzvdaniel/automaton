@@ -422,6 +422,16 @@ namespace Automaton.Core.Scripting
                     if (!string.IsNullOrEmpty(capturedOutput))
                     {
                         OutputCallback?.Invoke(capturedOutput);
+                        
+                        // Check if the output contains error indicators
+                        if (capturedOutput.Contains("ERROR:") || 
+                            capturedOutput.Contains("Traceback") || 
+                            capturedOutput.Contains("Exception:") ||
+                            capturedOutput.Contains("Error:"))
+                        {
+                            variables["error"] = "Script execution produced errors";
+                            variables["errorOutput"] = capturedOutput;
+                        }
                     }
 
                     // Collect variables (skip builtins and our helpers)

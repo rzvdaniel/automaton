@@ -143,12 +143,32 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             
             stopwatch.Stop();
 
+            // Check if execution had errors by looking for error variables
+            var hasErrors = scriptVariables?.ContainsKey("error") == true;
+            var errorMessage = hasErrors ? scriptVariables["error"]?.ToString() : null;
+            var stackTrace = scriptVariables?.ContainsKey("stackTrace") == true ? scriptVariables["stackTrace"]?.ToString() : null;
+
+            // Filter out error-related variables from output
+            var cleanVariables = scriptVariables?.Where(kvp => 
+                kvp.Key != "error" && 
+                kvp.Key != "stackTrace")
+                .ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new Dictionary<string, object>();
+
+            var errorsList = new List<string>();
+            if (hasErrors)
+            {
+                if (!string.IsNullOrEmpty(errorMessage))
+                    errorsList.Add(errorMessage);
+                if (!string.IsNullOrEmpty(stackTrace))
+                    errorsList.Add(stackTrace);
+            }
+
             return new CodeExecutionResult
             {
-                Success = true,
-                Output = "Code executed successfully",
-                Errors = Array.Empty<string>(),
-                OutputVariables = scriptVariables?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new Dictionary<string, object>(),
+                Success = !hasErrors,
+                Output = hasErrors ? $"Execution failed: {errorMessage}" : "Code executed successfully",
+                Errors = errorsList.ToArray(),
+                OutputVariables = cleanVariables,
                 ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
             };
         }

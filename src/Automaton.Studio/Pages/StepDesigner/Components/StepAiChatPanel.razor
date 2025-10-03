@@ -42,8 +42,6 @@
 								<div class="tool-execution-message" data-status="@msg.ToolStatus">
 									<div class="tool-header">
 										<div class="tool-info">
-											<span class="tool-icon">@GetToolIcon(msg.ToolName ?? "")</span>
-											<span class="tool-name">@GetToolDescription(msg.ToolName ?? "")</span>
 											<span class="tool-status @GetToolStatusClass(msg.ToolStatus)">
 												@GetToolStatusIcon(msg.ToolStatus)
 												@GetToolStatusText(msg.ToolStatus)
@@ -58,7 +56,7 @@
 											<div class="progress-bar">
 												<div class="progress-fill"></div>
 											</div>
-											<span class="progress-text">Executing tool...</span>
+											<span class="progress-text">@msg.Content</span>
 										</div>
 									}
 									else

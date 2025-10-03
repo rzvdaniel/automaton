@@ -106,7 +106,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
                     if (toolMessage != null)
                     {
-                        // Update the existing message with results
+                        // Update the existing message with results - replace entirely with final result format
                         var updatedMessage = toolMessage with
                         {
                             Content = FormatToolResult(toolMessage.ToolName!, toolResult),
@@ -118,6 +118,25 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
                         var index = messages.IndexOf(toolMessage);
                         messages[index] = updatedMessage;
+                    }
+                    else
+                    {
+                        // If we don't have an initial message (shouldn't happen), create one with final result
+                        var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
+                        if (toolCallForResult != null)
+                        {
+                            var resultMessage = new ChatMessage("AI", FormatToolResult(toolCallForResult.Name, toolResult), DateTime.Now)
+                            {
+                                Type = MessageType.ToolExecution,
+                                ToolCallId = toolResult.ToolCallId,
+                                ToolName = toolCallForResult.Name,
+                                ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                                ToolResult = toolResult.Result,
+                                ToolError = toolResult.ErrorMessage
+                            };
+                            
+                            messages.Add(resultMessage);
+                        }
                     }
                 }
 
@@ -132,7 +151,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         var icon = GetToolIcon(toolCall.Name);
         var description = GetToolDescription(toolCall.Name);
         
-        return $"{icon} **{description}**";
+        // For initial call, just show the action being performed
+        return $"{icon} {description}";
     }
 
     private string FormatToolResult(string toolName, ToolResult toolResult)
@@ -142,7 +162,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         var statusIcon = toolResult.IsSuccess ? "✅" : "❌";
         var status = toolResult.IsSuccess ? "Success" : "Failed";
         
-        var result = $"{icon} **{description}** {statusIcon} {status}";
+        // Format: Icon Description Status - no redundant title
+        var result = $"{icon} {description} {statusIcon} {status}";
         
         // Add result preview for specific tools
         if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))

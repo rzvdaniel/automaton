@@ -510,6 +510,23 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Do NOT return text like "The code executed successfully with results: ..."
             - Return the actual working code that you generated and tested
 
+            ## ERROR HANDLING MANDATE:
+            ?? **NEVER STOP ON FIRST ERROR - ALWAYS FIX AND RETRY** ??
+            - If execute_code returns Success: false, you MUST analyze the error and fix it
+            - Continue testing and fixing until you get Success: true
+            - Do NOT proceed to save_code until execution is successful
+            - Show persistence and problem-solving - don't give up on errors
+            - Each error is a learning opportunity to improve the code
+
+            ## MANDATORY ITERATIVE WORKFLOW:
+            1. **?? Read Current Code**: Use get_current_code to understand existing implementation
+            2. **?? Analyze Context**: Use get_step_variables to understand requirements
+            3. **?? Generate/Improve Code**: Create robust code following the rules below
+            4. **?? Test Code**: Use execute_code - if it fails, analyze and fix
+            5. **?? Fix & Retry**: Keep testing and fixing until Success: true
+            6. **?? Save Only When Working**: Use save_code only after successful execution
+            7. **?? Return Final Code**: Respond with the working code, not execution results
+
             ## EXECUTION ENVIRONMENT RULES:
             - The host injects all input variables as top-level globals before execution. Read them directly by name.
             - Do not rename input variables. Treat them as already defined; only use defaults if explicitly required.
@@ -523,34 +540,19 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Catch exceptions, log an ERROR line, and do not rethrow; preserve default outputs.
             - Prefer language-native console APIs, but keep the prefix format consistent.
 
-            ## MANDATORY DEVELOPMENT WORKFLOW:
-            1. **?? Read First**: ALWAYS use get_current_code to see existing implementation
-            2. **?? Understand Context**: Use get_step_variables to understand expected inputs/outputs  
-            3. **?? Generate Code**: Create robust code following the rules above
-            4. **?? Test Code**: Use execute_code tool to test your generated code
-            5. **?? Debug & Fix**: If execution fails, analyze errors and fix them
-            6. **?? Save Code**: Use save_code tool to save the working solution
-            7. **?? Return Code**: Your final response should be the WORKING CODE ONLY
-
-            ## FINAL RESPONSE FORMAT:
-            When you finish testing and the code works correctly:
-            - Return ONLY the final working code
-            - Do NOT include execution results in your response
-            - Do NOT say "The code executed successfully with results..."
-            - Just return the clean, working code
-
             ## QUALITY REQUIREMENTS:
             - Generate clean, robust code with proper error handling
             - The code should be suitable for automation workflows
             - Follow best practices for the chosen language
             - Ensure all declared output variables are assigned even on error (use sensible defaults)
             - Test your code before finalizing it
+            - Fix all errors before considering the task complete
 
             ## AVAILABLE TOOLS:
             - **get_current_code**: ?? Retrieve existing code from step (USE THIS FIRST for improvements!)
-            - **execute_code**: ?? Test code execution and see results (for validation only)
+            - **execute_code**: ?? Test code execution and see results (KEEP TESTING UNTIL SUCCESS!)
             - **get_step_variables**: ?? Get input/output variable definitions
-            - **save_code**: ?? Save working code to step
+            - **save_code**: ?? Save working code to step (ONLY after successful execution)
             """;
 
         // Add language-specific guidance
@@ -563,6 +565,8 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Do not wrap the entire logic under if __name__ == '__main__':; just write top-level script.
             - Assign outputs as plain variables at the end of the script.
             - Log with prefixes using print(); send errors to stderr when possible: print(f"ERROR: ...", file=sys.stderr); print("INFO: ...") and print("WARN: ...").
+            - Always use try/except blocks for robust error handling
+            - Import sys at the top if you need to write to stderr
             """;
         }
         else if (string.Equals(language, "PowerShell", StringComparison.OrdinalIgnoreCase))
@@ -573,6 +577,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Read inputs as already defined variables.
             - Initialize outputs upfront and set them at the end.
             - Use Write-Host "INFO: ..." for info, Write-Warning "WARN: ..." for warnings, Write-Error "ERROR: ..." for errors; avoid throwing.
+            - Use try/catch blocks for proper error handling
             """;
         }
         else if (string.Equals(language, "JavaScript", StringComparison.OrdinalIgnoreCase))
@@ -583,6 +588,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Access inputs from provided globals.
             - Initialize outputs and assign them on success.
             - Use console.log("INFO: ..."), console.warn("WARN: ..."), console.error("ERROR: ..."); avoid throwing uncaught errors.
+            - Use try/catch blocks for proper error handling
             """;
         }
 
@@ -590,8 +596,10 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             ## REMEMBER: 
             ?? If user says "improve", "modify", "enhance" or mentions "existing code" ? START WITH get_current_code!
+            ?? If execute_code returns Success: false ? ANALYZE ERROR AND FIX IT, don't give up!
             ?? Your final response should be WORKING CODE, not execution results!
-            Always test your code with execute_code before saving it with save_code.
+            ?? Only save code after successful execution (Success: true)!
+            Always test your code with execute_code and fix any errors before saving it with save_code.
             """;
 
         return prompt;
