@@ -368,11 +368,50 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                         // Then, execute each tool call and add results
                         foreach (var toolCall in completion.Value.ToolCalls)
                         {
-                            var toolResult = await ExecuteMcpToolAsync(toolCall, request);
-                            messages.Add(ChatMessage.CreateToolMessage(toolCall.Id, toolResult));
+                            // Emit tool call started event
+                            var currentToolCalls = new List<ToolCall>
+                            {
+                                new ToolCall
+                                {
+                                    Id = toolCall.Id,
+                                    Name = toolCall.FunctionName,
+                                    Arguments = JsonDocument.Parse(toolCall.FunctionArguments?.ToString() ?? "{}").RootElement.EnumerateObject()
+                                        .ToDictionary(p => p.Name, p => (object?)p.Value.ToString())
+                                }
+                            };
                             
-                            _logger.LogInformation("Executed tool {ToolName}: {Result}", 
-                                toolCall.FunctionName, toolResult.Substring(0, Math.Min(100, toolResult.Length)));
+                            // Emit tool execution started
+                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            {
+                                ConversationId = request.ConversationId,
+                                Messages = new List<ConversationMessage>(),
+                                ToolCalls = currentToolCalls,
+                                ToolResults = new List<ToolResult>()
+                            });
+                            
+                            // Execute the tool
+                            var toolResult = await ExecuteMcpToolAsync(toolCall, request);
+                            
+                            // Create tool result
+                            var toolResultObj = new ToolResult
+                            {
+                                ToolCallId = toolCall.Id,
+                                Result = toolResult,
+                                IsSuccess = !toolResult.StartsWith("Tool execution failed:") && !toolResult.StartsWith("Error executing tool"),
+                                ErrorMessage = toolResult.StartsWith("Tool execution failed:") || toolResult.StartsWith("Error executing tool") ? toolResult : null
+                            };
+                            
+                            // Emit tool execution completed
+                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            {
+                                ConversationId = request.ConversationId,
+                                Messages = new List<ConversationMessage>(),
+                                ToolCalls = currentToolCalls,
+                                ToolResults = new List<ToolResult> { toolResultObj }
+                            });
+                            
+                            // Add tool message to conversation
+                            messages.Add(ChatMessage.CreateToolMessage(toolCall.Id, toolResult));
                         }
                         
                         requiresAction = true;
@@ -424,7 +463,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     {
         try
         {
-            var arguments = JsonDocument.Parse(toolCall.FunctionArguments);
+            var arguments = JsonDocument.Parse(toolCall.FunctionArguments?.ToString() ?? "{}");
             var currentStepId = request.Context?.GetValueOrDefault("currentStepId")?.ToString();
             
             var result = await _toolProvider.ExecuteToolAsync(toolCall.FunctionName, arguments.RootElement, currentStepId);
@@ -464,6 +503,13 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             2. **ANALYZE** the current implementation
             3. **THEN** proceed with improvements
 
+            ## CRITICAL RESPONSE RULE:
+            ?? **NEVER RETURN EXECUTION RESULTS AS CODE** ??
+            - Tool execution results are for testing and validation ONLY
+            - Your final response should be the CODE itself, not execution results
+            - Do NOT return text like "The code executed successfully with results: ..."
+            - Return the actual working code that you generated and tested
+
             ## EXECUTION ENVIRONMENT RULES:
             - The host injects all input variables as top-level globals before execution. Read them directly by name.
             - Do not rename input variables. Treat them as already defined; only use defaults if explicitly required.
@@ -484,6 +530,14 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             4. **?? Test Code**: Use execute_code tool to test your generated code
             5. **?? Debug & Fix**: If execution fails, analyze errors and fix them
             6. **?? Save Code**: Use save_code tool to save the working solution
+            7. **?? Return Code**: Your final response should be the WORKING CODE ONLY
+
+            ## FINAL RESPONSE FORMAT:
+            When you finish testing and the code works correctly:
+            - Return ONLY the final working code
+            - Do NOT include execution results in your response
+            - Do NOT say "The code executed successfully with results..."
+            - Just return the clean, working code
 
             ## QUALITY REQUIREMENTS:
             - Generate clean, robust code with proper error handling
@@ -494,7 +548,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             ## AVAILABLE TOOLS:
             - **get_current_code**: ?? Retrieve existing code from step (USE THIS FIRST for improvements!)
-            - **execute_code**: ?? Test code execution and see results
+            - **execute_code**: ?? Test code execution and see results (for validation only)
             - **get_step_variables**: ?? Get input/output variable definitions
             - **save_code**: ?? Save working code to step
             """;
@@ -536,6 +590,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             ## REMEMBER: 
             ?? If user says "improve", "modify", "enhance" or mentions "existing code" ? START WITH get_current_code!
+            ?? Your final response should be WORKING CODE, not execution results!
             Always test your code with execute_code before saving it with save_code.
             """;
 

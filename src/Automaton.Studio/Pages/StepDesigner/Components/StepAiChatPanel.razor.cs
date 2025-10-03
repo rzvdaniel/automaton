@@ -6,6 +6,7 @@ using Microsoft.JSInterop;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Models;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
@@ -72,26 +73,51 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         {
             InvokeAsync(() =>
             {
-                // Add tool execution messages
+                // Process tool calls and results
+                foreach (var toolCall in e.ToolCalls)
+                {
+                    // Check if we already have this tool call
+                    var existingToolMessage = messages.FirstOrDefault(m => 
+                        m.Type == MessageType.ToolExecution && 
+                        m.ToolCallId == toolCall.Id);
+
+                    if (existingToolMessage == null)
+                    {
+                        // Add new tool execution message
+                        var toolMessage = new ChatMessage("AI", FormatToolCall(toolCall), DateTime.Now)
+                        {
+                            Type = MessageType.ToolExecution,
+                            ToolCallId = toolCall.Id,
+                            ToolName = toolCall.Name,
+                            ToolStatus = "executing",
+                            ToolArguments = System.Text.Json.JsonSerializer.Serialize(toolCall.Arguments)
+                        };
+                        
+                        messages.Add(toolMessage);
+                    }
+                }
+
+                // Update tool results
                 foreach (var toolResult in e.ToolResults)
                 {
-                    var toolCall = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
-                    var toolName = toolCall?.Name ?? "Unknown Tool";
-                    
-                    var toolMessage = new ChatMessage("Tool", FormatToolExecution(toolName, toolResult), DateTime.Now)
+                    var toolMessage = messages.FirstOrDefault(m => 
+                        m.Type == MessageType.ToolExecution && 
+                        m.ToolCallId == toolResult.ToolCallId);
+
+                    if (toolMessage != null)
                     {
-                        Type = MessageType.ToolExecution,
-                        IsSuccess = toolResult.IsSuccess,
-                        ToolName = toolName,
-                        ToolResult = toolResult.Result
-                    };
-                    
-                    // Check if this tool execution message already exists
-                    if (!messages.Any(m => m.Type == MessageType.ToolExecution && 
-                                          m.ToolName == toolName && 
-                                          m.ToolResult == toolResult.Result))
-                    {
-                        messages.Add(toolMessage);
+                        // Update the existing message with results
+                        var updatedMessage = toolMessage with
+                        {
+                            Content = FormatToolResult(toolMessage.ToolName!, toolResult),
+                            IsSuccess = toolResult.IsSuccess,
+                            ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                            ToolResult = toolResult.Result,
+                            ToolError = toolResult.ErrorMessage
+                        };
+
+                        var index = messages.IndexOf(toolMessage);
+                        messages[index] = updatedMessage;
                     }
                 }
 
@@ -101,17 +127,295 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private string FormatToolExecution(string toolName, ToolResult toolResult)
+    private string FormatToolCall(ToolCall toolCall)
     {
-        var status = toolResult.IsSuccess ? "✅" : "❌";
-        var summary = toolName switch
-        {
-            "get_current_code" => "Retrieved current code from editor",
-            "execute_code" => toolResult.IsSuccess ? "Code executed successfully" : "Code execution failed",
-            _ => "Tool executed"
-        };
+        var icon = GetToolIcon(toolCall.Name);
+        var description = GetToolDescription(toolCall.Name);
+        
+        return $"{icon} **{description}**";
+    }
 
-        return $"{status} {summary}";
+    private string FormatToolResult(string toolName, ToolResult toolResult)
+    {
+        var icon = GetToolIcon(toolName);
+        var description = GetToolDescription(toolName);
+        var statusIcon = toolResult.IsSuccess ? "✅" : "❌";
+        var status = toolResult.IsSuccess ? "Success" : "Failed";
+        
+        var result = $"{icon} **{description}** {statusIcon} {status}";
+        
+        // Add result preview for specific tools
+        if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
+        {
+            switch (toolName)
+            {
+                case "get_current_code":
+                    var codePreview = GetCodePreview(toolResult.Result);
+                    if (!string.IsNullOrEmpty(codePreview))
+                    {
+                        result += $"\n\n**Code Found:**\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{codePreview}\n```";
+                    }
+                    break;
+                    
+                case "execute_code":
+                    var executionSummary = GetExecutionSummary(toolResult.Result);
+                    if (!string.IsNullOrEmpty(executionSummary))
+                    {
+                        result += $"\n\n**Execution Result:**\n{executionSummary}";
+                    }
+                    break;
+                    
+                case "get_step_variables":
+                    var variableSummary = GetVariableSummary(toolResult.Result);
+                    if (!string.IsNullOrEmpty(variableSummary))
+                    {
+                        result += $"\n\n**Variables:**\n{variableSummary}";
+                    }
+                    break;
+                    
+                case "save_code":
+                    result += $"\n\n💾 **Code saved successfully to Step Designer**";
+                    break;
+            }
+        }
+        else if (!toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.ErrorMessage))
+        {
+            result += $"\n\n**Error:** {toolResult.ErrorMessage}";
+        }
+        
+        return result;
+    }
+
+    private string GetToolIcon(string toolName)
+    {
+        return toolName switch
+        {
+            "get_current_code" => "📖",
+            "execute_code" => "🧪",
+            "get_step_variables" => "🔍",
+            "save_code" => "💾",
+            _ => "🔧"
+        };
+    }
+
+    private string GetToolDescription(string toolName)
+    {
+        return toolName switch
+        {
+            "get_current_code" => "Reading current code from editor",
+            "execute_code" => "Testing code execution",
+            "get_step_variables" => "Analyzing step variables",
+            "save_code" => "Saving code to step",
+            _ => "Executing tool"
+        };
+    }
+
+    private string GetCodePreview(string toolResult)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(toolResult);
+            if (doc.RootElement.TryGetProperty("code", out var codeElement))
+            {
+                var code = codeElement.GetString() ?? "";
+                // Return first 5 lines or 200 characters, whichever is shorter
+                var lines = code.Split('\n');
+                if (lines.Length <= 5 && code.Length <= 200)
+                {
+                    return code;
+                }
+                else if (lines.Length > 5)
+                {
+                    return string.Join('\n', lines.Take(5)) + "\n# ... (truncated)";
+                }
+                else
+                {
+                    return code.Length > 200 ? code[..197] + "..." : code;
+                }
+            }
+        }
+        catch
+        {
+            // If not JSON or parsing fails, try to extract code directly
+            if (toolResult.Contains("```"))
+            {
+                var start = toolResult.IndexOf("```");
+                var end = toolResult.IndexOf("```", start + 3);
+                if (end > start)
+                {
+                    var codeBlock = toolResult.Substring(start + 3, end - start - 3);
+                    // Remove language identifier if present
+                    var firstNewline = codeBlock.IndexOf('\n');
+                    if (firstNewline > 0 && firstNewline < 20)
+                    {
+                        codeBlock = codeBlock.Substring(firstNewline + 1);
+                    }
+                    return codeBlock.Trim();
+                }
+            }
+        }
+        
+        return string.Empty;
+    }
+
+    private string GetExecutionSummary(string toolResult)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(toolResult);
+            var root = doc.RootElement;
+            
+            var success = root.TryGetProperty("success", out var successElement) && successElement.GetBoolean();
+            var output = root.TryGetProperty("output", out var outputElement) ? outputElement.GetString() : "";
+            var executionTime = root.TryGetProperty("executionTime", out var timeElement) ? timeElement.GetString() : "";
+            
+            var summary = success ? "✅ **Success**" : "❌ **Failed**";
+            
+            if (!string.IsNullOrEmpty(executionTime))
+            {
+                summary += $" (in {executionTime})";
+            }
+            
+            if (!string.IsNullOrEmpty(output) && output.Length < 200)
+            {
+                summary += $"\n```\n{output}\n```";
+            }
+            else if (!string.IsNullOrEmpty(output))
+            {
+                summary += $"\n```\n{output[..197]}...\n```";
+            }
+            
+            // Check for output variables
+            if (root.TryGetProperty("outputVariables", out var varsElement))
+            {
+                var varsJson = varsElement.GetRawText();
+                if (varsJson != "{}" && varsJson != "null")
+                {
+                    summary += $"\n\n**Output Variables:** {varsJson}";
+                }
+            }
+            
+            return summary;
+        }
+        catch
+        {
+            // Fallback to plain text
+            return toolResult.Length > 200 ? toolResult[..197] + "..." : toolResult;
+        }
+    }
+
+    private string GetVariableSummary(string toolResult)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(toolResult);
+            var root = doc.RootElement;
+            
+            var summary = "";
+            
+            if (root.TryGetProperty("inputVariables", out var inputVars) && inputVars.ValueKind == JsonValueKind.Array)
+            {
+                var inputCount = inputVars.GetArrayLength();
+                summary += $"📥 **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
+                
+                foreach (var variable in inputVars.EnumerateArray().Take(3))
+                {
+                    if (variable.TryGetProperty("name", out var nameEl) && 
+                        variable.TryGetProperty("type", out var typeEl))
+                    {
+                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
+                    }
+                }
+                
+                if (inputCount > 3)
+                {
+                    summary += $"\n• ... and {inputCount - 3} more";
+                }
+            }
+            
+            if (root.TryGetProperty("outputVariables", out var outputVars) && outputVars.ValueKind == JsonValueKind.Array)
+            {
+                var outputCount = outputVars.GetArrayLength();
+                if (!string.IsNullOrEmpty(summary)) summary += "\n\n";
+                summary += $"📤 **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
+                
+                foreach (var variable in outputVars.EnumerateArray().Take(3))
+                {
+                    if (variable.TryGetProperty("name", out var nameEl) && 
+                        variable.TryGetProperty("type", out var typeEl))
+                    {
+                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
+                    }
+                }
+                
+                if (outputCount > 3)
+                {
+                    summary += $"\n• ... and {outputCount - 3} more";
+                }
+            }
+            
+            return summary;
+        }
+        catch
+        {
+            return "Variables analyzed";
+        }
+    }
+
+    // NEW: Helper methods for enhanced tool execution display
+    private string GetToolStatusClass(string? status)
+    {
+        return status switch
+        {
+            "executing" => "status-executing",
+            "success" => "status-success",
+            "error" => "status-error",
+            _ => "status-unknown"
+        };
+    }
+
+    private string GetToolStatusIcon(string? status)
+    {
+        return status switch
+        {
+            "executing" => "⏳",
+            "success" => "✅",
+            "error" => "❌",
+            _ => "🔧"
+        };
+    }
+
+    private string GetToolStatusText(string? status)
+    {
+        return status switch
+        {
+            "executing" => "Executing",
+            "success" => "Success",
+            "error" => "Failed",
+            _ => "Unknown"
+        };
+    }
+
+    private string FormatToolContentForDisplay(string content)
+    {
+        // Convert markdown-style formatting to HTML for display
+        var html = content
+            .Replace("**", "<strong>", StringComparison.Ordinal)
+            .Replace("**", "</strong>", StringComparison.Ordinal)
+            .Replace("`", "<code>", StringComparison.Ordinal)
+            .Replace("`", "</code>", StringComparison.Ordinal)
+            .Replace("\n", "<br>", StringComparison.Ordinal);
+
+        // Handle code blocks
+        if (html.Contains("```"))
+        {
+            html = System.Text.RegularExpressions.Regex.Replace(html, 
+                @"```(\w+)?<br>(.*?)```", 
+                "<div class=\"code-block\"><pre><code>$2</code></pre></div>",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
+
+        return html;
     }
 
     private async Task LoadProvidersAsync()
@@ -285,6 +589,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     ["language"] = CurrentLanguage,
                     ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
                     ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
+                    ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(), // Pass the current step ID
                     // Pass frontend functions to MCP tools
                     ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
                     ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
@@ -294,6 +599,9 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     }))
                 }
             };
+
+            // 🔧 FIX: Set the conversation ID BEFORE making the call so events can be matched
+            _conversationId = conversationRequest.ConversationId;
 
             var result = await McpClient.StartConversationAsync(conversationRequest);
             _conversationId = result.ConversationId;
@@ -512,8 +820,12 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         public bool IsSuccess { get; init; } = true;
         public string? GeneratedCode { get; init; }
         public MessageType Type { get; init; } = MessageType.Text;
-        public string? ToolName { get; init; }  // NEW: For tool execution messages
-        public string? ToolResult { get; init; }  // NEW: For tool execution results
+        public string? ToolName { get; init; }  // Tool name
+        public string? ToolResult { get; init; }  // Tool execution result
+        public string? ToolCallId { get; init; }  // NEW: Tool call ID for tracking
+        public string? ToolStatus { get; init; }  // NEW: executing, success, error
+        public string? ToolArguments { get; init; }  // NEW: Tool arguments
+        public string? ToolError { get; init; }  // NEW: Tool error message
     }
 
     private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
