@@ -1,4 +1,4 @@
-﻿using Automaton.Studio.Models;
+using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -28,25 +28,25 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Parameter] public List<VariableInfo>? InputVariables { get; set; }
     [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
     [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
-    [Parameter] public Func<string, Task<ExecutionResult>>? ExecuteCode { get; set; }  // NEW: Frontend execution
-    [Parameter] public string? CurrentStepId { get; set; }  // NEW: For MCP tools
+    [Parameter] public Func<string, Task<ExecutionResult>>? ExecuteCode { get; set; }
+    [Parameter] public string? CurrentStepId { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
-    [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;  // NEW: MCP client
+    [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-    [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;  // NEW: Logger
+    [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
 
     protected ElementReference messagesContainer;
 
-    private string selectedAgent = Agent;  // Default to Agent mode for MCP
+    private string selectedAgent = Agent;
     private string selectedProviderModel = string.Empty;
     private string promptText = string.Empty;
     private bool showNoProvidersMessage = false;
     private bool isGeneratingCode = false;
     private Dictionary<string, string> pendingCodes = new();
     private List<CodeVersion> codeHistory = new();
-    private string? _conversationId;  // NEW: Track MCP conversation
+    private string? _conversationId;
 
     private List<AiProviderInfo>? availableProviders;
 
@@ -60,13 +60,11 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to real-time MCP conversation updates
         McpClient.ConversationUpdated += OnConversationUpdated;
-        
         await LoadProvidersAsync();
     }
 
-    // NEW: Handle real-time conversation updates from MCP client
+    // Handle real-time conversation updates from MCP client
     private void OnConversationUpdated(object? sender, ConversationUpdatedEvent e)
     {
         if (e.ConversationId == _conversationId)
@@ -76,14 +74,12 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 // Process tool calls and results
                 foreach (var toolCall in e.ToolCalls)
                 {
-                    // Check if we already have this tool call
                     var existingToolMessage = messages.FirstOrDefault(m => 
                         m.Type == MessageType.ToolExecution && 
                         m.ToolCallId == toolCall.Id);
 
                     if (existingToolMessage == null)
                     {
-                        // Add new tool execution message
                         var toolMessage = new ChatMessage("AI", FormatToolCall(toolCall), DateTime.Now)
                         {
                             Type = MessageType.ToolExecution,
@@ -94,10 +90,11 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         };
                         
                         messages.Add(toolMessage);
+                        logger.LogInformation("Added tool call message: {ToolName} - {Status}", toolCall.Name, "Executing");
                     }
                 }
 
-                // Update tool results
+                // Update tool results - but preserve the message in the list!
                 foreach (var toolResult in e.ToolResults)
                 {
                     var toolMessage = messages.FirstOrDefault(m => 
@@ -106,22 +103,24 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
                     if (toolMessage != null)
                     {
-                        // Update the existing message with results - replace entirely with final result format
                         var updatedMessage = toolMessage with
                         {
                             Content = FormatToolResult(toolMessage.ToolName!, toolResult),
                             IsSuccess = toolResult.IsSuccess,
                             ToolStatus = toolResult.IsSuccess ? "success" : "error",
                             ToolResult = toolResult.Result,
-                            ToolError = toolResult.ErrorMessage
+                            ToolError = toolResult.ErrorMessage,
+                            Time = DateTime.Now  // Preserve with updated timestamp
                         };
 
                         var index = messages.IndexOf(toolMessage);
                         messages[index] = updatedMessage;
+                        
+                        logger.LogInformation("Updated tool message: {ToolName} - {Status} (preserved at index {Index})", 
+                            toolMessage.ToolName, toolResult.IsSuccess ? "Success" : "Failed", index);
                     }
                     else
                     {
-                        // If we don't have an initial message (shouldn't happen), create one with final result
                         var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                         if (toolCallForResult != null)
                         {
@@ -136,6 +135,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                             };
                             
                             messages.Add(resultMessage);
+                            logger.LogInformation("Added standalone tool message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
                         }
                     }
                 }
@@ -150,8 +150,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         var icon = GetToolIcon(toolCall.Name);
         var description = GetToolDescription(toolCall.Name);
-        
-        // For initial call, just show the action being performed
         return $"{icon} {description}";
     }
 
@@ -159,13 +157,11 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         var icon = GetToolIcon(toolName);
         var description = GetToolDescription(toolName);
-        var statusIcon = toolResult.IsSuccess ? "✅" : "❌";
+        var statusIcon = toolResult.IsSuccess ? "?" : "?";
         var status = toolResult.IsSuccess ? "Success" : "Failed";
         
-        // Format: Icon Description Status - no redundant title
         var result = $"{icon} {description} {statusIcon} {status}";
         
-        // Add result preview for specific tools
         if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
         {
             switch (toolName)
@@ -195,7 +191,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     break;
                     
                 case "save_code":
-                    result += $"\n\n💾 **Code saved successfully to Step Designer**";
+                    result += $"\n\n?? **Code saved successfully to Step Designer**";
                     break;
             }
         }
@@ -211,11 +207,11 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         return toolName switch
         {
-            "get_current_code" => "📖",
-            "execute_code" => "🧪",
-            "get_step_variables" => "🔍",
-            "save_code" => "💾",
-            _ => "🔧"
+            "get_current_code" => "??",
+            "execute_code" => "??",
+            "get_step_variables" => "??",
+            "save_code" => "??",
+            _ => "??"
         };
     }
 
@@ -239,7 +235,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             if (doc.RootElement.TryGetProperty("code", out var codeElement))
             {
                 var code = codeElement.GetString() ?? "";
-                // Return first 5 lines or 200 characters, whichever is shorter
                 var lines = code.Split('\n');
                 if (lines.Length <= 5 && code.Length <= 200)
                 {
@@ -257,7 +252,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         catch
         {
-            // If not JSON or parsing fails, try to extract code directly
             if (toolResult.Contains("```"))
             {
                 var start = toolResult.IndexOf("```");
@@ -265,7 +259,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 if (end > start)
                 {
                     var codeBlock = toolResult.Substring(start + 3, end - start - 3);
-                    // Remove language identifier if present
                     var firstNewline = codeBlock.IndexOf('\n');
                     if (firstNewline > 0 && firstNewline < 20)
                     {
@@ -290,7 +283,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             var output = root.TryGetProperty("output", out var outputElement) ? outputElement.GetString() : "";
             var executionTime = root.TryGetProperty("executionTime", out var timeElement) ? timeElement.GetString() : "";
             
-            var summary = success ? "✅ **Success**" : "❌ **Failed**";
+            var summary = success ? "? **Success**" : "? **Failed**";
             
             if (!string.IsNullOrEmpty(executionTime))
             {
@@ -306,7 +299,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 summary += $"\n```\n{output[..197]}...\n```";
             }
             
-            // Check for output variables
             if (root.TryGetProperty("outputVariables", out var varsElement))
             {
                 var varsJson = varsElement.GetRawText();
@@ -320,7 +312,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         catch
         {
-            // Fallback to plain text
             return toolResult.Length > 200 ? toolResult[..197] + "..." : toolResult;
         }
     }
@@ -331,26 +322,25 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         {
             using var doc = JsonDocument.Parse(toolResult);
             var root = doc.RootElement;
-            
             var summary = "";
             
             if (root.TryGetProperty("inputVariables", out var inputVars) && inputVars.ValueKind == JsonValueKind.Array)
             {
                 var inputCount = inputVars.GetArrayLength();
-                summary += $"📥 **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
+                summary += $"?? **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in inputVars.EnumerateArray().Take(3))
                 {
                     if (variable.TryGetProperty("name", out var nameEl) && 
                         variable.TryGetProperty("type", out var typeEl))
                     {
-                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
+                        summary += $"\n� `{nameEl.GetString()}` ({typeEl.GetString()})";
                     }
                 }
                 
                 if (inputCount > 3)
                 {
-                    summary += $"\n• ... and {inputCount - 3} more";
+                    summary += $"\n� ... and {inputCount - 3} more";
                 }
             }
             
@@ -358,20 +348,20 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             {
                 var outputCount = outputVars.GetArrayLength();
                 if (!string.IsNullOrEmpty(summary)) summary += "\n\n";
-                summary += $"📤 **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
+                summary += $"?? **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in outputVars.EnumerateArray().Take(3))
                 {
                     if (variable.TryGetProperty("name", out var nameEl) && 
                         variable.TryGetProperty("type", out var typeEl))
                     {
-                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
+                        summary += $"\n� `{nameEl.GetString()}` ({typeEl.GetString()})";
                     }
                 }
                 
                 if (outputCount > 3)
                 {
-                    summary += $"\n• ... and {outputCount - 3} more";
+                    summary += $"\n� ... and {outputCount - 3} more";
                 }
             }
             
@@ -383,7 +373,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    // NEW: Helper methods for enhanced tool execution display
     private string GetToolStatusClass(string? status)
     {
         return status switch
@@ -399,10 +388,10 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         return status switch
         {
-            "executing" => "⏳",
-            "success" => "✅",
-            "error" => "❌",
-            _ => "🔧"
+            "executing" => "?",
+            "success" => "?",
+            "error" => "?",
+            _ => "??"
         };
     }
 
@@ -419,7 +408,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     private string FormatToolContentForDisplay(string content)
     {
-        // Convert markdown-style formatting to HTML for display
         var html = content
             .Replace("**", "<strong>", StringComparison.Ordinal)
             .Replace("**", "</strong>", StringComparison.Ordinal)
@@ -427,7 +415,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             .Replace("`", "</code>", StringComparison.Ordinal)
             .Replace("\n", "<br>", StringComparison.Ordinal);
 
-        // Handle code blocks
         if (html.Contains("```"))
         {
             html = System.Text.RegularExpressions.Regex.Replace(html, 
@@ -444,10 +431,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         try
         {
             availableProviders = (await AiApiKeyService.GetAvailableProvidersAsync(includeEnvironment: true)).ToList();
-
             showNoProvidersMessage = availableProviders?.Any(p => p.HasStoredKeys || p.HasEnvironmentKey) != true;
 
-            // Auto-select first available provider/model if available
             if (availableProviders?.Any() == true)
             {
                 var firstAvailableProvider = availableProviders.FirstOrDefault(p => (p.HasStoredKeys || p.HasEnvironmentKey) && p.SupportedModels?.Any() == true);
@@ -495,7 +480,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         var selectedProvider = GetSelectedProvider();
         if (selectedProvider == null) return null;
 
-        // Auto-select the most recently used key, or first available key
         if (selectedProvider.StoredKeys?.Any() == true)
         {
             var mostRecentKey = selectedProvider.StoredKeys
@@ -518,8 +502,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             if (selectedProvider == null)
                 return false;
 
-            // If provider has stored keys, we need at least one available
-            // If provider has environment key, it's ready
             return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
         }
     }
@@ -535,8 +517,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             if (selectedProvider == null)
                 return false;
 
-            // If provider has stored keys, we need at least one available
-            // If provider has environment key, it's ready
             return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
         }
     }
@@ -544,7 +524,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     private void OnInputChange(ChangeEventArgs e)
     {
         promptText = e.Value?.ToString() ?? string.Empty;
-        StateHasChanged(); // Trigger re-render to update button state
+        StateHasChanged();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
@@ -562,11 +542,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         try
         {
             isGeneratingCode = true;
-
-            // Clear any pending apply state when starting new generation
             pendingCodes.Clear();
 
-            // Add user message to chat
             messages.Add(new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now));
             var userPrompt = promptText;
             promptText = string.Empty;
@@ -575,7 +552,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             var selectedModel = GetSelectedModel();
             var selectedApiKeyId = GetSelectedApiKeyId();
 
-            // Add context about selected provider/model
             var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel} with frontend tools";
             if (!string.IsNullOrEmpty(selectedApiKeyId) && selectedProvider?.StoredKeys?.Any() == true)
             {
@@ -586,7 +562,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 }
             }
 
-            // Add generating message
             var generatingMessage = new ChatMessage("AI", contextMessage, DateTime.Now) 
             { 
                 IsGenerating = true, 
@@ -596,7 +571,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
 
-            // NEW: Use MCP client directly with frontend execution functions
             var conversationRequest = new ConversationRequest
             {
                 InitialMessage = userPrompt,
@@ -610,8 +584,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     ["language"] = CurrentLanguage,
                     ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
                     ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
-                    ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(), // Pass the current step ID
-                    // Pass frontend functions to MCP tools
+                    ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
                     ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
                     ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
                     { 
@@ -621,21 +594,25 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 }
             };
 
-            // 🔧 FIX: Set the conversation ID BEFORE making the call so events can be matched
             _conversationId = conversationRequest.ConversationId;
-
             var result = await McpClient.StartConversationAsync(conversationRequest);
             _conversationId = result.ConversationId;
 
-            // Remove the generating message
-            messages.RemoveAt(messages.Count - 1);
+            // Remove the generating message - BUT preserve tool execution messages!
+            var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
+            if (generatingIndex >= 0)
+            {
+                messages.RemoveAt(generatingIndex);
+            }
+
+            logger.LogInformation("Messages after removing generating message: {Count}, Tool messages: {ToolCount}", 
+                messages.Count, 
+                messages.Count(m => m.Type == MessageType.ToolExecution));
 
             if (result.IsSuccess)
             {
-                // Different behavior based on selected agent mode
                 if (selectedAgent == Ask)
                 {
-                    // Ask mode: Show code with apply button, don't auto-apply
                     var codeId = Guid.NewGuid().ToString();
                     var codeMessage = new ChatMessage("AI", "Code generated successfully with frontend tools:", DateTime.Now)
                     {
@@ -646,11 +623,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     };
                     
                     messages.Add(codeMessage);
-                    
-                    // Store the code for later application with unique ID
                     pendingCodes[codeId] = result.GeneratedCode ?? string.Empty;
                     
-                    // Track in version history
                     codeHistory.Add(new CodeVersion(
                         result.GeneratedCode ?? string.Empty, 
                         DateTime.Now, 
@@ -659,7 +633,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 }
                 else
                 {
-                    // Agent mode: Show code and auto-apply (existing behavior)
                     var codeMessage = new ChatMessage("AI", "Code generated and applied with frontend tools:", DateTime.Now)
                     {
                         Type = MessageType.CodeSuccess,
@@ -669,7 +642,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     
                     messages.Add(codeMessage);
 
-                    // Auto-apply code in Agent mode
                     if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(result.GeneratedCode))
                     {
                         await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
@@ -678,7 +650,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             }
             else
             {
-                // Add error response to chat
                 var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
                 {
                     Type = MessageType.CodeError,
@@ -689,7 +660,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 messages.Add(errorMessage);
             }
 
-            // Emit event for legacy compatibility if needed
             if (OnSend.HasDelegate)
             {
                 await OnSend.InvokeAsync($"{contextMessage}|{userPrompt}");
@@ -697,10 +667,10 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            // Remove generating message if it exists
-            if (messages.LastOrDefault()?.Type == MessageType.Generating)
+            var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
+            if (generatingIndex >= 0)
             {
-                messages.RemoveAt(messages.Count - 1);
+                messages.RemoveAt(generatingIndex);
             }
 
             var errorMessage = new ChatMessage("AI", "Unexpected error:", DateTime.Now)
@@ -720,7 +690,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    // NEW: Helper methods for MCP integration
     private string BuildSystemPrompt()
     {
         return $"""
@@ -764,7 +733,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             var selectedKey = provider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == selectedApiKeyId);
             if (selectedKey != null)
             {
-                // Get decrypted key from server
                 var decryptedKey = await AiApiKeyService.GetDecryptedApiKeyAsync(selectedKey.Id);
                 if (!string.IsNullOrEmpty(decryptedKey))
                 {
@@ -777,7 +745,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             }
         }
 
-        // Fall back to environment keys (for desktop scenarios)
         if (provider.HasEnvironmentKey)
         {
             var envKeys = await AiApiKeyService.GetEnvironmentApiKeysAsync();
@@ -791,19 +758,14 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         return string.Empty;
     }
 
-    private async Task<Guid> GetCurrentUserIdAsync()
-    {
-        // TODO: Get from authentication context
-        // For now, return a placeholder - this needs to be implemented based on your auth system
-        return Guid.Empty;
-    }
-
     private List<Automaton.Mcp.Client.Models.ConversationMessage> BuildMcpConversationHistory()
     {
         var conversationHistory = new List<Automaton.Mcp.Client.Models.ConversationMessage>();
         
-        // Convert existing messages to MCP format
-        foreach (var message in messages.Where(m => m.Type != MessageType.System && m.Type != MessageType.Generating && m.Type != MessageType.ToolExecution))
+        foreach (var message in messages.Where(m => 
+            m.Type != MessageType.System && 
+            m.Type != MessageType.Generating && 
+            m.Type != MessageType.ToolExecution))
         {
             string role = message.Role.ToLowerInvariant() switch
             {
@@ -834,39 +796,94 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private record ChatMessage(string Role, string Content, DateTime Time)
+    private List<ChatMessage> FilterConversationHistory()
     {
-        public bool IsGenerating { get; init; } = false;
-        public string? CodeId { get; init; }
-        public bool IsSuccess { get; init; } = true;
-        public string? GeneratedCode { get; init; }
-        public MessageType Type { get; init; } = MessageType.Text;
-        public string? ToolName { get; init; }  // Tool name
-        public string? ToolResult { get; init; }  // Tool execution result
-        public string? ToolCallId { get; init; }  // NEW: Tool call ID for tracking
-        public string? ToolStatus { get; init; }  // NEW: executing, success, error
-        public string? ToolArguments { get; init; }  // NEW: Tool arguments
-        public string? ToolError { get; init; }  // NEW: Tool error message
+        const int maxMessages = 20;
+        const int maxTokens = 8000;
+        
+        var allMessages = messages.Where(m => 
+            m.Type != MessageType.System && 
+            m.Type != MessageType.Generating).ToList();
+            
+        if (allMessages.Count <= maxMessages)
+        {
+            return allMessages;
+        }
+        
+        var recentMessages = allMessages.TakeLast(maxMessages).ToList();
+        var estimatedTokens = EstimateTokenCount(recentMessages);
+        
+        while (estimatedTokens > maxTokens && recentMessages.Count > 4)
+        {
+            var oldestNonTool = recentMessages.FirstOrDefault(m => m.Type != MessageType.ToolExecution);
+            if (oldestNonTool != null)
+            {
+                recentMessages.Remove(oldestNonTool);
+            }
+            else
+            {
+                recentMessages.RemoveAt(0);
+            }
+            estimatedTokens = EstimateTokenCount(recentMessages);
+        }
+        
+        return recentMessages;
+    }
+    
+    private bool ShouldIncludeCodeInHistory(ChatMessage message)
+    {
+        var recentMessages = messages.Where(m => 
+            m.Type == MessageType.CodeSuccess && 
+            m.Role == "AI").TakeLast(3);
+            
+        if (recentMessages.Contains(message))
+            return true;
+            
+        if (DateTime.Now - message.Time < TimeSpan.FromMinutes(5))
+            return true;
+            
+        if (message.GeneratedCode?.Length < 500)
+            return true;
+            
+        return false;
+    }
+    
+    private int EstimateTokenCount(List<ChatMessage> messages)
+    {
+        return messages.Sum(m => 
+            (m.Content?.Length ?? 0) + 
+            (m.GeneratedCode?.Length ?? 0)) / 4;
     }
 
-    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
+    private async Task ClearConversationHistory()
+    {
+        if (isGeneratingCode) return;
 
-    private const string Agent = "Agent";
-    private const string Ask = "Ask";
+        if (!string.IsNullOrEmpty(_conversationId))
+        {
+            await McpClient.EndConversationAsync(_conversationId);
+            _conversationId = null;
+        }
+
+        messages.RemoveAll(m => m.Type != MessageType.System);
+        pendingCodes.Clear();
+
+        messages.Add(new ChatMessage("System", "Conversation history cleared. AI can now see and test your code in real-time.", DateTime.Now) 
+        { 
+            Type = MessageType.System 
+        });
+
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             var objRef = DotNetObjectReference.Create(this);
-
-            // Store the component reference globally first
             await JSRuntime.InvokeVoidAsync("eval", "window.aiChatPanelInstance = null;");
-
-            // Set the reference using a separate call
             await JSRuntime.InvokeVoidAsync("setAiChatPanelRef", objRef);
-
-            // Register the apply code function
             await JSRuntime.InvokeVoidAsync("eval", @"
                 window.applyCode = function(codeId) {
                     if (window.aiChatPanelInstance) {
@@ -888,11 +905,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         if (pendingCodes.TryGetValue(codeId, out var code) && OnCodeGenerated.HasDelegate)
         {
             await OnCodeGenerated.InvokeAsync(code);
-
-            // Remove the applied code from pending
             pendingCodes.Remove(codeId);
 
-            // Add confirmation message
             messages.Add(new ChatMessage("System", "Code applied to editor", DateTime.Now) 
             { 
                 Type = MessageType.System 
@@ -902,184 +916,35 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private async Task<List<Automaton.Studio.Models.ConversationMessage>> BuildConversationHistoryAsync()
+    private record ChatMessage(string Role, string Content, DateTime Time)
     {
-        var conversationHistory = new List<Automaton.Studio.Models.ConversationMessage>();
-        
-        // Add current code context as system message if available
-        if (GetCurrentCode != null)
-        {
-            try
-            {
-                var currentCode = await GetCurrentCode();
-                if (!string.IsNullOrEmpty(currentCode))
-                {
-                    conversationHistory.Add(new Automaton.Studio.Models.ConversationMessage("system", 
-                        $"Current code in the editor ({CurrentLanguage ?? "python"}):\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{currentCode}\n```\n\n" +
-                        "When the user asks for modifications, improvements, or changes, please consider this existing code as the starting point. " +
-                        "If the user wants to add functionality, build upon this existing code. If they want to fix issues, modify the relevant parts. " +
-                        "Always provide complete, working code that includes both the existing functionality and the requested changes."));
-                }
-            }
-            catch
-            {
-                // If getting current code fails, continue without code context
-            }
-        }
-        
-        // Apply smart conversation history filtering
-        var relevantMessages = FilterConversationHistory();
-        
-        foreach (var message in relevantMessages)
-        {
-            // Skip system messages and generating messages
-            if (message.Type == MessageType.System || message.Type == MessageType.Generating)
-                continue;
-
-            string role;
-            string content;
-
-            if (message.Role == "User")
-            {
-                role = "user";
-                content = message.Content;
-            }
-            else if (message.Role == "AI")
-            {
-                role = "assistant";
-                // For successful code generation, include intent but not always full code
-                if (message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode))
-                {
-                    // Include code only for recent messages or when explicitly referenced
-                    if (ShouldIncludeCodeInHistory(message))
-                    {
-                        content = $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
-                    }
-                    else
-                    {
-                        content = $"{message.Content} [Code generated - {message.GeneratedCode.Length} chars]";
-                    }
-                }
-                // For errors, include the error message
-                else if (message.Type == MessageType.CodeError)
-                {
-                    content = $"I encountered an error: {message.Content}";
-                }
-                else
-                {
-                    content = message.Content;
-                }
-            }
-            else
-            {
-                continue; // Skip unknown roles
-            }
-
-            conversationHistory.Add(new Automaton.Studio.Models.ConversationMessage(role, content));
-        }
-
-        return conversationHistory;
+        public bool IsGenerating { get; init; } = false;
+        public string? CodeId { get; init; }
+        public bool IsSuccess { get; init; } = true;
+        public string? GeneratedCode { get; init; }
+        public MessageType Type { get; init; } = MessageType.Text;
+        public string? ToolName { get; init; }
+        public string? ToolResult { get; init; }
+        public string? ToolCallId { get; init; }
+        public string? ToolStatus { get; init; }
+        public string? ToolArguments { get; init; }
+        public string? ToolError { get; init; }
     }
 
-    private List<ChatMessage> FilterConversationHistory()
-    {
-        const int maxMessages = 10; // Keep last 10 exchanges
-        const int maxTokens = 8000; // Rough token limit
-        
-        var allMessages = messages.Where(m => 
-            m.Type != MessageType.System && 
-            m.Type != MessageType.Generating).ToList();
-            
-        // If we have few messages, return all
-        if (allMessages.Count <= maxMessages)
-        {
-            return allMessages;
-        }
-        
-        // Take recent messages and estimate token usage
-        var recentMessages = allMessages.TakeLast(maxMessages).ToList();
-        var estimatedTokens = EstimateTokenCount(recentMessages);
-        
-        // If still too long, reduce further
-        while (estimatedTokens > maxTokens && recentMessages.Count > 4)
-        {
-            recentMessages.RemoveAt(0); // Remove oldest
-            estimatedTokens = EstimateTokenCount(recentMessages);
-        }
-        
-        return recentMessages;
-    }
-    
-    private bool ShouldIncludeCodeInHistory(ChatMessage message)
-    {
-        // Include code in history only for:
-        // 1. Last 3 AI responses
-        // 2. Messages from last 5 minutes
-        // 3. When code is small (< 500 chars)
-        
-        var recentMessages = messages.Where(m => 
-            m.Type == MessageType.CodeSuccess && 
-            m.Role == "AI").TakeLast(3);
-            
-        if (recentMessages.Contains(message))
-            return true;
-            
-        if (DateTime.Now - message.Time < TimeSpan.FromMinutes(5))
-            return true;
-            
-        if (message.GeneratedCode?.Length < 500)
-            return true;
-            
-        return false;
-    }
-    
-    private int EstimateTokenCount(List<ChatMessage> messages)
-    {
-        // Rough estimation: 1 token ≈ 4 characters
-        return messages.Sum(m => 
-            (m.Content?.Length ?? 0) + 
-            (m.GeneratedCode?.Length ?? 0)) / 4;
-    }
+    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
 
-    private async Task ClearConversationHistory()
-    {
-        if (isGeneratingCode) return;
-
-        // End current MCP conversation if active
-        if (!string.IsNullOrEmpty(_conversationId))
-        {
-            await McpClient.EndConversationAsync(_conversationId);
-            _conversationId = null;
-        }
-
-        // Clear all messages except for system messages
-        messages.RemoveAll(m => m.Type != MessageType.System);
-        
-        // Clear pending codes
-        pendingCodes.Clear();
-
-        // Add a system message about the cleared history
-        messages.Add(new ChatMessage("System", "Conversation history cleared. AI can now see and test your code in real-time.", DateTime.Now) 
-        { 
-            Type = MessageType.System 
-        });
-
-        await InvokeAsync(StateHasChanged);
-        await ScrollToBottom();
-    }
+    private const string Agent = "Agent";
+    private const string Ask = "Ask";
 
     public void Dispose()
     {
-        // Unsubscribe from MCP events
         McpClient.ConversationUpdated -= OnConversationUpdated;
 
-        // End current conversation if active
         if (!string.IsNullOrEmpty(_conversationId))
         {
             _ = Task.Run(() => McpClient.EndConversationAsync(_conversationId));
         }
 
-        // Clean up JavaScript references
         try
         {
             JSRuntime.InvokeVoidAsync("eval", "delete window.applyCode; delete window.aiChatPanelInstance; delete window.setAiChatPanelRef;");
