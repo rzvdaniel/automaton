@@ -33,6 +33,7 @@ partial class StepPage : ComponentBase, IDisposable
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
+    [Inject] private ICurrentStepContextService CurrentStepContextService { get; set; }
 
     [Parameter] public string StepId { get; set; }
 
@@ -41,6 +42,11 @@ partial class StepPage : ComponentBase, IDisposable
         StepDesignerViewModel.ScriptTextWritten += OnScriptOutputWritten;
 
         await StepDesignerViewModel.Load(Guid.Parse(StepId));
+
+        // Register current step with the context service
+        CurrentStepContextService.SetCurrentStep(
+            StepDesignerViewModel.CustomStep, 
+            GetCurrentCodeForAI);
 
         // Clear logs when entering the step
         StepDesignerViewModel.ClearScriptOutputText();

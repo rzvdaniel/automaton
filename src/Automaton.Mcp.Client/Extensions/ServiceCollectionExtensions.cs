@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddAutomatonMcpClient(this IServiceCollection services)
     {
-        // Register the MCP client directly
+        // Register the MCP client (requires IStudioMcpToolProvider to be registered separately)
         services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
         
         return services;

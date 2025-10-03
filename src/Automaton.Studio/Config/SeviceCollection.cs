@@ -37,6 +37,8 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
 using Automaton.Mcp.Client.Extensions;
+using Automaton.Mcp.Client.Services;
+using Automaton.Studio.Services.Mcp;
 
 namespace Automaton.Studio.Config;
 
@@ -68,8 +70,11 @@ public static class SeviceCollection
         services.AddCourier(Assembly.GetExecutingAssembly());
         services.AddScoped<IAuthenticationStorage, WebAuthenticationStorage>();
 
-        // MCP Client Services (Frontend AI Integration)
+        // Register MCP services
         services.AddAutomatonMcpClient();
+        services.AddScoped<IMcpToolProvider, StudioMcpToolProvider>();
+        services.AddScoped<ICustomStepExecuteService, CustomStepExecuteService>();
+        services.AddScoped<ICurrentStepContextService, CurrentStepContextService>();
 
         // Services
         services.AddScoped<Services.ConfigurationService>();

@@ -1,26 +1,30 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Client.Services;
 using OpenAI.Chat;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
 
 namespace Automaton.Mcp.Client;
 
 /// <summary>
-/// Simplified MCP client implementation using official AI provider SDKs
+/// Simplified MCP client implementation using official AI provider SDKs and integrated tool provider
 /// </summary>
 public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 {
     private readonly ILogger<AutomatonMcpClient> _logger;
+    private readonly IMcpToolProvider _toolProvider;
     private readonly ConcurrentDictionary<string, ConversationContext> _conversations = new();
     
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
-    public AutomatonMcpClient(ILogger<AutomatonMcpClient> logger)
+    public AutomatonMcpClient(
+        ILogger<AutomatonMcpClient> logger,
+        IMcpToolProvider toolProvider)
     {
         _logger = logger;
+        _toolProvider = toolProvider;
     }
 
     public async Task<ConversationResult> StartConversationAsync(ConversationRequest request, CancellationToken cancellationToken = default)
@@ -112,7 +116,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                     break;
                     
                 case AiProvider.Anthropic:
-                    responseText = await CallAnthropicAsync(request, cancellationToken);
+                    responseText = await FallbackAiCallAsync(request, cancellationToken);
                     break;
                     
                 default:
@@ -281,22 +285,29 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     }
 
     /// <summary>
-    /// Call OpenAI directly using the official OpenAI .NET SDK
+    /// Call OpenAI with MCP tools using the official OpenAI .NET SDK
     /// </summary>
     private async Task<string> CallOpenAiAsync(ConversationRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            // Use the official OpenAI .NET SDK pattern you provided
+            // Use the official OpenAI .NET SDK pattern with tools
             var client = new ChatClient(model: request.Model ?? "gpt-4o", apiKey: request.ApiKey);
             
             // Build conversation messages
             var messages = new List<ChatMessage>();
             
-            // Add system prompt
+            // Add system prompt with enhanced guidance
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
+                // Use provided system prompt
                 messages.Add(ChatMessage.CreateSystemMessage(request.SystemPrompt));
+            }
+            else
+            {
+                // Use enhanced system prompt with Studio's proven guidance
+                var enhancedSystemPrompt = BuildEnhancedSystemPrompt(request);
+                messages.Add(ChatMessage.CreateSystemMessage(enhancedSystemPrompt));
             }
             
             // Add conversation history
@@ -317,40 +328,217 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             // Add current user message
             messages.Add(ChatMessage.CreateUserMessage(request.InitialMessage));
             
-            // Create chat completion options
+            // Create MCP tools for AI to use from integrated Studio services
+            var tools = await CreateMcpToolsAsync();
+            
+            // Create chat completion options with tools
             var options = new ChatCompletionOptions
             {
                 MaxOutputTokenCount = 2000,
                 Temperature = 0.7f
             };
             
-            // Call OpenAI API
-            var completion = await client.CompleteChatAsync(messages, options, cancellationToken);
+            // Add tools to options
+            foreach (var tool in tools)
+            {
+                options.Tools.Add(tool);
+            }
             
-            return completion.Value.Content[0].Text ?? "No response generated";
+            // Handle iterative conversation with tool calls
+            bool requiresAction;
+            var responseBuilder = new StringBuilder();
+            
+            do
+            {
+                requiresAction = false;
+                var completion = await client.CompleteChatAsync(messages, options, cancellationToken);
+                
+                switch (completion.Value.FinishReason)
+                {
+                    case ChatFinishReason.Stop:
+                        // Add the assistant message to conversation history
+                        messages.Add(ChatMessage.CreateAssistantMessage(completion.Value.Content[0].Text ?? ""));
+                        responseBuilder.AppendLine(completion.Value.Content[0].Text ?? "");
+                        break;
+                        
+                    case ChatFinishReason.ToolCalls:
+                        // First, add the assistant message with tool calls to conversation history
+                        messages.Add(ChatMessage.CreateAssistantMessage(completion.Value));
+                        
+                        // Then, execute each tool call and add results
+                        foreach (var toolCall in completion.Value.ToolCalls)
+                        {
+                            var toolResult = await ExecuteMcpToolAsync(toolCall, request);
+                            messages.Add(ChatMessage.CreateToolMessage(toolCall.Id, toolResult));
+                            
+                            _logger.LogInformation("Executed tool {ToolName}: {Result}", 
+                                toolCall.FunctionName, toolResult.Substring(0, Math.Min(100, toolResult.Length)));
+                        }
+                        
+                        requiresAction = true;
+                        break;
+                        
+                    case ChatFinishReason.Length:
+                        throw new InvalidOperationException("Incomplete model output due to token limit");
+                        
+                    default:
+                        throw new InvalidOperationException($"Unexpected finish reason: {completion.Value.FinishReason}");
+                }
+                
+            } while (requiresAction);
+            
+            return responseBuilder.ToString().Trim();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling OpenAI API");
+            _logger.LogError(ex, "Error calling OpenAI API with MCP tools");
             throw;
         }
     }
 
     /// <summary>
-    /// Call Anthropic directly using the official Anthropic SDK
+    /// Create MCP tools that AI can use from the integrated Studio tool provider
     /// </summary>
-    private async Task<string> CallAnthropicAsync(ConversationRequest request, CancellationToken cancellationToken)
+    private async Task<List<ChatTool>> CreateMcpToolsAsync()
+    {
+        var studioTools = await _toolProvider.GetToolsAsync();
+        var chatTools = new List<ChatTool>();
+
+        foreach (var tool in studioTools)
+        {
+            var schemaBytes = tool.InputSchema?.RootElement.GetRawText() ?? "{}";
+            chatTools.Add(ChatTool.CreateFunctionTool(
+                functionName: tool.Name,
+                functionDescription: tool.Description,
+                functionParameters: BinaryData.FromString(schemaBytes)
+            ));
+        }
+
+        return chatTools;
+    }
+
+    /// <summary>
+    /// Execute an MCP tool call using the integrated Studio tool provider
+    /// </summary>
+    private async Task<string> ExecuteMcpToolAsync(ChatToolCall toolCall, ConversationRequest request)
     {
         try
         {
-            // For now, use fallback until we get the Anthropic SDK API right
-            _logger.LogInformation("Anthropic API integration not yet completed, using fallback");
-            return await FallbackAiCallAsync(request, cancellationToken);
+            var arguments = JsonDocument.Parse(toolCall.FunctionArguments);
+            var currentStepId = request.Context?.GetValueOrDefault("currentStepId")?.ToString();
+            
+            var result = await _toolProvider.ExecuteToolAsync(toolCall.FunctionName, arguments.RootElement, currentStepId);
+            
+            if (result.Success)
+            {
+                return result.Content ?? "Tool executed successfully";
+            }
+            else
+            {
+                return $"Tool execution failed: {result.Error}";
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling Anthropic API");
-            throw;
+            _logger.LogError(ex, "Error executing MCP tool {ToolName}", toolCall.FunctionName);
+            return $"Error executing tool {toolCall.FunctionName}: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Build enhanced system prompt with Studio's proven code generation guidance
+    /// </summary>
+    private string BuildEnhancedSystemPrompt(ConversationRequest request)
+    {
+        var language = request.Context?.GetValueOrDefault("language", "Python")?.ToString() ?? "Python";
+        var inputVariables = request.Context?.GetValueOrDefault("inputVariables") as IEnumerable<object>;
+        var outputVariables = request.Context?.GetValueOrDefault("outputVariables") as IEnumerable<object>;
+
+        var prompt = $"""
+            You are an expert automation developer with access to execution tools. Generate {language} code for custom steps in automation workflows.
+
+            ## CRITICAL WORKFLOW RULE:
+            ?? **ALWAYS START BY READING EXISTING CODE** ??
+            When asked to "improve", "modify", "enhance", or "use existing code", you MUST:
+            1. **FIRST** call get_current_code to see what exists
+            2. **ANALYZE** the current implementation
+            3. **THEN** proceed with improvements
+
+            ## EXECUTION ENVIRONMENT RULES:
+            - The host injects all input variables as top-level globals before execution. Read them directly by name.
+            - Do not rename input variables. Treat them as already defined; only use defaults if explicitly required.
+            - You MUST assign the expected output variables by exactly the given names at module/global scope (not just returned from a function).
+            - Initialize all expected output variables with sensible defaults at the top of the script, then overwrite them on success. Keep defaults if an error occurs.
+            - Use only JSON-serializable primitive types for outputs: strings, numbers (int/float), booleans, lists of primitives/strings, or dicts with string keys and primitive values.
+            - Avoid using or redefining reserved names used by the host: sys, StringIO, _original_stdout, _original_stderr, _captured_output, _output_content.
+
+            ## LOGGING AND ERROR REPORTING:
+            - Use standardized log level prefixes so the host can parse streams: INFO: <message>, WARN: <message>, ERROR: <message>.
+            - Catch exceptions, log an ERROR line, and do not rethrow; preserve default outputs.
+            - Prefer language-native console APIs, but keep the prefix format consistent.
+
+            ## MANDATORY DEVELOPMENT WORKFLOW:
+            1. **?? Read First**: ALWAYS use get_current_code to see existing implementation
+            2. **?? Understand Context**: Use get_step_variables to understand expected inputs/outputs  
+            3. **?? Generate Code**: Create robust code following the rules above
+            4. **?? Test Code**: Use execute_code tool to test your generated code
+            5. **?? Debug & Fix**: If execution fails, analyze errors and fix them
+            6. **?? Save Code**: Use save_code tool to save the working solution
+
+            ## QUALITY REQUIREMENTS:
+            - Generate clean, robust code with proper error handling
+            - The code should be suitable for automation workflows
+            - Follow best practices for the chosen language
+            - Ensure all declared output variables are assigned even on error (use sensible defaults)
+            - Test your code before finalizing it
+
+            ## AVAILABLE TOOLS:
+            - **get_current_code**: ?? Retrieve existing code from step (USE THIS FIRST for improvements!)
+            - **execute_code**: ?? Test code execution and see results
+            - **get_step_variables**: ?? Get input/output variable definitions
+            - **save_code**: ?? Save working code to step
+            """;
+
+        // Add language-specific guidance
+        if (string.Equals(language, "Python", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            ## PYTHON-SPECIFIC GUIDANCE:
+            - Access inputs by name. For optional values, use: value = globals().get('VarName', <default>)
+            - Do not wrap the entire logic under if __name__ == '__main__':; just write top-level script.
+            - Assign outputs as plain variables at the end of the script.
+            - Log with prefixes using print(); send errors to stderr when possible: print(f"ERROR: ...", file=sys.stderr); print("INFO: ...") and print("WARN: ...").
+            """;
+        }
+        else if (string.Equals(language, "PowerShell", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            ## POWERSHELL-SPECIFIC GUIDANCE:
+            - Read inputs as already defined variables.
+            - Initialize outputs upfront and set them at the end.
+            - Use Write-Host "INFO: ..." for info, Write-Warning "WARN: ..." for warnings, Write-Error "ERROR: ..." for errors; avoid throwing.
+            """;
+        }
+        else if (string.Equals(language, "JavaScript", StringComparison.OrdinalIgnoreCase))
+        {
+            prompt += """
+
+            ## JAVASCRIPT-SPECIFIC GUIDANCE:
+            - Access inputs from provided globals.
+            - Initialize outputs and assign them on success.
+            - Use console.log("INFO: ..."), console.warn("WARN: ..."), console.error("ERROR: ..."); avoid throwing uncaught errors.
+            """;
+        }
+
+        prompt += """
+
+            ## REMEMBER: 
+            ?? If user says "improve", "modify", "enhance" or mentions "existing code" ? START WITH get_current_code!
+            Always test your code with execute_code before saving it with save_code.
+            """;
+
+        return prompt;
     }
 }

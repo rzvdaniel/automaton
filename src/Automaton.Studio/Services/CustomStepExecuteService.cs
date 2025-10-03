@@ -2,10 +2,11 @@
 using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
 using Automaton.Studio.Domain;
+using System.Diagnostics;
 
 namespace Automaton.Studio.Services;
 
-public class CustomStepExecuteService : IDisposable
+public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 {
     private readonly IMediator mediator;
     private readonly IMapper mapper;
@@ -104,5 +105,66 @@ public class CustomStepExecuteService : IDisposable
     public void Dispose()
     {
         scriptHost.ScriptTextWritten -= OnScriptTextWritten;
+    }
+
+    /// <summary>
+    /// Execute code asynchronously for MCP integration
+    /// </summary>
+    public async Task<CodeExecutionResult> ExecuteCustomStepCodeAsync(
+        string code, 
+        string language, 
+        Dictionary<string, object> inputVariables, 
+        string stepId)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        
+        try
+        {
+            LogContext.PushProperty(LogContextProperties.StepId, stepId);
+            logger.Information("Executing {Language} code for step {StepId}", language, stepId);
+
+            var contentType = language.ToLowerInvariant() switch
+            {
+                "python" => "text/x-python",
+                "batch" => "text/x-batch",
+                "javascript" => "text/javascript",
+                "powershell" => "text/x-powershell",
+                _ => "text/x-python"
+            };
+
+            var resource = new ScriptResource()
+            {
+                ContentType = contentType,
+                Content = code
+            };
+
+            // Execute on a background thread to avoid blocking
+            var scriptVariables = await Task.Run(() => scriptHost.Execute(resource, inputVariables));
+            
+            stopwatch.Stop();
+
+            return new CodeExecutionResult
+            {
+                Success = true,
+                Output = "Code executed successfully",
+                Errors = Array.Empty<string>(),
+                OutputVariables = scriptVariables?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new Dictionary<string, object>(),
+                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            logger.Error(ex, "Error executing {Language} code for step {StepId}", language, stepId);
+            
+            return new CodeExecutionResult
+            {
+                Success = false,
+                Output = "",
+                Errors = new[] { ex.Message },
+                OutputVariables = new Dictionary<string, object>(),
+                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
+            };
+        }
     }
 }
