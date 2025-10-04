@@ -12,43 +12,12 @@
         margin-bottom: 12px;
     }
 
-    .code-success-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 12px;
-    }
-
-    .code-success-status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .success-badge {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 12px;
-        font-weight: 500;
-        padding: 2px 8px;
-        border-radius: 12px;
-        background: rgba(34, 197, 94, 0.2);
-        border: 1px solid #22c55e;
-        color: #166534;
-    }
-
-    .code-success-title {
-        color: #374151;
-        font-weight: normal;
-        font-size: 14px;
-    }
-
     .code-success-content {
         color: #374151;
         line-height: 1.5;
         font-size: 14px;
         margin-bottom: 12px;
+        margin-top: 8px;
     }
 
     .code-success-content strong {
@@ -106,14 +75,12 @@
 </style>
 
 <div class="code-success-container">
-    <div class="code-success-header">
-        <div class="code-success-status">
-            <span class="success-badge">
-                ? Success
-            </span>
-            <span class="code-success-title">@Title</span>
-        </div>
-    </div>
+    <ToolResultHeader StatusIcon="?" 
+                      StatusText="Success" 
+                      Status="success"
+                      Title="@Title"
+                      Timestamp="@Timestamp"
+                      ShowTimestamp="@ShowTimestamp" />
     
     <div class="code-success-content">
         @((MarkupString)FormatContentForDisplay())
@@ -142,6 +109,12 @@
     
     [Parameter] 
     public bool IsApplyDisabled { get; set; } = false;
+    
+    [Parameter] 
+    public DateTime? Timestamp { get; set; }
+    
+    [Parameter] 
+    public bool ShowTimestamp { get; set; } = false;
     
     [Parameter] 
     public EventCallback<string> OnApplyCode { get; set; }

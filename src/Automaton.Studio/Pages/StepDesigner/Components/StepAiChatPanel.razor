@@ -44,15 +44,12 @@
 
 							case MessageType.ToolExecution:
 								<div class="tool-execution-message" data-status="@msg.ToolStatus">
-									<div class="tool-header">
-										<div class="tool-info">
-											<span class="tool-status @GetToolStatusClass(msg.ToolStatus)">
-												@GetToolStatusIcon(msg.ToolStatus)
-												@GetToolStatusText(msg.ToolStatus)
-											</span>
-										</div>
-										<span class="tool-timestamp">@msg.Time.ToString("HH:mm:ss")</span>
-									</div>
+									<ToolResultHeader StatusIcon="@GetToolStatusIcon(msg.ToolStatus)"
+													  StatusText="@GetToolStatusText(msg.ToolStatus)"
+													  Status="@(msg.ToolStatus ?? "unknown")"
+													  Title=""
+													  Timestamp="@msg.Time"
+													  ShowTimestamp="true" />
 									
 									@if (msg.ToolStatus == "executing")
 									{
@@ -84,6 +81,8 @@
 													Language="@CurrentLanguage"
 													CodeId="@msg.CodeId"
 													IsApplyDisabled="@isGeneratingCode"
+													Timestamp="@msg.Time"
+													ShowTimestamp="false"
 													OnApplyCode="@(async (codeId) => await ApplyCodeFromButton(codeId))" />
 								break;
 

@@ -1,0 +1,110 @@
+﻿@using System.Globalization
+
+<style>
+    .tool-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .tool-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tool-status {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .tool-status.status-executing {
+        color: #b45309;
+        background: rgba(251, 191, 36, 0.2);
+        border-color: #fbbf24;
+    }
+
+    .tool-status.status-success {
+        color: #166534;
+        background: rgba(34, 197, 94, 0.2);
+        border-color: #22c55e;
+    }
+
+    .tool-status.status-error {
+        color: #991b1b;
+        background: rgba(239, 68, 68, 0.2);
+        border-color: #ef4444;
+    }
+
+    .tool-status.status-unknown {
+        color: #64748b;
+        background: rgba(148, 163, 184, 0.2);
+        border-color: #94a3b8;
+    }
+
+    .tool-title {
+        color: #374151;
+        font-weight: normal;
+        font-size: 14px;
+    }
+
+    .tool-timestamp {
+        font-size: 11px;
+        color: #64748b;
+        font-family: 'Courier New', monospace;
+    }
+</style>
+
+<div class="tool-header">
+    <div class="tool-info">
+        <span class="tool-status @GetStatusClass()">
+            @StatusIcon @StatusText
+        </span>
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <span class="tool-title">@Title</span>
+        }
+    </div>
+    @if (ShowTimestamp && Timestamp.HasValue)
+    {
+        <span class="tool-timestamp">@Timestamp.Value.ToString("HH:mm:ss")</span>
+    }
+</div>
+
+@code {
+    [Parameter] 
+    public string StatusIcon { get; set; } = "🔧";
+    
+    [Parameter] 
+    public string StatusText { get; set; } = "Unknown";
+    
+    [Parameter] 
+    public string Status { get; set; } = "unknown";
+    
+    [Parameter] 
+    public string? Title { get; set; }
+    
+    [Parameter] 
+    public DateTime? Timestamp { get; set; }
+    
+    [Parameter] 
+    public bool ShowTimestamp { get; set; } = true;
+    
+    private string GetStatusClass()
+    {
+        return Status?.ToLowerInvariant() switch
+        {
+            "executing" => "status-executing",
+            "success" => "status-success",
+            "error" or "failed" => "status-error",
+            _ => "status-unknown"
+        };
+    }
+}
