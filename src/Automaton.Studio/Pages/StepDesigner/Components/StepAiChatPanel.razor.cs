@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults;
+using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
@@ -507,10 +508,13 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         };
                         
                         messages.Add(codeMessage);
-                        pendingCodes[codeId] = result.GeneratedCode;
+                        
+                        // Store only the code part for potential application
+                        var codeForEditor = ExtractCodeForEditor(result.GeneratedCode, CurrentLanguage);
+                        pendingCodes[codeId] = codeForEditor;
                         
                         codeHistory.Add(new CodeVersion(
-                            result.GeneratedCode, 
+                            codeForEditor, 
                             DateTime.Now, 
                             userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
                             false));
@@ -540,9 +544,11 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         
                         messages.Add(codeMessage);
 
-                        if (OnCodeGenerated.HasDelegate)
+                        // Extract only the code part for editor application
+                        var codeForEditor = ExtractCodeForEditor(result.GeneratedCode, CurrentLanguage);
+                        if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(codeForEditor))
                         {
-                            await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
+                            await OnCodeGenerated.InvokeAsync(codeForEditor);
                         }
                     }
                     else
@@ -772,6 +778,12 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
         }
+    }
+
+    // Helper method to extract only code for editor application from AI response
+    private string ExtractCodeForEditor(string response, string language)
+    {
+        return CodeExtractionUtility.ExtractCodeForEditor(response, language);
     }
 
     public void Dispose()

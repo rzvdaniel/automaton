@@ -79,19 +79,12 @@
 								break;
 
 							case MessageType.CodeSuccess:
-								<div style="background: #f6f8fa; padding: 12px; border-radius: 6px; border-left: 4px solid #28a745;">
-									<strong>✅ @msg.Content</strong><br /><br />
-									<pre style="background: #fff; padding: 8px; border-radius: 4px; overflow-x: auto; margin-bottom: 12px;"><code>@msg.GeneratedCode</code></pre>
-									@if (!string.IsNullOrEmpty(msg.CodeId))
-									{
-										<Button Type="@ButtonType.Primary"
-												Size="@ButtonSize.Small"
-												OnClick="() => ApplyCodeFromButton(msg.CodeId!)"
-												Style="font-size: 12px;">
-											Apply Code
-										</Button>
-									}
-								</div>
+								<CodeSuccessDisplay Title="@msg.Content"
+													FullResponse="@msg.GeneratedCode"
+													Language="@CurrentLanguage"
+													CodeId="@msg.CodeId"
+													IsApplyDisabled="@isGeneratingCode"
+													OnApplyCode="@(async (codeId) => await ApplyCodeFromButton(codeId))" />
 								break;
 
 							case MessageType.CodeError:
@@ -274,6 +267,12 @@
 			display: flex;
 			gap: 8px;
 		}
+
+	/* Remove padding/background for CodeSuccess messages since the component handles its own styling */
+	.message:has(code-success-display) {
+		padding: 0;
+		background: transparent;
+	}
 
 	.ai-chat-input {
 		border-top: 1px solid #e8e8e8;

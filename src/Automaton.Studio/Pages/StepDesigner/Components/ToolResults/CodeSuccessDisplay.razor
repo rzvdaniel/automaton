@@ -1,0 +1,164 @@
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities
+@using System.Net
+
+<style>
+    .code-success-container {
+        background: #f6f8fa;
+        padding: 12px;
+        border-radius: 6px;
+        border-left: 4px solid #28a745;
+        margin-bottom: 12px;
+    }
+
+    .code-success-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .code-success-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .success-badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(34, 197, 94, 0.2);
+        border: 1px solid #22c55e;
+        color: #166534;
+    }
+
+    .code-success-title {
+        color: #374151;
+        font-weight: normal;
+        font-size: 14px;
+    }
+
+    .code-success-content {
+        color: #374151;
+        line-height: 1.5;
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    .code-success-content strong {
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .code-success-content ul, .code-success-content ol {
+        margin: 8px 0;
+        padding-left: 20px;
+    }
+
+    .code-success-content li {
+        margin: 4px 0;
+    }
+
+    .code-success-content .generated-code-block {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        margin: 12px 0;
+        overflow: hidden;
+        padding: 12px;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    .code-success-content .generated-code-block code {
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .apply-code-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+
+    .apply-code-btn:hover {
+        background: #0056b3;
+    }
+
+    .apply-code-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="code-success-container">
+    <div class="code-success-header">
+        <div class="code-success-status">
+            <span class="success-badge">
+                ? Success
+            </span>
+            <span class="code-success-title">@Title</span>
+        </div>
+    </div>
+    
+    <div class="code-success-content">
+        @((MarkupString)FormatContentForDisplay())
+    </div>
+    
+    @if (!string.IsNullOrEmpty(CodeId) && OnApplyCode.HasDelegate)
+    {
+        <button class="apply-code-btn" @onclick="HandleApplyCode" disabled="@IsApplyDisabled" title="Apply code to editor">
+            Apply Code
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] 
+    public string Title { get; set; } = default!;
+    
+    [Parameter] 
+    public string? FullResponse { get; set; }
+    
+    [Parameter] 
+    public string? Language { get; set; }
+    
+    [Parameter] 
+    public string? CodeId { get; set; }
+    
+    [Parameter] 
+    public bool IsApplyDisabled { get; set; } = false;
+    
+    [Parameter] 
+    public EventCallback<string> OnApplyCode { get; set; }
+    
+    private async Task HandleApplyCode()
+    {
+        if (!string.IsNullOrEmpty(CodeId) && OnApplyCode.HasDelegate)
+        {
+            await OnApplyCode.InvokeAsync(CodeId);
+        }
+    }
+    
+    private string FormatContentForDisplay()
+    {
+        if (string.IsNullOrEmpty(FullResponse))
+            return string.Empty;
+            
+        return CodeExtractionUtility.FormatResponseForDisplay(FullResponse, Language ?? "python");
+    }
+}
