@@ -12,16 +12,6 @@ using Automaton.Studio.Pages.StepDesigner.Components.ToolResults;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
-public enum MessageType
-{
-    Text,
-    Generating,
-    CodeSuccess,
-    CodeError,
-    System,
-    ToolExecution  // NEW: For MCP tool executions
-}
-
 public partial class StepAiChatPanel : ComponentBase, IDisposable
 {
     [Parameter] public EventCallback<string> OnSend { get; set; }
@@ -38,6 +28,27 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
+
+    private record ChatMessage(string Role, string Content, DateTime Time)
+    {
+        public bool IsGenerating { get; init; } = false;
+        public string? CodeId { get; init; }
+        public bool IsSuccess { get; init; } = true;
+        public string? GeneratedCode { get; init; }
+        public MessageType Type { get; init; } = MessageType.Text;
+        public string? ToolName { get; init; }
+        public string? ToolResult { get; init; }
+        public string? ToolCallId { get; init; }
+        public string? ToolStatus { get; init; }
+        public string? ToolArguments { get; init; }
+        public string? ToolError { get; init; }
+        public ToolResultViewModel? ToolResultViewModel { get; init; }
+    }
+
+    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
+
+    private const string Agent = "Agent";
+    private const string Ask = "Ask";
 
     protected ElementReference messagesContainer;
 
@@ -426,37 +437,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             "error" => "Failed",
             _ => "Unknown"
         };
-    }
-
-    private string FormatToolContentForDisplay(string content)
-    {
-        var html = content
-            .Replace("**", "<strong>", StringComparison.Ordinal)
-            .Replace("**", "</strong>", StringComparison.Ordinal)
-            .Replace("`", "<code>", StringComparison.Ordinal)
-            .Replace("`", "</code>", StringComparison.Ordinal)
-            .Replace("\n", "<br>", StringComparison.Ordinal);
-
-        // Handle code blocks
-        if (html.Contains("```"))
-        {
-            html = System.Text.RegularExpressions.Regex.Replace(html, 
-                @"```(\w+)?<br>(.*?)```", 
-                "<div class=\"code-block\"><pre><code>$2</code></pre></div>",
-                System.Text.RegularExpressions.RegexOptions.Singleline);
-        }
-
-        // Handle collapsible details
-        if (html.Contains("<details"))
-        {
-            html = html
-                .Replace("<details", "<details", StringComparison.Ordinal)
-                .Replace("</details>", "</details>", StringComparison.Ordinal)
-                .Replace("<summary", "<summary", StringComparison.Ordinal)
-                .Replace("</summary>", "</summary>", StringComparison.Ordinal);
-        }
-
-        return html;
     }
 
     private async Task LoadProvidersAsync()
@@ -948,27 +928,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             await ScrollToBottom();
         }
     }
-
-    private record ChatMessage(string Role, string Content, DateTime Time)
-    {
-        public bool IsGenerating { get; init; } = false;
-        public string? CodeId { get; init; }
-        public bool IsSuccess { get; init; } = true;
-        public string? GeneratedCode { get; init; }
-        public MessageType Type { get; init; } = MessageType.Text;
-        public string? ToolName { get; init; }
-        public string? ToolResult { get; init; }
-        public string? ToolCallId { get; init; }
-        public string? ToolStatus { get; init; }
-        public string? ToolArguments { get; init; }
-        public string? ToolError { get; init; }
-        public ToolResultViewModel? ToolResultViewModel { get; init; }  // NEW: For component rendering
-    }
-
-    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
-
-    private const string Agent = "Agent";
-    private const string Ask = "Ask";
 
     public void Dispose()
     {

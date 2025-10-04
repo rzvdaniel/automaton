@@ -7,6 +7,9 @@
 @using Automaton.Studio.Shared.Components
 @using Automaton.Mcp.Client
 @using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using MessageType = Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors.MessageType;
+
 @implements IDisposable
 
 <div class="ai-chat-panel">
@@ -60,17 +63,9 @@
 											<span class="progress-text">@msg.Content</span>
 										</div>
 									}
-									else if (msg.ToolResultViewModel != null)
-									{
-										<!-- NEW: Use component-based rendering -->
-										<ToolResultDisplay Result="msg.ToolResultViewModel" />
-									}
 									else
 									{
-										<!-- FALLBACK: Use old text-based rendering -->
-										<div class="tool-content">
-											@((MarkupString)FormatToolContentForDisplay(msg.Content))
-										</div>
+										<ToolResultDisplay Result="msg.ToolResultViewModel" />
 									}
 									
 									@if (!string.IsNullOrEmpty(msg.ToolError))
