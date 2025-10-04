@@ -85,7 +85,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         {
             InvokeAsync(() =>
             {
-                // Process tool calls and results
+                // Process tool calls and results - ALWAYS SHOW THEM
                 foreach (var toolCall in e.ToolCalls)
                 {
                     var existingToolMessage = messages.FirstOrDefault(m => 
@@ -105,6 +105,8 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         
                         messages.Add(toolMessage);
                         logger.LogInformation("Added tool call message: {ToolName} - {Status}", toolCall.Name, "Executing");
+                        // Update UI immediately to show tool execution
+                        InvokeAsync(StateHasChanged);
                     }
                 }
 
@@ -192,6 +194,56 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         
         return result;
+    }
+
+    // Helper method to detect if response contains actual code
+    private bool IsActualCode(string? response)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+            return false;
+
+        // Check if the response contains code patterns
+        var codeIndicators = new[]
+        {
+            "def ", "class ", "import ", "from ", // Python
+            "function ", "const ", "let ", "var ", // JavaScript
+            "public ", "private ", "void ", "int ", "string ", // C#
+            "if ", "for ", "while ", "try ", "catch ", // General programming constructs
+            "{", "}", "[", "]", "(", ")", "=", ";", // Code symbols
+        };
+
+        // Check for actual code structure (not just explanatory text)
+        var hasCodeStructure = codeIndicators.Any(indicator => 
+            response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
+
+        // Also check if it's mostly explanatory text
+        var explanatoryPhrases = new[]
+        {
+            "the persistent failure",
+            "suggests that there might be",
+            "this could prevent",
+            "as a workaround",
+            "you can try",
+            "if you have further details",
+            "those could help"
+        };
+
+        var hasExplanatoryText = explanatoryPhrases.Any(phrase => 
+            response.Contains(phrase, StringComparison.OrdinalIgnoreCase));
+
+        // If it has explanatory text and no clear code structure, it's probably not code
+        if (hasExplanatoryText && !hasCodeStructure)
+            return false;
+
+        // Check for code block markers
+        if (response.Contains("```") || response.Contains("def ") || response.Contains("import "))
+            return true;
+
+        // Check if it has multiple programming keywords
+        var keywordCount = codeIndicators.Count(indicator => 
+            response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
+
+        return keywordCount >= 3; // Require at least 3 programming keywords
     }
 
     // Proper Unicode emoji icons - these work in browsers
@@ -438,40 +490,71 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
             if (result.IsSuccess)
             {
+                // Check if the result contains actual code or just explanatory text
+                bool isCode = IsActualCode(result.GeneratedCode);
+                
                 if (selectedAgent == Ask)
                 {
-                    var codeId = Guid.NewGuid().ToString();
-                    var codeMessage = new ChatMessage("AI", "Code generated successfully with frontend tools:", DateTime.Now)
+                    if (isCode && !string.IsNullOrEmpty(result.GeneratedCode))
                     {
-                        Type = MessageType.CodeSuccess,
-                        CodeId = codeId,
-                        GeneratedCode = result.GeneratedCode,
-                        IsSuccess = true
-                    };
-                    
-                    messages.Add(codeMessage);
-                    pendingCodes[codeId] = result.GeneratedCode ?? string.Empty;
-                    
-                    codeHistory.Add(new CodeVersion(
-                        result.GeneratedCode ?? string.Empty, 
-                        DateTime.Now, 
-                        userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
-                        false));
+                        var codeId = Guid.NewGuid().ToString();
+                        var codeMessage = new ChatMessage("AI", "Code generated successfully with frontend tools:", DateTime.Now)
+                        {
+                            Type = MessageType.CodeSuccess,
+                            CodeId = codeId,
+                            GeneratedCode = result.GeneratedCode,
+                            IsSuccess = true
+                        };
+                        
+                        messages.Add(codeMessage);
+                        pendingCodes[codeId] = result.GeneratedCode;
+                        
+                        codeHistory.Add(new CodeVersion(
+                            result.GeneratedCode, 
+                            DateTime.Now, 
+                            userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
+                            false));
+                    }
+                    else
+                    {
+                        // Just add as a regular AI response message, not as code
+                        var responseMessage = new ChatMessage("AI", result.GeneratedCode ?? "No response received.", DateTime.Now)
+                        {
+                            Type = MessageType.Text,
+                            IsSuccess = true
+                        };
+                        
+                        messages.Add(responseMessage);
+                    }
                 }
                 else
                 {
-                    var codeMessage = new ChatMessage("AI", "Code generated and applied with frontend tools:", DateTime.Now)
+                    if (isCode && !string.IsNullOrEmpty(result.GeneratedCode))
                     {
-                        Type = MessageType.CodeSuccess,
-                        GeneratedCode = result.GeneratedCode,
-                        IsSuccess = true
-                    };
-                    
-                    messages.Add(codeMessage);
+                        var codeMessage = new ChatMessage("AI", "Code generated and applied with frontend tools:", DateTime.Now)
+                        {
+                            Type = MessageType.CodeSuccess,
+                            GeneratedCode = result.GeneratedCode,
+                            IsSuccess = true
+                        };
+                        
+                        messages.Add(codeMessage);
 
-                    if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(result.GeneratedCode))
+                        if (OnCodeGenerated.HasDelegate)
+                        {
+                            await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
+                        }
+                    }
+                    else
                     {
-                        await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
+                        // Just add as a regular AI response message, don't apply to editor
+                        var responseMessage = new ChatMessage("AI", result.GeneratedCode ?? "No response received.", DateTime.Now)
+                        {
+                            Type = MessageType.Text,
+                            IsSuccess = true
+                        };
+                        
+                        messages.Add(responseMessage);
                     }
                 }
             }
