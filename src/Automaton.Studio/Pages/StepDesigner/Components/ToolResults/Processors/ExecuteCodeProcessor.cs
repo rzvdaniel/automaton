@@ -64,7 +64,7 @@ public class ExecuteCodeProcessor : IToolResultProcessor
                 var varsJson = varsElement.GetRawText();
                 if (varsJson != "{}" && varsJson != "null")
                 {
-                    summary += $"\n\n**Output Variables:** {varsJson}";
+                    summary += varsJson;
                 }
             }
             

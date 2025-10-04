@@ -3,7 +3,7 @@
 @using System.Net
 
 <style>
-    .raw-result-btn {
+    .view-code-btn, .raw-result-btn {
         background: none;
         border: none;
         color: #6c757d;
@@ -17,28 +17,28 @@
         text-decoration: none;
     }
 
-    .raw-result-btn:hover {
+    .view-code-btn:hover, .raw-result-btn:hover {
         color: #495057;
         background-color: #f8f9fa;
         border-radius: 0.25rem;
     }
 
-    .raw-result-btn .raw-icon {
+    .view-code-btn .code-icon, .raw-result-btn .raw-icon {
         font-size: 0.875rem;
     }
 
-    .raw-result-collapsible {
+    .code-collapsible, .raw-result-collapsible {
         margin-top: 0.5rem;
         border: 1px solid #dee2e6;
         border-radius: 0.375rem;
         overflow: hidden;
     }
 
-    .raw-result-content {
-        /* Removed background-color and padding */
+    .code-content, .raw-result-content {
+        /* No background or padding */
     }
 
-    .raw-result-content .raw-result {
+    .code-content .code-result, .raw-result-content .raw-result {
         margin: 0;
         background-color: white;
         border: 1px solid #dee2e6;
@@ -53,14 +53,18 @@
 </style>
 
 <div class="tool-result-container">
-    <details class="tool-code-details">
-        <summary class="tool-code-summary">
-            <span class="code-icon">📄</span> View Code (@(Result.LineCount ?? 0) lines)
-        </summary>
-        <div class="tool-result-content">
-            <pre class="code-result"><code class="language-@(Result.Language?.ToLowerInvariant() ?? "python")">@Result.CodeContent</code></pre>
+    <button class="view-code-btn" @onclick="ToggleCodeView" title="View Code">
+        <span class="code-icon">📄</span> View Code (@(Result.LineCount ?? 0) lines)
+    </button>
+    
+    @if (showCode)
+    {
+        <div class="code-collapsible">
+            <div class="code-content">
+                <pre class="code-result"><code class="language-@(Result.Language?.ToLowerInvariant() ?? "python")">@Result.CodeContent</code></pre>
+            </div>
         </div>
-    </details>
+    }
     
     @if (!string.IsNullOrEmpty(Result.RawResult))
     {
@@ -72,7 +76,7 @@
         {
             <div class="raw-result-collapsible">
                 <div class="raw-result-content">
-                    <pre class="raw-result">@WebUtility.HtmlEncode(Result.RawResult)</pre>
+                    <pre class="raw-result">@Result.RawResult</pre>
                 </div>
             </div>
         }
@@ -83,7 +87,13 @@
     [Parameter, EditorRequired] 
     public ToolResultViewModel Result { get; set; } = default!;
     
+    private bool showCode = false;
     private bool showRawResult = false;
+    
+    private void ToggleCodeView()
+    {
+        showCode = !showCode;
+    }
     
     private void ToggleRawResult()
     {

@@ -3,7 +3,7 @@
 @using System.Net
 
 <style>
-    .raw-result-btn {
+    .variables-result-btn, .raw-result-btn {
         background: none;
         border: none;
         color: #6c757d;
@@ -17,28 +17,28 @@
         text-decoration: none;
     }
 
-    .raw-result-btn:hover {
+    .variables-result-btn:hover, .raw-result-btn:hover {
         color: #495057;
         background-color: #f8f9fa;
         border-radius: 0.25rem;
     }
 
-    .raw-result-btn .raw-icon {
+    .variables-result-btn .variables-icon, .raw-result-btn .raw-icon {
         font-size: 0.875rem;
     }
 
-    .raw-result-collapsible {
+    .variables-result-collapsible, .raw-result-collapsible {
         margin-top: 0.5rem;
         border: 1px solid #dee2e6;
         border-radius: 0.375rem;
         overflow: hidden;
     }
 
-    .raw-result-content {
-        /* Removed background-color and padding */
+    .variables-result-content, .raw-result-content {
+        /* No background or padding */
     }
 
-    .raw-result-content .raw-result {
+    .variables-result-content .variables-result, .raw-result-content .raw-result {
         margin: 0;
         background-color: white;
         border: 1px solid #dee2e6;
@@ -54,10 +54,18 @@
 
 @if (!string.IsNullOrEmpty(Result.Summary))
 {
-    <div class="tool-result-summary">
-        <strong>Variables:</strong>
-        @((MarkupString)FormatSummaryForDisplay(Result.Summary))
-    </div>
+    <button class="variables-result-btn" @onclick="ToggleVariablesResult" title="View Variables">
+        <span class="variables-icon">📊</span> Variables
+    </button>
+    
+    @if (showVariablesResult)
+    {
+        <div class="variables-result-collapsible">
+            <div class="variables-result-content">
+                <div class="variables-result">@((MarkupString)FormatSummaryForDisplay(Result.Summary))</div>
+            </div>
+        </div>
+    }
 }
 
 @if (!string.IsNullOrEmpty(Result.RawResult))
@@ -70,7 +78,7 @@
     {
         <div class="raw-result-collapsible">
             <div class="raw-result-content">
-                <pre class="raw-result">@WebUtility.HtmlEncode(Result.RawResult)</pre>
+                <pre class="raw-result">@Result.RawResult</pre>
             </div>
         </div>
     }
@@ -80,7 +88,13 @@
     [Parameter, EditorRequired] 
     public ToolResultViewModel Result { get; set; } = default!;
     
+    private bool showVariablesResult = false;
     private bool showRawResult = false;
+
+    private void ToggleVariablesResult()
+    {
+        showVariablesResult = !showVariablesResult;
+    }
 
     private void ToggleRawResult()
     {

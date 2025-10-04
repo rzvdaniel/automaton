@@ -166,7 +166,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             return new CodeExecutionResult
             {
                 Success = !hasErrors,
-                Output = hasErrors ? $"Execution failed: {errorMessage}" : "Code executed successfully",
+                Output = hasErrors ? $"{errorMessage}" : "",
                 Errors = errorsList.ToArray(),
                 OutputVariables = cleanVariables,
                 ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
