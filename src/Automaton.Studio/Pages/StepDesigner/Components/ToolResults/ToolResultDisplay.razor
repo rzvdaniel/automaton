@@ -1,0 +1,47 @@
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using System.Net
+
+<div class="tool-result-display">
+    <div class="tool-result-header">
+        @Result.Icon @Result.Description @Result.StatusIcon @Result.Status
+    </div>
+
+    @if (!string.IsNullOrEmpty(Result.ErrorMessage))
+    {
+        <div class="tool-result-error">
+            <strong>Error:</strong> @Result.ErrorMessage
+        </div>
+    }
+    else if (Result.IsSuccess)
+    {
+        @switch (Result.ResultType)
+        {
+            case ToolResultType.Code:
+                <CodeResultDisplay Result="Result" />
+                break;
+                
+            case ToolResultType.Execution:
+                <ExecutionResultDisplay Result="Result" />
+                break;
+                
+            case ToolResultType.Variables:
+                <VariablesResultDisplay Result="Result" />
+                break;
+                
+            case ToolResultType.SaveCode:
+                <SaveCodeResultDisplay Result="Result" />
+                break;
+                
+            case ToolResultType.Generic:
+            default:
+                <GenericResultDisplay Result="Result" />
+                break;
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] 
+    public ToolResultViewModel Result { get; set; } = default!;
+}

@@ -1,0 +1,31 @@
+﻿@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using System.Net
+
+<div class="tool-result-container">
+    <details class="tool-code-details">
+        <summary class="tool-code-summary">
+            <span class="code-icon">📄</span> View Code (@(Result.LineCount ?? 0) lines)
+        </summary>
+        <div class="tool-result-content">
+            <pre class="code-result"><code class="language-@(Result.Language?.ToLowerInvariant() ?? "python")">@Result.CodeContent</code></pre>
+        </div>
+    </details>
+    
+    @if (!string.IsNullOrEmpty(Result.RawResult))
+    {
+        <details class="tool-raw-details">
+            <summary class="tool-raw-summary">
+                <span class="raw-icon">🔍</span> Raw Result
+            </summary>
+            <div class="tool-result-content">
+                <pre class="raw-result">@WebUtility.HtmlEncode(Result.RawResult)</pre>
+            </div>
+        </details>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] 
+    public ToolResultViewModel Result { get; set; } = default!;
+}

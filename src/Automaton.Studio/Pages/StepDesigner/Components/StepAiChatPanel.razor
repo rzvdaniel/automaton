@@ -6,6 +6,7 @@
 @using Automaton.Studio.Services
 @using Automaton.Studio.Shared.Components
 @using Automaton.Mcp.Client
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
 @implements IDisposable
 
 <div class="ai-chat-panel">
@@ -59,8 +60,14 @@
 											<span class="progress-text">@msg.Content</span>
 										</div>
 									}
+									else if (msg.ToolResultViewModel != null)
+									{
+										<!-- NEW: Use component-based rendering -->
+										<ToolResultDisplay Result="msg.ToolResultViewModel" />
+									}
 									else
 									{
+										<!-- FALLBACK: Use old text-based rendering -->
 										<div class="tool-content">
 											@((MarkupString)FormatToolContentForDisplay(msg.Content))
 										</div>
@@ -72,19 +79,6 @@
 											<Icon Type="exclamation-circle" Style="color: #dc3545; margin-right: 4px;" />
 											<span>@msg.ToolError</span>
 										</div>
-									}
-									
-									@if (!string.IsNullOrEmpty(msg.ToolResult) && msg.ToolStatus != "executing")
-									{
-										<details class="tool-details">
-											<summary class="tool-details-summary">
-												<Icon Type="eye" Style="margin-right: 4px; font-size: 12px;" />
-												Raw Result
-											</summary>
-											<div class="tool-details-content">
-												<pre><code>@msg.ToolResult</code></pre>
-											</div>
-										</details>
 									}
 								</div>
 								break;
@@ -620,5 +614,100 @@
 	.message[data-message-type="tool"] {
 		background: transparent;
 		padding: 0;
+	}
+
+	/* New component-based tool result styling */
+	.tool-result-display {
+		margin-top: 8px;
+	}
+
+	.tool-result-header {
+		font-weight: 600;
+		margin-bottom: 8px;
+		color: #374151;
+	}
+
+	.tool-result-error {
+		color: #dc2626;
+		background: rgba(239, 68, 68, 0.1);
+		padding: 8px;
+		border-radius: 4px;
+		border: 1px solid #fca5a5;
+		margin-top: 8px;
+	}
+
+	.tool-result-summary {
+		margin-top: 8px;
+		font-size: 13px;
+		line-height: 1.5;
+	}
+
+	.tool-result-container {
+		margin-top: 12px;
+		border-top: 1px solid rgba(0, 0, 0, 0.1);
+		padding-top: 8px;
+	}
+
+	.tool-code-details, .tool-raw-details {
+		margin-bottom: 8px;
+	}
+
+	.tool-code-summary, .tool-raw-summary {
+		cursor: pointer;
+		font-size: 12px;
+		color: #64748b;
+		display: flex;
+		align-items: center;
+		padding: 6px 8px;
+		background: rgba(255, 255, 255, 0.8);
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 4px;
+		user-select: none;
+		outline: none;
+		transition: background-color 0.2s;
+	}
+
+	.tool-code-summary:hover, .tool-raw-summary:hover {
+		background: rgba(255, 255, 255, 0.95);
+		color: #374151;
+	}
+
+	.tool-code-summary .code-icon, .tool-raw-summary .raw-icon {
+		margin-right: 6px;
+		font-size: 14px;
+	}
+
+	.tool-code-summary::-webkit-details-marker,
+	.tool-raw-summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.tool-result-content {
+		margin-top: 4px;
+		background: rgba(255, 255, 255, 0.95);
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.tool-result-content pre {
+		margin: 0;
+		padding: 12px;
+		font-size: 12px;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		overflow-x: auto;
+		background: transparent;
+		line-height: 1.4;
+	}
+
+	.code-result {
+		max-height: 400px;
+		overflow-y: auto;
+	}
+
+	.raw-result {
+		max-height: 200px;
+		overflow-y: auto;
+		color: #6b7280;
 	}
 </style>

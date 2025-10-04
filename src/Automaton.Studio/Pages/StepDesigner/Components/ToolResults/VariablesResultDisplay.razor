@@ -1,0 +1,38 @@
+﻿@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using System.Net
+
+@if (!string.IsNullOrEmpty(Result.Summary))
+{
+    <div class="tool-result-summary">
+        <strong>Variables:</strong>
+        @((MarkupString)FormatSummaryForDisplay(Result.Summary))
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Result.RawResult))
+{
+    <details class="tool-raw-details">
+        <summary class="tool-raw-summary">
+            <span class="raw-icon">🔍</span> Raw Result
+        </summary>
+        <div class="tool-result-content">
+            <pre class="raw-result">@WebUtility.HtmlEncode(Result.RawResult)</pre>
+        </div>
+    </details>
+}
+
+@code {
+    [Parameter, EditorRequired] 
+    public ToolResultViewModel Result { get; set; } = default!;
+
+    private string FormatSummaryForDisplay(string summary)
+    {
+        return summary
+            .Replace("**", "<strong>", StringComparison.Ordinal)
+            .Replace("**", "</strong>", StringComparison.Ordinal)
+            .Replace("`", "<code>", StringComparison.Ordinal)
+            .Replace("`", "</code>", StringComparison.Ordinal)
+            .Replace("\n", "<br>", StringComparison.Ordinal);
+    }
+}

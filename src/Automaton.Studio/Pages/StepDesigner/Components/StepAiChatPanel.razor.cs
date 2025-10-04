@@ -7,6 +7,8 @@ using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Models;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
+using Automaton.Studio.Pages.StepDesigner.Components.ToolResults;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
@@ -47,6 +49,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     private Dictionary<string, string> pendingCodes = new();
     private List<CodeVersion> codeHistory = new();
     private string? _conversationId;
+    private readonly ToolResultProcessorFactory _toolResultProcessorFactory = new();
 
     private List<AiProviderInfo>? availableProviders;
 
@@ -103,14 +106,19 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
                     if (toolMessage != null)
                     {
+                        // Process tool result using the new architecture
+                        var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                            toolMessage.ToolName!, toolResult, CurrentLanguage);
+
                         var updatedMessage = toolMessage with
                         {
-                            Content = FormatToolResult(toolMessage.ToolName!, toolResult),
+                            Content = FormatToolResultFromViewModel(processedResult),
                             IsSuccess = toolResult.IsSuccess,
                             ToolStatus = toolResult.IsSuccess ? "success" : "error",
                             ToolResult = toolResult.Result,
                             ToolError = toolResult.ErrorMessage,
-                            Time = DateTime.Now  // Preserve with updated timestamp
+                            Time = DateTime.Now,
+                            ToolResultViewModel = processedResult  // Store for component rendering
                         };
 
                         var index = messages.IndexOf(toolMessage);
@@ -124,14 +132,19 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                         if (toolCallForResult != null)
                         {
-                            var resultMessage = new ChatMessage("AI", FormatToolResult(toolCallForResult.Name, toolResult), DateTime.Now)
+                            // Process tool result using the new architecture
+                            var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                                toolCallForResult.Name, toolResult, CurrentLanguage);
+
+                            var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
                             {
                                 Type = MessageType.ToolExecution,
                                 ToolCallId = toolResult.ToolCallId,
                                 ToolName = toolCallForResult.Name,
                                 ToolStatus = toolResult.IsSuccess ? "success" : "error",
                                 ToolResult = toolResult.Result,
-                                ToolError = toolResult.ErrorMessage
+                                ToolError = toolResult.ErrorMessage,
+                                ToolResultViewModel = processedResult  // Store for component rendering
                             };
                             
                             messages.Add(resultMessage);
@@ -153,101 +166,18 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         return $"{icon} {description}";
     }
 
-    private string FormatToolResult(string toolName, ToolResult toolResult)
+    private string FormatToolResultFromViewModel(ToolResultViewModel viewModel)
     {
-        var icon = GetToolIcon(toolName);
-        var description = GetToolDescription(toolName);
-        var statusIcon = toolResult.IsSuccess ? "✅" : "❌";
-        var status = toolResult.IsSuccess ? "Success" : "Failed";
+        // Basic text format for backward compatibility
+        var result = $"{viewModel.Icon} {viewModel.Description} {viewModel.StatusIcon} {viewModel.Status}";
         
-        // Clean format without redundant success text
-        var result = $"{icon} {description} {statusIcon} {status}";
-        
-        if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
+        if (!string.IsNullOrEmpty(viewModel.ErrorMessage))
         {
-            switch (toolName)
-            {
-                case "get_current_code":
-                    var fullCode = GetFullCodeFromResult(toolResult.Result);
-                    if (!string.IsNullOrEmpty(fullCode))
-                    {
-                        // Store the raw result for Raw Result display
-                        var codeResultData = new
-                        {
-                            stepId = "example-step-id",
-                            language = CurrentLanguage,
-                            code = fullCode,
-                            codeAnalysis = new
-                            {
-                                linesOfCode = GetCodeLineCount(fullCode),
-                                hasErrorHandling = fullCode.Contains("try") || fullCode.Contains("except"),
-                                hasLogging = fullCode.Contains("print") || fullCode.Contains("log"),
-                                isStepTemplate = false
-                            }
-                        };
-                        
-                        var lineCount = GetCodeLineCount(fullCode);
-                        
-                        // Create collapsible code view
-                        result += $"\n\n<div class=\"tool-result-container\">" +
-                                 
-                                 // Collapsible Code View (like Raw Result style)
-                                 $"<details class=\"tool-code-details\">" +
-                                 $"<summary class=\"tool-code-summary\">" +
-                                 $"<span class=\"code-icon\">📄</span> View Code ({lineCount} lines)" +
-                                 $"</summary>" +
-                                 $"<div class=\"tool-result-content\">" +
-                                 $"<pre class=\"code-result\"><code class=\"language-{CurrentLanguage?.ToLowerInvariant() ?? "python"}\">{fullCode}</code></pre>" +
-                                 $"</div>" +
-                                 $"</details>" +                                
-                                 $"</div>";
-                    }
-                    break;
-                    
-                case "execute_code":
-                    var executionSummary = GetExecutionSummary(toolResult.Result);
-                    if (!string.IsNullOrEmpty(executionSummary))
-                    {
-                        result += $"\n\n**Execution Result:**\n{executionSummary}";
-                        
-                        // Add raw result for execution
-                        result += $"\n\n<details class=\"tool-raw-details\">" +
-                                 $"<summary class=\"tool-raw-summary\">" +
-                                 $"<span class=\"raw-icon\">🔍</span> Raw Result" +
-                                 $"</summary>" +
-                                 $"<div class=\"tool-result-content\">" +
-                                 $"<pre class=\"raw-result\">{System.Net.WebUtility.HtmlEncode(toolResult.Result)}</pre>" +
-                                 $"</div>" +
-                                 $"</details>";
-                    }
-                    break;
-                    
-                case "get_step_variables":
-                    var variableSummary = GetVariableSummary(toolResult.Result);
-                    if (!string.IsNullOrEmpty(variableSummary))
-                    {
-                        result += $"\n\n**Variables:**\n{variableSummary}";
-                        
-                        // Add raw result for variables
-                        result += $"\n\n<details class=\"tool-raw-details\">" +
-                                 $"<summary class=\"tool-raw-summary\">" +
-                                 $"<span class=\"raw-icon\">🔍</span> Raw Result" +
-                                 $"</summary>" +
-                                 $"<div class=\"tool-result-content\">" +
-                                 $"<pre class=\"raw-result\">{System.Net.WebUtility.HtmlEncode(toolResult.Result)}</pre>" +
-                                 $"</div>" +
-                                 $"</details>";
-                    }
-                    break;
-                    
-                case "save_code":
-                    result += $"\n\n💾 **Code saved successfully to Step Designer**";
-                    break;
-            }
+            result += $"\n\n**Error:** {viewModel.ErrorMessage}";
         }
-        else if (!toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.ErrorMessage))
+        else if (!string.IsNullOrEmpty(viewModel.Summary))
         {
-            result += $"\n\n**Error:** {toolResult.ErrorMessage}";
+            result += $"\n\n{viewModel.Summary}";
         }
         
         return result;
@@ -1032,6 +962,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         public string? ToolStatus { get; init; }
         public string? ToolArguments { get; init; }
         public string? ToolError { get; init; }
+        public ToolResultViewModel? ToolResultViewModel { get; init; }  // NEW: For component rendering
     }
 
     private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
