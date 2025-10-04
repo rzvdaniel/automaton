@@ -1,4 +1,4 @@
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -157,9 +157,10 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         var icon = GetToolIcon(toolName);
         var description = GetToolDescription(toolName);
-        var statusIcon = toolResult.IsSuccess ? "?" : "?";
+        var statusIcon = toolResult.IsSuccess ? "✅" : "❌";
         var status = toolResult.IsSuccess ? "Success" : "Failed";
         
+        // Clean format without redundant success text
         var result = $"{icon} {description} {statusIcon} {status}";
         
         if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
@@ -167,10 +168,39 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             switch (toolName)
             {
                 case "get_current_code":
-                    var codePreview = GetCodePreview(toolResult.Result);
-                    if (!string.IsNullOrEmpty(codePreview))
+                    var fullCode = GetFullCodeFromResult(toolResult.Result);
+                    if (!string.IsNullOrEmpty(fullCode))
                     {
-                        result += $"\n\n**Code Found:**\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{codePreview}\n```";
+                        // Store the raw result for Raw Result display
+                        var codeResultData = new
+                        {
+                            stepId = "example-step-id",
+                            language = CurrentLanguage,
+                            code = fullCode,
+                            codeAnalysis = new
+                            {
+                                linesOfCode = GetCodeLineCount(fullCode),
+                                hasErrorHandling = fullCode.Contains("try") || fullCode.Contains("except"),
+                                hasLogging = fullCode.Contains("print") || fullCode.Contains("log"),
+                                isStepTemplate = false
+                            }
+                        };
+                        
+                        var lineCount = GetCodeLineCount(fullCode);
+                        
+                        // Create collapsible code view
+                        result += $"\n\n<div class=\"tool-result-container\">" +
+                                 
+                                 // Collapsible Code View (like Raw Result style)
+                                 $"<details class=\"tool-code-details\">" +
+                                 $"<summary class=\"tool-code-summary\">" +
+                                 $"<span class=\"code-icon\">📄</span> View Code ({lineCount} lines)" +
+                                 $"</summary>" +
+                                 $"<div class=\"tool-result-content\">" +
+                                 $"<pre class=\"code-result\"><code class=\"language-{CurrentLanguage?.ToLowerInvariant() ?? "python"}\">{fullCode}</code></pre>" +
+                                 $"</div>" +
+                                 $"</details>" +                                
+                                 $"</div>";
                     }
                     break;
                     
@@ -179,6 +209,16 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     if (!string.IsNullOrEmpty(executionSummary))
                     {
                         result += $"\n\n**Execution Result:**\n{executionSummary}";
+                        
+                        // Add raw result for execution
+                        result += $"\n\n<details class=\"tool-raw-details\">" +
+                                 $"<summary class=\"tool-raw-summary\">" +
+                                 $"<span class=\"raw-icon\">🔍</span> Raw Result" +
+                                 $"</summary>" +
+                                 $"<div class=\"tool-result-content\">" +
+                                 $"<pre class=\"raw-result\">{System.Net.WebUtility.HtmlEncode(toolResult.Result)}</pre>" +
+                                 $"</div>" +
+                                 $"</details>";
                     }
                     break;
                     
@@ -187,11 +227,21 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     if (!string.IsNullOrEmpty(variableSummary))
                     {
                         result += $"\n\n**Variables:**\n{variableSummary}";
+                        
+                        // Add raw result for variables
+                        result += $"\n\n<details class=\"tool-raw-details\">" +
+                                 $"<summary class=\"tool-raw-summary\">" +
+                                 $"<span class=\"raw-icon\">🔍</span> Raw Result" +
+                                 $"</summary>" +
+                                 $"<div class=\"tool-result-content\">" +
+                                 $"<pre class=\"raw-result\">{System.Net.WebUtility.HtmlEncode(toolResult.Result)}</pre>" +
+                                 $"</div>" +
+                                 $"</details>";
                     }
                     break;
                     
                 case "save_code":
-                    result += $"\n\n?? **Code saved successfully to Step Designer**";
+                    result += $"\n\n💾 **Code saved successfully to Step Designer**";
                     break;
             }
         }
@@ -203,15 +253,16 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         return result;
     }
 
+    // Proper Unicode emoji icons - these work in browsers
     private string GetToolIcon(string toolName)
     {
         return toolName switch
         {
-            "get_current_code" => "??",
-            "execute_code" => "??",
-            "get_step_variables" => "??",
-            "save_code" => "??",
-            _ => "??"
+            "get_current_code" => "📖",    // Book emoji
+            "execute_code" => "🧪",        // Test tube emoji  
+            "get_step_variables" => "🔍",  // Magnifying glass emoji
+            "save_code" => "💾",           // Floppy disk emoji
+            _ => "🔧"                      // Wrench emoji
         };
     }
 
@@ -225,6 +276,46 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             "save_code" => "Saving code to step",
             _ => "Executing tool"
         };
+    }
+
+    // Helper method to count lines in code
+    private int GetCodeLineCount(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return 0;
+        return code.Split('\n', StringSplitOptions.None).Length;
+    }
+
+    // Helper method to get full code from JSON result (not truncated)
+    private string GetFullCodeFromResult(string toolResult)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(toolResult);
+            if (doc.RootElement.TryGetProperty("code", out var codeElement))
+            {
+                return codeElement.GetString() ?? string.Empty;
+            }
+        }
+        catch
+        {
+            if (toolResult.Contains("```"))
+            {
+                var start = toolResult.IndexOf("```");
+                var end = toolResult.IndexOf("```", start + 3);
+                if (end > start)
+                {
+                    var codeBlock = toolResult.Substring(start + 3, end - start - 3);
+                    var firstNewline = codeBlock.IndexOf('\n');
+                    if (firstNewline > 0 && firstNewline < 20)
+                    {
+                        codeBlock = codeBlock.Substring(firstNewline + 1);
+                    }
+                    return codeBlock.Trim();
+                }
+            }
+        }
+        
+        return string.Empty;
     }
 
     private string GetCodePreview(string toolResult)
@@ -283,7 +374,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             var output = root.TryGetProperty("output", out var outputElement) ? outputElement.GetString() : "";
             var executionTime = root.TryGetProperty("executionTime", out var timeElement) ? timeElement.GetString() : "";
             
-            var summary = success ? "? **Success**" : "? **Failed**";
+            var summary = success ? "✅ **Success**" : "❌ **Failed**";
             
             if (!string.IsNullOrEmpty(executionTime))
             {
@@ -327,20 +418,20 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             if (root.TryGetProperty("inputVariables", out var inputVars) && inputVars.ValueKind == JsonValueKind.Array)
             {
                 var inputCount = inputVars.GetArrayLength();
-                summary += $"?? **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
+                summary += $"📥 **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in inputVars.EnumerateArray().Take(3))
                 {
                     if (variable.TryGetProperty("name", out var nameEl) && 
                         variable.TryGetProperty("type", out var typeEl))
                     {
-                        summary += $"\n� `{nameEl.GetString()}` ({typeEl.GetString()})";
+                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
                     }
                 }
                 
                 if (inputCount > 3)
                 {
-                    summary += $"\n� ... and {inputCount - 3} more";
+                    summary += $"\n• ... and {inputCount - 3} more";
                 }
             }
             
@@ -348,20 +439,20 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             {
                 var outputCount = outputVars.GetArrayLength();
                 if (!string.IsNullOrEmpty(summary)) summary += "\n\n";
-                summary += $"?? **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
+                summary += $"📤 **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in outputVars.EnumerateArray().Take(3))
                 {
                     if (variable.TryGetProperty("name", out var nameEl) && 
                         variable.TryGetProperty("type", out var typeEl))
                     {
-                        summary += $"\n� `{nameEl.GetString()}` ({typeEl.GetString()})";
+                        summary += $"\n• `{nameEl.GetString()}` ({typeEl.GetString()})";
                     }
                 }
                 
                 if (outputCount > 3)
                 {
-                    summary += $"\n� ... and {outputCount - 3} more";
+                    summary += $"\n• ... and {outputCount - 3} more";
                 }
             }
             
@@ -384,14 +475,15 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         };
     }
 
+    // Proper Unicode emoji status icons
     private string GetToolStatusIcon(string? status)
     {
         return status switch
         {
-            "executing" => "?",
-            "success" => "?",
-            "error" => "?",
-            _ => "??"
+            "executing" => "⏳",  // Hourglass emoji
+            "success" => "✅",    // Check mark emoji
+            "error" => "❌",      // Cross mark emoji
+            _ => "🔧"             // Wrench emoji
         };
     }
 
@@ -415,12 +507,23 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             .Replace("`", "</code>", StringComparison.Ordinal)
             .Replace("\n", "<br>", StringComparison.Ordinal);
 
+        // Handle code blocks
         if (html.Contains("```"))
         {
             html = System.Text.RegularExpressions.Regex.Replace(html, 
                 @"```(\w+)?<br>(.*?)```", 
                 "<div class=\"code-block\"><pre><code>$2</code></pre></div>",
                 System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
+
+        // Handle collapsible details
+        if (html.Contains("<details"))
+        {
+            html = html
+                .Replace("<details", "<details", StringComparison.Ordinal)
+                .Replace("</details>", "</details>", StringComparison.Ordinal)
+                .Replace("<summary", "<summary", StringComparison.Ordinal)
+                .Replace("</summary>", "</summary>", StringComparison.Ordinal);
         }
 
         return html;
