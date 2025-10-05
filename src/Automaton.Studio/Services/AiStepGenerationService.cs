@@ -172,6 +172,13 @@ public class AiStepGenerationService
             6. Only stop when the code executes successfully or when you're confident it meets the requirements
             7. When finished, provide the final working code as your response
 
+            ?? CRITICAL VARIABLE NAMING CONSTRAINTS:
+            - Input and output variable names are PREDEFINED by the automation system and CANNOT be changed
+            - You MUST use the EXACT variable names specified below - never rename, modify, or create variations
+            - The automation system expects these exact names to capture results after code execution
+            - Any deviation from the specified variable names will break the automation workflow
+            - When modifying existing code, preserve all existing input/output variable names exactly as they are
+
             Execution environment and integration rules:
             - The host injects all input variables as top-level globals before execution. Read them directly by name.
             - Do not rename input variables. Treat them as already defined; only use defaults if explicitly required.
@@ -198,20 +205,22 @@ public class AiStepGenerationService
 
         if (request.InputVariables?.Any() == true)
         {
-            prompt += "\nInput Variables (pre-injected by host, read by exact name):\n";
+            prompt += "\n?? MANDATORY INPUT VARIABLES (use these EXACT names - DO NOT change them):\n";
             foreach (var variable in request.InputVariables)
             {
                 prompt += $"- {variable.Name} ({variable.Type}): {variable.Description}\n";
             }
+            prompt += "?? These input variable names are FIXED and must be used exactly as specified above.\n";
         }
 
         if (request.OutputVariables?.Any() == true)
         {
-            prompt += "\nExpected Output Variables (assign by exact name at module/global scope):\n";
+            prompt += "\n?? MANDATORY OUTPUT VARIABLES (assign these EXACT names at module/global scope - DO NOT change them):\n";
             foreach (var variable in request.OutputVariables)
             {
                 prompt += $"- {variable.Name} ({variable.Type}): {variable.Description}\n";
             }
+            prompt += "?? These output variable names are FIXED and must be assigned exactly as specified above. The automation system will look for these exact names after code execution.\n";
         }
 
         // Language-specific guidance
@@ -222,7 +231,8 @@ public class AiStepGenerationService
             Python-specific guidance:
             - Access inputs by name. For optional values, use: value = globals().get('VarName', <default>)
             - Do not wrap the entire logic under if __name__ == '__main__':; just write top-level script.
-            - Assign outputs as plain variables at the end of the script.
+            - Assign outputs as plain variables at the end of the script using the EXACT names specified above.
+            - Example: If output variables are "UsedSpace" and "FreeSpace", assign them as: UsedSpace = value1; FreeSpace = value2
             - Log with prefixes using print(); send errors to stderr when possible: print(f"ERROR: ...", file=sys.stderr); print("INFO: ...") and print("WARN: ...").
             """;
         }
@@ -231,8 +241,9 @@ public class AiStepGenerationService
             prompt += """
 
             PowerShell-specific guidance:
-            - Read inputs as already defined variables.
-            - Initialize outputs upfront and set them at the end.
+            - Read inputs as already defined variables using the EXACT names specified above.
+            - Initialize outputs upfront and set them at the end using the EXACT names specified above.
+            - Example: If output variables are "UsedSpace" and "FreeSpace", use: $UsedSpace = $value1; $FreeSpace = $value2
             - Use Write-Host "INFO: ..." for info, Write-Warning "WARN: ..." for warnings, Write-Error "ERROR: ..." for errors; avoid throwing.
             """;
         }
@@ -241,8 +252,9 @@ public class AiStepGenerationService
             prompt += """
 
             Bash-specific guidance:
-            - Treat inputs as environment variables or pre-set shell variables.
-            - Initialize outputs and export them if required by the host.
+            - Treat inputs as environment variables or pre-set shell variables using the EXACT names specified above.
+            - Initialize outputs and export them using the EXACT names specified above.
+            - Example: If output variables are "UsedSpace" and "FreeSpace", use: UsedSpace=$value1; FreeSpace=$value2; export UsedSpace FreeSpace
             - Use echo "INFO: ..." for info, echo "WARN: ..." for warnings, and echo "ERROR: ..." 1>&2 for errors; avoid exiting non-zero on handled errors.
             """;
         }
@@ -251,8 +263,9 @@ public class AiStepGenerationService
             prompt += """
 
             Windows Batch-specific guidance:
-            - Treat inputs as already defined variables (%VarName%).
-            - Initialize outputs and set them at the end with SET.
+            - Treat inputs as already defined variables (%VarName%) using the EXACT names specified above.
+            - Initialize outputs and set them at the end with SET using the EXACT names specified above.
+            - Example: If output variables are "UsedSpace" and "FreeSpace", use: SET UsedSpace=%value1% & SET FreeSpace=%value2%
             - Use echo INFO: ... for info, echo WARN: ... for warnings, and echo ERROR: ... 1>&2 for errors; avoid EXIT /B non-zero on handled errors.
             """;
         }
@@ -261,13 +274,20 @@ public class AiStepGenerationService
             prompt += """
 
             JavaScript/Node.js-specific guidance:
-            - Access inputs from provided globals.
-            - Initialize outputs and assign them on success.
+            - Access inputs from provided globals using the EXACT names specified above.
+            - Initialize outputs and assign them on success using the EXACT names specified above.
+            - Example: If output variables are "UsedSpace" and "FreeSpace", use: global.UsedSpace = value1; global.FreeSpace = value2;
             - Use console.log("INFO: ..."), console.warn("WARN: ..."), console.error("ERROR: ..."); avoid throwing uncaught errors.
             """;
         }
 
         prompt += """
+
+            ?? FINAL REMINDER: Variable names are SACRED in automation workflows!
+            - Input variable names: READ ONLY using exact names provided
+            - Output variable names: WRITE ONLY using exact names provided
+            - Never create variations like "UsedSpaceGB" when the expected name is "UsedSpace"
+            - The automation system relies on these exact names to function correctly
 
             Generate only the code, without any explanatory text or markdown formatting.
             The code should be ready to use directly in the automation step.

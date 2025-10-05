@@ -375,7 +375,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && (e.CtrlKey || e.ShiftKey))
+        if (e.Key == "Enter" && !(e.CtrlKey || e.ShiftKey))
         {
             await SendPrompt();
         }
