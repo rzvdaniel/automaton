@@ -160,7 +160,7 @@
 									@foreach (var model in provider.SupportedModels)
 									{
 										var value = $"{provider.Provider}:{model}";
-										var label = $"{provider.ProviderName} - {model}";
+										var label = $"{model}";
 										var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
 
 										<SelectOption TItemValue="string" TItem="string"

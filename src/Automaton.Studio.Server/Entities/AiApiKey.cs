@@ -43,6 +43,5 @@ public enum AiProvider
     OpenAI = 1,
     Anthropic = 2,
     Google = 3,
-    Azure = 4,
     Custom = 99
 }

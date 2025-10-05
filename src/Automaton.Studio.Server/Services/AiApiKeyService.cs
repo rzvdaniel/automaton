@@ -128,7 +128,6 @@ public class AiApiKeyService
             ?? Environment.GetEnvironmentVariable("CLAUDE_API_KEY");
         environmentKeys[AiProvider.Google] = Environment.GetEnvironmentVariable("GOOGLE_AI_API_KEY") 
             ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-        environmentKeys[AiProvider.Azure] = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
 
         return environmentKeys;
     }
@@ -224,7 +223,6 @@ public class AiApiKeyService
         AiProvider.OpenAI => "OpenAI",
         AiProvider.Anthropic => "Anthropic", 
         AiProvider.Google => "Google",
-        AiProvider.Azure => "Azure",
         AiProvider.Custom => "Custom Provider",
         _ => provider.ToString()
     };

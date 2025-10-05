@@ -38,7 +38,7 @@ partial class AiApiKeysPage : ComponentBase
             new() 
             { 
                 Title = "Easily connect to leading AI providers", 
-                Description = "Integrate with OpenAI, Anthropic, Google, and Azure OpenAI services. Our unified interface makes it simple to manage multiple AI providers.", 
+                Description = "Integrate with OpenAI, Anthropic, Google, services. Our unified interface makes it simple to manage multiple AI providers.", 
                 Icon = "robot",
                 IconColor = "#722ed1"
             },

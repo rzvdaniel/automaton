@@ -201,7 +201,6 @@ services.AddScoped<AiStepGenerationService>();
 services.AddScoped<OpenAiProvider>();
 services.AddScoped<AnthropicProvider>();
 services.AddScoped<GoogleProvider>();
-services.AddScoped<AzureOpenAiProvider>();
 services.AddScoped<AiProviderFactory>();
 
 services.AddScoped(service => configurationService);

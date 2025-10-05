@@ -146,7 +146,6 @@
                             <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.OpenAI" Label="OpenAI (GPT-4, ChatGPT)" />
                             <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.Anthropic" Label="Anthropic (Claude)" />
                             <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.Google" Label="Google (Gemini)" />
-                            <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.Azure" Label="Azure OpenAI" />
                         </SelectOptions>
                     </Select>
                 </FormItem>
@@ -217,11 +216,6 @@
         font-weight: 500;
     }
 
-    .provider-azure {
-        color: #0078d4;
-        font-weight: 500;
-    }
-
     .provider-custom {
         color: #666;
         font-weight: 500;
@@ -241,7 +235,6 @@
         AiProvider.OpenAI => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" },
         AiProvider.Anthropic => new List<string> { "claude-3-sonnet", "claude-3-haiku", "claude-3-opus" },
         AiProvider.Google => new List<string> { "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro" },
-        AiProvider.Azure => new List<string> { "gpt-4", "gpt-35-turbo" },
         _ => new List<string>()
     };
 
@@ -256,7 +249,6 @@
         AiProvider.OpenAI => "openai",
         AiProvider.Anthropic => "anthropic", 
         AiProvider.Google => "google",
-        AiProvider.Azure => "microsoft",
         _ => "robot"
     };
 
@@ -267,7 +259,6 @@
         AiProvider.OpenAI => "OpenAI",
         AiProvider.Anthropic => "Anthropic",
         AiProvider.Google => "Google",
-        AiProvider.Azure => "Azure OpenAI",
         AiProvider.Custom => "Custom",
         _ => provider.ToString()
     };
@@ -277,7 +268,6 @@
         AiProvider.OpenAI => "Get your API key from: https://platform.openai.com/api-keys",
         AiProvider.Anthropic => "Get your API key from: https://console.anthropic.com/",
         AiProvider.Google => "Get your API key from: https://aistudio.google.com/app/apikey",
-        AiProvider.Azure => "Get your API key and endpoint from Azure OpenAI Service",
         _ => "Enter the API key from your AI provider"
     };
 }

@@ -20,7 +20,6 @@ public class AiProviderFactory
             AiProvider.OpenAI => serviceProvider.GetRequiredService<OpenAiProvider>(),
             AiProvider.Anthropic => serviceProvider.GetRequiredService<AnthropicProvider>(),
             AiProvider.Google => serviceProvider.GetRequiredService<GoogleProvider>(),
-            AiProvider.Azure => serviceProvider.GetRequiredService<AzureOpenAiProvider>(),
             _ => throw new NotSupportedException($"Provider {providerType} is not supported yet.")
         };
     }

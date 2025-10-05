@@ -313,7 +313,6 @@ public class AiStepGenerationService
             Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
             Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
             Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
-            Models.AiProvider.Azure => Automaton.Mcp.Client.Models.AiProvider.Azure,
             Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
             _ => Automaton.Mcp.Client.Models.AiProvider.OpenAI
         };
