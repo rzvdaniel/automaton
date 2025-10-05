@@ -10,8 +10,37 @@ using System.Text.Json;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
+using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
+
+public enum MessageType
+{
+    Text,
+    CodeSuccess,
+    CodeError,
+    System,
+    Generating,
+    ToolExecution
+}
+
+public record ChatMessage(string Role, string Content, DateTime Time)
+{
+    public bool IsGenerating { get; init; } = false;
+    public string? CodeId { get; init; }
+    public bool IsSuccess { get; init; } = true;
+    public string? GeneratedCode { get; init; }
+    public MessageType Type { get; init; } = MessageType.Text;
+    public string? ToolName { get; init; }
+    public string? ToolResult { get; init; }
+    public string? ToolCallId { get; init; }
+    public string? ToolStatus { get; init; }
+    public string? ToolArguments { get; init; }
+    public string? ToolError { get; init; }
+    public ToolResultViewModel? ToolResultViewModel { get; init; }
+}
+
+public record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
 
 public partial class StepAiChatPanel : ComponentBase, IDisposable
 {
@@ -29,24 +58,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
-
-    private record ChatMessage(string Role, string Content, DateTime Time)
-    {
-        public bool IsGenerating { get; init; } = false;
-        public string? CodeId { get; init; }
-        public bool IsSuccess { get; init; } = true;
-        public string? GeneratedCode { get; init; }
-        public MessageType Type { get; init; } = MessageType.Text;
-        public string? ToolName { get; init; }
-        public string? ToolResult { get; init; }
-        public string? ToolCallId { get; init; }
-        public string? ToolStatus { get; init; }
-        public string? ToolArguments { get; init; }
-        public string? ToolError { get; init; }
-        public ToolResultViewModel? ToolResultViewModel { get; init; }
-    }
-
-    private record CodeVersion(string Code, DateTime Timestamp, string Description, bool WasApplied);
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -197,56 +208,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         return result;
     }
 
-    // Helper method to detect if response contains actual code
-    private bool IsActualCode(string? response)
-    {
-        if (string.IsNullOrWhiteSpace(response))
-            return false;
-
-        // Check if the response contains code patterns
-        var codeIndicators = new[]
-        {
-            "def ", "class ", "import ", "from ", // Python
-            "function ", "const ", "let ", "var ", // JavaScript
-            "public ", "private ", "void ", "int ", "string ", // C#
-            "if ", "for ", "while ", "try ", "catch ", // General programming constructs
-            "{", "}", "[", "]", "(", ")", "=", ";", // Code symbols
-        };
-
-        // Check for actual code structure (not just explanatory text)
-        var hasCodeStructure = codeIndicators.Any(indicator => 
-            response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
-
-        // Also check if it's mostly explanatory text
-        var explanatoryPhrases = new[]
-        {
-            "the persistent failure",
-            "suggests that there might be",
-            "this could prevent",
-            "as a workaround",
-            "you can try",
-            "if you have further details",
-            "those could help"
-        };
-
-        var hasExplanatoryText = explanatoryPhrases.Any(phrase => 
-            response.Contains(phrase, StringComparison.OrdinalIgnoreCase));
-
-        // If it has explanatory text and no clear code structure, it's probably not code
-        if (hasExplanatoryText && !hasCodeStructure)
-            return false;
-
-        // Check for code block markers
-        if (response.Contains("```") || response.Contains("def ") || response.Contains("import "))
-            return true;
-
-        // Check if it has multiple programming keywords
-        var keywordCount = codeIndicators.Count(indicator => 
-            response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
-
-        return keywordCount >= 3; // Require at least 3 programming keywords
-    }
-
     // Proper Unicode emoji icons - these work in browsers
     private string GetToolIcon(string toolName)
     {
@@ -387,188 +348,248 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
         try
         {
-            isGeneratingCode = true;
-            pendingCodes.Clear();
-
-            messages.Add(new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now));
-            var userPrompt = promptText;
-            promptText = string.Empty;
-
-            var selectedProvider = GetSelectedProvider();
-            var selectedModel = GetSelectedModel();
-            var selectedApiKeyId = GetSelectedApiKeyId();
-
-            var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel} with frontend tools";
-            if (!string.IsNullOrEmpty(selectedApiKeyId) && selectedProvider?.StoredKeys?.Any() == true)
-            {
-                var selectedKey = selectedProvider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == selectedApiKeyId);
-                if (selectedKey != null)
-                {
-                    contextMessage += $" (Key: {selectedKey.Name})";
-                }
-            }
-
-            var generatingMessage = new ChatMessage("AI", contextMessage, DateTime.Now) 
-            { 
-                IsGenerating = true, 
-                Type = MessageType.Generating 
-            };
-            messages.Add(generatingMessage);
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
-
-            var conversationRequest = new ConversationRequest
-            {
-                InitialMessage = userPrompt,
-                SystemPrompt = BuildSystemPrompt(),
-                Provider = MapToMcpProvider(selectedProvider!.Provider),
-                ApiKey = await GetApiKeyFromProvider(selectedProvider, selectedApiKeyId),
-                Model = selectedModel,
-                ConversationHistory = BuildMcpConversationHistory(),
-                Context = new Dictionary<string, object>
-                {
-                    ["language"] = CurrentLanguage,
-                    ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
-                    ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
-                    ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
-                    ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
-                    ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
-                    { 
-                        IsSuccess = false, 
-                        ErrorMessage = "Execution not available" 
-                    }))
-                }
-            };
-
-            _conversationId = conversationRequest.ConversationId;
-            var result = await McpClient.StartConversationAsync(conversationRequest);
-            _conversationId = result.ConversationId;
-
-            // Remove the generating message - BUT preserve tool execution messages!
-            var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
-            if (generatingIndex >= 0)
-            {
-                messages.RemoveAt(generatingIndex);
-            }
-
-            logger.LogInformation("Messages after removing generating message: {Count}, Tool messages: {ToolCount}", 
-                messages.Count, 
-                messages.Count(m => m.Type == MessageType.ToolExecution));
-
-            if (result.IsSuccess)
-            {
-                // Check if the result contains actual code or just explanatory text
-                bool isCode = IsActualCode(result.GeneratedCode);
-                
-                if (selectedAgent == Ask)
-                {
-                    if (isCode && !string.IsNullOrEmpty(result.GeneratedCode))
-                    {
-                        var codeId = Guid.NewGuid().ToString();
-                        var codeMessage = new ChatMessage("AI", "Code generated successfully with frontend tools:", DateTime.Now)
-                        {
-                            Type = MessageType.CodeSuccess,
-                            CodeId = codeId,
-                            GeneratedCode = result.GeneratedCode,
-                            IsSuccess = true
-                        };
-                        
-                        messages.Add(codeMessage);
-                        
-                        // Store only the code part for potential application
-                        var codeForEditor = ExtractCodeForEditor(result.GeneratedCode, CurrentLanguage);
-                        pendingCodes[codeId] = codeForEditor;
-                        
-                        codeHistory.Add(new CodeVersion(
-                            codeForEditor, 
-                            DateTime.Now, 
-                            userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt,
-                            false));
-                    }
-                    else
-                    {
-                        // Just add as a regular AI response message, not as code
-                        var responseMessage = new ChatMessage("AI", result.GeneratedCode ?? "No response received.", DateTime.Now)
-                        {
-                            Type = MessageType.Text,
-                            IsSuccess = true
-                        };
-                        
-                        messages.Add(responseMessage);
-                    }
-                }
-                else
-                {
-                    if (isCode && !string.IsNullOrEmpty(result.GeneratedCode))
-                    {
-                        var codeMessage = new ChatMessage("AI", "Code generated and applied with frontend tools:", DateTime.Now)
-                        {
-                            Type = MessageType.CodeSuccess,
-                            GeneratedCode = result.GeneratedCode,
-                            IsSuccess = true
-                        };
-                        
-                        messages.Add(codeMessage);
-
-                        // Extract only the code part for editor application
-                        var codeForEditor = ExtractCodeForEditor(result.GeneratedCode, CurrentLanguage);
-                        if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(codeForEditor))
-                        {
-                            await OnCodeGenerated.InvokeAsync(codeForEditor);
-                        }
-                    }
-                    else
-                    {
-                        // Just add as a regular AI response message, don't apply to editor
-                        var responseMessage = new ChatMessage("AI", result.GeneratedCode ?? "No response received.", DateTime.Now)
-                        {
-                            Type = MessageType.Text,
-                            IsSuccess = true
-                        };
-                        
-                        messages.Add(responseMessage);
-                    }
-                }
-            }
-            else
-            {
-                var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
-                {
-                    Type = MessageType.CodeError,
-                    Content = result.ErrorMessage ?? "Unknown error",
-                    IsSuccess = false
-                };
-                
-                messages.Add(errorMessage);
-            }
-
-            if (OnSend.HasDelegate)
-            {
-                await OnSend.InvokeAsync($"{contextMessage}|{userPrompt}");
-            }
+            await BeginConversation();
+            var conversationContext = await PrepareConversationContext();
+            var result = await ExecuteConversation(conversationContext);
+            await ProcessConversationResult(result, conversationContext.UserPrompt);
         }
         catch (Exception ex)
         {
-            var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
-            if (generatingIndex >= 0)
-            {
-                messages.RemoveAt(generatingIndex);
-            }
-
-            var errorMessage = new ChatMessage("AI", "Unexpected error:", DateTime.Now)
-            {
-                Type = MessageType.CodeError,
-                Content = ex.Message,
-                IsSuccess = false
-            };
-            
-            messages.Add(errorMessage);
+            await HandleConversationError(ex);
         }
         finally
         {
-            isGeneratingCode = false;
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
+            await EndConversation();
+        }
+    }
+
+    // SRP: UI State Management
+    private async Task BeginConversation()
+    {
+        isGeneratingCode = true;
+        pendingCodes.Clear();
+        
+        var userMessage = new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now);
+        messages.Add(userMessage);
+        
+        var generatingMessage = CreateGeneratingMessage();
+        messages.Add(generatingMessage);
+        
+        promptText = string.Empty;
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
+    }
+
+    // SRP: Message Creation
+    private ChatMessage CreateGeneratingMessage()
+    {
+        var selectedProvider = GetSelectedProvider();
+        var selectedModel = GetSelectedModel();
+        var selectedApiKeyId = GetSelectedApiKeyId();
+        
+        var contextMessage = BuildContextMessage(selectedProvider, selectedModel, selectedApiKeyId);
+        
+        return new ChatMessage("AI", contextMessage, DateTime.Now) 
+        { 
+            IsGenerating = true, 
+            Type = MessageType.Generating 
+        };
+    }
+
+    // SRP: Context Message Building
+    private string BuildContextMessage(AiProviderInfo? provider, string model, string? apiKeyId)
+    {
+        var contextMessage = $"Using {provider?.ProviderName} - {model} with frontend tools";
+        
+        if (!string.IsNullOrEmpty(apiKeyId) && provider?.StoredKeys?.Any() == true)
+        {
+            var selectedKey = provider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == apiKeyId);
+            if (selectedKey != null)
+            {
+                contextMessage += $" (Key: {selectedKey.Name})";
+            }
+        }
+        
+        return contextMessage;
+    }
+
+    // SRP: Conversation Context Preparation
+    private async Task<ConversationContext> PrepareConversationContext()
+    {
+        var selectedProvider = GetSelectedProvider();
+        var selectedModel = GetSelectedModel();
+        var selectedApiKeyId = GetSelectedApiKeyId();
+        
+        if (selectedProvider == null)
+            throw new InvalidOperationException("No AI provider selected");
+            
+        var apiKey = await GetApiKeyFromProvider(selectedProvider, selectedApiKeyId);
+        if (string.IsNullOrEmpty(apiKey))
+            throw new InvalidOperationException("No valid API key found for the specified provider");
+            
+        var userPrompt = messages.Last(m => m.Role == "User").Content;
+        
+        return new ConversationContext
+        {
+            UserPrompt = userPrompt,
+            Provider = selectedProvider,
+            Model = selectedModel,
+            ApiKey = apiKey,
+            ConversationRequest = BuildConversationRequest(userPrompt, selectedProvider, selectedModel, apiKey)
+        };
+    }
+
+    // SRP: MCP Request Building
+    private ConversationRequest BuildConversationRequest(string userPrompt, AiProviderInfo provider, string model, string apiKey)
+    {
+        var request = new ConversationRequest
+        {
+            InitialMessage = userPrompt,
+            SystemPrompt = BuildSystemPrompt(),
+            Provider = MapToMcpProvider(provider.Provider),
+            ApiKey = apiKey,
+            Model = model,
+            ConversationHistory = BuildMcpConversationHistory(),
+            Context = new Dictionary<string, object>
+            {
+                ["language"] = CurrentLanguage,
+                ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
+                ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
+                ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
+                ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
+                ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
+                { 
+                    IsSuccess = false, 
+                    ErrorMessage = "Execution not available" 
+                }))
+            }
+        };
+        
+        return request;
+    }
+
+    // SRP: MCP Conversation Execution
+    private async Task<ConversationResult> ExecuteConversation(ConversationContext context)
+    {
+        _conversationId = context.ConversationRequest.ConversationId;
+        var result = await McpClient.StartConversationAsync(context.ConversationRequest);
+        _conversationId = result.ConversationId;
+        
+        // Clean up generating message
+        RemoveGeneratingMessage();
+        
+        logger.LogInformation("Messages after conversation: {Count}, Tool messages: {ToolCount}", 
+            messages.Count, messages.Count(m => m.Type == MessageType.ToolExecution));
+            
+        return result;
+    }
+
+    // SRP: UI Cleanup
+    private void RemoveGeneratingMessage()
+    {
+        var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
+        if (generatingIndex >= 0)
+        {
+            messages.RemoveAt(generatingIndex);
+        }
+    }
+
+    // SRP: Result Processing Strategy Pattern
+    private async Task ProcessConversationResult(ConversationResult result, string userPrompt)
+    {
+        if (result.IsSuccess)
+        {
+            var processor = CreateResultProcessor();
+            await processor.ProcessSuccessResult(result, userPrompt, selectedAgent);
+        }
+        else
+        {
+            await ProcessFailureResult(result);
+        }
+        
+        await NotifyConversationComplete(result, userPrompt);
+    }
+
+    // Factory Method Pattern: Result Processor Creation
+    private IConversationResultProcessor CreateResultProcessor()
+    {
+        return new ConversationResultProcessor(
+            messages: messages,
+            pendingCodes: pendingCodes,
+            codeHistory: codeHistory,
+            onCodeGenerated: OnCodeGenerated,
+            currentLanguage: CurrentLanguage,
+            logger: logger);
+    }
+
+    // SRP: Failure Result Processing
+    private async Task ProcessFailureResult(ConversationResult result)
+    {
+        var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
+        {
+            Type = MessageType.CodeError,
+            Content = result.ErrorMessage ?? "Unknown error",
+            IsSuccess = false
+        };
+        
+        messages.Add(errorMessage);
+    }
+
+    // SRP: External Notification
+    private async Task NotifyConversationComplete(ConversationResult result, string userPrompt)
+    {
+        if (OnSend.HasDelegate)
+        {
+            var selectedProvider = GetSelectedProvider();
+            var selectedModel = GetSelectedModel();
+            var contextMessage = $"Using {selectedProvider?.ProviderName} - {selectedModel} with frontend tools";
+            await OnSend.InvokeAsync($"{contextMessage}|{userPrompt}");
+        }
+    }
+
+    // SRP: Error Handling
+    private async Task HandleConversationError(Exception ex)
+    {
+        RemoveGeneratingMessage();
+        
+        var errorMessage = new ChatMessage("AI", "Unexpected error:", DateTime.Now)
+        {
+            Type = MessageType.CodeError,
+            Content = ex.Message,
+            IsSuccess = false
+        };
+        
+        messages.Add(errorMessage);
+        logger.LogError(ex, "Error during conversation execution");
+    }
+
+    // SRP: Cleanup
+    private async Task EndConversation()
+    {
+        isGeneratingCode = false;
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
+    }
+
+    // Helper Classes for Better Structure
+    private record ConversationContext
+    {
+        public string UserPrompt { get; init; } = string.Empty;
+        public AiProviderInfo Provider { get; init; } = default!;
+        public string Model { get; init; } = string.Empty;
+        public string ApiKey { get; init; } = string.Empty;
+        public ConversationRequest ConversationRequest { get; init; } = default!;
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", "var element = document.getElementById('ai-chat-messages'); if(element) { element.scrollTop = element.scrollHeight; }");
+        }
+        catch
+        {
+            // Ignore JS interop errors
         }
     }
 
@@ -664,18 +685,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
 
         return conversationHistory;
-    }
-
-    private async Task ScrollToBottom()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("eval", "var element = document.getElementById('ai-chat-messages'); if(element) { element.scrollTop = element.scrollHeight; }");
-        }
-        catch
-        {
-            // Ignore JS interop errors
-        }
     }
     
     private int EstimateTokenCount(List<ChatMessage> messages)
