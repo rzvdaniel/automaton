@@ -3,9 +3,12 @@
 @using System.Net
 
 <div class="tool-result-display">
-    <div class="tool-result-header">
-        @Result.Icon @Result.Description @Result.StatusIcon @Result.Status
-    </div>
+    <ToolResultHeader StatusIcon="@GetToolStatusIcon(Status)"
+                      StatusText="@GetToolStatusText(Status)"
+                      Status="@Status"
+                      Title="@Result.Description"
+                      Timestamp="@Timestamp"
+                      ShowTimestamp="@ShowTimestamp" />
 
     @if (!string.IsNullOrEmpty(Result.ErrorMessage))
     {
@@ -44,4 +47,36 @@
 @code {
     [Parameter, EditorRequired] 
     public ToolResultViewModel Result { get; set; } = default!;
+    
+    [Parameter] 
+    public string Status { get; set; } = "unknown";
+    
+    [Parameter] 
+    public DateTime? Timestamp { get; set; }
+    
+    [Parameter] 
+    public bool ShowTimestamp { get; set; } = true;
+    
+    // Proper Unicode emoji status icons
+    private string GetToolStatusIcon(string? status)
+    {
+        return status switch
+        {
+            "executing" => "?",  // Hourglass emoji
+            "success" => "?",    // Check mark emoji
+            "error" => "?",      // Cross mark emoji
+            _ => "??"             // Wrench emoji
+        };
+    }
+
+    private string GetToolStatusText(string? status)
+    {
+        return status switch
+        {
+            "executing" => "Executing",
+            "success" => "Success",
+            "error" => "Failed",
+            _ => "Unknown"
+        };
+    }
 }

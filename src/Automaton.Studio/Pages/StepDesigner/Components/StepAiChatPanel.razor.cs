@@ -272,40 +272,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         };
     }
 
-    private string GetToolStatusClass(string? status)
-    {
-        return status switch
-        {
-            "executing" => "status-executing",
-            "success" => "status-success",
-            "error" => "status-error",
-            _ => "status-unknown"
-        };
-    }
-
-    // Proper Unicode emoji status icons
-    private string GetToolStatusIcon(string? status)
-    {
-        return status switch
-        {
-            "executing" => "⏳",  // Hourglass emoji
-            "success" => "✅",    // Check mark emoji
-            "error" => "❌",      // Cross mark emoji
-            _ => "🔧"             // Wrench emoji
-        };
-    }
-
-    private string GetToolStatusText(string? status)
-    {
-        return status switch
-        {
-            "executing" => "Executing",
-            "success" => "Success",
-            "error" => "Failed",
-            _ => "Unknown"
-        };
-    }
-
     private async Task LoadProvidersAsync()
     {
         try

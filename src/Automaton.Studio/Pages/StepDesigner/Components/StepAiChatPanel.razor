@@ -44,15 +44,14 @@
 
 							case MessageType.ToolExecution:
 								<div class="tool-execution-message" data-status="@msg.ToolStatus">
-									<ToolResultHeader StatusIcon="@GetToolStatusIcon(msg.ToolStatus)"
-													  StatusText="@GetToolStatusText(msg.ToolStatus)"
-													  Status="@(msg.ToolStatus ?? "unknown")"
-													  Title=""
-													  Timestamp="@msg.Time"
-													  ShowTimestamp="true" />
-									
 									@if (msg.ToolStatus == "executing")
 									{
+										<ToolResultHeader StatusIcon="⏳"
+														  StatusText="Executing"
+														  Status="executing"
+														  Title=""
+														  Timestamp="@msg.Time"
+														  ShowTimestamp="true" />
 										<div class="tool-progress">
 											<div class="progress-bar">
 												<div class="progress-fill"></div>
@@ -62,7 +61,10 @@
 									}
 									else
 									{
-										<ToolResultDisplay Result="msg.ToolResultViewModel" />
+										<ToolResultDisplay Result="msg.ToolResultViewModel" 
+														   Status="@(msg.ToolStatus ?? "unknown")"
+														   Timestamp="@msg.Time"
+														   ShowTimestamp="true" />
 									}
 									
 									@if (!string.IsNullOrEmpty(msg.ToolError))
