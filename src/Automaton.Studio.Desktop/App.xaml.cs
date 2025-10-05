@@ -1,4 +1,4 @@
-using Automaton.Studio.Config;
+using Automaton.Studio.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;

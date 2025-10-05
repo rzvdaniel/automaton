@@ -1,5 +1,6 @@
 using Automaton.Mcp.Client.Models;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -15,19 +16,22 @@ public class AskModeResultStrategy : IConversationResultStrategy
     private readonly List<CodeVersion> _codeHistory;
     private readonly string _currentLanguage;
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
+    private readonly ICodeExtractionService _codeExtractionService;
 
     public AskModeResultStrategy(
         List<ChatMessage> messages,
         Dictionary<string, string> pendingCodes,
         List<CodeVersion> codeHistory,
         string currentLanguage,
-        Microsoft.Extensions.Logging.ILogger logger)
+        Microsoft.Extensions.Logging.ILogger logger,
+        ICodeExtractionService codeExtractionService)
     {
         _messages = messages;
         _pendingCodes = pendingCodes;
         _codeHistory = codeHistory;
         _currentLanguage = currentLanguage;
         _logger = logger;
+        _codeExtractionService = codeExtractionService;
     }
 
     public async Task ProcessResult(ConversationResult result, string userPrompt, bool isCode)
@@ -55,16 +59,18 @@ public class AskModeResultStrategy : IConversationResultStrategy
 
         _messages.Add(codeMessage);
 
-        // Store the cleaned code for potential application
-        var codeForEditor = CodeExtractionUtility.ExtractCodeForEditor(result.GeneratedCode!, _currentLanguage);
+        // Use the centralized code extraction service
+        var codeForEditor = _codeExtractionService.ExtractCodeForEditor(result.GeneratedCode!, _currentLanguage);
+        var qualityScore = _codeExtractionService.GetCodeQualityConfidence(codeForEditor, _currentLanguage);
+        
         _pendingCodes[codeId] = codeForEditor;
 
         // Add to code history with truncated description
         var description = userPrompt.Length > 50 ? userPrompt[..47] + "..." : userPrompt;
         _codeHistory.Add(new CodeVersion(codeForEditor, DateTime.Now, description, false));
 
-        _logger.LogInformation("Code generated in Ask mode: {CodeLength} characters, CodeId: {CodeId}", 
-            codeForEditor.Length, codeId);
+        _logger.LogInformation("Code generated in Ask mode: {CodeLength} characters, Quality: {Quality:F2}, CodeId: {CodeId}", 
+            codeForEditor.Length, qualityScore, codeId);
     }
 
     private void ProcessTextResult(ConversationResult result)

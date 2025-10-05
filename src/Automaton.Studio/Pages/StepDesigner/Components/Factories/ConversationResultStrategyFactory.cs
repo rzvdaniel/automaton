@@ -1,4 +1,5 @@
 using Automaton.Studio.Pages.StepDesigner.Components.Strategies;
+using Automaton.Studio.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components;
 
@@ -10,10 +11,14 @@ namespace Automaton.Studio.Pages.StepDesigner.Components.Factories;
 public class ConversationResultStrategyFactory
 {
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
+    private readonly ICodeExtractionService _codeExtractionService;
 
-    public ConversationResultStrategyFactory(Microsoft.Extensions.Logging.ILogger logger)
+    public ConversationResultStrategyFactory(
+        Microsoft.Extensions.Logging.ILogger logger,
+        ICodeExtractionService codeExtractionService)
     {
         _logger = logger;
+        _codeExtractionService = codeExtractionService;
     }
 
     /// <summary>
@@ -41,13 +46,15 @@ public class ConversationResultStrategyFactory
                 pendingCodes,
                 codeHistory,
                 currentLanguage,
-                _logger),
+                _logger,
+                _codeExtractionService),
                 
             "Agent" => new AgentModeResultStrategy(
                 messages,
                 onCodeGenerated,
                 currentLanguage,
-                _logger),
+                _logger,
+                _codeExtractionService),
                 
             _ => throw new ArgumentException($"Unknown agent mode: {selectedAgent}", nameof(selectedAgent))
         };

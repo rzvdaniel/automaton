@@ -39,10 +39,11 @@ using System.Reflection;
 using Automaton.Mcp.Client.Extensions;
 using Automaton.Mcp.Client.Services;
 using Automaton.Studio.Services.Mcp;
+using Automaton.Studio.Config;
 
-namespace Automaton.Studio.Config;
+namespace Automaton.Studio.Extensions;
 
-public static class SeviceCollection
+public static class ServiceCollectionExtensions
 {
     public static void AddStudio(this IServiceCollection services, IConfiguration configuration)
     {
@@ -100,6 +101,7 @@ public static class SeviceCollection
         services.AddScoped<RecentActivityService>();
         services.AddScoped<AiCodeCleanupService>();
         services.AddScoped<CustomStepVersionService>();
+        services.AddScoped<ICodeExtractionService, CodeExtractionService>();
 
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();

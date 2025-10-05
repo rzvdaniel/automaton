@@ -1,5 +1,6 @@
 using Automaton.Mcp.Client.Models;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -14,17 +15,20 @@ public class AgentModeResultStrategy : IConversationResultStrategy
     private readonly EventCallback<string> _onCodeGenerated;
     private readonly string _currentLanguage;
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
+    private readonly ICodeExtractionService _codeExtractionService;
 
     public AgentModeResultStrategy(
         List<ChatMessage> messages,
         EventCallback<string> onCodeGenerated,
         string currentLanguage,
-        Microsoft.Extensions.Logging.ILogger logger)
+        Microsoft.Extensions.Logging.ILogger logger,
+        ICodeExtractionService codeExtractionService)
     {
         _messages = messages;
         _onCodeGenerated = onCodeGenerated;
         _currentLanguage = currentLanguage;
         _logger = logger;
+        _codeExtractionService = codeExtractionService;
     }
 
     public async Task ProcessResult(ConversationResult result, string userPrompt, bool isCode)
@@ -50,17 +54,20 @@ public class AgentModeResultStrategy : IConversationResultStrategy
 
         _messages.Add(codeMessage);
 
-        // Auto-apply the generated code to the Monaco editor
-        var codeForEditor = CodeExtractionUtility.ExtractCodeForEditor(result.GeneratedCode!, _currentLanguage);
+        // Use the centralized code extraction service
+        var codeForEditor = _codeExtractionService.ExtractCodeForEditor(result.GeneratedCode!, _currentLanguage);
+        var qualityScore = _codeExtractionService.GetCodeQualityConfidence(codeForEditor, _currentLanguage);
+        
         if (_onCodeGenerated.HasDelegate && !string.IsNullOrEmpty(codeForEditor))
         {
             await _onCodeGenerated.InvokeAsync(codeForEditor);
-            _logger.LogInformation("Auto-applied generated code to Monaco editor in Agent mode: {CodeLength} characters", 
-                codeForEditor.Length);
+            _logger.LogInformation("Auto-applied generated code to Monaco editor in Agent mode: {CodeLength} characters, Quality: {Quality:F2}", 
+                codeForEditor.Length, qualityScore);
         }
         else
         {
-            _logger.LogWarning("Failed to auto-apply code in Agent mode: OnCodeGenerated callback not available or code is empty");
+            _logger.LogWarning("Failed to auto-apply code in Agent mode: OnCodeGenerated callback not available or code is empty. Quality: {Quality:F2}", 
+                qualityScore);
         }
     }
 

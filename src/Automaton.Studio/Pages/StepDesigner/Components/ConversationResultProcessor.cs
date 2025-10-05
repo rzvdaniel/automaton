@@ -2,6 +2,7 @@ using Automaton.Mcp.Client.Models;
 using Automaton.Studio.Pages.StepDesigner.Components.Strategies;
 using Automaton.Studio.Pages.StepDesigner.Components.Factories;
 using Automaton.Studio.Pages.StepDesigner.Components.Services;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -35,7 +36,8 @@ public class ConversationResultProcessor : IConversationResultProcessor
         List<CodeVersion> codeHistory,
         EventCallback<string> onCodeGenerated,
         string currentLanguage,
-        Microsoft.Extensions.Logging.ILogger logger)
+        Microsoft.Extensions.Logging.ILogger logger,
+        ICodeExtractionService codeExtractionService)
     {
         _messages = messages;
         _pendingCodes = pendingCodes;
@@ -43,7 +45,7 @@ public class ConversationResultProcessor : IConversationResultProcessor
         _onCodeGenerated = onCodeGenerated;
         _currentLanguage = currentLanguage;
         _logger = logger;
-        _strategyFactory = new ConversationResultStrategyFactory(logger);
+        _strategyFactory = new ConversationResultStrategyFactory(logger, codeExtractionService);
     }
 
     public async Task ProcessSuccessResult(ConversationResult result, string userPrompt, string selectedAgent)

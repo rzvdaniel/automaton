@@ -1,4 +1,4 @@
-using Automaton.Studio.Config;
+using Automaton.Studio.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.StaticFiles;

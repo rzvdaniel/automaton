@@ -6,11 +6,9 @@ using Microsoft.JSInterop;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Models;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults;
 using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
-using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors;
 
 namespace Automaton.Studio.Pages.StepDesigner.Components;
 
@@ -58,6 +56,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
+    [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -355,7 +354,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            await HandleConversationError(ex);
+            HandleConversationError(ex);
         }
         finally
         {
@@ -504,7 +503,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
         else
         {
-            await ProcessFailureResult(result);
+            ProcessFailureResult(result);
         }
         
         await NotifyConversationComplete(result, userPrompt);
@@ -519,11 +518,12 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             codeHistory: codeHistory,
             onCodeGenerated: OnCodeGenerated,
             currentLanguage: CurrentLanguage,
-            logger: logger);
+            logger: logger,
+            codeExtractionService: CodeExtractionService);
     }
 
     // SRP: Failure Result Processing
-    private async Task ProcessFailureResult(ConversationResult result)
+    private void ProcessFailureResult(ConversationResult result)
     {
         var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
         {
@@ -548,7 +548,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     }
 
     // SRP: Error Handling
-    private async Task HandleConversationError(Exception ex)
+    private void HandleConversationError(Exception ex)
     {
         RemoveGeneratingMessage();
         
@@ -758,7 +758,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     // Helper method to extract only code for editor application from AI response
     private string ExtractCodeForEditor(string response, string language)
     {
-        return CodeExtractionUtility.ExtractCodeForEditor(response, language);
+        return CodeExtractionService.ExtractCodeForEditor(response, language);
     }
 
     public void Dispose()

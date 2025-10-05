@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Models;
+using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Services;
 
@@ -13,15 +14,18 @@ public class AiStepGenerationService
 {
     private readonly IAutomatonMcpClient mcpClient;
     private readonly AiApiKeyService aiApiKeyService;
+    private readonly ICodeExtractionService codeExtractionService;
     private readonly ILogger<AiStepGenerationService> logger;
 
     public AiStepGenerationService(
         IAutomatonMcpClient mcpClient,
         AiApiKeyService aiApiKeyService,
+        ICodeExtractionService codeExtractionService,
         ILogger<AiStepGenerationService> logger)
     {
         this.mcpClient = mcpClient;
         this.aiApiKeyService = aiApiKeyService;
+        this.codeExtractionService = codeExtractionService;
         this.logger = logger;
     }
 
@@ -73,10 +77,16 @@ public class AiStepGenerationService
 
             if (result.IsSuccess)
             {
+                var extractedCode = result.GeneratedCode ?? codeExtractionService.ExtractCodeFromMessages(result.Messages);
+                var qualityScore = codeExtractionService.GetCodeQualityConfidence(extractedCode, request.Language);
+                
+                logger.LogInformation("Code extraction completed. Length: {Length}, Quality: {Quality:F2}", 
+                    extractedCode.Length, qualityScore);
+
                 return new CodeGenerationResponse
                 {
                     IsSuccess = true,
-                    GeneratedCode = result.GeneratedCode ?? ExtractCodeFromMessages(result.Messages)
+                    GeneratedCode = extractedCode
                 };
             }
             else
@@ -296,22 +306,16 @@ public class AiStepGenerationService
         return prompt;
     }
 
-    private static Automaton.Mcp.Client.Models.AiProvider MapToMcpProvider(Automaton.Studio.Models.AiProvider provider)
+    private static Automaton.Mcp.Client.Models.AiProvider MapToMcpProvider(Models.AiProvider provider)
     {
         return provider switch
         {
-            Automaton.Studio.Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
-            Automaton.Studio.Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
-            Automaton.Studio.Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
-            Automaton.Studio.Models.AiProvider.Azure => Automaton.Mcp.Client.Models.AiProvider.Azure,
-            Automaton.Studio.Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
+            Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
+            Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
+            Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
+            Models.AiProvider.Azure => Automaton.Mcp.Client.Models.AiProvider.Azure,
+            Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
             _ => Automaton.Mcp.Client.Models.AiProvider.OpenAI
         };
-    }
-
-    private string ExtractCodeFromMessages(List<Automaton.Mcp.Client.Models.ConversationMessage> messages)
-    {
-        var lastAssistantMessage = messages.LastOrDefault(m => m.Role.ToLowerInvariant() == "assistant");
-        return lastAssistantMessage?.Content ?? string.Empty;
     }
 }
