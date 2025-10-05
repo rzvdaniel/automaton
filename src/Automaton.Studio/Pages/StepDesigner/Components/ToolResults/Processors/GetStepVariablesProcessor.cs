@@ -11,9 +11,9 @@ public class GetStepVariablesProcessor : IToolResultProcessor
     {
         var viewModel = new ToolResultViewModel
         {
-            Icon = "??",
+            Icon = "search",
             Description = "Analyzing step variables",
-            StatusIcon = toolResult.IsSuccess ? "?" : "?",
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.Variables
@@ -43,7 +43,7 @@ public class GetStepVariablesProcessor : IToolResultProcessor
             if (root.TryGetProperty("inputVariables", out var inputVars) && inputVars.ValueKind == JsonValueKind.Array)
             {
                 var inputCount = inputVars.GetArrayLength();
-                summary += $"?? **{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
+                summary += $"**{inputCount} Input Variable{(inputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in inputVars.EnumerateArray().Take(3))
                 {
@@ -64,7 +64,7 @@ public class GetStepVariablesProcessor : IToolResultProcessor
             {
                 var outputCount = outputVars.GetArrayLength();
                 if (!string.IsNullOrEmpty(summary)) summary += "\n\n";
-                summary += $"?? **{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
+                summary += $"**{outputCount} Output Variable{(outputCount != 1 ? "s" : "")}**";
                 
                 foreach (var variable in outputVars.EnumerateArray().Take(3))
                 {

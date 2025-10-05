@@ -12,9 +12,9 @@ public class GetCurrentCodeProcessor : IToolResultProcessor
     {
         var viewModel = new ToolResultViewModel
         {
-            Icon = "??",
+            Icon = "file-text",
             Description = "Reading current code from editor",
-            StatusIcon = toolResult.IsSuccess ? "?" : "?",
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.Code,

@@ -11,9 +11,9 @@ public class ExecuteCodeProcessor : IToolResultProcessor
     {
         var viewModel = new ToolResultViewModel
         {
-            Icon = "??",
+            Icon = "experiment",
             Description = "Testing code execution",
-            StatusIcon = toolResult.IsSuccess ? "?" : "?",
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.Execution
@@ -43,7 +43,7 @@ public class ExecuteCodeProcessor : IToolResultProcessor
             var output = root.TryGetProperty("output", out var outputElement) ? outputElement.GetString() : "";
             var executionTime = root.TryGetProperty("executionTime", out var timeElement) ? timeElement.GetString() : "";
             
-            var summary = success ? "? **Success**" : "? **Failed**";
+            var summary = success ? "**Success**" : "**Failed**";
             
             if (!string.IsNullOrEmpty(executionTime))
             {

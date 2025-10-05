@@ -10,9 +10,9 @@ public class SaveCodeProcessor : IToolResultProcessor
     {
         var viewModel = new ToolResultViewModel
         {
-            Icon = "??",
+            Icon = "save",
             Description = "Saving code to step",
-            StatusIcon = toolResult.IsSuccess ? "?" : "?",
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.SaveCode
@@ -20,7 +20,7 @@ public class SaveCodeProcessor : IToolResultProcessor
 
         if (toolResult.IsSuccess)
         {
-            viewModel.Summary = "?? **Code saved successfully to Step Designer**";
+            viewModel.Summary = "**Code saved successfully to Step Designer**";
         }
         else if (!toolResult.IsSuccess)
         {
@@ -39,9 +39,9 @@ public class GenericToolProcessor : IToolResultProcessor
     {
         return new ToolResultViewModel
         {
-            Icon = "??",
+            Icon = "tool",
             Description = "Executing tool",
-            StatusIcon = toolResult.IsSuccess ? "?" : "?",
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.Generic,
