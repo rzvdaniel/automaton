@@ -40,5 +40,36 @@ namespace Automaton.Core.Scripting
 
             return variables;
         }
+
+        public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, object> inputs)
+        {
+            // Delegate to Execute and wrap in ScriptExecutionResult
+            var variables = Execute(code, inputs);
+
+            var result = new ScriptExecutionResult
+            {
+                OutputVariables = variables
+                    .Where(kvp => kvp.Key != "error" && kvp.Key != "stackTrace")
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+            };
+
+            // Check for errors
+            if (variables.ContainsKey("error"))
+            {
+                result.Success = false;
+                result.Error = new ScriptErrorInfo
+                {
+                    ErrorType = "PythonError",
+                    Message = variables["error"]?.ToString() ?? "Unknown error",
+                    StackTrace = variables.ContainsKey("stackTrace") ? variables["stackTrace"]?.ToString() ?? string.Empty : string.Empty
+                };
+            }
+            else
+            {
+                result.Success = true;
+            }
+
+            return result;
+        }
     }
 }

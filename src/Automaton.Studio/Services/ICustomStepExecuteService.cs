@@ -1,3 +1,4 @@
+using Automaton.Core.Scripting;
 using System.Text.Json;
 
 namespace Automaton.Studio.Services;
@@ -12,6 +13,11 @@ public class CodeExecutionResult
     public string[]? Errors { get; set; }
     public Dictionary<string, object>? OutputVariables { get; set; }
     public string? ExecutionTime { get; set; }
+
+    /// <summary>
+    /// Structured error information for AI consumption
+    /// </summary>
+    public ScriptErrorInfo? ErrorInfo { get; set; }
 }
 
 /// <summary>

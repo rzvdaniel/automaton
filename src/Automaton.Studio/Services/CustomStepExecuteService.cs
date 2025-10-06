@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
+using Automaton.Core.Scripting.ErrorParsers;
 using Automaton.Studio.Domain;
 using System.Diagnostics;
 
@@ -108,7 +109,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     }
 
     /// <summary>
-    /// Execute code asynchronously for MCP integration
+    /// Execute code asynchronously for MCP integration with unified error handling
     /// </summary>
     public async Task<CodeExecutionResult> ExecuteCustomStepCodeAsync(
         string code, 
@@ -143,33 +144,59 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             
             stopwatch.Stop();
 
-            // Check if execution had errors by looking for error variables
-            var hasErrors = scriptVariables?.ContainsKey("error") == true;
-            var errorMessage = hasErrors ? scriptVariables["error"]?.ToString() : null;
-            var stackTrace = scriptVariables?.ContainsKey("stackTrace") == true ? scriptVariables["stackTrace"]?.ToString() : null;
+            // Use language-specific error parser for unified error handling
+            var errorParser = ScriptErrorParserFactory.GetParser(language);
+            
+            // Extract outputs (stdout/stderr if captured)
+            var standardOutput = scriptVariables.ContainsKey("stdout") 
+                ? scriptVariables["stdout"]?.ToString() ?? string.Empty 
+                : string.Empty;
+            
+            var standardError = scriptVariables.ContainsKey("stderr") 
+                ? scriptVariables["stderr"]?.ToString() ?? string.Empty 
+                : string.Empty;
 
-            // Filter out error-related variables from output
-            var cleanVariables = scriptVariables?.Where(kvp => 
-                kvp.Key != "error" && 
-                kvp.Key != "stackTrace")
-                .ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new Dictionary<string, object>();
+            // Check for errors using parser
+            var hasErrors = errorParser.HasErrors(standardOutput, standardError) || 
+                           scriptVariables.ContainsKey("error");
 
-            var errorsList = new List<string>();
+            ScriptErrorInfo? errorInfo = null;
             if (hasErrors)
             {
-                if (!string.IsNullOrEmpty(errorMessage))
-                    errorsList.Add(errorMessage);
-                if (!string.IsNullOrEmpty(stackTrace))
-                    errorsList.Add(stackTrace);
+                errorInfo = errorParser.ParseError(standardOutput, standardError, scriptVariables);
+                
+                logger.Warning("Script execution failed: {ErrorType} - {Message}", 
+                    errorInfo?.ErrorType ?? "Unknown", 
+                    errorInfo?.Message ?? "Unknown error");
             }
+
+            // Filter out internal variables from output
+            var internalKeys = new[] { "error", "stackTrace", "errorOutput", "stdout", "stderr" };
+            var cleanVariables = scriptVariables
+                .Where(kvp => !internalKeys.Contains(kvp.Key))
+                .ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+
+            // Build error list from structured error info
+            var errorsList = new List<string>();
+            if (errorInfo != null)
+            {
+                // Format error for AI consumption
+                errorsList.Add(errorInfo.GetFormattedErrorForAI());
+            }
+
+            // Build output message
+            var outputMessage = hasErrors 
+                ? $"**Execution Failed**\n\n{errorInfo?.Message ?? "Unknown error"}" 
+                : standardOutput;
 
             return new CodeExecutionResult
             {
                 Success = !hasErrors,
-                Output = hasErrors ? $"{errorMessage}" : "",
+                Output = outputMessage,
                 Errors = errorsList.ToArray(),
                 OutputVariables = cleanVariables,
-                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
+                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms",
+                ErrorInfo = errorInfo // Add structured error info
             };
         }
         catch (Exception ex)
@@ -177,13 +204,22 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             stopwatch.Stop();
             logger.Error(ex, "Error executing {Language} code for step {StepId}", language, stepId);
             
+            // Create structured error from exception
+            var errorInfo = new ScriptErrorInfo
+            {
+                ErrorType = ex.GetType().Name,
+                Message = ex.Message,
+                StackTrace = ex.StackTrace ?? string.Empty
+            };
+
             return new CodeExecutionResult
             {
                 Success = false,
-                Output = "",
-                Errors = new[] { ex.Message },
+                Output = $"**Execution Exception**\n\n{ex.Message}",
+                Errors = new[] { errorInfo.GetFormattedErrorForAI() },
                 OutputVariables = new Dictionary<string, object>(),
-                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms"
+                ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms",
+                ErrorInfo = errorInfo
             };
         }
     }
