@@ -347,6 +347,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             // Handle iterative conversation with tool calls
             bool requiresAction;
             var responseBuilder = new StringBuilder();
+            var allConversationMessages = new List<ConversationMessage>();
             
             do
             {
@@ -356,12 +357,53 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 switch (completion.Value.FinishReason)
                 {
                     case ChatFinishReason.Stop:
+                        // Extract assistant's text response
+                        var assistantText = completion.Value.Content[0].Text ?? "";
+                        
                         // Add the assistant message to conversation history
-                        messages.Add(ChatMessage.CreateAssistantMessage(completion.Value.Content[0].Text ?? ""));
-                        responseBuilder.AppendLine(completion.Value.Content[0].Text ?? "");
+                        messages.Add(ChatMessage.CreateAssistantMessage(assistantText));
+                        responseBuilder.AppendLine(assistantText);
+                        
+                        // Emit AI reasoning message if it contains text
+                        if (!string.IsNullOrWhiteSpace(assistantText))
+                        {
+                            var reasoningMessage = new ConversationMessage("assistant", assistantText);
+                            allConversationMessages.Add(reasoningMessage);
+                            
+                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            {
+                                ConversationId = request.ConversationId,
+                                Messages = new List<ConversationMessage> { reasoningMessage },
+                                ToolCalls = new List<ToolCall>(),
+                                ToolResults = new List<ToolResult>()
+                            });
+                        }
                         break;
                         
                     case ChatFinishReason.ToolCalls:
+                        // Check if there's text content alongside tool calls (AI reasoning/thinking)
+                        var thinkingText = completion.Value.Content
+                            .Where(c => c.Kind == ChatMessageContentPartKind.Text)
+                            .Select(c => c.Text)
+                            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+                        
+                        // Emit AI reasoning/thinking message if present
+                        if (!string.IsNullOrWhiteSpace(thinkingText))
+                        {
+                            var thinkingMessage = new ConversationMessage("assistant", thinkingText);
+                            allConversationMessages.Add(thinkingMessage);
+                            
+                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            {
+                                ConversationId = request.ConversationId,
+                                Messages = new List<ConversationMessage> { thinkingMessage },
+                                ToolCalls = new List<ToolCall>(),
+                                ToolResults = new List<ToolResult>()
+                            });
+                            
+                            _logger.LogInformation("AI reasoning: {Thinking}", thinkingText);
+                        }
+                        
                         // First, add the assistant message with tool calls to conversation history
                         messages.Add(ChatMessage.CreateAssistantMessage(completion.Value));
                         

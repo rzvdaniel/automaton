@@ -19,7 +19,11 @@ public enum MessageType
     CodeError,
     System,
     Generating,
-    ToolExecution
+    ToolExecution,
+    
+    // GitHub Copilot-style progressive operations
+    OperationInProgress,  // Shows operation in progress (e.g., "🤖 Reading current code...")
+    OperationComplete     // Shows completed operation with result
 }
 
 public record ChatMessage(string Role, string Content, DateTime Time)
@@ -96,6 +100,31 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         {
             InvokeAsync(() =>
             {
+                // Process AI reasoning messages (thinking/error analysis)
+                if (e.Messages?.Any() == true)
+                {
+                    foreach (var message in e.Messages)
+                    {
+                        if (message.Role.ToLowerInvariant() == "assistant" && !string.IsNullOrWhiteSpace(message.Content))
+                        {
+                            // Check if this is a reasoning message (not a final code response)
+                            var isReasoningMessage = IsReasoningMessage(message.Content);
+                            
+                            if (isReasoningMessage)
+                            {
+                                // Add as text message to show AI's thinking
+                                var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                                {
+                                    Type = MessageType.Text
+                                };
+                                messages.Add(reasoningMsg);
+                                logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
+                                InvokeAsync(StateHasChanged);
+                            }
+                        }
+                    }
+                }
+                
                 // Process tool calls and results - ALWAYS SHOW THEM
                 foreach (var toolCall in e.ToolCalls)
                 {
@@ -121,37 +150,16 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                     }
                 }
 
-                // Update tool results - but preserve the message in the list!
+                // Add tool results as NEW messages (don't replace executing messages)
                 foreach (var toolResult in e.ToolResults)
                 {
-                    var toolMessage = messages.FirstOrDefault(m => 
+                    // Check if we already added this result
+                    var existingResultMessage = messages.FirstOrDefault(m => 
                         m.Type == MessageType.ToolExecution && 
-                        m.ToolCallId == toolResult.ToolCallId);
+                        m.ToolCallId == toolResult.ToolCallId &&
+                        m.ToolStatus != "executing");
 
-                    if (toolMessage != null)
-                    {
-                        // Process tool result using the new architecture
-                        var processedResult = _toolResultProcessorFactory.ProcessToolResult(
-                            toolMessage.ToolName!, toolResult, CurrentLanguage);
-
-                        var updatedMessage = toolMessage with
-                        {
-                            Content = FormatToolResultFromViewModel(processedResult),
-                            IsSuccess = toolResult.IsSuccess,
-                            ToolStatus = toolResult.IsSuccess ? "success" : "error",
-                            ToolResult = toolResult.Result,
-                            ToolError = toolResult.ErrorMessage,
-                            Time = DateTime.Now,
-                            ToolResultViewModel = processedResult  // Store for component rendering
-                        };
-
-                        var index = messages.IndexOf(toolMessage);
-                        messages[index] = updatedMessage;
-                        
-                        logger.LogInformation("Updated tool message: {ToolName} - {Status} (preserved at index {Index})", 
-                            toolMessage.ToolName, toolResult.IsSuccess ? "Success" : "Failed", index);
-                    }
-                    else
+                    if (existingResultMessage == null)
                     {
                         var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                         if (toolCallForResult != null)
@@ -160,6 +168,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                             var processedResult = _toolResultProcessorFactory.ProcessToolResult(
                                 toolCallForResult.Name, toolResult, CurrentLanguage);
 
+                            // Add as NEW message to show progression
                             var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
                             {
                                 Type = MessageType.ToolExecution,
@@ -168,11 +177,12 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                                 ToolStatus = toolResult.IsSuccess ? "success" : "error",
                                 ToolResult = toolResult.Result,
                                 ToolError = toolResult.ErrorMessage,
-                                ToolResultViewModel = processedResult  // Store for component rendering
+                                ToolResultViewModel = processedResult,
+                                IsSuccess = toolResult.IsSuccess
                             };
                             
                             messages.Add(resultMessage);
-                            logger.LogInformation("Added standalone tool message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
+                            logger.LogInformation("Added tool result message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
                         }
                     }
                 }
@@ -181,6 +191,34 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 ScrollToBottom();
             });
         }
+    }
+    
+    /// <summary>
+    /// Determine if a message is AI reasoning/thinking (vs final code output)
+    /// </summary>
+    private bool IsReasoningMessage(string content)
+    {
+        // Skip if it's very short (likely not reasoning)
+        if (content.Length < 10)
+            return false;
+            
+        // Skip if it contains only code (no explanation)
+        if (content.StartsWith("```") && content.Count(c => c == '`') >= 6)
+            return false;
+            
+        // Include if it contains reasoning keywords
+        var reasoningKeywords = new[]
+        {
+            "I see", "I notice", "I'll", "Let me", "I need to",
+            "The error", "The issue", "The problem", "This is because",
+            "I'm going to", "I will", "First", "Next", "Now",
+            "Let's", "We need", "Looking at", "Based on",
+            "I can see", "It appears", "It looks like", "It seems",
+            "I should", "I must", "I have to", "To fix", "To solve"
+        };
+        
+        return reasoningKeywords.Any(keyword => 
+            content.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 
     private string FormatToolCall(ToolCall toolCall)

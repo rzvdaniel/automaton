@@ -7,6 +7,10 @@ public enum MessageType
     CodeSuccess,
     CodeError,
     System,
-    ToolExecution
+    ToolExecution,
+    
+    // New: Progressive AI operation status
+    OperationInProgress,  // "🤖 Reading current code..." / "🧪 Testing code execution..."
+    OperationComplete     // Shows result after operation
 }
 
