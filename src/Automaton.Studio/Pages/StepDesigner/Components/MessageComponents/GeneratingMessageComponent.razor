@@ -1,0 +1,18 @@
+@using AntDesign
+
+<div class="generating-indicator">
+    <p><em>@Content</em></p>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Content { get; set; } = string.Empty;
+}
+
+<style>
+    .generating-indicator {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+</style>

@@ -1,0 +1,19 @@
+@using Automaton.Studio.Services
+
+<div class="text-message">
+    @((MarkupString)FormattingService.FormatReasoningTextWithCode(Content))
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Content { get; set; } = string.Empty;
+
+    [Inject]
+    private IAiMessageFormattingService FormattingService { get; set; } = default!;
+}
+
+<style>
+    .text-message {
+        line-height: 1.6;
+    }
+</style>

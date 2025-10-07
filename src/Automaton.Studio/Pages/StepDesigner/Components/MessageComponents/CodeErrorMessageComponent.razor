@@ -1,0 +1,41 @@
+@using AntDesign
+
+<div class="error-message">
+    <Icon Type="close-circle" Style="color: #dc3545; margin-right: 4px;" />
+    <div class="error-content">
+        <strong>Error</strong>
+        <span>@ErrorMessage</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string ErrorMessage { get; set; } = string.Empty;
+}
+
+<style>
+    .error-message {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 6px;
+        border-left: 4px solid #dc3545;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .error-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .error-content strong {
+        color: #dc3545;
+    }
+
+    .error-content span {
+        color: #dc3545;
+        font-size: 14px;
+    }
+</style>

@@ -1,0 +1,21 @@
+@using AntDesign
+
+<div class="system-message">
+    <Icon Type="info-circle" Style="margin-right: 4px;" />
+    <span>@Content</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Content { get; set; } = string.Empty;
+}
+
+<style>
+    .system-message {
+        color: #666;
+        font-style: italic;
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+    }
+</style>

@@ -1,0 +1,148 @@
+@using Automaton.Studio.Pages.StepDesigner.Components.MessageComponents
+
+<div class="message @GetMessageClass()">
+    <div class="meta">
+        <span class="role">@Message.Role</span>
+        <span class="time">@Message.Time.ToString("HH:mm")</span>
+    </div>
+    <div class="content">
+        @switch (Message.Type)
+        {
+            case MessageType.Generating:
+                <GeneratingMessageComponent Content="@Message.Content" />
+                break;
+
+            case MessageType.ToolExecution:
+                <ToolExecutionMessageComponent 
+                    Description="@Message.Content"
+                    Status="@(Message.ToolStatus ?? "unknown")"
+                    ResultViewModel="@Message.ToolResultViewModel"
+                    ErrorMessage="@Message.ToolError"
+                    Timestamp="@Message.Time" />
+                break;
+
+            case MessageType.CodeSuccess:
+                <CodeSuccessMessageComponent 
+                    Title="@Message.Content"
+                    GeneratedCode="@Message.GeneratedCode"
+                    Language="@Language"
+                    CodeId="@Message.CodeId"
+                    IsApplyDisabled="@IsGeneratingCode"
+                    Timestamp="@Message.Time"
+                    OnApplyCode="@OnApplyCode" />
+                break;
+
+            case MessageType.CodeError:
+                <CodeErrorMessageComponent ErrorMessage="@Message.Content" />
+                break;
+
+            case MessageType.System:
+                <SystemMessageComponent Content="@Message.Content" />
+                break;
+
+            case MessageType.Text:
+            default:
+                <TextMessageComponent Content="@Message.Content" />
+                break;
+        }
+        
+        @* Show thinking dots only when AI is generating AND this is the last message AND it's not a message type that already has its own indicator *@
+        @if (ShowThinkingDots)
+        {
+            <div class="thinking-dots" style="margin-top: 8px;">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ChatMessage Message { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Language { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsLast { get; set; }
+
+    [Parameter]
+    public bool IsGeneratingCode { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnApplyCode { get; set; }
+
+    private bool ShowThinkingDots
+    {
+        get
+        {
+            var hasOwnIndicator = Message.Type == MessageType.Generating || Message.ToolStatus == "executing";
+            return !hasOwnIndicator && IsGeneratingCode && IsLast;
+        }
+    }
+
+    private string GetMessageClass()
+    {
+        // Remove padding/background for CodeSuccess messages since the component handles its own styling
+        return Message.Type == MessageType.CodeSuccess ? "message-no-padding" : "";
+    }
+}
+
+<style>
+    .message {
+        padding: 8px;
+        border-radius: 6px;
+        background: #f6f8fa;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .message-no-padding {
+        padding: 0;
+        background: transparent;
+    }
+
+    .message .meta {
+        font-size: 11px;
+        color: #666;
+        margin-bottom: 6px;
+        display: flex;
+        gap: 8px;
+    }
+
+    .thinking-dots {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 20px;
+    }
+
+    .thinking-dots span {
+        width: 6px;
+        height: 6px;
+        background-color: #8b949e;
+        border-radius: 50%;
+        animation: thinking 1.4s infinite ease-in-out both;
+    }
+
+    .thinking-dots span:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+
+    .thinking-dots span:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+
+    @@keyframes thinking {
+        0%, 80%, 100% {
+            opacity: 0.3;
+            transform: scale(0.8);
+        }
+        40% {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+    }
+</style>
