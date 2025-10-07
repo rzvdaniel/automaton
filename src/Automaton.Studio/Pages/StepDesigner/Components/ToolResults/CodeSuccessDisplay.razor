@@ -1,16 +1,8 @@
-@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
 @using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
 @using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities
 @using System.Net
 
 <div class="code-success-container">
-    <ToolResultHeader StatusIcon="?" 
-                      StatusText="Success" 
-                      Status="success"
-                      Title="@Title"
-                      Timestamp="@Timestamp"
-                      ShowTimestamp="@ShowTimestamp" />
-    
     <div class="code-success-content">
         @((MarkupString)FormatContentForDisplay())
     </div>
@@ -37,7 +29,6 @@
         line-height: 1.5;
         font-size: 14px;
         margin-bottom: 12px;
-        margin-top: 8px;
     }
 
     .code-success-content strong {
@@ -62,22 +53,21 @@
         border-radius: 0.25rem;
         font-size: 0.75rem;
         cursor: pointer;
+        transition: background-color 0.2s ease;
     }
 
-    .apply-code-btn:hover {
+    .apply-code-btn:hover:not(:disabled) {
         background: #0056b3;
     }
 
     .apply-code-btn:disabled {
         background: #6c757d;
         cursor: not-allowed;
+        opacity: 0.6;
     }
 </style>
 
 @code {
-    [Parameter, EditorRequired] 
-    public string Title { get; set; } = default!;
-    
     [Parameter] 
     public string? FullResponse { get; set; }
     
@@ -89,12 +79,6 @@
     
     [Parameter] 
     public bool IsApplyDisabled { get; set; } = false;
-    
-    [Parameter] 
-    public DateTime? Timestamp { get; set; }
-    
-    [Parameter] 
-    public bool ShowTimestamp { get; set; } = false;
     
     [Parameter] 
     public EventCallback<string> OnApplyCode { get; set; }

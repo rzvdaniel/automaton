@@ -1,18 +1,12 @@
 @using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
 
-<CodeSuccessDisplay Title="@Title"
-                    FullResponse="@GeneratedCode"
+<CodeSuccessDisplay FullResponse="@GeneratedCode"
                     Language="@Language"
                     CodeId="@CodeId"
                     IsApplyDisabled="@IsApplyDisabled"
-                    Timestamp="@Timestamp"
-                    ShowTimestamp="false"
                     OnApplyCode="@OnApplyCode" />
 
 @code {
-    [Parameter, EditorRequired]
-    public string Title { get; set; } = string.Empty;
-
     [Parameter]
     public string? GeneratedCode { get; set; }
 
@@ -24,9 +18,6 @@
 
     [Parameter]
     public bool IsApplyDisabled { get; set; }
-
-    [Parameter]
-    public DateTime Timestamp { get; set; }
 
     [Parameter]
     public EventCallback<string> OnApplyCode { get; set; }

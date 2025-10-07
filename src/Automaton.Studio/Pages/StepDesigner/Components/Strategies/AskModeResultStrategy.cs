@@ -49,7 +49,9 @@ public class AskModeResultStrategy : IConversationResultStrategy
     private async Task ProcessCodeResult(ConversationResult result, string userPrompt)
     {
         var codeId = Guid.NewGuid().ToString();
-        var codeMessage = new ChatMessage("AI", "Code generated successfully with MCP tools:", DateTime.Now)
+        
+        // Create a success message without any title - the component will display it cleanly
+        var codeMessage = new ChatMessage("AI", string.Empty, DateTime.Now)
         {
             Type = MessageType.CodeSuccess,
             CodeId = codeId,
@@ -71,6 +73,8 @@ public class AskModeResultStrategy : IConversationResultStrategy
 
         _logger.LogInformation("Code generated in Ask mode: {CodeLength} characters, Quality: {Quality:F2}, CodeId: {CodeId}", 
             codeForEditor.Length, qualityScore, codeId);
+        
+        await Task.CompletedTask;
     }
 
     private void ProcessTextResult(ConversationResult result)

@@ -114,27 +114,15 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                             
                             if (isReasoningMessage)
                             {
-                                // Enhanced duplicate detection: check for exact match OR very similar content
-                                var isDuplicate = messages.Any(m => 
-                                    m.Type == MessageType.Text && 
-                                    m.Role == "AI" &&
-                                    (m.Content == message.Content || TextSimilarityService.AreSimilar(m.Content, message.Content)));
+                                // Add as text message to show AI's thinking
+                                var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                                {
+                                    Type = MessageType.Text
+                                };
+                                messages.Add(reasoningMsg);
+                                logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
+                                InvokeAsync(StateHasChanged);
                                 
-                                if (!isDuplicate)
-                                {
-                                    // Add as text message to show AI's thinking
-                                    var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
-                                    {
-                                        Type = MessageType.Text
-                                    };
-                                    messages.Add(reasoningMsg);
-                                    logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
-                                    InvokeAsync(StateHasChanged);
-                                }
-                                else
-                                {
-                                    logger.LogInformation("Skipped duplicate/similar AI reasoning message: {Length} chars", message.Content.Length);
-                                }
                             }
                         }
                     }

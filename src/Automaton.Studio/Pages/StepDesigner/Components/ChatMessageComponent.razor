@@ -23,12 +23,10 @@
 
             case MessageType.CodeSuccess:
                 <CodeSuccessMessageComponent 
-                    Title="@Message.Content"
                     GeneratedCode="@Message.GeneratedCode"
                     Language="@Language"
                     CodeId="@Message.CodeId"
                     IsApplyDisabled="@IsGeneratingCode"
-                    Timestamp="@Message.Time"
                     OnApplyCode="@OnApplyCode" />
                 break;
 

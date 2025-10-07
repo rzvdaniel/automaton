@@ -45,7 +45,8 @@ public class AgentModeResultStrategy : IConversationResultStrategy
 
     private async Task ProcessCodeResult(ConversationResult result)
     {
-        var codeMessage = new ChatMessage("AI", "Code generated and applied with MCP tools:", DateTime.Now)
+        // Create a success message without any title - the component will display it cleanly
+        var codeMessage = new ChatMessage("AI", string.Empty, DateTime.Now)
         {
             Type = MessageType.CodeSuccess,
             GeneratedCode = result.GeneratedCode,
