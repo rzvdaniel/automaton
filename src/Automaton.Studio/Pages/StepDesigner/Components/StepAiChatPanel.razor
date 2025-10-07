@@ -35,33 +35,12 @@
 						@switch (msg.Type)
 						{
 							case MessageType.Generating:
-								<div>
+								<div class="generating-indicator">
 									<p><em>@msg.Content</em></p>
-									<Spin Size="SpinSize.Small" /> Generating code with MCP tools...
-								</div>
-								break;
-
-							case MessageType.OperationInProgress:
-								<!-- GitHub Copilot-style operation status -->
-								<div class="operation-in-progress">
-									<div class="operation-header">
-										<Icon Type="@GetOperationIcon(msg.Content)" Style="font-size: 16px; color: #f59e0b;" />
-										<span class="operation-text">@msg.Content</span>
-										<Spin Size="SpinSize.Small" Style="margin-left: 8px;" />
-									</div>
-								</div>
-								break;
-
-							case MessageType.OperationComplete:
-								<!-- GitHub Copilot-style completed operation -->
-								<div class="@($"operation-complete {(msg.IsSuccess ? "" : "failed")}")">
-									<div class="operation-header">
-										<Icon Type="@GetCompletionIcon(msg.IsSuccess)" Style="@($"font-size: 16px; color: {(msg.IsSuccess ? "#22c55e" : "#ef4444")};")"/>
-										<span class="operation-text">@msg.Content</span>
-										@if (!string.IsNullOrEmpty(msg.ToolResult))
-										{
-											<span class="operation-result-preview">@GetResultPreview(msg.ToolResult)</span>
-										}
+									<div class="thinking-dots">
+										<span></span>
+										<span></span>
+										<span></span>
 									</div>
 								</div>
 								break;
@@ -72,7 +51,6 @@
 									{
 										<!-- Executing state: Clean design with spinner -->
 										<div class="tool-header-executing">
-											<span class="tool-icon-emoji">@GetToolEmoji(msg.ToolName)</span>
 											<span class="tool-description">@msg.Content</span>
 											<Spin Size="SpinSize.Small" Style="margin-left: auto;" />
 										</div>
@@ -81,14 +59,13 @@
 									{
 										<!-- Completed state: Show checkmark to indicate operation finished -->
 										<div class="tool-header-completed">
-											<span class="tool-icon-emoji">@GetToolEmoji(msg.ToolName)</span>
 											<span class="tool-description">@msg.Content</span>
 											<Icon Type="check-circle" Style="margin-left: auto; color: #22c55e; font-size: 16px;" />
 										</div>
 									}
 									else
 									{
-										<!-- Result state: Show detailed result without duplicate icon -->
+										<!-- Result state: Show detailed result (ToolResultDisplay handles its own icon) -->
 										<ToolResultDisplay Result="msg.ToolResultViewModel" 
 														   Status="@(msg.ToolStatus ?? "unknown")"
 														   Timestamp="@msg.Time"
@@ -136,6 +113,26 @@
 								@((MarkupString)AiMessageFormattingService.FormatReasoningTextWithCode(msg.Content))
 								break;
 						}
+						
+						<!-- Show thinking dots only when AI is generating AND this is the last message AND it's not a message type that already has its own indicator -->
+						@{
+							var currentIndex = messages.IndexOf(msg);
+							var isLastMessage = currentIndex == messages.Count - 1;
+							var hasOwnIndicator = msg.Type == MessageType.Generating || msg.ToolStatus == "executing";
+							var showDots = !hasOwnIndicator && 
+										   isGeneratingCode && 
+										   isLastMessage;
+						}
+						
+						@if (showDots)
+						{
+							<div class="thinking-dots" style="margin-top: 8px;">
+								<span></span>
+								<span></span>
+								<span></span>
+							</div>
+						}
+
 					</div>
 				</div>
 			}
@@ -295,48 +292,6 @@
 		background: transparent;
 	}
 
-	/* GitHub Copilot-style operation status */
-	.operation-in-progress {
-		background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-		border: 1px solid #fbbf24;
-		border-left: 4px solid #f59e0b;
-		border-radius: 8px;
-		padding: 12px;
-	}
-
-	.operation-complete {
-		background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-		border: 1px solid #86efac;
-		border-left: 4px solid #22c55e;
-		border-radius: 8px;
-		padding: 12px;
-	}
-
-	.operation-complete.failed {
-		background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-		border-color: #fca5a5;
-		border-left-color: #ef4444;
-	}
-
-	.operation-header {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 13px;
-		font-weight: 500;
-	}
-
-	.operation-text {
-		color: #374151;
-	}
-
-	.operation-result-preview {
-		margin-left: auto;
-		font-size: 11px;
-		color: #64748b;
-		font-family: 'Courier New', monospace;
-	}
-
 	.ai-chat-input {
 		border-top: 1px solid #e8e8e8;
 		background: #ffffff;
@@ -460,7 +415,6 @@
 	.tool-execution-message[data-status="completed"] {
 		background: #f6faf8;
 		border-left-color: #22c55e;
-		opacity: 0.8;
 	}
 
 	.tool-execution-message[data-status="success"] {
@@ -481,8 +435,6 @@
 		gap: 8px;
 		font-size: 13px;
 		color: #24292f;
-		opacity: 0.7;
-		transition: opacity 0.3s ease;
 	}
 
 	.tool-icon-emoji {
@@ -531,47 +483,49 @@
 		line-height: 1.5;
 		color: #374151;
 	}
+
+	/* GitHub Copilot-style thinking/generating indicator */
+	.generating-indicator {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.thinking-dots {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		height: 20px;
+	}
+
+	.thinking-dots span {
+		width: 6px;
+		height: 6px;
+		background-color: #8b949e;
+		border-radius: 50%;
+		animation: thinking 1.4s infinite ease-in-out both;
+	}
+
+	.thinking-dots span:nth-child(1) {
+		animation-delay: -0.32s;
+	}
+
+	.thinking-dots span:nth-child(2) {
+		animation-delay: -0.16s;
+	}
+
+	@@keyframes thinking {
+		0%, 80%, 100% {
+			opacity: 0.3;
+			transform: scale(0.8);
+		}
+		40% {
+			opacity: 1;
+			transform: scale(1.2);
+		}
+	}
 	</style>
 
 @code {
-	private string GetOperationIcon(string operationText)
-	{
-		if (operationText.Contains("Reading", StringComparison.OrdinalIgnoreCase) || 
-			operationText.Contains("Get", StringComparison.OrdinalIgnoreCase))
-			return "file-text";
-		if (operationText.Contains("Testing", StringComparison.OrdinalIgnoreCase) || 
-			operationText.Contains("Execut", StringComparison.OrdinalIgnoreCase))
-			return "experiment";
-		if (operationText.Contains("Saving", StringComparison.OrdinalIgnoreCase))
-			return "save";
-		if (operationText.Contains("Generat", StringComparison.OrdinalIgnoreCase))
-			return "code";
-		return "loading";
-	}
 
-	private string GetCompletionIcon(bool isSuccess)
-	{
-		return isSuccess ? "check-circle" : "close-circle";
-	}
-
-	private string GetResultPreview(string result)
-	{
-		if (string.IsNullOrEmpty(result))
-			return string.Empty;
-			
-		// Show first 50 characters of result
-		return result.Length > 50 ? result[..50] + "..." : result;
-	}
-	
-	private string GetToolEmoji(string? toolName)
-	{
-		return toolName switch
-		{
-			"get_current_code" => "📖",
-			"execute_code" => "🧪",
-			"get_step_variables" => "🔍",
-			"save_code" => "💾",
-			_ => "🔧"
-		};
-	}
 }
