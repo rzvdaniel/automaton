@@ -3,6 +3,26 @@
 @using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities
 @using System.Net
 
+<div class="code-success-container">
+    <ToolResultHeader StatusIcon="?" 
+                      StatusText="Success" 
+                      Status="success"
+                      Title="@Title"
+                      Timestamp="@Timestamp"
+                      ShowTimestamp="@ShowTimestamp" />
+    
+    <div class="code-success-content">
+        @((MarkupString)FormatContentForDisplay())
+    </div>
+    
+    @if (!string.IsNullOrEmpty(CodeId) && OnApplyCode.HasDelegate)
+    {
+        <button class="apply-code-btn" @onclick="HandleApplyCode" disabled="@IsApplyDisabled" title="Apply code to editor">
+            Apply Code
+        </button>
+    }
+</div>
+
 <style>
     .code-success-container {
         background: #f6f8fa;
@@ -34,26 +54,6 @@
         margin: 4px 0;
     }
 
-    .code-success-content .generated-code-block {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-        margin: 12px 0;
-        overflow: hidden;
-        padding: 12px;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 0.875rem;
-        line-height: 1.4;
-    }
-
-    .code-success-content .generated-code-block code {
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-family: inherit;
-        font-size: inherit;
-    }
-
     .apply-code-btn {
         background: #007bff;
         color: white;
@@ -73,26 +73,6 @@
         cursor: not-allowed;
     }
 </style>
-
-<div class="code-success-container">
-    <ToolResultHeader StatusIcon="?" 
-                      StatusText="Success" 
-                      Status="success"
-                      Title="@Title"
-                      Timestamp="@Timestamp"
-                      ShowTimestamp="@ShowTimestamp" />
-    
-    <div class="code-success-content">
-        @((MarkupString)FormatContentForDisplay())
-    </div>
-    
-    @if (!string.IsNullOrEmpty(CodeId) && OnApplyCode.HasDelegate)
-    {
-        <button class="apply-code-btn" @onclick="HandleApplyCode" disabled="@IsApplyDisabled" title="Apply code to editor">
-            Apply Code
-        </button>
-    }
-</div>
 
 @code {
     [Parameter, EditorRequired] 

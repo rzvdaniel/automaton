@@ -103,6 +103,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CustomStepVersionService>();
         services.AddScoped<ICodeExtractionService, CodeExtractionService>();
         services.AddScoped<ITextSimilarityService, TextSimilarityService>();
+        services.AddScoped<IAiMessageFormattingService, AiMessageFormattingService>();
 
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();

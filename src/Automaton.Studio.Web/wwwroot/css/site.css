@@ -300,3 +300,33 @@ div.content-padding {
 .content-background-neutral {
     background-color: #fafafa !important; /* Original neutral background */
 }
+
+/* Shared styles for code blocks across the application */
+
+.generated-code-block {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin: 12px 0;
+    padding: 12px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    overflow: hidden;
+}
+
+    .generated-code-block code {
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-family: inherit;
+        font-size: inherit;
+        white-space: pre;
+        display: block;
+    }
+
+/* For use within message content areas */
+.message .content .generated-code-block,
+.code-success-content .generated-code-block {
+    margin: 8px 0;
+}

@@ -62,6 +62,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
     [Inject] private ITextSimilarityService TextSimilarityService { get; set; } = default!;
+    [Inject] private IAiMessageFormattingService AiMessageFormattingService { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -175,6 +176,23 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
                     if (existingResultMessage == null)
                     {
+                        // First, update the previous "executing" message to show it's complete
+                        var executingMessage = messages.FirstOrDefault(m =>
+                            m.Type == MessageType.ToolExecution &&
+                            m.ToolCallId == toolResult.ToolCallId &&
+                            m.ToolStatus == "executing");
+
+                        if (executingMessage != null)
+                        {
+                            // Update the executing message to show completion status
+                            var index = messages.IndexOf(executingMessage);
+                            messages[index] = executingMessage with 
+                            { 
+                                ToolStatus = "completed",
+                                IsSuccess = toolResult.IsSuccess
+                            };
+                        }
+
                         var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                         if (toolCallForResult != null)
                         {
@@ -182,7 +200,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                             var processedResult = _toolResultProcessorFactory.ProcessToolResult(
                                 toolCallForResult.Name, toolResult, CurrentLanguage);
 
-                            // Add as NEW message to show progression
+                            // Add as NEW message to show result details
                             var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
                             {
                                 Type = MessageType.ToolExecution,
@@ -550,6 +568,22 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     {
         if (result.IsSuccess)
         {
+            // Remove the last AI reasoning message to avoid duplication
+            // since it will be shown in the CodeSuccessDisplay component with better formatting
+            if (!string.IsNullOrEmpty(result.GeneratedCode))
+            {
+                var lastReasoningMessage = messages.LastOrDefault(m => m.Type == MessageType.Text && m.Role == "AI");
+                if (lastReasoningMessage != null)
+                {
+                    // Check if the reasoning message contains similar content to the final result
+                    if (TextSimilarityService.AreSimilar(lastReasoningMessage.Content, result.GeneratedCode, similarityThreshold: 0.6))
+                    {
+                        messages.Remove(lastReasoningMessage);
+                        logger.LogInformation("Removed duplicate AI reasoning message before code result display");
+                    }
+                }
+            }
+            
             var processor = CreateResultProcessor();
             await processor.ProcessSuccessResult(result, userPrompt, selectedAgent);
         }
