@@ -70,21 +70,16 @@
 								<div class="tool-execution-message" data-status="@msg.ToolStatus">
 									@if (msg.ToolStatus == "executing")
 									{
-										<ToolResultHeader StatusIcon="loading"
-														  StatusText="Executing"
-														  Status="executing"
-														  Title=""
-														  Timestamp="@msg.Time"
-														  ShowTimestamp="true" />
-										<div class="tool-progress">
-											<div class="progress-bar">
-												<div class="progress-fill"></div>
-											</div>
-											<span class="progress-text">@msg.Content</span>
+										<!-- Executing state: Clean design with spinner -->
+										<div class="tool-header-executing">
+											<span class="tool-icon-emoji">@GetToolEmoji(msg.ToolName)</span>
+											<span class="tool-description">@msg.Content</span>
+											<Spin Size="SpinSize.Small" Style="margin-left: auto;" />
 										</div>
 									}
 									else
 									{
+										<!-- Completed state: Show result without progress bar -->
 										<ToolResultDisplay Result="msg.ToolResultViewModel" 
 														   Status="@(msg.ToolStatus ?? "unknown")"
 														   Timestamp="@msg.Time"
@@ -437,35 +432,48 @@
 			font-size: 11px;
 		}
 
-	/* Tool execution message styling */
+	/* Tool execution message styling - GitHub Copilot style */
 	.tool-execution-message {
-		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-		border: 1px solid #bae6fd;
-		border-left: 4px solid #0ea5e9;
-		border-radius: 8px;
+		background: #ffffff;
+		border: 1px solid #e1e4e8;
+		border-left: 3px solid #0969da;
+		border-radius: 6px;
 		padding: 12px;
-		margin: 8px 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-		transition: all 0.3s ease;
+		margin: 4px 0;
+		transition: all 0.2s ease;
 	}
 
 	.tool-execution-message[data-status="executing"] {
-		background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-		border-color: #fbbf24;
-		border-left-color: #f59e0b;
-		animation: pulse 2s infinite;
+		background: #f6f8fa;
+		border-left-color: #8b949e;
 	}
 
 	.tool-execution-message[data-status="success"] {
-		background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-		border-color: #86efac;
-		border-left-color: #22c55e;
+		border-left-color: #1a7f37;
 	}
 
 	.tool-execution-message[data-status="error"] {
-		background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-		border-color: #fca5a5;
-		border-left-color: #ef4444;
+		background: #fff8f8;
+		border-left-color: #cf222e;
+	}
+
+	/* Clean header for executing state */
+	.tool-header-executing {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		color: #24292f;
+	}
+
+	.tool-icon-emoji {
+		font-size: 16px;
+		line-height: 1;
+	}
+
+	.tool-description {
+		flex: 1;
+		font-weight: 500;
 	}
 
 	.tool-header {
@@ -492,69 +500,10 @@
 		font-size: 14px;
 	}
 
-	.tool-status {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 12px;
-		font-weight: 500;
-		padding: 2px 8px;
-		border-radius: 12px;
-		background: rgba(255, 255, 255, 0.7);
-		border: 1px solid rgba(0, 0, 0, 0.1);
-	}
-
-	.tool-status.status-executing {
-		color: #b45309;
-		background: rgba(251, 191, 36, 0.2);
-		border-color: #fbbf24;
-	}
-
-	.tool-status.status-success {
-		color: #166534;
-		background: rgba(34, 197, 94, 0.2);
-		border-color: #22c55e;
-	}
-
-	.tool-status.status-error {
-		color: #991b1b;
-		background: rgba(239, 68, 68, 0.2);
-		border-color: #ef4444;
-	}
-
 	.tool-timestamp {
 		font-size: 11px;
 		color: #64748b;
 		font-family: 'Courier New', monospace;
-	}
-
-	.tool-progress {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-top: 8px;
-	}
-
-	.progress-bar {
-		flex: 1;
-		height: 4px;
-		background: rgba(0, 0, 0, 0.1);
-		border-radius: 2px;
-		overflow: hidden;
-	}
-
-	.progress-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #3b82f6, #06b6d4);
-		border-radius: 2px;
-		animation: progress-slide 2s infinite;
-		width: 30%;
-	}
-
-	.progress-text {
-		font-size: 12px;
-		color: #64748b;
-		font-style: italic;
 	}
 
 	.tool-content {
@@ -563,207 +512,7 @@
 		line-height: 1.5;
 		color: #374151;
 	}
-
-	.tool-content .code-block {
-		background: rgba(255, 255, 255, 0.8);
-		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 4px;
-		margin: 8px 0;
-		overflow: hidden;
-	}
-
-	.tool-content .code-block pre {
-		margin: 0;
-		padding: 8px;
-		font-size: 12px;
-		font-family: 'Courier New', Monaco, monospace;
-		background: transparent;
-		overflow-x: auto;
-	}
-
-	.tool-content strong {
-		color: #1e293b;
-		font-weight: 600;
-	}
-
-	.tool-content code {
-		background: rgba(255, 255, 255, 0.8);
-		padding: 2px 4px;
-		border-radius: 3px;
-		font-family: 'Courier New', Monaco, monospace;
-		font-size: 12px;
-		border: 1px solid rgba(0, 0, 0, 0.1);
-	}
-
-	.tool-error {
-		display: flex;
-		align-items: center;
-		margin-top: 8px;
-		padding: 8px;
-		background: rgba(239, 68, 68, 0.1);
-		border: 1px solid #fca5a5;
-		border-radius: 4px;
-		color: #991b1b;
-		font-size: 12px;
-	}
-
-	.tool-details {
-		margin-top: 12px;
-		border-top: 1px solid rgba(0, 0, 0, 0.1);
-		padding-top: 8px;
-	}
-
-	.tool-details-summary {
-		cursor: pointer;
-		font-size: 12px;
-		color: #64748b;
-		display: flex;
-		align-items: center;
-		padding: 4px 0;
-		user-select: none;
-		outline: none;
-	}
-
-	.tool-details-summary:hover {
-		color: #374151;
-	}
-
-	.tool-details-summary::-webkit-details-marker {
-		display: none;
-	}
-
-	.tool-details-content {
-		margin-top: 8px;
-		background: rgba(255, 255, 255, 0.9);
-		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.tool-details-content pre {
-		margin: 0;
-		padding: 8px;
-		font-size: 11px;
-		font-family: 'Courier New', Monaco, monospace;
-		overflow-x: auto;
-		background: transparent;
-		max-height: 200px;
-		overflow-y: auto;
-	}
-
-	/* Animations */
-	@@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.8; }
-	}
-
-	@@keyframes progress-slide {
-		0% { transform: translateX(-100%); }
-		50% { transform: translateX(0%); }
-		100% { transform: translateX(300%); }
-	}
-
-	/* Enhanced message styling */
-	.message[data-message-type="tool"] {
-		background: transparent;
-		padding: 0;
-	}
-
-	/* New component-based tool result styling */
-	.tool-result-display {
-		margin-top: 8px;
-	}
-
-	.tool-result-header {
-		font-weight: 600;
-		margin-bottom: 8px;
-		color: #374151;
-	}
-
-	.tool-result-error {
-		color: #dc2626;
-		background: rgba(239, 68, 68, 0.1);
-		padding: 8px;
-		border-radius: 4px;
-		border: 1px solid #fca5a5;
-		margin-top: 8px;
-	}
-
-	.tool-result-summary {
-		margin-top: 8px;
-		font-size: 13px;
-		line-height: 1.5;
-	}
-
-	.tool-result-container {
-		margin-top: 12px;
-		border-top: 1px solid rgba(0, 0, 0, 0.1);
-		padding-top: 8px;
-	}
-
-	.tool-code-details, .tool-raw-details {
-		margin-bottom: 8px;
-	}
-
-	.tool-code-summary, .tool-raw-summary {
-		cursor: pointer;
-		font-size: 12px;
-		color: #64748b;
-		display: flex;
-		align-items: center;
-		padding: 6px 8px;
-		background: rgba(255, 255, 255, 0.8);
-		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 4px;
-		user-select: none;
-		outline: none;
-		transition: background-color 0.2s;
-	}
-
-	.tool-code-summary:hover, .tool-raw-summary:hover {
-		background: rgba(255, 255, 255, 0.95);
-		color: #374151;
-	}
-
-	.tool-code-summary .code-icon, .tool-raw-summary .raw-icon {
-		margin-right: 6px;
-		font-size: 14px;
-	}
-
-	.tool-code-summary::-webkit-details-marker,
-	.tool-raw-summary::-webkit-details-marker {
-		display: none;
-	}
-
-	.tool-result-content {
-		margin-top: 4px;
-		background: rgba(255, 255, 255, 0.95);
-		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.tool-result-content pre {
-		margin: 0;
-		padding: 12px;
-		font-size: 12px;
-		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-		overflow-x: auto;
-		background: transparent;
-		line-height: 1.4;
-	}
-
-	.code-result {
-		max-height: 400px;
-		overflow-y: auto;
-	}
-
-	.raw-result {
-		max-height: 200px;
-		overflow-y: auto;
-		color: #6b7280;
-	}
-</style>
+	</style>
 
 @code {
 	private string GetOperationIcon(string operationText)
@@ -793,5 +542,17 @@
 			
 		// Show first 50 characters of result
 		return result.Length > 50 ? result[..50] + "..." : result;
+	}
+	
+	private string GetToolEmoji(string? toolName)
+	{
+		return toolName switch
+		{
+			"get_current_code" => "📖",
+			"execute_code" => "🧪",
+			"get_step_variables" => "🔍",
+			"save_code" => "💾",
+			_ => "🔧"
+		};
 	}
 }

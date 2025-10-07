@@ -61,6 +61,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
+    [Inject] private ITextSimilarityService TextSimilarityService { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -112,14 +113,27 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                             
                             if (isReasoningMessage)
                             {
-                                // Add as text message to show AI's thinking
-                                var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                                // Enhanced duplicate detection: check for exact match OR very similar content
+                                var isDuplicate = messages.Any(m => 
+                                    m.Type == MessageType.Text && 
+                                    m.Role == "AI" &&
+                                    (m.Content == message.Content || TextSimilarityService.AreSimilar(m.Content, message.Content)));
+                                
+                                if (!isDuplicate)
                                 {
-                                    Type = MessageType.Text
-                                };
-                                messages.Add(reasoningMsg);
-                                logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
-                                InvokeAsync(StateHasChanged);
+                                    // Add as text message to show AI's thinking
+                                    var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                                    {
+                                        Type = MessageType.Text
+                                    };
+                                    messages.Add(reasoningMsg);
+                                    logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
+                                    InvokeAsync(StateHasChanged);
+                                }
+                                else
+                                {
+                                    logger.LogInformation("Skipped duplicate/similar AI reasoning message: {Length} chars", message.Content.Length);
+                                }
                             }
                         }
                     }

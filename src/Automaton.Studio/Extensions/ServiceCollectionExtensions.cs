@@ -102,6 +102,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AiCodeCleanupService>();
         services.AddScoped<CustomStepVersionService>();
         services.AddScoped<ICodeExtractionService, CodeExtractionService>();
+        services.AddScoped<ITextSimilarityService, TextSimilarityService>();
 
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
