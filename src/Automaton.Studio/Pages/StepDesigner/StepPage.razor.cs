@@ -301,7 +301,7 @@ partial class StepPage : ComponentBase, IDisposable
         {
             AutomaticLayout = true,
             Language = StepDesignerViewModel.CustomStep.Definition.Language.ToLower(),
-            Value = StepDesignerViewModel.CustomStep.Definition.Code
+            Value = StepDesignerViewModel.CustomStep.Definition.Code ?? string.Empty
         };
     }
 
