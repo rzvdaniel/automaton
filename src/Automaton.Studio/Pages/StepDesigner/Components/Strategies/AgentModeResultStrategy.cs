@@ -45,17 +45,8 @@ public class AgentModeResultStrategy : IConversationResultStrategy
 
     private async Task ProcessCodeResult(ConversationResult result)
     {
-        // Create a success message without any title - the component will display it cleanly
-        var codeMessage = new ChatMessage("AI", string.Empty, DateTime.Now)
-        {
-            Type = MessageType.CodeSuccess,
-            GeneratedCode = result.GeneratedCode,
-            IsSuccess = true
-        };
-
-        _messages.Add(codeMessage);
-
-        // Use the centralized code extraction service
+        // In Agent mode, just auto-apply the code without adding any extra messages
+        // The reasoning messages from OnConversationUpdated are already displayed
         var codeForEditor = _codeExtractionService.ExtractCodeForEditor(result.GeneratedCode!, _currentLanguage);
         var qualityScore = _codeExtractionService.GetCodeQualityConfidence(codeForEditor, _currentLanguage);
         
