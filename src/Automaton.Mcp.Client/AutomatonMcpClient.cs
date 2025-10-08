@@ -516,13 +516,22 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             }
             else
             {
-                return $"Tool execution failed: {result.Error}";
+                // Include both the error and the content (which contains the full error details in JSON)
+                var errorMessage = $"Tool execution failed: {result.Error}";
+                
+                // If there's content with detailed error info, include it
+                if (!string.IsNullOrEmpty(result.Content))
+                {
+                    errorMessage += $"\n\nDetailed Result:\n{result.Content}";
+                }
+                
+                return errorMessage;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing MCP tool {ToolName}", toolCall.FunctionName);
-            return $"Error executing tool {toolCall.FunctionName}: {ex.Message}";
+            return $"Error executing tool {toolCall.FunctionName}: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
         }
     }
 

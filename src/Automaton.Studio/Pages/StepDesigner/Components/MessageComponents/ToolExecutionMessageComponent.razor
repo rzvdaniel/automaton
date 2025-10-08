@@ -26,14 +26,6 @@
                           Timestamp="@Timestamp"
                           ShowTimestamp="true" />
     }
-    
-    @if (!string.IsNullOrEmpty(ErrorMessage))
-    {
-        <div class="tool-error">
-            <Icon Type="exclamation-circle" Style="color: #dc3545; margin-right: 4px;" />
-            <span>@ErrorMessage</span>
-        </div>
-    }
 </div>
 
 @code {

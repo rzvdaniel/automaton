@@ -254,12 +254,21 @@ public class StudioMcpToolProvider : IMcpToolProvider
                 _stepContexts[stepId] = new StepContext { Code = code, Language = language };
             }
 
-            // Enhanced result with detailed feedback
+            // Enhanced result with detailed feedback and full error information
             var result = new
             {
                 success = executionResult.Success,
                 output = executionResult.Output ?? "",
                 errors = executionResult.Errors ?? Array.Empty<string>(),
+                errorInfo = executionResult.ErrorInfo != null ? new
+                {
+                    errorType = executionResult.ErrorInfo.ErrorType,
+                    message = executionResult.ErrorInfo.Message,
+                    lineNumber = executionResult.ErrorInfo.LineNumber,
+                    columnNumber = executionResult.ErrorInfo.ColumnNumber,
+                    stackTrace = executionResult.ErrorInfo.StackTrace,
+                    formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
+                } : null,
                 outputVariables = executionResult.OutputVariables ?? new Dictionary<string, object>(),
                 executionTime = executionResult.ExecutionTime ?? "0ms",
                 inputVariablesUsed = inputVariables,
@@ -275,8 +284,10 @@ public class StudioMcpToolProvider : IMcpToolProvider
 
             return new McpToolResult 
             { 
-                Success = executionResult.Success, // ?? FIX: Use actual execution result success status
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Success = executionResult.Success,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }),
+                // Include error message for failed executions
+                Error = executionResult.Success ? null : (executionResult.ErrorInfo?.GetFormattedErrorForAI() ?? string.Join("\n", executionResult.Errors ?? Array.Empty<string>()))
             };
         }
         catch (Exception ex)
@@ -285,7 +296,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
             return new McpToolResult 
             { 
                 Success = false, 
-                Error = $"Execution failed: {ex.Message}" 
+                Error = $"Execution failed: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}"
             };
         }
     }

@@ -26,10 +26,83 @@ public class ExecuteCodeProcessor : IToolResultProcessor
         }
         else if (!toolResult.IsSuccess)
         {
-            viewModel.ErrorMessage = toolResult.ErrorMessage;
+            // Extract detailed error information from the result
+            viewModel.ErrorMessage = ExtractErrorMessage(toolResult);
+            
+            // Also set raw result to full details if available
+            if (!string.IsNullOrEmpty(toolResult.Result))
+            {
+                viewModel.RawResult = toolResult.Result;
+            }
         }
 
         return viewModel;
+    }
+
+    private string ExtractErrorMessage(ToolResult toolResult)
+    {
+        // Try to parse the result as JSON and extract detailed error info
+        if (!string.IsNullOrEmpty(toolResult.Result))
+        {
+            try
+            {
+                // Check if result contains "Detailed Result:" which indicates error details
+                if (toolResult.Result.Contains("Detailed Result:"))
+                {
+                    var parts = toolResult.Result.Split(new[] { "Detailed Result:" }, StringSplitOptions.None);
+                    if (parts.Length > 1)
+                    {
+                        var jsonPart = parts[1].Trim();
+                        using var doc = JsonDocument.Parse(jsonPart);
+                        var root = doc.RootElement;
+                        
+                        // Extract error information
+                        var errorMessage = new System.Text.StringBuilder();
+                        
+                        // Add the main error message
+                        if (root.TryGetProperty("errorInfo", out var errorInfo) && errorInfo.ValueKind != JsonValueKind.Null)
+                        {
+                            if (errorInfo.TryGetProperty("formattedError", out var formattedError))
+                            {
+                                errorMessage.AppendLine(formattedError.GetString());
+                            }
+                            else if (errorInfo.TryGetProperty("message", out var message))
+                            {
+                                errorMessage.AppendLine(message.GetString());
+                                
+                                if (errorInfo.TryGetProperty("lineNumber", out var lineNumber) && lineNumber.ValueKind != JsonValueKind.Null)
+                                {
+                                    errorMessage.AppendLine($"Line: {lineNumber.GetInt32()}");
+                                }
+                            }
+                        }
+                        else if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var error in errors.EnumerateArray())
+                            {
+                                errorMessage.AppendLine(error.GetString());
+                            }
+                        }
+                        else if (root.TryGetProperty("output", out var output))
+                        {
+                            errorMessage.AppendLine(output.GetString());
+                        }
+                        
+                        if (errorMessage.Length > 0)
+                        {
+                            return errorMessage.ToString().Trim();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If parsing fails, fall through to default handling
+            }
+        }
+        
+        // Fallback to error message or raw result
+        return toolResult.ErrorMessage ?? toolResult.Result ?? "Unknown error occurred";
     }
 
     private string GetExecutionSummary(string toolResult)

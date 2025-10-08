@@ -10,37 +10,39 @@
                       Timestamp="@Timestamp"
                       ShowTimestamp="@ShowTimestamp" />
 
-    @if (!string.IsNullOrEmpty(Result.ErrorMessage))
+    @* Each result type component handles its own error display *@
+    @switch (Result.ResultType)
     {
-        <div class="tool-result-error">
-            <strong>Error:</strong> @Result.ErrorMessage
-        </div>
-    }
-    else if (Result.IsSuccess)
-    {
-        @switch (Result.ResultType)
-        {
-            case ToolResultType.Code:
-                <CodeResultDisplay Result="Result" />
-                break;
-                
-            case ToolResultType.Execution:
-                <ExecutionResultDisplay Result="Result" />
-                break;
-                
-            case ToolResultType.Variables:
-                <VariablesResultDisplay Result="Result" />
-                break;
-                
-            case ToolResultType.SaveCode:
-                <SaveCodeResultDisplay Result="Result" />
-                break;
-                
-            case ToolResultType.Generic:
-            default:
+        case ToolResultType.Code:
+            <CodeResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Execution:
+            <ExecutionResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Variables:
+            <VariablesResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.SaveCode:
+            <SaveCodeResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Generic:
+        default:
+            @* Generic results still need error display here *@
+            @if (!string.IsNullOrEmpty(Result.ErrorMessage))
+            {
+                <div class="tool-result-error">
+                    <strong>Error:</strong> @Result.ErrorMessage
+                </div>
+            }
+            else
+            {
                 <GenericResultDisplay Result="Result" />
-                break;
-        }
+            }
+            break;
     }
 </div>
 
