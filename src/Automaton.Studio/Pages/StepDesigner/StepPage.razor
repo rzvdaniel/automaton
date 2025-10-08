@@ -26,13 +26,20 @@
                                 </BreadcrumbItem>
                             </Breadcrumb>
                         </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="View documentation on creating custom steps">
+                                <a href="/docs/#/user-guide/custom-steps" target="_blank" class="docs-link">
+                                <Icon Type="question-circle" Width="20" Height="20" />
+                                </a>
+                            </Tooltip>
+                        </SpaceItem>
                     </Space>
                 </Col>
                 <Col Class="right-actions">
                     <Space Class="right-header-items">
                         <SpaceItem>
                             <Tooltip Title="Save step">
-                                <Button Icon="save" OnClick="Save">
+                                <Button Icon="save" OnClick="Save" Type="@ButtonType.Primary">
                                     Save
                                 </Button>
                             </Tooltip>
@@ -198,10 +205,10 @@
                                                              CurrentStepId="@StepId" />
                                             </div>
                                         </TabPane>
-                                        <TabPane Tab="Variables" Key="variables">
+                                        <TabPane Tab="Test Variables" Key="variables">
                                             <div class="tab-content-scrollable">
                                                 <div class="variables-panel">
-                                                    <PanelHeader Title="Variables"
+                                                    <PanelHeader Title="Test variable values"
                                                                  ShowClearButton="false"
                                                                  ShowPinButton="true"
                                                                  ShowCloseButton="true"
@@ -211,7 +218,7 @@
                                                     <Collapse DefaultActiveKey="@(new[] { "input" })" Bordered="false" Class="variables-collapse-panel">
                                                         <Panel Key="input">
                                                             <HeaderTemplate>
-                                                                <b>Test Input Variables</b>
+                                                                <b>Input Variables</b>
                                                             </HeaderTemplate>
                                                             <ChildContent>
                                                                 <div class="scrollable-list">
@@ -228,7 +235,7 @@
                                                     <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
                                                         <Panel Key="output">
                                                             <HeaderTemplate>
-                                                                <b>Test Output Variables</b>
+                                                                <b>Output Variables</b>
                                                             </HeaderTemplate>
                                                             <ChildContent>
                                                                 <div class="scrollable-list">
@@ -376,31 +383,89 @@
                     </TabPane>
 
                     <TabPane Tab="Settings" Key="4">
-                        <Row Gutter="(16, 0)" Justify="RowJustify.Start">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Name">
-                                <Input @bind-Value="@context.Name" Placeholder="Enter name" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Display Name">
-                                <Input @bind-Value="@context.DisplayName" Placeholder="Enter display name" />
-                            </FormItem>
-                            </Col>
-                        </Row>
+                        <div class="settings-container">
+                            <Card Class="settings-card" Bordered="true">
+                                <TitleTemplate>
+                                    <Space>
+                                        <SpaceItem>
+                                            <Icon Type="setting" Style="color: #1890ff;" />
+                                        </SpaceItem>
+                                        <SpaceItem>
+                                            <span>Step Configuration</span>
+                                        </SpaceItem>
+                                    </Space>
+                                </TitleTemplate>
+                                <Extra>
+                                    <Tooltip Title="View documentation on custom step configuration">
+                                        <a href="/docs/#/user-guide/custom-steps" target="_blank" style="color: #666;">
+                                            <Icon Type="book" />
+                                        </a>
+                                    </Tooltip>
+                                </Extra>
+                                <ChildContent>
+                                    <Paragraph Style="color: #666; margin-bottom: 24px;">
+                                        Configure your custom step's basic properties. These settings help identify and describe your step within workflows.
+                                    </Paragraph>
+                                    
+                                    <Row Gutter="(24, 16)">
+                                        <Col Xs="24" Md="12">
+                                            <FormItem Label="Name" Required>
+                                                <Input @bind-Value="@context.Name" 
+                                                       Placeholder="Enter a unique name (e.g., 'SendEmail')" 
+                                                       Size="@InputSize.Large" />
+                                                <div class="field-hint">
+                                                    <Icon Type="info-circle" Style="margin-right: 4px;" />
+                                                    <span>Unique identifier for this step</span>
+                                                </div>
+                                            </FormItem>
+                                        </Col>
+                                        <Col Xs="24" Md="12">
+                                            <FormItem Label="Display Name">
+                                                <Input @bind-Value="@context.DisplayName" 
+                                                       Placeholder="Enter display name (e.g., 'Send Email')" 
+                                                       Size="@InputSize.Large" />
+                                                <div class="field-hint">
+                                                    <Icon Type="info-circle" Style="margin-right: 4px;" />
+                                                    <span>Friendly name shown in the flow designer</span>
+                                                </div>
+                                            </FormItem>
+                                        </Col>
+                                    </Row>
 
-                        <Row Gutter="(16, 0)" Justify="RowJustify.Start">
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="Description">
-                                <Input @bind-Value="@context.Description" Placeholder="Enter description" />
-                            </FormItem>
-                            </Col>
-                            <Col Xs="24" Md="6">
-                            <FormItem Label="More info URL">
-                                <Input @bind-Value="@context.MoreInfo" Placeholder="Enter more info" />
-                            </FormItem>
-                            </Col>
-                        </Row>
+                                    <Row Gutter="(24, 16)">
+                                        <Col Span="24">
+                                            <FormItem Label="Description">
+                                                <TextArea @bind-Value="@context.Description" 
+                                                         Placeholder="Describe what this step does and when to use it..."
+                                                         Rows="4"
+                                                         ShowCount
+                                                         MaxLength="500"
+                                                         Size="@InputSize.Large" />
+                                                <div class="field-hint">
+                                                    <Icon Type="info-circle" Style="margin-right: 4px;" />
+                                                    <span>Help users understand the purpose and functionality of this step</span>
+                                                </div>
+                                            </FormItem>
+                                        </Col>
+                                    </Row>
+
+                                    <Row Gutter="(24, 16)">
+                                        <Col Span="24">
+                                            <FormItem Label="More Info URL">
+                                                <Input @bind-Value="@context.MoreInfo" 
+                                                       Placeholder="https://docs.example.com/steps/custom-step" 
+                                                       Size="@InputSize.Large"
+                                                       Prefix="@linkIcon" />
+                                                <div class="field-hint">
+                                                    <Icon Type="info-circle" Style="margin-right: 4px;" />
+                                                    <span>Optional link to detailed documentation or examples</span>
+                                                </div>
+                                            </FormItem>
+                                        </Col>
+                                    </Row>
+                                </ChildContent>
+                            </Card>
+                        </div>
                     </TabPane>
 
                 </Tabs>
@@ -408,6 +473,10 @@
         </Form>
     </Content>
 </Layout>
+
+@code {
+    private RenderFragment linkIcon = @<Icon Type="link" />;
+}
 
 <style>
     .step-form {
@@ -645,5 +714,74 @@
     .tab-content-scrollable .ai-chat-panel {
         height: 100%;
         min-height: 0;
+    }
+
+    /* Settings Tab Styling */
+    .settings-container {
+        padding: 24px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .settings-card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        border: 1px solid #f0f0f0;
+        border-radius: 8px;
+    }
+
+    .settings-card .ant-card-head {
+        border-bottom: 1px solid #f0f0f0;
+        background: #fafafa;
+    }
+
+    .settings-card .ant-card-head-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #262626;
+    }
+
+    .settings-card .ant-card-body {
+        padding: 32px;
+    }
+
+    .field-hint {
+        display: flex;
+        align-items: center;
+        margin-top: 6px;
+        font-size: 12px;
+        color: #8c8c8c;
+        line-height: 1.4;
+    }
+
+    .field-hint .anticon {
+        font-size: 12px;
+        color: #1890ff;
+    }
+
+    /* Documentation link in breadcrumb */
+    .docs-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        padding: 4px;
+        border-radius: 4px;
+        vertical-align: middle;
+        line-height: 1;
+    }
+
+    .docs-link:hover {
+        background-color: rgba(24, 144, 255, 0.1);
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .settings-container {
+            padding: 16px;
+        }
+
+        .settings-card .ant-card-body {
+            padding: 20px;
+        }
     }
 </style>
