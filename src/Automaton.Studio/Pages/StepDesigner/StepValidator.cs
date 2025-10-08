@@ -8,7 +8,6 @@ namespace Automaton.Studio.Pages.StepDesigner
         public StepValidator()
         {
             RuleFor(x => x.Name).NotEmpty().MaximumLength(256).WithMessage(Resources.Errors.NameRequired);
-            RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(256).WithMessage(Resources.Errors.DisplayNameRequired);
         }
     }
 }

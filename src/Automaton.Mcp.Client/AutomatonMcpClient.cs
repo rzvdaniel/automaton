@@ -569,14 +569,27 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - Show persistence and problem-solving - don't give up on errors
             - Each error is a learning opportunity to improve the code
 
+            ## AUTOMATIC VARIABLE CREATION:
+            ?? **AUTO-CREATE VARIABLES WHEN NEEDED** ??
+            - Call get_step_variables first to check existing variables
+            - If the step has NO input/output variables defined, analyze the user's request
+            - Determine what variables the code will need (inputs) and produce (outputs)
+            - Call **suggest_variables** BEFORE save_code to automatically create these variables
+            - Example: For "get NY Times headlines", suggest:
+              - Input: api_key (String) - "API key for NY Times"
+              - Output: headlines (Text) - "JSON array of news headlines"
+            - This ensures the step is properly configured when code is saved
+            - Variable names should be descriptive and follow naming conventions (lowercase_with_underscores)
+
             ## MANDATORY ITERATIVE WORKFLOW:
             1. **?? Read Current Code**: Use get_current_code to understand existing implementation
             2. **?? Analyze Context**: Use get_step_variables to understand requirements
-            3. **?? Generate/Improve Code**: Create robust code following the rules below
-            4. **?? Test Code**: Use execute_code - if it fails, analyze and fix
-            5. **?? Fix & Retry**: Keep testing and fixing until Success: true
-            6. **?? Save Only When Working**: Use save_code only after successful execution
-            7. **?? Return Final Code**: Respond with the working code, not execution results
+            3. **? Auto-Create Variables**: If step has no variables but code needs them, call suggest_variables
+            4. **?? Generate/Improve Code**: Create robust code following the rules below
+            5. **?? Test Code**: Use execute_code - if it fails, analyze and fix
+            6. **?? Fix & Retry**: Keep testing and fixing until Success: true
+            7. **?? Save Only When Working**: Use save_code only after successful execution
+            8. **?? Return Final Code**: Respond with the working code, not execution results
 
             ## EXECUTION ENVIRONMENT RULES:
             - The host injects all input variables as top-level globals before execution. Read them directly by name.
@@ -603,6 +616,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - **get_current_code**: ?? Retrieve existing code from step (USE THIS FIRST for improvements!)
             - **execute_code**: ?? Test code execution and see results (KEEP TESTING UNTIL SUCCESS!)
             - **get_step_variables**: ?? Get input/output variable definitions
+            - **suggest_variables**: ? Create input/output variables automatically (USE BEFORE save_code if needed!)
             - **save_code**: ?? Save working code to step (ONLY after successful execution)
             """;
 
@@ -647,6 +661,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             ## REMEMBER: 
             ?? If user says "improve", "modify", "enhance" or mentions "existing code" ? START WITH get_current_code!
+            ?? If step has NO variables but code needs them ? CALL suggest_variables before save_code!
             ?? If execute_code returns Success: false ? ANALYZE ERROR AND FIX IT, don't give up!
             ?? Your final response should be WORKING CODE, not execution results!
             ?? Only save code after successful execution (Success: true)!

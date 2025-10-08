@@ -96,6 +96,69 @@ public class StudioMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
+                Name = "suggest_variables",
+                Description = "Suggest input and output variables that should be created for the step based on the code requirements. Call this BEFORE save_code if the step has no variables defined but the code needs them.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "stepId": {
+                            "type": "string",
+                            "description": "The ID of the step"
+                        },
+                        "inputVariables": {
+                            "type": "array",
+                            "description": "Array of input variables to create",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Variable name (e.g., 'api_key', 'input_url')"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["String", "Text", "Number", "Boolean", "Date"],
+                                        "description": "Variable type"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Description of what this variable is used for"
+                                    }
+                                },
+                                "required": ["name", "type", "description"]
+                            }
+                        },
+                        "outputVariables": {
+                            "type": "array",
+                            "description": "Array of output variables to create",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Variable name (e.g., 'result', 'headlines')"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["String", "Text", "Number", "Boolean", "Date"],
+                                        "description": "Variable type"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Description of what this variable contains"
+                                    }
+                                },
+                                "required": ["name", "type", "description"]
+                            }
+                        }
+                    },
+                    "required": ["stepId"]
+                }
+                """)
+            },
+            new McpTool
+            {
                 Name = "save_code",
                 Description = "Save generated code to a step",
                 InputSchema = JsonDocument.Parse("""
@@ -133,6 +196,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
                 "get_current_code" => await GetCurrentCodeAsync(arguments, currentStepId),
                 "execute_code" => await ExecuteCodeAsync(arguments, currentStepId),
                 "get_step_variables" => await GetStepVariablesAsync(arguments, currentStepId),
+                "suggest_variables" => await SuggestVariablesAsync(arguments, currentStepId),
                 "save_code" => await SaveCodeAsync(arguments, currentStepId),
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
@@ -476,6 +540,85 @@ public class StudioMcpToolProvider : IMcpToolProvider
             { 
                 Success = false, 
                 Error = $"Failed to save code: {ex.Message}" 
+            };
+        }
+    }
+
+    private async Task<McpToolResult> SuggestVariablesAsync(JsonElement arguments, string? currentStepId)
+    {
+        var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
+            ? stepIdProp.GetString() 
+            : currentStepId ?? _stepContextService.GetCurrentStepId();
+        
+        if (string.IsNullOrEmpty(stepId))
+        {
+            return new McpToolResult { Success = false, Error = "Step ID is required" };
+        }
+
+        try
+        {
+            var inputVars = new List<(string Name, string Type, string Description)>();
+            var outputVars = new List<(string Name, string Type, string Description)>();
+
+            // Parse input variables
+            if (arguments.TryGetProperty("inputVariables", out var inputVarsElement))
+            {
+                foreach (var varElement in inputVarsElement.EnumerateArray())
+                {
+                    var name = varElement.GetProperty("name").GetString();
+                    var type = varElement.GetProperty("type").GetString();
+                    var description = varElement.GetProperty("description").GetString();
+                    
+                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(type))
+                    {
+                        inputVars.Add((name, type, description ?? ""));
+                    }
+                }
+            }
+
+            // Parse output variables
+            if (arguments.TryGetProperty("outputVariables", out var outputVarsElement))
+            {
+                foreach (var varElement in outputVarsElement.EnumerateArray())
+                {
+                    var name = varElement.GetProperty("name").GetString();
+                    var type = varElement.GetProperty("type").GetString();
+                    var description = varElement.GetProperty("description").GetString();
+                    
+                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(type))
+                    {
+                        outputVars.Add((name, type, description ?? ""));
+                    }
+                }
+            }
+
+            // Create variables using the step context service
+            var createdInputs = await _stepContextService.CreateInputVariablesAsync(inputVars);
+            var createdOutputs = await _stepContextService.CreateOutputVariablesAsync(outputVars);
+
+            _logger.LogInformation("Created {InputCount} input and {OutputCount} output variables for step {StepId}", 
+                createdInputs, createdOutputs, stepId);
+
+            return new McpToolResult 
+            { 
+                Success = true, 
+                Content = JsonSerializer.Serialize(new
+                {
+                    message = "Variables created successfully",
+                    inputVariablesCreated = createdInputs,
+                    outputVariablesCreated = createdOutputs,
+                    inputVariables = inputVars.Select(v => new { name = v.Name, type = v.Type, description = v.Description }),
+                    outputVariables = outputVars.Select(v => new { name = v.Name, type = v.Type, description = v.Description })
+                }, new JsonSerializerOptions { WriteIndented = true })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error suggesting variables for step {StepId}", stepId);
+            return new McpToolResult 
+            { 
+                Success = false, 
+                Error = $"Failed to create variables: {ex.Message}" 
             };
         }
     }

@@ -45,6 +45,16 @@ public interface ICurrentStepContextService
     Task SetCodeAsync(string code);
     
     /// <summary>
+    /// Create input variables for the current step
+    /// </summary>
+    Task<int> CreateInputVariablesAsync(List<(string Name, string Type, string Description)> variables);
+    
+    /// <summary>
+    /// Create output variables for the current step
+    /// </summary>
+    Task<int> CreateOutputVariablesAsync(List<(string Name, string Type, string Description)> variables);
+    
+    /// <summary>
     /// Event fired when step context changes
     /// </summary>
     event EventHandler<StepContextChangedEventArgs>? StepContextChanged;
@@ -131,6 +141,79 @@ public class CurrentStepContextService : ICurrentStepContextService
             _currentStep.Definition.Code = code;
             _logger.LogDebug("Code updated for step {StepId}", _currentStep.Id);
         }
+    }
+
+    public async Task<int> CreateInputVariablesAsync(List<(string Name, string Type, string Description)> variables)
+    {
+        if (_currentStep == null) return 0;
+
+        var created = 0;
+        foreach (var (name, type, description) in variables)
+        {
+            if (!Enum.TryParse<Automaton.Core.Enums.VariableType>(type, out var varType))
+                continue;
+
+            var variable = new Automaton.Core.Models.StepVariable
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = name,
+                Type = varType,
+                Description = description,
+                Value = GetDefaultValueForType(varType)
+            };
+
+            _currentStep.Definition.CodeInputVariables ??= new List<StepVariable>();
+            _currentStep.Definition.CodeInputVariables.Add(variable);
+            created++;
+        }
+
+        _logger.LogDebug("Created {Count} input variables for step {StepId}", created, _currentStep.Id);
+        
+        await Task.CompletedTask;
+        return created;
+    }
+
+    public async Task<int> CreateOutputVariablesAsync(List<(string Name, string Type, string Description)> variables)
+    {
+        if (_currentStep == null) return 0;
+
+        var created = 0;
+        foreach (var (name, type, description) in variables)
+        {
+            if (!Enum.TryParse<Automaton.Core.Enums.VariableType>(type, out var varType))
+                continue;
+
+            var variable = new Automaton.Core.Models.StepVariable
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = name,
+                Type = varType,
+                Description = description,
+                Value = GetDefaultValueForType(varType)
+            };
+
+            _currentStep.Definition.CodeOutputVariables ??= new List<StepVariable>();
+            _currentStep.Definition.CodeOutputVariables.Add(variable);
+            created++;
+        }
+
+        _logger.LogDebug("Created {Count} output variables for step {StepId}", created, _currentStep.Id);
+        
+        await Task.CompletedTask;
+        return created;
+    }
+
+    private string GetDefaultValueForType(Automaton.Core.Enums.VariableType type)
+    {
+        return type switch
+        {
+            Automaton.Core.Enums.VariableType.String => "",
+            Automaton.Core.Enums.VariableType.Text => "",
+            Automaton.Core.Enums.VariableType.Number => "0",
+            Automaton.Core.Enums.VariableType.Boolean => "false",
+            Automaton.Core.Enums.VariableType.Date => DateTime.Now.ToString("yyyy-MM-dd"),
+            _ => ""
+        };
     }
 }
 
