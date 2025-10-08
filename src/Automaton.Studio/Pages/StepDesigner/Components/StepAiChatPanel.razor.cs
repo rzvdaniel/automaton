@@ -273,6 +273,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             "get_current_code" => "📖",    // Book emoji
             "execute_code" => "🧪",        // Test tube emoji  
             "get_step_variables" => "🔍",  // Magnifying glass emoji
+            "suggest_variables" => "✨",    // Sparkles emoji (for creating variables)
             "save_code" => "💾",           // Floppy disk emoji
             _ => "🔧"                      // Wrench emoji
         };
@@ -285,6 +286,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             "get_current_code" => "Reading current code from editor",
             "execute_code" => "Testing code execution",
             "get_step_variables" => "Analyzing step variables",
+            "suggest_variables" => "Creating input/output variables",
             "save_code" => "Saving code to step",
             _ => "Executing tool"
         };

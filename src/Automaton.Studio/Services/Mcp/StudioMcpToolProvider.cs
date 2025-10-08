@@ -13,16 +13,19 @@ public class StudioMcpToolProvider : IMcpToolProvider
     private readonly ILogger<StudioMcpToolProvider> _logger;
     private readonly ICustomStepExecuteService _executeService;
     private readonly ICurrentStepContextService _stepContextService;
+    private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, StepContext> _stepContexts = new();
-    
+
     public StudioMcpToolProvider(
         ILogger<StudioMcpToolProvider> logger,
         ICustomStepExecuteService executeService,
-        ICurrentStepContextService stepContextService)
+        ICurrentStepContextService stepContextService,
+        AiCodeCleanupService codeCleanupService)
     {
         _logger = logger;
         _executeService = executeService;
         _stepContextService = stepContextService;
+        _codeCleanupService = codeCleanupService;
     }
 
     public Task<IEnumerable<McpTool>> GetToolsAsync()
@@ -506,40 +509,70 @@ public class StudioMcpToolProvider : IMcpToolProvider
 
     private async Task<McpToolResult> SaveCodeAsync(JsonElement arguments, string? currentStepId)
     {
-        var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
-            ? stepIdProp.GetString() 
+        var stepId = arguments.TryGetProperty("stepId", out var stepIdProp)
+            ? stepIdProp.GetString()
             : currentStepId ?? _stepContextService.GetCurrentStepId();
-        var code = arguments.GetProperty("code").GetString();
+        var rawCode = arguments.GetProperty("code").GetString();
         var language = arguments.GetProperty("language").GetString();
-        
-        if (string.IsNullOrEmpty(stepId) || string.IsNullOrEmpty(code) || string.IsNullOrEmpty(language))
+
+        if (string.IsNullOrEmpty(stepId) || string.IsNullOrEmpty(rawCode) || string.IsNullOrEmpty(language))
         {
             return new McpToolResult { Success = false, Error = "Step ID, code, and language are required" };
         }
 
         try
         {
-            // Save to the actual step context so it appears in the UI
-            await _stepContextService.SetCodeAsync(code);
-            
-            // Also store in our local context for future reference
-            _stepContexts[stepId] = new StepContext { Code = code, Language = language };
-            
-            _logger.LogInformation("Code saved for step {StepId} in {Language}", stepId, language);
+            // AUTOMATICALLY EXTRACT AND CLEAN THE CODE
+            // This removes markdown formatting, explanations, and other artifacts
+            var cleanedCode = _codeCleanupService.CleanupGeneratedCode(rawCode);
 
-            return new McpToolResult 
-            { 
-                Success = true, 
-                Content = $"Code saved successfully for step {stepId}. The code is now available in the Step Designer." 
+            if (string.IsNullOrWhiteSpace(cleanedCode))
+            {
+                _logger.LogWarning("Code cleanup resulted in empty code for step {StepId}", stepId);
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = "Code extraction failed - no valid code found after cleanup"
+                };
+            }
+
+            // Log what was cleaned
+            if (rawCode != cleanedCode)
+            {
+                _logger.LogInformation("Code cleaned for step {StepId}: {OriginalLength} -> {CleanedLength} chars",
+                    stepId, rawCode.Length, cleanedCode.Length);
+            }
+
+            // Save the CLEANED code to the step context
+            await _stepContextService.SetCodeAsync(cleanedCode);
+
+            // Also store in our local context for future reference
+            _stepContexts[stepId] = new StepContext { Code = cleanedCode, Language = language };
+
+            _logger.LogInformation("Code saved for step {StepId} in {Language} ({Length} characters, {Lines} lines)",
+                stepId, language, cleanedCode.Length, cleanedCode.Split('\n').Length);
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(new
+                {
+                    message = "Code saved successfully to Step Designer",
+                    stepId = stepId,
+                    language = language,
+                    linesOfCode = cleanedCode.Split('\n').Length,
+                    wasCleanedUp = rawCode != cleanedCode,
+                    note = "Code has been extracted and cleaned. Visible in editor now."
+                }, new JsonSerializerOptions { WriteIndented = true })
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error saving code for step {StepId}", stepId);
-            return new McpToolResult 
-            { 
-                Success = false, 
-                Error = $"Failed to save code: {ex.Message}" 
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to save code: {ex.Message}"
             };
         }
     }

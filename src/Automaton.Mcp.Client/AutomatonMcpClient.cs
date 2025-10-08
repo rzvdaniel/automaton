@@ -565,9 +565,11 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             ?? **NEVER STOP ON FIRST ERROR - ALWAYS FIX AND RETRY** ??
             - If execute_code returns Success: false, you MUST analyze the error and fix it
             - Continue testing and fixing until you get Success: true
-            - Do NOT proceed to save_code until execution is successful
+            - Do NOT return error explanations as your final response
             - Show persistence and problem-solving - don't give up on errors
             - Each error is a learning opportunity to improve the code
+            - IMPORTANT: If code depends on external inputs (like API keys), create variables for them using suggest_variables, then generate code that uses those variables
+            - For missing dependencies or API keys: First suggest the required input variables, then generate code that assumes those inputs exist
 
             ## AUTOMATIC VARIABLE CREATION:
             ?? **AUTO-CREATE VARIABLES WHEN NEEDED** ??
@@ -586,10 +588,19 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             2. **?? Analyze Context**: Use get_step_variables to understand requirements
             3. **? Auto-Create Variables**: If step has no variables but code needs them, call suggest_variables
             4. **?? Generate/Improve Code**: Create robust code following the rules below
-            5. **?? Test Code**: Use execute_code - if it fails, analyze and fix
-            6. **?? Fix & Retry**: Keep testing and fixing until Success: true
-            7. **?? Save Only When Working**: Use save_code only after successful execution
-            8. **?? Return Final Code**: Respond with the working code, not execution results
+            5. **?? Save Initial Code**: Use save_code to make your code visible in the editor immediately
+            6. **?? Test Code**: Use execute_code - if it fails, analyze and fix
+            7. **?? Fix & Iterate**: If errors occur:
+               - Analyze the error carefully
+               - Modify the code to fix the issue
+               - Call save_code again with the improved code (users see progress in real-time!)
+               - Test again with execute_code
+               - Repeat until Success: true
+               - If code fails due to missing inputs (API keys, etc.), that's EXPECTED
+               - Create the required input variables with suggest_variables if not done yet
+               - Generate code that will work WHEN those inputs are provided
+               - Don't try to fix errors caused by missing runtime inputs - just ensure the code logic is correct
+            8. **?? Return Final Code**: Respond with the working code, not execution results or error explanations
 
             ## EXECUTION ENVIRONMENT RULES:
             - The host injects all input variables as top-level globals before execution. Read them directly by name.
@@ -616,9 +627,9 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             - **get_current_code**: ?? Retrieve existing code from step (USE THIS FIRST for improvements!)
             - **execute_code**: ?? Test code execution and see results (KEEP TESTING UNTIL SUCCESS!)
             - **get_step_variables**: ?? Get input/output variable definitions
-            - **suggest_variables**: ? Create input/output variables automatically (USE BEFORE save_code if needed!)
-            - **save_code**: ?? Save working code to step (ONLY after successful execution)
-            """;
+            - **suggest_variables**: ? Create input/output variables automatically (USE BEFORE generating code if needed!)
+            - **save_code**: ?? Save code to step (Can be called MULTIPLE TIMES - save early, test, fix, save again!)
+            """.Trim();
 
         // Add language-specific guidance
         if (string.Equals(language, "Python", StringComparison.OrdinalIgnoreCase))
@@ -661,11 +672,12 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             ## REMEMBER: 
             ?? If user says "improve", "modify", "enhance" or mentions "existing code" ? START WITH get_current_code!
-            ?? If step has NO variables but code needs them ? CALL suggest_variables before save_code!
-            ?? If execute_code returns Success: false ? ANALYZE ERROR AND FIX IT, don't give up!
-            ?? Your final response should be WORKING CODE, not execution results!
-            ?? Only save code after successful execution (Success: true)!
-            Always test your code with execute_code and fix any errors before saving it with save_code.
+            ?? If step has NO variables but code needs them ? CALL suggest_variables before generating code!
+            ?? Save code EARLY and OFTEN - use save_code to show progress, then test and refine!
+            ?? If execute_code returns Success: false ? ANALYZE ERROR, FIX CODE, SAVE AGAIN, and retry!
+            ?? Your final response should be WORKING CODE, not execution results or explanations!
+            ?? The save-test-fix cycle can repeat multiple times - that's normal and expected!
+            Always test your code with execute_code and fix any errors by saving improved versions.
             """;
 
         return prompt;

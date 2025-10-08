@@ -58,6 +58,11 @@ public interface ICurrentStepContextService
     /// Event fired when step context changes
     /// </summary>
     event EventHandler<StepContextChangedEventArgs>? StepContextChanged;
+
+    /// <summary>
+    /// Event fired when code is updated (e.g., by MCP tools)
+    /// </summary>
+    event EventHandler<CodeChangedEventArgs>? CodeChanged;
 }
 
 /// <summary>
@@ -68,6 +73,8 @@ public class CurrentStepContextService : ICurrentStepContextService
     private CustomStep? _currentStep;
     private Func<Task<string>>? _getCurrentCodeCallback;
     private readonly ILogger<CurrentStepContextService> _logger;
+
+    public event EventHandler<CodeChangedEventArgs>? CodeChanged;
 
     public CurrentStepContextService(ILogger<CurrentStepContextService> logger)
     {
@@ -140,6 +147,13 @@ public class CurrentStepContextService : ICurrentStepContextService
         {
             _currentStep.Definition.Code = code;
             _logger.LogDebug("Code updated for step {StepId}", _currentStep.Id);
+
+            // Notify subscribers that code has changed (e.g., Monaco editor in UI)
+            CodeChanged?.Invoke(this, new CodeChangedEventArgs
+            {
+                StepId = _currentStep.Id.ToString(),
+                NewCode = code
+            });
         }
     }
 
@@ -224,4 +238,13 @@ public class StepContextChangedEventArgs : EventArgs
 {
     public string? StepId { get; set; }
     public string? Language { get; set; }
+}
+
+/// <summary>
+/// Event arguments for code changes
+/// </summary>
+public class CodeChangedEventArgs : EventArgs
+{
+    public string? StepId { get; set; }
+    public string NewCode { get; set; } = string.Empty;
 }

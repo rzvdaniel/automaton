@@ -40,12 +40,13 @@ partial class StepPage : ComponentBase, IDisposable
     protected override async Task OnInitializedAsync()
     {
         StepDesignerViewModel.ScriptTextWritten += OnScriptOutputWritten;
+        CurrentStepContextService.CodeChanged += OnCodeChangedByMcpTools;
 
         await StepDesignerViewModel.Load(Guid.Parse(StepId));
 
         // Register current step with the context service
         CurrentStepContextService.SetCurrentStep(
-            StepDesignerViewModel.CustomStep, 
+            StepDesignerViewModel.CustomStep,
             GetCurrentCodeForAI);
 
         // Clear logs when entering the step
@@ -284,6 +285,26 @@ partial class StepPage : ComponentBase, IDisposable
         return new Dictionary<string, object>() { { "Variable", customStepVariable } };
     }
 
+    private async void OnCodeChangedByMcpTools(object? sender, CodeChangedEventArgs e)
+    {
+        try
+        {
+            // Update Monaco editor with the new code saved by MCP tools
+            if (codeEditor != null && !string.IsNullOrEmpty(e.NewCode))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await codeEditor.SetValue(e.NewCode);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Error updating editor: {ex.Message}");
+        }
+    }
+
     private async void OnScriptOutputWritten(object sender, EventArgs e)
     {
         await InvokeAsync(StateHasChanged);
@@ -308,5 +329,6 @@ partial class StepPage : ComponentBase, IDisposable
     public void Dispose()
     {
         StepDesignerViewModel.ScriptTextWritten -= OnScriptOutputWritten;
+        CurrentStepContextService.CodeChanged -= OnCodeChangedByMcpTools; // ADD THIS LINE
     }
 }
