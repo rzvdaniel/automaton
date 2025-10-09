@@ -789,10 +789,7 @@ private string BuildEnhancedSystemPrompt(ConversationRequest request)
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2025-01-XX | Initial system prompt structure |
-| 2.0 | 2025-01-XX | Added `suggest_variables` tool and automatic variable creation |
-| 2.1 | 2025-01-XX | Updated workflow to support iterative save-test-fix cycle |
-| 2.2 | 2025-01-XX | Added server-side code extraction and cleaning |
+| 1.0 | 2025-10-08 | Initial system prompt structure |
 
 ---
 
