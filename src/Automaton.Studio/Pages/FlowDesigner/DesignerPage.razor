@@ -224,14 +224,6 @@
                                 <div class="right-panel-container">
                                     <CascadingValue Value="DesignerViewModel.Flow">
                                         <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
-                                            <TabPane Tab="AI Chat" Key="ai">
-                                                <div class="tab-content-scrollable">
-                                                    <FlowAiChatPanel OnFlowGenerated="OnFlowGenerated"
-                                                                        AvailableSteps="@GetAvailableStepsForAI()"
-                                                                        AvailableCustomSteps="@GetAvailableCustomStepsForAI()"
-                                                                        GetCurrentFlow="@GetCurrentFlowForAI" />
-                                                </div>
-                                            </TabPane>
                                             <TabPane Tab="Properties" Key="properties">
                                                 <div class="tab-content-scrollable">                                              
                                                     <div class="properties-container">
