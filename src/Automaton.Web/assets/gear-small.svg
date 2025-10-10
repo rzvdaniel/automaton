@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="gearGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <g>
+    <!-- Outer gear teeth -->
+    <path d="M60,15 L65,22 L55,22 Z M100,30 L103,38 L94,35 Z M105,60 L98,65 L98,55 Z M100,90 L94,85 L103,82 Z M60,105 L55,98 L65,98 Z M20,90 L17,82 L26,85 Z M15,60 L22,55 L22,65 Z M20,30 L26,35 L17,38 Z" 
+          fill="url(#gearGradient2)" opacity="0.8"/>
+    <!-- Main gear body -->
+    <circle cx="60" cy="60" r="35" fill="url(#gearGradient2)"/>
+    <!-- Center hole -->
+    <circle cx="60" cy="60" r="18" fill="#0F172A" stroke="url(#gearGradient2)" stroke-width="2"/>
+    <!-- Inner details -->
+    <circle cx="60" cy="60" r="26" fill="none" stroke="#0F172A" stroke-width="1.5" opacity="0.3"/>
+  </g>
+</svg>

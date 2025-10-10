@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, observerOptions);
     
     // Observe elements for animation
-    const animateElements = document.querySelectorAll('.feature-card, .use-case, .doc-preview');
+    const animateElements = document.querySelectorAll('.feature-card, .use-case, .doc-preview, .step-card, .app-element');
     animateElements.forEach(el => observer.observe(el));
     
     // Code editor typing effect
@@ -122,12 +122,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function animateStats() {
         stats.forEach(stat => {
-            const text = stat.textContent;
+            const text = stat.textContent.trim();
             if (text === '10x') {
                 animateNumber(stat, 1, 10, 'x');
             } else if (text === '100%') {
                 animateNumber(stat, 0, 100, '%');
-            } else if (text === 'AI') {
+            } else if (text === 'AI' || text === '2-in-1' || text === 'Zero') {
                 stat.style.animation = 'pulse 0.8s ease';
             }
         });
