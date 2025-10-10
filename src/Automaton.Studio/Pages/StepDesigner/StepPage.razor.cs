@@ -267,24 +267,6 @@ partial class StepPage : ComponentBase, IDisposable
         }
     }
 
-    private Type GetVariableComponent(VariableType type)
-    {
-        return type switch
-        {
-            VariableType.String => typeof(StringVariable),
-            VariableType.Text => typeof(TextVariable),
-            VariableType.Boolean => typeof(BooleanVariable),
-            VariableType.Number => typeof(NumericVariable),
-            VariableType.Date => typeof(DateVariable),
-            _ => throw new NotImplementedException()
-        };
-    }
-
-    private Dictionary<string, object> GetVariableComponentParameters(Core.Models.StepVariable customStepVariable)
-    {
-        return new Dictionary<string, object>() { { "Variable", customStepVariable } };
-    }
-
     private async void OnCodeChangedByMcpTools(object? sender, CodeChangedEventArgs e)
     {
         try
