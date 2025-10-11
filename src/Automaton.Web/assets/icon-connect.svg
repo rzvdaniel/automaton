@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="connectGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Connected gears -->
+  <circle cx="50" cy="50" r="45" fill="url(#connectGradient)" opacity="0.2"/>
+  <!-- Left gear -->
+  <circle cx="35" cy="50" r="12" fill="url(#connectGradient)"/>
+  <circle cx="35" cy="50" r="6" fill="#0F172A"/>
+  <!-- Right gear -->
+  <circle cx="65" cy="50" r="12" fill="url(#connectGradient)"/>
+  <circle cx="65" cy="50" r="6" fill="#0F172A"/>
+  <!-- Connection line -->
+  <rect x="41" y="48" width="18" height="4" fill="url(#connectGradient)" opacity="0.6"/>
+  <!-- Arrows -->
+  <path d="M58,50 L63,53 L63,47 Z" fill="url(#connectGradient)"/>
+  <path d="M42,50 L37,47 L37,53 Z" fill="url(#connectGradient)"/>
+</svg>
