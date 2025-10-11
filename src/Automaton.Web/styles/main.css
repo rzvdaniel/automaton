@@ -315,7 +315,7 @@ body {
     width: 180px;
     height: 180px;
     top: 50%;
-    right: 15%;
+    right: 0%;
     animation: rotateCounterClockwise 15s linear infinite;
     filter: drop-shadow(0 8px 25px rgba(59, 130, 246, 0.3));
 }
