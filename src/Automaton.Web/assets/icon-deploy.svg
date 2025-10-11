@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="deployGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Cloud with gears -->
+  <circle cx="50" cy="50" r="45" fill="url(#deployGradient)" opacity="0.2"/>
+  <path d="M30,55 Q30,45 40,45 Q40,35 50,35 Q60,35 60,45 Q70,45 70,55 Q70,65 60,65 L40,65 Q30,65 30,55 Z" fill="url(#deployGradient)"/>
+  <!-- Multiple small gears inside cloud -->
+  <circle cx="42" cy="52" r="6" fill="#0F172A" opacity="0.3"/>
+  <circle cx="50" cy="52" r="6" fill="#0F172A" opacity="0.3"/>
+  <circle cx="58" cy="52" r="6" fill="#0F172A" opacity="0.3"/>
+</svg>
