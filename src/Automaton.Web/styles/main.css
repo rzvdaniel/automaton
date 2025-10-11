@@ -1020,19 +1020,19 @@ body {
     box-shadow: 0 10px 30px rgba(6, 182, 212, 0.2);
 }
 
-.step-number {
+.step-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, var(--secondary-color), var(--accent-color));
-    border-radius: 50%;
-    font-size: 1.5rem;
-    font-weight: 700;
+    width: 80px;
+    height: 80px;
     margin-bottom: var(--spacing-md);
-    color: white;
-    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+}
+
+.step-icon img {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 4px 15px rgba(6, 182, 212, 0.3));
 }
 
 .step-card h3 {
