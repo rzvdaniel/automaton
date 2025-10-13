@@ -45,100 +45,93 @@
                                 </Button>
                             </Tooltip>
                         </SpaceItem>
-                                                
-                            <SpaceItem>
-                                <Space Size="SpaceSize.Small" Class="execution-controls">
-                                    
-                                    <SpaceItem>
-                                        <Tooltip Title="@(StepDesignerViewModel.CanExecuteLocally ? "Run script" : "Script execution is only available in development/debug mode or desktop application")">
-                                            <Button Class="code-button" 
-                                                    Icon="caret-right" 
-                                                    OnClick="Run" 
-                                                    Loading="@runningCode" 
-                                                    Disabled="@(runningCode || !StepDesignerViewModel.CanExecuteLocally)" 
-                                                    Type="@ButtonType.Primary" 
-                                                    HtmlType="submit">
-                                                Run
+                        
+                        <SpaceItem>
+                            <Space Size="SpaceSize.Small" Class="execution-controls">
+                                
+                                <!-- Unified Run Button with Enhanced UX -->
+                                <SpaceItem>
+                                    @if (ExecutionCapabilities.CanExecute)
+                                    {
+                                        <!-- Enabled Run Button -->
+                                        <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
+                                            <Button Icon="caret-right" 
+                                                    Type="@ButtonType.Primary"
+                                                    OnClick="Run"
+                                                    Loading="@runningCode"
+                                                    Disabled="@runningCode">
+                                                @ExecutionCapabilities.GetButtonText()
                                             </Button>
                                         </Tooltip>
-                                    </SpaceItem>
-
-                                    <!-- Run on Runners Button -->
-                                    <SpaceItem>
-                                        @if (HasSelectedRunners)
-                                        {
-                                            <Tooltip Title="Execute this step on all selected runners">
-                                                <Button Icon="caret-right" 
-                                                        Type="@ButtonType.Primary"
-                                                       >
-                                                    Run on Runners
-                                                </Button>
-                                            </Tooltip>
-                                        }
-                                        else
-                                        {
-                                            <Tooltip Title="@RunButtonDisabledMessage">
-                                                <Button Icon="caret-right" 
-                                                        Type="@ButtonType.Primary"
-                                                        Disabled="true"
-                                                        OnClick="@OnRunButtonClickWhenDisabled">
-                                                    Run on Runners
-                                                </Button>
-                                            </Tooltip>
-                                        }
-                                    </SpaceItem>
-
-                                    <!-- Runner Selection -->
-                                    <SpaceItem>
-                                        <Select Mode="SelectMode.Multiple"
-                                                Placeholder="Select runners..."
-                                                DataSource="availableRunners"
-                                                TItem="RunnerModel"
-                                                TItemValue="Guid"
-                                                ValueProperty="r => r.Id"
-                                                LabelProperty="r => r.Name"
-                                                DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-                                                Values="@selectedRunners"
-                                                OnSelectedItemsChanged="@OnRunnersSelectionChanged"
-                                                AllowClear
-                                                Style="width: 200px">
-                                            <ItemTemplate Context="runnerContext">
-                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                                @runnerContext.Name
-                                            </ItemTemplate>
-                                            <LabelTemplate Context="runnerContext">
-                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                                @runnerContext.Name
-                                            </LabelTemplate>
-                                        </Select>
-                                    </SpaceItem>
-                                    
-                                    <!-- Enhanced Help Section -->
-                                    @if (!HasSelectedRunners)
-                                    {
-                                        <SpaceItem>
-                                            @if (!HasAvailableRunners)
-                                            {
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <Tooltip Title="No runners installed. Please install a runner first from Downloads page">
-                                                        <Icon Type="info-circle" Style="color: #faad14;" Width="16" Height="16" />
-                                                    </Tooltip>
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <Tooltip Title="Select runners above to execute this step">
-                                                        <Icon Type="info-circle" Style="color: #1890ff;" Width="16" Height="16" />
-                                                    </Tooltip>
-                                                </div>
-                                            }
-                                        </SpaceItem>
                                     }
-                                </Space>
-                            </SpaceItem>
+                                    else
+                                    {
+                                        <!-- Disabled Run Button with Helpful Message -->
+                                        <Tooltip Title="@RunButtonDisabledMessage">
+                                            <Button Icon="caret-right" 
+                                                    Type="@ButtonType.Primary"
+                                                    Disabled="true"
+                                                    OnClick="@OnRunButtonClickWhenDisabled">
+                                                Run Step
+                                            </Button>
+                                        </Tooltip>
+                                    }
+                                </SpaceItem>
+
+                                <!-- Runner Selection -->
+                                <SpaceItem>
+                                    <Select Mode="SelectMode.Multiple"
+                                            Placeholder="Select runners..."
+                                            DataSource="availableRunners"
+                                            TItem="RunnerModel"
+                                            TItemValue="Guid"
+                                            ValueProperty="r => r.Id"
+                                            LabelProperty="r => r.Name"
+                                            DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                            Values="@selectedRunners"
+                                            OnSelectedItemsChanged="@OnRunnersSelectionChanged"
+                                            AllowClear
+                                            Style="width: 200px">
+                                        <ItemTemplate Context="runnerContext">
+                                            <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                  class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                            @runnerContext.Name
+                                        </ItemTemplate>
+                                        <LabelTemplate Context="runnerContext">
+                                            <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                  class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                            @runnerContext.Name
+                                        </LabelTemplate>
+                                    </Select>
+                                </SpaceItem>
+                                
+                                <!-- Enhanced Help Section -->
+                                @if (!ExecutionCapabilities.CanExecute)
+                                {
+                                    <SpaceItem>
+                                        @if (!HasAvailableRunners)
+                                        {
+                                            <!-- No Runners Available - Show Download Link -->
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <Tooltip Title="No runners installed. Please install a runner first from Downloads page">
+                                                    <Icon Type="info-circle" Style="color: #faad14;" Width="16" Height="16" />
+                                                </Tooltip>
+                                            </div>
+                                        }
+                                        else if (!HasSelectedRunners)
+                                        {
+                                            <!-- Runners Available but None Selected -->
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <Tooltip Title="Select runners above to execute this step">
+                                                    <Icon Type="info-circle" Style="color: #1890ff;" Width="16" Height="16" />
+                                                </Tooltip>
+                                            </div>
+                                        }
+                                    </SpaceItem>
+                                }
+                                
+                            </Space>
+                        </SpaceItem>
                     </Space>
                 </Col>
             </Row>
