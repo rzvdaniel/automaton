@@ -95,9 +95,17 @@
                                                                     </Select>
                                                                 </SpaceItem>
                                                                 <SpaceItem>
-                                                                    <Button Class="code-button" Icon="caret-right" OnClick="Run" Loading="@runningCode" Disabled="@runningCode" Type="@ButtonType.Primary" HtmlType="submit">
-                                                                        Run
-                                                                    </Button>
+                                                                    <Tooltip Title="@(StepDesignerViewModel.CanExecuteLocally ? "Run script" : "Script execution is only available in development/debug mode or desktop application")">
+                                                                        <Button Class="code-button" 
+                                                                                Icon="caret-right" 
+                                                                                OnClick="Run" 
+                                                                                Loading="@runningCode" 
+                                                                                Disabled="@(runningCode || !StepDesignerViewModel.CanExecuteLocally)" 
+                                                                                Type="@ButtonType.Primary" 
+                                                                                HtmlType="submit">
+                                                                            Run
+                                                                        </Button>
+                                                                    </Tooltip>
                                                                 </SpaceItem>
                                                             </Space>
                                                         </ChildContent>
