@@ -15,6 +15,9 @@ partial class StepPage : ComponentBase, IDisposable
     private bool loading = false;
     private bool runningCode = false;
     private bool autoScroll = true;
+    private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
+    private IEnumerable<Guid> selectedRunners = new List<Guid>();
+    private bool isLoadingRunners = false;
 
     private Form<CustomStep> form;
     private Form<CustomStep> codeForm;
@@ -29,11 +32,19 @@ partial class StepPage : ComponentBase, IDisposable
         Automaton.Steps.CustomStepLanguage.Batch
     ];
 
+    // Computed properties for Razor UI binding
+    private bool HasSelectedRunners => selectedRunners.Any();
+    private bool HasAvailableRunners => availableRunners.Any();
+    private ExecutionCapabilities ExecutionCapabilities => StepDesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
+    private string RunButtonDisabledMessage => StepDesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
+
     [Inject] private StepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
     [Inject] private ICurrentStepContextService CurrentStepContextService { get; set; }
+    [Inject] private RunnerService RunnerService { get; set; }
+    [Inject] private NavigationManager NavigationManager { get; set; }
 
     [Parameter] public string StepId { get; set; }
 
@@ -43,6 +54,7 @@ partial class StepPage : ComponentBase, IDisposable
         CurrentStepContextService.CodeChanged += OnCodeChangedByMcpTools;
 
         await StepDesignerViewModel.Load(Guid.Parse(StepId));
+        await LoadRunners();
 
         // Register current step with the context service
         CurrentStepContextService.SetCurrentStep(
@@ -62,6 +74,48 @@ partial class StepPage : ComponentBase, IDisposable
             await ScrollToBottom();
         }
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task LoadRunners()
+    {
+        try
+        {
+            isLoadingRunners = true;
+            StateHasChanged();
+            
+            availableRunners = await RunnerService.List();
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Failed to load runners: {ex.Message}");
+            availableRunners = new List<RunnerModel>();
+        }
+        finally
+        {
+            isLoadingRunners = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnRunnersSelectionChanged(IEnumerable<RunnerModel> runners)
+    {
+        selectedRunners = runners?.Select(x => x.Id) ?? [];
+        StateHasChanged();
+    }
+
+    private string GetRunnerStatusIcon(RunnerStatus status)
+    {
+        return status switch
+        {
+            RunnerStatus.Online => "check-circle",
+            RunnerStatus.Offline => "close-circle",
+            _ => "question-circle"
+        };
+    }
+
+    private string GetRunnerStatusClass(RunnerStatus status)
+    {
+        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
     }
 
     public void AddInputVariable()
@@ -87,7 +141,7 @@ partial class StepPage : ComponentBase, IDisposable
     private void ClearLogs()
     {
         StepDesignerViewModel.ClearScriptOutputText();
-        MessageService.Info("Logs cleared", 2);
+        _ = MessageService.InfoAsync("Logs cleared", 2);
     }
 
     private async Task CopyLogs()
@@ -98,16 +152,16 @@ partial class StepPage : ComponentBase, IDisposable
             if (!string.IsNullOrEmpty(logs))
             {
                 await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", logs);
-                MessageService.Success("Logs copied to clipboard", 2);
+                await MessageService.SuccessAsync("Logs copied to clipboard", 2);
             }
             else
             {
-                MessageService.Info("No logs to copy", 2);
+                await MessageService.InfoAsync("No logs to copy", 2);
             }
         }
         catch
         {
-            MessageService.Error("Failed to copy logs to clipboard", 3);
+            await MessageService.ErrorAsync("Failed to copy logs to clipboard", 3);
         }
     }
 
@@ -118,11 +172,11 @@ partial class StepPage : ComponentBase, IDisposable
         if (autoScroll)
         {
             await ScrollToBottom();
-            MessageService.Info("Auto-scroll enabled", 2);
+            await MessageService.InfoAsync("Auto-scroll enabled", 2);
         }
         else
         {
-            MessageService.Info("Auto-scroll disabled", 2);
+            await MessageService.InfoAsync("Auto-scroll disabled", 2);
         }
         
         StateHasChanged();
@@ -172,30 +226,52 @@ partial class StepPage : ComponentBase, IDisposable
 
     private async Task Run()
     {
+        var capabilities = ExecutionCapabilities;
+
+        if (!capabilities.CanExecute)
+        {
+            await MessageService.WarningAsync("Please select at least one runner to execute the step.");
+            return;
+        }
+
         try
         {
             runningCode = true;
-
             await Task.Delay(100);
-
             await RefreshCode();
 
-            // Don't clear logs here - let them accumulate
-            StepDesignerViewModel.Execute();
+            // Execute mutually exclusively - either locally OR on runners, not both
+            if (capabilities.ShouldRunLocally)
+            {
+                await ExecuteLocally();
+            }
+            else if (capabilities.ShouldRunOnRunners)
+            {
+                await ExecuteOnRunners();
+            }
 
-            // Enable the button immediately after execution completes
             runningCode = false;
-
-            // Show notification without awaiting it (fire and forget)
             _ = MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
         }
         catch (Exception ex)
         {
-            runningCode = false; // Also enable button immediately on error
-            
-            // Show error notification without awaiting it
+            runningCode = false;
             _ = MessageService.ErrorAsync($"{Resources.Errors.CustomStepExecutionFailed}. Error: {ex.Message}");
         }
+    }
+
+    private async Task ExecuteLocally()
+    {
+        StepDesignerViewModel.Execute();
+        await Task.CompletedTask;
+    }
+
+    private async Task ExecuteOnRunners()
+    {
+        // Note: Custom step execution on runners is not yet implemented
+        // This would require creating a server-side endpoint and runner implementation
+        // For now, show a message that this feature is not yet available
+        await MessageService.InfoAsync("Custom step execution on runners is not yet implemented. This feature is coming soon!", 3);
     }
 
     private async Task RefreshCode()
@@ -316,6 +392,29 @@ partial class StepPage : ComponentBase, IDisposable
         }
     }
 
+    private void OnRunButtonClickWhenDisabled()
+    {
+        var action = StepDesignerViewModel.GetRunButtonAction(HasSelectedRunners, HasAvailableRunners);
+        
+        switch (action)
+        {
+            case "download-runner":
+                NavigateToDownloadRunner();
+                break;
+            case "select-runners":
+                _ = MessageService.InfoAsync("Please select one or more runners from the dropdown to execute this step.", 3);
+                break;
+            default:
+                _ = MessageService.WarningAsync(RunButtonDisabledMessage, 3);
+                break;
+        }
+    }
+
+    private void NavigateToDownloadRunner()
+    {
+        NavigationManager.NavigateTo("/downloads-runner", true);
+    }
+
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
         return new StandaloneEditorConstructionOptions
@@ -329,6 +428,6 @@ partial class StepPage : ComponentBase, IDisposable
     public void Dispose()
     {
         StepDesignerViewModel.ScriptTextWritten -= OnScriptOutputWritten;
-        CurrentStepContextService.CodeChanged -= OnCodeChangedByMcpTools; // ADD THIS LINE
+        CurrentStepContextService.CodeChanged -= OnCodeChangedByMcpTools;
     }
 }

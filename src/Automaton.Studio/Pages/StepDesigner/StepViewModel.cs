@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Factories;
+using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using System.Text;
 
@@ -50,6 +51,54 @@ public class StepViewModel : IDisposable
     /// </summary>
     public bool CanExecuteLocally => IsDesktopMode || IsDevelopmentEnvironment;
 
+    /// <summary>
+    /// Gets the message to show when the run button is disabled
+    /// </summary>
+    public string GetRunButtonDisabledMessage(bool hasSelectedRunners, bool hasAvailableRunners)
+    {
+        // Debug and desktop modes - should always be enabled
+        if (CanExecuteLocally)
+            return string.Empty;
+
+        // Web release mode needs runners
+        if (!hasAvailableRunners)
+            return "No runners available - Install a runner to execute steps";
+        
+        if (!hasSelectedRunners)
+            return "Select one or more runners to execute this step";
+        
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Determines what action to take when run button is clicked while disabled
+    /// </summary>
+    public string GetRunButtonAction(bool hasSelectedRunners, bool hasAvailableRunners)
+    {
+        if (CanExecuteLocally)
+            return "run";
+
+        if (!hasAvailableRunners)
+            return "download-runner";
+        
+        if (!hasSelectedRunners)
+            return "select-runners";
+        
+        return "run";
+    }
+
+    /// <summary>
+    /// Determines what execution modes are available
+    /// </summary>
+    public ExecutionCapabilities GetExecutionCapabilities(bool hasSelectedRunners)
+    {
+        return new ExecutionCapabilities
+        {
+            CanRunLocally = CanExecuteLocally,
+            HasSelectedRunners = hasSelectedRunners
+        };
+    }
+
     public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory, ConfigurationService configurationService)
     {
         this.stepFactory = stepFactory;
@@ -75,7 +124,7 @@ public class StepViewModel : IDisposable
     {
         if (!CanExecuteLocally)
         {
-            throw new Exception("Can not execute step locally from designer");
+            throw new Exception("Cannot execute step locally from designer");
         }
 
         if (ScriptOutput.Length > 0)

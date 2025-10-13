@@ -1,6 +1,7 @@
 ﻿@page "/stepdesigner/{stepId}"
 @using AntDesign
 @using Automaton.Studio.Pages.StepDesigner.Components
+@using Automaton.Studio.Models
 @using Blazored.FluentValidation;
 @using Automaton.Core.Enums;
 
@@ -44,6 +45,100 @@
                                 </Button>
                             </Tooltip>
                         </SpaceItem>
+                                                
+                            <SpaceItem>
+                                <Space Size="SpaceSize.Small" Class="execution-controls">
+                                    
+                                    <SpaceItem>
+                                        <Tooltip Title="@(StepDesignerViewModel.CanExecuteLocally ? "Run script" : "Script execution is only available in development/debug mode or desktop application")">
+                                            <Button Class="code-button" 
+                                                    Icon="caret-right" 
+                                                    OnClick="Run" 
+                                                    Loading="@runningCode" 
+                                                    Disabled="@(runningCode || !StepDesignerViewModel.CanExecuteLocally)" 
+                                                    Type="@ButtonType.Primary" 
+                                                    HtmlType="submit">
+                                                Run
+                                            </Button>
+                                        </Tooltip>
+                                    </SpaceItem>
+
+                                    <!-- Run on Runners Button -->
+                                    <SpaceItem>
+                                        @if (HasSelectedRunners)
+                                        {
+                                            <Tooltip Title="Execute this step on all selected runners">
+                                                <Button Icon="caret-right" 
+                                                        Type="@ButtonType.Primary"
+                                                       >
+                                                    Run on Runners
+                                                </Button>
+                                            </Tooltip>
+                                        }
+                                        else
+                                        {
+                                            <Tooltip Title="@RunButtonDisabledMessage">
+                                                <Button Icon="caret-right" 
+                                                        Type="@ButtonType.Primary"
+                                                        Disabled="true"
+                                                        OnClick="@OnRunButtonClickWhenDisabled">
+                                                    Run on Runners
+                                                </Button>
+                                            </Tooltip>
+                                        }
+                                    </SpaceItem>
+
+                                    <!-- Runner Selection -->
+                                    <SpaceItem>
+                                        <Select Mode="SelectMode.Multiple"
+                                                Placeholder="Select runners..."
+                                                DataSource="availableRunners"
+                                                TItem="RunnerModel"
+                                                TItemValue="Guid"
+                                                ValueProperty="r => r.Id"
+                                                LabelProperty="r => r.Name"
+                                                DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                                                Values="@selectedRunners"
+                                                OnSelectedItemsChanged="@OnRunnersSelectionChanged"
+                                                AllowClear
+                                                Style="width: 200px">
+                                            <ItemTemplate Context="runnerContext">
+                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                                @runnerContext.Name
+                                            </ItemTemplate>
+                                            <LabelTemplate Context="runnerContext">
+                                                <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
+                                                      class="@(GetRunnerStatusClass(runnerContext.Status))" />
+                                                @runnerContext.Name
+                                            </LabelTemplate>
+                                        </Select>
+                                    </SpaceItem>
+                                    
+                                    <!-- Enhanced Help Section -->
+                                    @if (!HasSelectedRunners)
+                                    {
+                                        <SpaceItem>
+                                            @if (!HasAvailableRunners)
+                                            {
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <Tooltip Title="No runners installed. Please install a runner first from Downloads page">
+                                                        <Icon Type="info-circle" Style="color: #faad14;" Width="16" Height="16" />
+                                                    </Tooltip>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <Tooltip Title="Select runners above to execute this step">
+                                                        <Icon Type="info-circle" Style="color: #1890ff;" Width="16" Height="16" />
+                                                    </Tooltip>
+                                                </div>
+                                            }
+                                        </SpaceItem>
+                                    }
+                                </Space>
+                            </SpaceItem>
                     </Space>
                 </Col>
             </Row>
@@ -93,19 +188,6 @@
                                                                             }
                                                                         </SelectOptions>
                                                                     </Select>
-                                                                </SpaceItem>
-                                                                <SpaceItem>
-                                                                    <Tooltip Title="@(StepDesignerViewModel.CanExecuteLocally ? "Run script" : "Script execution is only available in development/debug mode or desktop application")">
-                                                                        <Button Class="code-button" 
-                                                                                Icon="caret-right" 
-                                                                                OnClick="Run" 
-                                                                                Loading="@runningCode" 
-                                                                                Disabled="@(runningCode || !StepDesignerViewModel.CanExecuteLocally)" 
-                                                                                Type="@ButtonType.Primary" 
-                                                                                HtmlType="submit">
-                                                                            Run
-                                                                        </Button>
-                                                                    </Tooltip>
                                                                 </SpaceItem>
                                                             </Space>
                                                         </ChildContent>
@@ -791,5 +873,28 @@
         .settings-card .ant-card-body {
             padding: 20px;
         }
+    }
+
+    /* Execution controls styling */
+    .execution-controls {
+        align-items: center;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    .runner-status-icon.runner-status-online {
+        color: #52c41a !important; /* Green for online */
+        margin-right: 4px;
+    }
+
+    .runner-status-icon.runner-status-offline {
+        color: #ff4d4f !important; /* Red for offline */
+        margin-right: 4px;
+    }
+
+    .runner-status-icon.runner-status-none {
+        color: #d9d9d9 !important; /* Gray for none/unknown */
+        margin-right: 4px;
     }
 </style>
