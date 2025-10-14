@@ -13,6 +13,7 @@ public class StepViewModel : IDisposable
     private readonly CustomStepsService customStepsService;
     private readonly CustomStepExecuteService customStepExecuteService;
     private readonly ConfigurationService configurationService;
+    private readonly RunnerService runnerService;
     private CustomStepDefinition CustomStepDefinition => CustomStep.Definition;
 
     public CustomStep CustomStep { get; set; } = new();
@@ -99,12 +100,13 @@ public class StepViewModel : IDisposable
         };
     }
 
-    public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory, ConfigurationService configurationService)
+    public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory, ConfigurationService configurationService, RunnerService runnerService)
     {
         this.stepFactory = stepFactory;
         this.customStepsService = customStepsService;
         this.customStepExecuteService = customStepExecuteService;
         this.configurationService = configurationService;
+        this.runnerService = runnerService;
         customStepExecuteService.ScriptTextWritten += OnNewScriptText;
     }
 
@@ -149,7 +151,71 @@ public class StepViewModel : IDisposable
             throw new ArgumentException("At least one runner must be specified", nameof(runnerIds));
         }
 
-        return await customStepExecuteService.ExecuteOnRunners(CustomStep.Id, runnerIds);
+        // Add execution header to logs
+        if (ScriptOutput.Length > 0)
+        {
+            ScriptOutput.AppendLine();
+        }
+        ScriptOutput.AppendLine($"=== Execution started on {runnerIds.Count()} runner(s) at {DateTime.Now:HH:mm:ss} ===");
+        ScriptOutput.AppendLine();
+        ScriptTextWritten?.Invoke(this, EventArgs.Empty);
+
+        var results = await customStepExecuteService.ExecuteOnRunners(CustomStep.Id, runnerIds);
+
+        // Display results for each runner
+        foreach (var result in results)
+        {
+            // Get runner name
+            var runners = await runnerService.List();
+            var runner = runners.FirstOrDefault(r => r.Id == result.RunnerId);
+            var runnerName = runner?.Name ?? result.RunnerId.ToString();
+
+            ScriptOutput.AppendLine($"--- Runner: {runnerName} ---");
+            
+            if (result.Success)
+            {
+                ScriptOutput.AppendLine($"✅ Status: SUCCESS");
+                
+                var executionTime = result.Finished - result.Started;
+                ScriptOutput.AppendLine($"⏱️  Execution Time: {executionTime.TotalMilliseconds:F2}ms");
+                ScriptOutput.AppendLine();
+                
+                if (!string.IsNullOrEmpty(result.Output))
+                {
+                    ScriptOutput.AppendLine($"📄 Output:");
+                    ScriptOutput.AppendLine(result.Output);
+                    ScriptOutput.AppendLine();
+                }
+
+                if (result.OutputVariables != null && result.OutputVariables.Any())
+                {
+                    ScriptOutput.AppendLine($"📊 Output Variables:");
+                    foreach (var variable in result.OutputVariables)
+                    {
+                        ScriptOutput.AppendLine($"  • {variable.Key}: {variable.Value}");
+                    }
+                    ScriptOutput.AppendLine();
+                }
+            }
+            else
+            {
+                ScriptOutput.AppendLine($"❌ Status: FAILED");
+                ScriptOutput.AppendLine();
+                
+                if (!string.IsNullOrEmpty(result.Error))
+                {
+                    ScriptOutput.AppendLine($"❗ Error:");
+                    ScriptOutput.AppendLine(result.Error);
+                    ScriptOutput.AppendLine();
+                }
+            }
+        }
+
+        // Add completion footer
+        ScriptOutput.AppendLine($"=== Execution completed at {DateTime.Now:HH:mm:ss} ===");
+        ScriptTextWritten?.Invoke(this, EventArgs.Empty);
+
+        return results;
     }
 
     public void AddInputVariable()

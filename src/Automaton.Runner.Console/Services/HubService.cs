@@ -133,13 +133,41 @@ public class HubService
                 }
             });
 
-            // Register custom step execution handler - resolve from service provider per request
-            connection.On<CustomStepPayload, Task<CustomStepExecutionResponse>>(RunCustomStepMethod, async (customStep) =>
+            // Register custom step execution handler that returns CustomStepExecutionResponse
+            // Using Func<> to support return values with SignalR
+            connection.On<CustomStepPayload, CustomStepExecutionResponse>(RunCustomStepMethod, (customStep) =>
             {
-                // Create a scope and resolve CustomStepHandler for this request
-                using var scope = serviceProvider.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<CustomStepHandler>();
-                return await handler.RunCustomStep(customStep);
+                try
+                {
+                    // Create a scope and resolve CustomStepHandler for this request
+                    using var scope = serviceProvider.CreateScope();
+                    var handler = scope.ServiceProvider.GetRequiredService<CustomStepHandler>();
+                    
+                    // Execute synchronously and return result
+                    // Note: This is a blocking call, but that's required for SignalR's synchronous handler pattern
+                    var result = handler.RunCustomStep(customStep);
+                    
+                    logger.Information("Custom step {CustomStepId} completed with status: {Success}", 
+                        customStep.Id, result.Success ? "Success" : "Failed");
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Error executing custom step {CustomStepId}", customStep.Id);
+                    WriteLine($"❌ Custom step failed: {ex.Message}");
+                    
+                    // Return error result
+                    return new CustomStepExecutionResponse
+                    {
+                        Success = false,
+                        Output = null,
+                        Error = $"Handler exception: {ex.Message}",
+                        Started = DateTime.UtcNow,
+                        Finished = DateTime.UtcNow,
+                        OutputVariables = new Dictionary<string, object>()
+                    };
+                }
             });
 
             connection.On(PingMethod, () =>

@@ -22,7 +22,7 @@ public class CustomStepHandler
     /// <summary>
     /// Execute a custom step and return the results
     /// </summary>
-    public async Task<CustomStepExecutionResponse> RunCustomStep(CustomStepPayload customStep)
+    public CustomStepExecutionResponse RunCustomStep(CustomStepPayload customStep)
     {
         var stopwatch = Stopwatch.StartNew();
         var started = DateTime.UtcNow;
@@ -46,7 +46,7 @@ public class CustomStepHandler
                 ?? new Dictionary<string, object>();
             
             // Execute the script on a background thread
-            var scriptVariables = await Task.Run(() => scriptHost.Execute(resource, inputVars));
+            var scriptVariables = scriptHost.Execute(resource, inputVars);
             
             stopwatch.Stop();
             

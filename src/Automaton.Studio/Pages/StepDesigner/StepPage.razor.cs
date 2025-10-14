@@ -273,6 +273,13 @@ partial class StepPage : ComponentBase, IDisposable
             var results = await StepDesignerViewModel.ExecuteOnRunners(selectedRunners);
             var resultsList = results.ToList();
             
+            // Small delay to ensure DOM updates before auto-scrolling
+            await Task.Delay(100);
+            if (autoScroll)
+            {
+                await ScrollToBottom();
+            }
+
             var successCount = resultsList.Count(r => r.Success);
             var failureCount = resultsList.Count(r => !r.Success);
             var totalCount = resultsList.Count;
@@ -288,7 +295,7 @@ partial class StepPage : ComponentBase, IDisposable
             {
                 // Some runners succeeded, some failed
                 await MessageService.WarningAsync(
-                    $"Custom step completed on {successCount} of {totalCount} runner(s). {failureCount} runner(s) failed. Check runner logs for details.", 
+                    $"Custom step completed on {successCount} of {totalCount} runner(s). {failureCount} runner(s) failed. Check logs for details.", 
                     5);
             }
             else
@@ -302,7 +309,7 @@ partial class StepPage : ComponentBase, IDisposable
 
                 var errorSummary = errorMessages.Any() 
                     ? $"Errors: {string.Join("; ", errorMessages)}" 
-                    : "Check runner logs for error details.";
+                    : "Check logs for error details.";
 
                 await MessageService.ErrorAsync(
                     $"Custom step execution failed on all {totalCount} runner(s). {errorSummary}", 
