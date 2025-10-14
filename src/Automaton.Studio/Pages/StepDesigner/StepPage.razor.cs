@@ -238,7 +238,28 @@ partial class StepPage : ComponentBase, IDisposable
         {
             runningCode = true;
             await Task.Delay(100);
+            
+            // Refresh code from Monaco editor to view model
             await RefreshCode();
+
+            // Auto-save before execution to ensure runners get the latest code
+            // This prevents executing outdated code from the database
+            if (form.Validate())
+            {
+                // Increment version when auto-saving before execution
+                StepDesignerViewModel.CustomStep.Definition.Version++;
+                
+                await StepDesignerViewModel.Save();
+                
+                // Show subtle notification that code was auto-saved
+                _ = MessageService.InfoAsync($"Step auto-saved before execution (v{StepDesignerViewModel.CustomStep.Definition.Version})", 2);
+            }
+            else
+            {
+                // If validation fails, still continue with execution using current code
+                // This allows users to test invalid configurations if needed
+                _ = MessageService.WarningAsync("Validation warnings detected, but continuing with execution...", 2);
+            }
 
             // Execute mutually exclusively - either locally OR on runners, not both
             if (capabilities.ShouldRunLocally)
