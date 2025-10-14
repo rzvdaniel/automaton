@@ -87,4 +87,36 @@ public class CustomStepsService
 
         return exists;
     }
+
+    /// <summary>
+    /// Execute a custom step on specified runners via server API
+    /// </summary>
+    public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            logger.Information("Requesting execution of custom step {CustomStepId} on runners", customStepId);
+
+            var requestBody = new
+            {
+                runnerIds = runnerIds.ToArray()
+            };
+
+            var response = await httpClient.PostAsJsonAsync(
+                $"{configService.CustomStepsUrl}/{customStepId}/execute", 
+                requestBody,
+                cancellationToken);
+
+            response.EnsureSuccessStatusCode();
+
+            var results = await response.Content.ReadAsAsync<IEnumerable<RunnerCustomStepResult>>(cancellationToken);
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing custom step {CustomStepId} on runners", customStepId);
+            throw;
+        }
+    }
 }

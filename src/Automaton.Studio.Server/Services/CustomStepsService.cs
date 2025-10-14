@@ -1,6 +1,8 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Serilog;
 using System.Text.Json;
 
@@ -10,6 +12,7 @@ public class CustomStepsService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
+    private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
     private const string DefaultIcon = "user";
@@ -19,11 +22,13 @@ public class CustomStepsService
     (
         ApplicationDbContext dataContext,
         UserContextService userContextService,
-        RecentActivityService recentActivityService
+        RecentActivityService recentActivityService,
+        IHubContext<AutomatonHub> automatonHub
     )
     {
         this.dataContext = dataContext;
         this.recentActivityService = recentActivityService;
+        this.automatonHub = automatonHub;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<CustomStepsService>();
     }
@@ -115,6 +120,128 @@ public class CustomStepsService
         var exists = dataContext.CustomSteps.Any(x => x.Name == name && x.CustomStepUsers.Any(x => x.UserId == userId));
 
         return exists;
+    }
+
+    /// <summary>
+    /// Execute a custom step on specified runners via SignalR
+    /// </summary>
+    public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
+    {
+        var results = new List<RunnerCustomStepResult>();
+        
+        // Get the custom step
+        var customStep = Get(customStepId);
+        
+        if (customStep == null)
+        {
+            throw new InvalidOperationException($"Custom step {customStepId} not found");
+        }
+
+        foreach (var runnerId in runnerIds)
+        {
+            RunnerCustomStepResult result;
+            
+            try
+            {
+                var runner = GetRunner(runnerId, userId);
+                
+                if (runner == null)
+                {
+                    logger.Warning("Runner {RunnerId} not found for user {UserId}", runnerId, userId);
+                    result = new RunnerCustomStepResult
+                    {
+                        CustomStepId = customStepId,
+                        RunnerId = runnerId,
+                        Success = false,
+                        Error = "Runner not found",
+                        Started = DateTime.UtcNow,
+                        Finished = DateTime.UtcNow
+                    };
+                }
+                else if (string.IsNullOrEmpty(runner.ConnectionId))
+                {
+                    logger.Warning("Runner {RunnerId} ({RunnerName}) is not connected", runnerId, runner.Name);
+                    result = new RunnerCustomStepResult
+                    {
+                        CustomStepId = customStepId,
+                        RunnerId = runnerId,
+                        Success = false,
+                        Error = "Runner is not connected",
+                        Started = DateTime.UtcNow,
+                        Finished = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    var client = automatonHub.Clients.Client(runner.ConnectionId);
+                    
+                    logger.Information("Executing custom step {CustomStepId} ({CustomStepName}) on runner {RunnerId} ({RunnerName})", 
+                        customStepId, customStep.Name, runnerId, runner.Name);
+
+                    // Map to runner payload format
+                    var payload = new
+                    {
+                        Id = customStep.Id,
+                        Name = customStep.Name,
+                        Code = customStep.Definition.Code,
+                        Language = customStep.Definition.Language,
+                        CodeInputVariables = customStep.Definition.CodeInputVariables,
+                        CodeOutputVariables = customStep.Definition.CodeOutputVariables
+                    };
+
+                    var response = await client.InvokeAsync<CustomStepExecutionResponse>(
+                        AutomatonHubMethods.RunCustomStep, 
+                        payload, 
+                        cancellationToken);
+
+                    result = new RunnerCustomStepResult
+                    {
+                        CustomStepId = customStepId,
+                        RunnerId = runnerId,
+                        Success = response.Success,
+                        Output = response.Output,
+                        Error = response.Error,
+                        Started = response.Started,
+                        Finished = response.Finished,
+                        OutputVariables = response.OutputVariables
+                    };
+
+                    logger.Information("Custom step {CustomStepId} completed on runner {RunnerId} with status: {Success}", 
+                        customStepId, runnerId, response.Success ? "Success" : "Failed");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Error executing custom step {CustomStepId} on runner {RunnerId}", customStepId, runnerId);
+                
+                result = new RunnerCustomStepResult
+                {
+                    CustomStepId = customStepId,
+                    RunnerId = runnerId,
+                    Success = false,
+                    Error = $"Execution failed: {ex.Message}",
+                    Started = DateTime.UtcNow,
+                    Finished = DateTime.UtcNow
+                };
+            }
+
+            results.Add(result);
+        }
+
+        return results;
+    }
+
+    private Entities.Runner GetRunner(Guid id, Guid userId)
+    {
+        var runner = dataContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
+
+        // Reload to get current ConnectionId (same pattern as ScheduleService)
+        if (runner != null)
+        {
+            dataContext.Entry(runner).Reload();
+        }
+
+        return runner;
     }
 
     private static CustomStep MapToModel(Entities.CustomStep entity)

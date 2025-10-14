@@ -64,4 +64,25 @@ public class CustomStepsController : BaseController
 
         return exists ? Ok(exists) : NotFound();
     }
+
+    [HttpPost("{id}/execute")]
+    public async Task<ActionResult<IEnumerable<Models.RunnerCustomStepResult>>> Execute(Guid id, [FromBody] ExecuteCustomStepRequest request, CancellationToken cancellationToken)
+    {
+        if (request?.RunnerIds == null || !request.RunnerIds.Any())
+        {
+            return BadRequest("At least one runner ID must be specified");
+        }
+
+        var results = await customStepsService.Execute(id, request.RunnerIds, cancellationToken);
+
+        return Ok(results);
+    }
+}
+
+/// <summary>
+/// Request model for executing custom steps on runners
+/// </summary>
+public class ExecuteCustomStepRequest
+{
+    public IEnumerable<Guid> RunnerIds { get; set; } = Array.Empty<Guid>();
 }

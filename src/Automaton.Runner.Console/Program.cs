@@ -276,6 +276,9 @@ public class Program
                 services.AddSingleton<ServiceManagementService>();
                 services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
+                
+                // Register custom step handler as transient (uses scoped ScriptEngineHost)
+                services.AddTransient<Handlers.CustomStepHandler>();
 
                 // Add HTTP client
                 services.AddHttpClient();

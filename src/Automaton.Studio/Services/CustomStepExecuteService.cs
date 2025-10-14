@@ -3,6 +3,7 @@ using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
 using Automaton.Core.Scripting.ErrorParsers;
 using Automaton.Studio.Domain;
+using Automaton.Studio.Models;
 using System.Diagnostics;
 
 namespace Automaton.Studio.Services;
@@ -17,6 +18,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     private readonly StudioFlowConvertService flowConvertService;
     private readonly FlowExecutionsService flowExecutionsService;
     private readonly ScriptEngineHost scriptHost;
+    private readonly CustomStepsService customStepsService;
 
     public event EventHandler<string> ScriptTextWritten;
 
@@ -28,7 +30,8 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         ScriptEngineHost scriptHost,
         IServiceProvider serviceProvider,
         IMediator mediator, 
-        IMapper mapper
+        IMapper mapper,
+        CustomStepsService customStepsService
     ) 
     {
         this.mediator = mediator;
@@ -38,11 +41,15 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         this.flowExecutionsService = flowExecutionsService;
         this.serviceProvider = serviceProvider;
         this.scriptHost = scriptHost;
+        this.customStepsService = customStepsService;
         this.scriptHost.ScriptTextWritten += OnScriptTextWritten;
 
         logger = Log.ForContext<StudioFlowExecuteService>();
     }
 
+    /// <summary>
+    /// Execute custom step locally (Desktop/Debug mode only)
+    /// </summary>
     public CustomStepExecution Execute(CustomStep step, CancellationToken cancellationToken = default)
     {
         using var customStepExecution = new CustomStepExecution();
@@ -68,6 +75,40 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         logger.Information("End step: {0}", step.Name);
 
         return customStepExecution;
+    }
+
+    /// <summary>
+    /// Execute custom step on specified runners
+    /// </summary>
+    public async Task<IEnumerable<RunnerCustomStepResult>> ExecuteOnRunners(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken = default)
+    {
+        logger.Information("Executing custom step {CustomStepId} on {RunnerCount} runners", customStepId, runnerIds.Count());
+
+        try
+        {
+            var results = await customStepsService.Execute(customStepId, runnerIds, cancellationToken);
+
+            foreach (var result in results)
+            {
+                if (result.Success)
+                {
+                    logger.Information("Custom step {CustomStepId} executed successfully on runner {RunnerId}", 
+                        customStepId, result.RunnerId);
+                }
+                else
+                {
+                    logger.Warning("Custom step {CustomStepId} failed on runner {RunnerId}: {Error}", 
+                        customStepId, result.RunnerId, result.Error);
+                }
+            }
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing custom step {CustomStepId} on runners", customStepId);
+            throw;
+        }
     }
 
     protected void ExecuteAsync(CustomStep step)

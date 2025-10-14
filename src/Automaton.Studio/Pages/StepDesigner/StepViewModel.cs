@@ -120,6 +120,9 @@ public class StepViewModel : IDisposable
         stepFactory.UpdateCustomStep(CustomStep);
     }
 
+    /// <summary>
+    /// Execute custom step locally (Desktop/Debug mode only)
+    /// </summary>
     public void Execute()
     {
         if (!CanExecuteLocally)
@@ -134,6 +137,19 @@ public class StepViewModel : IDisposable
         ScriptOutput.AppendLine($"=== Execution started at {DateTime.Now:HH:mm:ss} ===");
 
         customStepExecuteService.Execute(CustomStep);
+    }
+
+    /// <summary>
+    /// Execute custom step on specified runners
+    /// </summary>
+    public async Task<IEnumerable<RunnerCustomStepResult>> ExecuteOnRunners(IEnumerable<Guid> runnerIds)
+    {
+        if (!runnerIds.Any())
+        {
+            throw new ArgumentException("At least one runner must be specified", nameof(runnerIds));
+        }
+
+        return await customStepExecuteService.ExecuteOnRunners(CustomStep.Id, runnerIds);
     }
 
     public void AddInputVariable()

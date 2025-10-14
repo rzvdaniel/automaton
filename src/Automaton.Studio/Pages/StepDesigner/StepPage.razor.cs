@@ -268,10 +268,53 @@ partial class StepPage : ComponentBase, IDisposable
 
     private async Task ExecuteOnRunners()
     {
-        // Note: Custom step execution on runners is not yet implemented
-        // This would require creating a server-side endpoint and runner implementation
-        // For now, show a message that this feature is not yet available
-        await MessageService.InfoAsync("Custom step execution on runners is not yet implemented. This feature is coming soon!", 3);
+        try
+        {
+            var results = await StepDesignerViewModel.ExecuteOnRunners(selectedRunners);
+            var resultsList = results.ToList();
+            
+            var successCount = resultsList.Count(r => r.Success);
+            var failureCount = resultsList.Count(r => !r.Success);
+            var totalCount = resultsList.Count;
+
+            if (successCount == totalCount)
+            {
+                // All runners succeeded
+                await MessageService.SuccessAsync(
+                    $"Custom step executed successfully on all {totalCount} runner(s)!", 
+                    3);
+            }
+            else if (successCount > 0)
+            {
+                // Some runners succeeded, some failed
+                await MessageService.WarningAsync(
+                    $"Custom step completed on {successCount} of {totalCount} runner(s). {failureCount} runner(s) failed. Check runner logs for details.", 
+                    5);
+            }
+            else
+            {
+                // All runners failed
+                var errorMessages = resultsList
+                    .Where(r => !string.IsNullOrEmpty(r.Error))
+                    .Select(r => r.Error)
+                    .Take(3)
+                    .ToList();
+
+                var errorSummary = errorMessages.Any() 
+                    ? $"Errors: {string.Join("; ", errorMessages)}" 
+                    : "Check runner logs for error details.";
+
+                await MessageService.ErrorAsync(
+                    $"Custom step execution failed on all {totalCount} runner(s). {errorSummary}", 
+                    5);
+            }
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync(
+                $"Failed to execute custom step on runners: {ex.Message}. Please check runner connectivity and try again.", 
+                5);
+        }
     }
 
     private async Task RefreshCode()

@@ -3,7 +3,9 @@ using Serilog;
 using System.Net.Http;
 using System.Net.Sockets;
 using Automaton.Runner.Console.Connection;
+using Automaton.Runner.Console.Handlers;
 using static System.Console;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -12,12 +14,14 @@ public class HubService
     private const string RunnerIdHeader = "RunnerId";
     private const string RunnerNameHeader = "RunnerName";
     private const string RunWorkflowMethod = "RunWorkflow";
+    private const string RunCustomStepMethod = "RunCustomStep";
     private const string PingMethod = "Ping";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
     private readonly ApiKeyAuthenticationService apiKeyAuthService;
     private readonly FlowExecutionService flowExecutionService;
+    private readonly IServiceProvider serviceProvider;
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private bool isReconnecting = false;
@@ -25,11 +29,13 @@ public class HubService
     public HubService(
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
-        FlowExecutionService flowExecutionService)
+        FlowExecutionService flowExecutionService,
+        IServiceProvider serviceProvider)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
         this.flowExecutionService = flowExecutionService;
+        this.serviceProvider = serviceProvider;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -125,6 +131,15 @@ public class HubService
                     logger.Error(ex, "Error executing workflow {WorkflowId}", workflowId);
                     WriteLine($"❌ Workflow failed: {ex.Message}");
                 }
+            });
+
+            // Register custom step execution handler - resolve from service provider per request
+            connection.On<CustomStepPayload, Task<CustomStepExecutionResponse>>(RunCustomStepMethod, async (customStep) =>
+            {
+                // Create a scope and resolve CustomStepHandler for this request
+                using var scope = serviceProvider.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<CustomStepHandler>();
+                return await handler.RunCustomStep(customStep);
             });
 
             connection.On(PingMethod, () =>
