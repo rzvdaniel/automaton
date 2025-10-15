@@ -5,6 +5,7 @@ using Automaton.Core.Scripting.ErrorParsers;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using System.Diagnostics;
+using System.Text;
 
 namespace Automaton.Studio.Services;
 
@@ -48,20 +49,43 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     }
 
     /// <summary>
-    /// Execute custom step locally (Desktop/Debug mode only)
+    /// Execute custom step locally (Desktop/Debug mode only) and return structured results
     /// </summary>
-    public CustomStepExecution Execute(CustomStep step, CancellationToken cancellationToken = default)
+    public LocalCustomStepExecutionResult Execute(CustomStep step, CancellationToken cancellationToken = default)
     {
         using var customStepExecution = new CustomStepExecution();
+        var consoleOutput = new StringBuilder();
+        var started = DateTime.UtcNow;
 
         LogContext.PushProperty(LogContextProperties.StepId, step.Id);
         LogContext.PushProperty(LogContextProperties.StepName, step.Name);
 
         logger.Information("Start step: {0}", step.Name);
 
+        // Capture console output during execution
+        EventHandler<string> consoleHandler = (sender, text) =>
+        {
+            consoleOutput.Append(text);
+        };
+        
+        scriptHost.ScriptTextWritten += consoleHandler;
+
         try
         {
             ExecuteAsync(step);
+            
+            var finished = DateTime.UtcNow;
+
+            logger.Information("End step: {0}", step.Name);
+
+            return new LocalCustomStepExecutionResult
+            {
+                Success = true,
+                ConsoleOutput = consoleOutput.ToString(),
+                OutputVariables = step.OutputVariables?.ToDictionary(v => v.Name, v => (object)v.Value) ?? new Dictionary<string, object>(),
+                Started = started,
+                Finished = finished
+            };
         }
         catch (Exception ex)
         {
@@ -69,12 +93,22 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
             logger.Error(ex, "Step: {0} encountered an error. Message: {1}", step.Name, ex.Message);
 
-            throw;
+            var finished = DateTime.UtcNow;
+
+            return new LocalCustomStepExecutionResult
+            {
+                Success = false,
+                ConsoleOutput = consoleOutput.ToString(),
+                Error = ex.Message,
+                OutputVariables = new Dictionary<string, object>(),
+                Started = started,
+                Finished = finished
+            };
         }
-
-        logger.Information("End step: {0}", step.Name);
-
-        return customStepExecution;
+        finally
+        {
+            scriptHost.ScriptTextWritten -= consoleHandler;
+        }
     }
 
     /// <summary>
@@ -264,4 +298,17 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             };
         }
     }
+}
+
+/// <summary>
+/// Result of local custom step execution
+/// </summary>
+public class LocalCustomStepExecutionResult
+{
+    public bool Success { get; set; }
+    public string ConsoleOutput { get; set; } = string.Empty;
+    public string? Error { get; set; }
+    public Dictionary<string, object> OutputVariables { get; set; } = new();
+    public DateTime Started { get; set; }
+    public DateTime Finished { get; set; }
 }

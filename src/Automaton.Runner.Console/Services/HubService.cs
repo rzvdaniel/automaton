@@ -143,9 +143,8 @@ public class HubService
                     using var scope = serviceProvider.CreateScope();
                     var handler = scope.ServiceProvider.GetRequiredService<CustomStepHandler>();
                     
-                    // Execute synchronously and return result
-                    // Note: This is a blocking call, but that's required for SignalR's synchronous handler pattern
-                    var result = handler.RunCustomStep(customStep);
+                    // Execute and wait for result (SignalR requires synchronous return)
+                    var result = handler.RunCustomStep(customStep).GetAwaiter().GetResult();
                     
                     logger.Information("Custom step {CustomStepId} completed with status: {Success}", 
                         customStep.Id, result.Success ? "Success" : "Failed");

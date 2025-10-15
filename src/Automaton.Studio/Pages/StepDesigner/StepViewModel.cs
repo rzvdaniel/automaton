@@ -137,8 +137,50 @@ public class StepViewModel : IDisposable
             ScriptOutput.AppendLine();
         }
         ScriptOutput.AppendLine($"=== Execution started at {DateTime.Now:HH:mm:ss} ===");
+        ScriptOutput.AppendLine();
+        ScriptOutput.AppendLine($"📋 Console Output:");
+        ScriptTextWritten?.Invoke(this, EventArgs.Empty);
 
-        customStepExecuteService.Execute(CustomStep);
+        var result = customStepExecuteService.Execute(CustomStep);
+
+        // Display structured results (skip console output since it was streamed in real-time)
+        ScriptOutput.AppendLine();
+        ScriptOutput.AppendLine($"--- Local Execution ---");
+        
+        if (result.Success)
+        {
+            ScriptOutput.AppendLine($"✅ Status: SUCCESS");
+            
+            var executionTime = result.Finished - result.Started;
+            ScriptOutput.AppendLine($"⏱️  Execution Time: {executionTime.TotalMilliseconds:F2}ms");
+            ScriptOutput.AppendLine();
+
+            // Show output variables
+            if (result.OutputVariables != null && result.OutputVariables.Any())
+            {
+                ScriptOutput.AppendLine($"📊 Output Variables:");
+                foreach (var variable in result.OutputVariables)
+                {
+                    ScriptOutput.AppendLine($"  • {variable.Key}: {variable.Value}");
+                }
+                ScriptOutput.AppendLine();
+            }
+        }
+        else
+        {
+            ScriptOutput.AppendLine($"❌ Status: FAILED");
+            ScriptOutput.AppendLine();
+            
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                ScriptOutput.AppendLine($"❗ Error:");
+                ScriptOutput.AppendLine(result.Error);
+                ScriptOutput.AppendLine();
+            }
+        }
+
+        ScriptOutput.AppendLine($"=== Execution completed at {DateTime.Now:HH:mm:ss} ===");
+        ScriptTextWritten?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -180,13 +222,14 @@ public class StepViewModel : IDisposable
                 ScriptOutput.AppendLine($"⏱️  Execution Time: {executionTime.TotalMilliseconds:F2}ms");
                 ScriptOutput.AppendLine();
                 
+                // Show console output (stdout) - this contains print() statements
                 if (!string.IsNullOrEmpty(result.Output))
                 {
-                    ScriptOutput.AppendLine($"📄 Output:");
+                    ScriptOutput.AppendLine($"📋 Console Output:");
                     ScriptOutput.AppendLine(result.Output);
-                    ScriptOutput.AppendLine();
                 }
 
+                // Show output variables
                 if (result.OutputVariables != null && result.OutputVariables.Any())
                 {
                     ScriptOutput.AppendLine($"📊 Output Variables:");
@@ -206,6 +249,14 @@ public class StepViewModel : IDisposable
                 {
                     ScriptOutput.AppendLine($"❗ Error:");
                     ScriptOutput.AppendLine(result.Error);
+                    ScriptOutput.AppendLine();
+                }
+                
+                // Show console output even on failure (may contain error messages)
+                if (!string.IsNullOrEmpty(result.Output))
+                {
+                    ScriptOutput.AppendLine($"📋 Console Output:");
+                    ScriptOutput.AppendLine(result.Output);
                     ScriptOutput.AppendLine();
                 }
             }

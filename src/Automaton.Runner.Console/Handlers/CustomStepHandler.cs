@@ -1,4 +1,4 @@
-using Automaton.Core.Scripting;
+﻿using Automaton.Core.Scripting;
 using Automaton.Core.Models;
 using Serilog;
 using System.Diagnostics;
@@ -6,7 +6,7 @@ using System.Diagnostics;
 namespace Automaton.Runner.Console.Handlers;
 
 /// <summary>
-/// Handler for executing custom steps on the runner
+/// Handler for executing custom steps on the runner with proper output variable extraction
 /// </summary>
 public class CustomStepHandler
 {
@@ -20,19 +20,20 @@ public class CustomStepHandler
     }
 
     /// <summary>
-    /// Execute a custom step and return the results
+    /// Execute a custom step and return the results with properly extracted output variables
     /// </summary>
-    public CustomStepExecutionResponse RunCustomStep(CustomStepPayload customStep)
+    public async Task<CustomStepExecutionResponse> RunCustomStep(CustomStepPayload customStep)
     {
         var stopwatch = Stopwatch.StartNew();
         var started = DateTime.UtcNow;
+        var consoleOutput = new System.Text.StringBuilder();
         
         try
         {
             logger.Information("Executing custom step {CustomStepId} ({CustomStepName})", 
                 customStep.Id, customStep.Name);
             
-            System.Console.WriteLine($"??  Executing custom step: {customStep.Name}");
+            System.Console.WriteLine($"▶️  Executing custom step: {customStep.Name}");
 
             var contentType = GetContentType(customStep.Language);
             var resource = new ScriptResource
@@ -41,65 +42,80 @@ public class CustomStepHandler
                 Content = customStep.Code
             };
             
+            // Prepare input variables dictionary
             var inputVars = customStep.CodeInputVariables?
                 .ToDictionary(v => v.Name, v => (object)v.Value) 
                 ?? new Dictionary<string, object>();
             
-            // Execute the script on a background thread
-            var scriptVariables = scriptHost.Execute(resource, inputVars);
-            
-            stopwatch.Stop();
-            
-            // Extract output variables
-            var outputVars = customStep.CodeOutputVariables?
-                .Where(v => scriptVariables.ContainsKey(v.Name))
-                .ToDictionary(v => v.Name, v => (object)(scriptVariables[v.Name]?.ToString() ?? string.Empty))
-                ?? new Dictionary<string, object>();
-
-            // Check for errors
-            var hasErrors = scriptVariables.ContainsKey("error") || 
-                           scriptVariables.ContainsKey("stderr");
-            
-            if (hasErrors)
+            // Capture console output during execution
+            EventHandler<string> outputHandler = (sender, text) =>
             {
-                var errorMessage = scriptVariables.ContainsKey("error") 
-                    ? scriptVariables["error"]?.ToString() 
-                    : scriptVariables["stderr"]?.ToString();
+                consoleOutput.Append(text);
+            };
+            
+            scriptHost.ScriptTextWritten += outputHandler;
+            
+            try
+            {
+                // Execute the script
+                var scriptVariables = await Task.Run(() => scriptHost.Execute(resource, inputVars));
+                
+                stopwatch.Stop();
+                
+                // **KEY FIX**: Extract output variables based on CodeOutputVariables definitions
+                // This ensures output variables are properly matched and returned
+                var outputVars = ExtractOutputVariables(customStep.CodeOutputVariables, scriptVariables);
 
-                logger.Warning("Custom step {CustomStepId} completed with errors: {Error}", 
-                    customStep.Id, errorMessage);
+                // Check for errors
+                var hasErrors = scriptVariables.ContainsKey("error") || 
+                               scriptVariables.ContainsKey("stderr");
+                
+                if (hasErrors)
+                {
+                    var errorMessage = scriptVariables.ContainsKey("error") 
+                        ? scriptVariables["error"]?.ToString() 
+                        : scriptVariables["stderr"]?.ToString();
 
-                System.Console.WriteLine($"? Custom step failed: {customStep.Name}");
+                    logger.Warning("Custom step {CustomStepId} completed with errors: {Error}", 
+                        customStep.Id, errorMessage);
 
+                    System.Console.WriteLine($"❌ Custom step failed: {customStep.Name}");
+
+                    return new CustomStepExecutionResponse
+                    {
+                        Success = false,
+                        Output = consoleOutput.ToString(), // Use captured console output
+                        Error = errorMessage,
+                        Started = started,
+                        Finished = DateTime.UtcNow,
+                        OutputVariables = outputVars // Include partial output variables even on error
+                    };
+                }
+
+                // Use captured console output instead of default message
+                var output = consoleOutput.Length > 0 
+                    ? consoleOutput.ToString() 
+                    : "Custom step executed successfully";
+
+                logger.Information("Custom step {CustomStepId} completed successfully in {ElapsedMs}ms", 
+                    customStep.Id, stopwatch.ElapsedMilliseconds);
+                
+                System.Console.WriteLine($"✅ Custom step completed: {customStep.Name} ({stopwatch.ElapsedMilliseconds}ms)");
+                
                 return new CustomStepExecutionResponse
                 {
-                    Success = false,
-                    Output = scriptVariables.ContainsKey("stdout") ? scriptVariables["stdout"]?.ToString() : null,
-                    Error = errorMessage,
+                    Success = true,
+                    Output = output,
+                    Error = null,
                     Started = started,
                     Finished = DateTime.UtcNow,
                     OutputVariables = outputVars
                 };
             }
-
-            var output = scriptVariables.ContainsKey("stdout") 
-                ? scriptVariables["stdout"]?.ToString() 
-                : "Custom step executed successfully";
-
-            logger.Information("Custom step {CustomStepId} completed successfully in {ElapsedMs}ms", 
-                customStep.Id, stopwatch.ElapsedMilliseconds);
-            
-            System.Console.WriteLine($"? Custom step completed: {customStep.Name} ({stopwatch.ElapsedMilliseconds}ms)");
-            
-            return new CustomStepExecutionResponse
+            finally
             {
-                Success = true,
-                Output = output,
-                Error = null,
-                Started = started,
-                Finished = DateTime.UtcNow,
-                OutputVariables = outputVars
-            };
+                scriptHost.ScriptTextWritten -= outputHandler;
+            }
         }
         catch (Exception ex)
         {
@@ -108,18 +124,53 @@ public class CustomStepHandler
             logger.Error(ex, "Error executing custom step {CustomStepId} ({CustomStepName})", 
                 customStep.Id, customStep.Name);
             
-            System.Console.WriteLine($"? Custom step exception: {customStep.Name} - {ex.Message}");
+            System.Console.WriteLine($"❌ Custom step exception: {customStep.Name} - {ex.Message}");
             
             return new CustomStepExecutionResponse
             {
                 Success = false,
-                Output = null,
+                Output = consoleOutput.ToString(), // Include any captured output before the exception
                 Error = $"Execution exception: {ex.Message}",
                 Started = started,
                 Finished = DateTime.UtcNow,
                 OutputVariables = new Dictionary<string, object>()
             };
         }
+    }
+
+    /// <summary>
+    /// Extract output variables from script execution results
+    /// This matches the Studio's logic for consistent variable handling
+    /// </summary>
+    private Dictionary<string, object> ExtractOutputVariables(
+        List<StepVariable> outputVariableDefinitions,
+        IDictionary<string, dynamic> scriptVariables)
+    {
+        var outputVariables = new Dictionary<string, object>();
+
+        if (outputVariableDefinitions == null || !outputVariableDefinitions.Any())
+        {
+            return outputVariables;
+        }
+
+        foreach (var outputVar in outputVariableDefinitions)
+        {
+            // Try to find the variable in script results by name
+            if (scriptVariables.ContainsKey(outputVar.Name))
+            {
+                var value = scriptVariables[outputVar.Name];
+                outputVariables[outputVar.Name] = value?.ToString() ?? string.Empty;
+                logger.Debug("Output variable {VariableName} = {Value}", outputVar.Name, value);
+            }
+            else
+            {
+                // Variable not set by script - use empty string as default
+                outputVariables[outputVar.Name] = string.Empty;
+                logger.Debug("Output variable {VariableName} not found in script results", outputVar.Name);
+            }
+        }
+
+        return outputVariables;
     }
     
     private string GetContentType(string language) => language?.ToLowerInvariant() switch
