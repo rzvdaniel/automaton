@@ -27,4 +27,9 @@ public class RunnerModel
                 StatusClasses[RunnerStatus.None];
         }
     }
+    
+    // Python Configuration Properties
+    public string? PythonDllPath { get; set; }
+    public List<string> PythonPaths { get; set; } = new();
+    public bool AutoDetectPythonPaths { get; set; } = true;
 }
