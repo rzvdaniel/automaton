@@ -136,6 +136,28 @@ public class RunnerService
         return exists;
     }
 
+    public bool ExistsById(Guid id)
+    {
+        var exists = dbContext.Runners.Any(x =>
+            x.Id == id &&
+            x.RunnerUsers.Any(x => x.UserId == userId));
+
+        return exists;
+    }
+
+    public async Task Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = dbContext.Runners
+            .Include(x => x.RunnerUsers)
+            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
+
+        if (entity != null)
+        {
+            dbContext.Runners.Remove(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task<IEnumerable<RunnerFlowResult>> ExecuteFlow(Guid flowId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
         var results = new List<RunnerFlowResult>();
