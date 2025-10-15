@@ -35,6 +35,7 @@ public class RunnersController : BaseController
     }
 
     [HttpPut("{id}")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Put(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
     {
         await runnersService.Update(id, runner, cancellationToken);
