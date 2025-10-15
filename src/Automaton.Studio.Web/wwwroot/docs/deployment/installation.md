@@ -108,8 +108,59 @@ Configure in `appsettings.Production.json`:
 }
 ```
 
+## Runner Deployment
+
+After installing Automaton Studio, you'll need to deploy at least one runner to execute workflows.
+
+### Quick Runner Setup
+
+1. **Get an API Key** from Automaton Studio:
+   - Navigate to **Settings → API Keys**
+   - Create a new key with "Runner" scope
+   - Copy the generated key (starts with `ak_`)
+
+2. **Install the Console Runner**:
+
+   **Windows (PowerShell as Administrator):**
+   ```powershell
+   iwr -useb https://your-server.com/downloads/install.ps1 | iex
+   ```
+
+   **Linux/macOS:**
+   ```bash
+   curl -sSL https://your-server.com/downloads/install.sh | bash
+   ```
+
+3. **Run Interactive Setup**:
+   ```bash
+   automaton-runner
+   ```
+   
+   The runner will guide you through authentication and registration.
+
+4. **For Production - Install as Service**:
+   ```bash
+   automaton-runner service install --name "Production-Runner"
+   ```
+
+### Advanced Runner Configuration
+
+For production deployments with automation and CI/CD:
+
+```bash
+# Set environment variables
+export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
+export AppConfig__BaseUrl="https://automaton.company.com"
+
+# Start runner (no prompts)
+automaton-runner
+```
+
+For complete runner setup documentation, see the [Runner Setup Guide](../user-guide/runner-setup.md).
+
 ## Next Steps
 
-- Set up [Runner Deployment](runners.md)
-- Configure [Security Settings](../reference/security.md)
-- Review [Performance Tuning](../reference/performance.md)
+- Complete [Runner Setup Guide](../user-guide/runner-setup.md) for detailed configuration
+- Learn about [Managing Runners](../user-guide/runners.md) in Studio
+- Configure [Security Settings](../reference/security.md) (if available)
+- Review [Performance Tuning](../reference/performance.md) (if available)

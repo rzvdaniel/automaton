@@ -57,18 +57,20 @@ For a native desktop experience on Windows:
 
 #### Automaton Runner
 Runners execute your automation flows. To set up your first runner:
-1. Go to **Downloads Hub** in the platform  
-2. Navigate to **Downloads** section for runners
-3. Download the appropriate version for your platform (Windows, macOS, Linux)
-4. Follow the installation instructions provided on the download page
 
-### 3. Setting Up Authentication for Runners
+**Quick Setup:**
+1. Go to **Settings → API Keys** and create a new API key with "Runner" scope
+2. Download the runner from **Downloads Hub → Console Runner**
+3. Run the one-command installer (Windows PowerShell or Linux/macOS Terminal)
+4. Run `automaton-runner` and follow the interactive setup
 
-Runners need an API key to connect:
-1. Go to **API Keys** in the platform
-2. Click **Create New Key**
-3. Copy the generated key (starts with `ak_`)
-4. Use this key when configuring your runner
+**👉 For detailed instructions, see the [Runner Setup Guide](user-guide/runner-setup.md)**
+
+This includes:
+- Complete installation instructions for all platforms
+- Docker and CI/CD integration examples
+- Troubleshooting common issues
+- System service configuration
 ### 4. Creating Your First Flow
 
 Let's create a simple "Hello World" automation:

@@ -46,36 +46,42 @@ A **Runner** is a lightweight agent that connects to your Automaton platform and
 
 ## Setting Up Your First Runner
 
-### Download and Install
+> 💡 **Quick Start**: For complete setup instructions including installation, configuration, and troubleshooting, see the [Runner Setup Guide](runner-setup.md).
 
-1. **Go to Downloads Hub**: Navigate to the **Downloads Hub** in the platform
-2. **Select Platform**: Choose the appropriate version for your platform (Windows, macOS, Linux)
-3. **Download**: Download the runner package
-4. **Install**: Follow the installation instructions provided on the download page
+### Quick Setup Overview
 
-### Get an API Key
+1. **Download the Runner**: 
+   - Go to **Downloads Hub** in Automaton Studio
+   - Choose your platform (Windows, macOS, Linux)
+   - Use the quick installation script (recommended) or manual download
 
-1. **Navigate to API Keys**: Go to **API Keys** in the platform
-2. **Create New Key**: Click **Create New Key**
-3. **Set Permissions**: Choose appropriate access level:
-   - `ak_runner_xxx`: Full runner access
-   - `ak_execute_xxx`: Execute flows only
-   - `ak_readonly_xxx`: Read-only access
-4. **Copy Key**: Save the generated key (you won't see it again)
+2. **Get an API Key**: 
+   - Navigate to **Settings → API Keys** in Automaton Studio
+   - Click **Create API Key**
+   - Choose **"Runner"** scope
+   - Copy the generated key (starts with `ak_`)
 
-### Connect Your Runner
+3. **Run Interactive Setup**:
+   ```bash
+   automaton-runner
+   ```
+   The runner will guide you through authentication and registration automatically.
 
-#### Interactive Setup (Recommended)
-When you start the runner for the first time, it will guide you through:
-- API key configuration
-- Runner name and description
-- Connection testing
-- Registration with the platform
+4. **Verify Connection**:
+   - Check the **Runners** page in Automaton Studio
+   - Your runner should appear with a 🟢 Online status
 
-#### Manual Configuration
-You can also set the API key as an environment variable:
-- **Windows**: Set `AUTOMATON_API_KEY` environment variable
-- **macOS/Linux**: Export `AUTOMATON_API_KEY` in your shell
+### Detailed Setup Instructions
+
+For comprehensive documentation including:
+- Detailed installation for all platforms
+- Docker and container deployment
+- CI/CD integration examples
+- System service configuration
+- Troubleshooting common issues
+- Security best practices
+
+**👉 See the complete [Runner Setup Guide](runner-setup.md)**
 
 ## Runner Management
 
