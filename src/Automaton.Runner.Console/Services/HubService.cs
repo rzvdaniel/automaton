@@ -16,6 +16,7 @@ public class HubService
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string PingMethod = "Ping";
+    private const string UpdatePythonConfigMethod = "UpdatePythonConfig";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -174,6 +175,28 @@ public class HubService
             {
                 logger.Debug("Received ping from server");
                 return "Pong";
+            });
+
+            // Python Configuration Handlers
+            connection.On<Models.RunnerPythonConfig>("UpdatePythonConfig", async (config) =>
+            {
+                try
+                {
+                    logger.Information("Received Python configuration update");
+                    WriteLine($"⚙️  Updating Python configuration...");
+                    
+                    // Update local runner.json file
+                    var fileStorage = serviceProvider.GetRequiredService<FileStorageService>();
+                    await fileStorage.UpdatePythonConfigAsync(config);
+                    
+                    WriteLine($"✅ Python configuration updated successfully");
+                    logger.Information("Python configuration updated successfully");
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Failed to update Python configuration");
+                    WriteLine($"❌ Failed to update Python configuration: {ex.Message}");
+                }
             });
 
             // Handle connection events
