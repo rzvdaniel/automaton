@@ -91,4 +91,17 @@ partial class RunnersPage : ComponentBase
             new() { Text = "Troubleshooting", Description = "Common issues and solutions for runner connectivity.", Icon = "question-circle", Url = "#" }
         };
     }
+
+    private async Task DeleteRunner(Guid id)
+    {
+        try
+        {
+            await RunnersViewModel.DeleteRunner(id);
+            await MessageService.SuccessAsync("Runner deleted successfully");
+        }
+        catch
+        {
+            await MessageService.ErrorAsync("Failed to delete runner");
+        }
+    }
 }

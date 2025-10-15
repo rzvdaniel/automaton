@@ -507,7 +507,26 @@ public class RunnerHostService
     {
         try
         {
-            var runnerId = Guid.NewGuid();
+            // Check if we have an existing runner ID stored locally
+            var existingRunnerId = storageService.GetRunnerId();
+            Guid runnerId;
+            bool isUpdate = false;
+
+            if (!string.IsNullOrEmpty(existingRunnerId) && Guid.TryParse(existingRunnerId, out var parsedId))
+            {
+                // Reuse existing runner ID for update
+                runnerId = parsedId;
+                isUpdate = true;
+                WriteLine($"?? Found existing runner ID: {runnerId}");
+                WriteLine($"?? Updating runner name to: {runnerName}");
+            }
+            else
+            {
+                // Create new runner ID
+                runnerId = Guid.NewGuid();
+                WriteLine($"?? Creating new runner with ID: {runnerId}");
+            }
+
             var runnerData = new
             {
                 Id = runnerId,
@@ -517,26 +536,41 @@ public class RunnerHostService
             var json = JsonSerializer.Serialize(runnerData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
-            WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
-            WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-
-            var response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
+            HttpResponseMessage response;
+            
+            if (isUpdate)
+            {
+                // Update existing runner via PUT
+                WriteLine($"?? Making update request to: {configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}");
+                WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
+                WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
+                
+                response = await httpClient.PutAsync($"{configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}", content);
+            }
+            else
+            {
+                // Register new runner via POST
+                WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
+                WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
+                WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
+                
+                response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
+            }
 
             WriteLine($"?? Server response: {response.StatusCode}");
 
             if (response.IsSuccessStatusCode)
             {
                 await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                logger.Information("Runner {RunnerName} registered with ID {RunnerId}", runnerName, runnerId);
-                WriteLine("? Runner registration successful!");
+                logger.Information("Runner {RunnerName} {Action} with ID {RunnerId}", runnerName, isUpdate ? "updated" : "registered", runnerId);
+                WriteLine($"? Runner {(isUpdate ? "updated" : "registered")} successfully!");
                 return true;
             }
 
             var errorContent = await response.Content.ReadAsStringAsync();
-            logger.Warning("Runner registration failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+            logger.Warning("Runner {Action} failed: {StatusCode} - {Error}", isUpdate ? "update" : "registration", response.StatusCode, errorContent);
             
-            WriteLine($"? Registration failed: {response.StatusCode}");
+            WriteLine($"? {(isUpdate ? "Update" : "Registration")} failed: {response.StatusCode}");
             if (!string.IsNullOrEmpty(errorContent))
             {
                 WriteLine($"?? Server response body: {errorContent}");

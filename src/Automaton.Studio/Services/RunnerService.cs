@@ -46,4 +46,18 @@ public class RunnerService
 
         return runners;
     }
+
+    public async Task Delete(Guid id)
+    {
+        try
+        {
+            var result = await httpClient.DeleteAsync($"{configService.RunnersUrl}/{id}");
+            result.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete runner {RunnerId}", id);
+            throw;
+        }
+    }
 }

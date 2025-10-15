@@ -42,6 +42,14 @@ public class RunnersController : BaseController
         return NoContent();
     }
 
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await runnersService.Delete(id, cancellationToken);
+
+        return NoContent();
+    }
+
     [HttpGet("status")]
     public async Task<ActionResult<RunnerStatusResponse>> GetStatus(CancellationToken cancellationToken)
     {

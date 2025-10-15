@@ -28,4 +28,10 @@ public class RunnersViewModel
         var runners = await runnerService.List();
         Runners = mapper.Map<ICollection<RunnerModel>>(runners);
     }
+
+    public async Task DeleteRunner(Guid id)
+    {
+        await runnerService.Delete(id);
+        await GetRunners();
+    }
 }
