@@ -103,6 +103,39 @@ public class ConfigurationService
             await storageService.SaveServerConfigAsync(cleanUrl);
         }
     }
+
+    // Python configuration methods
+    public Models.RunnerPythonConfig GetPythonConfig()
+    {
+        // Configuration Priority Order:
+        // 1. Local runner.json file
+        // 2. Environment variables
+        // 3. Default (auto-detection enabled)
+        
+        var config = storageService.GetPythonConfig();
+        
+        // Override with environment variables if present
+        var envPythonDll = Environment.GetEnvironmentVariable("AUTOMATON_PYTHON_DLL");
+        if (!string.IsNullOrEmpty(envPythonDll))
+        {
+            config.PythonDllPath = envPythonDll;
+        }
+        
+        var envPythonPaths = Environment.GetEnvironmentVariable("AUTOMATON_PYTHON_PATHS");
+        if (!string.IsNullOrEmpty(envPythonPaths))
+        {
+            var separator = Path.PathSeparator;
+            config.PythonPaths = envPythonPaths.Split(separator, StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+        
+        var envAutoDetect = Environment.GetEnvironmentVariable("AUTOMATON_PYTHON_AUTO_DETECT");
+        if (!string.IsNullOrEmpty(envAutoDetect) && bool.TryParse(envAutoDetect, out var autoDetect))
+        {
+            config.AutoDetectPythonPaths = autoDetect;
+        }
+        
+        return config;
+    }
 }
 
 public class ClientAuthConfig

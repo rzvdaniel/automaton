@@ -62,11 +62,15 @@ public class FileStorageService
     // Runner configuration methods
     public async Task SaveRunnerConfigAsync(string runnerId, string runnerName)
     {
+        // Preserve existing Python config if present
+        var existingPythonConfig = GetPythonConfig();
+        
         var config = new
         {
             RunnerId = runnerId,
             RunnerName = runnerName,
-            RegisteredAt = DateTime.UtcNow
+            RegisteredAt = DateTime.UtcNow,
+            PythonConfig = existingPythonConfig
         };
 
         var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
@@ -167,6 +171,62 @@ public class FileStorageService
             File.Delete(runnerConfigFile);
         }
         return Task.CompletedTask;
+    }
+
+    // Python configuration methods
+    public Models.RunnerPythonConfig GetPythonConfig()
+    {
+        if (!File.Exists(runnerConfigFile))
+            return new Models.RunnerPythonConfig();
+
+        try
+        {
+            var json = File.ReadAllText(runnerConfigFile);
+            var config = JsonSerializer.Deserialize<JsonElement>(json);
+            
+            if (config.TryGetProperty("PythonConfig", out var pythonConfigElement))
+            {
+                var pythonConfig = JsonSerializer.Deserialize<Models.RunnerPythonConfig>(pythonConfigElement.GetRawText());
+                return pythonConfig ?? new Models.RunnerPythonConfig();
+            }
+            
+            return new Models.RunnerPythonConfig();
+        }
+        catch
+        {
+            return new Models.RunnerPythonConfig();
+        }
+    }
+
+    public async Task UpdatePythonConfigAsync(Models.RunnerPythonConfig pythonConfig)
+    {
+        if (!File.Exists(runnerConfigFile))
+        {
+            // If runner config doesn't exist, we can't update Python config
+            throw new InvalidOperationException("Runner configuration file not found. Please register the runner first.");
+        }
+
+        try
+        {
+            var json = File.ReadAllText(runnerConfigFile);
+            var config = JsonSerializer.Deserialize<JsonElement>(json);
+            
+            // Reconstruct the config with updated Python settings
+            var updatedConfig = new
+            {
+                RunnerId = config.TryGetProperty("RunnerId", out var id) ? id.GetString() : null,
+                RunnerName = config.TryGetProperty("RunnerName", out var name) ? name.GetString() : null,
+                RegisteredAt = config.TryGetProperty("RegisteredAt", out var regAt) ? regAt.GetDateTime() : DateTime.UtcNow,
+                PythonConfig = pythonConfig
+            };
+
+            var updatedJson = JsonSerializer.Serialize(updatedConfig, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(runnerConfigFile, updatedJson);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to update Python configuration: {ex.Message}", ex);
+        }
     }
 
     private void EnsureConfigDirectoryExists()
