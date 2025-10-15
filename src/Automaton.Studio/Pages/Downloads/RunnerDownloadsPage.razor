@@ -64,6 +64,12 @@
                         <Paragraph Class="downloads-subtitle">
                             Cross-platform command-line runner with one-command interactive setup
                         </Paragraph>
+                        <div Style="margin-top: 12px;">
+                            <Button Type="@ButtonType.Link" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/runner-setup"))" Style="padding: 0; font-size: 16px;">
+                                <Icon Type="book" Style="margin-right: 4px;" />
+                                📚 View Complete Setup Guide & Troubleshooting
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -364,7 +370,7 @@
             </Card>
 
             <!-- Environment Variables Section -->
-            <Card Class="env-vars-card">
+            <Card Class="env-vars-card" Style="margin-bottom: 24px;">
                 <TitleTemplate>
                     <Icon Type="setting" Style="margin-right: 8px;" />
                     <span>🤖 Automation & CI/CD (Skip Interactive Prompts)</span>
@@ -392,6 +398,63 @@
                             <strong>All set!</strong> Your runner is configured to start automatically with the provided settings.
                         </MessageTemplate>
                     </Alert>
+                </ChildContent>
+            </Card>
+
+            <!-- Documentation Link Section -->
+            <Card Class="documentation-card">
+                <TitleTemplate>
+                    <Icon Type="book" Style="margin-right: 8px;" />
+                    <span>📚 Need More Help?</span>
+                </TitleTemplate>
+                <ChildContent>
+                    <Row Gutter="24">
+                        <Col Span="16">
+                            <Title Level="4" Style="margin-bottom: 12px;">Complete Setup Guide & Troubleshooting</Title>
+                            <Paragraph>
+                                For comprehensive documentation including Docker deployment, CI/CD integration, 
+                                troubleshooting, service configuration, and advanced scenarios, check out our complete setup guide.
+                            </Paragraph>
+                            <div class="doc-features">
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>Detailed installation instructions for all platforms</span>
+                                </div>
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>Docker and Kubernetes deployment examples</span>
+                                </div>
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>CI/CD pipeline integration (GitHub Actions, Azure DevOps, GitLab)</span>
+                                </div>
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>Troubleshooting common issues</span>
+                                </div>
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>System service configuration</span>
+                                </div>
+                                <div class="doc-feature-item">
+                                    <Icon Type="check-circle" Style="color: #52c41a; margin-right: 8px;" />
+                                    <span>Security best practices</span>
+                                </div>
+                            </div>
+                        </Col>
+                        <Col Span="8" Style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <div Style="text-align: center;">
+                                <div Style="font-size: 64px; margin-bottom: 16px;">📖</div>
+                                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" Block="true" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/runner-setup"))">
+                                    <Icon Type="book" />
+                                    View Setup Guide
+                                </Button>
+                                <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px;">
+                                    Complete guide with examples and troubleshooting
+                                </Paragraph>
+                            </div>
+                        </Col>
+                    </Row>
                 </ChildContent>
             </Card>
         </div>
@@ -555,8 +618,32 @@
     .getting-started-card,
     .manual-downloads-card,
     .advanced-commands-card,
-    .env-vars-card {
+    .env-vars-card,
+    .documentation-card {
         margin-bottom: 24px;
+    }
+
+    .documentation-card {
+        border: 2px solid #1890ff;
+        background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+    }
+
+    .documentation-card .ant-card-head-title {
+        color: #1890ff;
+        font-weight: 600;
+    }
+
+    .doc-features {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .doc-feature-item {
+        display: flex;
+        align-items: center;
+        font-size: 14px;
     }
 
     .command-section {
