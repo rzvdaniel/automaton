@@ -202,9 +202,8 @@ Combine both database-backed UI management and local file-based runner configura
 │  │  ┌────────────────────────────────────────────┐   │                 │
 │  │  │ Runner Table                               │   │                 │
 │  │  │  - Id, Name, ConnectionId                  │   │                 │
-│  │  │  - PythonDllPath                           │   │                 │
-│  │  │  - PythonPathsJson                         │   │                 │
-│  │  │  - AutoDetectPythonPaths                   │   │                 │
+│  │  │  - Configuration (JSON)                    │   │                 │
+│  │  │    { "Python": { ... } }                   │   │                 │
 │  │  └────────────────────────────────────────────┘   │                 │
 │  └───────────────────────────────────────────────────┘                 │
 │                                                                           │
@@ -322,16 +321,35 @@ public class Runner
     
     public string ConnectionId { get; set; }
 
-    // Python Configuration Properties
-    public string? PythonDllPath { get; set; }
-    
-    public string? PythonPathsJson { get; set; } // JSON array: ["path1", "path2"]
-    
-    public bool AutoDetectPythonPaths { get; set; } = true;
+    // Generic Configuration Property - stores all runner settings as JSON
+    public string? Configuration { get; set; }
 
     public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; }
 }
 ```
+
+**Configuration JSON Structure**:
+The `Configuration` property stores a JSON object that can contain various runner settings, including Python configuration:
+
+```json
+{
+  "Python": {
+    "PythonDllPath": "C:\\Python311\\python311.dll",
+    "PythonPaths": ["C:\\Python311\\Lib\\site-packages", "C:\\CustomLibs"],
+    "AutoDetectPythonPaths": true
+  },
+  "Other": {
+    // Future settings can be added here without database schema changes
+  }
+}
+```
+
+**Benefits of Generic Configuration Property**:
+- **Extensibility**: Add new configuration sections without database migrations
+- **Flexibility**: Different runners can have different configuration schemas
+- **Versioning**: Easy to version configuration structure
+- **Backward Compatibility**: Missing sections default gracefully
+- **Single Column**: Reduces database schema complexity
 
 ### 2. Python Configuration DTO
 
@@ -457,11 +475,19 @@ public class RunnerDetails
     public string? ConnectionId { get; set; }
     public RunnerStatus Status { get; set; }
     
-    // Python Configuration
+    // Python Configuration (parsed from Configuration JSON)
     public string? PythonDllPath { get; set; }
     public List<string> PythonPaths { get; set; } = new();
     public bool AutoDetectPythonPaths { get; set; } = true;
 }
+
+// Note: RunnerDetails is a DTO that extracts Python config from the Runner.Configuration property
+// When mapping from Runner entity to RunnerDetails:
+// var runnerConfig = JsonSerializer.Deserialize<RunnerConfiguration>(runner.Configuration);
+// var details = new RunnerDetails { 
+//     PythonDllPath = runnerConfig?.Python?.PythonDllPath,
+//     // ... etc
+// }
 ```
 
 ### 7. UI Model Extension
@@ -555,16 +581,27 @@ public async Task<IActionResult> GetPythonConfig(Guid id)
     if (runner == null)
         return NotFound();
     
-    var config = new RunnerPythonConfig
+    // Parse Configuration JSON to extract Python settings
+    RunnerPythonConfig config;
+    if (!string.IsNullOrEmpty(runner.Configuration))
     {
-        PythonDllPath = runner.PythonDllPath,
-        PythonPaths = string.IsNullOrEmpty(runner.PythonPathsJson) 
-            ? new List<string>() 
-            : JsonSerializer.Deserialize<List<string>>(runner.PythonPathsJson) ?? new List<string>(),
-        AutoDetectPythonPaths = runner.AutoDetectPythonPaths
-    };
+        var runnerConfig = JsonSerializer.Deserialize<RunnerConfiguration>(runner.Configuration);
+        config = runnerConfig?.Python ?? new RunnerPythonConfig();
+    }
+    else
+    {
+        // Return defaults if no configuration exists
+        config = new RunnerPythonConfig();
+    }
     
     return Ok(config);
+}
+
+// Helper class for deserialization
+public class RunnerConfiguration
+{
+    public RunnerPythonConfig? Python { get; set; }
+    // Future configuration sections can be added here
 }
 ```
 
@@ -593,10 +630,23 @@ public async Task<IActionResult>UpdatePythonConfig(
     if (runner == null)
         return NotFound();
     
-    // Update database
-    runner.PythonDllPath = config.PythonDllPath;
-    runner.PythonPathsJson = JsonSerializer.Serialize(config.PythonPaths);
-    runner.AutoDetectPythonPaths = config.AutoDetectPythonPaths;
+    // Parse existing Configuration or create new one
+    RunnerConfiguration runnerConfig;
+    if (!string.IsNullOrEmpty(runner.Configuration))
+    {
+        runnerConfig = JsonSerializer.Deserialize<RunnerConfiguration>(runner.Configuration) 
+            ?? new RunnerConfiguration();
+    }
+    else
+    {
+        runnerConfig = new RunnerConfiguration();
+    }
+    
+    // Update Python configuration section
+    runnerConfig.Python = config;
+    
+    // Serialize back to Configuration property
+    runner.Configuration = JsonSerializer.Serialize(runnerConfig);
     
     await runnerService.UpdateRunnerAsync(runner);
     
@@ -1299,12 +1349,12 @@ private bool ValidatePathsLocally(RunnerPythonConfig config)
 
 ```bash
 cd src/Automaton.Studio.Server
-dotnet ef migrations add AddPythonConfigToRunner
+dotnet ef migrations add AddConfigurationToRunner
 ```
 
 #### 2. Migration File
 
-**File**: `Automaton.Studio.Server/Migrations/YYYYMMDDHHMMSS_AddPythonConfigToRunner.cs`
+**File**: `Automaton.Studio.Server/Migrations/YYYYMMDDHHMMSS_AddConfigurationToRunner.cs`
 
 ```csharp
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -1313,48 +1363,33 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Automaton.Studio.Server.Migrations
 {
-    public partial class AddPythonConfigToRunner : Migration
+    public partial class AddConfigurationToRunner : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Add generic Configuration column to store all runner settings as JSON
             migrationBuilder.AddColumn<string>(
-                name: "PythonDllPath",
-                table: "Runners",
-                type: "varchar(500)",
-                maxLength: 500,
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PythonPathsJson",
+                name: "Configuration",
                 table: "Runners",
                 type: "text",
                 nullable: true);
-
-            migrationBuilder.AddColumn<bool>(
-                name: "AutoDetectPythonPaths",
-                table: "Runners",
-                type: "tinyint(1)",
-                nullable: false,
-                defaultValue: true);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "PythonDllPath",
-                table: "Runners");
-
-            migrationBuilder.DropColumn(
-                name: "PythonPathsJson",
-                table: "Runners");
-
-            migrationBuilder.DropColumn(
-                name: "AutoDetectPythonPaths",
+                name: "Configuration",
                 table: "Runners");
         }
     }
 }
 ```
+
+**Benefits of Single Configuration Column**:
+- Only one column added to the database
+- No schema changes needed for new configuration types
+- Supports versioning and evolution of configuration structure
+- Easier to backup and restore runner configurations
 
 #### 3. Update DbContext
 
@@ -1365,18 +1400,10 @@ modelBuilder.Entity<Runner>(entity =>
 {
     entity.HasKey(e => new { e.Id });
     
-    // Python configuration properties
-    entity.Property(e => e.PythonDllPath)
-        .HasMaxLength(500)
-        .IsRequired(false);
-    
-    entity.Property(e => e.PythonPathsJson)
+    // Generic Configuration property for storing all runner settings
+    entity.Property(e => e.Configuration)
         .HasColumnType("text")
         .IsRequired(false);
-    
-    entity.Property(e => e.AutoDetectPythonPaths)
-        .IsRequired()
-        .HasDefaultValue(true);
 });
 ```
 
@@ -1392,10 +1419,11 @@ dotnet ef database update --connection "YourConnectionString" --project src/Auto
 
 ### Backward Compatibility
 
-- All new columns are **nullable** (except AutoDetectPythonPaths with default value)
-- Existing runners continue working with auto-detection enabled by default
-- No data migration needed
+- The new `Configuration` column is **nullable**
+- Existing runners continue working without any configuration (auto-detection enabled by default)
+- No data migration needed - empty Configuration is handled gracefully
 - Runner console gracefully handles missing Python config in runner.json
+- New configuration sections can be added without database changes
 
 ### Data Validation
 
@@ -2101,7 +2129,31 @@ The **hybrid configuration strategy** is the recommended solution because it:
 
 ## Appendix
 
-### A. Sample runner.json with Python Configuration
+### A. Database Configuration JSON Structure
+
+**Runner.Configuration Property** (stored in database):
+
+```json
+{
+  "Python": {
+    "PythonDllPath": "C:\\Python311\\python311.dll",
+    "PythonPaths": [
+      "C:\\Python311\\Lib\\site-packages",
+      "C:\\CustomLibs\\MyPythonModules"
+    ],
+    "AutoDetectPythonPaths": true
+  }
+}
+```
+
+**Benefits of this structure**:
+- Extensible: Add new sections like `"NodeJs": {...}`, `"Java": {...}` without schema changes
+- Versionable: Can add `"Version": "1.0"` for future compatibility
+- Flexible: Different runners can have different configuration structures
+
+### B. Sample runner.json with Python Configuration
+
+**Local Runner Configuration File** (stored on runner machine at `~/.config/AutomatonRunner/runner.json`):
 
 ```json
 {
@@ -2119,7 +2171,9 @@ The **hybrid configuration strategy** is the recommended solution because it:
 }
 ```
 
-### B. Environment Variables Reference
+**Note**: The local runner.json file uses `"PythonConfig"` as the key, while the database Configuration uses `"Python"`. This is intentional - the runner's local file can have a different structure optimized for local usage.
+
+### C. Environment Variables Reference
 
 ```bash
 # Python DLL path
@@ -2132,7 +2186,7 @@ export AUTOMATON_PYTHON_PATHS="/usr/local/lib/python3.11/site-packages:/home/use
 export AUTOMATON_PYTHON_AUTO_DETECT="true"
 ```
 
-### C. CLI Examples
+### D. CLI Examples
 
 ```bash
 # Interactive configuration
@@ -2157,7 +2211,7 @@ automaton-runner config python --show
 automaton-runner config python --reset
 ```
 
-### D. Troubleshooting Common Issues
+### E. Troubleshooting Common Issues
 
 **Issue**: Runner can't find Python DLL
 
