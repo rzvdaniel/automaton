@@ -27,7 +27,28 @@ namespace Automaton.Studio.Server.Mapper
 
         private void CreateMaps()
         {
-            CreateMap<Entities.Runner, RunnerDetails>();
+            CreateMap<Entities.Runner, RunnerDetails>()
+                .AfterMap((src, dest) =>
+                {
+                    // Parse Python configuration from Configuration JSON
+                    if (!string.IsNullOrEmpty(src.Configuration))
+                    {
+                        try
+                        {
+                            var runnerConfig = JsonSerializer.Deserialize<RunnerConfiguration>(src.Configuration);
+                            if (runnerConfig?.Python != null)
+                            {
+                                dest.PythonDllPath = runnerConfig.Python.PythonDllPath;
+                                dest.PythonPaths = runnerConfig.Python.PythonPaths;
+                                dest.AutoDetectPythonPaths = runnerConfig.Python.AutoDetectPythonPaths;
+                            }
+                        }
+                        catch
+                        {
+                            // If deserialization fails, leave defaults
+                        }
+                    }
+                });
             CreateMap<Entities.Flow, FlowInfo>();
             CreateMap<Entities.CustomStep, CustomStep>().ForMember
             (

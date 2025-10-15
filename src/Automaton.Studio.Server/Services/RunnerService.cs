@@ -255,4 +255,84 @@ public class RunnerService
             Status = WorkflowStatus.None
         };
     }
+
+    /// <summary>
+    /// Get Python configuration for a runner
+    /// </summary>
+    public async Task<RunnerPythonConfig> GetPythonConfigAsync(Runner runner)
+    {
+        if (!string.IsNullOrEmpty(runner.Configuration))
+        {
+            try
+            {
+                var runnerConfig = System.Text.Json.JsonSerializer.Deserialize<RunnerConfiguration>(runner.Configuration);
+                return runnerConfig?.Python ?? new RunnerPythonConfig();
+            }
+            catch (Exception ex)
+            {
+                logger.ForContext("RunnerId", runner.Id)
+                      .ForContext("RunnerName", runner.Name)
+                      .Error(ex, "Failed to deserialize Python configuration");
+                return new RunnerPythonConfig();
+            }
+        }
+        
+        return new RunnerPythonConfig();
+    }
+
+    /// <summary>
+    /// Update Python configuration for a runner
+    /// </summary>
+    public async Task UpdatePythonConfigAsync(Runner runner, RunnerPythonConfig pythonConfig)
+    {
+        try
+        {
+            // Parse existing Configuration or create new one
+            RunnerConfiguration runnerConfig;
+            if (!string.IsNullOrEmpty(runner.Configuration))
+            {
+                runnerConfig = System.Text.Json.JsonSerializer.Deserialize<RunnerConfiguration>(runner.Configuration) 
+                    ?? new RunnerConfiguration();
+            }
+            else
+            {
+                runnerConfig = new RunnerConfiguration();
+            }
+            
+            // Update Python configuration section
+            runnerConfig.Python = pythonConfig;
+            
+            // Serialize back to Configuration property
+            runner.Configuration = System.Text.Json.JsonSerializer.Serialize(runnerConfig);
+            
+            await dbContext.SaveChangesAsync();
+            
+            // Send SignalR command to runner to update local config (if online)
+            if (!string.IsNullOrEmpty(runner.ConnectionId))
+            {
+                try
+                {
+                    await automatonHub.Clients.Client(runner.ConnectionId)
+                        .SendAsync("UpdatePythonConfig", pythonConfig);
+                }
+                catch (Exception ex)
+                {
+                    logger.ForContext("RunnerId", runner.Id)
+                          .ForContext("RunnerName", runner.Name)
+                          .Warning(ex, "Failed to send Python configuration update to runner via SignalR");
+                }
+            }
+            
+            logger.ForContext("RunnerId", runner.Id)
+                  .ForContext("RunnerName", runner.Name)
+                  .Information("Python configuration updated successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.ForContext("RunnerId", runner.Id)
+                  .ForContext("RunnerName", runner.Name)
+                  .Error(ex, "Failed to update Python configuration");
+            throw;
+        }
+    }
 }

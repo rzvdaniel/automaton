@@ -55,4 +55,43 @@ public class RunnersController : BaseController
             OnlineRunners = onlineRunners
         });
     }
+
+    /// <summary>
+    /// Get Python configuration for a specific runner
+    /// </summary>
+    [HttpGet("{id}/python-config")]
+    [Authorize]
+    [ProducesResponseType(typeof(RunnerPythonConfig), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetPythonConfig(Guid id)
+    {
+        var runner = runnersService.Get(id);
+        
+        if (runner == null)
+            return NotFound();
+        
+        var config = await runnersService.GetPythonConfigAsync(runner);
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Update Python configuration for a runner
+    /// </summary>
+    [HttpPut("{id}/python-config")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> UpdatePythonConfig(Guid id, [FromBody] RunnerPythonConfig config)
+    {
+        var runner = runnersService.Get(id);
+        
+        if (runner == null)
+            return NotFound();
+        
+        await runnersService.UpdatePythonConfigAsync(runner, config);
+        
+        return Ok(new { Message = "Python configuration updated successfully" });
+    }
 }
