@@ -890,8 +890,28 @@ body {
         gap: var(--spacing-xl);
     }
     
-    .steps-container {
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    .steps-container::before {
+        display: none;
+    }
+    
+    .step-card {
+        flex-direction: column !important;
+        text-align: center;
+        margin-bottom: var(--spacing-lg);
+    }
+    
+    .step-card::after {
+        position: static;
+        transform: none;
+        margin: var(--spacing-sm) auto;
+    }
+    
+    .step-content {
+        width: 100%;
+    }
+    
+    .step-icon {
+        margin: 0 auto;
     }
 }
 
@@ -965,7 +985,12 @@ body {
     }
     
     .steps-container {
-        grid-template-columns: 1fr;
+        padding: 0 var(--spacing-sm);
+    }
+    
+    .step-card {
+        flex-direction: column !important;
+        text-align: center;
     }
 }
 
@@ -991,59 +1016,195 @@ body {
     }
 }
 
-/* How It Works Section */
+/* How It Works Section - Timeline Design */
 .how-it-works {
     padding: var(--spacing-2xl) 0;
     background: var(--dark-bg);
-}
-
-.steps-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: var(--spacing-xl);
-    margin-top: var(--spacing-2xl);
-}
-
-.step-card {
-    text-align: center;
-    padding: var(--spacing-xl);
-    background: var(--dark-surface);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--dark-border);
-    transition: all 0.3s ease;
     position: relative;
 }
 
-.step-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--secondary-color);
-    box-shadow: 0 10px 30px rgba(6, 182, 212, 0.2);
+.steps-container {
+    position: relative;
+    max-width: 900px;
+    margin: var(--spacing-2xl) auto 0;
+    padding: 0 var(--spacing-lg);
+}
+
+/* Timeline line - connects all steps */
+.steps-container::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 60px;
+    bottom: 60px;
+    width: 3px;
+    background: linear-gradient(180deg, 
+        var(--secondary-color) 0%, 
+        var(--primary-light) 50%, 
+        var(--accent-color) 100%);
+    transform: translateX(-50%);
+    z-index: 0;
+}
+
+.step-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-2xl);
+    position: relative;
+    opacity: 0;
+    animation: slideInFromLeft 0.6s ease forwards;
+}
+
+.step-card:nth-child(1) { animation-delay: 0.1s; }
+.step-card:nth-child(2) { 
+    animation-name: slideInFromRight; 
+    animation-delay: 0.3s;
+    flex-direction: row-reverse;
+}
+.step-card:nth-child(3) { animation-delay: 0.5s; }
+.step-card:nth-child(4) { 
+    animation-name: slideInFromRight;
+    animation-delay: 0.7s;
+    flex-direction: row-reverse;
 }
 
 .step-icon {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 80px;
-    height: 80px;
-    margin-bottom: var(--spacing-md);
+    width: 120px;
+    height: 120px;
+    min-width: 120px;
+    background: linear-gradient(135deg, var(--dark-surface), var(--dark-bg));
+    border-radius: 50%;
+    border: 3px solid var(--secondary-color);
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.4);
+    transition: all 0.4s ease;
+}
+
+.step-card:nth-child(2) .step-icon {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+}
+
+.step-card:nth-child(3) .step-icon {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+}
+
+.step-card:nth-child(4) .step-icon {
+    border-color: #C084FC;
+    box-shadow: 0 0 30px rgba(192, 132, 252, 0.4);
 }
 
 .step-icon img {
-    width: 100%;
-    height: 100%;
+    width: 60px;
+    height: 60px;
     filter: drop-shadow(0 4px 15px rgba(6, 182, 212, 0.3));
+    transition: transform 0.4s ease;
 }
 
-.step-card h3 {
-    font-size: 1.25rem;
+.step-card:hover .step-icon {
+    transform: scale(1.1);
+    box-shadow: 0 0 40px rgba(6, 182, 212, 0.6);
+}
+
+.step-card:hover .step-icon img {
+    transform: rotate(5deg) scale(1.1);
+}
+
+.step-content {
+    flex: 1;
+    background: rgba(30, 41, 59, 0.5);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--dark-border);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.step-card:hover .step-content {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: var(--secondary-color);
+    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.15);
+}
+
+.step-content h3 {
+    font-size: 1.5rem;
     margin-bottom: var(--spacing-sm);
     color: var(--text-primary);
+    font-weight: 600;
 }
 
-.step-card p {
+.step-content p {
     color: var(--text-secondary);
-    line-height: 1.6;
+    line-height: 1.7;
+    margin: 0;
+}
+
+/* Number badge on timeline */
+.step-card::after {
+    content: attr(data-step);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: var(--dark-bg);
+    border: 2px solid var(--secondary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--secondary-color);
+    z-index: 3;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+}
+
+.step-card:nth-child(2)::after {
+    border-color: var(--primary-light);
+    color: var(--primary-light);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.step-card:nth-child(3)::after {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+.step-card:nth-child(4)::after {
+    border-color: #C084FC;
+    color: #C084FC;
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.5);
+}
+
+/* Animations for timeline entries */
+@keyframes slideInFromLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* Web Apps Section */
