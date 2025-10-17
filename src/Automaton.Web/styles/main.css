@@ -1117,9 +1117,7 @@ body {
     }
     
     .step-card::after {
-        position: static;
-        transform: none;
-        margin: var(--spacing-sm) auto;
+        display: none;
     }
     
     .step-content {
