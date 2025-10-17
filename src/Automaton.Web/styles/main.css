@@ -1285,21 +1285,6 @@ body {
 }
 
 /* Timeline line - connects all steps */
-.steps-container::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 60px;
-    bottom: 60px;
-    width: 3px;
-    background: linear-gradient(180deg, 
-        var(--secondary-color) 0%, 
-        var(--primary-light) 50%, 
-        var(--accent-color) 100%);
-    transform: translateX(-50%);
-    z-index: 0;
-}
-
 .step-card {
     display: flex;
     align-items: center;

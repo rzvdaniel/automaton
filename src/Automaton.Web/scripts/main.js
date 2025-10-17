@@ -156,17 +156,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return 1 - Math.pow(1 - t, 3);
     }
     
-    // Parallax effect for hero background
-    window.addEventListener('scroll', function() {
-        const scrolled = window.pageYOffset;
-        const hero = document.querySelector('.hero');
-        
-        if (hero) {
-            const rate = scrolled * -0.5;
-            hero.style.transform = `translateY(${rate}px)`;
-        }
-    });
-    
     // Documentation tabs interaction
     const docItems = document.querySelectorAll('.doc-item');
     const docContent = document.querySelector('.doc-content-preview');
