@@ -93,36 +93,44 @@
             </div>
             
             <div class="steps-container">
-                <div class="step-card">
+                <div class="step-card" data-step="1">
                     <div class="step-icon">
                         <img src="assets/icon-design.svg" alt="Design" />
                     </div>
-                    <h3>Design Visual Flows</h3>
-                    <p>Create automation workflows using our drag-and-drop flow designer. Connect steps, add logic, and define your business processes visually - no coding required (but Python/PowerShell supported if needed).</p>
+                    <div class="step-content">
+                        <h3>Design Visual Flows</h3>
+                        <p>Create automation workflows using our drag-and-drop flow designer. Connect steps, add logic, and define your business processes visually - no coding required (but Python/PowerShell supported if needed).</p>
+                    </div>
                 </div>
                 
-                <div class="step-card">
+                <div class="step-card" data-step="2">
                     <div class="step-icon">
                         <img src="assets/icon-deploy.svg" alt="Deploy" />
                     </div>
-                    <h3>Deploy Runners Anywhere</h3>
-                    <p>Install lightweight runners on your infrastructure - cloud, on-premise, or edge devices. Runners execute your flows securely and report back to the central platform.</p>
+                    <div class="step-content">
+                        <h3>Deploy Runners Anywhere</h3>
+                        <p>Install lightweight runners on your infrastructure - cloud, on-premise, or edge devices. Runners execute your flows securely and report back to the central platform.</p>
+                    </div>
                 </div>
                 
-                <div class="step-card">
+                <div class="step-card" data-step="3">
                     <div class="step-icon">
                         <img src="assets/icon-build.svg" alt="Build" />
                     </div>
-                    <h3>Build Web Interfaces</h3>
-                    <p>Create web applications hosted directly in Automaton. Design forms, dashboards, and user interfaces that connect seamlessly with your automation workflows as the backend.</p>
+                    <div class="step-content">
+                        <h3>Build Web Interfaces</h3>
+                        <p>Create web applications hosted directly in Automaton. Design forms, dashboards, and user interfaces that connect seamlessly with your automation workflows as the backend.</p>
+                    </div>
                 </div>
                 
-                <div class="step-card">
+                <div class="step-card" data-step="4">
                     <div class="step-icon">
                         <img src="assets/icon-connect.svg" alt="Connect" />
                     </div>
-                    <h3>Everything Connected</h3>
-                    <p>Your web apps trigger workflows, workflows update UI data, all in real-time. No separate API development, no deployment pipelines - it just works together.</p>
+                    <div class="step-content">
+                        <h3>Everything Connected</h3>
+                        <p>Your web apps trigger workflows, workflows update UI data, all in real-time. No separate API development, no deployment pipelines - it just works together.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -132,77 +140,111 @@
     <section id="features" class="features">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Enterprise-Grade Automation Platform</h2>
+                <h2 class="section-title">Powerful Features for Modern Automation</h2>
                 <p class="section-description">
-                    Built for businesses that need reliable, scalable automation without the complexity
+                    Everything you need to build, deploy, and scale automation workflows in one platform
                 </p>
             </div>
             
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-flow.svg" alt="Visual Flow Designer">
+            <!-- Featured Highlight Cards -->
+            <div class="featured-highlights">
+                <div class="highlight-card highlight-primary">
+                    <div class="highlight-badge">AI-Powered</div>
+                    <div class="highlight-content">
+                        <div class="highlight-icon">
+                            <img src="assets/feature-ai.svg" alt="AI Workflow Generation">
+                        </div>
+                        <h3 class="highlight-title">Intelligent Workflow Generation</h3>
+                        <p class="highlight-description">
+                            Describe your automation needs in plain language and watch as AI creates complete, 
+                            production-ready workflows with proper error handling and best practices built-in.
+                        </p>
+                        <div class="highlight-stats">
+                            <div class="stat-item">
+                                <span class="stat-value">10x</span>
+                                <span class="stat-label">Faster Setup</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value">Zero</span>
+                                <span class="stat-label">Code Required</span>
+                            </div>
+                        </div>
                     </div>
-                    <h3 class="feature-title">Visual Flow Designer</h3>
-                    <p class="feature-description">
-                        Intuitive drag-and-drop interface for building workflows. Design complex automation 
-                        logic visually - perfect for both technical and non-technical users.
-                    </p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-ai.svg" alt="AI Workflow Generation">
+                <div class="highlight-card highlight-secondary">
+                    <div class="highlight-badge">Enterprise-Ready</div>
+                    <div class="highlight-content">
+                        <div class="highlight-icon">
+                            <img src="assets/feature-observe.svg" alt="Real-time Monitoring">
+                        </div>
+                        <h3 class="highlight-title">Complete Visibility & Control</h3>
+                        <p class="highlight-description">
+                            Monitor every workflow execution with detailed logs, real-time variable inspection, 
+                            and comprehensive performance metrics. Debug issues in minutes, not hours.
+                        </p>
+                        <div class="highlight-stats">
+                            <div class="stat-item">
+                                <span class="stat-value">100%</span>
+                                <span class="stat-label">Traceable</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value">Real-time</span>
+                                <span class="stat-label">Monitoring</span>
+                            </div>
+                        </div>
                     </div>
-                    <h3 class="feature-title">AI-Assisted Creation</h3>
-                    <p class="feature-description">
-                        Describe what you want in plain language and let AI generate complete workflows 
-                        with proper error handling and best practices built-in.
-                    </p>
+                </div>
+            </div>
+            
+            <!-- Additional Features Grid -->
+            <div class="features-grid-enhanced">
+                <div class="feature-card-enhanced">
+                    <div class="feature-card-inner">
+                        <div class="feature-icon-enhanced">
+                            <img src="assets/feature-flow.svg" alt="Visual Flow Designer">
+                        </div>
+                        <h3 class="feature-title-enhanced">Visual Designer</h3>
+                        <p class="feature-description-enhanced">
+                            Drag-and-drop canvas for building complex workflows without writing code.
+                        </p>
+                    </div>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-deploy.svg" alt="Flexible Deployment">
+                <div class="feature-card-enhanced">
+                    <div class="feature-card-inner">
+                        <div class="feature-icon-enhanced">
+                            <img src="assets/feature-deploy.svg" alt="Flexible Deployment">
+                        </div>
+                        <h3 class="feature-title-enhanced">Cross-Platform</h3>
+                        <p class="feature-description-enhanced">
+                            Deploy on Windows, Linux, macOS - cloud, on-premise, or at the edge.
+                        </p>
                     </div>
-                    <h3 class="feature-title">Deploy Anywhere</h3>
-                    <p class="feature-description">
-                        Cross-platform runners work on Windows, Linux, and macOS. Run in cloud, on-premise, 
-                        or at the edge - you control where your automation executes.
-                    </p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-runtime.svg" alt="Python Integration">
+                <div class="feature-card-enhanced">
+                    <div class="feature-card-inner">
+                        <div class="feature-icon-enhanced">
+                            <img src="assets/feature-runtime.svg" alt="Python Integration">
+                        </div>
+                        <h3 class="feature-title-enhanced">Extensible</h3>
+                        <p class="feature-description-enhanced">
+                            Run Python, PowerShell, Bash scripts and integrate with any API or database.
+                        </p>
                     </div>
-                    <h3 class="feature-title">Extensible Runtime</h3>
-                    <p class="feature-description">
-                        Execute Python scripts, PowerShell, Bash, and custom steps. Integrate with any 
-                        system through REST APIs, databases, and file operations.
-                    </p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-observe.svg" alt="Real-time Monitoring">
+                <div class="feature-card-enhanced">
+                    <div class="feature-card-inner">
+                        <div class="feature-icon-enhanced">
+                            <img src="assets/feature-schedule.svg" alt="Scheduling">
+                        </div>
+                        <h3 class="feature-title-enhanced">Flexible Triggers</h3>
+                        <p class="feature-description-enhanced">
+                            Schedule, webhook, API, or event-driven execution with full parameter support.
+                        </p>
                     </div>
-                    <h3 class="feature-title">Complete Observability</h3>
-                    <p class="feature-description">
-                        Track every execution with detailed logs, variable inspection, and performance 
-                        metrics. Debug issues quickly with full execution history.
-                    </p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <img src="assets/feature-schedule.svg" alt="Scheduling">
-                    </div>
-                    <h3 class="feature-title">Smart Scheduling</h3>
-                    <p class="feature-description">
-                        Trigger workflows on schedule, via API, or from events. Support for cron expressions, 
-                        webhooks, and manual execution with parameters.
-                    </p>
                 </div>
             </div>
         </div>
