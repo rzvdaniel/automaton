@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automaton - Build Automation & Web Apps That Work Together</title>
+    <meta name="description" content="The only platform that combines workflow automation with web app hosting. Design flows, create interfaces, deploy anywhere. No separate backend needed - your workflows ARE the backend.">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="assets/automaton-logo.svg" alt="Automaton" class="logo">
+                <span class="brand-text">Automaton</span>
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-link">Home</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#web-apps" class="nav-link">Web Apps</a>
+                <a href="https://studio.automaton.monster" class="btn btn-primary" target="_blank">Get Started</a>
+            </div>
+            <div class="mobile-menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    The Automation Engine That
+                    <span class="gradient-text">Powers Your Applications</span>
+                </h1>
+                <p class="hero-description">
+                    Automaton is a complete platform combining workflow automation with web application hosting. 
+                    Design visual flows, create user interfaces, and deploy everything together - your workflows 
+                    become the backend, no separate infrastructure needed.
+                </p>
+                <div class="hero-cta">
+                    <a href="https://studio.automaton.monster" class="btn btn-primary btn-large" target="_blank">
+                        Start Building Free
+                    </a>
+                    <a href="#how-it-works" class="btn btn-secondary btn-large">
+                        See How It Works
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number">2-in-1</span>
+                        <span class="stat-label">Automation + Web Apps</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">Zero</span>
+                        <span class="stat-label">Deployment Hassle</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">AI</span>
+                        <span class="stat-label">Assisted Design</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="mechanical-hero">
+                    <div class="gear-container">
+                        <img src="assets/gear-large.svg" alt="Automation Engine" class="gear-large">
+                        <img src="assets/gear-small.svg" alt="Processing Unit" class="gear-medium">
+                        <img src="assets/gear-small.svg" alt="Integration Module" class="gear-small">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">How Automaton Works</h2>
+                <p class="section-description">
+                    A unified platform that eliminates the complexity of building automated systems
+                </p>
+            </div>
+            
+            <div class="steps-container">
+                <div class="step-card" data-step="1">
+                    <div class="step-icon">
+                        <img src="assets/icon-design.svg" alt="Design" />
+                    </div>
+                    <div class="step-content">
+                        <h3>Design Visual Flows</h3>
+                        <p>Create automation workflows using our drag-and-drop flow designer. Connect steps, add logic, and define your business processes visually - no coding required (but Python/PowerShell supported if needed).</p>
+                    </div>
+                </div>
+                
+                <div class="step-card" data-step="2">
+                    <div class="step-icon">
+                        <img src="assets/icon-deploy.svg" alt="Deploy" />
+                    </div>
+                    <div class="step-content">
+                        <h3>Deploy Runners Anywhere</h3>
+                        <p>Install lightweight runners on your infrastructure - cloud, on-premise, or edge devices. Runners execute your flows securely and report back to the central platform.</p>
+                    </div>
+                </div>
+                
+                <div class="step-card" data-step="3">
+                    <div class="step-icon">
+                        <img src="assets/icon-build.svg" alt="Build" />
+                    </div>
+                    <div class="step-content">
+                        <h3>Build Web Interfaces</h3>
+                        <p>Create web applications hosted directly in Automaton. Design forms, dashboards, and user interfaces that connect seamlessly with your automation workflows as the backend.</p>
+                    </div>
+                </div>
+                
+                <div class="step-card" data-step="4">
+                    <div class="step-icon">
+                        <img src="assets/icon-connect.svg" alt="Connect" />
+                    </div>
+                    <div class="step-content">
+                        <h3>Everything Connected</h3>
+                        <p>Your web apps trigger workflows, workflows update UI data, all in real-time. No separate API development, no deployment pipelines - it just works together.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Enterprise-Grade Automation Platform</h2>
+                <p class="section-description">
+                    Built for businesses that need reliable, scalable automation without the complexity
+                </p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-flow.svg" alt="Visual Flow Designer">
+                    </div>
+                    <h3 class="feature-title">Visual Flow Designer</h3>
+                    <p class="feature-description">
+                        Intuitive drag-and-drop interface for building workflows. Design complex automation 
+                        logic visually - perfect for both technical and non-technical users.
+                    </p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-ai.svg" alt="AI Workflow Generation">
+                    </div>
+                    <h3 class="feature-title">AI-Assisted Creation</h3>
+                    <p class="feature-description">
+                        Describe what you want in plain language and let AI generate complete workflows 
+                        with proper error handling and best practices built-in.
+                    </p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-deploy.svg" alt="Flexible Deployment">
+                    </div>
+                    <h3 class="feature-title">Deploy Anywhere</h3>
+                    <p class="feature-description">
+                        Cross-platform runners work on Windows, Linux, and macOS. Run in cloud, on-premise, 
+                        or at the edge - you control where your automation executes.
+                    </p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-runtime.svg" alt="Python Integration">
+                    </div>
+                    <h3 class="feature-title">Extensible Runtime</h3>
+                    <p class="feature-description">
+                        Execute Python scripts, PowerShell, Bash, and custom steps. Integrate with any 
+                        system through REST APIs, databases, and file operations.
+                    </p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-observe.svg" alt="Real-time Monitoring">
+                    </div>
+                    <h3 class="feature-title">Complete Observability</h3>
+                    <p class="feature-description">
+                        Track every execution with detailed logs, variable inspection, and performance 
+                        metrics. Debug issues quickly with full execution history.
+                    </p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <img src="assets/feature-schedule.svg" alt="Scheduling">
+                    </div>
+                    <h3 class="feature-title">Smart Scheduling</h3>
+                    <p class="feature-description">
+                        Trigger workflows on schedule, via API, or from events. Support for cron expressions, 
+                        webhooks, and manual execution with parameters.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Web Apps Feature Section -->
+    <section id="web-apps" class="web-apps-feature">
+        <div class="container">
+            <div class="web-apps-content">
+                <div class="web-apps-text">
+                    <h2 class="section-title" style="text-align: left;">Beyond Automation: Host Your Applications</h2>
+                    <p class="section-description" style="text-align: left; margin: 0;">
+                        Automaton isn't just about background processes - it's a complete application platform.
+                    </p>
+                    
+                    <div class="highlight-box">
+                        <h4>🚀 Build Full-Stack Apps Without Separate Infrastructure</h4>
+                        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">
+                            Create web applications, dashboards, admin panels, or customer portals directly in Automaton. 
+                            Your workflows become the backend API automatically - no separate servers, no deployment complexity.
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: var(--spacing-lg);">
+                        <h3 style="font-size: 1.25rem; margin-bottom: var(--spacing-md); color: var(--text-primary);">What You Can Build:</h3>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <li style="padding: 0.5rem 0; color: var(--text-secondary); display: flex; align-items: start;">
+                                <span style="color: var(--secondary-color); margin-right: 0.75rem; font-weight: bold;">✓</span>
+                                <span><strong style="color: var(--text-primary);">Interactive Dashboards</strong> - Visualize automation data in real-time with charts, tables, and custom components</span>
+                            </li>
+                            <li style="padding: 0.5rem 0; color: var(--text-secondary); display: flex; align-items: start;">
+                                <span style="color: var(--secondary-color); margin-right: 0.75rem; font-weight: bold;">✓</span>
+                                <span><strong style="color: var(--text-primary);">Customer Portals</strong> - Build self-service interfaces where users can trigger workflows and view results</span>
+                            </li>
+                            <li style="padding: 0.5rem 0; color: var(--text-secondary); display: flex; align-items: start;">
+                                <span style="color: var(--secondary-color); margin-right: 0.75rem; font-weight: bold;">✓</span>
+                                <span><strong style="color: var(--text-primary);">Admin Panels</strong> - Create internal tools to manage and monitor your automation infrastructure</span>
+                            </li>
+                            <li style="padding: 0.5rem 0; color: var(--text-secondary); display: flex; align-items: start;">
+                                <span style="color: var(--secondary-color); margin-right: 0.75rem; font-weight: bold;">✓</span>
+                                <span><strong style="color: var(--text-primary);">Progressive Web Apps</strong> - Deploy PWAs that work offline and feel like native apps</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-top: var(--spacing-lg);">
+                        <a href="https://studio.automaton.monster" class="btn btn-primary btn-large" target="_blank">
+                            Start Building
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="web-apps-visual">
+                    <div class="browser-mockup">
+                        <div class="browser-header">
+                            <div class="browser-dots">
+                                <span class="browser-dot dot-red"></span>
+                                <span class="browser-dot dot-yellow"></span>
+                                <span class="browser-dot dot-green"></span>
+                            </div>
+                            <div class="browser-url">yourapp.automaton.monster</div>
+                        </div>
+                        <div class="browser-content">
+                            <div class="app-element">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-primary); font-weight: 600;">Dashboard</span>
+                                    <span style="color: var(--accent-color); font-size: 0.875rem;">● Live</span>
+                                </div>
+                            </div>
+                            <div class="app-element">
+                                <div style="color: var(--text-secondary); font-size: 0.875rem;">Workflow Executions</div>
+                                <div style="color: var(--text-primary); font-size: 2rem; font-weight: 700; margin: 0.5rem 0;">1,234</div>
+                                <div style="color: var(--accent-color); font-size: 0.875rem;">↑ 23% from last week</div>
+                            </div>
+                            <div class="app-element">
+                                <div style="display: flex; gap: 1rem;">
+                                    <div style="flex: 1; padding: 1rem; background: rgba(6, 182, 212, 0.1); border-radius: 6px; text-align: center;">
+                                        <div style="color: var(--secondary-color); font-weight: 600; font-size: 1.5rem;">8</div>
+                                        <div style="color: var(--text-secondary); font-size: 0.75rem;">Active Flows</div>
+                                    </div>
+                                    <div style="flex: 1; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px; text-align: center;">
+                                        <div style="color: var(--accent-color); font-weight: 600; font-size: 1.5rem;">12</div>
+                                        <div style="color: var(--text-secondary); font-size: 0.75rem;">Runners Online</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="use-cases">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Real-World Applications</h2>
+                <p class="section-description">
+                    See how businesses use Automaton to streamline operations and build powerful tools
+                </p>
+            </div>
+            
+            <div class="use-cases-grid">
+                <div class="use-case">
+                    <div class="use-case-image">
+                        <img src="https://images.unsplash.com/photo-1556157382-97eda2d62296?w=400&h=250&fit=crop&crop=center" alt="E-commerce Automation">
+                    </div>
+                    <div class="use-case-content">
+                        <h3>E-commerce Operations</h3>
+                        <p>Automate order processing, inventory sync, and customer notifications. Add a custom admin dashboard to monitor sales and manage products - all in one platform.</p>
+                    </div>
+                </div>
+                
+                <div class="use-case">
+                    <div class="use-case-image">
+                        <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=400&h=250&fit=crop&crop=center" alt="Data Processing">
+                    </div>
+                    <div class="use-case-content">
+                        <h3>Data Analytics Pipeline</h3>
+                        <p>Extract, transform, and load data from multiple sources. Create automated reports with interactive web dashboards that update in real-time.</p>
+                    </div>
+                </div>
+                
+                <div class="use-case">
+                    <div class="use-case-image">
+                        <img src="https://images.unsplash.com/photo-1553877522-43269d4ea984?w=400&h=250&fit=crop&crop=center" alt="DevOps Integration">
+                    </div>
+                    <div class="use-case-content">
+                        <h3>CI/CD & DevOps</h3>
+                        <p>Orchestrate deployment pipelines, run automated tests, and manage infrastructure. Build a status dashboard for your team to monitor all deployments.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Documentation Section -->
+    <section id="documentation" class="documentation">
+        <div class="container">
+            <div class="doc-content">
+                <div class="doc-text">
+                    <h2 class="section-title">Complete Documentation</h2>
+                    <p class="section-description">
+                        Get started quickly with our comprehensive guides, tutorials, and API reference. 
+                        Everything you need to build powerful automation workflows.
+                    </p>
+                    <ul class="doc-features">
+                        <li>Step-by-step tutorials for beginners</li>
+                        <li>Advanced workflow patterns and best practices</li>
+                        <li>Complete API reference and examples</li>
+                        <li>Integration guides for popular services</li>
+                    </ul>
+                    <a href="https://studio.automaton.monster/docs" class="btn btn-outline" target="_blank">
+                        View Documentation
+                    </a>
+                </div>
+                <div class="doc-visual">
+                    <div class="doc-preview">
+                        <div class="doc-header">
+                            <div class="doc-nav">
+                                <span class="doc-item active">Quick Start</span>
+                                <span class="doc-item">Platform Pages</span>
+                                <span class="doc-item">Flows</span>
+                                <span class="doc-item">Runners</span>
+                            </div>
+                        </div>
+                        <div class="doc-content-preview">
+                            <h4># Quick Start Guide</h4>
+                            <p>Welcome to Automaton! This guide will help you get started with the automation platform quickly.</p>
+                            <h4>## Creating Your First Flow</h4>
+                            <p>Let's create a simple "Hello World" automation:</p>
+                            <div class="code-snippet">
+                                <span class="code-comment"># Navigate to Flows</span><br>
+                                <span class="code-keyword">Click</span> <span class="code-string">"Flows"</span> in navigation<br>
+                                <span class="code-keyword">Click</span> <span class="code-string">"Create New Flow"</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2 class="cta-title">Start Building Today</h2>
+                <p class="cta-description">
+                    Join innovative teams building automation and web applications on a single platform. 
+                    Get started in minutes - no credit card required.
+                </p>
+                <div class="cta-buttons">
+                    <a href="https://studio.automaton.monster" class="btn btn-primary btn-large" target="_blank">
+                        Launch Studio
+                    </a>
+                    <a href="https://studio.automaton.monster/docs" class="btn btn-outline btn-large" target="_blank">
+                        Read Documentation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <img src="assets/automaton-logo.svg" alt="Automaton" class="footer-logo">
+                    <p class="footer-description">
+                        The unified platform for workflow automation and web application hosting. 
+                        Build, deploy, and run everything together.
+                    </p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Platform</h4>
+                        <a href="https://studio.automaton.monster">Studio</a>
+                        <a href="https://studio.automaton.monster/docs">Documentation</a>
+                        <a href="#features">Features</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Resources</h4>
+                        <a href="https://studio.automaton.monster/docs/getting-started.md">Quick Start</a>
+                        <a href="https://studio.automaton.monster/docs/user-guide/flows.md">User Guide</a>
+                        <a href="https://studio.automaton.monster/docs/user-guide/platform-pages.md">Platform Pages</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Automaton. Powering the next generation of automated applications.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="scripts/main.js"></script>
+</body>
+</html>
