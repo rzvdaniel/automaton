@@ -1289,20 +1289,20 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-2xl);
+    margin-bottom: 0;
     position: relative;
     opacity: 0;
     animation: slideInFromLeft 0.6s ease forwards;
 }
 
 .step-card:nth-child(1) { animation-delay: 0.1s; }
-.step-card:nth-child(2) { 
+.step-card:nth-child(3) { 
     animation-name: slideInFromRight; 
     animation-delay: 0.3s;
     flex-direction: row-reverse;
 }
-.step-card:nth-child(3) { animation-delay: 0.5s; }
-.step-card:nth-child(4) { 
+.step-card:nth-child(5) { animation-delay: 0.5s; }
+.step-card:nth-child(7) { 
     animation-name: slideInFromRight;
     animation-delay: 0.7s;
     flex-direction: row-reverse;
@@ -1324,17 +1324,17 @@ body {
     transition: all 0.4s ease;
 }
 
-.step-card:nth-child(2) .step-icon {
+.step-card:nth-child(3) .step-icon {
     border-color: var(--primary-light);
     box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
 }
 
-.step-card:nth-child(3) .step-icon {
+.step-card:nth-child(5) .step-icon {
     border-color: var(--accent-color);
     box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
 }
 
-.step-card:nth-child(4) .step-icon {
+.step-card:nth-child(7) .step-icon {
     border-color: #C084FC;
     box-shadow: 0 0 30px rgba(192, 132, 252, 0.4);
 }
@@ -1382,6 +1382,69 @@ body {
     color: var(--text-secondary);
     line-height: 1.7;
     margin: 0;
+}
+
+/* Step Arrow Connectors */
+.step-arrow {
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeIn 0.6s ease forwards;
+}
+
+.step-arrow:nth-of-type(2) { animation-delay: 0.2s; }
+.step-arrow:nth-of-type(4) { animation-delay: 0.4s; }
+.step-arrow:nth-of-type(6) { animation-delay: 0.6s; }
+
+.step-arrow svg {
+    width: 60px;
+    height: 50px;
+}
+
+.step-arrow svg line {
+    stroke: var(--secondary-color);
+    stroke-width: 6;
+    opacity: 0.9;
+    stroke-linecap: round;
+}
+
+.step-arrow svg polygon {
+    fill: var(--secondary-color);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.6));
+}
+
+.step-arrow:hover svg line {
+    stroke: var(--accent-color);
+    opacity: 1;
+    animation: dashMove 1s linear infinite;
+}
+
+.step-arrow:hover svg polygon {
+    fill: var(--accent-color);
+    opacity: 1;
+}
+
+@keyframes dashMove {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* Animations for timeline entries */
