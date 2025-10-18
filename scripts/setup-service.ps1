@@ -1,3 +1,28 @@
+<#
+.SYNOPSIS
+    Automaton Runner - Windows Service Setup Script
+
+.DESCRIPTION
+    This script configures the Automaton Runner as a Windows service using NSSM.
+
+.NOTES
+    HOW TO RUN THIS SCRIPT:
+    1. Open PowerShell as Administrator (right-click PowerShell → "Run as Administrator")
+    2. Navigate to the scripts directory: cd c:\Work\automaton\scripts
+    3. Allow script execution: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+    4. Run the script: .\setup-service.ps1
+    
+    DO NOT double-click this file - it will open in an editor instead of executing.
+
+.EXAMPLE
+    .\setup-service.ps1
+    Install service with default settings
+
+.EXAMPLE
+    .\setup-service.ps1 -Uninstall
+    Uninstall the service
+#>
+
 # Automaton Runner - Windows Service Setup Script
 # Run this script in PowerShell as Administrator to configure the runner as a Windows service
 

@@ -9,6 +9,9 @@ public class ApiKeyAuthenticationService
     private readonly ConfigurationService configService;
     private readonly FileStorageService storageService;
     private readonly ILogger logger;
+    
+    // Cache the API key in memory for the current session
+    private string? _cachedApiKey;
 
     public ApiKeyAuthenticationService(
         HttpClient httpClient, 
@@ -28,14 +31,14 @@ public class ApiKeyAuthenticationService
             // Validate API key format
             if (!IsValidApiKeyFormat(apiKey))
             {
-                WriteLine("? Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("❌ Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
                 return false;
             }
 
-            WriteLine($"?? Testing API key against server: {configService.BaseUrl}");
-            WriteLine($"?? API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
-            WriteLine($"?? API key length: {apiKey.Length}");
-            WriteLine($"?? Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
+            WriteLine($"🔍 Testing API key against server: {configService.BaseUrl}");
+            WriteLine($"🔍 API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
+            WriteLine($"🔍 API key length: {apiKey.Length}");
+            WriteLine($"🔍 Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
 
             // Use dedicated API key validation endpoint
             httpClient.DefaultRequestHeaders.Clear();
@@ -47,16 +50,19 @@ public class ApiKeyAuthenticationService
 
             var response = await httpClient.PostAsync($"{configService.BaseUrl}/api/apikeys/validate", content);
             
-            WriteLine($"?? Server response: {response.StatusCode}");
+            WriteLine($"🔍 Server response: {response.StatusCode}");
             
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
-                WriteLine($"?? Validation successful: {responseContent}");
+                WriteLine($"🔍 Validation successful: {responseContent}");
                 
-                // API key validated successfully - automatically set as persistent environment variable
+                // API key validated successfully - cache it in memory FIRST
+                _cachedApiKey = apiKey;
+                logger.Debug("API key cached in memory for current session");
+                
                 WriteLine();
-                WriteLine("? API key validated successfully!");
+                WriteLine("✅ API key validated successfully!");
                 WriteLine();
                 WriteLine("📝 Setting API key as persistent environment variable...");
                 
@@ -105,23 +111,23 @@ public class ApiKeyAuthenticationService
                 }
                 
                 WriteLine();
-                logger.Information("API key validated and persisted successfully");
+                logger.Information("API key validated, cached, and persisted successfully");
                 return true;
             }
 
-            WriteLine($"? API key validation failed: {response.StatusCode}");
+            WriteLine($"❌ API key validation failed: {response.StatusCode}");
             
             // Get detailed error information
             var errorContent = await response.Content.ReadAsStringAsync();
             if (!string.IsNullOrEmpty(errorContent))
             {
-                WriteLine($"?? Server error details: {errorContent}");
+                WriteLine($"🔍 Server error details: {errorContent}");
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 WriteLine();
-                WriteLine("?? Troubleshooting suggestions:");
+                WriteLine("🔧 Troubleshooting suggestions:");
                 WriteLine("1. Verify the API key is correct and hasn't been modified");
                 WriteLine("2. Check if the API key has expired in Automaton Studio");
                 WriteLine("3. Ensure the API key has appropriate scope/permissions (not ReadOnly)");
@@ -132,21 +138,21 @@ public class ApiKeyAuthenticationService
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission to access runner operations.");
-                WriteLine("?? Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
+                WriteLine("🔧 Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
             }
 
             return false;
         }
         catch (HttpRequestException ex)
         {
-            WriteLine($"?? Network error: {ex.Message}");
-            WriteLine("?? Check if the Automaton Studio server is running and accessible at the specified URL.");
+            WriteLine($"🔧 Network error: {ex.Message}");
+            WriteLine("🔧 Check if the Automaton Studio server is running and accessible at the specified URL.");
             logger.Error(ex, "Network error during API key validation");
             return false;
         }
         catch (Exception ex)
         {
-            WriteLine($"? API key validation error: {ex.Message}");
+            WriteLine($"❌ API key validation error: {ex.Message}");
             logger.Error(ex, "API key validation error occurred");
             return false;
         }
@@ -154,7 +160,17 @@ public class ApiKeyAuthenticationService
 
     public Task<string?> GetValidApiKeyAsync()
     {
-        // API keys are now read from environment variable only
+        // PRIORITY 1: Check in-memory cache (for current session after SetApiKeyAsync)
+        if (!string.IsNullOrEmpty(_cachedApiKey))
+        {
+            if (IsValidApiKeyFormat(_cachedApiKey))
+            {
+                logger.Debug("Using cached API key from memory");
+                return Task.FromResult<string?>(_cachedApiKey);
+            }
+        }
+        
+        // PRIORITY 2: Try to read from environment variable (persisted key or externally set)
         var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
         
         if (!string.IsNullOrEmpty(apiKey))
@@ -162,11 +178,13 @@ public class ApiKeyAuthenticationService
             if (IsValidApiKeyFormat(apiKey))
             {
                 logger.Debug("Using API key from environment variable");
+                // Cache it for future requests in this session
+                _cachedApiKey = apiKey;
                 return Task.FromResult<string?>(apiKey);
             }
             else
             {
-                WriteLine("?? API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("🔧 API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
                 logger.Warning("API key from environment variable has invalid format");
             }
         }
@@ -182,7 +200,10 @@ public class ApiKeyAuthenticationService
 
     public Task LogoutAsync()
     {
-        WriteLine("? To remove the API key, unset the environment variable:");
+        // Clear in-memory cache
+        _cachedApiKey = null;
+        
+        WriteLine("❌ To remove the API key, unset the environment variable:");
         WriteLine();
         
         if (OperatingSystem.IsWindows())
@@ -203,7 +224,7 @@ public class ApiKeyAuthenticationService
         }
         
         WriteLine();
-        logger.Information("API key logout instructions displayed");
+        logger.Information("API key logout instructions displayed and memory cache cleared");
         return Task.CompletedTask;
     }
 
