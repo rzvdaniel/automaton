@@ -490,6 +490,9 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("Configuration")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("ConnectionId")
                         .HasColumnType("longtext");
 
@@ -567,7 +570,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 9, 25, 11, 17, 39, 287, DateTimeKind.Local).AddTicks(5946));
+                        .HasDefaultValue(new DateTime(2025, 10, 18, 11, 37, 18, 541, DateTimeKind.Local).AddTicks(8426));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
