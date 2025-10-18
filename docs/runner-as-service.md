@@ -2,6 +2,49 @@
 
 This guide shows you how to configure Automaton Runner to run as a system service on Windows, Linux, and macOS. Running as a service provides automatic startup, resilience, and better resource management for production deployments.
 
+## Quick Setup with Scripts
+
+For simplified installation, we provide automated setup scripts:
+
+**🚀 Recommended: Two-Step Workflow**
+
+**Step 1: Configure the runner interactively**
+```powershell
+# Windows - Run the runner first to configure everything
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Automatically saves API key as environment variable
+```
+
+```bash
+# Linux/macOS - Run the runner first to configure everything
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Saves configuration automatically
+```
+
+**Step 2: Convert to service (no parameters needed!)**
+```powershell
+# Windows (PowerShell as Administrator)
+.\scripts\setup-service.ps1
+# ↑ Detects all configuration automatically - just confirm!
+```
+
+```bash
+# Linux/macOS (with sudo)
+sudo ./scripts/setup-service.sh
+# ↑ Detects all configuration automatically - just confirm!
+```
+
+The scripts will:
+- ✅ Download required service management tools (NSSM for Windows)
+- ✅ Create the service with proper configuration
+- ✅ Set up logging and automatic restart
+- ✅ Configure environment variables
+- ✅ Enable automatic startup on boot
+
+**For manual setup or advanced configuration**, continue reading the detailed instructions below.
+
 ## Why Run as a Service?
 
 **Benefits:**

@@ -54,9 +54,58 @@ public class ApiKeyAuthenticationService
                 var responseContent = await response.Content.ReadAsStringAsync();
                 WriteLine($"?? Validation successful: {responseContent}");
                 
-                await storageService.SaveApiKeyAsync(apiKey);
-                WriteLine("? API key validated and saved!");
-                logger.Information("API key validated successfully");
+                // API key validated successfully - automatically set as persistent environment variable
+                WriteLine();
+                WriteLine("? API key validated successfully!");
+                WriteLine();
+                WriteLine("📝 Setting API key as persistent environment variable...");
+                
+                try
+                {
+                    if (OperatingSystem.IsWindows())
+                    {
+                        // Set for current user on Windows
+                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.User);
+                        WriteLine("✅ API key saved as user environment variable (AUTOMATON_API_KEY)");
+                        WriteLine("   This will persist across sessions and can be used by services.");
+                    }
+                    else
+                    {
+                        // For Linux/macOS, we can't directly set persistent environment variables
+                        // We need to guide the user to add it to their shell profile
+                        WriteLine("⚠️  On Linux/macOS, environment variables must be added to your shell profile.");
+                        WriteLine();
+                        WriteLine("📝 Add this line to ~/.bashrc, ~/.zshrc, or your shell's config file:");
+                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
+                        WriteLine();
+                        WriteLine("Then reload your shell:");
+                        WriteLine("   source ~/.bashrc  # or source ~/.zshrc");
+                        WriteLine();
+                        WriteLine("💡 For now, the API key is set for this session only.");
+                        
+                        // Set for current process at least
+                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.Process);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLine($"⚠️  Could not set environment variable automatically: {ex.Message}");
+                    WriteLine();
+                    WriteLine("📝 Please set it manually:");
+                    if (OperatingSystem.IsWindows())
+                    {
+                        WriteLine($"   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', '{apiKey}', 'User')");
+                    }
+                    else
+                    {
+                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
+                        WriteLine($"   echo 'export AUTOMATON_API_KEY=\"{apiKey}\"' >> ~/.bashrc");
+                    }
+                    logger.Warning(ex, "Failed to set environment variable automatically");
+                }
+                
+                WriteLine();
+                logger.Information("API key validated and persisted successfully");
                 return true;
             }
 
@@ -103,16 +152,17 @@ public class ApiKeyAuthenticationService
         }
     }
 
-    public async Task<string?> GetValidApiKeyAsync()
+    public Task<string?> GetValidApiKeyAsync()
     {
-        // First check environment variable
-        var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-        if (!string.IsNullOrEmpty(envApiKey))
+        // API keys are now read from environment variable only
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        
+        if (!string.IsNullOrEmpty(apiKey))
         {
-            if (IsValidApiKeyFormat(envApiKey))
+            if (IsValidApiKeyFormat(apiKey))
             {
                 logger.Debug("Using API key from environment variable");
-                return envApiKey;
+                return Task.FromResult<string?>(apiKey);
             }
             else
             {
@@ -121,23 +171,7 @@ public class ApiKeyAuthenticationService
             }
         }
 
-        // Fallback to stored API key
-        var apiKey = await storageService.LoadApiKeyAsync();
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            return null;
-        }
-
-        // Simple validation - in production you might want to test it with a lightweight API call
-        if (!IsValidApiKeyFormat(apiKey))
-        {
-            WriteLine("Stored API key format is invalid. Please set a new API key.");
-            await storageService.DeleteApiKeyAsync();
-            return null;
-        }
-
-        return apiKey;
+        return Task.FromResult<string?>(null);
     }
 
     public async Task<bool> IsAuthenticatedAsync()
@@ -146,11 +180,31 @@ public class ApiKeyAuthenticationService
         return !string.IsNullOrEmpty(apiKey);
     }
 
-    public async Task LogoutAsync()
+    public Task LogoutAsync()
     {
-        await storageService.DeleteApiKeyAsync();
-        WriteLine("? API key removed successfully");
-        logger.Information("API key removed");
+        WriteLine("? To remove the API key, unset the environment variable:");
+        WriteLine();
+        
+        if (OperatingSystem.IsWindows())
+        {
+            WriteLine("   For current session (PowerShell):");
+            WriteLine("   Remove-Item Env:AUTOMATON_API_KEY");
+            WriteLine();
+            WriteLine("   For persistent removal:");
+            WriteLine("   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', $null, 'User')");
+        }
+        else
+        {
+            WriteLine("   For current session:");
+            WriteLine("   unset AUTOMATON_API_KEY");
+            WriteLine();
+            WriteLine("   For persistent removal (remove from ~/.bashrc or ~/.zshrc):");
+            WriteLine("   sed -i '/AUTOMATON_API_KEY/d' ~/.bashrc");
+        }
+        
+        WriteLine();
+        logger.Information("API key logout instructions displayed");
+        return Task.CompletedTask;
     }
 
     private static bool IsValidApiKeyFormat(string apiKey)

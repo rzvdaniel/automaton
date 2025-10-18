@@ -654,22 +654,24 @@ public class RunnerHostService
         // Authentication Status
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
         var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
-        var hasStoredKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
         
         WriteLine("🔐 Authentication Status:");
         WriteLine($"   • Authenticated: {(!string.IsNullOrEmpty(apiKey) ? "✅ Yes" : "❌ No")}");
         
         if (!string.IsNullOrEmpty(apiKey))
         {
-            var authSource = hasEnvKey ? "Environment Variable" : hasStoredKey ? "Stored API Key" : "Unknown";
-            WriteLine($"   • Auth Source: {authSource}");
+            WriteLine("   • Auth Source: Environment Variable (AUTOMATON_API_KEY)");
             WriteLine($"   • Key Preview: {apiKey[..Math.Min(15, apiKey.Length)]}...");
+        }
+        else if (!hasEnvKey)
+        {
+            WriteLine("   • API Key: ⚠️  Not set. Set AUTOMATON_API_KEY environment variable.");
         }
         WriteLine();
         
         // Configuration Storage Status
         WriteLine("💾 Stored Configuration:");
-        WriteLine($"   • API Key: {(hasStoredKey ? "✅ Saved" : "❌ Not saved")}");
+        WriteLine($"   • API Key: Environment variable only (AUTOMATON_API_KEY)");
         WriteLine($"   • Runner Config: {(storageService.IsRunnerRegistered() ? "✅ Saved" : "❌ Not saved")}");
         
         var hasStoredServerUrl = !string.IsNullOrEmpty(await storageService.LoadServerUrlAsync());
@@ -701,9 +703,9 @@ public class RunnerHostService
     {
         try
         {
-            await storageService.DeleteApiKeyAsync();
             await storageService.DeleteRunnerConfigAsync();
             WriteLine("? All stored data cleared successfully!");
+            WriteLine("📝 Note: To remove API key, unset AUTOMATON_API_KEY environment variable");
             logger.Information("All stored data cleared");
             return true;
         }
@@ -729,18 +731,8 @@ public class RunnerHostService
             WriteLine("🧹 Cleaning up stored runner data...");
             WriteLine();
 
-            var apiKeyCleared = false;
             var runnerConfigCleared = false;
             var serverConfigCleared = false;
-
-            // Clear API key if it exists
-            var hasApiKey = !string.IsNullOrEmpty(await storageService.LoadApiKeyAsync());
-            if (hasApiKey)
-            {
-                await storageService.DeleteApiKeyAsync();
-                WriteLine("✅ Stored API key removed");
-                apiKeyCleared = true;
-            }
 
             // Clear runner configuration if it exists
             if (storageService.IsRunnerRegistered())
@@ -759,7 +751,7 @@ public class RunnerHostService
                 serverConfigCleared = true;
             }
 
-            if (!apiKeyCleared && !runnerConfigCleared && !serverConfigCleared)
+            if (!runnerConfigCleared && !serverConfigCleared)
             {
                 WriteLine("ℹ️  No stored data found to cleanup");
             }
@@ -768,10 +760,6 @@ public class RunnerHostService
                 WriteLine();
                 WriteLine("✅ Cleanup completed successfully!");
                 
-                if (apiKeyCleared)
-                {
-                    WriteLine("   - API key authentication cleared");
-                }
                 if (runnerConfigCleared)
                 {
                     WriteLine("   - Runner registration cleared");
@@ -782,11 +770,12 @@ public class RunnerHostService
                 }
                 
                 WriteLine();
-                WriteLine("📝 Note: Environment variable AUTOMATON_API_KEY (if set) is not affected");
+                WriteLine("📝 Note: API key is stored in AUTOMATON_API_KEY environment variable");
+                WriteLine("   To remove it, unset the environment variable manually.");
             }
 
-            logger.Information("Runner cleanup completed. API key cleared: {ApiKeyCleared}, Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}", 
-                apiKeyCleared, runnerConfigCleared, serverConfigCleared);
+            logger.Information("Runner cleanup completed. Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}", 
+                runnerConfigCleared, serverConfigCleared);
             return true;
         }
         catch (Exception ex)

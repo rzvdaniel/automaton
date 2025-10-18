@@ -283,14 +283,38 @@ Removes stored API key, runner registration data, and server URL configuration f
 
 For production deployments, you may want to run the Automaton Runner as a system service that automatically starts on boot and restarts on failure.
 
-**📖 See the complete guide**: [Running Automaton Runner as a System Service](../../../docs/runner-as-service.md)
+**🚀 Quick Setup with Scripts** (Recommended):
 
-The guide provides detailed instructions for:
-- **Windows**: Using NSSM (Non-Sucking Service Manager)
-- **Linux**: Using systemd
-- **macOS**: Using launchd
+**Two-step workflow:**
 
-Each platform includes step-by-step instructions, configuration examples, troubleshooting tips, and security best practices.
+```powershell
+# Windows - Step 1: Configure the runner interactively
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Automatically saves everything (including API key as environment variable)
+
+# Windows - Step 2: Convert to service (no parameters needed!)
+.\scripts\setup-service.ps1
+# ↑ Detects all configuration automatically - just confirm!
+```
+
+```bash
+# Linux/macOS - Step 1: Configure the runner interactively  
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Automatically saves everything
+
+# Linux/macOS - Step 2: Convert to service (no parameters needed!)
+sudo ./scripts/setup-service.sh
+# ↑ Detects all configuration automatically - just confirm!
+```
+
+**📖 Complete guide**: [Running Automaton Runner as a System Service](../../../docs/runner-as-service.md)
+
+The guide provides:
+- Automated setup scripts and manual instructions
+- Platform-specific configuration (Windows/NSSM, Linux/systemd, macOS/launchd)
+- Troubleshooting tips and security best practices
 
 **Quick Reference - Platform-Specific Service Commands:**
 

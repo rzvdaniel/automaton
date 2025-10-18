@@ -118,12 +118,18 @@ automaton-runner
 ```
 
 #### Running as a Service
-For production deployments, the runner can be configured as a system service. See the comprehensive guide at `docs/runner-as-service.md` which provides manual setup instructions for:
-- **Windows**: Using NSSM (Non-Sucking Service Manager)
-- **Linux**: Using systemd
-- **macOS**: Using launchd
+For production deployments, the runner can be configured as a system service. We provide:
 
-**Note**: The runner does NOT include built-in service installation commands. Service configuration uses platform-native tools for better transparency and control.
+1. **Automated Setup Scripts** (Recommended):
+   - `scripts/setup-service.ps1` for Windows
+   - `scripts/setup-service.sh` for Linux/macOS
+
+2. **Manual Setup Guide**: See `docs/runner-as-service.md` for detailed instructions:
+   - **Windows**: Using NSSM (Non-Sucking Service Manager)
+   - **Linux**: Using systemd
+   - **macOS**: Using launchd
+
+**Note**: The runner does NOT include built-in service installation commands. Service configuration uses platform-native tools (NSSM, systemd, launchd) for better transparency and control. The setup scripts automate the manual process documented in the guide.
 
 ### Automaton Studio Server
 The server is the backend for the studio. The Swagger API documentation can be found at:

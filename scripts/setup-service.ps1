@@ -1,0 +1,375 @@
+# Automaton Runner - Windows Service Setup Script
+# Run this script in PowerShell as Administrator to configure the runner as a Windows service
+
+param(
+    [string]$RunnerPath = "$env:ProgramFiles\AutomatonRunner\automaton-runner.exe",
+    [string]$ServiceName = "AutomatonRunner",
+    [string]$ApiKey = "",
+    [string]$ServerUrl = "https://api.automaton.monster",
+    [string]$RunnerName = "$env:COMPUTERNAME-Runner",
+    [string]$LogsPath = "$env:ProgramFiles\AutomatonRunner\logs",
+    [switch]$Uninstall = $false,
+    [switch]$Help = $false
+)
+
+$ColorInfo = "Green"
+$ColorWarning = "Yellow"
+$ColorError = "Red"
+$ColorHeader = "Cyan"
+
+function Write-Header {
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+    Write-Host "      Automaton Runner - Windows Service Setup             " -ForegroundColor $ColorHeader
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+    Write-Host ""
+}
+
+function Write-Step {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor $ColorInfo
+}
+
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "[WARN] $Message" -ForegroundColor $ColorWarning
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor $ColorError
+}
+
+function Show-Help {
+    @"
+Automaton Runner - Windows Service Setup Script
+
+USAGE:
+    .\setup-service.ps1 [OPTIONS]
+
+OPTIONS:
+    -RunnerPath PATH        Path to automaton-runner.exe (default: Program Files\AutomatonRunner\automaton-runner.exe)
+    -ServiceName NAME       Service name (default: AutomatonRunner)
+    -ApiKey KEY            API key for authentication (optional)
+    -ServerUrl URL         Server URL (default: https://api.automaton.monster)
+    -RunnerName NAME       Runner name (default: COMPUTERNAME-Runner)
+    -LogsPath PATH         Logs directory (default: Program Files\AutomatonRunner\logs)
+    -Uninstall             Remove the service
+    -Help                  Show this help message
+
+EXAMPLES:
+    # Install service with default settings
+    .\setup-service.ps1
+
+    # Install with custom configuration
+    .\setup-service.ps1 -ApiKey "ak_runner_xxx" -ServerUrl "https://automaton.company.com" -RunnerName "prod-01"
+
+    # Install with custom runner location
+    .\setup-service.ps1 -RunnerPath "C:\Tools\AutomatonRunner\automaton-runner.exe"
+
+    # Uninstall service
+    .\setup-service.ps1 -Uninstall
+
+REQUIREMENTS:
+    - PowerShell 5.0 or later
+    - Administrator privileges
+    - NSSM (Non-Sucking Service Manager) - will be downloaded if needed
+    - Automaton Runner already installed
+
+"@
+}
+
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Get-ExistingConfig {
+    # Try to find existing runner configuration
+    $configDir = Join-Path $env:APPDATA "AutomatonRunner"
+    $configPath = Join-Path $configDir "appsettings.json"
+    
+    $result = @{
+        ServerUrl = $null
+    }
+    
+    # Read server URL from appsettings.json
+    if (Test-Path $configPath) {
+        try {
+            $config = Get-Content $configPath -Raw | ConvertFrom-Json
+            if ($config.AppConfig -and $config.AppConfig.BaseUrl) {
+                $result.ServerUrl = $config.AppConfig.BaseUrl
+            }
+        } catch {
+            Write-Warning "Found config file but couldn't parse it: $configPath"
+        }
+    }
+    
+    # Check for API key in environment variable
+    $envApiKey = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')
+    if ($envApiKey) {
+        Write-Step "Found API key in user environment variable"
+    }
+    
+    if ($result.ServerUrl) {
+        Write-Step "Found existing runner configuration in: $configDir"
+        return $result
+    }
+    
+    return $null
+}
+
+function Install-NSSM {
+    $installDir = Split-Path $RunnerPath
+    $nssmPath = Join-Path $installDir "nssm.exe"
+    
+    if (Test-Path $nssmPath) {
+        Write-Step "NSSM already exists at $nssmPath"
+        return $nssmPath
+    }
+    
+    Write-Step "Downloading NSSM (Non-Sucking Service Manager)"
+    
+    $nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
+    $tempZip = Join-Path $env:TEMP "nssm.zip"
+    $tempExtract = Join-Path $env:TEMP "nssm-extract"
+    
+    try {
+        Invoke-WebRequest -Uri $nssmUrl -OutFile $tempZip -UseBasicParsing
+        Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+        
+        # Find the correct NSSM executable based on architecture
+        $arch = $env:PROCESSOR_ARCHITECTURE
+        $nssmArch = if ($arch -eq "AMD64") { "win64" } else { "win32" }
+        $nssmSource = Get-ChildItem -Path $tempExtract -Filter "nssm.exe" -Recurse | Where-Object { $_.FullName -like "*$nssmArch*" } | Select-Object -First 1
+        
+        if ($nssmSource) {
+            Copy-Item $nssmSource.FullName $nssmPath
+            Write-Step "NSSM installed to $nssmPath"
+        } else {
+            Write-Error "Could not find NSSM executable for architecture: $arch"
+            return $null
+        }
+        
+    } catch {
+        Write-Error "Failed to download NSSM: $($_.Exception.Message)"
+        return $null
+    } finally {
+        if (Test-Path $tempZip) { Remove-Item $tempZip -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    
+    return $nssmPath
+}
+
+function Remove-Service {
+    # Check if service exists
+    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if (!$service) {
+        Write-Warning "Service '$ServiceName' does not exist"
+        return $true
+    }
+    
+    Write-Step "Stopping service '$ServiceName'"
+    Stop-Service $ServiceName -Force -ErrorAction SilentlyContinue
+    Start-Sleep 2
+    
+    Write-Step "Removing service '$ServiceName'"
+    & sc.exe delete $ServiceName
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Step "Service '$ServiceName' removed successfully"
+        return $true
+    } else {
+        Write-Error "Failed to remove service"
+        return $false
+    }
+}
+
+function Install-Service {
+    # Verify runner exists
+    if (!(Test-Path $RunnerPath)) {
+        Write-Error "Runner not found at: $RunnerPath"
+        Write-Host "Please specify the correct path with -RunnerPath parameter" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Check if service already exists
+    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($existingService) {
+        Write-Warning "Service '$ServiceName' already exists"
+        $response = Read-Host "Do you want to reinstall? (y/N)"
+        if ($response -ne 'y' -and $response -ne 'Y') {
+            Write-Step "Installation cancelled"
+            return $false
+        }
+        
+        Write-Step "Removing existing service"
+        if (!(Remove-Service)) {
+            return $false
+        }
+        Start-Sleep 2
+    }
+    
+    # Install NSSM
+    $nssmPath = Install-NSSM
+    if (!$nssmPath) {
+        Write-Error "Failed to install NSSM"
+        return $false
+    }
+    
+    Write-Step "Creating Windows service '$ServiceName'"
+    
+    try {
+        # Install service with NSSM
+        & $nssmPath install $ServiceName $RunnerPath
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install service"
+            return $false
+        }
+        
+        # Configure service description
+        & $nssmPath set $ServiceName Description "Automaton workflow runner for cross-platform automation"
+        
+        # Set startup type to automatic
+        & $nssmPath set $ServiceName Start SERVICE_AUTO_START
+        
+        # Create logs directory if it doesn't exist
+        if (!(Test-Path $LogsPath)) {
+            New-Item -ItemType Directory -Path $LogsPath -Force | Out-Null
+            Write-Step "Created logs directory: $LogsPath"
+        }
+        
+        # Configure logging
+        & $nssmPath set $ServiceName AppStdout "$LogsPath\service-output.log"
+        & $nssmPath set $ServiceName AppStderr "$LogsPath\service-error.log"
+        & $nssmPath set $ServiceName AppRotateFiles 1
+        & $nssmPath set $ServiceName AppRotateOnline 1
+        & $nssmPath set $ServiceName AppRotateBytes 10485760  # 10MB
+        
+        # Detect existing configuration if parameters not provided
+        $existingConfig = Get-ExistingConfig
+        $effectiveServerUrl = $ServerUrl
+        $effectiveApiKey = $ApiKey
+        
+        # Check for API key in user environment variable
+        $envApiKey = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')
+        
+        if ($existingConfig) {
+            Write-Host ""
+            Write-Host "✅ Detected existing runner configuration!" -ForegroundColor Green
+            
+            if ($existingConfig.ServerUrl) {
+                $effectiveServerUrl = $existingConfig.ServerUrl
+                Write-Host "   Server URL: $effectiveServerUrl" -ForegroundColor Cyan
+            }
+            
+            if ($envApiKey -and !$ApiKey) {
+                $keyPreview = $envApiKey.Substring(0, [Math]::Min(15, $envApiKey.Length))
+                Write-Host "   API Key (from environment): ${keyPreview}..." -ForegroundColor Cyan
+                $effectiveApiKey = $envApiKey
+            }
+            
+            Write-Host ""
+            $useExisting = Read-Host "Use this configuration for the service? (Y/n)"
+            if ($useExisting -eq 'n' -or $useExisting -eq 'N') {
+                Write-Host "Please provide configuration manually:" -ForegroundColor Yellow
+                
+                if (!$ApiKey) {
+                    $effectiveApiKey = Read-Host "Enter API key"
+                }
+                
+                $customUrl = Read-Host "Enter server URL (press Enter for $ServerUrl)"
+                if ($customUrl) {
+                    $effectiveServerUrl = $customUrl
+                }
+            } else {
+                Write-Step "Using detected configuration for service"
+            }
+        } elseif ($envApiKey -and !$ApiKey) {
+            Write-Step "Found API key in user environment variable"
+            $effectiveApiKey = $envApiKey
+        } elseif (!$ApiKey) {
+            Write-Warning "No API key found in environment variables."
+            Write-Host ""
+            Write-Host "💡 Tip: Set AUTOMATON_API_KEY environment variable before running this script" -ForegroundColor Cyan
+            Write-Host ""
+            $effectiveApiKey = Read-Host "Enter your API key (or press Enter to configure later)"
+        }
+        
+        # Set environment variables
+        $envVars = @("AppConfig__BaseUrl=$effectiveServerUrl")
+        if ($effectiveApiKey) {
+            $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
+        } else {
+            Write-Warning "No API key configured. The service will need to be configured manually or restarted with credentials."
+        }
+        & $nssmPath set $ServiceName AppEnvironmentExtra $envVars
+        
+        Write-Step "Windows service '$ServiceName' created successfully"
+        Write-Host ""
+        Write-Host "Service Management Commands:" -ForegroundColor $ColorHeader
+        Write-Host "  Start:   Start-Service '$ServiceName'" -ForegroundColor Cyan
+        Write-Host "  Stop:    Stop-Service '$ServiceName'" -ForegroundColor Cyan
+        Write-Host "  Status:  Get-Service '$ServiceName'" -ForegroundColor Cyan
+        Write-Host "  Logs:    $LogsPath" -ForegroundColor Cyan
+        Write-Host ""
+        
+        # Ask if user wants to start the service now
+        $startNow = Read-Host "Start the service now? (Y/n)"
+        if ($startNow -ne 'n' -and $startNow -ne 'N') {
+            Write-Step "Starting service..."
+            Start-Service $ServiceName
+            Start-Sleep 2
+            
+            $service = Get-Service $ServiceName
+            if ($service.Status -eq 'Running') {
+                Write-Step "Service started successfully and is running"
+            } else {
+                Write-Warning "Service status: $($service.Status)"
+                Write-Host "Check logs at: $LogsPath" -ForegroundColor Yellow
+            }
+        }
+        
+        return $true
+        
+    } catch {
+        Write-Error "Failed to create Windows service: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+# Main logic
+function Main {
+    if ($Help) {
+        Show-Help
+        return
+    }
+
+    Write-Header
+    
+    # Check if running as administrator
+    if (!(Test-Administrator)) {
+        Write-Error "This script must be run as Administrator"
+        Write-Host "Please run PowerShell as Administrator and try again" -ForegroundColor Yellow
+        exit 1
+    }
+    
+    if ($Uninstall) {
+        if (Remove-Service) {
+            Write-Step "Service uninstallation completed"
+        } else {
+            exit 1
+        }
+    } else {
+        if (Install-Service) {
+            Write-Step "Service installation completed"
+        } else {
+            exit 1
+        }
+    }
+}
+
+# Run main function
+Main
