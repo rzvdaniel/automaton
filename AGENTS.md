@@ -117,6 +117,14 @@ export AUTOMATON_API_KEY="your_api_key"
 automaton-runner
 ```
 
+#### Running as a Service
+For production deployments, the runner can be configured as a system service. See the comprehensive guide at `docs/runner-as-service.md` which provides manual setup instructions for:
+- **Windows**: Using NSSM (Non-Sucking Service Manager)
+- **Linux**: Using systemd
+- **macOS**: Using launchd
+
+**Note**: The runner does NOT include built-in service installation commands. Service configuration uses platform-native tools for better transparency and control.
+
 ### Automaton Studio Server
 The server is the backend for the studio. The Swagger API documentation can be found at:
 - `https://localhost:7091/swagger/v1/swagger.json`
