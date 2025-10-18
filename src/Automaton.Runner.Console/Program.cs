@@ -290,8 +290,32 @@ public class Program
                     cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
                 });
 
-                // Register Automaton services (this includes default FlowExecuteService)
-                services.AddScripting();
+                // Register Automaton services with Python configuration from runner settings
+                services.AddScoped<ScriptEngineConfiguration>(provider =>
+                {
+                    var configuration = provider.GetService<IConfiguration>();
+                    var configService = provider.GetRequiredService<ConfigurationService>();
+                    
+                    // Start with configuration from appsettings.json
+                    var config = new ScriptEngineConfiguration();
+                    configuration?.GetSection("Scripting").Bind(config);
+                    
+                    // Override with runner-specific Python configuration
+                    var pythonConfig = configService.GetPythonConfig();
+                    if (pythonConfig != null)
+                    {
+                        config.PythonDllPath = pythonConfig.PythonDllPath ?? config.PythonDllPath;
+                        config.PythonPaths = pythonConfig.PythonPaths?.Any() == true 
+                            ? pythonConfig.PythonPaths 
+                            : config.PythonPaths;
+                        config.AutoDetectPythonPaths = pythonConfig.AutoDetectPythonPaths;
+                    }
+                    
+                    return config;
+                });
+                
+                services.AddScoped<ScriptEngineFactory>();
+                services.AddScoped<ScriptEngineHost>();
                 services.AddAutomatonCore();
                 services.AddAutomatonSteps();
 
