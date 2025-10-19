@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -38,26 +39,37 @@ public class ConfigurationService
             // They work reliably with Docker, Kubernetes, CI/CD, and Windows services.
             // File fallback provides convenience for interactive/standalone usage.
             
+            // DEBUG: Log configuration resolution process
+            Log.Debug("BaseUrl resolution started");
+            
             if (!string.IsNullOrEmpty(cachedServerUrl))
             {
+                Log.Debug("Using cached server URL: {CachedUrl}", cachedServerUrl);
                 return cachedServerUrl;
             }
+            Log.Debug("No cached server URL found");
             
             // Check environment variable first (works for services!)
             if (!string.IsNullOrEmpty(appConfig.BaseUrl))
             {
+                Log.Debug("Using environment variable server URL: {EnvUrl}", appConfig.BaseUrl);
                 cachedServerUrl = appConfig.BaseUrl;
                 return appConfig.BaseUrl;
             }
+            Log.Debug("No environment variable server URL found (AppConfig.BaseUrl is empty)");
             
             // Fall back to stored file (user preference from interactive setup)
+            Log.Debug("Attempting to load server URL from file storage");
             var storedServerUrl = storageService.LoadServerUrlAsync().Result;
             if (!string.IsNullOrEmpty(storedServerUrl))
             {
+                Log.Debug("Using stored file server URL: {StoredUrl}", storedServerUrl);
                 cachedServerUrl = storedServerUrl;
                 return storedServerUrl;
             }
+            Log.Debug("No stored file server URL found");
 
+            Log.Warning("Server URL is not configured from any source (cached, environment, or file)");
             throw new InvalidOperationException(
                 "Server URL is not configured. Please set AppConfig__BaseUrl environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
         }
@@ -78,18 +90,32 @@ public class ConfigurationService
     public bool IsServerConfigured() 
     {
         // Check all possible sources for server URL using the same priority order as BaseUrl
+        Log.Debug("IsServerConfigured check started");
+        
         if (!string.IsNullOrEmpty(cachedServerUrl))
+        {
+            Log.Debug("Server configured: cached value present");
             return true;
+        }
         
         // Check environment variable first (12-factor app pattern)
         if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+        {
+            Log.Debug("Server configured: environment variable present - {EnvUrl}", appConfig.BaseUrl);
             return true;
+        }
+        Log.Debug("Environment variable check: AppConfig.BaseUrl is empty");
             
         // Check stored file (user preference)
         var storedServerUrl = storageService.LoadServerUrlAsync().Result;
         if (!string.IsNullOrEmpty(storedServerUrl))
+        {
+            Log.Debug("Server configured: stored file present - {StoredUrl}", storedServerUrl);
             return true;
-            
+        }
+        Log.Debug("Stored file check: no server URL found in file storage");
+        
+        Log.Warning("Server NOT configured: no source available (cached, environment, or file)");
         return false;
     }
 

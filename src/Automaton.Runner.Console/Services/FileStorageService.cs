@@ -10,7 +10,21 @@ public class FileStorageService
 
     public FileStorageService()
     {
-        configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
+        // Check if running as a Windows service (SYSTEM account won't have normal APPDATA)
+        var isService = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("USERPROFILE")) ||
+                       Environment.UserName.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase);
+        
+        if (isService)
+        {
+            // When running as service, use config folder in working directory
+            configDirectory = Path.Combine(Directory.GetCurrentDirectory(), "config");
+        }
+        else
+        {
+            // When running interactively, use user's AppData
+            configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
+        }
+        
         runnerConfigFile = Path.Combine(configDirectory, "runner.json");
         serverConfigFile = Path.Combine(configDirectory, "server.json");
 
@@ -47,6 +61,12 @@ public class FileStorageService
 
     public string? GetRunnerId()
     {
+        // Check environment variable first (for service mode)
+        var envRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
+        if (!string.IsNullOrEmpty(envRunnerId))
+            return envRunnerId;
+        
+        // Fall back to file storage
         if (!File.Exists(runnerConfigFile))
             return null;
 
@@ -64,6 +84,12 @@ public class FileStorageService
 
     public string? GetRunnerName()
     {
+        // Check environment variable first (for service mode)
+        var envRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
+        if (!string.IsNullOrEmpty(envRunnerName))
+            return envRunnerName;
+        
+        // Fall back to file storage
         if (!File.Exists(runnerConfigFile))
             return null;
 

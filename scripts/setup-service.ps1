@@ -117,10 +117,13 @@ function Get-ExistingConfig {
     # Try to find existing runner configuration
     $configDir = Join-Path $env:APPDATA "AutomatonRunner"
     $serverConfigPath = Join-Path $configDir "server.json"
+    $runnerConfigPath = Join-Path $configDir "runner.json"
     
     $result = @{
         ServerUrl = $null
         ApiKey = $null
+        RunnerId = $null
+        RunnerName = $null
     }
     
     # Read server URL from server.json (new format)
@@ -135,6 +138,21 @@ function Get-ExistingConfig {
         }
     }
     
+    # Read runner registration from runner.json
+    if (Test-Path $runnerConfigPath) {
+        try {
+            $config = Get-Content $runnerConfigPath -Raw | ConvertFrom-Json
+            if ($config.RunnerId) {
+                $result.RunnerId = $config.RunnerId
+            }
+            if ($config.RunnerName) {
+                $result.RunnerName = $config.RunnerName
+            }
+        } catch {
+            Write-Warning "Found runner config file but couldn't parse it: $runnerConfigPath"
+        }
+    }
+    
     # IMPORTANT: Check for API key in user environment variable
     # Note: We need to read this NOW because the service won't have access to it
     $envApiKey = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')
@@ -143,7 +161,7 @@ function Get-ExistingConfig {
         $result.ApiKey = $envApiKey
     }
     
-    if ($result.ServerUrl -or $result.ApiKey) {
+    if ($result.ServerUrl -or $result.ApiKey -or $result.RunnerName) {
         Write-Step "Found existing runner configuration in: $configDir"
         return $result
     }
@@ -298,8 +316,8 @@ function Install-Service {
     Write-Step "Creating Windows service '$ServiceName'"
     
     try {
-        # Install service with NSSM
-        & $nssmPath install $ServiceName $RunnerPath
+        # Install service with NSSM - use 'service' command for non-interactive mode
+        & $nssmPath install $ServiceName $RunnerPath service
         
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to install service"
@@ -317,6 +335,11 @@ function Install-Service {
         
         # Set startup type to automatic
         & $nssmPath set $ServiceName Start SERVICE_AUTO_START
+        
+        # CRITICAL: Set service account to LocalSystem with desktop interaction disabled
+        # This allows network access while maintaining security
+        & $nssmPath set $ServiceName ObjectName "LocalSystem"
+        Write-Step "Service configured to run as LocalSystem for network access"
         
         # Create logs directory if it doesn't exist
         if (!(Test-Path $LogsPath)) {
@@ -349,6 +372,11 @@ function Install-Service {
                 $keyPreview = $existingConfig.ApiKey.Substring(0, [Math]::Min(15, $existingConfig.ApiKey.Length))
                 Write-Host "   API Key (from environment): ${keyPreview}..." -ForegroundColor Cyan
                 $effectiveApiKey = $existingConfig.ApiKey
+            }
+            
+            if ($existingConfig.RunnerName) {
+                Write-Host "   Runner Name: $($existingConfig.RunnerName)" -ForegroundColor Cyan
+                Write-Host "   Runner ID: $($existingConfig.RunnerId)" -ForegroundColor Cyan
             }
             
             Write-Host ""
@@ -403,18 +431,83 @@ function Install-Service {
             Write-Warning "No API key configured - service will not connect"
         }
         
-        # Set ALL environment variables in a SINGLE NSSM call
+        # Add runner registration if it exists (to avoid auto-registration)
+        if ($existingConfig -and $existingConfig.RunnerId -and $existingConfig.RunnerName) {
+            $envVars += "AUTOMATON_RUNNER_ID=$($existingConfig.RunnerId)"
+            $envVars += "AUTOMATON_RUNNER_NAME=$($existingConfig.RunnerName)"
+            Write-Step "Runner registration will be set via environment variables"
+            Write-Host "  Runner Name: $($existingConfig.RunnerName)" -ForegroundColor DarkGray
+            Write-Host "  Runner ID: $($existingConfig.RunnerId)" -ForegroundColor DarkGray
+        } else {
+            Write-Warning "No runner registration found - service will auto-register with name 'Service-$env:COMPUTERNAME'"
+        }
+        
+        # Add development environment for SSL bypass (for localhost)
+        if ($effectiveServerUrl -like "*localhost*" -or $effectiveServerUrl -like "*127.0.0.1*") {
+            $envVars += "DOTNET_ENVIRONMENT=Development"
+            Write-Step "Development environment enabled (for SSL bypass on localhost)"
+        }
+        
+        # Set ALL environment variables via NSSM
         if ($envVars.Count -gt 0) {
-            $nssmArgs = @("set", $ServiceName, "AppEnvironmentExtra") + $envVars
-            & $nssmPath $nssmArgs
+            Write-Step "Setting environment variables via NSSM..."
+            Write-Host "  Command: nssm set $ServiceName AppEnvironmentExtra" -ForegroundColor DarkGray
             
-            Write-Step "Environment variables configured:"
-            Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
-            if ($effectiveApiKey) {
-                Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+            # CRITICAL: NSSM's AppEnvironmentExtra parameter needs ALL variables in ONE call
+            # Multiple variables must be separated by newlines in a single string
+            $envString = $envVars -join "`r`n"
+            
+            & $nssmPath set $ServiceName AppEnvironmentExtra $envString
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Step "Environment variables configured successfully"
+                Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
+                if ($effectiveApiKey) {
+                    Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+                }
+            } else {
+                Write-Warning "Failed to set environment variables (exit code: $LASTEXITCODE)"
+            }
+            
+            # Verify what was actually set
+            Write-Step "Verifying NSSM configuration..."
+            $verifyEnv = & $nssmPath get $ServiceName AppEnvironmentExtra
+            Write-Host "  NSSM environment variables:" -ForegroundColor DarkGray
+            $verifyEnv -split "`r?`n" | ForEach-Object {
+                if ($_ -match "AUTOMATON_API_KEY=") {
+                    Write-Host "    $($_ -replace '(AUTOMATON_API_KEY=).+', '$1***REDACTED***')" -ForegroundColor DarkGray
+                } elseif ($_ -ne "") {
+                    Write-Host "    $_" -ForegroundColor DarkGray
+                }
             }
         }
-
+        
+        # Copy runner registration if it exists in user config
+        if ($existingConfig -and $existingConfig.RunnerId -and $existingConfig.RunnerName) {
+            Write-Step "Copying runner registration to service directory..."
+            
+            $serviceConfigDir = Join-Path $runnerDirectory "config"
+            if (!(Test-Path $serviceConfigDir)) {
+                New-Item -ItemType Directory -Path $serviceConfigDir -Force | Out-Null
+            }
+            
+            $serviceRunnerConfig = Join-Path $serviceConfigDir "runner.json"
+            $runnerConfigContent = @{
+                RunnerId = $existingConfig.RunnerId
+                RunnerName = $existingConfig.RunnerName
+                RegisteredAt = (Get-Date).ToUniversalTime().ToString("o")
+                CopiedFromUserConfig = $true
+            } | ConvertTo-Json
+            
+            Set-Content -Path $serviceRunnerConfig -Value $runnerConfigContent -Force
+            Write-Step "Runner registration copied: $($existingConfig.RunnerName) ($($existingConfig.RunnerId))"
+            Write-Host "  Location: $serviceRunnerConfig" -ForegroundColor DarkGray
+        } else {
+            Write-Warning "No runner registration found in user config"
+            Write-Host "  The service will prompt for runner name on first start" -ForegroundColor Yellow
+            Write-Host "  Tip: Run 'automaton-runner register' first to pre-register" -ForegroundColor Cyan
+        }
+        
         Write-Step "Windows service '$ServiceName' created successfully"
         Write-Host ""
         Write-Host "================================================================" -ForegroundColor $ColorHeader

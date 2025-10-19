@@ -32,6 +32,99 @@ public class RunnerHostService
     }
 
     /// <summary>
+    /// Start in non-interactive service mode - no prompts, use environment variables only
+    /// </summary>
+    public async Task StartServiceModeAsync()
+    {
+        try
+        {
+            logger.Information("Starting runner in service mode (non-interactive)");
+            
+            // Validate configuration from environment variables only
+            if (!configService.IsServerConfigured())
+            {
+                logger.Error("Service mode requires AppConfig__BaseUrl environment variable");
+                throw new InvalidOperationException("Server URL not configured. Set AppConfig__BaseUrl environment variable.");
+            }
+            
+            var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                logger.Error("Service mode requires AUTOMATON_API_KEY environment variable");
+                throw new InvalidOperationException("API key not configured. Set AUTOMATON_API_KEY environment variable.");
+            }
+            
+            logger.Information("Service configuration valid - Server: {Server}", configService.BaseUrl);
+            
+            // Set up HTTP client authentication
+            await SetupHttpClientAuth();
+            
+            // Check if runner is registered - if not, use default name
+            if (!configService.IsRunnerRegistered())
+            {
+                logger.Warning("Runner not registered - will register with default name");
+                var defaultName = $"Service-{Environment.MachineName}";
+                var registerSuccess = await RegisterRunnerAsync(defaultName);
+                
+                if (!registerSuccess)
+                {
+                    logger.Error("Failed to register runner in service mode");
+                    throw new InvalidOperationException("Runner registration failed");
+                }
+            }
+            
+            logger.Information("Runner registered: {Name} (ID: {Id})", configService.ApplicationName, configService.RunnerId);
+            
+            // Start the runner without console interaction
+            await StartServiceRunnerAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Fatal(ex, "Fatal error in service mode startup");
+            throw;
+        }
+    }
+    
+    /// <summary>
+    /// Start runner loop for service mode - no console interaction
+    /// </summary>
+    private async Task StartServiceRunnerAsync()
+    {
+        logger.Information("Connecting to server...");
+        
+        try
+        {
+            var connected = await hubService.ConnectAsync();
+            
+            if (!connected)
+            {
+                logger.Warning("Initial connection failed - will retry in background");
+            }
+            else
+            {
+                logger.Information("Successfully connected to server");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Connection attempt failed with exception: {ErrorMessage}", ex.Message);
+            logger.Error("Exception type: {ExceptionType}", ex.GetType().FullName);
+            if (ex.InnerException != null)
+            {
+                logger.Error("Inner exception: {InnerException}", ex.InnerException.Message);
+            }
+        }
+        
+        logger.Information("Runner active - waiting for workflows");
+        logger.Information("Runner: {Name} (ID: {Id})", configService.ApplicationName, configService.RunnerId);
+        logger.Information("Server: {Server}", configService.BaseUrl);
+        logger.Information("Status: {Status}", hubService.IsConnected() ? "Connected" : "Connecting...");
+        
+        // Keep service running indefinitely
+        await Task.Delay(Timeout.Infinite);
+    }
+
+    /// <summary>
     /// Interactive start - guides user through setup if needed
     /// </summary>
     public async Task StartInteractiveAsync()
@@ -40,6 +133,16 @@ public class RunnerHostService
         {
             WriteLine("=== Automaton Runner - Interactive Setup ===");
             WriteLine();
+
+            // DEBUG: Log all environment variables that might affect configuration
+            logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
+            logger.Debug("AppConfig__BaseUrl: {EnvVar}", Environment.GetEnvironmentVariable("AppConfig__BaseUrl"));
+            logger.Debug("AUTOMATON_API_KEY: {EnvVar}", 
+                string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
+            logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+            logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
+            logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
+            logger.Debug("=== END ENVIRONMENT VARIABLES ===");
 
             // Step 1: Check/Configure Server
             if (!configService.IsServerConfigured())
