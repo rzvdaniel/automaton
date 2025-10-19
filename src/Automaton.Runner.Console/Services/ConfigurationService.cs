@@ -28,20 +28,29 @@ public class ConfigurationService
     { 
         get 
         {
-            // Configuration Priority Order:
+            // Configuration Priority Order (12-Factor App Pattern):
             // 1. Cached value - Highest priority for current session changes
-            // 2. User's stored preference - User's explicit choice should override defaults
-            // 3. AppConfig defaults - Fallback values from appsettings.json/command line
+            // 2. Environment variable - Perfect for services and Docker (AppConfig__BaseUrl)
+            // 3. User's stored preference - User's explicit choice from interactive setup
             // 4. Exception if none available
             //
-            // Rationale: User preferences should take priority over application defaults.
-            // The appsettings.json should provide fallback defaults, not override user choices.
+            // Rationale: Environment variables are industry standard for service configuration.
+            // They work reliably with Docker, Kubernetes, CI/CD, and Windows services.
+            // File fallback provides convenience for interactive/standalone usage.
             
             if (!string.IsNullOrEmpty(cachedServerUrl))
             {
                 return cachedServerUrl;
             }
             
+            // Check environment variable first (works for services!)
+            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+            {
+                cachedServerUrl = appConfig.BaseUrl;
+                return appConfig.BaseUrl;
+            }
+            
+            // Fall back to stored file (user preference from interactive setup)
             var storedServerUrl = storageService.LoadServerUrlAsync().Result;
             if (!string.IsNullOrEmpty(storedServerUrl))
             {
@@ -49,13 +58,8 @@ public class ConfigurationService
                 return storedServerUrl;
             }
 
-            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
-            {
-                return appConfig.BaseUrl;
-            }
-
             throw new InvalidOperationException(
-                "Server URL is not configured. Please run 'automaton-runner auth --server <url>' or set it during interactive setup.");
+                "Server URL is not configured. Please set AppConfig__BaseUrl environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
         }
     }
 
@@ -76,12 +80,14 @@ public class ConfigurationService
         // Check all possible sources for server URL using the same priority order as BaseUrl
         if (!string.IsNullOrEmpty(cachedServerUrl))
             return true;
-            
-        var storedServerUrl = storageService.LoadServerUrlAsync().Result;
-        if (!string.IsNullOrEmpty(storedServerUrl))
+        
+        // Check environment variable first (12-factor app pattern)
+        if (!string.IsNullOrEmpty(appConfig.BaseUrl))
             return true;
             
-        if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+        // Check stored file (user preference)
+        var storedServerUrl = storageService.LoadServerUrlAsync().Result;
+        if (!string.IsNullOrEmpty(storedServerUrl))
             return true;
             
         return false;

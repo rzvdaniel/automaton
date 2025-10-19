@@ -384,25 +384,37 @@ function Install-Service {
         Write-Host ""
         Write-Step "Configuring service environment..."
         
-        # CRITICAL: The service runs as SYSTEM and cannot access user profile files
-        # We need to create a server.json in the runner's working directory
-        $runnerServerConfig = Join-Path $runnerDirectory "server.json"
-        $serverConfigContent = @{
-            ServerUrl = $effectiveServerUrl
-        } | ConvertTo-Json
+        # CRITICAL: Windows services run as SYSTEM and need environment variables
+        # We use AppConfig__BaseUrl which .NET's configuration system reads automatically
+        # This follows the 12-factor app pattern and works reliably with services
         
-        Set-Content -Path $runnerServerConfig -Value $serverConfigContent -Force
-        Write-Step "Created server configuration: $runnerServerConfig"
-        Write-Step "Server URL: $effectiveServerUrl"
+        # Build environment variables list
+        $envVars = @()
         
-        # Set API key via environment variable (secure)
+        # Add server URL (required)
+        $envVars += "AppConfig__BaseUrl=$effectiveServerUrl"
+        Write-Step "Server URL will be set via environment variable"
+        
+        # Add API key (required)
         if ($effectiveApiKey) {
-            & $nssmPath set $ServiceName AppEnvironmentExtra "AUTOMATON_API_KEY=$effectiveApiKey"
-            Write-Step "API key configured via environment variable"
+            $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
+            Write-Step "API key will be set via environment variable"
         } else {
             Write-Warning "No API key configured - service will not connect"
         }
         
+        # Set ALL environment variables in a SINGLE NSSM call
+        if ($envVars.Count -gt 0) {
+            $nssmArgs = @("set", $ServiceName, "AppEnvironmentExtra") + $envVars
+            & $nssmPath $nssmArgs
+            
+            Write-Step "Environment variables configured:"
+            Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
+            if ($effectiveApiKey) {
+                Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+            }
+        }
+
         Write-Step "Windows service '$ServiceName' created successfully"
         Write-Host ""
         Write-Host "================================================================" -ForegroundColor $ColorHeader
