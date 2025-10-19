@@ -94,17 +94,17 @@ detect_platform() {
 get_existing_config() {
     # Try to find existing runner configuration
     local config_dir="$HOME/.config/AutomatonRunner"
-    local config_path="$config_dir/appsettings.json"
+    local server_config_path="$config_dir/server.json"
     
     local server_url=""
     local api_key=""
     
-    # Read server URL from appsettings.json
-    if [[ -f "$config_path" ]]; then
+    # Read server URL from server.json (new format)
+    if [[ -f "$server_config_path" ]]; then
         if command -v jq &> /dev/null; then
-            server_url=$(jq -r '.AppConfig.BaseUrl // empty' "$config_path" 2>/dev/null)
+            server_url=$(jq -r '.ServerUrl // empty' "$server_config_path" 2>/dev/null)
         else
-            server_url=$(grep -o '"BaseUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_path" | sed 's/.*"BaseUrl"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+            server_url=$(grep -o '"ServerUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$server_config_path" | sed 's/.*"ServerUrl"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         fi
     fi
     

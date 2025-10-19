@@ -116,22 +116,22 @@ function Test-Administrator {
 function Get-ExistingConfig {
     # Try to find existing runner configuration
     $configDir = Join-Path $env:APPDATA "AutomatonRunner"
-    $configPath = Join-Path $configDir "appsettings.json"
+    $serverConfigPath = Join-Path $configDir "server.json"
     
     $result = @{
         ServerUrl = $null
         ApiKey = $null
     }
     
-    # Read server URL from appsettings.json
-    if (Test-Path $configPath) {
+    # Read server URL from server.json (new format)
+    if (Test-Path $serverConfigPath) {
         try {
-            $config = Get-Content $configPath -Raw | ConvertFrom-Json
-            if ($config.AppConfig -and $config.AppConfig.BaseUrl) {
-                $result.ServerUrl = $config.AppConfig.BaseUrl
+            $config = Get-Content $serverConfigPath -Raw | ConvertFrom-Json
+            if ($config.ServerUrl) {
+                $result.ServerUrl = $config.ServerUrl
             }
         } catch {
-            Write-Warning "Found config file but couldn't parse it: $configPath"
+            Write-Warning "Found server config file but couldn't parse it: $serverConfigPath"
         }
     }
     
