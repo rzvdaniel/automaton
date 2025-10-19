@@ -95,9 +95,12 @@ get_existing_config() {
     # Try to find existing runner configuration
     local config_dir="$HOME/.config/AutomatonRunner"
     local server_config_path="$config_dir/server.json"
+    local runner_config_path="$config_dir/runner.json"
     
     local server_url=""
     local api_key=""
+    local runner_id=""
+    local runner_name=""
     
     # Read server URL from server.json (new format)
     if [[ -f "$server_config_path" ]]; then
@@ -108,6 +111,17 @@ get_existing_config() {
         fi
     fi
     
+    # Read runner registration from runner.json
+    if [[ -f "$runner_config_path" ]]; then
+        if command -v jq &> /dev/null; then
+            runner_id=$(jq -r '.RunnerId // empty' "$runner_config_path" 2>/dev/null)
+            runner_name=$(jq -r '.RunnerName // empty' "$runner_config_path" 2>/dev/null)
+        else
+            runner_id=$(grep -o '"RunnerId"[[:space:]]*:[[:space:]]*"[^"]*"' "$runner_config_path" | sed 's/.*"RunnerId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+            runner_name=$(grep -o '"RunnerName"[[:space:]]*:[[:space:]]*"[^"]*"' "$runner_config_path" | sed 's/.*"RunnerName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+        fi
+    fi
+    
     # IMPORTANT: Check for API key in current user's environment variable
     # We need to read this NOW because the service may run as a different user/context
     if [[ -n "$AUTOMATON_API_KEY" ]]; then
@@ -115,9 +129,9 @@ get_existing_config() {
         api_key="$AUTOMATON_API_KEY"
     fi
     
-    if [[ -n "$server_url" ]] || [[ -n "$api_key" ]]; then
+    if [[ -n "$server_url" ]] || [[ -n "$api_key" ]] || [[ -n "$runner_name" ]]; then
         print_step "Found existing runner configuration"
-        echo "${server_url}|${api_key}"
+        echo "${server_url}|${api_key}|${runner_id}|${runner_name}"
     fi
 }
 
@@ -127,6 +141,8 @@ create_systemd_service() {
     local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
     local effective_server_url="$SERVER_URL"
     local effective_api_key="$API_KEY"
+    local effective_runner_id=""
+    local effective_runner_name=""
     local service_user="${SUDO_USER:-$USER}"
     
     # Detect existing configuration if not provided
@@ -139,6 +155,8 @@ create_systemd_service() {
             
             local detected_url=$(echo "$detected_config" | cut -d'|' -f1)
             local detected_key=$(echo "$detected_config" | cut -d'|' -f2)
+            local detected_id=$(echo "$detected_config" | cut -d'|' -f3)
+            local detected_name=$(echo "$detected_config" | cut -d'|' -f4)
             
             if [[ -n "$detected_url" ]]; then
                 echo -e "   Server URL: ${CYAN}$detected_url${NC}"
@@ -149,6 +167,13 @@ create_systemd_service() {
                 local key_preview="${detected_key:0:15}"
                 echo -e "   API Key (from environment): ${CYAN}${key_preview}...${NC}"
                 effective_api_key="$detected_key"
+            fi
+            
+            if [[ -n "$detected_name" ]]; then
+                echo -e "   Runner Name: ${CYAN}$detected_name${NC}"
+                echo -e "   Runner ID: ${CYAN}$detected_id${NC}"
+                effective_runner_id="$detected_id"
+                effective_runner_name="$detected_name"
             fi
             
             echo ""
@@ -183,20 +208,42 @@ create_systemd_service() {
     local runner_directory=$(dirname "$RUNNER_PATH")
     
     # Build environment variables section
-    local env_section=""
+    local env_section="Environment=\"AppConfig__BaseUrl=${effective_server_url}\""
+    print_step "✅ Server URL will be configured in service environment"
+    
     if [[ -n "$effective_api_key" ]]; then
-        env_section="Environment=\"AUTOMATON_API_KEY=${effective_api_key}\""
+        env_section="${env_section}
+Environment=\"AUTOMATON_API_KEY=${effective_api_key}\""
         print_step "✅ API key will be configured in service environment"
     else
         print_warning "⚠️  No API key configured! Service will NOT be able to connect."
         echo -e "${YELLOW}   You can add it later by editing: $service_file${NC}"
     fi
     
+    # Add runner registration if exists (to avoid auto-registration)
+    if [[ -n "$effective_runner_id" ]] && [[ -n "$effective_runner_name" ]]; then
+        env_section="${env_section}
+Environment=\"AUTOMATON_RUNNER_ID=${effective_runner_id}\"
+Environment=\"AUTOMATON_RUNNER_NAME=${effective_runner_name}\""
+        print_step "✅ Runner registration will be configured in service environment"
+        echo -e "   Runner Name: ${CYAN}$effective_runner_name${NC}"
+        echo -e "   Runner ID: ${CYAN}$effective_runner_id${NC}"
+    else
+        print_warning "⚠️  No runner registration found - service will auto-register with name 'Service-$(hostname)'"
+    fi
+    
+    # Add development environment for SSL bypass (for localhost)
+    if [[ "$effective_server_url" == *"localhost"* ]] || [[ "$effective_server_url" == *"127.0.0.1"* ]]; then
+        env_section="${env_section}
+Environment=\"DOTNET_ENVIRONMENT=Development\""
+        print_step "✅ Development environment enabled (for SSL bypass on localhost)"
+    fi
+    
     print_step "Set working directory: $runner_directory"
     
     cat > /tmp/${SERVICE_NAME}.service << EOF
 [Unit]
-Description=Automaton Runner
+Description=Automaton Runner - Workflow Automation
 After=network.target
 Wants=network.target
 
@@ -205,8 +252,7 @@ Type=simple
 User=${service_user}
 WorkingDirectory=${runner_directory}
 ${env_section}
-Environment="AppConfig__BaseUrl=${effective_server_url}"
-ExecStart=${RUNNER_PATH}
+ExecStart=${RUNNER_PATH} service
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -268,6 +314,8 @@ create_launchd_service() {
     local plist_file="${plist_dir}/com.automaton.runner.plist"
     local effective_server_url="$SERVER_URL"
     local effective_api_key="$API_KEY"
+    local effective_runner_id=""
+    local effective_runner_name=""
     
     # Detect existing configuration if not provided
     if [[ -z "$API_KEY" ]]; then
@@ -279,6 +327,8 @@ create_launchd_service() {
             
             local detected_url=$(echo "$detected_config" | cut -d'|' -f1)
             local detected_key=$(echo "$detected_config" | cut -d'|' -f2)
+            local detected_id=$(echo "$detected_config" | cut -d'|' -f3)
+            local detected_name=$(echo "$detected_config" | cut -d'|' -f4)
             
             if [[ -n "$detected_url" ]]; then
                 echo -e "   Server URL: ${CYAN}$detected_url${NC}"
@@ -289,6 +339,13 @@ create_launchd_service() {
                 local key_preview="${detected_key:0:15}"
                 echo -e "   API Key (from environment): ${CYAN}${key_preview}...${NC}"
                 effective_api_key="$detected_key"
+            fi
+            
+            if [[ -n "$detected_name" ]]; then
+                echo -e "   Runner Name: ${CYAN}$detected_name${NC}"
+                echo -e "   Runner ID: ${CYAN}$detected_id${NC}"
+                effective_runner_id="$detected_id"
+                effective_runner_name="$detected_name"
             fi
             
             echo ""
@@ -333,6 +390,7 @@ create_launchd_service() {
     <key>ProgramArguments</key>
     <array>
         <string>${RUNNER_PATH}</string>
+        <string>service</string>
     </array>
     <key>WorkingDirectory</key>
     <string>${runner_directory}</string>
@@ -358,6 +416,30 @@ EOF
         print_step "✅ API key will be configured in service environment"
     else
         print_warning "⚠️  No API key configured! Service will NOT be able to connect."
+    fi
+
+    # Add runner registration if exists
+    if [[ -n "$effective_runner_id" ]] && [[ -n "$effective_runner_name" ]]; then
+        cat >> /tmp/com.automaton.runner.plist << EOF
+        <key>AUTOMATON_RUNNER_ID</key>
+        <string>${effective_runner_id}</string>
+        <key>AUTOMATON_RUNNER_NAME</key>
+        <string>${effective_runner_name}</string>
+EOF
+        print_step "✅ Runner registration will be configured in service environment"
+        echo -e "   Runner Name: ${CYAN}$effective_runner_name${NC}"
+        echo -e "   Runner ID: ${CYAN}$effective_runner_id${NC}"
+    else
+        print_warning "⚠️  No runner registration found - service will auto-register with name 'Service-$(hostname)'"
+    fi
+    
+    # Add development environment for SSL bypass (for localhost)
+    if [[ "$effective_server_url" == *"localhost"* ]] || [[ "$effective_server_url" == *"127.0.0.1"* ]]; then
+        cat >> /tmp/com.automaton.runner.plist << EOF
+        <key>DOTNET_ENVIRONMENT</key>
+        <string>Development</string>
+EOF
+        print_step "✅ Development environment enabled (for SSL bypass on localhost)"
     fi
 
     cat >> /tmp/com.automaton.runner.plist << EOF
