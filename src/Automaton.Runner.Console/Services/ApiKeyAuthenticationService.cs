@@ -74,6 +74,10 @@ public class ApiKeyAuthenticationService
                         Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.User);
                         WriteLine("✅ API key saved as user environment variable (AUTOMATON_API_KEY)");
                         WriteLine("   This will persist across sessions and can be used by services.");
+                        WriteLine();
+                        WriteLine("⚠️  IMPORTANT: Restart your terminal for the environment variable to take effect!");
+                        WriteLine("   Current session: API key is cached in memory (works for now)");
+                        WriteLine("   Future sessions: Restart terminal to automatically load the API key");
                     }
                     else
                     {

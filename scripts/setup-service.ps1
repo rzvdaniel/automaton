@@ -74,7 +74,7 @@ USAGE:
 OPTIONS:
     -RunnerPath PATH        Path to automaton-runner.exe (default: Program Files\AutomatonRunner\automaton-runner.exe)
     -ServiceName NAME       Service name (default: AutomatonRunner)
-    -ApiKey KEY            API key for authentication (optional)
+    -ApiKey KEY            API key for authentication (optional - will auto-detect from environment)
     -ServerUrl URL         Server URL (default: https://api.automaton.monster)
     -RunnerName NAME       Runner name (default: COMPUTERNAME-Runner)
     -LogsPath PATH         Logs directory (default: Program Files\AutomatonRunner\logs)
@@ -82,7 +82,7 @@ OPTIONS:
     -Help                  Show this help message
 
 EXAMPLES:
-    # Install service with default settings
+    # Install service with default settings (auto-detects configuration)
     .\setup-service.ps1
 
     # Install with custom configuration
@@ -100,6 +100,10 @@ REQUIREMENTS:
     - NSSM (Non-Sucking Service Manager) - will be downloaded if needed
     - Automaton Runner already installed
 
+IMPORTANT NOTE:
+    Windows services run under SYSTEM account and cannot access user-level environment variables.
+    This script will pass the API key directly to the service via NSSM environment configuration.
+
 "@
 }
 
@@ -116,6 +120,7 @@ function Get-ExistingConfig {
     
     $result = @{
         ServerUrl = $null
+        ApiKey = $null
     }
     
     # Read server URL from appsettings.json
@@ -130,13 +135,15 @@ function Get-ExistingConfig {
         }
     }
     
-    # Check for API key in environment variable
+    # IMPORTANT: Check for API key in user environment variable
+    # Note: We need to read this NOW because the service won't have access to it
     $envApiKey = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')
     if ($envApiKey) {
         Write-Step "Found API key in user environment variable"
+        $result.ApiKey = $envApiKey
     }
     
-    if ($result.ServerUrl) {
+    if ($result.ServerUrl -or $result.ApiKey) {
         Write-Step "Found existing runner configuration in: $configDir"
         return $result
     }
@@ -278,9 +285,6 @@ function Install-Service {
         $effectiveServerUrl = $ServerUrl
         $effectiveApiKey = $ApiKey
         
-        # Check for API key in user environment variable
-        $envApiKey = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')
-        
         if ($existingConfig) {
             Write-Host ""
             Write-Host "✅ Detected existing runner configuration!" -ForegroundColor Green
@@ -290,10 +294,10 @@ function Install-Service {
                 Write-Host "   Server URL: $effectiveServerUrl" -ForegroundColor Cyan
             }
             
-            if ($envApiKey -and !$ApiKey) {
-                $keyPreview = $envApiKey.Substring(0, [Math]::Min(15, $envApiKey.Length))
+            if ($existingConfig.ApiKey -and !$ApiKey) {
+                $keyPreview = $existingConfig.ApiKey.Substring(0, [Math]::Min(15, $existingConfig.ApiKey.Length))
                 Write-Host "   API Key (from environment): ${keyPreview}..." -ForegroundColor Cyan
-                $effectiveApiKey = $envApiKey
+                $effectiveApiKey = $existingConfig.ApiKey
             }
             
             Write-Host ""
@@ -312,27 +316,38 @@ function Install-Service {
             } else {
                 Write-Step "Using detected configuration for service"
             }
-        } elseif ($envApiKey -and !$ApiKey) {
-            Write-Step "Found API key in user environment variable"
-            $effectiveApiKey = $envApiKey
         } elseif (!$ApiKey) {
-            Write-Warning "No API key found in environment variables."
             Write-Host ""
-            Write-Host "💡 Tip: Set AUTOMATON_API_KEY environment variable before running this script" -ForegroundColor Cyan
+            Write-Host "⚠️  No API key found!" -ForegroundColor Yellow
             Write-Host ""
-            $effectiveApiKey = Read-Host "Enter your API key (or press Enter to configure later)"
+            Write-Host "Windows services run under SYSTEM account and cannot access user-level environment variables." -ForegroundColor Yellow
+            Write-Host "You need to provide the API key to this script so it can be configured for the service." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "💡 Tip: Run 'automaton-runner' first to configure your API key, then run this script." -ForegroundColor Cyan
+            Write-Host ""
+            $effectiveApiKey = Read-Host "Enter your API key (or press Enter to skip - service won't work without it)"
         }
         
-        # Set environment variables
+        # CRITICAL: Set environment variables via NSSM so the SERVICE can access them
+        # User-level environment variables are NOT accessible to Windows services
+        Write-Host ""
+        Write-Step "Configuring service environment variables..."
+        
         $envVars = @("AppConfig__BaseUrl=$effectiveServerUrl")
         if ($effectiveApiKey) {
             $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
+            Write-Step "✅ API key will be passed to service via NSSM environment"
         } else {
-            Write-Warning "No API key configured. The service will need to be configured manually or restarted with credentials."
+            Write-Warning "⚠️  No API key configured! The service will NOT be able to connect."
+            Write-Host "   You can reconfigure the service later with:" -ForegroundColor Yellow
+            Write-Host "   nssm set $ServiceName AppEnvironmentExtra AUTOMATON_API_KEY=your_key_here AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor Yellow
         }
+        
         & $nssmPath set $ServiceName AppEnvironmentExtra $envVars
         
         Write-Step "Windows service '$ServiceName' created successfully"
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
         Write-Host ""
         Write-Host "Service Management Commands:" -ForegroundColor $ColorHeader
         Write-Host "  Start:   Start-Service '$ServiceName'" -ForegroundColor Cyan
@@ -341,21 +356,34 @@ function Install-Service {
         Write-Host "  Logs:    $LogsPath" -ForegroundColor Cyan
         Write-Host ""
         
-        # Ask if user wants to start the service now
-        $startNow = Read-Host "Start the service now? (Y/n)"
-        if ($startNow -ne 'n' -and $startNow -ne 'N') {
-            Write-Step "Starting service..."
-            Start-Service $ServiceName
-            Start-Sleep 2
-            
-            $service = Get-Service $ServiceName
-            if ($service.Status -eq 'Running') {
-                Write-Step "Service started successfully and is running"
-            } else {
-                Write-Warning "Service status: $($service.Status)"
-                Write-Host "Check logs at: $LogsPath" -ForegroundColor Yellow
+        if ($effectiveApiKey) {
+            # Ask if user wants to start the service now
+            $startNow = Read-Host "Start the service now? (Y/n)"
+            if ($startNow -ne 'n' -and $startNow -ne 'N') {
+                Write-Step "Starting service..."
+                Start-Service $ServiceName
+                Start-Sleep 3
+                
+                $service = Get-Service $ServiceName
+                if ($service.Status -eq 'Running') {
+                    Write-Host ""
+                    Write-Host "✅ Service started successfully and is running" -ForegroundColor Green
+                    Write-Host ""
+                    Write-Host "💡 Check the runner status in Automaton Studio to verify connection" -ForegroundColor Cyan
+                } else {
+                    Write-Warning "Service status: $($service.Status)"
+                    Write-Host "Check logs at: $LogsPath" -ForegroundColor Yellow
+                }
             }
+        } else {
+            Write-Host ""
+            Write-Host "⚠️  Service created but NOT started (no API key configured)" -ForegroundColor Yellow
+            Write-Host "   Configure the API key and start manually when ready" -ForegroundColor Yellow
         }
+        
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+        Write-Host ""
         
         return $true
         

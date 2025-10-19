@@ -69,6 +69,32 @@ public class RunnerHostService
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
+                // Check if the API key might be set in registry but not visible to current process
+                var isSetInRegistry = OperatingSystem.IsWindows() && 
+                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY", EnvironmentVariableTarget.User));
+                
+                if (isSetInRegistry)
+                {
+                    WriteLine("⚠️  API key is saved but not visible to this terminal session.");
+                    WriteLine();
+                    WriteLine("📋 To fix this:");
+                    WriteLine("   1. Close this terminal window");
+                    WriteLine("   2. Open a new terminal");
+                    WriteLine("   3. Run 'automaton-runner' again");
+                    WriteLine();
+                    WriteLine("   OR set it for current session:");
+                    WriteLine("   $env:AUTOMATON_API_KEY = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')");
+                    WriteLine();
+                    Write("Would you like to enter the API key again for this session? (Y/n): ");
+                    var response = ReadLine()?.Trim().ToLower();
+                    
+                    if (response == "n" || response == "no")
+                    {
+                        WriteLine("❌ Authentication required to continue. Exiting.");
+                        return;
+                    }
+                }
+                
                 WriteLine("🔧 Authentication required...");
                 WriteLine();
                 WriteLine("You need an API key to authenticate with the Automaton server.");
