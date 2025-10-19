@@ -51,14 +51,14 @@ USAGE:
 OPTIONS:
     --runner-path PATH      Path to automaton-runner (default: /usr/local/bin/automaton-runner)
     --service-name NAME     Service name (default: automaton-runner)
-    --api-key KEY          API key for authentication (optional)
+    --api-key KEY          API key for authentication (optional - will auto-detect)
     --server-url URL       Server URL (default: https://api.automaton.monster)
     --runner-name NAME     Runner name (default: hostname-runner)
     --uninstall            Remove the service
     --help                 Show this help message
 
 EXAMPLES:
-    # Install service with default settings
+    # Install service with default settings (auto-detects configuration)
     sudo ./setup-service.sh
 
     # Install with custom configuration
@@ -74,6 +74,11 @@ REQUIREMENTS:
     - sudo privileges
     - systemd (Linux) or launchd (macOS)
     - Automaton Runner already installed
+
+IMPORTANT NOTES:
+    - Linux (systemd): Service runs as specified user and can access environment variables set in service file
+    - macOS (launchd): Service runs as root by default and uses plist environment variables
+    - This script will auto-detect API key from your user environment and configure it for the service
 
 EOF
 }
@@ -92,6 +97,7 @@ get_existing_config() {
     local config_path="$config_dir/appsettings.json"
     
     local server_url=""
+    local api_key=""
     
     # Read server URL from appsettings.json
     if [[ -f "$config_path" ]]; then
@@ -102,14 +108,16 @@ get_existing_config() {
         fi
     fi
     
-    # Check for API key in environment variable
+    # IMPORTANT: Check for API key in current user's environment variable
+    # We need to read this NOW because the service may run as a different user/context
     if [[ -n "$AUTOMATON_API_KEY" ]]; then
-        print_step "Found API key in environment variable"
+        print_step "Found API key in environment variable (AUTOMATON_API_KEY)"
+        api_key="$AUTOMATON_API_KEY"
     fi
     
-    if [[ -n "$server_url" ]]; then
-        print_step "Found existing runner configuration in: $config_dir"
-        echo "$server_url"
+    if [[ -n "$server_url" ]] || [[ -n "$api_key" ]]; then
+        print_step "Found existing runner configuration"
+        echo "${server_url}|${api_key}"
     fi
 }
 
@@ -117,30 +125,30 @@ create_systemd_service() {
     print_step "Creating systemd service"
     
     local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
-    local env_vars=""
     local effective_server_url="$SERVER_URL"
     local effective_api_key="$API_KEY"
+    local service_user="${SUDO_USER:-$USER}"
     
     # Detect existing configuration if not provided
     if [[ -z "$API_KEY" ]]; then
-        local detected_url=$(get_existing_config)
+        local detected_config=$(get_existing_config)
         
-        # Check for API key in environment variable
-        local env_api_key="$AUTOMATON_API_KEY"
-        
-        if [[ -n "$detected_url" ]] || [[ -n "$env_api_key" ]]; then
+        if [[ -n "$detected_config" ]]; then
             echo ""
-            print_step "✅ Detected existing runner configuration!"
+            echo -e "${GREEN}✅ Detected existing runner configuration!${NC}"
+            
+            local detected_url=$(echo "$detected_config" | cut -d'|' -f1)
+            local detected_key=$(echo "$detected_config" | cut -d'|' -f2)
             
             if [[ -n "$detected_url" ]]; then
                 echo -e "   Server URL: ${CYAN}$detected_url${NC}"
                 effective_server_url="$detected_url"
             fi
             
-            if [[ -n "$env_api_key" ]]; then
-                local key_preview="${env_api_key:0:15}"
+            if [[ -n "$detected_key" ]]; then
+                local key_preview="${detected_key:0:15}"
                 echo -e "   API Key (from environment): ${CYAN}${key_preview}...${NC}"
-                effective_api_key="$env_api_key"
+                effective_api_key="$detected_key"
             fi
             
             echo ""
@@ -148,7 +156,7 @@ create_systemd_service() {
             echo
             
             if [[ $REPLY =~ ^[Nn]$ ]]; then
-                print_warning "Please provide configuration manually:"
+                echo -e "${YELLOW}Please provide configuration manually:${NC}"
                 read -p "Enter API key: " effective_api_key
                 read -p "Enter server URL (press Enter for $SERVER_URL): " custom_url
                 if [[ -n "$custom_url" ]]; then
@@ -158,18 +166,27 @@ create_systemd_service() {
                 print_step "Using detected configuration for service"
             fi
         else
-            print_warning "No API key found in environment (AUTOMATON_API_KEY)."
             echo ""
-            echo -e "${CYAN}💡 Tip: Set AUTOMATON_API_KEY environment variable before running this script${NC}"
+            echo -e "${YELLOW}⚠️  No API key found!${NC}"
             echo ""
-            read -p "Enter your API key (or press Enter to configure later): " effective_api_key
+            echo -e "${YELLOW}The service needs an API key to connect to Automaton Studio.${NC}"
+            echo -e "${CYAN}💡 Tip: Run 'automaton-runner' first to configure, then run this script${NC}"
+            echo ""
+            read -p "Enter your API key (or press Enter to skip - service won't work without it): " effective_api_key
         fi
     fi
     
+    echo ""
+    print_step "Configuring systemd service..."
+    
+    # Build environment variables section
+    local env_section=""
     if [[ -n "$effective_api_key" ]]; then
-        env_vars="Environment=AUTOMATON_API_KEY=${effective_api_key}"
+        env_section="Environment=\"AUTOMATON_API_KEY=${effective_api_key}\""
+        print_step "✅ API key will be configured in service environment"
     else
-        print_warning "No API key configured. The service will need manual configuration."
+        print_warning "⚠️  No API key configured! Service will NOT be able to connect."
+        echo -e "${YELLOW}   You can add it later by editing: $service_file${NC}"
     fi
     
     cat > /tmp/${SERVICE_NAME}.service << EOF
@@ -180,10 +197,10 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=${SUDO_USER:-$USER}
-WorkingDirectory=${HOME}
-${env_vars}
-Environment=AppConfig__BaseUrl=${effective_server_url}
+User=${service_user}
+WorkingDirectory=/home/${service_user}
+${env_section}
+Environment="AppConfig__BaseUrl=${effective_server_url}"
 ExecStart=${RUNNER_PATH}
 Restart=always
 RestartSec=10
@@ -200,6 +217,8 @@ EOF
     
     print_step "Systemd service created and enabled"
     echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
     echo -e "${CYAN}Service Management Commands:${NC}"
     echo "  Start:   sudo systemctl start ${SERVICE_NAME}"
     echo "  Stop:    sudo systemctl stop ${SERVICE_NAME}"
@@ -207,21 +226,34 @@ EOF
     echo "  Logs:    sudo journalctl -u ${SERVICE_NAME} -f"
     echo ""
     
-    # Ask if user wants to start the service now
-    read -p "Start the service now? (Y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        print_step "Starting service..."
-        sudo systemctl start "$SERVICE_NAME"
-        sleep 2
-        
-        if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
-            print_step "Service started successfully and is running"
-        else
-            print_warning "Service may not have started properly"
-            echo "Check status with: sudo systemctl status ${SERVICE_NAME}"
+    if [[ -n "$effective_api_key" ]]; then
+        # Ask if user wants to start the service now
+        read -p "Start the service now? (Y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            print_step "Starting service..."
+            sudo systemctl start "$SERVICE_NAME"
+            sleep 3
+            
+            if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
+                echo ""
+                echo -e "${GREEN}✅ Service started successfully and is running${NC}"
+                echo ""
+                echo -e "${CYAN}💡 Check the runner status in Automaton Studio to verify connection${NC}"
+            else
+                print_warning "Service may not have started properly"
+                echo "Check status with: sudo systemctl status ${SERVICE_NAME}"
+            fi
         fi
+    else
+        echo ""
+        echo -e "${YELLOW}⚠️  Service created but NOT started (no API key configured)${NC}"
+        echo -e "${YELLOW}   Configure the API key and start manually when ready${NC}"
     fi
+    
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
 }
 
 create_launchd_service() {
@@ -234,24 +266,24 @@ create_launchd_service() {
     
     # Detect existing configuration if not provided
     if [[ -z "$API_KEY" ]]; then
-        local detected_url=$(get_existing_config)
+        local detected_config=$(get_existing_config)
         
-        # Check for API key in environment variable
-        local env_api_key="$AUTOMATON_API_KEY"
-        
-        if [[ -n "$detected_url" ]] || [[ -n "$env_api_key" ]]; then
+        if [[ -n "$detected_config" ]]; then
             echo ""
-            print_step "✅ Detected existing runner configuration!"
+            echo -e "${GREEN}✅ Detected existing runner configuration!${NC}"
+            
+            local detected_url=$(echo "$detected_config" | cut -d'|' -f1)
+            local detected_key=$(echo "$detected_config" | cut -d'|' -f2)
             
             if [[ -n "$detected_url" ]]; then
                 echo -e "   Server URL: ${CYAN}$detected_url${NC}"
                 effective_server_url="$detected_url"
             fi
             
-            if [[ -n "$env_api_key" ]]; then
-                local key_preview="${env_api_key:0:15}"
+            if [[ -n "$detected_key" ]]; then
+                local key_preview="${detected_key:0:15}"
                 echo -e "   API Key (from environment): ${CYAN}${key_preview}...${NC}"
-                effective_api_key="$env_api_key"
+                effective_api_key="$detected_key"
             fi
             
             echo ""
@@ -259,7 +291,7 @@ create_launchd_service() {
             echo
             
             if [[ $REPLY =~ ^[Nn]$ ]]; then
-                print_warning "Please provide configuration manually:"
+                echo -e "${YELLOW}Please provide configuration manually:${NC}"
                 read -p "Enter API key: " effective_api_key
                 read -p "Enter server URL (press Enter for $SERVER_URL): " custom_url
                 if [[ -n "$custom_url" ]]; then
@@ -269,13 +301,18 @@ create_launchd_service() {
                 print_step "Using detected configuration for service"
             fi
         else
-            print_warning "No API key found in environment (AUTOMATON_API_KEY)."
             echo ""
-            echo -e "${CYAN}💡 Tip: Set AUTOMATON_API_KEY environment variable before running this script${NC}"
+            echo -e "${YELLOW}⚠️  No API key found!${NC}"
             echo ""
-            read -p "Enter your API key (or press Enter to configure later): " effective_api_key
+            echo -e "${YELLOW}The service needs an API key to connect to Automaton Studio.${NC}"
+            echo -e "${CYAN}💡 Tip: Run 'automaton-runner' first to configure, then run this script${NC}"
+            echo ""
+            read -p "Enter your API key (or press Enter to skip - service won't work without it): " effective_api_key
         fi
     fi
+    
+    echo ""
+    print_step "Configuring launchd service..."
     
     cat > /tmp/com.automaton.runner.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -307,6 +344,9 @@ EOF
         <key>AUTOMATON_API_KEY</key>
         <string>${effective_api_key}</string>
 EOF
+        print_step "✅ API key will be configured in service environment"
+    else
+        print_warning "⚠️  No API key configured! Service will NOT be able to connect."
     fi
 
     cat >> /tmp/com.automaton.runner.plist << EOF
@@ -321,6 +361,8 @@ EOF
     
     print_step "Launchd service created"
     echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
     echo -e "${CYAN}Service Management Commands:${NC}"
     echo "  Start:   sudo launchctl load ${plist_file}"
     echo "  Stop:    sudo launchctl unload ${plist_file}"
@@ -328,21 +370,34 @@ EOF
     echo "  Logs:    tail -f /var/log/automaton-runner.log"
     echo ""
     
-    # Ask if user wants to start the service now
-    read -p "Start the service now? (Y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        print_step "Starting service..."
-        sudo launchctl load "$plist_file"
-        sleep 2
-        
-        if sudo launchctl list | grep -q "com.automaton.runner"; then
-            print_step "Service started successfully and is running"
-        else
-            print_warning "Service may not have started properly"
-            echo "Check status with: sudo launchctl list | grep automaton"
+    if [[ -n "$effective_api_key" ]]; then
+        # Ask if user wants to start the service now
+        read -p "Start the service now? (Y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            print_step "Starting service..."
+            sudo launchctl load "$plist_file"
+            sleep 3
+            
+            if sudo launchctl list | grep -q "com.automaton.runner"; then
+                echo ""
+                echo -e "${GREEN}✅ Service started successfully and is running${NC}"
+                echo ""
+                echo -e "${CYAN}💡 Check the runner status in Automaton Studio to verify connection${NC}"
+            else
+                print_warning "Service may not have started properly"
+                echo "Check status with: sudo launchctl list | grep automaton"
+            fi
         fi
+    else
+        echo ""
+        echo -e "${YELLOW}⚠️  Service created but NOT started (no API key configured)${NC}"
+        echo -e "${YELLOW}   Configure the API key and start manually when ready${NC}"
     fi
+    
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
 }
 
 remove_systemd_service() {
