@@ -452,7 +452,68 @@ function Install-Service {
             Write-Step "Service configured to run as LocalSystem"
         }
         
-        # Copy runner registration if it exists in user config
+        # CRITICAL: Set environment variables via NSSM so the SERVICE can access them
+        Write-Host ""
+        Write-Step "Configuring service environment..."
+        
+        # Build environment variables list
+        $envVars = @()
+        
+        # Add server URL (required)
+        $envVars += "AppConfig__BaseUrl=$effectiveServerUrl"
+        Write-Step "Server URL will be set via environment variable"
+        
+        # Add API key (required)
+        if ($effectiveApiKey) {
+            $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
+            Write-Step "API key will be set via environment variable"
+        } else {
+            Write-Warning "No API key configured - service will not connect"
+        }
+        
+        # Add runner registration if it exists (to avoid auto-registration)
+        if ($existingConfig -and $existingConfig.RunnerId -and $existingConfig.RunnerName) {
+            $envVars += "AUTOMATON_RUNNER_ID=$($existingConfig.RunnerId)"
+            $envVars += "AUTOMATON_RUNNER_NAME=$($existingConfig.RunnerName)"
+            Write-Step "Runner registration will be set via environment variables"
+            Write-Host "  Runner Name: $($existingConfig.RunnerName)" -ForegroundColor DarkGray
+            Write-Host "  Runner ID: $($existingConfig.RunnerId)" -ForegroundColor DarkGray
+        } else {
+            Write-Warning "No runner registration found - service will auto-register with name 'Service-$env:COMPUTERNAME'"
+        }
+        
+        # Add development environment for SSL bypass (for localhost)
+        if ($effectiveServerUrl -like "*localhost*" -or $effectiveServerUrl -like "*127.0.0.1*") {
+            $envVars += "DOTNET_ENVIRONMENT=Development"
+            Write-Step "Development environment enabled (for SSL bypass on localhost)"
+        }
+        
+        # Set ALL environment variables via NSSM
+        if ($envVars.Count -gt 0) {
+            Write-Step "Setting environment variables via NSSM..."
+            Write-Host "  Command: nssm set $ServiceName AppEnvironmentExtra" -ForegroundColor DarkGray
+            
+            # CRITICAL: NSSM's AppEnvironmentExtra parameter needs ALL variables in ONE call
+            # Multiple variables must be separated by newlines in a single string
+            $envString = $envVars -join "`r`n"
+            
+            & $nssmPath set $ServiceName AppEnvironmentExtra $envString
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Step "Environment variables configured successfully"
+                Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
+                if ($effectiveApiKey) {
+                    Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+                }
+                if ($existingConfig -and $existingConfig.RunnerName) {
+                    Write-Host "  - AUTOMATON_RUNNER_NAME=$($existingConfig.RunnerName)" -ForegroundColor DarkGray
+                }
+            } else {
+                Write-Warning "Failed to set environment variables (exit code: $LASTEXITCODE)"
+            }
+        }
+        
+        # Copy runner registration if it exists in user config (backup method)
         if ($existingConfig -and $existingConfig.RunnerId -and $existingConfig.RunnerName) {
             Write-Step "Copying runner registration to service directory..."
             
