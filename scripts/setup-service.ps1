@@ -7,7 +7,7 @@
 
 .NOTES
     HOW TO RUN THIS SCRIPT:
-    1. Open PowerShell as Administrator (right-click PowerShell → "Run as Administrator")
+    1. Open PowerShell as Administrator (right-click PowerShell ? "Run as Administrator")
     2. Navigate to the scripts directory: cd c:\Work\automaton\scripts
     3. Allow script execution: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
     4. Run the script: .\setup-service.ps1
@@ -43,9 +43,9 @@ $ColorError = "Red"
 $ColorHeader = "Cyan"
 
 function Write-Header {
-    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+    Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
     Write-Host "      Automaton Runner - Windows Service Setup             " -ForegroundColor $ColorHeader
-    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+    Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
     Write-Host ""
 }
 
@@ -225,16 +225,16 @@ function Install-Service {
         Write-Host ""
         Write-Host "The runner executable was not found at the expected location." -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "💡 Common installation locations:" -ForegroundColor Cyan
-        Write-Host "   • $env:ProgramFiles\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
-        Write-Host "   • C:\Tools\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
-        Write-Host "   • C:\Work\automaton\src\Automaton.Runner.Console\bin\Debug\net8.0\automaton-runner.exe (debug)" -ForegroundColor Cyan
+        Write-Host "Common installation locations:" -ForegroundColor Cyan
+        Write-Host "  - $env:ProgramFiles\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
+        Write-Host "  - C:\Tools\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
+        Write-Host "  - C:\Work\automaton\src\Automaton.Runner.Console\bin\Debug\net8.0\automaton-runner.exe (debug)" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "📝 You can either:" -ForegroundColor Cyan
-        Write-Host "   1) Enter the path below, OR" -ForegroundColor White
-        Write-Host "   2) Re-run this script with the -RunnerPath parameter:" -ForegroundColor White
+        Write-Host "You can either:" -ForegroundColor Cyan
+        Write-Host "  1. Enter the path below, OR" -ForegroundColor White
+        Write-Host "  2. Re-run this script with the -RunnerPath parameter:" -ForegroundColor White
         Write-Host ""
-        Write-Host '   .\scripts\setup-service.ps1 -RunnerPath "C:\Path\To\automaton-runner.exe"' -ForegroundColor Green
+        Write-Host '     .\scripts\setup-service.ps1 -RunnerPath "C:\Path\To\automaton-runner.exe"' -ForegroundColor Green
         Write-Host ""
         
         # Prompt for custom path
@@ -338,7 +338,7 @@ function Install-Service {
         
         if ($existingConfig) {
             Write-Host ""
-            Write-Host "✅ Detected existing runner configuration!" -ForegroundColor Green
+            Write-Host "Detected existing runner configuration!" -ForegroundColor Green
             
             if ($existingConfig.ServerUrl) {
                 $effectiveServerUrl = $existingConfig.ServerUrl
@@ -369,12 +369,12 @@ function Install-Service {
             }
         } elseif (!$ApiKey) {
             Write-Host ""
-            Write-Host "⚠️  No API key found!" -ForegroundColor Yellow
+            Write-Host "No API key found!" -ForegroundColor Yellow
             Write-Host ""
             Write-Host "Windows services run under SYSTEM account and cannot access user-level environment variables." -ForegroundColor Yellow
             Write-Host "You need to provide the API key to this script so it can be configured for the service." -ForegroundColor Yellow
             Write-Host ""
-            Write-Host "💡 Tip: Run 'automaton-runner' first to configure your API key, then run this script." -ForegroundColor Cyan
+            Write-Host "Tip: Run 'automaton-runner' first to configure your API key, then run this script." -ForegroundColor Cyan
             Write-Host ""
             $effectiveApiKey = Read-Host "Enter your API key (or press Enter to skip - service won't work without it)"
         }
@@ -387,9 +387,9 @@ function Install-Service {
         $envVars = @("AppConfig__BaseUrl=$effectiveServerUrl")
         if ($effectiveApiKey) {
             $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
-            Write-Step "✅ API key will be passed to service via NSSM environment"
+            Write-Step "API key will be passed to service via NSSM environment"
         } else {
-            Write-Warning "⚠️  No API key configured! The service will NOT be able to connect."
+            Write-Warning "No API key configured! The service will NOT be able to connect."
             Write-Host "   You can reconfigure the service later with:" -ForegroundColor Yellow
             Write-Host "   nssm set $ServiceName AppEnvironmentExtra AUTOMATON_API_KEY=your_key_here AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor Yellow
         }
@@ -398,7 +398,7 @@ function Install-Service {
         
         Write-Step "Windows service '$ServiceName' created successfully"
         Write-Host ""
-        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+        Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
         Write-Host ""
         Write-Host "Service Management Commands:" -ForegroundColor $ColorHeader
         Write-Host "  Start:   Start-Service '$ServiceName'" -ForegroundColor Cyan
@@ -418,9 +418,9 @@ function Install-Service {
                 $service = Get-Service $ServiceName
                 if ($service.Status -eq 'Running') {
                     Write-Host ""
-                    Write-Host "✅ Service started successfully and is running" -ForegroundColor Green
+                    Write-Host "Service started successfully and is running" -ForegroundColor Green
                     Write-Host ""
-                    Write-Host "💡 Check the runner status in Automaton Studio to verify connection" -ForegroundColor Cyan
+                    Write-Host "Check the runner status in Automaton Studio to verify connection" -ForegroundColor Cyan
                 } else {
                     Write-Warning "Service status: $($service.Status)"
                     Write-Host "Check logs at: $LogsPath" -ForegroundColor Yellow
@@ -428,12 +428,12 @@ function Install-Service {
             }
         } else {
             Write-Host ""
-            Write-Host "⚠️  Service created but NOT started (no API key configured)" -ForegroundColor Yellow
+            Write-Host "Service created but NOT started (no API key configured)" -ForegroundColor Yellow
             Write-Host "   Configure the API key and start manually when ready" -ForegroundColor Yellow
         }
         
         Write-Host ""
-        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor $ColorHeader
+        Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
         Write-Host ""
         
         return $true
