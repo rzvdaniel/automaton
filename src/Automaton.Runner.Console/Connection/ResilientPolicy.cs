@@ -19,6 +19,13 @@ public class ResilientPolicy : IConnectionPolicy
         this.durationOfBreak = durationOfBreak;
         this.logger = Log.ForContext<ResilientPolicy>();
     }
+    
+    public bool ShouldStopRetrying()
+    {
+        // For now, never stop - retry indefinitely
+        // This can be changed to add max duration limits if needed
+        return false;
+    }
 
     public IAsyncPolicy GetPolicy()
     {
