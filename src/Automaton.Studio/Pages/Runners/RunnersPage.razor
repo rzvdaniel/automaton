@@ -67,6 +67,17 @@
                 <Column Title="Status" @bind-Field="@context.Status">
                     <span class="@context.StatusClass">@context.Status</span>
                 </Column>
+
+                <ActionColumn Title="Actions">
+                    <Space>
+                        <SpaceItem>
+                            <Button Type="@ButtonType.Link" OnClick="@(() => OpenPythonConfigDialog(context))">
+                                <Icon Type="setting" />
+                                Configure Python
+                            </Button>
+                        </SpaceItem>
+                    </Space>
+                </ActionColumn>
             </Table>
         }
     </Content>

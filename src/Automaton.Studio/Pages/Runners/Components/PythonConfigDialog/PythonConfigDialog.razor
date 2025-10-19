@@ -1,0 +1,79 @@
+@using Automaton.Studio.Resources
+@inherits FeedbackComponent<PythonConfigModel>
+
+<Form Model="@model"
+      LabelColSpan="6"
+      WrapperColSpan="18">
+    <ChildContent>
+        <Alert Type="@AlertType.Info" 
+               Message="Python Configuration" 
+               Description="Configure Python paths for this runner. These settings will be synchronized to the runner and used when executing Python scripts."
+               ShowIcon="true"
+               Style="margin-bottom: 24px;" />
+
+        <FormItem Label="Runner">
+            <Input @bind-Value="@model.RunnerName" Disabled="true" />
+        </FormItem>
+
+        <FormItem Label="Python DLL Path">
+            <Input @bind-Value="@model.PythonDllPath" 
+                   Placeholder="e.g., C:\Python311\python311.dll or /usr/lib/libpython3.11.so"
+                   AllowClear="true">
+                <Suffix>
+                    <Tooltip Title="Path to the Python DLL/shared library">
+                        <Icon Type="question-circle" />
+                    </Tooltip>
+                </Suffix>
+            </Input>
+            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                Leave empty for auto-detection
+            </Text>
+        </FormItem>
+
+        <FormItem Label="Python Paths">
+            <div style="margin-bottom: 8px;">
+                @foreach (var (path, index) in model.PythonPaths.Select((p, i) => (p, i)))
+                {
+                    <Space Style="width: 100%; margin-bottom: 8px;">
+                        <SpaceItem Style="flex: 1;">
+                            <Input Value="@path" 
+                                   OnChange="@((string e) => UpdatePath(index, e))"
+                                   Placeholder="e.g., C:\Python311\Lib\site-packages"
+                                   AllowClear="true" />
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Button Icon="delete" 
+                                    Danger 
+                                    OnClick="@(() => RemovePath(index))" 
+                                    Type="@ButtonType.Text" />
+                        </SpaceItem>
+                    </Space>
+                }
+            </div>
+            <Button Icon="plus" 
+                    Type="@ButtonType.Dashed" 
+                    Block 
+                    OnClick="AddPath">
+                Add Python Path
+            </Button>
+            <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                Additional paths for Python libraries and modules
+            </Text>
+        </FormItem>
+
+        <FormItem Label="Auto-detect Paths">
+            <Switch @bind-Checked="@model.AutoDetectPythonPaths" />
+            <Text Type="@TextElementType.Secondary" Style="font-size: 12px; margin-left: 8px;">
+                Automatically detect Python installation and paths
+            </Text>
+        </FormItem>
+
+        <Divider />
+
+        <Alert Type="@AlertType.Warning" 
+               Message="Configuration Priority" 
+               Description="Runner uses: Local file → Environment variables → This configuration → Auto-detection"
+               ShowIcon="true"
+               Style="margin-bottom: 16px;" />
+    </ChildContent>
+</Form>

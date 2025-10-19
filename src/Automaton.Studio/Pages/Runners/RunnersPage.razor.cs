@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Components;
 using System.Threading.Tasks;
 using Automaton.Studio.Shared.Components;
+using Automaton.Studio.Pages.Runners.Components.PythonConfigDialog;
+using Automaton.Studio.Models;
+using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Pages.Runners;
 
@@ -13,6 +16,7 @@ partial class RunnersPage : ComponentBase
     [Inject] private RunnersViewModel RunnersViewModel { get; set; } = default!;
     [Inject] private ModalService ModalService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
+    [Inject] private RunnerService RunnerService { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -32,6 +36,80 @@ partial class RunnersPage : ComponentBase
         }
 
         await base.OnInitializedAsync();
+    }
+
+    private async Task OpenPythonConfigDialog(RunnerModel runner)
+    {
+        try
+        {
+            // Load current Python configuration from the server
+            var currentConfig = await RunnerService.GetPythonConfig(runner.Id);
+
+            var configModel = new PythonConfigModel
+            {
+                RunnerId = runner.Id,
+                RunnerName = runner.Name,
+                PythonDllPath = currentConfig?.PythonDllPath,
+                PythonPaths = currentConfig?.PythonPaths?.ToList() ?? new List<string>(),
+                AutoDetectPythonPaths = currentConfig?.AutoDetectPythonPaths ?? true
+            };
+
+            var modalConfig = new ModalOptions
+            {
+                Title = $"Configure Python - {runner.Name}",
+                Width = 800,
+                Draggable = true,
+                Maximizable = true,
+                Footer = null
+            };
+
+            var modalRef = await ModalService.CreateModalAsync<PythonConfigDialog, PythonConfigModel>(
+                modalConfig, 
+                configModel
+            );
+
+            modalRef.OnOk = async () =>
+            {
+                try
+                {
+                    // Map back to RunnerModel
+                    var updatedRunner = new RunnerModel
+                    {
+                        Id = configModel.RunnerId,
+                        Name = configModel.RunnerName,
+                        PythonDllPath = configModel.PythonDllPath,
+                        PythonPaths = configModel.PythonPaths,
+                        AutoDetectPythonPaths = configModel.AutoDetectPythonPaths
+                    };
+
+                    var success = await RunnerService.UpdatePythonConfig(runner.Id, updatedRunner);
+
+                    if (success)
+                    {
+                        await MessageService.SuccessAsync("Python configuration updated successfully");
+                        
+                        // Update local runner model
+                        runner.PythonDllPath = configModel.PythonDllPath;
+                        runner.PythonPaths = configModel.PythonPaths;
+                        runner.AutoDetectPythonPaths = configModel.AutoDetectPythonPaths;
+                        
+                        StateHasChanged();
+                    }
+                    else
+                    {
+                        await MessageService.ErrorAsync("Failed to update Python configuration");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await MessageService.ErrorAsync($"Error updating Python configuration: {ex.Message}");
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            await MessageService.ErrorAsync($"Error opening Python configuration: {ex.Message}");
+        }
     }
 
     private List<string> GetRunnerActionCardBullets()
