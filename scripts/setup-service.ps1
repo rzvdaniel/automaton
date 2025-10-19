@@ -221,9 +221,54 @@ function Remove-Service {
 function Install-Service {
     # Verify runner exists
     if (!(Test-Path $RunnerPath)) {
-        Write-Error "Runner not found at: $RunnerPath"
-        Write-Host "Please specify the correct path with -RunnerPath parameter" -ForegroundColor Yellow
-        return $false
+        Write-Warning "Runner not found at default location: $RunnerPath"
+        Write-Host ""
+        Write-Host "The runner executable was not found at the expected location." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "💡 Common installation locations:" -ForegroundColor Cyan
+        Write-Host "   • $env:ProgramFiles\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
+        Write-Host "   • C:\Tools\AutomatonRunner\automaton-runner.exe" -ForegroundColor Cyan
+        Write-Host "   • C:\Work\automaton\src\Automaton.Runner.Console\bin\Debug\net8.0\automaton-runner.exe (debug)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "📝 You can either:" -ForegroundColor Cyan
+        Write-Host "   1) Enter the path below, OR" -ForegroundColor White
+        Write-Host "   2) Re-run this script with the -RunnerPath parameter:" -ForegroundColor White
+        Write-Host ""
+        Write-Host '   .\scripts\setup-service.ps1 -RunnerPath "C:\Path\To\automaton-runner.exe"' -ForegroundColor Green
+        Write-Host ""
+        
+        # Prompt for custom path
+        Write-Host "Please provide the full path to automaton-runner.exe:" -ForegroundColor Yellow
+        Write-Host "(or press Ctrl+C to exit and re-run with -RunnerPath parameter)" -ForegroundColor DarkGray
+        $customPath = Read-Host "Path"
+        
+        if ([string]::IsNullOrWhiteSpace($customPath)) {
+            Write-Error "No path provided. Cannot continue without runner executable."
+            return $false
+        }
+        
+        # Validate the custom path
+        if (!(Test-Path $customPath)) {
+            Write-Error "Runner not found at specified path: $customPath"
+            Write-Host "Please verify the path and try again." -ForegroundColor Yellow
+            return $false
+        }
+        
+        # Verify it's actually the runner executable
+        if ($customPath -notlike "*automaton-runner.exe") {
+            Write-Warning "The specified file doesn't appear to be automaton-runner.exe"
+            $confirm = Read-Host "Continue anyway? (y/N)"
+            if ($confirm -ne 'y' -and $confirm -ne 'Y') {
+                Write-Step "Installation cancelled"
+                return $false
+            }
+        }
+        
+        $RunnerPath = $customPath
+        Write-Step "Using runner at: $RunnerPath"
+        Write-Host ""
+    } else {
+        Write-Step "Found runner at: $RunnerPath"
     }
     
     # Check if service already exists
@@ -260,6 +305,12 @@ function Install-Service {
             Write-Error "Failed to install service"
             return $false
         }
+        
+        # CRITICAL: Set working directory to the runner's directory
+        # This ensures appsettings.json and other config files can be found
+        $runnerDirectory = Split-Path $RunnerPath -Parent
+        & $nssmPath set $ServiceName AppDirectory $runnerDirectory
+        Write-Step "Set working directory: $runnerDirectory"
         
         # Configure service description
         & $nssmPath set $ServiceName Description "Automaton workflow runner for cross-platform automation"

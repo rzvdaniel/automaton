@@ -179,6 +179,9 @@ create_systemd_service() {
     echo ""
     print_step "Configuring systemd service..."
     
+    # Get the runner's directory for WorkingDirectory
+    local runner_directory=$(dirname "$RUNNER_PATH")
+    
     # Build environment variables section
     local env_section=""
     if [[ -n "$effective_api_key" ]]; then
@@ -189,6 +192,8 @@ create_systemd_service() {
         echo -e "${YELLOW}   You can add it later by editing: $service_file${NC}"
     fi
     
+    print_step "Set working directory: $runner_directory"
+    
     cat > /tmp/${SERVICE_NAME}.service << EOF
 [Unit]
 Description=Automaton Runner
@@ -198,7 +203,7 @@ Wants=network.target
 [Service]
 Type=simple
 User=${service_user}
-WorkingDirectory=/home/${service_user}
+WorkingDirectory=${runner_directory}
 ${env_section}
 Environment="AppConfig__BaseUrl=${effective_server_url}"
 ExecStart=${RUNNER_PATH}
@@ -314,6 +319,10 @@ create_launchd_service() {
     echo ""
     print_step "Configuring launchd service..."
     
+    # Get the runner's directory for WorkingDirectory
+    local runner_directory=$(dirname "$RUNNER_PATH")
+    print_step "Set working directory: $runner_directory"
+    
     cat > /tmp/com.automaton.runner.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -325,6 +334,8 @@ create_launchd_service() {
     <array>
         <string>${RUNNER_PATH}</string>
     </array>
+    <key>WorkingDirectory</key>
+    <string>${runner_directory}</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -444,9 +455,73 @@ remove_launchd_service() {
 install_service() {
     # Verify runner exists
     if [[ ! -f "$RUNNER_PATH" ]]; then
-        print_error "Runner not found at: $RUNNER_PATH"
-        echo "Please specify the correct path with --runner-path parameter"
-        exit 1
+        print_warning "Runner not found at default location: $RUNNER_PATH"
+        echo ""
+        echo -e "${YELLOW}The runner executable was not found at the expected location.${NC}"
+        echo ""
+        echo -e "${CYAN}💡 Common installation locations:${NC}"
+        echo -e "${CYAN}   • /usr/local/bin/automaton-runner${NC}"
+        echo -e "${CYAN}   • /opt/automaton/automaton-runner${NC}"
+        echo -e "${CYAN}   • ~/bin/automaton-runner${NC}"
+        echo -e "${CYAN}   • /home/user/automaton/src/Automaton.Runner.Console/bin/Debug/net8.0/automaton-runner (debug)${NC}"
+        echo ""
+        echo -e "${CYAN}📝 You can either:${NC}"
+        echo -e "${NC}   1) Enter the path below, OR${NC}"
+        echo -e "${NC}   2) Re-run this script with the --runner-path parameter:${NC}"
+        echo ""
+        echo -e "${GREEN}   sudo ./scripts/setup-service.sh --runner-path \"/path/to/automaton-runner\"${NC}"
+        echo ""
+        
+        # Prompt for custom path
+        echo -e "${YELLOW}Please provide the full path to automaton-runner:${NC}"
+        echo -e "${NC}(or press Ctrl+C to exit and re-run with --runner-path parameter)${NC}"
+        read -p "Path: " custom_path
+        
+        if [[ -z "$custom_path" ]]; then
+            print_error "No path provided. Cannot continue without runner executable."
+            exit 1
+        fi
+        
+        # Expand tilde if present
+        custom_path="${custom_path/#\~/$HOME}"
+        
+        # Validate the custom path
+        if [[ ! -f "$custom_path" ]]; then
+            print_error "Runner not found at specified path: $custom_path"
+            echo "Please verify the path and try again."
+            exit 1
+        fi
+        
+        # Verify it's executable
+        if [[ ! -x "$custom_path" ]]; then
+            print_warning "The specified file is not executable"
+            read -p "Make it executable and continue? (y/N) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                chmod +x "$custom_path"
+                print_step "Made file executable"
+            else
+                print_error "Installation cancelled"
+                exit 1
+            fi
+        fi
+        
+        # Verify it's actually the runner executable (basic check)
+        if [[ ! "$custom_path" =~ automaton-runner$ ]]; then
+            print_warning "The specified file doesn't appear to be automaton-runner"
+            read -p "Continue anyway? (y/N) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_step "Installation cancelled"
+                exit 1
+            fi
+        fi
+        
+        RUNNER_PATH="$custom_path"
+        print_step "Using runner at: $RUNNER_PATH"
+        echo ""
+    else
+        print_step "Found runner at: $RUNNER_PATH"
     fi
     
     local platform

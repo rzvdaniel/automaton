@@ -40,8 +40,10 @@ automaton-runner
 
 **Advanced Options (If Needed):**
 ```powershell
-# Specify custom runner installation path
+# Specify custom runner installation path (if not in default location)
 .\scripts\setup-service.ps1 -RunnerPath "C:\CustomPath\automaton-runner.exe"
+
+# The script will also prompt interactively if it can't find the runner at the default location
 
 # Override auto-detected configuration (not recommended)
 .\scripts\setup-service.ps1 -ApiKey "ak_runner_xxx" -ServerUrl "https://automaton.company.com"
@@ -73,12 +75,14 @@ Get-Content "$env:ProgramFiles\AutomatonRunner\logs\service-output.log" -Tail 50
 - ✅ **Zero Re-Entry**: Uses credentials you already configured interactively
 - ✅ **NSSM Integration**: Downloads and installs NSSM automatically if needed
 - ✅ **Service-Level Environment**: Passes API key via NSSM (accessible to SYSTEM account)
+- ✅ **Correct Working Directory**: Automatically sets working directory so runner can find config files
 - ✅ **Automatic Startup**: Service starts with Windows
 - ✅ **Log Rotation**: 10MB max per log file with automatic rotation
 - ✅ **Interactive Prompts**: Confirms configuration before proceeding
+- ✅ **Debug-Friendly**: Works with debug builds in project folders or production installs
 
 **Important Note for Windows:**
-Windows services run under the SYSTEM account and cannot access user-level environment variables. This script automatically configures the API key as a service-level environment variable via NSSM, ensuring the runner can connect to Automaton Studio.
+Windows services run under the SYSTEM account and cannot access user-level environment variables. This script automatically configures the API key as a service-level environment variable via NSSM, ensuring the runner can connect to Automaton Studio. The working directory is also set to the runner's location so it can find `appsettings.json` and other configuration files.
 
 ### `setup-service.sh` (Linux/macOS)
 
@@ -112,8 +116,10 @@ sudo ./scripts/setup-service.sh
 
 **Advanced Options (If Needed):**
 ```bash
-# Specify custom runner installation path
+# Specify custom runner installation path (if not in default location)
 sudo ./scripts/setup-service.sh --runner-path "/opt/automaton/automaton-runner"
+
+# The script will also prompt interactively if it can't find the runner at the default location
 
 # Override auto-detected configuration (not recommended)
 sudo ./scripts/setup-service.sh --api-key "ak_runner_xxx" --server-url "https://automaton.company.com"
@@ -169,10 +175,12 @@ tail -f /var/log/automaton-runner-error.log
 - ✅ **Zero Re-Entry**: Uses credentials you already configured interactively
 - ✅ **Platform Auto-Detection**: Automatically detects Linux (systemd) or macOS (launchd)
 - ✅ **Service-Level Environment**: Configures environment variables in service file
+- ✅ **Correct Working Directory**: Automatically sets working directory so runner can find config files
 - ✅ **Automatic Startup**: Service starts on system boot
 - ✅ **Auto-Restart**: Restarts automatically on failure (10-second delay)
 - ✅ **Centralized Logging**: systemd journal (Linux) or /var/log (macOS)
 - ✅ **Interactive Prompts**: Confirms configuration before proceeding
+- ✅ **Debug-Friendly**: Works with custom paths for testing or production installs
 
 ## How Smart Auto-Detection Works
 
@@ -286,133 +294,17 @@ sudo cat /Library/LaunchDaemons/com.automaton.runner.plist
 
 ### Common Issues
 
+**"Runner not found at default location"**
+- **Don't panic!** The script will interactively prompt you for the correct path
+- Common locations to check:
+  - Windows: `C:\Program Files\AutomatonRunner\automaton-runner.exe`
+  - Linux: `/usr/local/bin/automaton-runner`
+  - macOS: `/usr/local/bin/automaton-runner`
+  - Custom: Check where you extracted or installed the runner
+- Alternatively, run the script with an explicit path:
+  - Windows: `.\scripts\setup-service.ps1 -RunnerPath "C:\YourPath\automaton-runner.exe"`
+  - Linux/macOS: `sudo ./scripts/setup-service.sh --runner-path "/your/path/automaton-runner"`
+
 **"No API key found"**
 - Run `automaton-runner` first to configure your API key
 - The runner will set the `AUTOMATON_API_KEY` environment variable automatically
-
-**"Service can't connect to server"**
-- Verify network connectivity: `curl https://your-server.com/api/health`
-- Check API key hasn't been revoked in Automaton Studio
-- Review service logs for detailed error messages
-
-**"API key in environment but service doesn't see it" (Windows only)**
-- **This is expected!** Windows services run as SYSTEM and cannot access user environment variables
-- The script **automatically handles this** by passing the API key via NSSM's `AppEnvironmentExtra`
-- If you see this error, the service wasn't created with this script - use `setup-service.ps1` to recreate it
-
-### Need to Change Configuration?
-
-**Windows:**
-```powershell
-# Option 1: Reconfigure with the script
-.\scripts\setup-service.ps1 -ApiKey "new_key_here"
-
-# Option 2: Edit via NSSM GUI
-& "$env:ProgramFiles\AutomatonRunner\nssm.exe" edit AutomatonRunner
-
-# Option 3: Set environment variable via NSSM CLI
-& "$env:ProgramFiles\AutomatonRunner\nssm.exe" set AutomatonRunner AppEnvironmentExtra "AUTOMATON_API_KEY=new_key" "AppConfig__BaseUrl=https://new-server.com"
-```
-
-**Linux:**
-```bash
-# Edit service file
-sudo nano /etc/systemd/system/automaton-runner.service
-
-# Reload systemd configuration
-sudo systemctl daemon-reload
-
-# Restart service
-sudo systemctl restart automaton-runner
-```
-
-**macOS:**
-```bash
-# Edit plist file
-sudo nano /Library/LaunchDaemons/com.automaton.runner.plist
-
-# Reload service
-sudo launchctl unload /Library/LaunchDaemons/com.automaton.runner.plist
-sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist
-```
-
-## Security Best Practices
-
-1. **API Keys**: 
-   - ✅ **Automatically persisted**: Runner sets `AUTOMATON_API_KEY` environment variable when configured
-   - ✅ **Windows**: Stored in user environment variables, then passed to service via NSSM
-   - ✅ **Linux/macOS**: Stored in environment variable and configured in service file
-   - ✅ **No plaintext files**: More secure than file-based storage
-   - ✅ **Easy to rotate**: Run `automaton-runner auth` again with a new key, then re-run setup script
-   - ⚠️ **Never** hardcode API keys in scripts or commit them to version control
-
-2. **Service Accounts**:
-   - Windows: Service runs as `LOCAL SYSTEM` by default (via NSSM)
-   - Linux: Service runs as the user who configured it (specified in systemd unit file)
-   - macOS: Service runs as `root` by default (launchd daemon)
-   - Consider creating dedicated service accounts for production deployments
-
-3. **File Permissions**:
-   - Service configuration files should have restricted permissions
-   - Linux: `chmod 644 /etc/systemd/system/automaton-runner.service`
-   - macOS: `chmod 644 /Library/LaunchDaemons/com.automaton.runner.plist`
-
-4. **Monitoring**:
-   - Regularly review service logs for errors and security events
-   - Set up alerts for service failures
-   - Monitor runner status in Automaton Studio
-
-5. **Updates**:
-   - Keep the runner and service management tools up to date
-   - Test updates in non-production environments first
-
-## Advanced Configuration
-
-### Custom Service Names
-
-```powershell
-# Windows
-.\scripts\setup-service.ps1 -ServiceName "AutomatonRunner-Prod"
-
-# Linux/macOS
-sudo ./scripts/setup-service.sh --service-name "automaton-runner-prod"
-```
-
-### Multiple Runners on Same Machine
-
-You can run multiple runner instances as separate services:
-
-```powershell
-# Windows - Different service names and runner paths
-.\scripts\setup-service.ps1 -ServiceName "AutomatonRunner-Prod" -RunnerPath "C:\Automaton\Prod\automaton-runner.exe"
-.\scripts\setup-service.ps1 -ServiceName "AutomatonRunner-Test" -RunnerPath "C:\Automaton\Test\automaton-runner.exe"
-
-# Linux/macOS - Different service names and runner paths
-sudo ./scripts/setup-service.sh --service-name "automaton-runner-prod" --runner-path "/opt/automaton/prod/automaton-runner"
-sudo ./scripts/setup-service.sh --service-name "automaton-runner-test" --runner-path "/opt/automaton/test/automaton-runner"
-```
-
-## Documentation
-
-For detailed information:
-- **Full Documentation**: [Running Automaton Runner as a System Service](../docs/runner-as-service.md)
-- **Installation Guide**: [Automaton Runner Installation](../docs/runner-installation.md)
-- **Troubleshooting**: [Common Issues and Solutions](../docs/troubleshooting.md)
-
-## Support
-
-For issues or questions:
-- **Documentation**: https://docs.automaton.monster
-- **GitHub Issues**: https://github.com/rzvdaniel/automaton/issues
-- **Community Discussions**: https://github.com/rzvdaniel/automaton/discussions
-
-## Quick Reference
-
-| Task | Windows | Linux | macOS |
-|------|---------|-------|-------|
-| **Setup Service** | `.\scripts\setup-service.ps1` | `sudo ./scripts/setup-service.sh` | `sudo ./scripts/setup-service.sh` |
-| **Start Service** | `Start-Service AutomatonRunner` | `sudo systemctl start automaton-runner` | `sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist` |
-| **Stop Service** | `Stop-Service AutomatonRunner` | `sudo systemctl stop automaton-runner` | `sudo launchctl unload /Library/LaunchDaemons/com.automaton.runner.plist` |
-| **Check Status** | `Get-Service AutomatonRunner` | `sudo systemctl status automaton-runner` | `sudo launchctl list \| grep automaton` |
-| **View Logs** | `Get-Content "$env:ProgramFiles\AutomatonRunner\logs\service-output.log" -Tail 50 -Wait` | `sudo journalctl -u automaton-runner -f` | `tail -f /var/log/automaton-runner.log` |
-| **Uninstall Service** | `.\scripts\setup-service.ps1 -Uninstall` | `sudo ./scripts/setup-service.sh --uninstall` | `sudo ./scripts/setup-service.sh --uninstall` |
