@@ -1,0 +1,8 @@
+@using Automaton.Studio.Models
+@inherits AntDesign.FeedbackComponent<NewApp>
+
+<Form Model="@Options">
+    <FormItem Label="Name">
+        <Input @bind-Value="@context.Name" Placeholder="Enter app name (e.g., 'MyDashboard')" />
+    </FormItem>
+</Form>
