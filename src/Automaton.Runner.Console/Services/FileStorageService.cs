@@ -5,58 +5,44 @@ namespace Automaton.Runner.Console.Services;
 public class FileStorageService
 {
     private readonly string configDirectory;
-    private readonly string apiKeyFile;
     private readonly string runnerConfigFile;
     private readonly string serverConfigFile;
 
     public FileStorageService()
     {
-        configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
-        apiKeyFile = Path.Combine(configDirectory, "apikey.json");
+        // Check if running as a Windows service (SYSTEM account won't have normal APPDATA)
+        var isService = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("USERPROFILE")) ||
+                       Environment.UserName.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase);
+        
+        if (isService)
+        {
+            // When running as service, use config folder in working directory
+            configDirectory = Path.Combine(Directory.GetCurrentDirectory(), "config");
+        }
+        else
+        {
+            // When running interactively, use user's AppData
+            configDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutomatonRunner");
+        }
+        
         runnerConfigFile = Path.Combine(configDirectory, "runner.json");
         serverConfigFile = Path.Combine(configDirectory, "server.json");
 
         EnsureConfigDirectoryExists();
     }
 
-    // API Key methods
-    public async Task SaveApiKeyAsync(string apiKey)
+    // API Key methods - Environment variable only (no file storage)
+    public Task<string?> LoadApiKeyAsync()
     {
-        var apiKeyData = new
-        {
-            ApiKey = apiKey,
-            SavedAt = DateTime.UtcNow
-        };
-
-        var json = JsonSerializer.Serialize(apiKeyData, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(apiKeyFile, json);
+        // API keys are now stored in environment variables only for better security
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        return Task.FromResult(apiKey);
     }
 
-    public async Task<string?> LoadApiKeyAsync()
+    public Task<bool> HasApiKeyAsync()
     {
-        if (!File.Exists(apiKeyFile))
-            return null;
-
-        try
-        {
-            var json = await File.ReadAllTextAsync(apiKeyFile);
-            var apiKeyData = JsonSerializer.Deserialize<JsonElement>(json);
-
-            return apiKeyData.TryGetProperty("ApiKey", out var ak) ? ak.GetString() : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    public Task DeleteApiKeyAsync()
-    {
-        if (File.Exists(apiKeyFile))
-        {
-            File.Delete(apiKeyFile);
-        }
-        return Task.CompletedTask;
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        return Task.FromResult(!string.IsNullOrEmpty(apiKey));
     }
 
     // Runner configuration methods
@@ -75,6 +61,12 @@ public class FileStorageService
 
     public string? GetRunnerId()
     {
+        // Check environment variable first (for service mode)
+        var envRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_ID");
+        if (!string.IsNullOrEmpty(envRunnerId))
+            return envRunnerId;
+        
+        // Fall back to file storage
         if (!File.Exists(runnerConfigFile))
             return null;
 
@@ -92,6 +84,12 @@ public class FileStorageService
 
     public string? GetRunnerName()
     {
+        // Check environment variable first (for service mode)
+        var envRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
+        if (!string.IsNullOrEmpty(envRunnerName))
+            return envRunnerName;
+        
+        // Fall back to file storage
         if (!File.Exists(runnerConfigFile))
             return null;
 
@@ -153,11 +151,10 @@ public class FileStorageService
 
     public bool IsLoggedIn()
     {
-        // Check API key authentication (both stored and environment variable)
-        var apiKey = LoadApiKeyAsync().Result;
-        var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        // Check API key authentication from environment variable only
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
         
-        return !string.IsNullOrEmpty(apiKey) || !string.IsNullOrEmpty(envApiKey);
+        return !string.IsNullOrEmpty(apiKey);
     }
 
     public Task DeleteRunnerConfigAsync()

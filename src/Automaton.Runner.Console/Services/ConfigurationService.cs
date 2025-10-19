@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -28,34 +29,49 @@ public class ConfigurationService
     { 
         get 
         {
-            // Configuration Priority Order:
+            // Configuration Priority Order (12-Factor App Pattern):
             // 1. Cached value - Highest priority for current session changes
-            // 2. User's stored preference - User's explicit choice should override defaults
-            // 3. AppConfig defaults - Fallback values from appsettings.json/command line
+            // 2. Environment variable - Perfect for services and Docker (AppConfig__BaseUrl)
+            // 3. User's stored preference - User's explicit choice from interactive setup
             // 4. Exception if none available
             //
-            // Rationale: User preferences should take priority over application defaults.
-            // The appsettings.json should provide fallback defaults, not override user choices.
+            // Rationale: Environment variables are industry standard for service configuration.
+            // They work reliably with Docker, Kubernetes, CI/CD, and Windows services.
+            // File fallback provides convenience for interactive/standalone usage.
+            
+            // DEBUG: Log configuration resolution process
+            Log.Debug("BaseUrl resolution started");
             
             if (!string.IsNullOrEmpty(cachedServerUrl))
             {
+                Log.Debug("Using cached server URL: {CachedUrl}", cachedServerUrl);
                 return cachedServerUrl;
             }
+            Log.Debug("No cached server URL found");
             
+            // Check environment variable first (works for services!)
+            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+            {
+                Log.Debug("Using environment variable server URL: {EnvUrl}", appConfig.BaseUrl);
+                cachedServerUrl = appConfig.BaseUrl;
+                return appConfig.BaseUrl;
+            }
+            Log.Debug("No environment variable server URL found (AppConfig.BaseUrl is empty)");
+            
+            // Fall back to stored file (user preference from interactive setup)
+            Log.Debug("Attempting to load server URL from file storage");
             var storedServerUrl = storageService.LoadServerUrlAsync().Result;
             if (!string.IsNullOrEmpty(storedServerUrl))
             {
+                Log.Debug("Using stored file server URL: {StoredUrl}", storedServerUrl);
                 cachedServerUrl = storedServerUrl;
                 return storedServerUrl;
             }
+            Log.Debug("No stored file server URL found");
 
-            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
-            {
-                return appConfig.BaseUrl;
-            }
-
+            Log.Warning("Server URL is not configured from any source (cached, environment, or file)");
             throw new InvalidOperationException(
-                "Server URL is not configured. Please run 'automaton-runner auth --server <url>' or set it during interactive setup.");
+                "Server URL is not configured. Please set AppConfig__BaseUrl environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
         }
     }
 
@@ -74,16 +90,32 @@ public class ConfigurationService
     public bool IsServerConfigured() 
     {
         // Check all possible sources for server URL using the same priority order as BaseUrl
+        Log.Debug("IsServerConfigured check started");
+        
         if (!string.IsNullOrEmpty(cachedServerUrl))
+        {
+            Log.Debug("Server configured: cached value present");
             return true;
+        }
+        
+        // Check environment variable first (12-factor app pattern)
+        if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+        {
+            Log.Debug("Server configured: environment variable present - {EnvUrl}", appConfig.BaseUrl);
+            return true;
+        }
+        Log.Debug("Environment variable check: AppConfig.BaseUrl is empty");
             
+        // Check stored file (user preference)
         var storedServerUrl = storageService.LoadServerUrlAsync().Result;
         if (!string.IsNullOrEmpty(storedServerUrl))
+        {
+            Log.Debug("Server configured: stored file present - {StoredUrl}", storedServerUrl);
             return true;
-            
-        if (!string.IsNullOrEmpty(appConfig.BaseUrl))
-            return true;
-            
+        }
+        Log.Debug("Stored file check: no server URL found in file storage");
+        
+        Log.Warning("Server NOT configured: no source available (cached, environment, or file)");
         return false;
     }
 

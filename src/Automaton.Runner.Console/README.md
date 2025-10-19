@@ -149,15 +149,13 @@ automaton-runner [command] [options]
 - [`register`](#register---register-runner-with-server) - Register runner with server
 - [`status`](#status---show-configuration-and-status) - Show runner status
 - [`server`](#server---configure-server-url) - Configure server URL
-- [`service`](#service---service-management-optional-convenience-commands) - Service management
-- [`cleanup`](#cleanup---cleanup-stored-data)
+- [`cleanup`](#cleanup---cleanup-stored-data) - Clear stored configuration
 
 **Quick Reference:**
 ```bash
 # Most common usage patterns
 automaton-runner                    # Interactive setup and start
 automaton-runner status             # Show current status
-automaton-runner service status     # Show service status
 automaton-runner cleanup            # Clear stored configuration
 ```
 
@@ -281,63 +279,50 @@ Removes stored API key, runner registration data, and server URL configuration f
 
 **Note**: After cleanup, the next run of `automaton-runner` will prompt for configuration again, just like a fresh installation.
 
-#### `service` - Service Management (Optional Convenience Commands)
+#### Running as a System Service
 
-Manage the runner as a system service. **Note**: For new installations, we recommend using the installation scripts which provide better service setup.
+For production deployments, you may want to run the Automaton Runner as a system service that automatically starts on boot and restarts on failure.
 
-```bash
-automaton-runner service <subcommand>
+**🚀 Quick Setup with Scripts** (Recommended):
+
+**Two-step workflow:**
+
+```powershell
+# Windows - Step 1: Configure the runner interactively
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Automatically saves everything (including API key as environment variable)
+
+# Windows - Step 2: Convert to service (no parameters needed!)
+.\scripts\setup-service.ps1
+# ↑ Detects all configuration automatically - just confirm!
 ```
 
-**Subcommands:**
-
-##### `install` - Install as System Service
 ```bash
-automaton-runner service install [--name <runner-name>] [--no-start]
+# Linux/macOS - Step 1: Configure the runner interactively  
+automaton-runner
+# ↑ Prompts for API key, server URL, runner name
+# ↑ Automatically saves everything
+
+# Linux/macOS - Step 2: Convert to service (no parameters needed!)
+sudo ./scripts/setup-service.sh
+# ↑ Detects all configuration automatically - just confirm!
 ```
 
-**Options:**
-- `--name`: Runner name for the service (optional)
-- `--no-start`: Install service but don't start it immediately
+**📖 Complete guide**: [Running Automaton Runner as a System Service](../../../docs/runner-as-service.md)
 
-**Examples:**
-```bash
-# Install and start service
-automaton-runner service install
+The guide provides:
+- Automated setup scripts and manual instructions
+- Platform-specific configuration (Windows/NSSM, Linux/systemd, macOS/launchd)
+- Troubleshooting tips and security best practices
 
-# Install with custom name
-automaton-runner service install --name "Production-Runner"
+**Quick Reference - Platform-Specific Service Commands:**
 
-# Install but don't start
-automaton-runner service install --no-start
-```
-
-**Requirements by Platform:**
-- **Windows**: Administrator privileges, NSSM recommended
-- **Linux**: sudo privileges, systemd
-- **macOS**: sudo privileges, launchd
-
-##### `uninstall` - Remove System Service
-```bash
-automaton-runner service uninstall
-```
-
-Stops and removes the system service.
-
-##### `status` - Show Service Status
-```bash
-automaton-runner service status
-```
-
-Shows the current status of the system service and available management commands.
-
-**Platform-Specific Service Commands:**
-
-| Platform | Start Service | Stop Service | Status |
-|----------|---------------|--------------|---------|
-| **Windows** | `net start AutomatonRunner` | `net stop AutomatonRunner` | `automaton-runner service status` |
-| **Linux** | `sudo systemctl start AutomatonRunner` | `sudo systemctl stop AutomatonRunner` | `systemctl status AutomatonRunner` |
-| **macOS** | `launchctl start com.automaton.runner` | `launchctl stop com.automaton.runner` | `automaton-runner service status` |
+| Platform | Start Service | Stop Service | Check Status |
+|----------|---------------|--------------|--------------|
+| **Windows** | `net start AutomatonRunner` | `net stop AutomatonRunner` | `Get-Service AutomatonRunner` |
+| **Linux** | `sudo systemctl start automaton-runner` | `sudo systemctl stop automaton-runner` | `systemctl status automaton-runner` |
+| **macOS** | `launchctl start com.automaton.runner` | `launchctl stop com.automaton.runner` | `launchctl list \| grep automaton` |
 
 ## Examples
 
@@ -371,18 +356,6 @@ automaton-runner
 automaton-runner auth --api-key ak_runner_xxx --server https://server.com
 automaton-runner register --name "Production-Runner-01"
 automaton-runner  # Start the runner
-```
-
-#### Service Management Examples
-```bash
-# Install runner as a system service
-automaton-runner service install --name "Production-Runner"
-
-# Check service status
-automaton-runner service status
-
-# Remove the service
-automaton-runner service uninstall
 ```
 
 #### Troubleshooting Examples

@@ -59,6 +59,13 @@ OPTIONS:
     -ForceArch ARCH         Force architecture (x64/arm64)
     -Help                   Show this help message
 
+NOTE:
+    Simplified service setup workflow:
+    1. Run the runner interactively first: automaton-runner
+       (It will prompt for API key, server URL, runner name, and automatically persist them)
+    2. Convert to service: scripts/setup-service.ps1
+       (No parameters needed - detects everything automatically!)
+
 EXAMPLES:
     # Basic installation
     iwr -useb https://studio.automaton.monster/downloads/install.ps1 | iex

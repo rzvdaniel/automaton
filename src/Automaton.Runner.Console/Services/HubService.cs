@@ -25,6 +25,8 @@ public class HubService
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private bool isReconnecting = false;
+    private bool shouldKeepRetrying = true;
+    private CancellationTokenSource? retryTokenSource;
 
     public HubService(
         ConfigurationService configService,
@@ -72,14 +74,90 @@ public class HubService
             WriteLine($"🔍 Runner ID: {configService.RunnerId}");
             WriteLine($"🔍 Runner Name: {configService.ApplicationName}");
             
-            await BuildAndConnectWithRetry(apiKey, hubUrl);
+            // Start continuous retry loop in background
+            retryTokenSource = new CancellationTokenSource();
+            _ = Task.Run(() => ContinuousRetryLoop(apiKey, hubUrl, retryTokenSource.Token));
+            
             return true;
         }
         catch (Exception ex)
         {
-            await HandleConnectionError(ex);
+            logger.Error(ex, "Error starting connection process");
             return false;
         }
+    }
+    
+    private async Task ContinuousRetryLoop(string apiKey, string hubUrl, CancellationToken cancellationToken)
+    {
+        var wasDisconnected = false;
+        
+        while (shouldKeepRetrying && !cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                // Check if we should stop retrying (e.g., max duration exceeded)
+                if (resilientConnectionPolicy.ShouldStopRetrying())
+                {
+                    WriteLine("⏹️  Maximum retry duration exceeded - stopping connection attempts");
+                    logger.Warning("Stopping continuous retry loop - maximum retry duration exceeded");
+                    break;
+                }
+                
+                // If already connected, just wait and check again
+                if (IsConnected())
+                {
+                    // Reset the flag if we reconnected
+                    if (wasDisconnected)
+                    {
+                        wasDisconnected = false;
+                        isReconnecting = false; // Reset the flag for next cycle
+                    }
+                    
+                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+                    continue;
+                }
+                
+                wasDisconnected = true;
+                
+                // Try to connect using the resilient policy (which includes circuit breaker)
+                await BuildAndConnectWithRetry(apiKey, hubUrl);
+                
+                // If we get here, connection succeeded
+                logger.Information("Successfully connected via continuous retry loop");
+                WriteLine("✅ Connection established successfully after retries!");
+                isReconnecting = false;
+                wasDisconnected = false;
+                
+                // Wait a bit before next check (in case connection drops)
+                await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation, exit loop
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Connection failed (including circuit breaker open)
+                await HandleConnectionError(ex);
+                
+                // Wait before next retry attempt
+                // Use longer delay to respect the circuit breaker cool-down period
+                var delaySeconds = 30; // Wait 30 seconds between retry cycles
+                logger.Debug("Waiting {DelaySeconds} seconds before next connection attempt", delaySeconds);
+                
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }
+        
+        logger.Information("Continuous retry loop terminated");
     }
 
     private async Task BuildAndConnectWithRetry(string apiKey, string hubUrl)
@@ -240,10 +318,24 @@ public class HubService
         var hubUrl = $"{configService.BaseUrl}/{configService.WorkflowHubUrl}";
         
         // Log full technical details with stack trace to file logs only
-        logger.Error(ex, "Final connection failure after all retry attempts. Server: {Server}, HubUrl: {HubUrl}, Error: {ErrorType}", 
+        logger.Error(ex, "Connection attempt failed. Server: {Server}, HubUrl: {HubUrl}, Error: {ErrorType}", 
             configService.BaseUrl, hubUrl, ex.GetType().Name);
         
         var friendlyMessage = GetFriendlyErrorMessage(ex);
+        
+        // Don't flood console with repeated circuit breaker messages
+        if (ex.Message.Contains("circuit is now open"))
+        {
+            // Circuit breaker is open - just log once
+            if (!isReconnecting)
+            {
+                WriteLine($"⏸️  Connection paused temporarily due to repeated failures");
+                WriteLine($"   The runner will automatically retry after the cool-down period");
+                isReconnecting = true; // Use this flag to prevent repeated messages
+            }
+            return;
+        }
+        
         WriteLine($"❌ Connection failed: {friendlyMessage}");
         WriteLine();
         
@@ -319,6 +411,10 @@ public class HubService
 
     public async Task DisconnectAsync()
     {
+        // Stop the retry loop
+        shouldKeepRetrying = false;
+        retryTokenSource?.Cancel();
+        
         if (connection != null)
         {
             try

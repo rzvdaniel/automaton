@@ -9,6 +9,9 @@ public class ApiKeyAuthenticationService
     private readonly ConfigurationService configService;
     private readonly FileStorageService storageService;
     private readonly ILogger logger;
+    
+    // Cache the API key in memory for the current session
+    private string? _cachedApiKey;
 
     public ApiKeyAuthenticationService(
         HttpClient httpClient, 
@@ -28,14 +31,14 @@ public class ApiKeyAuthenticationService
             // Validate API key format
             if (!IsValidApiKeyFormat(apiKey))
             {
-                WriteLine("? Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("❌ Invalid API key format. Expected format: ak_xxxxxxxxxxxx");
                 return false;
             }
 
-            WriteLine($"?? Testing API key against server: {configService.BaseUrl}");
-            WriteLine($"?? API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
-            WriteLine($"?? API key length: {apiKey.Length}");
-            WriteLine($"?? Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
+            WriteLine($"🔍 Testing API key against server: {configService.BaseUrl}");
+            WriteLine($"🔍 API key format: {apiKey.Substring(0, Math.Min(15, apiKey.Length))}...");
+            WriteLine($"🔍 API key length: {apiKey.Length}");
+            WriteLine($"🔍 Validation endpoint: {configService.BaseUrl}/api/apikeys/validate");
 
             // Use dedicated API key validation endpoint
             httpClient.DefaultRequestHeaders.Clear();
@@ -47,32 +50,88 @@ public class ApiKeyAuthenticationService
 
             var response = await httpClient.PostAsync($"{configService.BaseUrl}/api/apikeys/validate", content);
             
-            WriteLine($"?? Server response: {response.StatusCode}");
+            WriteLine($"🔍 Server response: {response.StatusCode}");
             
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
-                WriteLine($"?? Validation successful: {responseContent}");
+                WriteLine($"🔍 Validation successful: {responseContent}");
                 
-                await storageService.SaveApiKeyAsync(apiKey);
-                WriteLine("? API key validated and saved!");
-                logger.Information("API key validated successfully");
+                // API key validated successfully - cache it in memory FIRST
+                _cachedApiKey = apiKey;
+                logger.Debug("API key cached in memory for current session");
+                
+                WriteLine();
+                WriteLine("✅ API key validated successfully!");
+                WriteLine();
+                WriteLine("📝 Setting API key as persistent environment variable...");
+                
+                try
+                {
+                    if (OperatingSystem.IsWindows())
+                    {
+                        // Set for current user on Windows
+                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.User);
+                        WriteLine("✅ API key saved as user environment variable (AUTOMATON_API_KEY)");
+                        WriteLine("   This will persist across sessions and can be used by services.");
+                        WriteLine();
+                        WriteLine("⚠️  IMPORTANT: Restart your terminal for the environment variable to take effect!");
+                        WriteLine("   Current session: API key is cached in memory (works for now)");
+                        WriteLine("   Future sessions: Restart terminal to automatically load the API key");
+                    }
+                    else
+                    {
+                        // For Linux/macOS, we can't directly set persistent environment variables
+                        // We need to guide the user to add it to their shell profile
+                        WriteLine("⚠️  On Linux/macOS, environment variables must be added to your shell profile.");
+                        WriteLine();
+                        WriteLine("📝 Add this line to ~/.bashrc, ~/.zshrc, or your shell's config file:");
+                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
+                        WriteLine();
+                        WriteLine("Then reload your shell:");
+                        WriteLine("   source ~/.bashrc  # or source ~/.zshrc");
+                        WriteLine();
+                        WriteLine("💡 For now, the API key is set for this session only.");
+                        
+                        // Set for current process at least
+                        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", apiKey, EnvironmentVariableTarget.Process);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLine($"⚠️  Could not set environment variable automatically: {ex.Message}");
+                    WriteLine();
+                    WriteLine("📝 Please set it manually:");
+                    if (OperatingSystem.IsWindows())
+                    {
+                        WriteLine($"   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', '{apiKey}', 'User')");
+                    }
+                    else
+                    {
+                        WriteLine($"   export AUTOMATON_API_KEY=\"{apiKey}\"");
+                        WriteLine($"   echo 'export AUTOMATON_API_KEY=\"{apiKey}\"' >> ~/.bashrc");
+                    }
+                    logger.Warning(ex, "Failed to set environment variable automatically");
+                }
+                
+                WriteLine();
+                logger.Information("API key validated, cached, and persisted successfully");
                 return true;
             }
 
-            WriteLine($"? API key validation failed: {response.StatusCode}");
+            WriteLine($"❌ API key validation failed: {response.StatusCode}");
             
             // Get detailed error information
             var errorContent = await response.Content.ReadAsStringAsync();
             if (!string.IsNullOrEmpty(errorContent))
             {
-                WriteLine($"?? Server error details: {errorContent}");
+                WriteLine($"🔍 Server error details: {errorContent}");
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 WriteLine();
-                WriteLine("?? Troubleshooting suggestions:");
+                WriteLine("🔧 Troubleshooting suggestions:");
                 WriteLine("1. Verify the API key is correct and hasn't been modified");
                 WriteLine("2. Check if the API key has expired in Automaton Studio");
                 WriteLine("3. Ensure the API key has appropriate scope/permissions (not ReadOnly)");
@@ -83,61 +142,58 @@ public class ApiKeyAuthenticationService
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission to access runner operations.");
-                WriteLine("?? Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
+                WriteLine("🔧 Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
             }
 
             return false;
         }
         catch (HttpRequestException ex)
         {
-            WriteLine($"?? Network error: {ex.Message}");
-            WriteLine("?? Check if the Automaton Studio server is running and accessible at the specified URL.");
+            WriteLine($"🔧 Network error: {ex.Message}");
+            WriteLine("🔧 Check if the Automaton Studio server is running and accessible at the specified URL.");
             logger.Error(ex, "Network error during API key validation");
             return false;
         }
         catch (Exception ex)
         {
-            WriteLine($"? API key validation error: {ex.Message}");
+            WriteLine($"❌ API key validation error: {ex.Message}");
             logger.Error(ex, "API key validation error occurred");
             return false;
         }
     }
 
-    public async Task<string?> GetValidApiKeyAsync()
+    public Task<string?> GetValidApiKeyAsync()
     {
-        // First check environment variable
-        var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-        if (!string.IsNullOrEmpty(envApiKey))
+        // PRIORITY 1: Check in-memory cache (for current session after SetApiKeyAsync)
+        if (!string.IsNullOrEmpty(_cachedApiKey))
         {
-            if (IsValidApiKeyFormat(envApiKey))
+            if (IsValidApiKeyFormat(_cachedApiKey))
+            {
+                logger.Debug("Using cached API key from memory");
+                return Task.FromResult<string?>(_cachedApiKey);
+            }
+        }
+        
+        // PRIORITY 2: Try to read from environment variable (persisted key or externally set)
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            if (IsValidApiKeyFormat(apiKey))
             {
                 logger.Debug("Using API key from environment variable");
-                return envApiKey;
+                // Cache it for future requests in this session
+                _cachedApiKey = apiKey;
+                return Task.FromResult<string?>(apiKey);
             }
             else
             {
-                WriteLine("?? API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
+                WriteLine("🔧 API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
                 logger.Warning("API key from environment variable has invalid format");
             }
         }
 
-        // Fallback to stored API key
-        var apiKey = await storageService.LoadApiKeyAsync();
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            return null;
-        }
-
-        // Simple validation - in production you might want to test it with a lightweight API call
-        if (!IsValidApiKeyFormat(apiKey))
-        {
-            WriteLine("Stored API key format is invalid. Please set a new API key.");
-            await storageService.DeleteApiKeyAsync();
-            return null;
-        }
-
-        return apiKey;
+        return Task.FromResult<string?>(null);
     }
 
     public async Task<bool> IsAuthenticatedAsync()
@@ -146,11 +202,34 @@ public class ApiKeyAuthenticationService
         return !string.IsNullOrEmpty(apiKey);
     }
 
-    public async Task LogoutAsync()
+    public Task LogoutAsync()
     {
-        await storageService.DeleteApiKeyAsync();
-        WriteLine("? API key removed successfully");
-        logger.Information("API key removed");
+        // Clear in-memory cache
+        _cachedApiKey = null;
+        
+        WriteLine("❌ To remove the API key, unset the environment variable:");
+        WriteLine();
+        
+        if (OperatingSystem.IsWindows())
+        {
+            WriteLine("   For current session (PowerShell):");
+            WriteLine("   Remove-Item Env:AUTOMATON_API_KEY");
+            WriteLine();
+            WriteLine("   For persistent removal:");
+            WriteLine("   [System.Environment]::SetEnvironmentVariable('AUTOMATON_API_KEY', $null, 'User')");
+        }
+        else
+        {
+            WriteLine("   For current session:");
+            WriteLine("   unset AUTOMATON_API_KEY");
+            WriteLine();
+            WriteLine("   For persistent removal (remove from ~/.bashrc or ~/.zshrc):");
+            WriteLine("   sed -i '/AUTOMATON_API_KEY/d' ~/.bashrc");
+        }
+        
+        WriteLine();
+        logger.Information("API key logout instructions displayed and memory cache cleared");
+        return Task.CompletedTask;
     }
 
     private static bool IsValidApiKeyFormat(string apiKey)

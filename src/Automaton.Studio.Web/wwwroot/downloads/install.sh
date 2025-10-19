@@ -67,6 +67,13 @@ OPTIONS:
     --force-arch ARCH       Force architecture (x64/arm64)
     --help                  Show this help message
 
+NOTE:
+    Simplified service setup workflow:
+    1. Run the runner interactively first: automaton-runner
+       (It will prompt for API key, server URL, runner name, and automatically persist them)
+    2. Convert to service: sudo scripts/setup-service.sh
+       (No parameters needed - detects everything automatically!)
+
 EXAMPLES:
     # Basic installation
     curl -sSL https://studio.automaton.monster/downloads/install.sh | bash

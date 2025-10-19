@@ -7,6 +7,7 @@ using Serilog;
 using System.CommandLine;
 using Automaton.Core.Scripting;
 using Automaton.Core.Services;
+using Microsoft.Extensions.Http;
 
 namespace Automaton.Runner.Console;
 
@@ -30,8 +31,8 @@ public class Program
                 CreateRegisterCommand(),
                 CreateStatusCommand(),
                 CreateServerCommand(),
-                CreateCleanupCommand(),
-                CreateServiceCommand()
+                CreateServiceCommand(),
+                CreateCleanupCommand()
             };
 
             // Default action when no command is specified - start interactive runner
@@ -162,6 +163,21 @@ public class Program
         return command;
     }
 
+    private static Command CreateServiceCommand()
+    {
+        var command = new Command("service", "Run in non-interactive service mode (for Windows services, systemd, etc.)");
+
+        command.SetHandler(async () =>
+        {
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            using var scope = host.Services.CreateScope();
+            var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+            await runnerService.StartServiceModeAsync();
+        });
+
+        return command;
+    }
+
     private static Command CreateCleanupCommand()
     {
         var command = new Command("cleanup", "Clean up stored API key and runner configuration");
@@ -177,82 +193,16 @@ public class Program
         return command;
     }
 
-    private static Command CreateServiceCommand()
-    {
-        var serviceCommand = new Command("service", "Manage runner as a system service");
-        
-        serviceCommand.AddCommand(CreateInstallServiceCommand());
-        serviceCommand.AddCommand(CreateUninstallServiceCommand());
-        serviceCommand.AddCommand(CreateServiceStatusCommand());
-        
-        return serviceCommand;
-    }
-
-    private static Command CreateInstallServiceCommand()
-    {
-        var nameOption = new Option<string>(
-            name: "--name",
-            description: "Runner name for the service (optional)")
-        {
-            IsRequired = false
-        };
-
-        var noStartOption = new Option<bool>(
-            name: "--no-start",
-            description: "Install service but don't start it immediately")
-        {
-            IsRequired = false
-        };
-
-        var command = new Command("install", "Install runner as a system service")
-        {
-            nameOption,
-            noStartOption
-        };
-
-        command.SetHandler(async (string? name, bool noStart) =>
-        {
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var serviceManager = scope.ServiceProvider.GetRequiredService<ServiceManagementService>();
-            await serviceManager.InstallServiceAsync(name, !noStart);
-        }, nameOption, noStartOption);
-
-        return command;
-    }
-
-    private static Command CreateUninstallServiceCommand()
-    {
-        var command = new Command("uninstall", "Uninstall the system service");
-
-        command.SetHandler(async () =>
-        {
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var serviceManager = scope.ServiceProvider.GetRequiredService<ServiceManagementService>();
-            await serviceManager.UninstallServiceAsync();
-        });
-
-        return command;
-    }
-
-    private static Command CreateServiceStatusCommand()
-    {
-        var command = new Command("status", "Show system service status and management commands");
-
-        command.SetHandler(async () =>
-        {
-            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
-            using var scope = host.Services.CreateScope();
-            var serviceManager = scope.ServiceProvider.GetRequiredService<ServiceManagementService>();
-            await serviceManager.ShowServiceStatusAsync();
-        });
-
-        return command;
-    }
-
     private static IConfiguration GetConfiguration(string[] args)
     {
+        // Allow self-signed certificates in development
+        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ||
+            Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development")
+        {
+            System.Net.ServicePointManager.ServerCertificateValidationCallback = 
+                (sender, certificate, chain, sslPolicyErrors) => true;
+        }
+        
         return new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -266,6 +216,9 @@ public class Program
             .UseSerilog()
             .ConfigureServices((context, services) =>
             {
+                // CRITICAL: Bind AppConfig from configuration (enables environment variables like AppConfig__BaseUrl)
+                services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
+                
                 // Register configuration services
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
@@ -273,16 +226,41 @@ public class Program
                 services.AddSingleton<HubService>();
                 services.AddSingleton<FlowExecutionService>();
                 services.AddSingleton<RunnerHostService>();
-                services.AddSingleton<ServiceManagementService>();
                 services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
                 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<Handlers.CustomStepHandler>();
 
-                // Add HTTP client
-                services.AddHttpClient();
+                // Configure HTTP client factory with SSL bypass for development
+                var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
+                                   Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+                
+                if (isDevelopment)
+                {
+                    // Configure all HTTP clients to bypass SSL validation in development
+                    services.ConfigureAll<HttpClientFactoryOptions>(options =>
+                    {
+                        options.HttpMessageHandlerBuilderActions.Add(builder =>
+                        {
+                            builder.PrimaryHandler = new HttpClientHandler
+                            {
+                                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                            };
+                        });
+                    });
+                }
 
+                // Add HTTP client for RunnerHostService
+                services.AddHttpClient<RunnerHostService>((sp, client) =>
+                {
+                    var configService = sp.GetRequiredService<ConfigurationService>();
+                    client.BaseAddress = new Uri(configService.BaseUrl);
+                });
+                
+                // Add default HTTP client
+                services.AddHttpClient();
+                
                 // Register MediatR - scan current assembly and Core assembly
                 services.AddMediatR(cfg => 
                 {
