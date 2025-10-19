@@ -15,6 +15,11 @@ namespace Automaton.Core.Enums
         RunnerDeleted,
         ScheduleCreated,
         ScheduleUpdated,
-        ScheduleDeleted
+        ScheduleDeleted,
+        AppCreated,
+        AppUpdated,
+        AppDeleted,
+        AppPublished,
+        AppUnpublished
     }
 }

@@ -94,6 +94,11 @@ namespace Automaton.Studio.Server.Services
             await LogActivityAsync(activityType, scheduleName, scheduleId, cancellationToken: cancellationToken);
         }
 
+        public async Task LogAppActivityAsync(ActivityType activityType, string appName, Guid appId, CancellationToken cancellationToken = default)
+        {
+            await LogActivityAsync(activityType, appName, appId, cancellationToken: cancellationToken);
+        }
+
         private static Models.RecentActivity MapToModel(Entities.RecentActivity entity)
         {
             return new Models.RecentActivity
@@ -126,6 +131,11 @@ namespace Automaton.Studio.Server.Services
                 ActivityType.ScheduleCreated => $"Created schedule '{entityName}'",
                 ActivityType.ScheduleUpdated => $"Updated schedule '{entityName}'",
                 ActivityType.ScheduleDeleted => $"Deleted schedule '{entityName}'",
+                ActivityType.AppCreated => $"Created app '{entityName}'",
+                ActivityType.AppUpdated => $"Updated app '{entityName}'",
+                ActivityType.AppDeleted => $"Deleted app '{entityName}'",
+                ActivityType.AppPublished => $"Published app '{entityName}'",
+                ActivityType.AppUnpublished => $"Unpublished app '{entityName}'",
                 _ => $"Performed action on '{entityName}'"
             };
         }

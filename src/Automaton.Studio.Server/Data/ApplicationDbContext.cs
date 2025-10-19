@@ -33,6 +33,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
+        public virtual DbSet<Entities.App> Apps { get; set; }
+        public virtual DbSet<Entities.AppUser> AppUsers { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -120,6 +122,20 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.CustomStepId, "IX_CustomStepUser_CustomStepId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.CustomStepId).IsRequired();
+            });
+
+            modelBuilder.Entity<Entities.App>(entity =>
+            {
+                entity.HasKey(e => new { e.Id });
+                entity.HasIndex(e => e.PublicUrl).IsUnique();
+            });
+
+            modelBuilder.Entity<Entities.AppUser>(entity =>
+            {
+                entity.HasKey(e => new { e.AppId, e.UserId });
+                entity.HasIndex(e => e.AppId, "IX_AppUser_AppId");
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.AppId).IsRequired();
             });
 
             modelBuilder.Entity<RefreshToken>(entity =>

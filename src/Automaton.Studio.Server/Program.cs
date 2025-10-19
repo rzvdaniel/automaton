@@ -181,6 +181,7 @@ services.AddHangfireServer();
 
 services.AddScoped<FlowLogsService>();
 services.AddScoped<CustomStepsService>();
+services.AddScoped<AppsService>();
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
