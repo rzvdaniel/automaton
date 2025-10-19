@@ -336,11 +336,6 @@ function Install-Service {
         # Set startup type to automatic
         & $nssmPath set $ServiceName Start SERVICE_AUTO_START
         
-        # CRITICAL: Set service account to LocalSystem with desktop interaction disabled
-        # This allows network access while maintaining security
-        & $nssmPath set $ServiceName ObjectName "LocalSystem"
-        Write-Step "Service configured to run as LocalSystem for network access"
-        
         # Create logs directory if it doesn't exist
         if (!(Test-Path $LogsPath)) {
             New-Item -ItemType Directory -Path $LogsPath -Force | Out-Null
@@ -407,79 +402,54 @@ function Install-Service {
             $effectiveApiKey = Read-Host "Enter your API key (or press Enter to skip - service won't work without it)"
         }
         
-        # CRITICAL: Set environment variables via NSSM so the SERVICE can access them
-        # User-level environment variables are NOT accessible to Windows services
+        # NOW configure service account based on detected server URL
         Write-Host ""
-        Write-Step "Configuring service environment..."
-        
-        # CRITICAL: Windows services run as SYSTEM and need environment variables
-        # We use AppConfig__BaseUrl which .NET's configuration system reads automatically
-        # This follows the 12-factor app pattern and works reliably with services
-        
-        # Build environment variables list
-        $envVars = @()
-        
-        # Add server URL (required)
-        $envVars += "AppConfig__BaseUrl=$effectiveServerUrl"
-        Write-Step "Server URL will be set via environment variable"
-        
-        # Add API key (required)
-        if ($effectiveApiKey) {
-            $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
-            Write-Step "API key will be set via environment variable"
-        } else {
-            Write-Warning "No API key configured - service will not connect"
-        }
-        
-        # Add runner registration if it exists (to avoid auto-registration)
-        if ($existingConfig -and $existingConfig.RunnerId -and $existingConfig.RunnerName) {
-            $envVars += "AUTOMATON_RUNNER_ID=$($existingConfig.RunnerId)"
-            $envVars += "AUTOMATON_RUNNER_NAME=$($existingConfig.RunnerName)"
-            Write-Step "Runner registration will be set via environment variables"
-            Write-Host "  Runner Name: $($existingConfig.RunnerName)" -ForegroundColor DarkGray
-            Write-Host "  Runner ID: $($existingConfig.RunnerId)" -ForegroundColor DarkGray
-        } else {
-            Write-Warning "No runner registration found - service will auto-register with name 'Service-$env:COMPUTERNAME'"
-        }
-        
-        # Add development environment for SSL bypass (for localhost)
         if ($effectiveServerUrl -like "*localhost*" -or $effectiveServerUrl -like "*127.0.0.1*") {
-            $envVars += "DOTNET_ENVIRONMENT=Development"
-            Write-Step "Development environment enabled (for SSL bypass on localhost)"
-        }
-        
-        # Set ALL environment variables via NSSM
-        if ($envVars.Count -gt 0) {
-            Write-Step "Setting environment variables via NSSM..."
-            Write-Host "  Command: nssm set $ServiceName AppEnvironmentExtra" -ForegroundColor DarkGray
+            Write-Host "??  Localhost server detected!" -ForegroundColor Yellow
+            Write-Host "   Windows services running as LocalSystem cannot always access localhost servers." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "   Options:" -ForegroundColor Cyan
+            Write-Host "   1. Run service as your user account (recommended for localhost)" -ForegroundColor White
+            Write-Host "   2. Run service as LocalSystem" -ForegroundColor White
+            Write-Host ""
             
-            # CRITICAL: NSSM's AppEnvironmentExtra parameter needs ALL variables in ONE call
-            # Multiple variables must be separated by newlines in a single string
-            $envString = $envVars -join "`r`n"
-            
-            & $nssmPath set $ServiceName AppEnvironmentExtra $envString
-            
-            if ($LASTEXITCODE -eq 0) {
-                Write-Step "Environment variables configured successfully"
-                Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
-                if ($effectiveApiKey) {
-                    Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+            $runAsUser = Read-Host "Run service as current user? (Y/n)"
+            if ($runAsUser -ne 'n' -and $runAsUser -ne 'N') {
+                # Get current user
+                $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+                Write-Host "   Service will run as: $currentUser" -ForegroundColor Cyan
+                Write-Host "   You'll need to provide your Windows password" -ForegroundColor Yellow
+                Write-Host ""
+                
+                # Use Read-Host with -AsSecureString for password input
+                Write-Host "Enter password for $currentUser" -ForegroundColor Cyan
+                $securePassword = Read-Host "Password" -AsSecureString
+                
+                if ($securePassword.Length -gt 0) {
+                    # Convert SecureString to plain text for NSSM
+                    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+                    $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+                    
+                    & $nssmPath set $ServiceName ObjectName $currentUser $password
+                    
+                    # Clear password from memory
+                    $password = $null
+                    [System.GC]::Collect()
+                    
+                    Write-Step "Service configured to run as: $currentUser"
+                } else {
+                    Write-Warning "No password provided - falling back to LocalSystem"
+                    & $nssmPath set $ServiceName ObjectName "LocalSystem"
                 }
             } else {
-                Write-Warning "Failed to set environment variables (exit code: $LASTEXITCODE)"
+                & $nssmPath set $ServiceName ObjectName "LocalSystem"
+                Write-Warning "Service will run as LocalSystem - may have connection issues with localhost"
             }
-            
-            # Verify what was actually set
-            Write-Step "Verifying NSSM configuration..."
-            $verifyEnv = & $nssmPath get $ServiceName AppEnvironmentExtra
-            Write-Host "  NSSM environment variables:" -ForegroundColor DarkGray
-            $verifyEnv -split "`r?`n" | ForEach-Object {
-                if ($_ -match "AUTOMATON_API_KEY=") {
-                    Write-Host "    $($_ -replace '(AUTOMATON_API_KEY=).+', '$1***REDACTED***')" -ForegroundColor DarkGray
-                } elseif ($_ -ne "") {
-                    Write-Host "    $_" -ForegroundColor DarkGray
-                }
-            }
+        } else {
+            # Production/remote server - use LocalSystem
+            & $nssmPath set $ServiceName ObjectName "LocalSystem"
+            Write-Step "Service configured to run as LocalSystem"
         }
         
         # Copy runner registration if it exists in user config
