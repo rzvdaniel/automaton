@@ -270,6 +270,23 @@ EOF
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
+    echo -e "${CYAN}📋 Service Configuration Summary:${NC}"
+    echo -e "${CYAN}════════════════════════════════════${NC}"
+    echo -e "  • Server URL: ${effective_server_url}"
+    if [[ -n "$effective_api_key" ]]; then
+        local key_preview="${effective_api_key:0:15}"
+        echo -e "  • API Key: ${key_preview}***REDACTED***"
+    fi
+    if [[ -n "$effective_runner_name" ]]; then
+        echo -e "  • Runner Name: ${effective_runner_name}"
+        echo -e "  • Runner ID: ${effective_runner_id}"
+    fi
+    echo -e "  • Service User: ${service_user}"
+    echo -e "  • Working Directory: ${runner_directory}"
+    if [[ "$effective_server_url" == *"localhost"* ]] || [[ "$effective_server_url" == *"127.0.0.1"* ]]; then
+        echo -e "  • Environment: Development (SSL bypass enabled)"
+    fi
+    echo ""
     echo -e "${CYAN}Service Management Commands:${NC}"
     echo "  Start:   sudo systemctl start ${SERVICE_NAME}"
     echo "  Stop:    sudo systemctl stop ${SERVICE_NAME}"
@@ -290,16 +307,43 @@ EOF
                 echo ""
                 echo -e "${GREEN}✅ Service started successfully and is running${NC}"
                 echo ""
-                echo -e "${CYAN}💡 Check the runner status in Automaton Studio to verify connection${NC}"
+                
+                # Show initial log output
+                echo -e "${CYAN}📄 Initial service logs (last 10 lines):${NC}"
+                echo -e "${CYAN}════════════════════════════════════════${NC}"
+                sudo journalctl -u "$SERVICE_NAME" -n 10 --no-pager 2>/dev/null | while IFS= read -r line; do
+                    # Redact API keys in log output
+                    if [[ "$line" =~ "API Key:" ]]; then
+                        line=$(echo "$line" | sed 's/\(API Key:\)[[:space:]]*[^[:space:]]*/\1 ***REDACTED***/')
+                    fi
+                    echo "  $line"
+                done
+                echo ""
+                echo -e "${CYAN}💡 Monitor logs in real-time with:${NC}"
+                echo -e "   ${NC}sudo journalctl -u ${SERVICE_NAME} -f${NC}"
+                echo ""
+                echo -e "${CYAN}✅ Check the runner status in Automaton Studio to verify connection${NC}"
             else
                 print_warning "Service may not have started properly"
-                echo "Check status with: sudo systemctl status ${SERVICE_NAME}"
+                echo ""
+                echo -e "${YELLOW}Troubleshooting:${NC}"
+                echo -e "  • Check status: ${NC}sudo systemctl status ${SERVICE_NAME}${NC}"
+                echo -e "  • View logs: ${NC}sudo journalctl -u ${SERVICE_NAME} -n 50${NC}"
+                echo -e "  • Check errors: ${NC}sudo journalctl -u ${SERVICE_NAME} -p err${NC}"
             fi
         fi
-    else
+    else {
         echo ""
         echo -e "${YELLOW}⚠️  Service created but NOT started (no API key configured)${NC}"
-        echo -e "${YELLOW}   Configure the API key and start manually when ready${NC}"
+        echo ""
+        echo -e "${CYAN}📝 To configure and start the service:${NC}"
+        echo -e "   ${NC}1. Edit the service file:${NC}"
+        echo -e "      ${NC}sudo systemctl edit --full ${SERVICE_NAME}${NC}"
+        echo -e "   ${NC}2. Add to [Service] section:${NC}"
+        echo -e "      ${NC}Environment=\"AUTOMATON_API_KEY=your_api_key\"${NC}"
+        echo -e "   ${NC}3. Reload and start:${NC}"
+        echo -e "      ${NC}sudo systemctl daemon-reload${NC}"
+        echo -e "      ${NC}sudo systemctl start ${SERVICE_NAME}${NC}"
     fi
     
     echo ""
@@ -456,6 +500,23 @@ EOF
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
+    echo -e "${CYAN}📋 Service Configuration Summary:${NC}"
+    echo -e "${CYAN}════════════════════════════════════${NC}"
+    echo -e "  • Server URL: ${effective_server_url}"
+    if [[ -n "$effective_api_key" ]]; then
+        local key_preview="${effective_api_key:0:15}"
+        echo -e "  • API Key: ${key_preview}***REDACTED***"
+    fi
+    if [[ -n "$effective_runner_name" ]]; then
+        echo -e "  • Runner Name: ${effective_runner_name}"
+        echo -e "  • Runner ID: ${effective_runner_id}"
+    fi
+    echo -e "  • Working Directory: ${runner_directory}"
+    echo -e "  • Logs: /var/log/automaton-runner*.log"
+    if [[ "$effective_server_url" == *"localhost"* ]] || [[ "$effective_server_url" == *"127.0.0.1"* ]]; then
+        echo -e "  • Environment: Development (SSL bypass enabled)"
+    fi
+    echo ""
     echo -e "${CYAN}Service Management Commands:${NC}"
     echo "  Start:   sudo launchctl load ${plist_file}"
     echo "  Stop:    sudo launchctl unload ${plist_file}"
@@ -476,241 +537,50 @@ EOF
                 echo ""
                 echo -e "${GREEN}✅ Service started successfully and is running${NC}"
                 echo ""
-                echo -e "${CYAN}💡 Check the runner status in Automaton Studio to verify connection${NC}"
+                
+                # Show initial log output
+                echo -e "${CYAN}📄 Initial service logs (last 10 lines):${NC}"
+                echo -e "${CYAN}════════════════════════════════════════${NC}"
+                if [[ -f "/var/log/automaton-runner.log" ]]; then
+                    tail -n 10 /var/log/automaton-runner.log 2>/dev/null | while IFS= read -r line; do
+                        # Redact API keys in log output
+                        if [[ "$line" =~ "API Key:" ]]; then
+                            line=$(echo "$line" | sed 's/\(API Key:\)[[:space:]]*[^[:space:]]*/\1 ***REDACTED***/')
+                        fi
+                        echo "  $line"
+                    done
+                else
+                    echo "  (Log file not yet created - service is starting up)"
+                fi
+                echo ""
+                echo -e "${CYAN}💡 Monitor logs in real-time with:${NC}"
+                echo -e "   ${NC}tail -f /var/log/automaton-runner.log${NC}"
+                echo ""
+                echo -e "${CYAN}✅ Check the runner status in Automaton Studio to verify connection${NC}"
             else
                 print_warning "Service may not have started properly"
-                echo "Check status with: sudo launchctl list | grep automaton"
+                echo ""
+                echo -e "${YELLOW}Troubleshooting:${NC}"
+                echo -e "  • Check status: ${NC}sudo launchctl list | grep automaton${NC}"
+                echo -e "  • View logs: ${NC}tail -f /var/log/automaton-runner.log${NC}"
+                echo -e "  • Check errors: ${NC}tail -f /var/log/automaton-runner-error.log${NC}"
             fi
         fi
     else
         echo ""
         echo -e "${YELLOW}⚠️  Service created but NOT started (no API key configured)${NC}"
-        echo -e "${YELLOW}   Configure the API key and start manually when ready${NC}"
+        echo ""
+        echo -e "${CYAN}📝 To configure and start the service:${NC}"
+        echo -e "   ${NC}1. Edit the plist file:${NC}"
+        echo -e "      ${NC}sudo nano ${plist_file}${NC}"
+        echo -e "   ${NC}2. Add to EnvironmentVariables section:${NC}"
+        echo -e "      ${NC}<key>AUTOMATON_API_KEY</key>${NC}"
+        echo -e "      ${NC}<string>your_api_key</string>${NC}"
+        echo -e "   ${NC}3. Load the service:${NC}"
+        echo -e "      ${NC}sudo launchctl load ${plist_file}${NC}"
     fi
     
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
-
-remove_systemd_service() {
-    print_step "Removing systemd service"
-    
-    local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
-    
-    if [[ ! -f "$service_file" ]]; then
-        print_warning "Service file not found: $service_file"
-        return 0
-    fi
-    
-    # Stop the service
-    if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
-        print_step "Stopping service..."
-        sudo systemctl stop "$SERVICE_NAME"
-    fi
-    
-    # Disable and remove
-    sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-    sudo rm "$service_file"
-    sudo systemctl daemon-reload
-    
-    print_step "Systemd service removed successfully"
-}
-
-remove_launchd_service() {
-    print_step "Removing launchd service"
-    
-    local plist_file="/Library/LaunchDaemons/com.automaton.runner.plist"
-    
-    if [[ ! -f "$plist_file" ]]; then
-        print_warning "Service file not found: $plist_file"
-        return 0
-    fi
-    
-    # Unload the service
-    sudo launchctl unload "$plist_file" 2>/dev/null || true
-    sudo rm "$plist_file"
-    
-    print_step "Launchd service removed successfully"
-}
-
-install_service() {
-    # Verify runner exists
-    if [[ ! -f "$RUNNER_PATH" ]]; then
-        print_warning "Runner not found at default location: $RUNNER_PATH"
-        echo ""
-        echo -e "${YELLOW}The runner executable was not found at the expected location.${NC}"
-        echo ""
-        echo -e "${CYAN}💡 Common installation locations:${NC}"
-        echo -e "${CYAN}   • /usr/local/bin/automaton-runner${NC}"
-        echo -e "${CYAN}   • /opt/automaton/automaton-runner${NC}"
-        echo -e "${CYAN}   • ~/bin/automaton-runner${NC}"
-        echo -e "${CYAN}   • /home/user/automaton/src/Automaton.Runner.Console/bin/Debug/net8.0/automaton-runner (debug)${NC}"
-        echo ""
-        echo -e "${CYAN}📝 You can either:${NC}"
-        echo -e "${NC}   1) Enter the path below, OR${NC}"
-        echo -e "${NC}   2) Re-run this script with the --runner-path parameter:${NC}"
-        echo ""
-        echo -e "${GREEN}   sudo ./scripts/setup-service.sh --runner-path \"/path/to/automaton-runner\"${NC}"
-        echo ""
-        
-        # Prompt for custom path
-        echo -e "${YELLOW}Please provide the full path to automaton-runner:${NC}"
-        echo -e "${NC}(or press Ctrl+C to exit and re-run with --runner-path parameter)${NC}"
-        read -p "Path: " custom_path
-        
-        if [[ -z "$custom_path" ]]; then
-            print_error "No path provided. Cannot continue without runner executable."
-            exit 1
-        fi
-        
-        # Expand tilde if present
-        custom_path="${custom_path/#\~/$HOME}"
-        
-        # Validate the custom path
-        if [[ ! -f "$custom_path" ]]; then
-            print_error "Runner not found at specified path: $custom_path"
-            echo "Please verify the path and try again."
-            exit 1
-        fi
-        
-        # Verify it's executable
-        if [[ ! -x "$custom_path" ]]; then
-            print_warning "The specified file is not executable"
-            read -p "Make it executable and continue? (y/N) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                chmod +x "$custom_path"
-                print_step "Made file executable"
-            else
-                print_error "Installation cancelled"
-                exit 1
-            fi
-        fi
-        
-        # Verify it's actually the runner executable (basic check)
-        if [[ ! "$custom_path" =~ automaton-runner$ ]]; then
-            print_warning "The specified file doesn't appear to be automaton-runner"
-            read -p "Continue anyway? (y/N) " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                print_step "Installation cancelled"
-                exit 1
-            fi
-        fi
-        
-        RUNNER_PATH="$custom_path"
-        print_step "Using runner at: $RUNNER_PATH"
-        echo ""
-    else
-        print_step "Found runner at: $RUNNER_PATH"
-    fi
-    
-    local platform
-    platform=$(detect_platform)
-    
-    case "$platform" in
-        linux)
-            if [[ ! -f "/usr/bin/systemctl" ]]; then
-                print_error "systemd not found. This script requires systemd for Linux systems."
-                exit 1
-            fi
-            create_systemd_service
-            ;;
-        darwin)
-            create_launchd_service
-            ;;
-        *)
-            print_error "Unsupported platform: $platform"
-            echo "This script supports Linux (systemd) and macOS (launchd) only"
-            exit 1
-            ;;
-    esac
-    
-    print_step "Service installation completed"
-}
-
-uninstall_service() {
-    local platform
-    platform=$(detect_platform)
-    
-    case "$platform" in
-        linux)
-            remove_systemd_service
-            ;;
-        darwin)
-            remove_launchd_service
-            ;;
-        *)
-            print_error "Unsupported platform: $platform"
-            exit 1
-            ;;
-    esac
-    
-    print_step "Service uninstallation completed"
-}
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --runner-path)
-            RUNNER_PATH="$2"
-            shift 2
-            ;;
-        --service-name)
-            SERVICE_NAME="$2"
-            shift 2
-            ;;
-        --api-key)
-            API_KEY="$2"
-            shift 2
-            ;;
-        --server-url)
-            SERVER_URL="$2"
-            shift 2
-            ;;
-        --runner-name)
-            RUNNER_NAME="$2"
-            shift 2
-            ;;
-        --uninstall)
-            UNINSTALL=true
-            shift
-            ;;
-        --help)
-            SHOW_HELP=true
-            shift
-            ;;
-        *)
-            print_error "Unknown parameter: $1"
-            echo "Use --help for usage information"
-            exit 1
-            ;;
-    esac
-done
-
-# Main logic
-main() {
-    if [[ "$SHOW_HELP" == true ]]; then
-        show_help
-        exit 0
-    fi
-
-    print_header
-    
-    # Check if running with sudo
-    if [[ $EUID -ne 0 ]]; then
-        print_error "This script must be run with sudo privileges"
-        echo "Please run: sudo $0 $*"
-        exit 1
-    fi
-    
-    if [[ "$UNINSTALL" == true ]]; then
-        uninstall_service
-    else
-        install_service
-    fi
-}
-
-# Run main function
-main

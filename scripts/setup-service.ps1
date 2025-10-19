@@ -491,7 +491,6 @@ function Install-Service {
         # Set ALL environment variables via NSSM
         if ($envVars.Count -gt 0) {
             Write-Step "Setting environment variables via NSSM..."
-            Write-Host "  Command: nssm set $ServiceName AppEnvironmentExtra" -ForegroundColor DarkGray
             
             # CRITICAL: NSSM's AppEnvironmentExtra parameter needs ALL variables in ONE call
             # Multiple variables must be separated by newlines in a single string
@@ -501,13 +500,26 @@ function Install-Service {
             
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Environment variables configured successfully"
-                Write-Host "  - AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor DarkGray
+                Write-Host ""
+                Write-Host "  ?? Service Configuration Summary:" -ForegroundColor Cyan
+                Write-Host "  ????????????????????????????????" -ForegroundColor Cyan
+                Write-Host "  • Server URL: $effectiveServerUrl" -ForegroundColor DarkGray
                 if ($effectiveApiKey) {
-                    Write-Host "  - AUTOMATON_API_KEY=***REDACTED***" -ForegroundColor DarkGray
+                    $keyPreview = $effectiveApiKey.Substring(0, [Math]::Min(15, $effectiveApiKey.Length))
+                    Write-Host "  • API Key: ${keyPreview}***REDACTED***" -ForegroundColor DarkGray
                 }
                 if ($existingConfig -and $existingConfig.RunnerName) {
-                    Write-Host "  - AUTOMATON_RUNNER_NAME=$($existingConfig.RunnerName)" -ForegroundColor DarkGray
+                    Write-Host "  • Runner Name: $($existingConfig.RunnerName)" -ForegroundColor DarkGray
+                    Write-Host "  • Runner ID: $($existingConfig.RunnerId)" -ForegroundColor DarkGray
                 }
+                $serviceAccount = if ($effectiveServerUrl -like "*localhost*") { "Current User" } else { "LocalSystem" }
+                Write-Host "  • Service Account: $serviceAccount" -ForegroundColor DarkGray
+                Write-Host "  • Working Directory: $runnerDirectory" -ForegroundColor DarkGray
+                Write-Host "  • Logs Directory: $LogsPath" -ForegroundColor DarkGray
+                if ($effectiveServerUrl -like "*localhost*") {
+                    Write-Host "  • Environment: Development (SSL bypass enabled)" -ForegroundColor DarkGray
+                }
+                Write-Host ""
             } else {
                 Write-Warning "Failed to set environment variables (exit code: $LASTEXITCODE)"
             }
@@ -556,23 +568,54 @@ function Install-Service {
             if ($startNow -ne 'n' -and $startNow -ne 'N') {
                 Write-Step "Starting service..."
                 Start-Service $ServiceName
-                Start-Sleep 3
+                sleep 3
                 
                 $service = Get-Service $ServiceName
                 if ($service.Status -eq 'Running') {
                     Write-Host ""
-                    Write-Host "Service started successfully and is running" -ForegroundColor Green
+                    Write-Host "? Service started successfully and is running" -ForegroundColor Green
                     Write-Host ""
-                    Write-Host "Check the runner status in Automaton Studio to verify connection" -ForegroundColor Cyan
+                    
+                    # Show initial log output
+                    Write-Host "?? Initial service logs (last 10 lines):" -ForegroundColor Cyan
+                    Write-Host "????????????????????????????????????????" -ForegroundColor Cyan
+                    if (Test-Path "$LogsPath\service-output.log") {
+                        Get-Content "$LogsPath\service-output.log" -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object {
+                            # Redact API keys in log output
+                            $logLine = $_
+                            if ($logLine -match "API Key:") {
+                                $logLine = $logLine -replace '(API Key:)\s*\w+', '$1 ***REDACTED***'
+                            }
+                            Write-Host "  $_" -ForegroundColor Gray
+                        }
+                    } else {
+                        Write-Host "  (Log file not yet created - service is starting up)" -ForegroundColor DarkGray
+                    }
+                    Write-Host ""
+                    Write-Host "?? Monitor logs in real-time with:" -ForegroundColor Cyan
+                    Write-Host "   Get-Content '$LogsPath\service-output.log' -Tail 50 -Wait" -ForegroundColor White
+                    Write-Host ""
+                    Write-Host "? Check the runner status in Automaton Studio to verify connection" -ForegroundColor Cyan
                 } else {
                     Write-Warning "Service status: $($service.Status)"
-                    Write-Host "Check logs at: $LogsPath" -ForegroundColor Yellow
+                    Write-Host ""
+                    Write-Host "Troubleshooting:" -ForegroundColor Yellow
+                    Write-Host "  • Check logs: $LogsPath" -ForegroundColor White
+                    Write-Host "  • View output: Get-Content '$LogsPath\service-output.log'" -ForegroundColor White
+                    Write-Host "  • View errors: Get-Content '$LogsPath\service-error.log'" -ForegroundColor White
+                    Write-Host "  • Service status: Get-Service $ServiceName | Format-List *" -ForegroundColor White
                 }
             }
         } else {
             Write-Host ""
-            Write-Host "Service created but NOT started (no API key configured)" -ForegroundColor Yellow
-            Write-Host "   Configure the API key and start manually when ready" -ForegroundColor Yellow
+            Write-Host "??  Service created but NOT started (no API key configured)" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "?? To configure and start the service:" -ForegroundColor Cyan
+            Write-Host "   1. Edit the service configuration:" -ForegroundColor White
+            Write-Host "      nssm edit $ServiceName" -ForegroundColor DarkGray
+            Write-Host "   2. Add AUTOMATON_API_KEY to 'Environment' tab" -ForegroundColor White
+            Write-Host "   3. Start the service:" -ForegroundColor White
+            Write-Host "      Start-Service $ServiceName" -ForegroundColor DarkGray
         }
         
         Write-Host ""
