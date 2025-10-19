@@ -43,9 +43,9 @@ $ColorError = "Red"
 $ColorHeader = "Cyan"
 
 function Write-Header {
-    Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
-    Write-Host "      Automaton Runner - Windows Service Setup             " -ForegroundColor $ColorHeader
-    Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
+    Write-Host "================================================================" -ForegroundColor $ColorHeader
+    Write-Host "      Automaton Runner - Windows Service Setup                 " -ForegroundColor $ColorHeader
+    Write-Host "================================================================" -ForegroundColor $ColorHeader
     Write-Host ""
 }
 
@@ -382,23 +382,30 @@ function Install-Service {
         # CRITICAL: Set environment variables via NSSM so the SERVICE can access them
         # User-level environment variables are NOT accessible to Windows services
         Write-Host ""
-        Write-Step "Configuring service environment variables..."
+        Write-Step "Configuring service environment..."
         
-        $envVars = @("AppConfig__BaseUrl=$effectiveServerUrl")
+        # CRITICAL: The service runs as SYSTEM and cannot access user profile files
+        # We need to create a server.json in the runner's working directory
+        $runnerServerConfig = Join-Path $runnerDirectory "server.json"
+        $serverConfigContent = @{
+            ServerUrl = $effectiveServerUrl
+        } | ConvertTo-Json
+        
+        Set-Content -Path $runnerServerConfig -Value $serverConfigContent -Force
+        Write-Step "Created server configuration: $runnerServerConfig"
+        Write-Step "Server URL: $effectiveServerUrl"
+        
+        # Set API key via environment variable (secure)
         if ($effectiveApiKey) {
-            $envVars += "AUTOMATON_API_KEY=$effectiveApiKey"
-            Write-Step "API key will be passed to service via NSSM environment"
+            & $nssmPath set $ServiceName AppEnvironmentExtra "AUTOMATON_API_KEY=$effectiveApiKey"
+            Write-Step "API key configured via environment variable"
         } else {
-            Write-Warning "No API key configured! The service will NOT be able to connect."
-            Write-Host "   You can reconfigure the service later with:" -ForegroundColor Yellow
-            Write-Host "   nssm set $ServiceName AppEnvironmentExtra AUTOMATON_API_KEY=your_key_here AppConfig__BaseUrl=$effectiveServerUrl" -ForegroundColor Yellow
+            Write-Warning "No API key configured - service will not connect"
         }
-        
-        & $nssmPath set $ServiceName AppEnvironmentExtra $envVars
         
         Write-Step "Windows service '$ServiceName' created successfully"
         Write-Host ""
-        Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
+        Write-Host "================================================================" -ForegroundColor $ColorHeader
         Write-Host ""
         Write-Host "Service Management Commands:" -ForegroundColor $ColorHeader
         Write-Host "  Start:   Start-Service '$ServiceName'" -ForegroundColor Cyan
@@ -433,7 +440,7 @@ function Install-Service {
         }
         
         Write-Host ""
-        Write-Host "???????????????????????????????????????????????????????????" -ForegroundColor $ColorHeader
+        Write-Host "================================================================" -ForegroundColor $ColorHeader
         Write-Host ""
         
         return $true
