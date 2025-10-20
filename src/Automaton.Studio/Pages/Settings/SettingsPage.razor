@@ -5,6 +5,7 @@
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigurationService
 @inject DesktopSettingsService DesktopSettingsService
+@inject DesktopScriptEngineSettingsInitializer SettingsInitializer
 @inject IMessageService MessageService
 
 <Layout>
@@ -353,7 +354,10 @@
             
             if (success)
             {
-                MessageService.Success("Python settings saved successfully! Restart the application for changes to take effect.");
+                // Reload settings into the singleton configuration immediately
+                await SettingsInitializer.ReloadSettingsAsync();
+                
+                MessageService.Success("Python settings saved and applied successfully! Settings are now active.");
             }
             else
             {

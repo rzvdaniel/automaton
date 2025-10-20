@@ -74,14 +74,29 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Add scripting for runners with dynamic settings loading
     /// This allows runners to load Python paths from database configuration
-    /// Requires RunnerSettingsService to be registered
+    /// Requires RunnerSettingsService and ScriptEngineSettingsInitializer to be registered
+    /// 
+    /// Configuration Priority (later overrides earlier):
+    /// 1. appsettings.json "Scripting" section (optional base configuration)
+    /// 2. Database runner-specific settings (user-configured overrides)
+    /// 
+    /// Settings are loaded at application startup by ScriptEngineSettingsInitializer (IHostedService).
+    /// This avoids async/sync deadlocks during service registration while ensuring settings
+    /// are available before any script execution occurs.
+    /// 
+    /// Example appsettings.json:
+    /// {
+    ///   "Scripting": {
+    ///     "EnableDebugMode": true,
+    ///     "AutoDetectPythonPaths": true,
+    ///     "DefaultTimeoutSeconds": 120
+    ///   }
+    /// }
     /// </summary>
-    /// <param name="loadSettingsAsync">Function to load runner settings asynchronously</param>
-    public static void AddScriptingForRunner(
-        this IServiceCollection services, 
-        Func<IServiceProvider, Task<RunnerScriptEngineSettings?>> loadSettingsAsync)
+    public static void AddScriptingForRunner(this IServiceCollection services)
     {
-        services.AddScoped<ScriptEngineConfiguration>(provider =>
+        // Register configuration as Singleton so settings loaded at startup persist
+        services.AddSingleton<ScriptEngineConfiguration>(provider =>
         {
             var configuration = provider.GetService<IConfiguration>();
             var config = new ScriptEngineConfiguration
@@ -90,21 +105,61 @@ public static class ServiceCollectionExtensions
                 EnableDebugMode = false
             };
             
-            // Bind from appsettings.json first
+            // Bind base configuration from appsettings.json (optional)
+            // This allows environment-specific defaults (Dev/Production) without database changes
             configuration?.GetSection("Scripting").Bind(config);
             
-            // Load runner-specific settings and apply them
-            // This runs synchronously in the factory but uses async internally
-            try
+            // Note: Runner-specific settings from database are loaded at startup
+            // by ScriptEngineSettingsInitializer (IHostedService) after DI container is built.
+            // Settings are loaded into this singleton instance and persist for app lifetime.
+            
+            return config;
+        });
+        
+        services.AddScoped<ScriptEngineFactory>();
+        services.AddScoped<ScriptEngineHost>();
+    }
+
+    /// <summary>
+    /// Add scripting for desktop with dynamic settings loading
+    /// This allows desktop to load Python paths from database configuration
+    /// Requires DesktopSettingsService and DesktopScriptEngineSettingsInitializer to be registered
+    /// 
+    /// Configuration Priority (later overrides earlier):
+    /// 1. appsettings.json "Scripting" section (optional base configuration)
+    /// 2. Database desktop-specific settings (user-configured overrides)
+    /// 
+    /// Settings are loaded at application startup by DesktopScriptEngineSettingsInitializer (IHostedService).
+    /// This avoids async/sync deadlocks during service registration while ensuring settings
+    /// are available before any script execution occurs.
+    /// 
+    /// Example appsettings.json:
+    /// {
+    ///   "Scripting": {
+    ///     "EnableDebugMode": true,
+    ///     "AutoDetectPythonPaths": true
+    ///   }
+    /// }
+    /// </summary>
+    public static void AddScriptingForDesktop(this IServiceCollection services)
+    {
+        // Register configuration as Singleton so settings loaded at startup persist
+        services.AddSingleton<ScriptEngineConfiguration>(provider =>
+        {
+            var configuration = provider.GetService<IConfiguration>();
+            var config = new ScriptEngineConfiguration
             {
-                var settings = loadSettingsAsync(provider).GetAwaiter().GetResult();
-                config.LoadFromRunnerSettings(settings);
-            }
-            catch (Exception ex)
-            {
-                // Log error but continue with default configuration
-                Console.WriteLine($"Warning: Failed to load runner settings - {ex.Message}");
-            }
+                UsePythonNet = true, // Desktop uses Python.NET
+                EnableDebugMode = true // Enable debug mode for Desktop
+            };
+            
+            // Bind base configuration from appsettings.json (optional)
+            // This allows environment-specific defaults without database changes
+            configuration?.GetSection("Scripting").Bind(config);
+            
+            // Note: Desktop-specific settings from database are loaded at startup
+            // by DesktopScriptEngineSettingsInitializer (IHostedService) after DI container is built.
+            // Settings are loaded into this singleton instance and persist for app lifetime.
             
             return config;
         });

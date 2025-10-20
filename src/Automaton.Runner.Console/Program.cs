@@ -232,6 +232,9 @@ public class Program
                 // Register runner settings service for loading script engine configuration
                 services.AddScoped<Automaton.Runner.Console.Services.RunnerSettingsService>();
                 
+                // Register background service to load script engine settings at startup
+                services.AddHostedService<Services.ScriptEngineSettingsInitializer>();
+                
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<Handlers.CustomStepHandler>();
 
@@ -287,11 +290,8 @@ public class Program
                 });
 
                 // Register Automaton services with runner-specific script engine settings
-                services.AddScriptingForRunner(async (provider) =>
-                {
-                    var settingsService = provider.GetRequiredService<Automaton.Runner.Console.Services.RunnerSettingsService>();
-                    return await settingsService.LoadSettingsAsync();
-                });
+                // Settings will be loaded at execution time to avoid deadlocks
+                services.AddScriptingForRunner();
                 services.AddAutomatonCore();
                 services.AddAutomatonSteps();
 

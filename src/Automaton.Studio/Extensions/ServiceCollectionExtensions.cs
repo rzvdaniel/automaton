@@ -58,9 +58,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<StepTypeDescriptor>();
         services.AddScoped<StepFactory>();
 
-        // Scripting
-        // services.AddScripting();
-        services.AddScriptingWithPythonNet();
+        // Scripting - Desktop settings are loaded by CustomStepExecuteService at execution time
+        // This avoids async/sync deadlocks during service registration
+        services.AddScriptingForDesktop();
 
         // Authentication & Authorization
         services.AddBlazoredLocalStorage();
@@ -80,6 +80,10 @@ public static class ServiceCollectionExtensions
         // Services
         services.AddScoped<Services.ConfigurationService>();
         services.AddScoped<DesktopSettingsService>();
+        
+        // Register hosted service to load desktop script engine settings at startup
+        services.AddHostedService<Services.DesktopScriptEngineSettingsInitializer>();
+        
         services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();
         services.AddScoped<IApiKeysService, ApiKeysService>();
