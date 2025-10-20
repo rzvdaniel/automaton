@@ -45,19 +45,27 @@ namespace Automaton.Core.Scripting
 
                 try
                 {
-                    // Detect host python environment so embedded runtime can find stdlib and site-packages
-                    DetectPythonEnvironment();
-
-                    // If a Python DLL path is provided, use it
+                    // Priority 1: Use user-specified Python DLL path from configuration
                     if (!string.IsNullOrWhiteSpace(configuration.PythonDllPath))
                     {
                         Runtime.PythonDLL = configuration.PythonDllPath;
+                        if (configuration.EnableDebugMode)
+                        {
+                            Console.WriteLine($"Using user-specified Python DLL: {configuration.PythonDllPath}");
+                        }
+                    }
+                    else
+                    {
+                        // Priority 2: Auto-detect Python environment if no user-specified DLL
+                        if (configuration.AutoDetectPythonPaths)
+                        {
+                            DetectPythonEnvironment();
+                            TryResolveAndSetPythonDll();
+                        }
                     }
 
-                    // Try to resolve Python DLL automatically on Windows if not configured
-                    TryResolveAndSetPythonDll();
-
                     // Apply PYTHONHOME/PYTHONPATH before initializing runtime
+                    // This respects user-configured paths with priority over auto-detection
                     ApplyHostPythonEnvironmentVariables();
 
                     // Initialize Python and release the GIL so ASP.NET threads are not blocked
@@ -147,8 +155,15 @@ namespace Automaton.Core.Scripting
                 // Only attempt on Windows; on Linux/macOS pythonnet uses libpython (different file names)
                 if (!OperatingSystem.IsWindows()) return;
 
-                // If already set by configuration, do nothing
-                if (!string.IsNullOrWhiteSpace(configuration.PythonDllPath)) return;
+                // If user specified a DLL path in configuration, do not auto-resolve
+                if (!string.IsNullOrWhiteSpace(configuration.PythonDllPath)) 
+                {
+                    if (configuration.EnableDebugMode)
+                    {
+                        Console.WriteLine("Skipping Python DLL auto-resolution (user-specified path is set)");
+                    }
+                    return;
+                }
 
                 // If already set elsewhere, do nothing
                 if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL)) return;
@@ -283,30 +298,38 @@ namespace Automaton.Core.Scripting
             {
                 var pathList = new List<string>();
 
-                if (!string.IsNullOrWhiteSpace(_detectedPythonPaths))
+                // Priority 1: Add user-configured Python paths first
+                if (configuration.PythonPaths?.Any() == true)
                 {
-                    pathList.AddRange(_detectedPythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
-                }
-
-                if (!string.IsNullOrWhiteSpace(_detectedPythonHome))
-                {
-                    var lib = Path.Combine(_detectedPythonHome, "Lib");
-                    var sitePkgs = Path.Combine(lib, "site-packages");
-                    var dlls = Path.Combine(_detectedPythonHome, "DLLs");
-                    foreach (var p in new[] { lib, sitePkgs, dlls })
-                    {
-                        if (Directory.Exists(p)) pathList.Add(p);
-                    }
-                    // help stdlib resolution
-                    Environment.SetEnvironmentVariable("PYTHONHOME", _detectedPythonHome);
-                }
-
-                // Add user-configured extra paths
-                if (configuration.PythonPaths != null)
-                {
-                    foreach (var p in configuration.PythonPaths.Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p)))
+                    foreach (var p in configuration.PythonPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
                     {
                         pathList.Add(p);
+                        if (configuration.EnableDebugMode)
+                        {
+                            Console.WriteLine($"Adding user-specified Python path: {p}");
+                        }
+                    }
+                }
+
+                // Priority 2: Add auto-detected paths if auto-detection is enabled
+                if (configuration.AutoDetectPythonPaths)
+                {
+                    if (!string.IsNullOrWhiteSpace(_detectedPythonPaths))
+                    {
+                        pathList.AddRange(_detectedPythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(_detectedPythonHome))
+                    {
+                        var lib = Path.Combine(_detectedPythonHome, "Lib");
+                        var sitePkgs = Path.Combine(lib, "site-packages");
+                        var dlls = Path.Combine(_detectedPythonHome, "DLLs");
+                        foreach (var p in new[] { lib, sitePkgs, dlls })
+                        {
+                            if (Directory.Exists(p)) pathList.Add(p);
+                        }
+                        // help stdlib resolution
+                        Environment.SetEnvironmentVariable("PYTHONHOME", _detectedPythonHome);
                     }
                 }
 
@@ -322,7 +345,8 @@ namespace Automaton.Core.Scripting
                     Environment.SetEnvironmentVariable("PYTHONPATH", joined);
                     if (configuration.EnableDebugMode)
                     {
-                        Console.WriteLine($"Set PYTHONPATH: {joined}");
+                        Console.WriteLine($"Set PYTHONPATH with {finalPaths.Length} paths (user-specified paths take priority)");
+                        Console.WriteLine($"PYTHONPATH: {joined}");
                     }
                 }
             }
