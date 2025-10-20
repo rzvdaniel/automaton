@@ -1,0 +1,372 @@
+@page "/runners/{RunnerId:guid}/edit"
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@using Automaton.Core.Scripting
+@using System.Text.Json
+@inject RunnerService RunnerService
+@inject NavigationManager NavigationManager
+@inject IMessageService MessageService
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb>
+                            <BreadcrumbItem Href="/">
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem Href="/runners">
+                                <Icon Type="play-square" Width="16" Height="16" />
+                                <span>Runners</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="edit" Width="16" Height="16" />
+                                <span>Edit Runner</span>
+                            </BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Class="content-padding home-content content-background">
+        <div class="home-container">
+            
+            @if (isLoading)
+            {
+                <div style="text-align: center; padding: 60px;">
+                    <Spin Size="@SpinSize.Large" />
+                    <Paragraph Style="margin-top: 16px;">Loading runner settings...</Paragraph>
+                </div>
+            }
+            else if (runner == null)
+            {
+                <Result Status="@ResultStatus.Http404"
+                        Title="Runner Not Found"
+                        SubTitle="The runner you're looking for doesn't exist or you don't have access to it.">
+                    <Extra>
+                        <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/runners"))">
+                            Back to Runners
+                        </Button>
+                    </Extra>
+                </Result>
+            }
+            else
+            {
+                <!-- Header Section -->
+                <div class="settings-header">
+                    <div class="settings-header-content">
+                        <div class="settings-header-icon">
+                            <Icon Type="play-square" Style="font-size: 48px; color: white;" />
+                        </div>
+                        <div class="settings-header-text">
+                            <Title Level="1" Style="margin-bottom: 8px;">Edit Runner: @runner.Name</Title>
+                            <Paragraph Class="settings-subtitle">
+                                Configure Python settings and other options for this runner.
+                            </Paragraph>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Content -->
+                <div class="settings-content">
+                    
+                    <!-- Basic Information -->
+                    <div class="section">
+                        <Card Title="Basic Information" Class="settings-card" Bordered="true">
+                            <Extra>
+                                <Icon Type="info-circle" Style="color: #1890ff;" />
+                            </Extra>
+                            <ChildContent>
+                                <Form Model="runner">
+                                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="@SpaceSize.Large">
+                                        <SpaceItem>
+                                            <FormItem Label="Runner Name">
+                                                <Input @bind-Value="runnerName" 
+                                                       Placeholder="Enter runner name"
+                                                       Style="width: 100%;" />
+                                            </FormItem>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <Descriptions Bordered Size="@DescriptionsSize.Small" Column="1">
+                                                <DescriptionsItem Title="Runner ID">@runner.Id</DescriptionsItem>
+                                                <DescriptionsItem Title="Status">
+                                                    @if (runner.Status == Automaton.Core.Enums.RunnerStatus.Online)
+                                                    {
+                                                        <Badge Status="@BadgeStatus.Success" Text="Online" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <Badge Status="@BadgeStatus.Default" Text="Offline" />
+                                                    }
+                                                </DescriptionsItem>
+                                            </Descriptions>
+                                        </SpaceItem>
+                                    </Space>
+                                </Form>
+                            </ChildContent>
+                        </Card>
+                    </div>
+
+                    <!-- Python Engine Settings -->
+                    <div class="section">
+                        <Card Title="Python Engine Settings" Class="settings-card" Bordered="true">
+                            <Extra>
+                                <Icon Type="code" Style="color: #1890ff;" />
+                            </Extra>
+                            <ChildContent>
+                                <Form Model="runner">
+                                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="@SpaceSize.Large">
+                                        <SpaceItem>
+                                            <Alert Type="@AlertType.Info" ShowIcon="true" Closable="false">
+                                                <MessageTemplate>
+                                                    <Text>Configure Python.NET settings for this specific runner. These settings override the default auto-detection and are useful when you need a specific Python version or custom packages.</Text>
+                                                </MessageTemplate>
+                                            </Alert>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <FormItem Label="Python DLL Path">
+                                                <Input @bind-Value="pythonDllPath" 
+                                                       Placeholder="e.g., C:\Python312\python312.dll (leave empty for auto-detection)"
+                                                       Style="width: 100%;" />
+                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                    Path to python3XX.dll file for this runner. If not specified, the runner will auto-detect the Python installation.
+                                                </Text>
+                                            </FormItem>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <FormItem Label="Python Package Paths">
+                                                <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+                                                    @foreach (var (path, index) in pythonPaths.Select((p, i) => (p, i)))
+                                                    {
+                                                        <SpaceItem Style="width: 100%;">
+                                                            <Space Style="width: 100%;">
+                                                                <SpaceItem Style="flex: 1;">
+                                                                    <Input @bind-Value="pythonPaths[index]" 
+                                                                           Placeholder="e.g., C:\Python312\Lib\site-packages"
+                                                                           Style="width: 100%;" />
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Button Danger 
+                                                                            Icon="delete" 
+                                                                            Size="@ButtonSize.Small"
+                                                                            OnClick="() => RemovePythonPath(index)"
+                                                                            Disabled="@(pythonPaths.Count <= 1)" />
+                                                                </SpaceItem>
+                                                            </Space>
+                                                        </SpaceItem>
+                                                    }
+                                                    <SpaceItem>
+                                                        <Button Type="@ButtonType.Dashed" 
+                                                                Icon="plus" 
+                                                                Block 
+                                                                OnClick="AddPythonPath">
+                                                            Add Path
+                                                        </Button>
+                                                    </SpaceItem>
+                                                </Space>
+                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                    Additional Python package search paths for this runner. These paths take priority over auto-detected paths.
+                                                </Text>
+                                            </FormItem>
+                                        </SpaceItem>
+                                    </Space>
+                                </Form>
+                            </ChildContent>
+                        </Card>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="section">
+                        <Card Bordered="false" Style="background: transparent; box-shadow: none;">
+                            <ChildContent>
+                                <Space>
+                                    <SpaceItem>
+                                        <Button Type="@ButtonType.Primary" 
+                                                Icon="save" 
+                                                Size="@ButtonSize.Large"
+                                                Loading="@isSaving"
+                                                OnClick="SaveRunner">
+                                            Save Changes
+                                        </Button>
+                                    </SpaceItem>
+                                    <SpaceItem>
+                                        <Button Icon="close" 
+                                                Size="@ButtonSize.Large"
+                                                OnClick="@(() => NavigationManager.NavigateTo("/runners"))">
+                                            Cancel
+                                        </Button>
+                                    </SpaceItem>
+                                </Space>
+                            </ChildContent>
+                        </Card>
+                    </div>
+
+                </div>
+            }
+        </div>
+    </Content>
+</Layout>
+
+@code {
+    [Parameter]
+    public Guid RunnerId { get; set; }
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private RunnerModel? runner = null;
+    
+    // Basic settings
+    private string runnerName = string.Empty;
+    
+    // Python settings
+    private string? pythonDllPath = null;
+    private List<string> pythonPaths = new List<string> { "" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRunner();
+    }
+
+    private async Task LoadRunner()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var runners = await RunnerService.List();
+            runner = runners.FirstOrDefault(r => r.Id == RunnerId);
+
+            if (runner != null)
+            {
+                runnerName = runner.Name ?? string.Empty;
+                await LoadPythonSettings();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to load runner: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPythonSettings()
+    {
+        try
+        {
+            var settingsJson = await RunnerService.GetScriptEngineSettings(RunnerId);
+            
+            if (!string.IsNullOrWhiteSpace(settingsJson))
+            {
+                var settings = JsonSerializer.Deserialize<RunnerScriptEngineSettings>(
+                    settingsJson, 
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+
+                if (settings?.Python != null)
+                {
+                    pythonDllPath = settings.Python.PythonDllPath;
+                    pythonPaths = settings.Python.PythonPaths?.Any() == true 
+                        ? new List<string>(settings.Python.PythonPaths) 
+                        : new List<string> { "" };
+                }
+                else
+                {
+                    // Default values
+                    pythonDllPath = null;
+                    pythonPaths = new List<string> { "" };
+                }
+            }
+            else
+            {
+                // No settings configured - use defaults
+                pythonDllPath = null;
+                pythonPaths = new List<string> { "" };
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to load Python settings: {ex.Message}");
+            // Use defaults on error
+            pythonDllPath = null;
+            pythonPaths = new List<string> { "" };
+        }
+    }
+
+    private async Task SaveRunner()
+    {
+        try
+        {
+            isSaving = true;
+            StateHasChanged();
+
+            // Update runner name if changed
+            if (!string.IsNullOrWhiteSpace(runnerName) && runnerName != runner?.Name)
+            {
+                await RunnerService.Update(RunnerId, runnerName);
+            }
+
+            // Save Python settings
+            var settings = new RunnerScriptEngineSettings
+            {
+                Python = new PythonEngineSettings
+                {
+                    PythonDllPath = string.IsNullOrWhiteSpace(pythonDllPath) ? null : pythonDllPath,
+                    PythonPaths = pythonPaths
+                        .Where(p => !string.IsNullOrWhiteSpace(p))
+                        .ToList()
+                }
+            };
+
+            var settingsJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions 
+            { 
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            await RunnerService.UpdateScriptEngineSettings(RunnerId, settingsJson);
+
+            MessageService.Success("Runner settings saved successfully! Restart the runner for changes to take effect.");
+            
+            // Navigate back to runners list after a short delay
+            await Task.Delay(1500);
+            NavigationManager.NavigateTo("/runners");
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to save runner settings: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddPythonPath()
+    {
+        pythonPaths.Add("");
+        StateHasChanged();
+    }
+
+    private void RemovePythonPath(int index)
+    {
+        if (pythonPaths.Count > 1)
+        {
+            pythonPaths.RemoveAt(index);
+            StateHasChanged();
+        }
+    }
+}

@@ -190,6 +190,7 @@ services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<EmailService>();
 services.AddScoped<InstallService>();
+services.AddScoped<SettingsService>();
 services.AddTransient<UsersService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();

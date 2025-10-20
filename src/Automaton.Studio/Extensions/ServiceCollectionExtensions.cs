@@ -79,6 +79,7 @@ public static class ServiceCollectionExtensions
 
         // Services
         services.AddScoped<Services.ConfigurationService>();
+        services.AddScoped<DesktopSettingsService>();
         services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();
         services.AddScoped<IApiKeysService, ApiKeysService>();

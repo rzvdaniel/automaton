@@ -1,7 +1,11 @@
 ﻿@page "/settings"
 @using Automaton.Studio.Services
+@using Automaton.Core.Scripting
 @inject OnboardingService OnboardingService
 @inject NavigationManager NavigationManager
+@inject ConfigurationService ConfigurationService
+@inject DesktopSettingsService DesktopSettingsService
+@inject IMessageService MessageService
 
 <Layout>
     <Header Class="header">
@@ -45,6 +49,98 @@
 
             <!-- Settings Content -->
             <div class="settings-content">
+                
+                <!-- Python Engine Settings (Desktop Only) -->
+                @if (ConfigurationService.IsDesktop)
+                {
+                    <div class="section">
+                        <Card Title="Python Engine Settings" Class="settings-card" Bordered="true">
+                            <Extra>
+                                <Icon Type="code" Style="color: #1890ff;" />
+                            </Extra>
+                            <ChildContent>
+                                <Form Model="dummyModel">
+                                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="@SpaceSize.Large">
+                                        <SpaceItem>
+                                            <Alert Type="@AlertType.Info" ShowIcon="true" Closable="false">
+                                                <MessageTemplate>
+                                                    <Text>Configure Python.NET settings for the desktop application. These settings control how Python scripts are executed in custom steps.</Text>
+                                                </MessageTemplate>
+                                            </Alert>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <FormItem Label="Python DLL Path">
+                                                <Input @bind-Value="pythonDllPath" 
+                                                       Placeholder="e.g., C:\Python312\python312.dll (leave empty for auto-detection)"
+                                                       Style="width: 100%;" />
+                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                    Path to python3XX.dll file. If not specified, Automaton will auto-detect the Python installation.
+                                                </Text>
+                                            </FormItem>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <FormItem Label="Python Package Paths">
+                                                <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+                                                    @foreach (var (path, index) in pythonPaths.Select((p, i) => (p, i)))
+                                                    {
+                                                        <SpaceItem Style="width: 100%;">
+                                                            <Space Style="width: 100%;">
+                                                                <SpaceItem Style="flex: 1;">
+                                                                    <Input @bind-Value="pythonPaths[index]" 
+                                                                           Placeholder="e.g., C:\Python312\Lib\site-packages"
+                                                                           Style="width: 100%;" />
+                                                                </SpaceItem>
+                                                                <SpaceItem>
+                                                                    <Button Danger 
+                                                                            Icon="delete" 
+                                                                            Size="@ButtonSize.Small"
+                                                                            OnClick="() => RemovePythonPath(index)"
+                                                                            Disabled="@(pythonPaths.Count <= 1)" />
+                                                                </SpaceItem>
+                                                            </Space>
+                                                        </SpaceItem>
+                                                    }
+                                                    <SpaceItem>
+                                                        <Button Type="@ButtonType.Dashed" 
+                                                                Icon="plus" 
+                                                                Block 
+                                                                OnClick="AddPythonPath">
+                                                            Add Path
+                                                        </Button>
+                                                    </SpaceItem>
+                                                </Space>
+                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                    Additional Python package search paths (e.g., custom site-packages directories). These take priority over auto-detected paths.
+                                                </Text>
+                                            </FormItem>
+                                        </SpaceItem>
+
+                                        <SpaceItem>
+                                            <Space>
+                                                <SpaceItem>
+                                                    <Button Type="@ButtonType.Primary" 
+                                                            Icon="save" 
+                                                            Loading="@isSavingPythonSettings"
+                                                            OnClick="SavePythonSettings">
+                                                        Save Settings
+                                                    </Button>
+                                                </SpaceItem>
+                                                <SpaceItem>
+                                                    <Button Icon="reload" 
+                                                            OnClick="LoadPythonSettings">
+                                                        Reset
+                                                    </Button>
+                                                </SpaceItem>
+                                            </Space>
+                                        </SpaceItem>
+                                    </Space>
+                                </Form>
+                            </ChildContent>
+                        </Card>
+                    </div>
+                }
                 
                 <!-- Getting Started Section -->
                 <div class="section">
@@ -167,6 +263,25 @@
 
 @code {
     private bool hasRunners = false;
+    private bool isSavingPythonSettings = false;
+    
+    // Python settings
+    private string? pythonDllPath = null;
+    private List<string> pythonPaths = new List<string> { "" };
+    
+    // Dummy model for Form component
+    private object dummyModel = new { };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        
+        // Load Python settings if in desktop mode
+        if (ConfigurationService.IsDesktop)
+        {
+            await LoadPythonSettings();
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -189,5 +304,85 @@
         }
         
         StateHasChanged();
+    }
+
+    private async Task LoadPythonSettings()
+    {
+        try
+        {
+            var settings = await DesktopSettingsService.GetPythonSettingsAsync();
+            
+            if (settings != null)
+            {
+                pythonDllPath = settings.PythonDllPath;
+                pythonPaths = settings.PythonPaths?.Any() == true 
+                    ? new List<string>(settings.PythonPaths) 
+                    : new List<string> { "" };
+            }
+            else
+            {
+                // Default values
+                pythonDllPath = null;
+                pythonPaths = new List<string> { "" };
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Failed to load Python settings: {ex.Message}");
+        }
+    }
+
+    private async Task SavePythonSettings()
+    {
+        try
+        {
+            isSavingPythonSettings = true;
+            StateHasChanged();
+
+            var settings = new PythonEngineSettings
+            {
+                PythonDllPath = string.IsNullOrWhiteSpace(pythonDllPath) ? null : pythonDllPath,
+                PythonPaths = pythonPaths
+                    .Where(p => !string.IsNullOrWhiteSpace(p))
+                    .ToList()
+            };
+
+            var success = await DesktopSettingsService.SavePythonSettingsAsync(settings);
+            
+            if (success)
+            {
+                MessageService.Success("Python settings saved successfully! Restart the application for changes to take effect.");
+            }
+            else
+            {
+                MessageService.Error("Failed to save Python settings. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageService.Error($"Error saving Python settings: {ex.Message}");
+        }
+        finally
+        {
+            isSavingPythonSettings = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddPythonPath()
+    {
+        pythonPaths.Add("");
+        StateHasChanged();
+    }
+
+    private void RemovePythonPath(int index)
+    {
+        if (pythonPaths.Count > 1)
+        {
+            pythonPaths.RemoveAt(index);
+            StateHasChanged();
+        }
     }
 }

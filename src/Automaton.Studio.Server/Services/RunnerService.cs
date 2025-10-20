@@ -277,4 +277,51 @@ public class RunnerService
             Status = WorkflowStatus.None
         };
     }
+
+    /// <summary>
+    /// Get script engine settings for a specific runner
+    /// </summary>
+    public async Task<object?> GetScriptEngineSettings(Guid id, CancellationToken cancellationToken)
+    {
+        var runner = await dbContext.Runners
+            .Include(x => x.RunnerUsers)
+            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+
+        if (runner == null || string.IsNullOrWhiteSpace(runner.ScriptEngineSettings))
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<object>(runner.ScriptEngineSettings);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            logger.Warning(ex, "Failed to deserialize script engine settings for runner {RunnerId}", id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Update script engine settings for a specific runner
+    /// </summary>
+    public async Task UpdateScriptEngineSettings(Guid id, string? settingsJson, CancellationToken cancellationToken)
+    {
+        var runner = await dbContext.Runners
+            .Include(x => x.RunnerUsers)
+            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+
+        if (runner == null)
+        {
+            throw new InvalidOperationException($"Runner {id} not found or user does not have access");
+        }
+
+        runner.ScriptEngineSettings = settingsJson;
+        
+        dbContext.Entry(runner).State = EntityState.Modified;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        
+        logger.Information("Updated script engine settings for runner {RunnerId}", id);
+    }
 }

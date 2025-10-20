@@ -60,4 +60,72 @@ public class RunnerService
             throw;
         }
     }
+
+    /// <summary>
+    /// Update runner name
+    /// </summary>
+    public async Task Update(Guid id, string name)
+    {
+        try
+        {
+            var runnerData = new { Id = id, Name = name };
+            var result = await httpClient.PutAsJsonAsync($"{configService.RunnersUrl}/{id}", runnerData);
+            result.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to update runner {RunnerId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Get script engine settings for a specific runner
+    /// </summary>
+    public async Task<string?> GetScriptEngineSettings(Guid id)
+    {
+        try
+        {
+            var result = await httpClient.GetAsync($"{configService.RunnersUrl}/{id}/script-settings");
+            result.EnsureSuccessStatusCode();
+
+            // Read JSON string directly to avoid serialization issues
+            var jsonString = await result.Content.ReadAsStringAsync();
+            
+            if (!string.IsNullOrWhiteSpace(jsonString))
+            {
+                return jsonString;
+            }
+
+            return null;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            logger.LogInformation("No script engine settings found for runner {RunnerId}", id);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get script engine settings for runner {RunnerId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Update script engine settings for a specific runner
+    /// </summary>
+    public async Task UpdateScriptEngineSettings(Guid id, string settingsJson)
+    {
+        try
+        {
+            var content = new StringContent(settingsJson, System.Text.Encoding.UTF8, "application/json");
+            var result = await httpClient.PutAsync($"{configService.RunnersUrl}/{id}/script-settings", content);
+            result.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to update script engine settings for runner {RunnerId}", id);
+            throw;
+        }
+    }
 }

@@ -71,6 +71,14 @@
                 <ActionColumn Title="Actions">
                     <Space>
                         <SpaceItem>
+                            <Button Icon="edit" 
+                                    Type="@ButtonType.Link" 
+                                    Size="@ButtonSize.Small"
+                                    OnClick="@(() => NavigationManager.NavigateTo($"/runners/{context.Id}/edit"))">
+                                Edit
+                            </Button>
+                        </SpaceItem>
+                        <SpaceItem>
                             <Popconfirm Title="Are you sure you want to delete this runner?"
                                         OnConfirm="@(() => DeleteRunner(context.Id))"
                                         OkText="Yes"
