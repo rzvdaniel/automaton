@@ -70,4 +70,46 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
+
+    /// <summary>
+    /// Add scripting for runners with dynamic settings loading
+    /// This allows runners to load Python paths from database configuration
+    /// Requires RunnerSettingsService to be registered
+    /// </summary>
+    /// <param name="loadSettingsAsync">Function to load runner settings asynchronously</param>
+    public static void AddScriptingForRunner(
+        this IServiceCollection services, 
+        Func<IServiceProvider, Task<RunnerScriptEngineSettings?>> loadSettingsAsync)
+    {
+        services.AddScoped<ScriptEngineConfiguration>(provider =>
+        {
+            var configuration = provider.GetService<IConfiguration>();
+            var config = new ScriptEngineConfiguration
+            {
+                UsePythonNet = true, // Runners use Python.NET
+                EnableDebugMode = false
+            };
+            
+            // Bind from appsettings.json first
+            configuration?.GetSection("Scripting").Bind(config);
+            
+            // Load runner-specific settings and apply them
+            // This runs synchronously in the factory but uses async internally
+            try
+            {
+                var settings = loadSettingsAsync(provider).GetAwaiter().GetResult();
+                config.LoadFromRunnerSettings(settings);
+            }
+            catch (Exception ex)
+            {
+                // Log error but continue with default configuration
+                Console.WriteLine($"Warning: Failed to load runner settings - {ex.Message}");
+            }
+            
+            return config;
+        });
+        
+        services.AddScoped<ScriptEngineFactory>();
+        services.AddScoped<ScriptEngineHost>();
+    }
 }

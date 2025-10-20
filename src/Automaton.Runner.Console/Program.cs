@@ -229,6 +229,9 @@ public class Program
                 services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
                 
+                // Register runner settings service for loading script engine configuration
+                services.AddScoped<Automaton.Runner.Console.Services.RunnerSettingsService>();
+                
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<Handlers.CustomStepHandler>();
 
@@ -258,6 +261,21 @@ public class Program
                     client.BaseAddress = new Uri(configService.BaseUrl);
                 });
                 
+                // Add HTTP client for RunnerSettingsService
+                services.AddHttpClient<Automaton.Runner.Console.Services.RunnerSettingsService>((sp, client) =>
+                {
+                    var configService = sp.GetRequiredService<ConfigurationService>();
+                    client.BaseAddress = new Uri(configService.BaseUrl);
+                    
+                    // Add authentication header if API key is available
+                    var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
+                    var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+                    }
+                });
+                
                 // Add default HTTP client
                 services.AddHttpClient();
                 
@@ -268,8 +286,12 @@ public class Program
                     cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
                 });
 
-                // Register Automaton services (this includes default FlowExecuteService)
-                services.AddScripting();
+                // Register Automaton services with runner-specific script engine settings
+                services.AddScriptingForRunner(async (provider) =>
+                {
+                    var settingsService = provider.GetRequiredService<Automaton.Runner.Console.Services.RunnerSettingsService>();
+                    return await settingsService.LoadSettingsAsync();
+                });
                 services.AddAutomatonCore();
                 services.AddAutomatonSteps();
 
