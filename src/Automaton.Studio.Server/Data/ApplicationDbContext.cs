@@ -33,6 +33,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
+        public virtual DbSet<Setting> Settings { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -216,6 +217,17 @@ namespace Automaton.Studio.Server.Data
 
                 // Unique index to ensure one log entry per execution
                 entity.HasIndex(e => e.FlowExecutionId).IsUnique();
+            });
+
+            modelBuilder.Entity<Setting>(entity =>
+            {
+                entity.HasKey(e => e.Key);
+                entity.Property(e => e.Key).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Value).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500);
+                
+                entity.HasIndex(e => e.Key).IsUnique();
             });
         }
 

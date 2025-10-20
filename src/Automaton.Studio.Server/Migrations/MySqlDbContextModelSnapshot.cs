@@ -497,6 +497,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("ScriptEngineSettings")
+                        .HasColumnType("longtext");
+
                     b.HasKey("Id");
 
                     b.ToTable("Runners");
@@ -558,6 +561,31 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Settings");
+                });
+
             modelBuilder.Entity("Common.Authentication.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -567,7 +595,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 9, 25, 11, 17, 39, 287, DateTimeKind.Local).AddTicks(5946));
+                        .HasDefaultValue(new DateTime(2025, 10, 20, 10, 28, 53, 972, DateTimeKind.Local).AddTicks(6400));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

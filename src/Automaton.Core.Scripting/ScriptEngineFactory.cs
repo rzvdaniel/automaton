@@ -98,6 +98,60 @@ namespace Automaton.Core.Scripting
         public int DefaultTimeoutSeconds { get; set; } = 60; // Default timeout for script execution
         public int NetworkTimeoutSeconds { get; set; } = 30; // Timeout for network requests
 
+        /// <summary>
+        /// Load configuration from runner-specific settings
+        /// User-specified paths take priority over auto-detection
+        /// </summary>
+        public void LoadFromRunnerSettings(RunnerScriptEngineSettings? settings)
+        {
+            if (settings?.Python == null) return;
+
+            if (!string.IsNullOrWhiteSpace(settings.Python.PythonDllPath))
+            {
+                PythonDllPath = settings.Python.PythonDllPath;
+                if (EnableDebugMode)
+                {
+                    Console.WriteLine($"Using user-specified Python DLL: {PythonDllPath}");
+                }
+            }
+
+            if (settings.Python.PythonPaths?.Any() == true)
+            {
+                PythonPaths = new List<string>(settings.Python.PythonPaths);
+                if (EnableDebugMode)
+                {
+                    Console.WriteLine($"Using {PythonPaths.Count} user-specified Python paths");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Load configuration from desktop-specific settings
+        /// Same logic as LoadFromRunnerSettings but kept separate for clarity
+        /// </summary>
+        public void LoadFromDesktopSettings(PythonEngineSettings? settings)
+        {
+            if (settings == null) return;
+
+            if (!string.IsNullOrWhiteSpace(settings.PythonDllPath))
+            {
+                PythonDllPath = settings.PythonDllPath;
+                if (EnableDebugMode)
+                {
+                    Console.WriteLine($"Using user-specified Python DLL: {PythonDllPath}");
+                }
+            }
+
+            if (settings.PythonPaths?.Any() == true)
+            {
+                PythonPaths = new List<string>(settings.PythonPaths);
+                if (EnableDebugMode)
+                {
+                    Console.WriteLine($"Using {PythonPaths.Count} user-specified Python paths");
+                }
+            }
+        }
+
         public void AddPythonPath(string path)
         {
             if (!string.IsNullOrWhiteSpace(path) && !PythonPaths.Contains(path))
