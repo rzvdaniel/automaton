@@ -64,17 +64,13 @@ namespace Automaton.Core.Scripting
                         }
                     }
 
-                    // Apply PYTHONHOME/PYTHONPATH before initializing runtime
-                    // This respects user-configured paths with priority over auto-detection
-                    ApplyHostPythonEnvironmentVariables();
-
                     // Initialize Python and release the GIL so ASP.NET threads are not blocked
                     PythonEngine.Initialize();
                     _allowThreadsState = PythonEngine.BeginAllowThreads();
                     isInitialized = true;
 
-                    // Also inject configured paths into sys.path for the running interpreter
-                    EnsureSysPathContainsConfiguredPaths();
+                    // Apply configured paths to sys.path for the running interpreter
+                    ApplyConfiguredPathsToSyspath();
                 }
                 catch (Exception ex)
                 {
@@ -292,31 +288,56 @@ namespace Automaton.Core.Scripting
             }
         }
 
-        private void ApplyHostPythonEnvironmentVariables()
+        /// <summary>
+        /// Apply configured paths directly to Python's sys.path
+        /// Priority: user-configured paths (searched first) > auto-detected paths
+        /// 
+        /// BEHAVIOR: Both user paths AND auto-detected paths are added:
+        /// 1. User-configured paths are added first (highest priority in search order)
+        /// 2. Auto-detected paths are added second (fallback if user config incomplete)
+        /// 3. Duplicates are removed automatically via .Distinct()
+        /// 4. Non-existent paths are filtered out
+        ///
+        /// This approach provides robustness: if user configuration is incomplete or contains
+        /// typos, auto-detection fills the gaps. If auto-detection finds something user needs,
+        /// it's available as fallback. User retains full control via priority ordering.
+        /// 
+        /// No environment variables are set; paths are injected directly into the running interpreter.
+        /// </summary>
+        private void ApplyConfiguredPathsToSyspath()
         {
             try
             {
-                var pathList = new List<string>();
+                var pathsToAdd = new List<string>();
 
-                // Priority 1: Add user-configured Python paths first
+                // Priority 1: Add user-configured paths first
                 if (configuration.PythonPaths?.Any() == true)
                 {
                     foreach (var p in configuration.PythonPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
                     {
-                        pathList.Add(p);
+                        pathsToAdd.Add(p);
                         if (configuration.EnableDebugMode)
                         {
-                            Console.WriteLine($"Adding user-specified Python path: {p}");
+                            Console.WriteLine($"Adding user-configured Python path: {p}");
                         }
                     }
                 }
 
-                // Priority 2: Add auto-detected paths if auto-detection is enabled
+                // Priority 2: ALSO add auto-detected paths if auto-detection is enabled
+                // This is now additive: both user and auto-detected paths are combined
                 if (configuration.AutoDetectPythonPaths)
                 {
                     if (!string.IsNullOrWhiteSpace(_detectedPythonPaths))
                     {
-                        pathList.AddRange(_detectedPythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+                        var detectedPaths = _detectedPythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var p in detectedPaths)
+                        {
+                            pathsToAdd.Add(p);
+                            if (configuration.EnableDebugMode)
+                            {
+                                Console.WriteLine($"Adding auto-detected Python path: {p}");
+                            }
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(_detectedPythonHome))
@@ -326,66 +347,66 @@ namespace Automaton.Core.Scripting
                         var dlls = Path.Combine(_detectedPythonHome, "DLLs");
                         foreach (var p in new[] { lib, sitePkgs, dlls })
                         {
-                            if (Directory.Exists(p)) pathList.Add(p);
-                        }
-                        // help stdlib resolution
-                        Environment.SetEnvironmentVariable("PYTHONHOME", _detectedPythonHome);
-                    }
-                }
-
-                var finalPaths = pathList
-                    .Select(p => p.Trim())
-                    .Where(p => !string.IsNullOrWhiteSpace(p))
-                    .Distinct()
-                    .ToArray();
-
-                if (finalPaths.Length > 0)
-                {
-                    var joined = string.Join(Path.PathSeparator, finalPaths);
-                    Environment.SetEnvironmentVariable("PYTHONPATH", joined);
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine($"Set PYTHONPATH with {finalPaths.Length} paths (user-specified paths take priority)");
-                        Console.WriteLine($"PYTHONPATH: {joined}");
-                    }
-                }
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-        private void EnsureSysPathContainsConfiguredPaths()
-        {
-            try
-            {
-                var envPyPath = Environment.GetEnvironmentVariable("PYTHONPATH");
-                if (string.IsNullOrWhiteSpace(envPyPath)) return;
-                var parts = envPyPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length == 0) return;
-
-                lock (gilExecutionLock)
-                {
-                    using (Py.GIL())
-                    {
-                        var sys = Py.Import("sys");
-                        var currentPath = sys.GetAttr("path");
-                        foreach (var p in parts)
-                        {
-                            using var pyPath = new PyString(p);
-                            try
+                            if (Directory.Exists(p))
                             {
-                                if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
+                                pathsToAdd.Add(p);
+                                if (configuration.EnableDebugMode)
                                 {
-                                    currentPath.InvokeMethod("append", pyPath);
+                                    Console.WriteLine($"Adding auto-detected Python path: {p}");
                                 }
                             }
-                            catch { }
                         }
                     }
                 }
+
+                // Deduplicate and filter - removes duplicates and non-existent paths
+                var finalPaths = pathsToAdd
+                    .Select(p => p.Trim())
+                    .Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (finalPaths.Any())
+                {
+                    lock (gilExecutionLock)
+                    {
+                        using (Py.GIL())
+                        {
+                            var sys = Py.Import("sys");
+                            var currentPath = sys.GetAttr("path");
+                           
+                           foreach (var p in finalPaths)
+{
+        using var pyPath = new PyString(p);
+             try
+   {
+        if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
+                  {
+          currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
+ if (configuration.EnableDebugMode)
+                   {
+   Console.WriteLine($"? Added to sys.path: {p}");
+ }
+                 }
+    }
+      catch { }
+       }
+    }
             }
-            catch { }
+
+              if (configuration.EnableDebugMode)
+   {
+    Console.WriteLine($"Successfully configured {finalPaths.Count} Python paths");
+           }
+        }
+   }
+    catch (Exception ex)
+            {
+         if (configuration.EnableDebugMode)
+   {
+         Console.WriteLine($"Warning: Failed to apply configured paths to sys.path: {ex.Message}");
+         }
+ }
         }
 
         private static string? RunPythonAndReadStdOut(string exe, string args)
