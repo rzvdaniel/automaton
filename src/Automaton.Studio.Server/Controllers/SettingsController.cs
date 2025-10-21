@@ -1,3 +1,4 @@
+using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public class SettingsController : BaseController
     /// Get Python engine settings for desktop environment
     /// </summary>
     [HttpGet("python")]
-    public async Task<ActionResult<object>> GetPythonSettings()
+    public async Task<ActionResult<PythonEngineSettings>> GetPythonSettings()
     {
         try
         {
@@ -32,7 +33,7 @@ public class SettingsController : BaseController
             
             if (settings == null)
             {
-                return Ok(new { }); // Return empty object if no settings
+                return NotFound();
             }
 
             return Ok(settings);

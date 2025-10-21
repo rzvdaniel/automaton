@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using Automaton.Core.Scripting;
 using Serilog;
@@ -54,7 +55,7 @@ public class RunnerSettingsService
             _logger.Debug("Loading script engine settings from {Url}", url);
 
             var response = await _httpClient.GetAsync(url);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -69,21 +70,8 @@ public class RunnerSettingsService
                 return null;
             }
 
-            var json = await response.Content.ReadAsStringAsync();
+            var settings = await response.Content.ReadFromJsonAsync<RunnerScriptEngineSettings>();
             
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                _logger.Information("No script engine settings configured for runner {RunnerId}", runnerId);
-                _cachedSettings = null;
-                _lastLoadTime = DateTime.UtcNow;
-                return null;
-            }
-
-            var settings = JsonSerializer.Deserialize<RunnerScriptEngineSettings>(
-                json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
-
             _cachedSettings = settings;
             _lastLoadTime = DateTime.UtcNow;
 

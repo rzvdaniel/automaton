@@ -1,12 +1,14 @@
 ﻿using AutoMapper;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -281,7 +283,7 @@ public class RunnerService
     /// <summary>
     /// Get script engine settings for a specific runner
     /// </summary>
-    public async Task<object?> GetScriptEngineSettings(Guid id, CancellationToken cancellationToken)
+    public async Task<RunnerScriptEngineSettings?> GetScriptEngineSettings(Guid id, CancellationToken cancellationToken)
     {
         var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
@@ -294,9 +296,14 @@ public class RunnerService
 
         try
         {
-            return System.Text.Json.JsonSerializer.Deserialize<object>(runner.ScriptEngineSettings);
+            var settings = JsonSerializer.Deserialize<RunnerScriptEngineSettings>(
+                runner.ScriptEngineSettings,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
+            return settings;
         }
-        catch (System.Text.Json.JsonException ex)
+        catch (JsonException ex)
         {
             logger.Warning(ex, "Failed to deserialize script engine settings for runner {RunnerId}", id);
             return null;

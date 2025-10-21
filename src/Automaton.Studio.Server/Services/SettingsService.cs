@@ -1,3 +1,4 @@
+using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,7 @@ public class SettingsService
     /// <summary>
     /// Get Python engine settings for desktop environment
     /// </summary>
-    public async Task<object?> GetPythonSettingsAsync()
+    public async Task<PythonEngineSettings?> GetPythonSettingsAsync()
     {
         try
         {
@@ -41,7 +42,11 @@ public class SettingsService
                 return null;
             }
 
-            var settingsObject = JsonSerializer.Deserialize<object>(setting.Value);
+            var settingsObject = JsonSerializer.Deserialize<PythonEngineSettings>(
+                setting.Value,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
+
             return settingsObject;
         }
         catch (JsonException ex)

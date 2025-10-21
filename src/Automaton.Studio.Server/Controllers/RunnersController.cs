@@ -1,4 +1,5 @@
 ﻿using Automaton.Core.Enums;
+using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -70,13 +71,13 @@ public class RunnersController : BaseController
     /// </summary>
     [HttpGet("{id}/script-settings")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult<object>> GetScriptSettings(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<RunnerScriptEngineSettings>> GetScriptSettings(Guid id, CancellationToken cancellationToken)
     {
         var settings = await runnersService.GetScriptEngineSettings(id, cancellationToken);
         
         if (settings == null)
         {
-            return Ok(new { }); // Return empty object if no settings configured
+            return NotFound();
         }
 
         return Ok(settings);

@@ -1,6 +1,7 @@
-using System.Text.Json;
 using Automaton.Core.Scripting;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Automaton.Studio.Services;
 
@@ -64,20 +65,7 @@ public class DesktopSettingsService
                 return null;
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                _logger.LogInformation("No Python settings configured for desktop");
-                _cachedSettings = null;
-                _lastLoadTime = DateTime.UtcNow;
-                return null;
-            }
-
-            var settings = JsonSerializer.Deserialize<PythonEngineSettings>(
-                json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
+            var settings = await response.Content.ReadFromJsonAsync<PythonEngineSettings>();
 
             _cachedSettings = settings;
             _lastLoadTime = DateTime.UtcNow;
