@@ -42,15 +42,24 @@
 <AntContainer />
 
 @code {
-
     [Inject] public HttpClient HttpClient { get; set; }
     [Inject] public SerilogHttpClient SerilogHttpClient { get; set; }
     [Inject] public ConfigurationService ConfigurationService { get; set; }
+    [Inject] public DesktopScriptEngineSettingsInitializer SettingsInitializer { get; set; }
+    [Inject] public AuthenticationStateProvider AuthStateProvider { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         await ConfigureSerilog();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            await SettingsInitializer.ReloadSettingsAsync();
+        }
     }
+
 
     /// <summary>
     /// Configure Serilog here because we need the injected SerilogHttpClient

@@ -81,8 +81,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Services.ConfigurationService>();
         services.AddScoped<DesktopSettingsService>();
         
-        // Register hosted service to load desktop script engine settings at startup
-        services.AddHostedService<Services.DesktopScriptEngineSettingsInitializer>();
+        // Register initializer as singleton and as hosted service
+        services.AddSingleton<DesktopScriptEngineSettingsInitializer>();
+        services.AddHostedService(sp => sp.GetRequiredService<DesktopScriptEngineSettingsInitializer>());
         
         services.AddScoped<OnboardingService>();
         services.AddScoped<UserAccountService>();

@@ -163,8 +163,7 @@ public static class ServiceCollectionExtensions
             
             return config;
         });
-        
-        services.AddScoped<ScriptEngineFactory>();
-        services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<ScriptEngineFactory>();
+        services.AddSingleton<ScriptEngineHost>();
     }
 }

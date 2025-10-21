@@ -20,6 +20,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     private readonly FlowExecutionsService flowExecutionsService;
     private readonly ScriptEngineHost scriptHost;
     private readonly CustomStepsService customStepsService;
+    private readonly ScriptEngineConfiguration scriptConfig;
 
     public event EventHandler<string> ScriptTextWritten;
 
@@ -32,7 +33,8 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         IServiceProvider serviceProvider,
         IMediator mediator, 
         IMapper mapper,
-        CustomStepsService customStepsService
+        CustomStepsService customStepsService,
+        ScriptEngineConfiguration scriptConfig
     ) 
     {
         this.mediator = mediator;
@@ -43,6 +45,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         this.serviceProvider = serviceProvider;
         this.scriptHost = scriptHost;
         this.customStepsService = customStepsService;
+        this.scriptConfig = scriptConfig;
         this.scriptHost.ScriptTextWritten += OnScriptTextWritten;
 
         logger = Log.ForContext<StudioFlowExecuteService>();
@@ -162,7 +165,10 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
         var inputVariablesDictionary = step.InputVariables.ToDictionary(x => x.Name, x => x.Value);
 
-        var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
+        // Use the injected configuration for the script engine
+        var engineFactory = new ScriptEngineFactory(scriptConfig);
+        var engine = engineFactory.GetEngine(contentType);
+        var scriptVariables = engine.Execute(step.Code, inputVariablesDictionary);
 
         foreach (var variable in step.OutputVariables)
         {
