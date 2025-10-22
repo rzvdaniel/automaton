@@ -96,7 +96,6 @@ public static class ServiceCollectionExtensions
             var config = new ScriptEngineConfiguration
             {
                 UsePythonNet = true, // Runners use Python.NET
-                EnableDebugMode = false
             };
             
             // Bind base configuration from appsettings.json (optional)
@@ -143,7 +142,6 @@ public static class ServiceCollectionExtensions
             var config = new ScriptEngineConfiguration
             {
                 UsePythonNet = true, // Desktop uses Python.NET
-                EnableDebugMode = true // Enable debug mode for Desktop
             };
             
             // Bind base configuration from appsettings.json (optional)

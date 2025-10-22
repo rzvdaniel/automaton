@@ -37,7 +37,6 @@ public class ScriptEngineConfigurationIntegrationTests
 
         // Assert
         scriptEngineConfig.Should().NotBeNull();
-        scriptEngineConfig!.EnableDebugMode.Should().BeTrue();
         scriptEngineConfig.AutoDetectPythonPaths.Should().BeFalse();
         scriptEngineConfig.PythonPaths.Should().Contain(Path.GetTempPath());
 
@@ -116,7 +115,6 @@ result_length = len(greeting_message)
         services.AddScripting(config =>
         {
             config.AutoDetectPythonPaths = false;
-            config.EnableDebugMode = true;
             config.AddPythonPath(Path.GetTempPath());
         });
 
@@ -128,7 +126,6 @@ result_length = len(greeting_message)
         // Assert
         config.Should().NotBeNull();
         config!.AutoDetectPythonPaths.Should().BeFalse();
-        config.EnableDebugMode.Should().BeTrue();
         config.PythonPaths.Should().Contain(Path.GetTempPath());
     }
 }

@@ -58,12 +58,7 @@ public class DesktopScriptEngineSettingsInitializer : IHostedService
                 if (settings != null)
                 {
                     _config.LoadFromDesktopSettings(settings);
-                    _logger.Information("Successfully loaded desktop script engine settings");
-                    
-                    if (_config.EnableDebugMode)
-                    {
-                        _logger.Debug("Python Paths: {Count} configured", _config.PythonPaths?.Count ?? 0);
-                    }
+                    _logger.Information("Successfully loaded desktop script engine settings");     
                 }
                 else
                 {

@@ -4,15 +4,15 @@ namespace Automaton.Core.Scripting;
 
 public class PythonEnvironmentConfigurator
 {
-    public void Configure(PythonEnvironmentInfo detected, ScriptEngineConfiguration configuration, bool enableDebug = false)
+    public void Configure(PythonEnvironmentInfo detected, ScriptEngineConfiguration configuration)
     {
         if (configuration.AutoDetectPythonPaths && detected != null)
         {
-            TryResolveAndSetPythonDll(detected, enableDebug, configuration);
+            TryResolveAndSetPythonDll(detected, configuration);
         }
     }
 
-    private void TryResolveAndSetPythonDll(PythonEnvironmentInfo detected, bool enableDebug, ScriptEngineConfiguration configuration)
+    private void TryResolveAndSetPythonDll(PythonEnvironmentInfo detected, ScriptEngineConfiguration configuration)
     {
         if (!OperatingSystem.IsWindows()) return;
         if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL)) return;

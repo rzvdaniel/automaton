@@ -35,18 +35,9 @@ namespace Automaton.Core.Scripting
                 try
                 {
                     engines[PythonScrypt] = new PythonNetScriptEngine(configuration);
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine("✓ Python.NET engine initialized successfully");
-                    }
                 }
                 catch (Exception ex)
                 {
-                    // Fallback to IronPython if Python.NET fails to initialize
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine($"Warning: Python.NET initialization failed ({ex.Message}), falling back to IronPython");
-                    }
                     InitializeIronPython();
                 }
             }
@@ -87,7 +78,6 @@ namespace Automaton.Core.Scripting
     public class ScriptEngineConfiguration
     {
         public bool UsePythonNet { get; set; } = false; // Default to IronPython for backward compatibility
-        public bool EnableDebugMode { get; set; } = false;
         public bool AutoDetectPythonPaths { get; set; } = true;
         public List<string> PythonPaths { get; set; } = new List<string>();
         public int DefaultTimeoutSeconds { get; set; } = 60; // Default timeout for script execution
@@ -104,10 +94,6 @@ namespace Automaton.Core.Scripting
             if (settings.Python.PythonPaths?.Any() == true)
             {
                 PythonPaths = new List<string>(settings.Python.PythonPaths);
-                if (EnableDebugMode)
-                {
-                    Console.WriteLine($"Using {PythonPaths.Count} user-specified Python paths");
-                }
             }
         }
 
@@ -122,10 +108,6 @@ namespace Automaton.Core.Scripting
             if (settings.PythonPaths?.Any() == true)
             {
                 PythonPaths = new List<string>(settings.PythonPaths);
-                if (EnableDebugMode)
-                {
-                    Console.WriteLine($"Using {PythonPaths.Count} user-specified Python paths");
-                }
             }
         }
 

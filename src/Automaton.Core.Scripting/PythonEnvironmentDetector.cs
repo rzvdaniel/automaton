@@ -4,7 +4,7 @@ namespace Automaton.Core.Scripting;
 
 public class PythonEnvironmentDetector
 {
-    public PythonEnvironmentInfo Detect(bool enableDebug = false)
+    public PythonEnvironmentInfo Detect()
     {
         var info = new PythonEnvironmentInfo();
         var candidates = new[] { "python3", "python" };
@@ -35,15 +35,6 @@ public class PythonEnvironmentDetector
                         info.PythonMajor = maj;
                         info.PythonMinor = min;
                     }
-                }
-
-                if (enableDebug)
-                {
-                    Console.WriteLine($"Detected Python home: {info.PythonHome}");
-                    if (!string.IsNullOrWhiteSpace(info.PythonExe))
-                        Console.WriteLine($"Detected Python exe: {info.PythonExe}");
-                    if (info.PythonMajor.HasValue)
-                        Console.WriteLine($"Detected Python version: {info.PythonMajor}.{info.PythonMinor}");
                 }
                 break;
             }

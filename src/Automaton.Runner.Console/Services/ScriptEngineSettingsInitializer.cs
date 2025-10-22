@@ -58,12 +58,7 @@ public class ScriptEngineSettingsInitializer : IHostedService
                 if (settings != null)
                 {
                     _config.LoadFromRunnerSettings(settings);
-                    _logger.Information("Successfully loaded runner script engine settings");
-                    
-                    if (_config.EnableDebugMode)
-                    {
-                        _logger.Debug("Python Paths: {Count} configured", _config.PythonPaths?.Count ?? 0);
-                    }
+                    _logger.Information("Successfully loaded runner script engine settings");                
                 }
                 else
                 {

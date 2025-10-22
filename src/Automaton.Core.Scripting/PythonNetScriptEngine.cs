@@ -29,7 +29,7 @@ namespace Automaton.Core.Scripting
             this.configuration = configuration;
             this.detector = new PythonEnvironmentDetector();
             this.configurator = new PythonEnvironmentConfigurator();
-            this.detectedEnv = detector.Detect(configuration.EnableDebugMode);
+            this.detectedEnv = detector.Detect();
             // Do not call InitializePython() here - defer until Execute() is called
         }
 
@@ -45,21 +45,7 @@ namespace Automaton.Core.Scripting
                         // Set Python DLL before initialization if not already set
                         if (string.IsNullOrWhiteSpace(Runtime.PythonDLL))
                         {
-                            // Priority 2: Auto-detect and set DLL
-                            if (configuration.EnableDebugMode)
-                            {
-                                Console.WriteLine("[DEBUG] Auto-detecting Python DLL...");
-                            }
-                            configurator.Configure(detectedEnv, configuration, configuration.EnableDebugMode);
-                            if (configuration.EnableDebugMode)
-                            {
-                                Console.WriteLine($"[DEBUG] Auto-detected Runtime.PythonDLL: {Runtime.PythonDLL}");
-                            }
-                        }
-
-                        if (configuration.EnableDebugMode)
-                        {
-                            Console.WriteLine($"[DEBUG] Final Runtime.PythonDLL before Initialize(): {Runtime.PythonDLL}");
+                            configurator.Configure(detectedEnv, configuration);
                         }
 
                         // Initialize Python and release the GIL so ASP.NET threads are not blocked
@@ -72,17 +58,6 @@ namespace Automaton.Core.Scripting
                 }
                 catch (Exception ex)
                 {
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine($"[ERROR] Python.NET initialization failed: {ex.Message}");
-                        Console.WriteLine($"[ERROR] InnerException: {ex.InnerException?.Message}");
-                        Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
-                        if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL))
-                        {
-                            Console.WriteLine($"[ERROR] Runtime.PythonDLL: {Runtime.PythonDLL}");
-                            Console.WriteLine($"[ERROR] DLL exists: {System.IO.File.Exists(Runtime.PythonDLL)}");
-                        }
-                    }
                     throw;
                 }
             }
@@ -116,10 +91,6 @@ namespace Automaton.Core.Scripting
                     foreach (var p in configuration.PythonPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
                     {
                         pathsToAdd.Add(p);
-                        if (configuration.EnableDebugMode)
-                        {
-                            Console.WriteLine($"Adding user-configured Python path: {p}");
-                        }
                     }
                 }
 
@@ -133,10 +104,6 @@ namespace Automaton.Core.Scripting
                         foreach (var p in detectedPaths)
                         {
                             pathsToAdd.Add(p);
-                            if (configuration.EnableDebugMode)
-                            {
-                                Console.WriteLine($"Adding auto-detected Python path: {p}");
-                            }
                         }
                     }
 
@@ -150,10 +117,6 @@ namespace Automaton.Core.Scripting
                             if (Directory.Exists(p))
                             {
                                 pathsToAdd.Add(p);
-                                if (configuration.EnableDebugMode)
-                                {
-                                    Console.WriteLine($"Adding auto-detected Python path: {p}");
-                                }
                             }
                         }
                     }
@@ -183,29 +146,16 @@ namespace Automaton.Core.Scripting
                                     if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
                                     {
                                         currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
-                                        if (configuration.EnableDebugMode)
-                                        {
-                                            Console.WriteLine($"? Added to sys.path: {p}");
-                                        }
                                     }
                                 }
                                 catch { }
                             }
                         }
                     }
-
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine($"Successfully configured {finalPaths.Count} Python paths");
-                    }
                 }
             }
             catch (Exception ex)
             {
-                if (configuration.EnableDebugMode)
-                {
-                    Console.WriteLine($"Warning: Failed to apply configured paths to sys.path: {ex.Message}");
-                }
             }
         }
 
