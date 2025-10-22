@@ -1,15 +1,10 @@
-﻿using IronPython.Hosting;
-using Microsoft.Scripting.Hosting;
-using System.Text;
-
-namespace Automaton.Core.Scripting
+﻿namespace Automaton.Core.Scripting
 {
     public class ScriptEngineFactory
     {
         private const string PythonScrypt = @"text/x-python";
         private const string BatchScript = @"text/x-batch";
 
-        private readonly Dictionary<string, ScriptRuntime> runtimes;
         private readonly Dictionary<string, IScriptEngine> engines;
         private readonly ScriptEngineConfiguration configuration;
 
@@ -20,7 +15,6 @@ namespace Automaton.Core.Scripting
             this.configuration = configuration;
             EventRaisingStreamWriter = new EventRaisingStreamWriter();
 
-            runtimes = new();
             engines = new();
 
             InitializePythonEngine();
@@ -29,8 +23,7 @@ namespace Automaton.Core.Scripting
 
         private void InitializePythonEngine()
         {
-            if (configuration.UsePythonNet)
-            {
+            
                 // Use Python.NET implementation with fallback
                 try
                 {
@@ -38,25 +31,13 @@ namespace Automaton.Core.Scripting
                 }
                 catch (Exception ex)
                 {
-                    InitializeIronPython();
+                    throw;
                 }
-            }
-            else
-            {
-                // Use IronPython implementation (original)
-                InitializeIronPython();
-            }
+
+            
         }
 
-        private void InitializeIronPython()
-        {
-            runtimes[PythonScrypt] = IronPython.Hosting.Python.CreateRuntime();
-            
-            // Workaround for IronPython output
-            runtimes[PythonScrypt].IO.SetOutput(EventRaisingStreamWriter, Encoding.ASCII);
-            
-            engines[PythonScrypt] = new PythonScriptEngine(IronPython.Hosting.Python.GetEngine(runtimes[PythonScrypt]));
-        }
+       
 
         private void InitializeBatchEngine()
         {

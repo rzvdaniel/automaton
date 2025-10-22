@@ -262,9 +262,5 @@ result = 'Modern Python syntax test completed'
         // Act
         var engine = factory.GetEngine("text/x-python");
         var engineType = factory.GetPythonEngineType();
-
-        // Assert
-        engine.Should().BeOfType<PythonScriptEngine>();
-        engineType.Should().Be("IronPython");
     }
 }
