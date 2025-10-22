@@ -42,20 +42,10 @@
         }
 
         public IScriptEngine GetEngine(string contentType) => engines[contentType];
-
-        public string GetPythonEngineType() 
-        {
-            if (configuration.UsePythonNet && engines[PythonScrypt] is PythonNetScriptEngine)
-            {
-                return "Python.NET";
-            }
-            return "IronPython";
-        }
     }
 
     public class ScriptEngineConfiguration
     {
-        public bool UsePythonNet { get; set; } = false; // Default to IronPython for backward compatibility
         public bool AutoDetectPythonPaths { get; set; } = true;
         public List<string> PythonPaths { get; set; } = new List<string>();
         public int DefaultTimeoutSeconds { get; set; } = 60; // Default timeout for script execution

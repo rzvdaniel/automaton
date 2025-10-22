@@ -32,32 +32,19 @@ public static class ServiceCollectionExtensions
 
     public static void AddScriptingWithPythonNet(this IServiceCollection services)
     {
-        services.AddScoped<ScriptEngineConfiguration>(_ => new ScriptEngineConfiguration 
-        { 
-            UsePythonNet = true
-        });
+        services.AddScoped<ScriptEngineConfiguration>(_ => new ScriptEngineConfiguration());
         services.AddScoped<ScriptEngineHost>();
     }
 
     /// <summary>
     /// Add scripting with Python.NET using configuration from appsettings.json
-    /// Example configuration:
-    /// {
-    ///   "Scripting": {
-    ///     "UsePythonNet": true,
-    ///     "EnableDebugMode": false
-    ///   }
-    /// }
     /// </summary>
     public static void AddScriptingWithConfiguredPythonNet(this IServiceCollection services)
     {
         services.AddScoped<ScriptEngineConfiguration>(provider =>
         {
             var configuration = provider.GetService<IConfiguration>();
-            var config = new ScriptEngineConfiguration
-            {
-                UsePythonNet = true // Force Python.NET usage
-            };
+            var config = new ScriptEngineConfiguration();
             configuration?.GetSection("Scripting").Bind(config);
             return config;
         });
@@ -81,7 +68,6 @@ public static class ServiceCollectionExtensions
     /// Example appsettings.json:
     /// {
     ///   "Scripting": {
-    ///     "EnableDebugMode": true,
     ///     "AutoDetectPythonPaths": true,
     ///     "DefaultTimeoutSeconds": 120
     ///   }
@@ -93,10 +79,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ScriptEngineConfiguration>(provider =>
         {
             var configuration = provider.GetService<IConfiguration>();
-            var config = new ScriptEngineConfiguration
-            {
-                UsePythonNet = true, // Runners use Python.NET
-            };
+            var config = new ScriptEngineConfiguration();
             
             // Bind base configuration from appsettings.json (optional)
             // This allows environment-specific defaults (Dev/Production) without database changes
@@ -128,7 +111,6 @@ public static class ServiceCollectionExtensions
     /// Example appsettings.json:
     /// {
     ///   "Scripting": {
-    ///     "EnableDebugMode": true,
     ///     "AutoDetectPythonPaths": true
     ///   }
     /// }
@@ -139,10 +121,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ScriptEngineConfiguration>(provider =>
         {
             var configuration = provider.GetService<IConfiguration>();
-            var config = new ScriptEngineConfiguration
-            {
-                UsePythonNet = true, // Desktop uses Python.NET
-            };
+            var config = new ScriptEngineConfiguration();
             
             // Bind base configuration from appsettings.json (optional)
             // This allows environment-specific defaults without database changes

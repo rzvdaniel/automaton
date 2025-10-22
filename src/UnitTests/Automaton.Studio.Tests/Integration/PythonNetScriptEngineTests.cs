@@ -235,32 +235,4 @@ result = 'Modern Python syntax test completed'
         numbers.Should().NotBeNull();
         numbers.Should().HaveCount(5);
     }
-
-    [Test]
-    public void ScriptEngineFactory_WithPythonNetConfiguration_UsesPythonNet()
-    {
-        // Arrange
-        var config = new ScriptEngineConfiguration { UsePythonNet = true };
-        var factory = new ScriptEngineFactory(config);
-
-        // Act
-        var engine = factory.GetEngine("text/x-python");
-        var engineType = factory.GetPythonEngineType();
-
-        // Assert
-        engine.Should().BeOfType<PythonNetScriptEngine>();
-        engineType.Should().Be("Python.NET");
-    }
-
-    [Test]
-    public void ScriptEngineFactory_WithDefaultConfiguration_UsesIronPython()
-    {
-        // Arrange
-        var config = new ScriptEngineConfiguration(); // UsePythonNet defaults to false
-        var factory = new ScriptEngineFactory(config);
-
-        // Act
-        var engine = factory.GetEngine("text/x-python");
-        var engineType = factory.GetPythonEngineType();
-    }
 }
