@@ -2,21 +2,22 @@
 
 public class ScriptEngineHost
 {
-    private readonly ScriptEngineFactory engineFactory;
+    private readonly ScriptEngineConfiguration configuration;
 
     public event EventHandler<string> ScriptTextWritten;
 
-    public ScriptEngineHost(ScriptEngineFactory engineFactory)
+    public ScriptEngineHost(ScriptEngineConfiguration configuration)
     {
-        this.engineFactory = engineFactory;
-
-        engineFactory.EventRaisingStreamWriter.NewText += OnTextWritten;
+        this.configuration = configuration;
     }
 
     public IDictionary<string, dynamic> Execute(ScriptResource resource, IDictionary<string, object> inputs)
     {
         try
         {
+            // Create ScriptEngineFactory on demand
+            var engineFactory = new ScriptEngineFactory(configuration);
+            engineFactory.EventRaisingStreamWriter.NewText += OnTextWritten;
             var engine = engineFactory.GetEngine(resource.ContentType);
 
             // Set output callback if supported

@@ -15,7 +15,6 @@ public static class ServiceCollectionExtensions
             return config;
         });
         
-        services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
 
@@ -28,7 +27,6 @@ public static class ServiceCollectionExtensions
             return config;
         });
         
-        services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
 
@@ -39,7 +37,6 @@ public static class ServiceCollectionExtensions
             UsePythonNet = true,
             PythonDllPath = pythonDllPath
         });
-        services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
 
@@ -67,7 +64,6 @@ public static class ServiceCollectionExtensions
             return config;
         });
         
-        services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
 
@@ -116,7 +112,6 @@ public static class ServiceCollectionExtensions
             return config;
         });
         
-        services.AddScoped<ScriptEngineFactory>();
         services.AddScoped<ScriptEngineHost>();
     }
 
@@ -163,7 +158,6 @@ public static class ServiceCollectionExtensions
             
             return config;
         });
-        services.AddSingleton<ScriptEngineFactory>();
         services.AddSingleton<ScriptEngineHost>();
     }
 }

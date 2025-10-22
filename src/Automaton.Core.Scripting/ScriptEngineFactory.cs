@@ -15,10 +15,6 @@ namespace Automaton.Core.Scripting
 
         public EventRaisingStreamWriter EventRaisingStreamWriter { get; set; }
 
-        public ScriptEngineFactory() : this(new ScriptEngineConfiguration())
-        {
-        }
-
         public ScriptEngineFactory(ScriptEngineConfiguration configuration)
         {
             this.configuration = configuration;
