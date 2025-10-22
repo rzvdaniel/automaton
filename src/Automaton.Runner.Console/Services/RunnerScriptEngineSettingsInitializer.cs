@@ -10,19 +10,19 @@ namespace Automaton.Runner.Console.Services;
 /// Runs after DI container is fully initialized to avoid deadlocks
 /// Also provides a method to reload settings when user updates them
 /// </summary>
-public class ScriptEngineSettingsInitializer : IHostedService
+public class RunnerScriptEngineSettingsInitializer : IHostedService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ScriptEngineConfiguration _config;
     private readonly ILogger _logger;
 
-    public ScriptEngineSettingsInitializer(
+    public RunnerScriptEngineSettingsInitializer(
         IServiceProvider serviceProvider,
         ScriptEngineConfiguration config)
     {
         _serviceProvider = serviceProvider;
         _config = config;
-        _logger = Log.ForContext<ScriptEngineSettingsInitializer>();
+        _logger = Log.ForContext<RunnerScriptEngineSettingsInitializer>();
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)

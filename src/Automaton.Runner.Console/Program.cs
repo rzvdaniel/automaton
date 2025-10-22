@@ -233,7 +233,7 @@ public class Program
                 services.AddScoped<Automaton.Runner.Console.Services.RunnerSettingsService>();
                 
                 // Register background service to load script engine settings at startup
-                services.AddHostedService<Services.ScriptEngineSettingsInitializer>();
+                services.AddHostedService<Services.RunnerScriptEngineSettingsInitializer>();
                 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<Handlers.CustomStepHandler>();
@@ -265,7 +265,7 @@ public class Program
                 });
                 
                 // Add HTTP client for RunnerSettingsService
-                services.AddHttpClient<Automaton.Runner.Console.Services.RunnerSettingsService>((sp, client) =>
+                services.AddHttpClient<RunnerSettingsService>((sp, client) =>
                 {
                     var configService = sp.GetRequiredService<ConfigurationService>();
                     client.BaseAddress = new Uri(configService.BaseUrl);
