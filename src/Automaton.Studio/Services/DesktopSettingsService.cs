@@ -73,12 +73,7 @@ public class DesktopSettingsService
             if (settings != null)
             {
                 _logger.LogInformation("Loaded desktop Python settings");
-                
-                if (!string.IsNullOrWhiteSpace(settings.PythonDllPath))
-                {
-                    _logger.LogInformation("Python DLL path configured: {Path}", settings.PythonDllPath);
-                }
-                
+                                
                 if (settings.PythonPaths?.Any() == true)
                 {
                     _logger.LogInformation("Python paths configured: {Count} paths", settings.PythonPaths.Count);

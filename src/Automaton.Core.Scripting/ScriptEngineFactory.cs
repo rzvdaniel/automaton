@@ -90,7 +90,6 @@ namespace Automaton.Core.Scripting
         public bool EnableDebugMode { get; set; } = false;
         public bool AutoDetectPythonPaths { get; set; } = true;
         public List<string> PythonPaths { get; set; } = new List<string>();
-        public string? PythonDllPath { get; set; } = null; // Path to Python DLL for Python.NET
         public int DefaultTimeoutSeconds { get; set; } = 60; // Default timeout for script execution
         public int NetworkTimeoutSeconds { get; set; } = 30; // Timeout for network requests
 
@@ -101,15 +100,6 @@ namespace Automaton.Core.Scripting
         public void LoadFromRunnerSettings(RunnerScriptEngineSettings? settings)
         {
             if (settings?.Python == null) return;
-
-            if (!string.IsNullOrWhiteSpace(settings.Python.PythonDllPath))
-            {
-                PythonDllPath = settings.Python.PythonDllPath;
-                if (EnableDebugMode)
-                {
-                    Console.WriteLine($"Using user-specified Python DLL: {PythonDllPath}");
-                }
-            }
 
             if (settings.Python.PythonPaths?.Any() == true)
             {
@@ -128,15 +118,6 @@ namespace Automaton.Core.Scripting
         public void LoadFromDesktopSettings(PythonEngineSettings? settings)
         {
             if (settings == null) return;
-
-            if (!string.IsNullOrWhiteSpace(settings.PythonDllPath))
-            {
-                PythonDllPath = settings.PythonDllPath;
-                if (EnableDebugMode)
-                {
-                    Console.WriteLine($"Using user-specified Python DLL: {PythonDllPath}");
-                }
-            }
 
             if (settings.PythonPaths?.Any() == true)
             {

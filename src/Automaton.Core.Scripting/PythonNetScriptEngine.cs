@@ -7,19 +7,16 @@ namespace Automaton.Core.Scripting
 {
     public class PythonNetScriptEngine : IScriptEngine, IOutputCallbackScriptEngine, IDisposable
     {
-        private bool isInitialized = false;
         private readonly object initLock = new object();
         private static readonly object gilExecutionLock = new object();
         private readonly StringBuilder outputBuffer = new StringBuilder();
         private readonly ScriptEngineConfiguration configuration;
         private IntPtr _allowThreadsState = IntPtr.Zero;
 
-        // Detected Python environment (used to resolve external packages like 'requests')
-        private string? _detectedPythonHome;
-        private string? _detectedPythonPaths; // os.pathsep-joined list
-        private string? _detectedPythonExe;   // Path to the python executable
-        private int? _detectedPyMajor;
-        private int? _detectedPyMinor;
+        // Extracted environment detection/configuration
+        private readonly PythonEnvironmentInfo detectedEnv;
+        private readonly PythonEnvironmentDetector detector;
+        private readonly PythonEnvironmentConfigurator configurator;
 
         public Action<string>? OutputCallback { get; set; }
 
@@ -30,261 +27,64 @@ namespace Automaton.Core.Scripting
         public PythonNetScriptEngine(ScriptEngineConfiguration configuration)
         {
             this.configuration = configuration;
-            InitializePython();
+            this.detector = new PythonEnvironmentDetector();
+            this.configurator = new PythonEnvironmentConfigurator();
+            this.detectedEnv = detector.Detect(configuration.EnableDebugMode);
+            // Do not call InitializePython() here - defer until Execute() is called
         }
 
         private void InitializePython()
         {
             lock (initLock)
             {
-                if (isInitialized || PythonEngine.IsInitialized)
-                {
-                    isInitialized = true;
-                    return;
-                }
-
                 try
                 {
-                    // Priority 1: Use user-specified Python DLL path from configuration
-                    if (!string.IsNullOrWhiteSpace(configuration.PythonDllPath))
+                    // Only initialize Python.NET if not already initialized globally
+                    if (!PythonEngine.IsInitialized)
                     {
-                        Runtime.PythonDLL = configuration.PythonDllPath;
+                        // Set Python DLL before initialization if not already set
+                        if (string.IsNullOrWhiteSpace(Runtime.PythonDLL))
+                        {
+                            // Priority 2: Auto-detect and set DLL
+                            if (configuration.EnableDebugMode)
+                            {
+                                Console.WriteLine("[DEBUG] Auto-detecting Python DLL...");
+                            }
+                            configurator.Configure(detectedEnv, configuration, configuration.EnableDebugMode);
+                            if (configuration.EnableDebugMode)
+                            {
+                                Console.WriteLine($"[DEBUG] Auto-detected Runtime.PythonDLL: {Runtime.PythonDLL}");
+                            }
+                        }
+
                         if (configuration.EnableDebugMode)
                         {
-                            Console.WriteLine($"Using user-specified Python DLL: {configuration.PythonDllPath}");
+                            Console.WriteLine($"[DEBUG] Final Runtime.PythonDLL before Initialize(): {Runtime.PythonDLL}");
                         }
-                    }
-                    else
-                    {
-                        // Priority 2: Auto-detect Python environment if no user-specified DLL
-                        if (configuration.AutoDetectPythonPaths)
-                        {
-                            DetectPythonEnvironment();
-                            TryResolveAndSetPythonDll();
-                        }
+
+                        // Initialize Python and release the GIL so ASP.NET threads are not blocked
+                        PythonEngine.Initialize();
+                        _allowThreadsState = PythonEngine.BeginAllowThreads();
                     }
 
-                    // Initialize Python and release the GIL so ASP.NET threads are not blocked
-                    PythonEngine.Initialize();
-                    _allowThreadsState = PythonEngine.BeginAllowThreads();
-                    isInitialized = true;
-
-                    // Apply configured paths to sys.path for the running interpreter
+                    // Always apply configured paths for this engine instance, even if Python was already initialized
                     ApplyConfiguredPathsToSyspath();
                 }
                 catch (Exception ex)
                 {
                     if (configuration.EnableDebugMode)
                     {
-                        Console.WriteLine($"Python.NET initialization failed: {ex.Message}");
+                        Console.WriteLine($"[ERROR] Python.NET initialization failed: {ex.Message}");
+                        Console.WriteLine($"[ERROR] InnerException: {ex.InnerException?.Message}");
+                        Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
                         if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL))
                         {
-                            Console.WriteLine($"Runtime.PythonDLL: {Runtime.PythonDLL}");
+                            Console.WriteLine($"[ERROR] Runtime.PythonDLL: {Runtime.PythonDLL}");
+                            Console.WriteLine($"[ERROR] DLL exists: {System.IO.File.Exists(Runtime.PythonDLL)}");
                         }
                     }
                     throw;
                 }
-            }
-        }
-
-        // Best-effort: query a system Python to get exec_prefix and sys.path
-        private void DetectPythonEnvironment()
-        {
-            try
-            {
-                var candidates = new[] { "python3", "python" };
-                foreach (var exe in candidates)
-                {
-                    try
-                    {
-                        var home = RunPythonAndReadStdOut(exe, "-c \"import sys; print(sys.exec_prefix)\"")?.Trim();
-                        if (string.IsNullOrWhiteSpace(home) || !Directory.Exists(home))
-                            continue;
-
-                        var paths = RunPythonAndReadStdOut(exe, "-c \"import sys, os; print(os.pathsep.join(sys.path))\"")?.Trim();
-                        if (string.IsNullOrWhiteSpace(paths))
-                            continue;
-
-                        var ver = RunPythonAndReadStdOut(exe, "-c \"import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')\"")?.Trim();
-                        var sysExe = RunPythonAndReadStdOut(exe, "-c \"import sys; print(sys.executable)\"")?.Trim();
-
-                        _detectedPythonHome = home;
-                        _detectedPythonPaths = paths;
-                        _detectedPythonExe = !string.IsNullOrWhiteSpace(sysExe) ? sysExe : null;
-
-                        if (!string.IsNullOrWhiteSpace(ver))
-                        {
-                            var parts = ver.Split('.', StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length >= 2 && int.TryParse(parts[0], out var maj) && int.TryParse(parts[1], out var min))
-                            {
-                                _detectedPyMajor = maj;
-                                _detectedPyMinor = min;
-                            }
-                        }
-
-                        if (configuration.EnableDebugMode)
-                        {
-                            Console.WriteLine($"Detected Python home: {_detectedPythonHome}");
-                            if (!string.IsNullOrWhiteSpace(_detectedPythonExe))
-                                Console.WriteLine($"Detected Python exe: {_detectedPythonExe}");
-                            if (_detectedPyMajor.HasValue)
-                                Console.WriteLine($"Detected Python version: {_detectedPyMajor}.{_detectedPyMinor}");
-                        }
-                        break;
-                    }
-                    catch
-                    {
-                        // try next
-                    }
-                }
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-
-        private void TryResolveAndSetPythonDll()
-        {
-            try
-            {
-                // Only attempt on Windows; on Linux/macOS pythonnet uses libpython (different file names)
-                if (!OperatingSystem.IsWindows()) return;
-
-                // If user specified a DLL path in configuration, do not auto-resolve
-                if (!string.IsNullOrWhiteSpace(configuration.PythonDllPath)) 
-                {
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine("Skipping Python DLL auto-resolution (user-specified path is set)");
-                    }
-                    return;
-                }
-
-                // If already set elsewhere, do nothing
-                if (!string.IsNullOrWhiteSpace(Runtime.PythonDLL)) return;
-
-                var candidateDirs = new List<string>();
-
-                // Detected locations
-                if (!string.IsNullOrWhiteSpace(_detectedPythonHome) && Directory.Exists(_detectedPythonHome))
-                {
-                    candidateDirs.Add(_detectedPythonHome);
-                    var dlls = Path.Combine(_detectedPythonHome, "DLLs");
-                    var bin = Path.Combine(_detectedPythonHome, "bin");
-                    if (Directory.Exists(dlls)) candidateDirs.Add(dlls);
-                    if (Directory.Exists(bin)) candidateDirs.Add(bin);
-                }
-
-                if (!string.IsNullOrWhiteSpace(_detectedPythonExe))
-                {
-                    var exeDir = Path.GetDirectoryName(_detectedPythonExe);
-                    if (!string.IsNullOrWhiteSpace(exeDir)) candidateDirs.Add(exeDir);
-                }
-
-                // PYTHONHOME
-                var pyHomeEnv = Environment.GetEnvironmentVariable("PYTHONHOME");
-                if (!string.IsNullOrWhiteSpace(pyHomeEnv) && Directory.Exists(pyHomeEnv))
-                {
-                    candidateDirs.Add(pyHomeEnv);
-                    var dlls = Path.Combine(pyHomeEnv, "DLLs");
-                    var bin = Path.Combine(pyHomeEnv, "bin");
-                    if (Directory.Exists(dlls)) candidateDirs.Add(dlls);
-                    if (Directory.Exists(bin)) candidateDirs.Add(bin);
-                }
-
-                // PATH entries
-                var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-                foreach (var p in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (Directory.Exists(p)) candidateDirs.Add(p);
-                }
-
-                // De-duplicate
-                candidateDirs = candidateDirs
-                    .Select(p => p.Trim())
-                    .Where(p => !string.IsNullOrWhiteSpace(p))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                string? bestMatch = null;
-                int bestScore = int.MinValue;
-
-                // Build expected version token, e.g., 311, 312
-                var versionToken = (_detectedPyMajor.HasValue && _detectedPyMinor.HasValue)
-                    ? ($"{_detectedPyMajor}{_detectedPyMinor}")
-                    : null;
-
-                foreach (var dir in candidateDirs)
-                {
-                    try
-                    {
-                        // search for python3*.dll first, then python*.dll as fallback
-                        var files = Enumerable.Empty<string>();
-                        try { files = Directory.EnumerateFiles(dir, "python3*.dll"); } catch { }
-                        if (!files.Any())
-                        {
-                            try { files = Directory.EnumerateFiles(dir, "python*.dll"); } catch { }
-                        }
-
-                        foreach (var file in files)
-                        {
-                            var name = Path.GetFileName(file);
-                            // Typical names: python311.dll, python312.dll
-                            var m = Regex.Match(name, @"python(?<maj>\d)(?<min>\d{1,2})\.dll", RegexOptions.IgnoreCase);
-                            int score = 0;
-                            if (m.Success)
-                            {
-                                var token = m.Groups["maj"].Value + m.Groups["min"].Value; // e.g. 311
-                                if (!string.IsNullOrWhiteSpace(versionToken))
-                                {
-                                    if (string.Equals(token, versionToken, StringComparison.Ordinal))
-                                    {
-                                        score += 1000; // exact match
-                                    }
-                                    else if (token.StartsWith(_detectedPyMajor?.ToString() ?? string.Empty))
-                                    {
-                                        score += 500; // same major
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Unknown pattern, lower confidence
-                                score += 10;
-                            }
-
-                            // Prefer files closer to detected locations by giving base dir a boost
-                            if (!string.IsNullOrWhiteSpace(_detectedPythonHome) && dir.StartsWith(_detectedPythonHome, StringComparison.OrdinalIgnoreCase))
-                            {
-                                score += 50;
-                            }
-
-                            if (score > bestScore)
-                            {
-                                bestScore = score;
-                                bestMatch = file;
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // ignore this directory
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(bestMatch) && File.Exists(bestMatch))
-                {
-                    Runtime.PythonDLL = bestMatch;
-                    if (configuration.EnableDebugMode)
-                    {
-                        Console.WriteLine($"Auto-resolved Runtime.PythonDLL to: {bestMatch}");
-                    }
-                }
-            }
-            catch
-            {
-                // swallow, pythonnet will throw if not set and not discoverable
             }
         }
 
@@ -327,9 +127,9 @@ namespace Automaton.Core.Scripting
                 // This is now additive: both user and auto-detected paths are combined
                 if (configuration.AutoDetectPythonPaths)
                 {
-                    if (!string.IsNullOrWhiteSpace(_detectedPythonPaths))
+                    if (!string.IsNullOrWhiteSpace(detectedEnv.PythonPaths))
                     {
-                        var detectedPaths = _detectedPythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+                        var detectedPaths = detectedEnv.PythonPaths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
                         foreach (var p in detectedPaths)
                         {
                             pathsToAdd.Add(p);
@@ -340,11 +140,11 @@ namespace Automaton.Core.Scripting
                         }
                     }
 
-                    if (!string.IsNullOrWhiteSpace(_detectedPythonHome))
+                    if (!string.IsNullOrWhiteSpace(detectedEnv.PythonHome))
                     {
-                        var lib = Path.Combine(_detectedPythonHome, "Lib");
+                        var lib = Path.Combine(detectedEnv.PythonHome, "Lib");
                         var sitePkgs = Path.Combine(lib, "site-packages");
-                        var dlls = Path.Combine(_detectedPythonHome, "DLLs");
+                        var dlls = Path.Combine(detectedEnv.PythonHome, "DLLs");
                         foreach (var p in new[] { lib, sitePkgs, dlls })
                         {
                             if (Directory.Exists(p))
@@ -374,39 +174,39 @@ namespace Automaton.Core.Scripting
                         {
                             var sys = Py.Import("sys");
                             var currentPath = sys.GetAttr("path");
-                           
-                           foreach (var p in finalPaths)
-{
-        using var pyPath = new PyString(p);
-             try
-   {
-        if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
-                  {
-          currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
- if (configuration.EnableDebugMode)
-                   {
-   Console.WriteLine($"? Added to sys.path: {p}");
- }
-                 }
-    }
-      catch { }
-       }
-    }
-            }
 
-              if (configuration.EnableDebugMode)
-   {
-    Console.WriteLine($"Successfully configured {finalPaths.Count} Python paths");
-           }
-        }
-   }
-    catch (Exception ex)
+                            foreach (var p in finalPaths)
+                            {
+                                using var pyPath = new PyString(p);
+                                try
+                                {
+                                    if (!currentPath.InvokeMethod("__contains__", pyPath).As<bool>())
+                                    {
+                                        currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
+                                        if (configuration.EnableDebugMode)
+                                        {
+                                            Console.WriteLine($"? Added to sys.path: {p}");
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+
+                    if (configuration.EnableDebugMode)
+                    {
+                        Console.WriteLine($"Successfully configured {finalPaths.Count} Python paths");
+                    }
+                }
+            }
+            catch (Exception ex)
             {
-         if (configuration.EnableDebugMode)
-   {
-         Console.WriteLine($"Warning: Failed to apply configured paths to sys.path: {ex.Message}");
-         }
- }
+                if (configuration.EnableDebugMode)
+                {
+                    Console.WriteLine($"Warning: Failed to apply configured paths to sys.path: {ex.Message}");
+                }
+            }
         }
 
         private static string? RunPythonAndReadStdOut(string exe, string args)
@@ -443,7 +243,7 @@ namespace Automaton.Core.Scripting
         {
             // Delegate to Execute and wrap in ScriptExecutionResult
             var variables = Execute(code, inputs);
-            
+
             var result = new ScriptExecutionResult
             {
                 OutputVariables = variables
@@ -500,10 +300,10 @@ namespace Automaton.Core.Scripting
                     if (!string.IsNullOrEmpty(capturedOutput))
                     {
                         OutputCallback?.Invoke(capturedOutput);
-                        
+
                         // Check if the output contains error indicators
-                        if (capturedOutput.Contains("ERROR:") || 
-                            capturedOutput.Contains("Traceback") || 
+                        if (capturedOutput.Contains("ERROR:") ||
+                            capturedOutput.Contains("Traceback") ||
                             capturedOutput.Contains("Exception:") ||
                             capturedOutput.Contains("Error:"))
                         {

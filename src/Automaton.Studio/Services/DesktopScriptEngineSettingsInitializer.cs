@@ -62,7 +62,6 @@ public class DesktopScriptEngineSettingsInitializer : IHostedService
                     
                     if (_config.EnableDebugMode)
                     {
-                        _logger.Debug("Python DLL: {PythonDll}", _config.PythonDllPath ?? "auto-detect");
                         _logger.Debug("Python Paths: {Count} configured", _config.PythonPaths?.Count ?? 0);
                     }
                 }

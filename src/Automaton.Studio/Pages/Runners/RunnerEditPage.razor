@@ -128,18 +128,7 @@
                                                     <Text>Configure Python.NET settings for this specific runner. These settings override the default auto-detection and are useful when you need a specific Python version or custom packages.</Text>
                                                 </MessageTemplate>
                                             </Alert>
-                                        </SpaceItem>
-
-                                        <SpaceItem>
-                                            <FormItem Label="Python DLL Path">
-                                                <Input @bind-Value="pythonDllPath" 
-                                                       Placeholder="e.g., C:\Python312\python312.dll (leave empty for auto-detection)"
-                                                       Style="width: 100%;" />
-                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                                                    Path to python3XX.dll file for this runner. If not specified, the runner will auto-detect the Python installation.
-                                                </Text>
-                                            </FormItem>
-                                        </SpaceItem>
+                                        </SpaceItem>                                   
 
                                         <SpaceItem>
                                             <FormItem Label="Python Package Paths">
@@ -226,8 +215,6 @@
     // Basic settings
     private string runnerName = string.Empty;
     
-    // Python settings
-    private string? pythonDllPath = null;
     private List<string> pythonPaths = new List<string> { "" };
 
     protected override async Task OnInitializedAsync()
@@ -277,7 +264,6 @@
 
                 if (settings?.Python != null)
                 {
-                    pythonDllPath = settings.Python.PythonDllPath;
                     pythonPaths = settings.Python.PythonPaths?.Any() == true 
                         ? new List<string>(settings.Python.PythonPaths) 
                         : new List<string> { "" };
@@ -285,14 +271,12 @@
                 else
                 {
                     // Default values
-                    pythonDllPath = null;
                     pythonPaths = new List<string> { "" };
                 }
             }
             else
             {
                 // No settings configured - use defaults
-                pythonDllPath = null;
                 pythonPaths = new List<string> { "" };
             }
         }
@@ -300,7 +284,6 @@
         {
             MessageService.Error($"Failed to load Python settings: {ex.Message}");
             // Use defaults on error
-            pythonDllPath = null;
             pythonPaths = new List<string> { "" };
         }
     }
@@ -323,7 +306,6 @@
             {
                 Python = new PythonEngineSettings
                 {
-                    PythonDllPath = string.IsNullOrWhiteSpace(pythonDllPath) ? null : pythonDllPath,
                     PythonPaths = pythonPaths
                         .Where(p => !string.IsNullOrWhiteSpace(p))
                         .ToList()

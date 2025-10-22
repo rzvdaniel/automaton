@@ -30,12 +30,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScriptEngineHost>();
     }
 
-    public static void AddScriptingWithPythonNet(this IServiceCollection services, string? pythonDllPath = null)
+    public static void AddScriptingWithPythonNet(this IServiceCollection services)
     {
         services.AddScoped<ScriptEngineConfiguration>(_ => new ScriptEngineConfiguration 
         { 
-            UsePythonNet = true,
-            PythonDllPath = pythonDllPath
+            UsePythonNet = true
         });
         services.AddScoped<ScriptEngineHost>();
     }
@@ -46,7 +45,6 @@ public static class ServiceCollectionExtensions
     /// {
     ///   "Scripting": {
     ///     "UsePythonNet": true,
-    ///     "PythonDllPath": "C:\\Python311\\python311.dll",
     ///     "EnableDebugMode": false
     ///   }
     /// }

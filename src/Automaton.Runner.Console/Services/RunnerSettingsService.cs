@@ -78,12 +78,7 @@ public class RunnerSettingsService
             if (settings?.Python != null)
             {
                 _logger.Information("Loaded script engine settings for runner {RunnerId}", runnerId);
-                
-                if (!string.IsNullOrWhiteSpace(settings.Python.PythonDllPath))
-                {
-                    _logger.Information("Python DLL path configured: {Path}", settings.Python.PythonDllPath);
-                }
-                
+                                
                 if (settings.Python.PythonPaths?.Any() == true)
                 {
                     _logger.Information("Python paths configured: {Count} paths", settings.Python.PythonPaths.Count);

@@ -24,12 +24,6 @@ public class RunnerScriptEngineSettings
 public class PythonEngineSettings
 {
     /// <summary>
-    /// Path to Python DLL (e.g., C:\Python312\python312.dll)
-    /// If null or empty, auto-detection will be used
-    /// </summary>
-    public string? PythonDllPath { get; set; }
-
-    /// <summary>
     /// List of paths to search for Python packages
     /// These paths are added to sys.path before script execution
     /// If empty, auto-detection will be used
