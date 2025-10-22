@@ -23,21 +23,18 @@
 
         private void InitializePythonEngine()
         {
-            
-                // Use Python.NET implementation with fallback
-                try
-                {
-                    engines[PythonScrypt] = new PythonNetScriptEngine(configuration);
-                }
-                catch (Exception ex)
-                {
-                    throw;
-                }
 
-            
+            // Use Python.NET implementation with fallback
+            try
+            {
+                engines[PythonScrypt] = new PythonNetScriptEngine(configuration);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+
         }
-
-       
 
         private void InitializeBatchEngine()
         {
