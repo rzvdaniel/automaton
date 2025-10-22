@@ -2,6 +2,7 @@
 using Automaton.Core.Models;
 using Serilog;
 using System.Diagnostics;
+using Automaton.Core.Scripting.Step;
 
 namespace Automaton.Runner.Console.Handlers;
 
@@ -98,15 +99,6 @@ public class CustomStepHandler
             };
         }
     }
-
-    private string GetContentType(string language) => language?.ToLowerInvariant() switch
-    {
-        "python" => "text/x-python",
-        "batch" => "text/x-batch",
-        "powershell" => "text/x-powershell",
-        "javascript" => "text/javascript",
-        _ => "text/x-python"
-    };
 }
 
 /// <summary>

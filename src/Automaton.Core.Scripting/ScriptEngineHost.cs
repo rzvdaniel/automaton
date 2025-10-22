@@ -1,10 +1,12 @@
-﻿namespace Automaton.Core.Scripting;
+﻿using Automaton.Core.Scripting.Step;
 
-public class ScriptEngineHost
+namespace Automaton.Core.Scripting;
+
+public class ScriptEngineHost : IScriptEngineHost
 {
     private readonly ScriptEngineConfiguration configuration;
 
-    public event EventHandler<string> ScriptTextWritten;
+    public event EventHandler<string>? ScriptTextWritten;
 
     public ScriptEngineHost(ScriptEngineConfiguration configuration)
     {

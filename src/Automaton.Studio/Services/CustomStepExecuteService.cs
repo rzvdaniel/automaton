@@ -2,6 +2,7 @@
 using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
 using Automaton.Core.Scripting.ErrorParsers;
+using Automaton.Core.Scripting.Step;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using System.Diagnostics;
@@ -11,16 +12,17 @@ namespace Automaton.Studio.Services;
 
 public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 {
-    private readonly IMediator mediator;
-    private readonly IMapper mapper;
-    private readonly ILogger logger;
-    private readonly IServiceProvider serviceProvider;
-    private readonly ConfigurationService configurationService;
-    private readonly StudioFlowConvertService flowConvertService;
-    private readonly FlowExecutionsService flowExecutionsService;
-    private readonly ScriptEngineHost scriptHost;
-    private readonly CustomStepsService customStepsService;
-    private readonly ScriptEngineConfiguration scriptConfig;
+    private readonly IMediator _mediator;
+    private readonly IMapper _mapper;
+    private readonly ILogger _logger;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ConfigurationService _configurationService;
+    private readonly StudioFlowConvertService _flowConvertService;
+    private readonly FlowExecutionsService _flowExecutionsService;
+    private readonly ScriptEngineHost _scriptHost;
+    private readonly CustomStepsService _customStepsService;
+    private readonly ScriptEngineConfiguration _scriptConfig;
+    private readonly IScriptLanguageProvider _languageProvider;
 
     public event EventHandler<string> ScriptTextWritten;
 
@@ -34,21 +36,22 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         IMediator mediator,
         IMapper mapper,
         CustomStepsService customStepsService,
-        ScriptEngineConfiguration scriptConfig
-    )
+        ScriptEngineConfiguration scriptConfig,
+        IScriptLanguageProvider languageProvider)
     {
-        this.mediator = mediator;
-        this.mapper = mapper;
-        this.configurationService = configurationService;
-        this.flowConvertService = flowConvertService;
-        this.flowExecutionsService = flowExecutionsService;
-        this.serviceProvider = serviceProvider;
-        this.scriptHost = scriptHost;
-        this.customStepsService = customStepsService;
-        this.scriptConfig = scriptConfig;
-        this.scriptHost.ScriptTextWritten += OnScriptTextWritten;
+        _mediator = mediator;
+        _mapper = mapper;
+        _configurationService = configurationService;
+        _flowConvertService = flowConvertService;
+        _flowExecutionsService = flowExecutionsService;
+        _serviceProvider = serviceProvider;
+        _scriptHost = scriptHost;
+        _customStepsService = customStepsService;
+        _scriptConfig = scriptConfig;
+        _languageProvider = languageProvider ?? new DefaultScriptLanguageProvider();
+        _scriptHost.ScriptTextWritten += OnScriptTextWritten;
 
-        logger = Log.ForContext<StudioFlowExecuteService>();
+        _logger = Log.ForContext<CustomStepExecuteService>();
     }
 
     /// <summary>
@@ -63,7 +66,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         LogContext.PushProperty(LogContextProperties.StepId, step.Id);
         LogContext.PushProperty(LogContextProperties.StepName, step.Name);
 
-        logger.Information("Start step: {0}", step.Name);
+        _logger.Information("Start step: {0}", step.Name);
 
         // Capture console output during execution
         EventHandler<string> consoleHandler = (sender, text) =>
@@ -71,7 +74,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             consoleOutput.Append(text);
         };
 
-        scriptHost.ScriptTextWritten += consoleHandler;
+        _scriptHost.ScriptTextWritten += consoleHandler;
 
         try
         {
@@ -79,7 +82,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
             var finished = DateTime.UtcNow;
 
-            logger.Information("End step: {0}", step.Name);
+            _logger.Information("End step: {0}", step.Name);
 
             return new LocalCustomStepExecutionResult
             {
@@ -94,7 +97,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         {
             customStepExecution.HasErrors();
 
-            logger.Error(ex, "Step: {0} encountered an error. Message: {1}", step.Name, ex.Message);
+            _logger.Error(ex, "Step: {0} encountered an error. Message: {1}", step.Name, ex.Message);
 
             var finished = DateTime.UtcNow;
 
@@ -110,7 +113,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         }
         finally
         {
-            scriptHost.ScriptTextWritten -= consoleHandler;
+            _scriptHost.ScriptTextWritten -= consoleHandler;
         }
     }
 
@@ -119,23 +122,23 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     /// </summary>
     public async Task<IEnumerable<RunnerCustomStepResult>> ExecuteOnRunners(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken = default)
     {
-        logger.Information("Executing custom step {CustomStepId} on {RunnerCount} runners", customStepId, runnerIds.Count());
+        _logger.Information("Executing custom step {CustomStepId} on {RunnerCount} runners", customStepId, runnerIds.Count());
 
         try
         {
-            var results = await customStepsService.Execute(customStepId, runnerIds, cancellationToken);
+            var results = await _customStepsService.Execute(customStepId, runnerIds, cancellationToken);
 
             foreach (var result in results)
             {
                 if (result.Success)
                 {
-                    logger.Information("Custom step {CustomStepId} executed successfully on runner {RunnerId}",
+                    _logger.Information("Custom step {CustomStepId} executed successfully on runner {RunnerId}",
                         customStepId, result.RunnerId);
                 }
                 else
                 {
-                    logger.Warning("Custom step {CustomStepId} failed on runner {RunnerId}: {Error}",
-                        customStepId, result.RunnerId, result.Error);
+                    _logger.Warning("Custom step {CustomStepId} failed on runner {RunnerId}: {Error}",
+                   customStepId, result.RunnerId, result.Error);
                 }
             }
 
@@ -143,7 +146,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Error executing custom step {CustomStepId} on runners", customStepId);
+            _logger.Error(ex, "Error executing custom step {CustomStepId} on runners", customStepId);
             throw;
         }
     }
@@ -154,15 +157,19 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
         // Convert output variable definitions
         var outputVarDefs = step.OutputVariables?
-       .Select(v => new StepOutputVariableDefinition { Name = v.Name, Description = v.Description })
-             .ToList();
+            .Select(v => new StepOutputVariableDefinition 
+            { 
+                Name = v.Name, 
+                Description = v.Description 
+            })
+            .ToList();
 
         // Use unified executor for consistency with Runner
-        var executor = new CustomStepExecutor(scriptHost);
+        var executor = new CustomStepExecutor(_scriptHost);
         var result = executor.Execute(step.Code,
-      step.Definition.Language.ToString().ToLowerInvariant(),
-    inputVariablesDictionary,
-      outputVarDefs);
+            step.Definition.Language.ToString().ToLowerInvariant(),
+            inputVariablesDictionary,
+            outputVarDefs);
 
         // Update output variables with execution results
         if (result.OutputVariables != null)
@@ -191,34 +198,28 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
     public void Dispose()
     {
-        scriptHost.ScriptTextWritten -= OnScriptTextWritten;
+        _scriptHost.ScriptTextWritten -= OnScriptTextWritten;
     }
 
     /// <summary>
     /// Execute code asynchronously for MCP integration with unified error handling
     /// </summary>
-    public async Task<CodeExecutionResult> ExecuteCustomStepCodeAsync(
+    public async Task<CodeExecutionResult> ExecuteCustomStepCodeAsync
+    (
         string code,
         string language,
         Dictionary<string, object> inputVariables,
-        string stepId)
+        string stepId
+    )
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
             LogContext.PushProperty(LogContextProperties.StepId, stepId);
-            logger.Information("Executing {Language} code for step {StepId}", language, stepId);
+            _logger.Information("Executing {Language} code for step {StepId}", language, stepId);
 
-            var contentType = language.ToLowerInvariant() switch
-            {
-                "python" => "text/x-python",
-                "batch" => "text/x-batch",
-                "javascript" => "text/javascript",
-                "powershell" => "text/x-powershell",
-                _ => "text/x-python"
-            };
-
+            var contentType = _languageProvider.GetContentType(language);
             var resource = new ScriptResource()
             {
                 ContentType = contentType,
@@ -226,7 +227,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             };
 
             // Execute on a background thread to avoid blocking
-            var scriptVariables = await Task.Run(() => scriptHost.Execute(resource, inputVariables));
+            var scriptVariables = await Task.Run(() => _scriptHost.Execute(resource, inputVariables));
 
             stopwatch.Stop();
 
@@ -244,14 +245,14 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
             // Check for errors using parser
             var hasErrors = errorParser.HasErrors(standardOutput, standardError) ||
-                           scriptVariables.ContainsKey("error");
+                scriptVariables.ContainsKey("error");
 
             ScriptErrorInfo? errorInfo = null;
             if (hasErrors)
             {
                 errorInfo = errorParser.ParseError(standardOutput, standardError, scriptVariables);
 
-                logger.Warning("Script execution failed: {ErrorType} - {Message}",
+                _logger.Warning("Script execution failed: {ErrorType} - {Message}",
                     errorInfo?.ErrorType ?? "Unknown",
                     errorInfo?.Message ?? "Unknown error");
             }
@@ -271,9 +272,9 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             }
 
             // Build output message
-            var outputMessage = hasErrors
-                ? $"**Execution Failed**\n\n{errorInfo?.Message ?? "Unknown error"}"
-                : standardOutput;
+            var outputMessage = hasErrors ? 
+                $"**Execution Failed**\n\n{errorInfo?.Message ?? "Unknown error"}" : 
+                standardOutput;
 
             return new CodeExecutionResult
             {
@@ -288,7 +289,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         catch (Exception ex)
         {
             stopwatch.Stop();
-            logger.Error(ex, "Error executing {Language} code for step {StepId}", language, stepId);
+            _logger.Error(ex, "Error executing {Language} code for step {StepId}", language, stepId);
 
             // Create structured error from exception
             var errorInfo = new ScriptErrorInfo
