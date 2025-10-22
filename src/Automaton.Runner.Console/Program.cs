@@ -236,7 +236,7 @@ public class Program
                 services.AddHostedService<Services.RunnerScriptEngineSettingsInitializer>();
                 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
-                services.AddTransient<Handlers.CustomStepHandler>();
+                services.AddTransient<CustomStepExecuteService>();
 
                 // Configure HTTP client factory with SSL bypass for development
                 var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||

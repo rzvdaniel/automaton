@@ -3,7 +3,6 @@ using Serilog;
 using System.Net.Http;
 using System.Net.Sockets;
 using Automaton.Runner.Console.Connection;
-using Automaton.Runner.Console.Handlers;
 using static System.Console;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -219,7 +218,7 @@ public class HubService
                 {
                     // Create a scope and resolve CustomStepHandler for this request
                     using var scope = serviceProvider.CreateScope();
-                    var handler = scope.ServiceProvider.GetRequiredService<CustomStepHandler>();
+                    var handler = scope.ServiceProvider.GetRequiredService<CustomStepExecuteService>();
                     
                     // Execute and wait for result (SignalR requires synchronous return)
                     var result = handler.RunCustomStep(customStep).GetAwaiter().GetResult();

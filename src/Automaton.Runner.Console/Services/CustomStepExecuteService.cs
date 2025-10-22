@@ -1,23 +1,22 @@
 ﻿using Automaton.Core.Scripting;
 using Automaton.Core.Models;
 using Serilog;
-using System.Diagnostics;
 using Automaton.Core.Scripting.Step;
 
-namespace Automaton.Runner.Console.Handlers;
+namespace Automaton.Runner.Console.Services;
 
 /// <summary>
 /// Handler for executing custom steps on the runner with proper output variable extraction
 /// </summary>
-public class CustomStepHandler
+public class CustomStepExecuteService
 {
     private readonly CustomStepExecutor executor;
     private readonly ILogger logger;
 
-    public CustomStepHandler(ScriptEngineHost scriptHost)
+    public CustomStepExecuteService(ScriptEngineHost scriptHost)
     {
         this.executor = new CustomStepExecutor(scriptHost);
-        this.logger = Log.ForContext<CustomStepHandler>();
+        this.logger = Log.ForContext<CustomStepExecuteService>();
     }
 
     /// <summary>
