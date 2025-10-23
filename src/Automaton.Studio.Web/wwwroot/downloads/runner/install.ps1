@@ -3,7 +3,7 @@
 
 param(
     [string]$ApiKey = "",
-    [string]$ServerUrl = "https://localhost:7091",
+    [string]$ServerUrl = "https://api.automaton.monster",
     [string]$RunnerName = "$env:COMPUTERNAME-Runner",
     [string]$InstallPath = "$env:ProgramFiles\AutomatonRunner",
     [switch]$CreateService = $false,

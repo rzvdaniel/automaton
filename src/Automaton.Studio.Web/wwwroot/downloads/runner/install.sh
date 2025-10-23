@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 
 # Command line arguments
 API_KEY=""
-SERVER_URL="https://localhost:7091"
+SERVER_URL="https://api.automaton.monster"
 RUNNER_NAME="$(hostname)-runner"
 INSTALL_DIR="$INSTALL_PATH"
 CREATE_SERVICE=false
