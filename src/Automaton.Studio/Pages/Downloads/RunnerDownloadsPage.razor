@@ -477,8 +477,8 @@
         var clientBaseUrl = NavigationManager.BaseUri.TrimEnd('/');
         
         // Installation scripts - these are served from the Blazor client app
-        windowsInstallCommand = $"iwr -useb {clientBaseUrl}/downloads/install.ps1 | iex";
-        unixInstallCommand = $"curl -sSL {clientBaseUrl}/downloads/install.sh | bash";
+        windowsInstallCommand = $"iwr -useb {clientBaseUrl}/downloads/runner/install.ps1 | iex";
+        unixInstallCommand = $"curl -sSL {clientBaseUrl}/downloads/runner/install.sh | bash";
         
         // Build download URLs - these are also served from the Blazor client app
         windowsX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-x64.zip";

@@ -122,7 +122,7 @@ stages:
               rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-x64'
               includeRootFolder: false
               archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-x64-$(buildNumber).zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-x64.zip'
               replaceExistingArchive: true
 
           - task: ArchiveFiles@2
@@ -131,7 +131,7 @@ stages:
               rootFolderOrFile: '$(Agent.TempDirectory)/builds/win-arm64'
               includeRootFolder: false
               archiveType: 'zip'
-              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-arm64-$(buildNumber).zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/AutomatonStudioDesktop-win-arm64.zip'
               replaceExistingArchive: true
 
           # Create version info
@@ -198,18 +198,14 @@ stages:
 
               ## First Run
               - The application starts with a local workflow designer
-              - No server connection required for basic functionality
               - Create your first workflow using the visual interface
               - All workflows execute locally on your machine
-              - No installation or administrator rights required
 
               ## Features
               - Visual workflow designer with drag-and-drop interface
               - Local workflow execution engine
               - Integrated management interface
-              - Complete offline operation capability
               - Self-contained deployment (no external dependencies)
-              - Portable - runs from any folder
 
               ## For System Administrators
               - No registry modifications
