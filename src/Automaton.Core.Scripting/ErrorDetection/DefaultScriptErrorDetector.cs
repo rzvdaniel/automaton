@@ -1,4 +1,4 @@
-﻿namespace Automaton.Core.Scripting;
+﻿namespace Automaton.Core.Scripting.ErrorDetection;
 
 /// <summary>
 /// Default error detection strategy.
@@ -23,9 +23,9 @@ public class DefaultScriptErrorDetector : IScriptErrorDetector
         if (!string.IsNullOrEmpty(consoleOutput))
         {
             if (consoleOutput.Contains("ERROR:") ||
-                        consoleOutput.Contains("Traceback") ||
-                         consoleOutput.Contains("Exception:") ||
-                  consoleOutput.Contains("FAILED"))
+                consoleOutput.Contains("Traceback") ||
+                consoleOutput.Contains("Exception:") ||
+                consoleOutput.Contains("FAILED"))
             {
                 return "Script execution produced errors";
             }

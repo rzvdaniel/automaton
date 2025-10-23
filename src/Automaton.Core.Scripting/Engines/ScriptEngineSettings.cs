@@ -1,4 +1,4 @@
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines;
 
 /// <summary>
 /// Root container for all script engine settings

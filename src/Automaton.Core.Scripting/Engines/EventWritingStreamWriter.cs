@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines;
 
 public class EventRaisingStreamWriter : MemoryStream
 {

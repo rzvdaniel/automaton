@@ -1,4 +1,4 @@
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines.Python;
 
 public class PythonEnvironmentInfo
 {

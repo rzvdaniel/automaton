@@ -1,4 +1,5 @@
 using Automaton.Core.Scripting;
+using Automaton.Core.Scripting.Engines;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

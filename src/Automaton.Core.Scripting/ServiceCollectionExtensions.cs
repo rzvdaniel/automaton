@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Automaton.Core.Scripting.Engines;
+using Automaton.Core.Scripting.Languages;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Core.Scripting;
@@ -16,6 +18,7 @@ public static class ServiceCollectionExtensions
         });
         
         services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
     public static void AddScripting(this IServiceCollection services, Action<ScriptEngineConfiguration> configureOptions)
@@ -26,14 +29,16 @@ public static class ServiceCollectionExtensions
             configureOptions(config);
             return config;
         });
-        
+
         services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
     public static void AddScriptingWithPythonNet(this IServiceCollection services)
     {
         services.AddScoped<ScriptEngineConfiguration>(_ => new ScriptEngineConfiguration());
         services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
     /// <summary>
@@ -48,8 +53,9 @@ public static class ServiceCollectionExtensions
             configuration?.GetSection("Scripting").Bind(config);
             return config;
         });
-        
+      
         services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
     /// <summary>
@@ -84,7 +90,7 @@ public static class ServiceCollectionExtensions
             // Bind base configuration from appsettings.json (optional)
             // This allows environment-specific defaults (Dev/Production) without database changes
             configuration?.GetSection("Scripting").Bind(config);
-            
+  
             // Note: Runner-specific settings from database are loaded at startup
             // by ScriptEngineSettingsInitializer (IHostedService) after DI container is built.
             // Settings are loaded into this singleton instance and persist for app lifetime.
@@ -93,13 +99,14 @@ public static class ServiceCollectionExtensions
         });
         
         services.AddScoped<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
     /// <summary>
     /// Add scripting for desktop with dynamic settings loading
     /// This allows desktop to load Python paths from database configuration
-    /// Requires DesktopSettingsService and DesktopScriptEngineSettingsInitializer to be registered
-    /// 
+  /// Requires DesktopSettingsService and DesktopScriptEngineSettingsInitializer to be registered
+ /// 
     /// Configuration Priority (later overrides earlier):
     /// 1. appsettings.json "Scripting" section (optional base configuration)
     /// 2. Database desktop-specific settings (user-configured overrides)
@@ -117,22 +124,23 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static void AddScriptingForDesktop(this IServiceCollection services)
     {
-        // Register configuration as Singleton so settings loaded at startup persist
+  // Register configuration as Singleton so settings loaded at startup persist
         services.AddSingleton<ScriptEngineConfiguration>(provider =>
-        {
+   {
             var configuration = provider.GetService<IConfiguration>();
-            var config = new ScriptEngineConfiguration();
-            
-            // Bind base configuration from appsettings.json (optional)
-            // This allows environment-specific defaults without database changes
-            configuration?.GetSection("Scripting").Bind(config);
+ var config = new ScriptEngineConfiguration();
+
+          // Bind base configuration from appsettings.json (optional)
+ // This allows environment-specific defaults without database changes
+      configuration?.GetSection("Scripting").Bind(config);
             
             // Note: Desktop-specific settings from database are loaded at startup
-            // by DesktopScriptEngineSettingsInitializer (IHostedService) after DI container is built.
-            // Settings are loaded into this singleton instance and persist for app lifetime.
-            
+      // by DesktopScriptEngineSettingsInitializer (IHostedService) after DI container is built.
+    // Settings are loaded into this singleton instance and persist for app lifetime.
+       
             return config;
         });
         services.AddSingleton<ScriptEngineHost>();
+        services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 }

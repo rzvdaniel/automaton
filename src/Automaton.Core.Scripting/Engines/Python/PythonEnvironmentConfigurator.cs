@@ -1,6 +1,6 @@
 using Python.Runtime;
 
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines.Python;
 
 public class PythonEnvironmentConfigurator
 {

@@ -1,4 +1,4 @@
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines;
 
 /// <summary>
 /// Represents the result of script execution with structured error information

@@ -1,4 +1,6 @@
-﻿namespace Automaton.Core.Scripting
+﻿using Automaton.Core.Scripting.Engines.Python;
+
+namespace Automaton.Core.Scripting.Engines
 {
     public class ScriptEngineFactory
     {

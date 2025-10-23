@@ -1,4 +1,4 @@
-﻿namespace Automaton.Core.Scripting;
+﻿namespace Automaton.Core.Scripting.Languages;
 
 /// <summary>
 /// Language to content type mapping.

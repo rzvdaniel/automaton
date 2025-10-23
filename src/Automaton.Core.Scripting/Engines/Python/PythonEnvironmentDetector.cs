@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines.Python;
 
 public class PythonEnvironmentDetector
 {

@@ -1,4 +1,4 @@
-﻿namespace Automaton.Core.Scripting;
+﻿namespace Automaton.Core.Scripting.ErrorDetection;
 
 /// <summary>
 /// Strategy for detecting script execution errors.

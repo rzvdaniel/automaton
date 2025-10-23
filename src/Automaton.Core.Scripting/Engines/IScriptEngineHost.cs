@@ -1,4 +1,4 @@
-﻿namespace Automaton.Core.Scripting
+﻿namespace Automaton.Core.Scripting.Engines
 {
     /// <summary>
     /// Abstraction for script engine to support dependency injection and testing.

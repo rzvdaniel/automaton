@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Studio.Services;
 using Automaton.Mcp.Client.Services;
+using Automaton.Studio.Models;
 
 namespace Automaton.Studio.Services.Mcp;
 

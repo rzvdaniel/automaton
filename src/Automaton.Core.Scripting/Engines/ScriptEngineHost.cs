@@ -1,6 +1,6 @@
 ﻿using Automaton.Core.Scripting.Step;
 
-namespace Automaton.Core.Scripting;
+namespace Automaton.Core.Scripting.Engines;
 
 public class ScriptEngineHost : IScriptEngineHost
 {

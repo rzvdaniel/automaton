@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Automaton.Core.Scripting
+namespace Automaton.Core.Scripting.Engines.Python
 {
     public class PythonNetScriptEngine : IScriptEngine, IOutputCallbackScriptEngine, IDisposable
     {

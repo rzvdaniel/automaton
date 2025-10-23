@@ -1,3 +1,6 @@
+using Automaton.Core.Scripting.Engines;
+using Automaton.Core.Scripting.ErrorDetection;
+using Automaton.Core.Scripting.Languages;
 using System.Diagnostics;
 using System.Text;
 
