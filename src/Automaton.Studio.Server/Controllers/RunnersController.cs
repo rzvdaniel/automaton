@@ -57,9 +57,9 @@ public class RunnersController : BaseController
     {
         var runners = await runnersService.List(cancellationToken);
         var onlineRunners = runners.Count(r => r.Status == RunnerStatus.Online);
-        
+
         return Ok(new RunnerStatusResponse
-        { 
+        {
             HasOnlineRunners = onlineRunners > 0,
             TotalRunners = runners.Count(),
             OnlineRunners = onlineRunners
@@ -74,7 +74,7 @@ public class RunnersController : BaseController
     public async Task<ActionResult<RunnerScriptEngineSettings>> GetScriptSettings(Guid id, CancellationToken cancellationToken)
     {
         var settings = await runnersService.GetScriptEngineSettings(id, cancellationToken);
-        
+
         if (settings == null)
         {
             return NotFound();
@@ -98,10 +98,10 @@ public class RunnersController : BaseController
     public async Task<ActionResult<RunnerDetails>> GetByName(string name, CancellationToken cancellationToken)
     {
         var runner = await runnersService.GetByNameAsync(name, cancellationToken);
-        
-    if (runner == null)
+
+        if (runner == null)
         {
-      return NotFound();
+            return NotFound();
         }
 
         return Ok(runner);

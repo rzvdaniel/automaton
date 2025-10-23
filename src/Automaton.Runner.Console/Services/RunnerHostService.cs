@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Automaton.Runner.Console.Models;
+using Serilog;
 using System.Text;
 using System.Text.Json;
 using static System.Console;
@@ -144,29 +145,8 @@ public class RunnerHostService
             logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
             logger.Debug("=== END ENVIRONMENT VARIABLES ===");
 
-            // Step 1: Check/Configure Server
-            if (!configService.IsServerConfigured())
-            {
-                WriteLine("🔧 Server configuration required...");
-                WriteLine("No server URL configured.");
-                WriteLine();
-
-                Write("Enter server URL (or press Enter for default https://localhost:7091): ");
-                var serverUrl = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(serverUrl))
-                {
-                    serverUrl = "https://localhost:7091";
-                }
-
-                await configService.UpdateServerUrlAsync(serverUrl);
-                WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
-                WriteLine();
-            }
-            else
-            {
-                WriteLine($"✅ Server: {configService.BaseUrl}");
-            }
+            // Step 1: Ask for default server confirmation or new one
+            await PromptForServerConfigurationAsync();
 
             // Step 2: Check Authentication
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
@@ -478,35 +458,21 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Server Configuration ===");
-
-            try
-            {
-                WriteLine($"Current server: {configService.BaseUrl}");
-            }
-            catch (InvalidOperationException)
-            {
-                WriteLine("Current server: Not configured");
-            }
             WriteLine();
+
+            string configuredServer;
 
             if (!string.IsNullOrEmpty(serverUrl))
             {
+                // Server URL provided as argument
                 await configService.UpdateServerUrlAsync(serverUrl);
-                WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
+                configuredServer = configService.BaseUrl;
+                WriteLine($"✅ Server configured and saved: {configuredServer}");
             }
-            else
+            else 
             {
-                Write("Enter new server URL: ");
-                var inputServerUrl = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(inputServerUrl))
-                {
-                    WriteLine("Server URL cannot be empty.");
-                    return;
-                }
-
-                await configService.UpdateServerUrlAsync(inputServerUrl);
-                WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
+                // Server already configured - ask user to confirm or change
+                configuredServer = await PromptForServerConfigurationAsync();
             }
 
             // Check if we need to re-register due to server change
@@ -697,29 +663,26 @@ public class RunnerHostService
                     if (existingRunnerResponse.IsSuccessStatusCode)
                     {
                         // Runner exists on server! Retrieve its ID
-                        var existingRunnerJson = await existingRunnerResponse.Content.ReadAsStringAsync();
-                        using (var doc = JsonDocument.Parse(existingRunnerJson))
-                        {
-                            var root = doc.RootElement;
-                            if (root.TryGetProperty("id", out var idElement) && Guid.TryParse(idElement.GetString(), out var existingId))
-                            {
-                                runnerId = existingId;
-                                isUpdate = true;
-                                WriteLine($"?? Found existing runner on server with ID: {runnerId}");
-                                WriteLine($"?? Will reuse this runner locally");
+                        var runnerDetails = await existingRunnerResponse.Content.ReadAsAsync<RunnerDetails>();
+                        
+                       if(runnerDetails != null)
+                       {
+                            runnerId = runnerDetails.Id;
+                            isUpdate = true;
+                            WriteLine($"?? Found existing runner on server with ID: {runnerId}");
+                            WriteLine($"?? Will reuse this runner locally");
 
-                                // Save to local storage for next time
-                                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                                logger.Information("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
-                                WriteLine($"? Runner '{runnerName}' recovered successfully!");
-                                return true;
-                            }
-                            else
-                            {
-                                // Couldn't parse ID, create new
-                                runnerId = Guid.NewGuid();
-                                WriteLine($"?? Creating new runner with ID: {runnerId}");
-                            }
+                            // Save to local storage for next time
+                            await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
+                            logger.Information("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
+                            WriteLine($"? Runner '{runnerName}' recovered successfully!");
+                            return true;
+                        }
+                        else
+                        {
+                            // Couldn't parse runner details, create new runner Id
+                            runnerId = Guid.NewGuid();
+                            WriteLine($"?? Creating new runner with ID: {runnerId}");
                         }
                     }
                     else
@@ -1060,6 +1023,43 @@ public class RunnerHostService
         {
             WriteLine("❌ Cannot continue without a valid API key. Exiting.");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Shared server configuration logic - prompts user to confirm or change server URL
+    /// </summary>
+    private async Task<string> PromptForServerConfigurationAsync()
+    {
+        try
+        {
+            var server = configService.BaseUrl;
+
+            WriteLine($"✅ Server is: {server}");
+            Write("Use this server? (Y/n): ");
+            
+            var choice = ReadLine()?.Trim().ToLower();
+
+            if (choice == "n" || choice == "new")
+            {
+                Write("Enter new server URL: ");
+                server = ReadLine();
+
+                if (string.IsNullOrWhiteSpace(server))
+                {
+                    WriteLine("❌ Server URL cannot be empty. Keeping current server.");
+                }             
+            }
+
+            await configService.UpdateServerUrlAsync(server);
+            WriteLine($"✅ Server configured and saved: {server}");
+            return server;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Error during server configuration prompt: {ErrorMessage}", ex.Message);
+            WriteLine("⚠️  Could not configure server interactively, continuing with current server.");
+            return configService.BaseUrl;
         }
     }
 }
