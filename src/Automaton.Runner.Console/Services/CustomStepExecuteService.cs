@@ -1,7 +1,7 @@
-﻿using Automaton.Core.Models;
-using Serilog;
+﻿using Serilog;
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
+using Automaton.Runner.Console.Models;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -34,17 +34,16 @@ public class CustomStepExecuteService
         {
             // Prepare input variables dictionary
             var inputVars = customStep.CodeInputVariables?
-                .ToDictionary(v => v.Name, v => (object)v.Value)
+                .ToDictionary(v => v.Name, v => v.Value)
                 ?? new Dictionary<string, object>();
 
             // Convert output variable definitions
-            var outputVarDefs = customStep.CodeOutputVariables?
-                .Select(v => new StepOutputVariableDefinition { Name = v.Name, Description = v.Description })
-                .ToList();
+            var ouputVariableNames = customStep.CodeOutputVariables?
+                .Select(v => v.Name);
 
             // Execute using unified executor
             var result = await Task.Run(() =>
-                executor.Execute(customStep.Code, customStep.Language, inputVars, outputVarDefs));
+                executor.Execute(customStep.Code, customStep.Language, inputVars, ouputVariableNames));
 
             // Check for errors
             if (!result.Success)
@@ -98,30 +97,4 @@ public class CustomStepExecuteService
             };
         }
     }
-}
-
-/// <summary>
-/// Payload for custom step execution (subset of CustomStep model)
-/// </summary>
-public class CustomStepPayload
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; }
-    public string Code { get; set; }
-    public string Language { get; set; }
-    public List<StepVariable> CodeInputVariables { get; set; }
-    public List<StepVariable> CodeOutputVariables { get; set; }
-}
-
-/// <summary>
-/// Response from runner after executing a custom step
-/// </summary>
-public class CustomStepExecutionResponse
-{
-    public bool Success { get; set; }
-    public string? Output { get; set; }
-    public string? Error { get; set; }
-    public DateTime Started { get; set; }
-    public DateTime Finished { get; set; }
-    public Dictionary<string, object>? OutputVariables { get; set; }
 }

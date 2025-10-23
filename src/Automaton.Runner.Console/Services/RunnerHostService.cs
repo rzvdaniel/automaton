@@ -828,28 +828,6 @@ public class RunnerHostService
         WriteLine();
     }
 
-    private async Task<bool> ClearAllDataAsync()
-    {
-        try
-        {
-            await storageService.DeleteRunnerConfigAsync();
-            WriteLine("? All stored data cleared successfully!");
-            WriteLine("📝 Note: To remove API key, unset AUTOMATON_API_KEY environment variable");
-            logger.Information("All stored data cleared");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            // Log technical details to file logs only
-            logger.Error(ex, "Error clearing all data. Error: {ErrorType}", ex.GetType().Name);
-            
-            // Show friendly message to user
-            WriteLine($"? Error clearing data: {ex.Message}");
-            WriteLine("Check the log files for detailed technical information.");
-            return false;
-        }
-    }
-
     /// <summary>
     /// Cleanup stored API key and runner configuration
     /// </summary>

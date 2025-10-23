@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using Automaton.Runner.Console.Connection;
 using static System.Console;
 using Microsoft.Extensions.DependencyInjection;
+using Automaton.Runner.Console.Models;
 
 namespace Automaton.Runner.Console.Services;
 

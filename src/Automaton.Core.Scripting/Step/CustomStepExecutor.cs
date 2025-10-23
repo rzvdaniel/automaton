@@ -34,7 +34,7 @@ public class CustomStepExecutor
         string code,
         string language,
         Dictionary<string, object> inputVariables,
-        List<StepOutputVariableDefinition>? outputVariableDefinitions = null
+        IEnumerable<string>? outputVariableNames = null
     )
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -63,7 +63,7 @@ public class CustomStepExecutor
             stopwatch.Stop();
 
             // Extract output variables
-            var outputVars = ExtractOutputVariables(outputVariableDefinitions, scriptVariables);
+            var outputVars = ExtractOutputVariables(outputVariableNames, scriptVariables);
 
             // Detect errors using strategy pattern
             var executionError = _errorDetector.DetectError(scriptVariables, consoleOutput.ToString());
@@ -108,20 +108,20 @@ public class CustomStepExecutor
 
     private Dictionary<string, object> ExtractOutputVariables
     (
-        List<StepOutputVariableDefinition>? outputVariableDefinitions,
+        IEnumerable<string>? outputVariableNames,
         IDictionary<string, dynamic> scriptVariables
     )
     {
-        if (outputVariableDefinitions == null || !outputVariableDefinitions.Any())
+        if (outputVariableNames == null || !outputVariableNames.Any())
         {
             return new Dictionary<string, object>();
         }
 
-        return outputVariableDefinitions
+        return outputVariableNames
             .ToDictionary(
-                outputVar => outputVar.Name,
-                outputVar => scriptVariables.ContainsKey(outputVar.Name) ? 
-                (object)(scriptVariables[outputVar.Name]?.ToString() ?? string.Empty) : 
+                outputVar => outputVar,
+                outputVar => scriptVariables.ContainsKey(outputVar) ? 
+                (object)(scriptVariables[outputVar]?.ToString() ?? string.Empty) : 
                 string.Empty);
     }
 

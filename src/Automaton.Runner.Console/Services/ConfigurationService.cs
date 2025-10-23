@@ -1,3 +1,4 @@
+using Automaton.Runner.Console.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -135,11 +136,4 @@ public class ConfigurationService
             await storageService.SaveServerConfigAsync(cleanUrl);
         }
     }
-}
-
-public class ClientAuthConfig
-{
-    public string LoginUserUrl { get; set; } = "api/account/loginuser";
-    public string RefreshAccessTokenUrl { get; set; } = "api/token/refreshaccesstoken";
-    public int RefreshTokenExpirationMinutesCheck { get; set; } = 2;
 }

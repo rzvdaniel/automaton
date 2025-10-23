@@ -157,20 +157,15 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         var inputVariablesDictionary = step.InputVariables.ToDictionary(x => x.Name, x => x.Value);
 
         // Convert output variable definitions
-        var outputVarDefs = step.OutputVariables?
-            .Select(v => new StepOutputVariableDefinition 
-            { 
-                Name = v.Name, 
-                Description = v.Description 
-            })
-            .ToList();
+        var outputVariableNames = step.OutputVariables?
+            .Select(v => v.Name);
 
         // Use unified executor for consistency with Runner
         var executor = new CustomStepExecutor(_scriptHost);
         var result = executor.Execute(step.Code,
             step.Definition.Language.ToString().ToLowerInvariant(),
             inputVariablesDictionary,
-            outputVarDefs);
+            outputVariableNames);
 
         // Update output variables with execution results
         if (result.OutputVariables != null)
