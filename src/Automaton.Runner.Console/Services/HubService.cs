@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using Serilog;
-using System.Net.Http;
 using System.Net.Sockets;
 using Automaton.Runner.Console.Connection;
 using static System.Console;

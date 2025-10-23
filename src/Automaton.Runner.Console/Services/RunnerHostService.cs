@@ -39,42 +39,42 @@ public class RunnerHostService
         try
         {
             logger.Information("Starting runner in service mode (non-interactive)");
-            
+
             // Validate configuration from environment variables only
             if (!configService.IsServerConfigured())
             {
                 logger.Error("Service mode requires AppConfig__BaseUrl environment variable");
                 throw new InvalidOperationException("Server URL not configured. Set AppConfig__BaseUrl environment variable.");
             }
-            
+
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
                 logger.Error("Service mode requires AUTOMATON_API_KEY environment variable");
                 throw new InvalidOperationException("API key not configured. Set AUTOMATON_API_KEY environment variable.");
             }
-            
+
             logger.Information("Service configuration valid - Server: {Server}", configService.BaseUrl);
-            
+
             // Set up HTTP client authentication
             await SetupHttpClientAuth();
-            
+
             // Check if runner is registered - if not, use default name
             if (!configService.IsRunnerRegistered())
             {
                 logger.Warning("Runner not registered - will register with default name");
                 var defaultName = $"Service-{Environment.MachineName}";
                 var registerSuccess = await RegisterRunnerAsync(defaultName);
-                
+
                 if (!registerSuccess)
                 {
                     logger.Error("Failed to register runner in service mode");
                     throw new InvalidOperationException("Runner registration failed");
                 }
             }
-            
+
             logger.Information("Runner registered: {Name} (ID: {Id})", configService.ApplicationName, configService.RunnerId);
-            
+
             // Start the runner without console interaction
             await StartServiceRunnerAsync();
         }
@@ -84,18 +84,18 @@ public class RunnerHostService
             throw;
         }
     }
-    
+
     /// <summary>
     /// Start runner loop for service mode - no console interaction
     /// </summary>
     private async Task StartServiceRunnerAsync()
     {
         logger.Information("Connecting to server...");
-        
+
         try
         {
             var connected = await hubService.ConnectAsync();
-            
+
             if (!connected)
             {
                 logger.Warning("Initial connection failed - will retry in background");
@@ -114,12 +114,12 @@ public class RunnerHostService
                 logger.Error("Inner exception: {InnerException}", ex.InnerException.Message);
             }
         }
-        
+
         logger.Information("Runner active - waiting for workflows");
         logger.Information("Runner: {Name} (ID: {Id})", configService.ApplicationName, configService.RunnerId);
         logger.Information("Server: {Server}", configService.BaseUrl);
         logger.Information("Status: {Status}", hubService.IsConnected() ? "Connected" : "Connecting...");
-        
+
         // Keep service running indefinitely
         await Task.Delay(Timeout.Infinite);
     }
@@ -137,7 +137,7 @@ public class RunnerHostService
             // DEBUG: Log all environment variables that might affect configuration
             logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
             logger.Debug("AppConfig__BaseUrl: {EnvVar}", Environment.GetEnvironmentVariable("AppConfig__BaseUrl"));
-            logger.Debug("AUTOMATON_API_KEY: {EnvVar}", 
+            logger.Debug("AUTOMATON_API_KEY: {EnvVar}",
                 string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
             logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
             logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
@@ -150,15 +150,15 @@ public class RunnerHostService
                 WriteLine("🔧 Server configuration required...");
                 WriteLine("No server URL configured.");
                 WriteLine();
-                
+
                 Write("Enter server URL (or press Enter for default https://localhost:7091): ");
                 var serverUrl = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(serverUrl))
                 {
                     serverUrl = "https://localhost:7091";
                 }
-                
+
                 await configService.UpdateServerUrlAsync(serverUrl);
                 WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
                 WriteLine();
@@ -173,9 +173,9 @@ public class RunnerHostService
             if (string.IsNullOrEmpty(apiKey))
             {
                 // Check if the API key might be set in registry but not visible to current process
-                var isSetInRegistry = OperatingSystem.IsWindows() && 
+                var isSetInRegistry = OperatingSystem.IsWindows() &&
                     !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY", EnvironmentVariableTarget.User));
-                
+
                 if (isSetInRegistry)
                 {
                     WriteLine("⚠️  API key is saved but not visible to this terminal session.");
@@ -190,29 +190,29 @@ public class RunnerHostService
                     WriteLine();
                     Write("Would you like to enter the API key again for this session? (Y/n): ");
                     var response = ReadLine()?.Trim().ToLower();
-                    
+
                     if (response == "n" || response == "no")
                     {
                         WriteLine("❌ Authentication required to continue. Exiting.");
                         return;
                     }
                 }
-                
+
                 WriteLine("🔧 Authentication required...");
                 WriteLine();
                 WriteLine("You need an API key to authenticate with the Automaton server.");
                 WriteLine("Get your API key from: Automaton Studio → Settings → API Keys");
                 WriteLine();
-                
+
                 Write("Enter your API key (starts with 'ak_'): ");
                 var inputApiKey = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(inputApiKey))
                 {
                     WriteLine("❌ API key is required. Exiting.");
                     return;
                 }
-                
+
                 await apiKeyAuthService.SetApiKeyAsync(inputApiKey);
                 WriteLine("✅ Authentication configured successfully!");
                 WriteLine();
@@ -231,16 +231,16 @@ public class RunnerHostService
             {
                 WriteLine("🔧 Runner registration required...");
                 WriteLine();
-                
+
                 Write("Enter a name for this runner (e.g., 'My-Server-Runner'): ");
                 var runnerName = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(runnerName))
                 {
                     runnerName = $"AutoRunner-{Environment.MachineName}";
                     WriteLine($"Using default name: {runnerName}");
                 }
-                
+
                 var registerSuccess = await RegisterRunnerAsync(runnerName);
                 if (!registerSuccess)
                 {
@@ -261,7 +261,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error in interactive runner setup. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"❌ Setup error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
@@ -289,12 +289,12 @@ public class RunnerHostService
                 WriteLine("Server URL is required for authentication.");
                 Write("Enter server URL (or press Enter for https://localhost:7091): ");
                 var inputServerUrl = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(inputServerUrl))
                 {
                     inputServerUrl = "https://localhost:7091";
                 }
-                
+
                 await configService.UpdateServerUrlAsync(inputServerUrl);
                 WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
             }
@@ -315,13 +315,13 @@ public class RunnerHostService
                 WriteLine();
                 Write("Enter your API key (starts with 'ak_'): ");
                 var inputApiKey = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(inputApiKey))
                 {
                     WriteLine("❌ API key is required.");
                     return;
                 }
-                
+
                 await apiKeyAuthService.SetApiKeyAsync(inputApiKey);
                 WriteLine("✅ Authentication configured successfully!");
             }
@@ -337,7 +337,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error in interactive authentication. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"❌ Authentication error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
@@ -352,7 +352,7 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Registration ===");
-            
+
             try
             {
                 WriteLine($"Server: {configService.BaseUrl}");
@@ -371,7 +371,7 @@ public class RunnerHostService
                 WriteLine();
                 Write("Do you want to register with a different name? (y/N): ");
                 var response = ReadLine()?.Trim().ToLower();
-                
+
                 if (response != "y" && response != "yes")
                 {
                     WriteLine("Registration cancelled.");
@@ -395,13 +395,13 @@ public class RunnerHostService
             if (string.IsNullOrEmpty(runnerName))
             {
                 var currentName = configService.ApplicationName;
-                var prompt = !string.IsNullOrEmpty(currentName) 
-                    ? $"Enter runner name (current: {currentName}): " 
+                var prompt = !string.IsNullOrEmpty(currentName)
+                    ? $"Enter runner name (current: {currentName}): "
                     : "Enter runner name: ";
-                    
+
                 Write(prompt);
                 runnerName = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(runnerName))
                 {
                     if (!string.IsNullOrEmpty(currentName))
@@ -433,7 +433,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error in interactive registration. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"? Registration error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
@@ -448,7 +448,7 @@ public class RunnerHostService
         try
         {
             WriteLine("=== Automaton Runner - Server Configuration ===");
-            
+
             try
             {
                 WriteLine($"Current server: {configService.BaseUrl}");
@@ -468,13 +468,13 @@ public class RunnerHostService
             {
                 Write("Enter new server URL: ");
                 var inputServerUrl = ReadLine();
-                
+
                 if (string.IsNullOrWhiteSpace(inputServerUrl))
                 {
                     WriteLine("Server URL cannot be empty.");
                     return;
                 }
-                
+
                 await configService.UpdateServerUrlAsync(inputServerUrl);
                 WriteLine($"✅ Server configured and saved: {configService.BaseUrl}");
             }
@@ -486,7 +486,7 @@ public class RunnerHostService
                 WriteLine("⚠️ Note: Server URL changed. You may need to re-register your runner.");
                 WriteLine("Run: automaton-runner register --force");
             }
-            
+
             WriteLine();
             WriteLine("💡 The server URL has been saved and will be remembered for future runs.");
         }
@@ -494,7 +494,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error configuring server. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"❌ Server configuration error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
@@ -508,11 +508,11 @@ public class RunnerHostService
     {
         WriteLine("?? Starting runner...");
         WriteLine();
-        
+
         // Attempt to connect to hub with better error handling
         WriteLine("?? Establishing connection to server...");
         var connected = await hubService.ConnectAsync();
-        
+
         if (!connected)
         {
             WriteLine();
@@ -524,22 +524,22 @@ public class RunnerHostService
             WriteLine("   • Wait for connection (press Enter to continue)");
             WriteLine("   • Exit and fix connection issues (press 'q' to quit)");
             WriteLine();
-            
+
             Write("Your choice (Enter to continue, 'q' to quit): ");
             var choice = ReadLine()?.Trim().ToLower();
-            
+
             if (choice == "q" || choice == "quit")
             {
                 WriteLine("?? Exiting runner...");
                 return;
             }
-            
+
             WriteLine("? Continuing in disconnected mode - will connect when server becomes available.");
         }
 
         // Start the runner regardless of initial connection status
         cancellationTokenSource = new CancellationTokenSource();
-        
+
         WriteLine();
         WriteLine("?? Runner is now active and will execute workflows when connected...");
         WriteLine($"??? Runner: {configService.ApplicationName} (ID: {configService.RunnerId})");
@@ -597,7 +597,7 @@ public class RunnerHostService
         {
             WriteLine("?? Attempting manual reconnection...");
             var connected = await hubService.ConnectAsync();
-            
+
             if (connected)
             {
                 WriteLine("? Reconnection successful!");
@@ -611,11 +611,11 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Warning(ex, "Manual reconnection attempt failed. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"? Manual reconnection failed - automatic retry will continue in background.");
         }
-        
+
         WriteLine();
     }
 
@@ -627,7 +627,13 @@ public class RunnerHostService
             throw new InvalidOperationException("No valid API key available for authentication. Please run 'auth' command first or set AUTOMATON_API_KEY environment variable.");
         }
 
-        httpClient.DefaultRequestHeaders.Clear();
+        // Don't clear all headers - just add/update the API key header
+        // Clearing headers can remove important headers set elsewhere
+        if (httpClient.DefaultRequestHeaders.Contains("X-API-Key"))
+        {
+            httpClient.DefaultRequestHeaders.Remove("X-API-Key");
+        }
+
         httpClient.DefaultRequestHeaders.Add("X-API-Key", apiKey);
         logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
     }
@@ -666,14 +672,14 @@ public class RunnerHostService
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             HttpResponseMessage response;
-            
+
             if (isUpdate)
             {
                 // Update existing runner via PUT
                 WriteLine($"?? Making update request to: {configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}");
                 WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
                 WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-                
+
                 response = await httpClient.PutAsync($"{configService.BaseUrl}/{configService.RunnersUrl}/{runnerId}", content);
             }
             else
@@ -682,7 +688,7 @@ public class RunnerHostService
                 WriteLine($"?? Making registration request to: {configService.BaseUrl}/{configService.RunnersUrl}");
                 WriteLine($"?? Runner data: ID={runnerId}, Name={runnerName}");
                 WriteLine($"?? Request headers: X-API-Key = {(httpClient.DefaultRequestHeaders.Contains("X-API-Key") ? "Present" : "Missing")}");
-                
+
                 response = await httpClient.PostAsync($"{configService.BaseUrl}/{configService.RunnersUrl}", content);
             }
 
@@ -698,7 +704,7 @@ public class RunnerHostService
 
             var errorContent = await response.Content.ReadAsStringAsync();
             logger.Warning("Runner {Action} failed: {StatusCode} - {Error}", isUpdate ? "update" : "registration", response.StatusCode, errorContent);
-            
+
             WriteLine($"? {(isUpdate ? "Update" : "Registration")} failed: {response.StatusCode}");
             if (!string.IsNullOrEmpty(errorContent))
             {
@@ -727,7 +733,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error during runner registration. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"? Registration error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
@@ -742,27 +748,27 @@ public class RunnerHostService
         WriteLine("         📊 RUNNER STATUS REPORT         ");
         WriteLine("╚═════════════════════════════════════════╝");
         WriteLine();
-        
+
         // Runner Information
         WriteLine("🤖 Runner Information:");
         WriteLine($"   • ID: {configService.RunnerId}");
         WriteLine($"   • Name: {configService.ApplicationName}");
         WriteLine($"   • Machine: {Environment.MachineName}");
         WriteLine();
-        
+
         // Connection Status
         var isConnected = hubService.IsConnected();
         WriteLine("🌐 Connection Status:");
-        
+
         try
         {
             var serverUrl = configService.BaseUrl;
             WriteLine($"   • Server: {serverUrl}");
-            
+
             // Show server configuration source
             var storedServerUrl = await storageService.LoadServerUrlAsync();
             var isFromStorage = !string.IsNullOrEmpty(storedServerUrl);
-            
+
             string serverSource = isFromStorage ? "Saved Locally" : "Configuration";
             WriteLine($"   • Source: {serverSource}");
         }
@@ -770,23 +776,23 @@ public class RunnerHostService
         {
             WriteLine("   • Server: ❌ Not configured");
         }
-        
+
         WriteLine($"   • Status: {(isConnected ? "✅ Connected" : "❌ Disconnected")}");
-        
+
         if (!isConnected)
         {
             WriteLine("   • The runner will automatically attempt to reconnect");
             WriteLine("   • Press 'r' to manually retry connection");
         }
         WriteLine();
-        
+
         // Authentication Status
         var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
         var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
-        
+
         WriteLine("🔐 Authentication Status:");
         WriteLine($"   • Authenticated: {(!string.IsNullOrEmpty(apiKey) ? "✅ Yes" : "❌ No")}");
-        
+
         if (!string.IsNullOrEmpty(apiKey))
         {
             WriteLine("   • Auth Source: Environment Variable (AUTOMATON_API_KEY)");
@@ -797,23 +803,23 @@ public class RunnerHostService
             WriteLine("   • API Key: ⚠️  Not set. Set AUTOMATON_API_KEY environment variable.");
         }
         WriteLine();
-        
+
         // Configuration Storage Status
         WriteLine("💾 Stored Configuration:");
         WriteLine($"   • API Key: Environment variable only (AUTOMATON_API_KEY)");
         WriteLine($"   • Runner Config: {(storageService.IsRunnerRegistered() ? "✅ Saved" : "❌ Not saved")}");
-        
+
         var hasStoredServerUrl = !string.IsNullOrEmpty(await storageService.LoadServerUrlAsync());
         WriteLine($"   • Server URL: {(hasStoredServerUrl ? "✅ Saved" : "❌ Not saved")}");
         WriteLine();
-        
+
         // Runtime Information
         WriteLine("⚙️  Runtime Information:");
         WriteLine($"   • Process ID: {Environment.ProcessId}");
         WriteLine($"   • Working Directory: {Environment.CurrentDirectory}");
         WriteLine($"   • .NET Version: {Environment.Version}");
         WriteLine();
-        
+
         // Available Commands
         WriteLine("📋 Available Commands:");
         WriteLine("   • automaton-runner (start runner)");
@@ -823,7 +829,7 @@ public class RunnerHostService
         WriteLine("   • automaton-runner server (configure server)");
         WriteLine("   • automaton-runner service (service management)");
         WriteLine("   • automaton-runner cleanup (clear stored data)");
-        
+
         WriteLine("╚═════════════════════════════════════════╝");
         WriteLine();
     }
@@ -866,7 +872,7 @@ public class RunnerHostService
             {
                 WriteLine();
                 WriteLine("✅ Cleanup completed successfully!");
-                
+
                 if (runnerConfigCleared)
                 {
                     WriteLine("   - Runner registration cleared");
@@ -875,13 +881,13 @@ public class RunnerHostService
                 {
                     WriteLine("   - Server URL configuration cleared");
                 }
-                
+
                 WriteLine();
                 WriteLine("📝 Note: API key is stored in AUTOMATON_API_KEY environment variable");
                 WriteLine("   To remove it, unset the environment variable manually.");
             }
 
-            logger.Information("Runner cleanup completed. Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}", 
+            logger.Information("Runner cleanup completed. Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}",
                 runnerConfigCleared, serverConfigCleared);
             return true;
         }
@@ -889,7 +895,7 @@ public class RunnerHostService
         {
             // Log technical details to file logs only
             logger.Error(ex, "Error during cleanup. Error: {ErrorType}", ex.GetType().Name);
-            
+
             // Show friendly message to user
             WriteLine($"❌ Cleanup error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
