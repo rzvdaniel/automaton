@@ -111,6 +111,14 @@ stages:
               arguments: '--configuration $(buildConfiguration) --runtime win-x64 --self-contained true --output "$(Agent.TempDirectory)/builds/win-x64" -p:PublishSingleFile=false -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber) -p:IncludeNativeLibrariesForSelfExtract=true'
               zipAfterPublish: false
 
+          - task: FileTransform@1
+            displayName: 'Transform appsettings - Windows x64'
+            condition: eq(${{ parameters.isRelease }}, false)
+            inputs:
+              folderPath: '$(Agent.TempDirectory)/builds/win-x64'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
+
           # Publish Windows ARM64 self-contained
           - task: DotNetCoreCLI@2
             displayName: 'Publish Desktop App - Windows ARM64'
@@ -120,11 +128,12 @@ stages:
               projects: '$(desktopProjectPath)'
               arguments: '--configuration $(buildConfiguration) --runtime win-arm64 --self-contained true --output "$(Agent.TempDirectory)/builds/win-arm64" -p:PublishSingleFile=false -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber) -p:IncludeNativeLibrariesForSelfExtract=true'
               zipAfterPublish: false
+
           - task: FileTransform@1
-            displayName: Transform appsettings
+            displayName: 'Transform appsettings - Windows ARM64'
             condition: eq(${{ parameters.isRelease }}, false)
             inputs:
-              folderPath: '$(build.ArtifactStagingDirectory)'
+              folderPath: '$(Agent.TempDirectory)/builds/win-arm64'
               fileType: 'json'
               targetFiles: '**/appsettings.json'
 
