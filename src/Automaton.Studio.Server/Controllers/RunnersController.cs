@@ -92,4 +92,18 @@ public class RunnersController : BaseController
         await runnersService.UpdateScriptEngineSettings(id, settings?.ToString(), cancellationToken);
         return NoContent();
     }
+
+    [HttpGet("by-name/{name}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<RunnerDetails>> GetByName(string name, CancellationToken cancellationToken)
+    {
+        var runner = await runnersService.GetByNameAsync(name, cancellationToken);
+        
+    if (runner == null)
+        {
+      return NotFound();
+        }
+
+        return Ok(runner);
+    }
 }

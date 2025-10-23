@@ -347,4 +347,18 @@ public class RunnerService
 
         logger.Information("Updated script engine settings for runner {RunnerId}", id);
     }
+
+    public async Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)
+    {
+        var runner = await dbContext.Runners
+            .Include(x => x.RunnerUsers)
+            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower() && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+
+        if (runner == null)
+        {
+            return null;
+        }
+
+        return mapper.Map<RunnerDetails>(runner);
+    }
 }

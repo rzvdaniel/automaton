@@ -186,7 +186,7 @@ public class RunnerHostService
                     WriteLine("   3. Run 'automaton-runner' again");
                     WriteLine();
                     WriteLine("   OR set it for current session:");
-                    WriteLine("   $env:AUTOMATON_API_KEY = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')");
+                    WriteLine("   $env:AUTOMON_API_KEY = [System.Environment]::GetEnvironmentVariable('AUTOMATON_API_KEY', 'User')");
                     WriteLine();
                     Write("Would you like to enter the API key again for this session? (Y/n): ");
                     var response = ReadLine()?.Trim().ToLower();
@@ -221,6 +221,19 @@ public class RunnerHostService
             {
                 var hasEnvKey = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
                 WriteLine($"✅ Authenticated via: {(hasEnvKey ? "Environment Variable" : "Stored API Key")}");
+
+                // Validate API key against the server
+                WriteLine();
+                var isValid = await ValidateApiKeyWithServerAsync(apiKey);
+
+                if (!isValid)
+                {
+                    var canContinue = await HandleInvalidApiKeyAsync();
+                    if (!canContinue)
+                    {
+                        return;
+                    }
+                }
             }
 
             // Set up HTTP client authentication
@@ -287,12 +300,12 @@ public class RunnerHostService
             else if (!configService.IsServerConfigured())
             {
                 WriteLine("Server URL is required for authentication.");
-                Write("Enter server URL (or press Enter for https://localhost:7091): ");
+                Write($"Enter server URL (or press Enter for {configService.BaseUrl}): ");
                 var inputServerUrl = ReadLine();
 
                 if (string.IsNullOrWhiteSpace(inputServerUrl))
                 {
-                    inputServerUrl = "https://localhost:7091";
+                    inputServerUrl = $"{configService.BaseUrl}";
                 }
 
                 await configService.UpdateServerUrlAsync(inputServerUrl);
@@ -308,22 +321,39 @@ public class RunnerHostService
             {
                 await apiKeyAuthService.SetApiKeyAsync(apiKey);
                 WriteLine("✅ Authentication successful!");
+
+                // Validate the provided API key
+                WriteLine();
+                var isValid = await ValidateApiKeyWithServerAsync(apiKey);
+                if (!isValid)
+                {
+                    var canContinue = await HandleInvalidApiKeyAsync();
+                    if (!canContinue)
+                    {
+                        return;
+                    }
+                }
             }
             else
             {
-                WriteLine("Get your API key from: Automaton Studio → Settings → API Keys");
-                WriteLine();
-                Write("Enter your API key (starts with 'ak_'): ");
-                var inputApiKey = ReadLine();
-
-                if (string.IsNullOrWhiteSpace(inputApiKey))
+                var newApiKey = await PromptForNewApiKeyAsync();
+                if (newApiKey == null)
                 {
                     WriteLine("❌ API key is required.");
                     return;
                 }
 
-                await apiKeyAuthService.SetApiKeyAsync(inputApiKey);
-                WriteLine("✅ Authentication configured successfully!");
+                // Validate the entered API key
+                WriteLine();
+                var isValid = await ValidateApiKeyWithServerAsync(newApiKey);
+                if (!isValid)
+                {
+                    var canContinue = await HandleInvalidApiKeyAsync();
+                    if (!canContinue)
+                    {
+                        return;
+                    }
+                }
             }
 
             // Show next steps
@@ -644,7 +674,7 @@ public class RunnerHostService
         {
             // Check if we have an existing runner ID stored locally
             var existingRunnerId = storageService.GetRunnerId();
-            Guid runnerId;
+            Guid runnerId = Guid.Empty;
             bool isUpdate = false;
 
             if (!string.IsNullOrEmpty(existingRunnerId) && Guid.TryParse(existingRunnerId, out var parsedId))
@@ -657,9 +687,55 @@ public class RunnerHostService
             }
             else
             {
-                // Create new runner ID
-                runnerId = Guid.NewGuid();
-                WriteLine($"?? Creating new runner with ID: {runnerId}");
+                // No local ID - check if runner exists on server by name
+                WriteLine($"?? Checking if runner '{runnerName}' already exists on server...");
+
+                try
+                {
+                    var existingRunnerResponse = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners/by-name/{Uri.EscapeDataString(runnerName)}");
+
+                    if (existingRunnerResponse.IsSuccessStatusCode)
+                    {
+                        // Runner exists on server! Retrieve its ID
+                        var existingRunnerJson = await existingRunnerResponse.Content.ReadAsStringAsync();
+                        using (var doc = JsonDocument.Parse(existingRunnerJson))
+                        {
+                            var root = doc.RootElement;
+                            if (root.TryGetProperty("id", out var idElement) && Guid.TryParse(idElement.GetString(), out var existingId))
+                            {
+                                runnerId = existingId;
+                                isUpdate = true;
+                                WriteLine($"?? Found existing runner on server with ID: {runnerId}");
+                                WriteLine($"?? Will reuse this runner locally");
+
+                                // Save to local storage for next time
+                                await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
+                                logger.Information("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
+                                WriteLine($"? Runner '{runnerName}' recovered successfully!");
+                                return true;
+                            }
+                            else
+                            {
+                                // Couldn't parse ID, create new
+                                runnerId = Guid.NewGuid();
+                                WriteLine($"?? Creating new runner with ID: {runnerId}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Runner doesn't exist on server, create new ID
+                        runnerId = Guid.NewGuid();
+                        WriteLine($"?? Creating new runner with ID: {runnerId}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // If lookup fails, just create new ID and continue
+                    logger.Debug(ex, "Could not check for existing runner by name, will create new: {ErrorMessage}", ex.Message);
+                    runnerId = Guid.NewGuid();
+                    WriteLine($"?? Creating new runner with ID: {runnerId}");
+                }
             }
 
             var runnerData = new
@@ -906,6 +982,83 @@ public class RunnerHostService
             // Show friendly message to user
             WriteLine($"❌ Cleanup error: {ex.Message}");
             WriteLine("Check the log files for detailed technical information.");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Validate API key against the server
+    /// </summary>
+    private async Task<bool> ValidateApiKeyWithServerAsync(string apiKey)
+    {
+        try
+        {
+            WriteLine("🔐 Validating API key with server...");
+            var validationResponse = await httpClient.PostAsync(
+                $"{configService.BaseUrl}/api/apikeys/validate",
+                new StringContent(JsonSerializer.Serialize(new { ApiKey = apiKey }), Encoding.UTF8, "application/json"));
+
+            if (!validationResponse.IsSuccessStatusCode)
+            {
+                WriteLine("❌ API key validation failed against the server!");
+                WriteLine("   The API key is not valid for this server.");
+                return false;
+            }
+
+            WriteLine("✅ API key validated successfully!");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Could not validate API key against server: {ErrorMessage}", ex.Message);
+            WriteLine("⚠️  Could not validate API key against server (connection issue)");
+            WriteLine("   Continuing anyway - validation will happen during runner operations");
+            return true; // Continue anyway on connection errors
+        }
+    }
+
+    /// <summary>
+    /// Prompt user for a new API key
+    /// </summary>
+    private async Task<string?> PromptForNewApiKeyAsync()
+    {
+        WriteLine("Get your API key from: Automaton Studio → Settings → API Keys");
+        WriteLine();
+        Write("Enter your API key (starts with 'ak_'): ");
+        var newApiKey = ReadLine();
+
+        if (!string.IsNullOrWhiteSpace(newApiKey))
+        {
+            await apiKeyAuthService.SetApiKeyAsync(newApiKey);
+            WriteLine("✅ New API key configured!");
+            return newApiKey;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Handle invalid API key - prompt user for new one or exit
+    /// </summary>
+    private async Task<bool> HandleInvalidApiKeyAsync()
+    {
+        WriteLine();
+        Write("Would you like to enter a different API key? (Y/n): ");
+        var response = ReadLine()?.Trim().ToLower();
+
+        if (response != "n" && response != "no")
+        {
+            var newApiKey = await PromptForNewApiKeyAsync();
+            if (newApiKey == null)
+            {
+                WriteLine("❌ No API key provided. Exiting.");
+                return false;
+            }
+            return true;
+        }
+        else
+        {
+            WriteLine("❌ Cannot continue without a valid API key. Exiting.");
             return false;
         }
     }
