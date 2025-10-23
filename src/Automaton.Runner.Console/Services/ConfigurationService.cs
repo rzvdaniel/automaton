@@ -136,4 +136,13 @@ public class ConfigurationService
             await storageService.SaveServerConfigAsync(cleanUrl);
         }
     }
+
+    /// <summary>
+    /// Clear the cached server URL. Used during cleanup to force reload from storage on next access.
+    /// </summary>
+    public void ClearCachedServerUrl()
+    {
+        Log.Information("Clearing cached server URL");
+        cachedServerUrl = null;
+    }
 }

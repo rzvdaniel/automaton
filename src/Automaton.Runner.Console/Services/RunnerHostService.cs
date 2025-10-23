@@ -864,6 +864,10 @@ public class RunnerHostService
                 serverConfigCleared = true;
             }
 
+            // Clear cached server URL so it won't be used on next run
+            configService.ClearCachedServerUrl();
+            logger.Information("Cleared cached server URL from memory");
+
             if (!runnerConfigCleared && !serverConfigCleared)
             {
                 WriteLine("ℹ️  No stored data found to cleanup");
@@ -885,6 +889,9 @@ public class RunnerHostService
                 WriteLine();
                 WriteLine("📝 Note: API key is stored in AUTOMATON_API_KEY environment variable");
                 WriteLine("   To remove it, unset the environment variable manually.");
+                WriteLine();
+                WriteLine("💡 Next time you run 'automaton-runner', you'll be asked to configure everything from scratch.");
+                WriteLine("   ℹ️  If you enter a runner name that already exists in the database, the runner will use that existing entry.");
             }
 
             logger.Information("Runner cleanup completed. Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}",
