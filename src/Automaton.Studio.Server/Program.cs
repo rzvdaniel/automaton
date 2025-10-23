@@ -90,9 +90,10 @@ services.AddAuthorization(options =>
         .Build();
 
     // Policy for API endpoints that should support API keys (runner operations)
+    // This policy accepts EITHER API Key OR JWT/Identity authentication
     options.AddPolicy("AllowApiKey", policy =>
-        policy.AddAuthenticationSchemes("Identity.Application", JwtBearerDefaults.AuthenticationScheme, ApiKeyAuthenticationSchemeOptions.DefaultScheme)
-              .RequireAuthenticatedUser());
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+    .RequireAuthenticatedUser());
 
     // Policy for anonymous endpoints (validation, etc.)
     options.AddPolicy("AllowAnonymous", policy =>
