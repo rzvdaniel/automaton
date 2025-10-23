@@ -72,6 +72,18 @@ public class RunnerService
 
     public int Add(RunnerDetails runnerModel)
     {
+        logger.Information("=== ADD RUNNER DEBUG ===");
+        logger.Information("Runner model: ID={Id}, Name={Name}", runnerModel.Id, runnerModel.Name);
+        logger.Information("UserId from context: {UserId}", userId);
+        logger.Information("UserId is empty: {IsEmpty}", userId == Guid.Empty);
+
+        if (userId == Guid.Empty)
+        {
+            logger.Error("Cannot add runner: userId is empty/null. User context not properly set from authentication");
+            logger.Error("This usually means API key authentication claims are not being properly converted to user context");
+            throw new InvalidOperationException("User context not available. Authentication may not have been properly processed. UserId is empty.");
+        }
+
         var runner = new Runner()
         {
             Id = runnerModel.Id,
@@ -89,6 +101,10 @@ public class RunnerService
         dbContext.RunnerUsers.Add(runnerUser);
 
         var result = dbContext.SaveChanges();
+
+        logger.Information("Runner created successfully: ID={RunnerId}, Name={Name}, UserId={UserId}, Changes={Changes}",
+            runner.Id, runner.Name, userId, result);
+        logger.Information("=== END ADD RUNNER DEBUG ===");
 
         return result;
     }
@@ -251,8 +267,8 @@ public class RunnerService
 
     private static RunnerStatus GetRunnerStatus(string response)
     {
-        return response.Equals("Pong", StringComparison.OrdinalIgnoreCase) ? 
-            RunnerStatus.Online : 
+        return response.Equals("Pong", StringComparison.OrdinalIgnoreCase) ?
+            RunnerStatus.Online :
             RunnerStatus.Offline;
     }
 
@@ -325,10 +341,10 @@ public class RunnerService
         }
 
         runner.ScriptEngineSettings = settingsJson;
-        
+
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
-        
+
         logger.Information("Updated script engine settings for runner {RunnerId}", id);
     }
 }
