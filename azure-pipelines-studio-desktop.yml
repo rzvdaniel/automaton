@@ -3,10 +3,10 @@
 # Generates ready-to-deploy packages for Windows x64 and ARM64
 
 parameters:
-    - name: isRelease
-      displayName: Is a release build
-      default: false
-      type: boolean
+  - name: isRelease
+    displayName: Is a release build
+    default: false
+    type: boolean
       
 trigger:
   branches:
@@ -120,6 +120,13 @@ stages:
               projects: '$(desktopProjectPath)'
               arguments: '--configuration $(buildConfiguration) --runtime win-arm64 --self-contained true --output "$(Agent.TempDirectory)/builds/win-arm64" -p:PublishSingleFile=false -p:Version=$(buildNumber) -p:AssemblyVersion=$(buildNumber) -p:FileVersion=$(buildNumber) -p:IncludeNativeLibrariesForSelfExtract=true'
               zipAfterPublish: false
+          - task: FileTransform@1
+            displayName: Transform appsettings
+            condition: eq(${{ parameters.isRelease }}, false)
+            inputs:
+              folderPath: '$(build.ArtifactStagingDirectory)'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
 
           # Create ZIP packages for both architectures
           - task: ArchiveFiles@2
@@ -247,14 +254,6 @@ stages:
                 Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 2)) MB"
               }
             displayName: 'List Final Artifacts'
-
-          - task: FileTransform@1
-            displayName: Transform appsettings
-            condition: eq(${{ parameters.isRelease }}, false)
-            inputs:
-              folderPath: '$(build.ArtifactStagingDirectory)'
-              fileType: 'json'
-              targetFiles: '**/appsettings.json'
 
           # Publish artifacts
           - task: PublishBuildArtifacts@1
