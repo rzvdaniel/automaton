@@ -1,0 +1,565 @@
+@page "/downloads"
+@using Microsoft.AspNetCore.Components
+@using Automaton.Studio.Services
+@inject IJSRuntime JSRuntime
+@inject ConfigurationService ConfigService
+@inject NavigationManager NavigationManager
+@inject MessageService MessageService
+
+<PageTitle>Downloads - Automaton Studio</PageTitle>
+
+<Layout>
+    <Header Class="header">
+        <Row>
+          <Col Flex=@("none")>
+        <Space Size="SpaceSize.Large">
+          <SpaceItem Class="header-item">
+      <Breadcrumb>
+       <BreadcrumbItem Href="/">
+         <Icon Type="home" Width="16" Height="16" />
+       <span>Home</span>
+    </BreadcrumbItem>
+   <BreadcrumbItem>
+        <Icon Type="download" Width="16" Height="16" />
+       <span>Downloads</span>
+      </BreadcrumbItem>
+     </Breadcrumb>
+     </SpaceItem>
+             </Space>
+       </Col>
+            <Col Class="right-actions">
+     <Space>
+      <SpaceItem>
+              <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/onboarding"))">
+  <Icon Type="question-circle" />
+ Get Started
+          </Button>
+</SpaceItem>
+        </Space>
+    </Col>
+ </Row>
+    </Header>
+
+    <Content Class="content-padding home-content content-background">
+        <div class="home-container">
+            
+ <!-- Hero Section -->
+            <div class="downloads-header">
+        <div class="downloads-header-content">
+         <div class="downloads-header-icon">
+ <Icon Type="download" Style="font-size: 48px; color: white;" />
+    </div>
+            <div class="downloads-header-text">
+     <Title Level="1" Style="margin-bottom: 8px;">Download Automaton</Title>
+           <Paragraph Class="downloads-subtitle">
+     Choose the best option for your workflow automation needs
+          </Paragraph>
+ </div>
+ </div>
+            </div>
+
+ <!-- Quick Comparison -->
+            <Card Class="comparison-card" Style="margin-bottom: 32px;">
+        <TitleTemplate>
+                  <Icon Type="experiment" Style="margin-right: 8px;" />
+      <span>Which Version Should I Choose?</span>
+        </TitleTemplate>
+            <ChildContent>
+     <Row Gutter="24">
+        <Col Span="12">
+                <div class="comparison-option">
+        <div class="option-icon desktop-icon">
+ <Icon Type="desktop" Style="font-size: 32px; color: #1890ff;" />
+             </div>
+            <Title Level="4">Desktop App</Title>
+  <Paragraph Type="@TextElementType.Secondary">
+          <strong>Best for:</strong> Visual workflow design and local development
+        </Paragraph>
+            <ul class="feature-list">
+           <li>? Graphical workflow designer</li>
+           <li>? Run workflows locally</li>
+         <li>? Windows only (x64 & ARM64)</li>
+         <li>? One-click installer</li>
+         </ul>
+      <Button Type="@ButtonType.Primary" Block="true" OnClick="@(() => ScrollToSection("desktop-section"))">
+   <Icon Type="download" />
+         Download Desktop App
+       </Button>
+         </div>
+         </Col>
+       <Col Span="12">
+    <div class="comparison-option">
+   <div class="option-icon runner-icon">
+       <Icon Type="code" Style="font-size: 32px; color: #52c41a;" />
+    </div>
+             <Title Level="4">Console Runner</Title>
+     <Paragraph Type="@TextElementType.Secondary">
+            <strong>Best for:</strong> Server deployments and automation
+   </Paragraph>
+         <ul class="feature-list">
+    <li>? Cross-platform (Windows, Linux, macOS)</li>
+   <li>? Headless execution</li>
+     <li>? CI/CD & Docker ready</li>
+   <li>? Auto-setup with one command</li>
+              </ul>
+    <Button Type="@ButtonType.Primary" Block="true" OnClick="@(() => ScrollToSection("runner-section"))">
+ <Icon Type="download" />
+                 Download Console Runner
+      </Button>
+              </div>
+            </Col>
+         </Row>
+   </ChildContent>
+            </Card>
+
+       <!-- Desktop App Section -->
+<div id="desktop-section" class="download-section">
+                <Card Class="desktop-card">
+          <TitleTemplate>
+  <Icon Type="desktop" Style="margin-right: 8px; color: #1890ff;" />
+    <span>Desktop App (Windows)</span>
+         </TitleTemplate>
+        <ChildContent>
+    <!-- Primary: MSIX Installers -->
+        <div class="install-primary">
+      <Title Level="4">
+     <Icon Type="rocket" Style="margin-right: 8px; color: #52c41a;" />
+          Recommended: One-Click Installer
+     </Title>
+          <Paragraph>Modern Windows installer with automatic updates:</Paragraph>
+       
+    <Row Gutter="16" Style="margin-top: 16px;">
+   <Col Span="12">
+    <Card Size="@CardSize.Small" Class="installer-card">
+             <TitleTemplate>
+     <Icon Type="windows" Style="margin-right: 8px;" />
+      <span>Windows x64 (Intel/AMD)</span>
+  </TitleTemplate>
+   <ChildContent>
+     <DownloadButton 
+    Url="@desktopX64InstallerUrl" 
+      FileName="AutomatonStudioSetup-x64.msix" 
+          Type="@ButtonType.Primary" 
+            Size="@ButtonSize.Large"
+       Block="true">
+    <Icon Type="download" />
+          Download Installer (.msix)
+          </DownloadButton>
+                     <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px; text-align: center;">
+     ~50 MB · One-click install
+ </Paragraph>
+        </ChildContent>
+         </Card>
+     </Col>
+         <Col Span="12">
+        <Card Size="@CardSize.Small" Class="installer-card">
+             <TitleTemplate>
+ <Icon Type="windows" Style="margin-right: 8px;" />
+        <span>Windows ARM64</span>
+       </TitleTemplate>
+               <ChildContent>
+   <DownloadButton 
+     Url="@desktopArm64InstallerUrl" 
+               FileName="AutomatonStudioSetup-arm64.msix" 
+                    Type="@ButtonType.Primary" 
+   Size="@ButtonSize.Large"
+       Block="true">
+    <Icon Type="download" />
+         Download Installer (.msix)
+               </DownloadButton>
+                 <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 8px; font-size: 12px; text-align: center;">
+             ~48 MB · One-click install
+           </Paragraph>
+     </ChildContent>
+           </Card>
+           </Col>
+    </Row>
+
+        <Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
+   <MessageTemplate>
+      <strong>Simple Installation:</strong><br/>
+        1. Download the .msix file<br/>
+          2. Double-click to install<br/>
+       3. Find "Automaton Studio" in your Start Menu<br/>
+      <strong>? Automatic updates included!</strong>
+           </MessageTemplate>
+    </Alert>
+   </div>
+
+  <!-- Alternative: ZIP Archives (Collapsed) -->
+      <Collapse Accordion="true" Style="margin-top: 24px;">
+  <Panel Header="Advanced: Manual Installation (ZIP)" Key="1">
+            <Paragraph Type="@TextElementType.Secondary">
+        For advanced users who prefer manual installation:
+            </Paragraph>
+          <Row Gutter="16">
+    <Col Span="12">
+        <DownloadButton 
+   Url="@desktopX64ZipUrl" 
+     FileName="AutomatonStudioDesktop-win-x64.zip" 
+    Block="true">
+         <Icon Type="file-zip" />
+             Windows x64 (.zip)
+            </DownloadButton>
+         </Col>
+               <Col Span="12">
+   <DownloadButton 
+       Url="@desktopArm64ZipUrl" 
+        FileName="AutomatonStudioDesktop-win-arm64.zip" 
+           Block="true">
+     <Icon Type="file-zip" />
+         Windows ARM64 (.zip)
+     </DownloadButton>
+         </Col>
+   </Row>
+         <Alert Type="@AlertType.Warning" ShowIcon="true" Style="margin-top: 12px;">
+         <MessageTemplate>
+     <strong>Manual steps required:</strong> Extract ZIP, run Automaton.Studio.Desktop.exe, create shortcut manually.
+             </MessageTemplate>
+     </Alert>
+   </Panel>
+        </Collapse>
+
+            <!-- Documentation Link -->
+  <div Style="margin-top: 24px; text-align: center;">
+   <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/desktop-setup"))">
+               <Icon Type="book" />
+       View Complete Desktop Setup Guide
+               </Button>
+              </div>
+      </ChildContent>
+         </Card>
+       </div>
+
+          <!-- Console Runner Section -->
+ <div id="runner-section" class="download-section" Style="margin-top: 32px;">
+            <Card Class="runner-card">
+ <TitleTemplate>
+ <Icon Type="code" Style="margin-right: 8px; color: #52c41a;" />
+  <span>Console Runner (Cross-Platform)</span>
+  </TitleTemplate>
+<ChildContent>
+     <!-- Primary: Installation Scripts -->
+  <div class="install-primary">
+        <Title Level="4">
+            <Icon Type="rocket" Style="margin-right: 8px; color: #52c41a;" />
+     Quick Installation (Recommended)
+          </Title>
+          <Paragraph>One command to download, install, and configure:</Paragraph>
+ 
+            <Row Gutter="16" Style="margin-top: 16px;">
+   <Col Span="12">
+          <Card Size="@CardSize.Small" Class="script-card">
+       <TitleTemplate>
+       <Icon Type="windows" Style="margin-right: 8px;" />
+          <span>Windows (PowerShell)</span>
+         </TitleTemplate>
+     <ChildContent>
+            <Paragraph><strong>Run as Administrator:</strong></Paragraph>
+ <div class="code-container">
+        <div class="command-display">
+  <Text Code Class="code-block">@windowsInstallCommand</Text>
+   <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsInstallCommand, "Windows install command"))">
+        Copy
+           </Button>
+                     </div>
+         </div>
+               </ChildContent>
+    </Card>
+      </Col>
+<Col Span="12">
+             <Card Size="@CardSize.Small" Class="script-card">
+      <TitleTemplate>
+              <Icon Type="code" Style="margin-right: 8px;" />
+      <span>Linux / macOS</span>
+       </TitleTemplate>
+         <ChildContent>
+      <Paragraph><strong>Terminal command:</strong></Paragraph>
+  <div class="code-container">
+         <div class="command-display">
+  <Text Code Class="code-block">@unixInstallCommand</Text>
+        <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixInstallCommand, "Unix install command"))">
+       Copy
+         </Button>
+  </div>
+          </div>
+      </ChildContent>
+          </Card>
+           </Col>
+          </Row>
+
+<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
+    <MessageTemplate>
+      <strong>After installation:</strong> Just run <code>automaton-runner</code> for guided setup!
+    </MessageTemplate>
+      </Alert>
+           </div>
+
+              <!-- Manual Downloads (Collapsed) -->
+             <Collapse Accordion="true" Style="margin-top: 24px;">
+    <Panel Header="Advanced: Manual Downloads" Key="1">
+         <Paragraph Type="@TextElementType.Secondary">
+ Download binaries directly for manual installation:
+        </Paragraph>
+ <Row Gutter="16">
+            <Col Span="8">
+  <Card Size="@CardSize.Small">
+              <TitleTemplate>Windows</TitleTemplate>
+            <ChildContent>
+           <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+           <SpaceItem>
+               <DownloadButton Url="@runnerWindowsX64Url" FileName="automaton-runner-win-x64.zip" Block="true">
+        x64 (.zip)
+         </DownloadButton>
+                  </SpaceItem>
+              <SpaceItem>
+<DownloadButton Url="@runnerWindowsArm64Url" FileName="automaton-runner-win-arm64.zip" Block="true">
+ ARM64 (.zip)
+    </DownloadButton>
+                </SpaceItem>
+              </Space>
+     </ChildContent>
+                  </Card>
+          </Col>
+     <Col Span="8">
+  <Card Size="@CardSize.Small">
+     <TitleTemplate>Linux</TitleTemplate>
+                <ChildContent>
+  <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+   <SpaceItem>
+           <DownloadButton Url="@runnerLinuxX64Url" FileName="automaton-runner-linux-x64.tar.gz" Block="true">
+       x64 (.tar.gz)
+   </DownloadButton>
+      </SpaceItem>
+ <SpaceItem>
+         <DownloadButton Url="@runnerLinuxArm64Url" FileName="automaton-runner-linux-arm64.tar.gz" Block="true">
+     ARM64 (.tar.gz)
+    </DownloadButton>
+             </SpaceItem>
+    </Space>
+     </ChildContent>
+ </Card>
+         </Col>
+      <Col Span="8">
+   <Card Size="@CardSize.Small">
+  <TitleTemplate>macOS</TitleTemplate>
+             <ChildContent>
+   <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+            <SpaceItem>
+          <DownloadButton Url="@runnerMacosX64Url" FileName="automaton-runner-macos-x64.tar.gz" Block="true">
+     Intel (.tar.gz)
+       </DownloadButton>
+   </SpaceItem>
+          <SpaceItem>
+  <DownloadButton Url="@runnerMacosArm64Url" FileName="automaton-runner-macos-arm64.tar.gz" Block="true">
+               Apple Silicon (.tar.gz)
+               </DownloadButton>
+         </SpaceItem>
+          </Space>
+          </ChildContent>
+   </Card>
+         </Col>
+    </Row>
+       </Panel>
+    </Collapse>
+
+    <!-- Documentation Link -->
+          <div Style="margin-top: 24px; text-align: center;">
+     <Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/runner-setup"))">
+       <Icon Type="book" />
+             View Complete Runner Setup Guide & Troubleshooting
+            </Button>
+              </div>
+    </ChildContent>
+        </Card>
+            </div>
+        </div>
+</Content>
+</Layout>
+
+@code {
+    // Desktop URLs
+    private string desktopX64InstallerUrl = "";
+    private string desktopArm64InstallerUrl = "";
+    private string desktopX64ZipUrl = "";
+    private string desktopArm64ZipUrl = "";
+
+    // Runner URLs
+    private string windowsInstallCommand = "";
+    private string unixInstallCommand = "";
+    private string runnerWindowsX64Url = "";
+    private string runnerWindowsArm64Url = "";
+    private string runnerLinuxX64Url = "";
+ private string runnerLinuxArm64Url = "";
+    private string runnerMacosX64Url = "";
+    private string runnerMacosArm64Url = "";
+
+    protected override void OnInitialized()
+    {
+   var clientBaseUrl = NavigationManager.BaseUri.TrimEnd('/');
+      
+        // Desktop installers and ZIPs
+      desktopX64InstallerUrl = $"{clientBaseUrl}/downloads/desktop/latest/AutomatonStudioSetup-x64.msix";
+    desktopArm64InstallerUrl = $"{clientBaseUrl}/downloads/desktop/latest/AutomatonStudioSetup-arm64.msix";
+    desktopX64ZipUrl = $"{clientBaseUrl}/downloads/desktop/latest/AutomatonStudioDesktop-win-x64.zip";
+      desktopArm64ZipUrl = $"{clientBaseUrl}/downloads/desktop/latest/AutomatonStudioDesktop-win-arm64.zip";
+
+        // Runner installation scripts
+        windowsInstallCommand = $"iwr -useb {clientBaseUrl}/downloads/runner/install.ps1 | iex";
+  unixInstallCommand = $"curl -sSL {clientBaseUrl}/downloads/runner/install.sh | bash";
+        
+     // Runner manual downloads
+        runnerWindowsX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-x64.zip";
+        runnerWindowsArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-arm64.zip";
+    runnerLinuxX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-linux-x64.tar.gz";
+        runnerLinuxArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-linux-arm64.tar.gz";
+  runnerMacosX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-x64.tar.gz";
+        runnerMacosArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-arm64.tar.gz";
+    }
+
+    private async Task CopyToClipboard(string text, string description)
+    {
+        try
+     {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+ await MessageService.SuccessAsync($"{description} copied to clipboard");
+        }
+        catch
+        {
+      await MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
+        }
+    }
+
+  private async Task ScrollToSection(string sectionId)
+    {
+      await JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('{sectionId}')?.scrollIntoView({{ behavior: 'smooth', block: 'start' }})");
+    }
+}
+
+<style>
+    .home-content {
+        min-height: auto;
+padding-bottom: 40px;
+    }
+
+    .home-container {
+      max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 40px 24px;
+    }
+
+    .downloads-header {
+        margin-bottom: 24px;
+  padding: 24px 0;
+    }
+
+    .downloads-header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .downloads-header-icon {
+      flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+      height: 80px;
+    background-color: #1890ff;
+        border-radius: 16px;
+    }
+
+    .downloads-header-text {
+ flex: 1;
+    }
+
+    .downloads-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    .comparison-card {
+        background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+        border: 2px solid #1890ff;
+  }
+
+    .comparison-option {
+        text-align: center;
+        padding: 16px;
+    }
+
+    .option-icon {
+        width: 80px;
+     height: 80px;
+        margin: 0 auto 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+    }
+
+    .desktop-icon {
+   background: linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%);
+    }
+
+    .runner-icon {
+        background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+    }
+
+    .feature-list {
+        list-style: none;
+      padding: 0;
+        margin: 16px 0;
+        text-align: left;
+    }
+
+    .feature-list li {
+        padding: 4px 0;
+    }
+
+    .download-section {
+        scroll-margin-top: 80px;
+    }
+
+    .desktop-card {
+ border: 2px solid #1890ff;
+   background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+    }
+
+    .runner-card {
+     border: 2px solid #52c41a;
+        background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+    }
+
+    .install-primary {
+   margin-bottom: 24px;
+    }
+
+    .installer-card, .script-card {
+        text-align: center;
+    }
+
+    .code-container {
+        background: #f6f8fa;
+ border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 12px;
+    margin-top: 8px;
+    }
+
+    .command-display {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+  gap: 8px;
+    }
+
+    .code-block {
+        flex: 1;
+     font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 13px;
+        word-break: break-all;
+    }
+</style>
