@@ -1,8 +1,10 @@
 using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Apps.Components.NewAppDialog;
+using Automaton.Studio.Pages.Apps.Components.PublishAppDialog;
 using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -14,6 +16,7 @@ partial class AppsPage : ComponentBase
     [Inject] private AppsViewModel AppsViewModel { get; set; } = default!;
     [Inject] private ModalService ModalService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
+    [Inject] private IJSRuntime JSRuntime { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -40,11 +43,12 @@ partial class AppsPage : ComponentBase
         NavigationManager.NavigateTo($"appdesigner/{id}");
     }
 
-    private void ViewApp(string publicUrl)
+    private async Task ViewApp(string publicUrl)
     {
         if (!string.IsNullOrEmpty(publicUrl))
         {
-            NavigationManager.NavigateTo($"/apps/{publicUrl}", true);
+            // Open in new tab to avoid disposing the Blazor circuit
+            await JSRuntime.InvokeVoidAsync("open", $"/web/{publicUrl}", "_blank");
         }
     }
 
@@ -56,54 +60,75 @@ partial class AppsPage : ComponentBase
 
     private async Task ShowPublishDialog(Guid id)
     {
-        var publicUrl = "";
-        var inputRef = "";
-
-        // Create a simple string input modal
-        var modalContent = "Enter a public URL slug for your app (e.g., 'my-dashboard'):";
-        
-        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
+        // Get the app to retrieve its display name
+        var app = AppsViewModel.Apps?.FirstOrDefault(a => a.Id == id);
+        if (app == null)
         {
-            Title = "Publish App",
-            Content = modalContent,
-            OnOk = async (e) =>
+            await MessageService.ErrorAsync("App not found");
+            return;
+        }
+
+        var model = new PublishAppModel
+        {
+            AppId = id,
+            DisplayName = app.DisplayName,
+            PublicUrl = app.PublicUrl ?? string.Empty
+        };
+
+        var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>(
+            new ModalOptions
             {
-                // Show input dialog
-                var result = await ModalService.ConfirmAsync(new ConfirmOptions
-                {
-                    Title = "Enter URL Slug",
-                    Content = "URL slug (lowercase, letters, numbers, hyphens only):"
-                });
-            }
-        });
+                Title = "Publish App",
+                Width = 600,
+                OkText = "Publish",
+                CancelText = "Cancel"
+            },
+            model
+        );
 
-        // For now, use a simple approach - we'll enhance this later
-        if (!string.IsNullOrWhiteSpace(publicUrl))
+        modalRef.OnOk = async () =>
         {
+            if (string.IsNullOrWhiteSpace(model.PublicUrl))
+            {
+                await MessageService.WarningAsync("Please enter a URL slug");
+                return;
+            }
+
             try
             {
-                await AppsViewModel.PublishApp(id, publicUrl.ToLower().Trim());
-                await MessageService.SuccessAsync($"App published at /apps/{publicUrl}");
+                await AppsViewModel.PublishApp(id, model.PublicUrl);
+                await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
                 StateHasChanged();
             }
-            catch
+            catch (Exception ex)
             {
-                await MessageService.ErrorAsync("Failed to publish app. The URL might already be taken.");
+                await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
             }
-        }
+        };
     }
 
     private async Task UnpublishApp(Guid id)
     {
-        try
+        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
         {
-            await AppsViewModel.UnpublishApp(id);
-            await MessageService.SuccessAsync("App unpublished successfully");
-            StateHasChanged();
-        }
-        catch
+            Title = "Unpublish App?",
+            Content = "The app will no longer be accessible via public URL. You can republish it later.",
+            OkText = "Unpublish",
+            CancelText = "Cancel"
+        });
+
+        if (confirmed)
         {
-            await MessageService.ErrorAsync("Failed to unpublish app");
+            try
+            {
+                await AppsViewModel.UnpublishApp(id);
+                await MessageService.SuccessAsync("App unpublished successfully");
+                StateHasChanged();
+            }
+            catch
+            {
+                await MessageService.ErrorAsync("Failed to unpublish app");
+            }
         }
     }
 
@@ -152,24 +177,24 @@ partial class AppsPage : ComponentBase
     {
         return new List<EnhancedEmpty.FeatureCardModel>
         {
-            new() 
-            { 
-                Title = "Create powerful web applications", 
-                Description = "Build web apps using HTML, CSS, and JavaScript. Use the integrated code editor to develop and test your applications.", 
+            new()
+            {
+                Title = "Create powerful web applications",
+                Description = "Build web apps using HTML, CSS, and JavaScript. Use the integrated code editor to develop and test your applications.",
                 Icon = "code",
                 IconColor = "#1890ff"
             },
-            new() 
-            { 
-                Title = "Connect to your Flows", 
-                Description = "Use your existing Flows as backend services. Your apps can invoke Flows to retrieve data, process information, and more.", 
+            new()
+            {
+                Title = "Connect to your Flows",
+                Description = "Use your existing Flows as backend services. Your apps can invoke Flows to retrieve data, process information, and more.",
                 Icon = "api",
                 IconColor = "#52c41a"
             },
-            new() 
-            { 
-                Title = "Publish and share", 
-                Description = "Publish your apps with a public URL and share them with users. Apps can be accessed without authentication for external users.", 
+            new()
+            {
+                Title = "Publish and share",
+                Description = "Publish your apps with a public URL and share them with users. Apps can be accessed without authentication for external users.",
                 Icon = "share-alt",
                 IconColor = "#fa8c16"
             }

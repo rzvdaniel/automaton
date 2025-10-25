@@ -8,6 +8,8 @@ public class AppModel
     public string Description { get; set; }
     public bool IsPublished { get; set; }
     public string? PublicUrl { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public int Version { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
@@ -39,6 +41,8 @@ public class AppListItem
     public string DisplayName { get; set; }
     public bool IsPublished { get; set; }
     public string? PublicUrl { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public int Version { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 }

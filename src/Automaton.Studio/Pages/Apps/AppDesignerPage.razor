@@ -5,226 +5,261 @@
 <Layout>
     <Content>
         <Header Class="header">
-            <Row>
-           <Col>
-         <Space Direction="SpaceDirection.Horizontal">
-   <SpaceItem Class="header-item">
-       <Breadcrumb>
-       <BreadcrumbItem Href="/">
-          <Icon Type="home" Width="16" Height="16" />
-         <span>Home</span>
+     <Row>
+<Col>
+             <Space Direction="SpaceDirection.Horizontal">
+      <SpaceItem Class="header-item">
+         <Breadcrumb>
+     <BreadcrumbItem Href="/">
+ <Icon Type="home" Width="16" Height="16" />
+               <span>Home</span>
+   </BreadcrumbItem>
+      <BreadcrumbItem Href="/apps">
+    <Icon Type="appstore" Width="16" Height="16" />
+     <span>Apps</span>
+ </BreadcrumbItem>
+        <BreadcrumbItem>
+            <Icon Type="edit" Width="16" Height="16" />
+       <span>@currentApp.Name</span>
         </BreadcrumbItem>
-     <BreadcrumbItem Href="/apps">
-   <Icon Type="appstore" Width="16" Height="16" />
-      <span>Apps</span>
-      </BreadcrumbItem>
-               <BreadcrumbItem>
-       <Icon Type="edit" Width="16" Height="16" />
-    <span>@currentApp.Name</span>
-     </BreadcrumbItem>
-   </Breadcrumb>
-     </SpaceItem>
-   </Space>
-     </Col>
-        <Col Class="right-actions">
-        <Space Class="right-header-items">
-         <SpaceItem>
-        <Tooltip Title="Save app">
-    <Button Icon="save" OnClick="Save" Type="@ButtonType.Primary" Loading="@saving">
-        Save
-      </Button>
-       </Tooltip>
+            </Breadcrumb>
              </SpaceItem>
-</Space>
-  </Col>
+         
+       @if (currentApp.IsPublished)
+             {
+<SpaceItem>
+          <Tag Color="@("green")" Icon="check-circle">
+               Published
+    </Tag>
+       </SpaceItem>
+ <SpaceItem>
+       <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+         <Icon Type="link" />
+       /web/@currentApp.PublicUrl
+           </Text>
+      </SpaceItem>
+                }
+          </Space>
+          </Col>
+       <Col Class="right-actions">
+         <Space Class="right-header-items">
+            <SpaceItem>
+  <Tooltip Title="Save app">
+    <Button Icon="save" OnClick="Save" Type="@ButtonType.Primary" Loading="@saving">
+Save
+        </Button>
+     </Tooltip>
+      </SpaceItem>
+      
+                <SpaceItem>
+    <Button Icon="@(currentApp.IsPublished ? "stop" : "cloud-upload")"
+    OnClick="TogglePublish"
+ Loading="@publishing">
+                @(currentApp.IsPublished ? "Unpublish" : "Publish")
+   </Button>
+                 </SpaceItem>
+    
+        @if (currentApp.IsPublished)
+   {
+      <SpaceItem>
+        <Button Icon="eye" 
+OnClick="OpenPublishedApp"
+                  Type="@ButtonType.Default">
+           View Published
+      </Button>
+     </SpaceItem>
+         }
+            </Space>
+         </Col>
             </Row>
         </Header>
         
         <Form Model="@currentApp"
     Loading="loading"
-              Class="app-form"
-            Layout="@FormLayout.Vertical"
-              LabelColSpan="24"
-              WrapperColSpan="24">
-            <ChildContent>
-     <Tabs DefaultActiveKey="1">
-   <TabPane Tab="Code" Key="1">
-         <Splitter Layout="@SplitterLayout.Horizontal" Class="main-splitter">
-   <SplitterPanel Size="70%">
-         <div class="left-panel">
-    <div class="monaco-container">
+    Class="app-form"
+  Layout="@FormLayout.Vertical"
+            LabelColSpan="24"
+     WrapperColSpan="24">
+ <ChildContent>
+           <Tabs DefaultActiveKey="1">
+          <TabPane Tab="Code" Key="1">
+              <Splitter Layout="@SplitterLayout.Horizontal" Class="main-splitter">
+                   <SplitterPanel Size="70%">
+  <div class="left-panel">
+     <div class="monaco-container">
             <StandaloneCodeEditor Id="app-code-editor" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
- </div>
-    </div>
-  </SplitterPanel>
+        </div>
+  </div>
+          </SplitterPanel>
 
-     <SplitterPanel Size="30%">
-          <div class="right-panel-container">
-            <Tabs Size="TabSize.Small" Class="right-panel">
-       <TabPane Tab="AI Chat" Key="ai">
-     <div class="tab-content-scrollable">
- <WebAiChatPanel OnCodeGenerated="OnCodeGenerated"
-           GetCurrentCode="@GetCurrentCodeForAI"
+            <SplitterPanel Size="30%">
+         <div class="right-panel-container">
+           <Tabs Size="TabSize.Small" Class="right-panel">
+        <TabPane Tab="AI Chat" Key="ai">
+        <div class="tab-content-scrollable">
+   <WebAiChatPanel OnCodeGenerated="OnCodeGenerated"
+         GetCurrentCode="@GetCurrentCodeForAI"
        CurrentWebAppId="@AppId" />
-   </div>
-          </TabPane>
+     </div>
+              </TabPane>
        </Tabs>
        </div>
-     </SplitterPanel>
-               </Splitter>
-          </TabPane>
-   
-          <TabPane Tab="Preview" Key="preview">
-         <div class="preview-container">
-     <div class="preview-toolbar">
-        <Space>
-                  <SpaceItem>
-   <Tooltip Title="Refresh preview">
-   <Button Icon="reload" OnClick="RefreshPreview" Size="@ButtonSize.Small">
-      Refresh
-  </Button>
-      </Tooltip>
-         </SpaceItem>
-            <SpaceItem>
-    <Tooltip Title="Open preview in new tab">
-      <Button Icon="fullscreen" OnClick="OpenPreviewInNewTab" Size="@ButtonSize.Small">
-           Open in New Tab
-  </Button>
-            </Tooltip>
-       </SpaceItem>
-           @if (currentApp.IsPublished)
-        {
-          <SpaceItem>
- <Tooltip Title="View published app">
-           <Button Icon="eye" 
-          Type="@ButtonType.Primary" 
-                OnClick="OpenPublishedApp"
-          Size="@ButtonSize.Small">
-         View Published
-     </Button>
-        </Tooltip>
-             </SpaceItem>
-    }
-          </Space>
-     </div>
-                 <iframe id="app-preview-frame" 
-         srcdoc="@GetPreviewHtml()" 
-            sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
-      class="preview-iframe">
-         </iframe>
-            </div>
-          </TabPane>
+         </SplitterPanel>
+       </Splitter>
+       </TabPane>
           
-     <TabPane Tab="Settings" Key="2">
-       <div class="settings-container">
-        <Card Class="settings-card" Bordered="true">
-       <TitleTemplate>
-                <Space>
-            <SpaceItem>
-                 <Icon Type="setting" Style="color: #1890ff;" />
-              </SpaceItem>
-         <SpaceItem>
-  <span>App Configuration</span>
-        </SpaceItem>
-          </Space>
-         </TitleTemplate>
-       <ChildContent>
-         <Row Gutter="(24, 16)">
-            <Col Xs="24" Md="12">
-            <FormItem Label="Name" Required>
-   <Input @bind-Value="@currentApp.Name" 
-             Placeholder="Enter app name" 
-    Size="@InputSize.Large" />
-            </FormItem>
-           </Col>
-         <Col Xs="24" Md="12">
-     <FormItem Label="Display Name">
-      <Input @bind-Value="@currentApp.DisplayName" 
-            Placeholder="Enter display name" 
-       Size="@InputSize.Large" />
-             </FormItem>
-      </Col>
-        </Row>
-
-    <Row Gutter="(24, 16)">
-         <Col Span="24">
-    <FormItem Label="Description">
-        <TextArea @bind-Value="@currentApp.Description" 
-            Placeholder="Describe your app..."
-             Rows="4"
-             ShowCount
-     MaxLength="500"
-     Size="@InputSize.Large" />
-      </FormItem>
-     </Col>
- </Row>
-              </ChildContent>
-       </Card>
-
-     <Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
-       <TitleTemplate>
-    <Space>
-           <SpaceItem>
-            <Icon Type="mobile" Style="color: #1890ff;" />
-            </SpaceItem>
-            <SpaceItem>
-           <span>PWA Settings</span>
+     <TabPane Tab="Preview" Key="preview">
+        <div class="preview-container">
+        <div class="preview-toolbar">
+     <Space>
+ <SpaceItem>
+  <Tooltip Title="Refresh preview">
+            <Button Icon="reload" OnClick="RefreshPreview" Size="@ButtonSize.Small">
+       Refresh
+           </Button>
+        </Tooltip>
       </SpaceItem>
- </Space>
-    </TitleTemplate>
-         <ChildContent>
-    <FormItem Label="Enable PWA">
-    <Switch @bind-Value="@currentApp.Definition.Settings.EnablePwa" />
-       </FormItem>
-       
-   <Row Gutter="(24, 16)">
-        <Col Xs="24" Md="12">
-                 <FormItem Label="PWA Name">
-           <Input @bind-Value="@currentApp.Definition.Settings.PwaName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-        </FormItem>
-              </Col>
-      <Col Xs="24" Md="12">
-            <FormItem Label="PWA Short Name">
- <Input @bind-Value="@currentApp.Definition.Settings.PwaShortName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-  </FormItem>
-         </Col>
-           </Row>
-         <Row Gutter="(24, 16)">
-     <Col Xs="24" Md="12">
-      <FormItem Label="Theme Color">
-    <Input @bind-Value="@currentApp.Definition.Settings.ThemeColor" Placeholder="#1890ff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-                   </FormItem>
-          </Col>
-         <Col Xs="24" Md="12">
-         <FormItem Label="Background Color">
-    <Input @bind-Value="@currentApp.Definition.Settings.BackgroundColor" Placeholder="#ffffff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-         </FormItem>
-          </Col>
-  </Row>
-       </ChildContent>
-           </Card>
+           <SpaceItem>
+             <Tooltip Title="Open preview in new tab">
+          <Button Icon="fullscreen" OnClick="OpenPreviewInNewTab" Size="@ButtonSize.Small">
+    Open in New Tab
+    </Button>
+         </Tooltip>
+       </SpaceItem>
+      @if (currentApp.IsPublished)
+            {
+     <SpaceItem>
+        <Tooltip Title="View published app">
+          <Button Icon="eye" 
+      Type="@ButtonType.Primary" 
+       OnClick="OpenPublishedApp"
+             Size="@ButtonSize.Small">
+             View Published
+    </Button>
+           </Tooltip>
+         </SpaceItem>
+                  }
+                   </Space>
+     </div>
+ <iframe id="app-preview-frame" 
+       srcdoc="@GetPreviewHtml()" 
+            sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
+     class="preview-iframe">
+    </iframe>
             </div>
-        </TabPane>
-           </Tabs>
-            </ChildContent>
+              </TabPane>
+       
+     <TabPane Tab="Settings" Key="2">
+            <div class="settings-container">
+        <Card Class="settings-card" Bordered="true">
+             <TitleTemplate>
+        <Space>
+               <SpaceItem>
+ <Icon Type="setting" Style="color: #1890ff;" />
+        </SpaceItem>
+ <SpaceItem>
+     <span>App Configuration</span>
+       </SpaceItem>
+            </Space>
+            </TitleTemplate>
+  <ChildContent>
+        <Row Gutter="(24, 16)">
+        <Col Xs="24" Md="12">
+  <FormItem Label="Name" Required>
+         <Input @bind-Value="@currentApp.Name" 
+      Placeholder="Enter app name" 
+ Size="@InputSize.Large" />
+  </FormItem>
+            </Col>
+  <Col Xs="24" Md="12">
+       <FormItem Label="Display Name">
+     <Input @bind-Value="@currentApp.DisplayName" 
+                  Placeholder="Enter display name" 
+             Size="@InputSize.Large" />
+            </FormItem>
+       </Col>
+       </Row>
+
+      <Row Gutter="(24, 16)">
+<Col Span="24">
+             <FormItem Label="Description">
+            <TextArea @bind-Value="@currentApp.Description" 
+        Placeholder="Describe your app..."
+        Rows="4"
+          ShowCount
+       MaxLength="500"
+        Size="@InputSize.Large" />
+          </FormItem>
+             </Col>
+    </Row>
+        </ChildContent>
+         </Card>
+
+ <Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
+         <TitleTemplate>
+     <Space>
+ <SpaceItem>
+      <Icon Type="mobile" Style="color: #1890ff;" />
+         </SpaceItem>
+      <SpaceItem>
+    <span>PWA Settings</span>
+     </SpaceItem>
+       </Space>
+    </TitleTemplate>
+            <ChildContent>
+  <FormItem Label="Enable PWA">
+             <Switch @bind-Value="@currentApp.Definition.Settings.EnablePwa" />
+     </FormItem>
+          
+         <Row Gutter="(24, 16)">
+       <Col Xs="24" Md="12">
+   <FormItem Label="PWA Name">
+       <Input @bind-Value="@currentApp.Definition.Settings.PwaName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+     </FormItem>
+        </Col>
+      <Col Xs="24" Md="12">
+    <FormItem Label="PWA Short Name">
+   <Input @bind-Value="@currentApp.Definition.Settings.PwaShortName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+     </FormItem>
+ </Col>
+  </Row>
+          <Row Gutter="(24, 16)">
+           <Col Xs="24" Md="12">
+             <FormItem Label="Theme Color">
+            <Input @bind-Value="@currentApp.Definition.Settings.ThemeColor" Placeholder="#1890ff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+          </FormItem>
+            </Col>
+           <Col Xs="24" Md="12">
+      <FormItem Label="Background Color">
+                <Input @bind-Value="@currentApp.Definition.Settings.BackgroundColor" Placeholder="#ffffff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+         </FormItem>
+  </Col>
+         </Row>
+               </ChildContent>
+                 </Card>
+            </div>
+     </TabPane>
+      </Tabs>
+    </ChildContent>
         </Form>
     </Content>
 </Layout>
 
 <style>
+    /* All existing styles remain the same */
     .app-form {
         background-color: #fff;
- padding: 20px;
+        padding: 20px;
         height: calc(100vh - 117px);
     }
     
-  .main-splitter {
- height: calc(100vh - 180px);
-        width: 100%;
-        display: flex;
+    .main-splitter {
+        height: calc(100vh - 180px);
+     width: 100%;
+      display: flex;
     }
     
- .left-panel {
+    .left-panel {
         display: flex;
         flex-direction: column;
         height: 100%;
@@ -233,7 +268,7 @@
 
     .monaco-container {
         flex: 1 1 auto;
-        width: 100%;
+    width: 100%;
         height: 100%;
         display: flex;
         overflow: hidden;
@@ -243,7 +278,7 @@
         width: 100% !important;
         height: 100% !important;
         box-sizing: border-box;
-        display: block;
+   display: block;
     }
 
     .ant-splitter-panel {
@@ -254,8 +289,8 @@
     }
 
     .right-panel { 
-        padding: 0 0 0 10px;
-     height: 100%;
+     padding: 0 0 0 10px;
+   height: 100%;
         display: flex;
         flex-direction: column;
     }
@@ -264,92 +299,91 @@
         height: 100%;
         display: flex;
         flex-direction: column;
-   overflow: hidden;
-}
+        overflow: hidden;
+    }
 
     .right-panel .ant-tabs {
         height: 100%;
         display: flex;
-    flex-direction: column;
+        flex-direction: column;
     }
 
     .right-panel .ant-tabs-nav {
-        flex-shrink: 0;
-        margin-bottom: 0;
+ flex-shrink: 0;
+      margin-bottom: 0;
         position: sticky;
-   top: 0;
-        background: white;
+        top: 0;
+   background: white;
         z-index: 10;
     }
 
     .right-panel .ant-tabs-content-holder {
         flex: 1 1 auto;
-     overflow: hidden;
-      min-height: 0;
+        overflow: hidden;
+        min-height: 0;
     }
 
     .right-panel .ant-tabs-content {
         height: 100%;
     }
 
-    .right-panel .ant-tabs-tabpane {
+.right-panel .ant-tabs-tabpane {
         height: 100%;
         overflow: hidden;
     }
 
     .tab-content-scrollable {
         height: 100%;
-    overflow-y: auto;
-   overflow-x: hidden;
+   overflow-y: auto;
+        overflow-x: hidden;
     }
 
-    /* Preview Container Styles */
     .preview-container {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - 180px);
-        background: #fafafa;
+  height: calc(100vh - 180px);
+  background: #fafafa;
     }
     
-    .preview-toolbar {
+ .preview-toolbar {
         padding: 12px;
-        border-bottom: 1px solid #e8e8e8;
+ border-bottom: 1px solid #e8e8e8;
         background: #ffffff;
-flex-shrink: 0;
-    }
+        flex-shrink: 0;
+}
     
     .preview-iframe {
-        flex: 1;
-        border: none;
+   flex: 1;
+    border: none;
         width: 100%;
         height: 100%;
-        background: white;
+  background: white;
     }
 
     .settings-container {
-    padding: 24px;
+        padding: 24px;
         max-width: 1000px;
-      margin: 0 auto;
-   overflow-y: auto;
-     height: calc(100vh - 180px);
+        margin: 0 auto;
+        overflow-y: auto;
+        height: calc(100vh - 180px);
     }
 
     .settings-card {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
         border: 1px solid #f0f0f0;
         border-radius: 8px;
     }
 
     .settings-card .ant-card-head {
         border-bottom: 1px solid #f0f0f0;
- background: #fafafa;
+     background: #fafafa;
     }
 
     .settings-card .ant-card-head-title {
         font-size: 18px;
         font-weight: 600;
-     color: #262626;
-  }
+  color: #262626;
+    }
 
     .settings-card .ant-card-body {
         padding: 32px;
@@ -357,11 +391,11 @@ flex-shrink: 0;
 
     @@media (max-width: 768px) {
         .settings-container {
-      padding: 16px;
+        padding: 16px;
       }
 
-        .settings-card .ant-card-body {
-            padding: 20px;
-     }
+ .settings-card .ant-card-body {
+     padding: 20px;
+        }
     }
 </style>

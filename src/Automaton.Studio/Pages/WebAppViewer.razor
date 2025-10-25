@@ -1,0 +1,227 @@
+@page "/web/{slug}"
+@layout Automaton.Studio.Shared.EmptyLayout
+@using AntDesign
+@using Automaton.Studio.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="web-app-container">
+    @if (loading)
+    {
+        <div class="loading">
+<div class="spinner"></div>
+    <p>Loading app...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="error-container">
+      <div class="error-content">
+   <Icon Type="exclamation-circle" Style="font-size: 48px; color: #ff4d4f; margin-bottom: 16px;" />
+   <h2>App Not Found</h2>
+        <p>@error</p>
+  <button class="btn-home" @onclick="GoHome">Go Home</button>
+            </div>
+     </div>
+    }
+    else
+    {
+        <iframe id="web-app-frame" 
+           srcdoc="@ProcessedHtmlContent" 
+sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
+                class="web-app-iframe">
+   </iframe>
+    }
+</div>
+
+@code {
+    [Parameter] public string Slug { get; set; }
+    
+    private bool loading = true;
+    private string? error;
+    private string ProcessedHtmlContent = string.Empty;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+     var response = await Http.GetFromJsonAsync<WebAppResponse>($"api/web/{Slug}");
+      
+  if (response != null)
+    {
+     ProcessedHtmlContent = InjectAutomatonBridge(response.HtmlContent);
+     }
+        }
+        catch (HttpRequestException)
+{
+            error = "This app does not exist or has not been published.";
+        }
+        catch (Exception ex)
+     {
+            error = $"Error loading app: {ex.Message}";
+        }
+        finally
+        {
+   loading = false;
+        }
+    }
+    
+    private string InjectAutomatonBridge(string htmlContent)
+    {
+        var bridge = @"
+      <script>
+            window.Automaton = {
+  executeFlow: async function(flowId, inputs = {}) {
+   try {
+       console.log('?? Executing flow:', flowId);
+                   
+             const response = await fetch('/api/flows/execute', {
+  method: 'POST',
+             headers: {
+     'Content-Type': 'application/json'
+    },
+     body: JSON.stringify({
+        flowId: flowId,
+    inputs: inputs
+         })
+  });
+       
+       if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Flow execution failed');
+            }
+
+           const result = await response.json();
+         console.log('? Flow executed successfully:', result);
+      return result;
+  } catch (error) {
+   console.error('? Automaton.executeFlow error:', error);
+  throw error;
+         }
+         },
+     version: '1.0.0',
+   mode: 'production'
+    };
+        
+     console.log('? Automaton bridge loaded (Production Mode)');
+        </script>";
+        
+   // Insert before </head> if exists, otherwise prepend
+        if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+    {
+  return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
+     }
+    
+        return bridge + htmlContent;
+    }
+    
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+    
+    private class WebAppResponse
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string DisplayName { get; set; }
+        public string Description { get; set; }
+      public string HtmlContent { get; set; }
+        public DateTime? PublishedAt { get; set; }
+    }
+}
+
+<style>
+    .web-app-container {
+        position: fixed;
+    top: 0;
+        left: 0;
+     right: 0;
+        bottom: 0;
+        width: 100vw;
+     height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .web-app-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+    }
+    
+    .loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+  background: #fafafa;
+    }
+    
+  .spinner {
+        width: 40px;
+     height: 40px;
+   border: 4px solid #f3f3f3;
+   border-top: 4px solid #1890ff;
+        border-radius: 50%;
+    animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+    }
+    
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+     100% { transform: rotate(360deg); }
+    }
+    
+    .loading p {
+        color: #666;
+  font-size: 14px;
+    }
+    
+    .error-container {
+        display: flex;
+     align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background: #fafafa;
+    }
+    
+    .error-content {
+        text-align: center;
+        padding: 40px;
+        background: white;
+      border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        max-width: 400px;
+    }
+    
+    .error-content h2 {
+        margin: 0 0 8px 0;
+        color: #262626;
+      font-size: 24px;
+}
+    
+    .error-content p {
+    color: #666;
+        margin: 0 0 24px 0;
+    }
+    
+    .btn-home {
+        background: #1890ff;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+    font-size: 14px;
+   font-weight: 500;
+    }
+    
+    .btn-home:hover {
+ background: #40a9ff;
+    }
+</style>

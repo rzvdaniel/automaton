@@ -1,5 +1,6 @@
 using Automaton.Studio.Models;
 using Serilog;
+using System.Text.RegularExpressions;
 
 namespace Automaton.Studio.Services;
 
@@ -74,18 +75,60 @@ public class AppsService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task Publish(Guid id, string publicUrl)
+    public async Task<string> PublishAsync(Guid id, string publicUrl)
     {
         var request = new { PublicUrl = publicUrl };
         var response = await httpClient.PostAsJsonAsync($"{configService.AppsUrl}/{id}/publish", request);
 
         response.EnsureSuccessStatusCode();
+
+        return publicUrl;
     }
 
-    public async Task Unpublish(Guid id)
+    public async Task UnpublishAsync(Guid id)
     {
         var response = await httpClient.PostAsync($"{configService.AppsUrl}/{id}/unpublish", null);
 
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Generate a URL slug from display name (client-side preview)
+    /// </summary>
+    public static string GenerateSlugPreview(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+            return "app";
+
+        // Convert to lowercase and replace spaces/underscores with hyphens
+        var slug = displayName.ToLowerInvariant()
+            .Replace(' ', '-')
+            .Replace('_', '-');
+
+        // Remove special characters (keep only alphanumeric and hyphens)
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
+
+        // Remove multiple consecutive hyphens
+        slug = Regex.Replace(slug, @"\-+", "-");
+
+        // Trim hyphens from start and end
+        slug = slug.Trim('-');
+
+        // Ensure we have something
+        if (string.IsNullOrEmpty(slug))
+            slug = "app";
+
+        return slug;
+    }
+
+    // Keep old methods for backward compatibility
+    public async Task Publish(Guid id, string publicUrl)
+    {
+        await PublishAsync(id, publicUrl);
+    }
+
+    public async Task Unpublish(Guid id)
+    {
+        await UnpublishAsync(id);
     }
 }

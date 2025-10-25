@@ -7,8 +7,17 @@ public class WebApp
     public string DisplayName { get; set; }
     public string Description { get; set; }
     public string Definition { get; set; }
+    
+    // Publishing fields
     public bool IsPublished { get; set; }
     public string? PublicUrl { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public int Version { get; set; } = 1;
+    
+    // Access control (future use)
+    public bool RequiresAuthentication { get; set; } = false;
+    public string? AllowedRoles { get; set; }
+    
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
