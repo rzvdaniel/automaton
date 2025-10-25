@@ -131,30 +131,31 @@ currentApp.Definition.HtmlContent = code;
 
        modalRef.OnOk = async () =>
  {
-           if (string.IsNullOrWhiteSpace(model.PublicUrl))
-       {
-          await MessageService.WarningAsync("Please enter a URL slug");
-        return;
-                }
+        if (string.IsNullOrWhiteSpace(model.PublicUrl))
+  {
+   await MessageService.WarningAsync("Please enter a URL slug");
+    return;
+}
 
-    try
-    {
-         await AppsService.PublishAsync(currentApp.Id, model.PublicUrl);
-    
-         // Update local model
-     currentApp.IsPublished = true;
-                 currentApp.PublicUrl = model.PublicUrl;
-          currentApp.PublishedAt = DateTime.UtcNow;
-currentApp.Version++;
+  try
+   {
+     await AppsService.PublishAsync(currentApp.Id, model.PublicUrl, model.RequiresAuthentication);
+   
+      // Update local model
+         currentApp.IsPublished = true;
+     currentApp.PublicUrl = model.PublicUrl;
+     currentApp.PublishedAt = DateTime.UtcNow;
+        currentApp.Version++;
+   currentApp.RequiresAuthentication = model.RequiresAuthentication;
 
      await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
-       await InvokeAsync(StateHasChanged);
+          await InvokeAsync(StateHasChanged);
       }
-catch (Exception ex)
+       catch (Exception ex)
     {
-        await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
-          }
-   };
+     await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
+   }
+ };
         }
         catch (Exception ex)
         {

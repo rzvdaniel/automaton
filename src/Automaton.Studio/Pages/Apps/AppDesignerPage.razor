@@ -29,15 +29,31 @@
              {
 <SpaceItem>
           <Tag Color="@("green")" Icon="check-circle">
-               Published
-    </Tag>
-       </SpaceItem>
+       Published
+ </Tag>
+    </SpaceItem>
  <SpaceItem>
        <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
          <Icon Type="link" />
        /web/@currentApp.PublicUrl
            </Text>
       </SpaceItem>
+                @if (!currentApp.RequiresAuthentication)
+       {
+ <SpaceItem>
+     <Tooltip Title="This app is accessible to anyone with the link (no login required)">
+         <Tag Color="@("orange")" Icon="unlock">Public Access</Tag>
+</Tooltip>
+     </SpaceItem>
+  }
+           else
+  {
+      <SpaceItem>
+         <Tooltip Title="This app requires users to be logged in to Automaton">
+        <Tag Color="@("blue")" Icon="lock">Protected</Tag>
+    </Tooltip>
+    </SpaceItem>
+   }
                 }
           </Space>
           </Col>

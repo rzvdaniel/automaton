@@ -5,60 +5,86 @@
 
 <div class="publish-dialog">
     <Alert Type="@AlertType.Info" 
-    Message="Publishing your app" 
-  Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
-           ShowIcon="true"
-Style="margin-bottom: 16px;" />
+       Message="Publishing your app" 
+   Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
+      ShowIcon="true"
+           Style="margin-bottom: 16px;" />
 
     <Form Model="@Options" Layout="@FormLayout.Vertical">
-        <FormItem Label="App Display Name">
-<Input @bind-Value="@Options.DisplayName" Disabled="true" Size="@InputSize.Large" />
-    </FormItem>
+   <FormItem Label="App Display Name">
+  <Input @bind-Value="@Options.DisplayName" Disabled="true" Size="@InputSize.Large" />
+        </FormItem>
 
         <FormItem Label="Public URL Slug" Required>
- <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
-             <SpaceItem>
-    <Input @bind-Value="@Options.PublicUrl" 
-   Placeholder="my-app-name"
-   Size="@InputSize.Large"
-      @oninput="OnSlugInput" />
-      </SpaceItem>
-       <SpaceItem>
-      <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-     <Icon Type="link" Style="margin-right: 4px;" />
-     Your app will be available at: <Text Strong>/web/@(string.IsNullOrEmpty(Options.PublicUrl) ? "your-app-slug" : Options.PublicUrl)</Text>
-      </Text>
+         <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+          <SpaceItem>
+  <Input @bind-Value="@Options.PublicUrl" 
+              Placeholder="my-app-name"
+         Size="@InputSize.Large"
+        @oninput="OnSlugInput" />
  </SpaceItem>
-  </Space>
-   </FormItem>
+      <SpaceItem>
+        <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+   <Icon Type="link" Style="margin-right: 4px;" />
+      Your app will be available at: <Text Strong>/web/@(string.IsNullOrEmpty(Options.PublicUrl) ? "your-app-slug" : Options.PublicUrl)</Text>
+   </Text>
+       </SpaceItem>
+            </Space>
+     </FormItem>
+
+   <FormItem Label="Access Control">
+            <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+ <SpaceItem>
+    <Checkbox @bind-Checked="@Options.RequiresAuthentication">
+      Require users to be logged in to Automaton
+          </Checkbox>
+  </SpaceItem>
+                <SpaceItem>
+      @if (Options.RequiresAuthentication)
+      {
+  <AntDesign.Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+    <Icon Type="lock" Style="margin-right: 4px; color: #52c41a;" />
+     Protected: Only authenticated Automaton users can access this app
+      </AntDesign.Text>
+   }
+          else
+   {
+ <AntDesign.Text Type="@TextElementType.Warning" Style="font-size: 12px;">
+  <Icon Type="unlock" Style="margin-right: 4px; color: #fa8c16;" />
+  Public: Anyone with the link can access this app (no login required)
+  </AntDesign.Text>
+}
+  </SpaceItem>
+    </Space>
+      </FormItem>
 
         <Alert Type="@AlertType.Warning"
-     Message="URL slug rules"
-    Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
-               ShowIcon="true"
-     Style="margin-top: 8px;" />
+       Message="URL slug rules"
+               Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
+        ShowIcon="true"
+          Style="margin-top: 8px;" />
     </Form>
 </div>
 
 @code {
     protected override void OnInitialized()
     {
-// Generate initial slug from display name if PublicUrl is empty
+      // Generate initial slug from display name if PublicUrl is empty
         if (string.IsNullOrEmpty(Options.PublicUrl) && !string.IsNullOrEmpty(Options.DisplayName))
-  {
-     Options.PublicUrl = AppsService.GenerateSlugPreview(Options.DisplayName);
-     }
+    {
+ Options.PublicUrl = AppsService.GenerateSlugPreview(Options.DisplayName);
+ }
     }
 
     private void OnSlugInput(ChangeEventArgs e)
     {
- var input = e.Value?.ToString() ?? "";
+    var input = e.Value?.ToString() ?? "";
+   
+        // Clean the input on the fly
+        var cleaned = AppsService.GenerateSlugPreview(input);
+    Options.PublicUrl = cleaned;
         
-      // Clean the input on the fly
-  var cleaned = AppsService.GenerateSlugPreview(input);
-     Options.PublicUrl = cleaned;
-     
-   StateHasChanged();
+        StateHasChanged();
     }
 }
 

@@ -60,7 +60,7 @@ public class AppsController : BaseController
     [HttpPost("{id}/publish")]
     public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request)
     {
-        await appsService.Publish(id, request.PublicUrl);
+        await appsService.Publish(id, request.PublicUrl, request.RequiresAuthentication);
 
         return NoContent();
     }
@@ -77,4 +77,5 @@ public class AppsController : BaseController
 public class PublishAppRequest
 {
     public required string PublicUrl { get; set; }
+    public bool RequiresAuthentication { get; set; } = true;
 }

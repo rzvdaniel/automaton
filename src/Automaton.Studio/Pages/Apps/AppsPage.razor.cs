@@ -72,7 +72,8 @@ partial class AppsPage : ComponentBase
         {
             AppId = id,
             DisplayName = app.DisplayName,
-            PublicUrl = app.PublicUrl ?? string.Empty
+            PublicUrl = app.PublicUrl ?? string.Empty,
+            RequiresAuthentication = true // Default to protected
         };
 
         var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>(
@@ -96,8 +97,10 @@ partial class AppsPage : ComponentBase
 
             try
             {
-                await AppsViewModel.PublishApp(id, model.PublicUrl);
-                await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
+                await AppsViewModel.PublishApp(id, model.PublicUrl, model.RequiresAuthentication);
+
+                var accessType = model.RequiresAuthentication ? "Protected" : "Public";
+                await MessageService.SuccessAsync($"App published! ({accessType}) Access it at /web/{model.PublicUrl}");
                 StateHasChanged();
             }
             catch (Exception ex)

@@ -116,7 +116,7 @@ var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppU
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
     }
 
-    public async Task Publish(Guid id, string publicUrl)
+    public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true)
  {
       var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
 
@@ -134,18 +134,20 @@ var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppU
         // Check if URL is already taken
     if (dataContext.WebApps.Any(x => x.PublicUrl == publicUrl && x.Id != id))
         {
-            throw new InvalidOperationException("This URL is already taken");
-        }
+       throw new InvalidOperationException("This URL is already taken");
+   }
 
       entity.IsPublished = true;
-        entity.PublicUrl = publicUrl;
+ entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
+        entity.RequiresAuthentication = requiresAuthentication;
         entity.Version++;
       entity.Updated = DateTime.UtcNow;
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} published with slug {Slug} (v{Version})", id, publicUrl, entity.Version);
+        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth})", 
+     id, publicUrl, entity.Version, requiresAuthentication);
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
@@ -224,6 +226,7 @@ Id = entity.Id,
        PublicUrl = entity.PublicUrl,
           PublishedAt = entity.PublishedAt,
          Version = entity.Version,
+     RequiresAuthentication = entity.RequiresAuthentication,
             Created = entity.Created,
       Updated = entity.Updated,
     Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()

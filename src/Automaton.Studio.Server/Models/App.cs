@@ -10,6 +10,7 @@ public class AppModel
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; }
+    public bool RequiresAuthentication { get; set; } = true;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 

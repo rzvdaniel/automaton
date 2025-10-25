@@ -76,7 +76,27 @@
                 <Column Title="Status" @bind-Field="@context.IsPublished">
                     @if (context.IsPublished)
                     {
-                        <Tag Color="@("green")">Published</Tag>
+                        <Space Size="@SpaceSize.Small">
+                            <SpaceItem>
+                                <Tag Color="@("green")">Published</Tag>
+                            </SpaceItem>
+                            @if (!context.RequiresAuthentication)
+                            {
+                                <SpaceItem>
+                                    <Tooltip Title="This app is accessible to anyone with the link">
+                                        <Tag Color="@("orange")" Icon="unlock">Public</Tag>
+                                    </Tooltip>
+                                </SpaceItem>
+                            }
+                            else
+                            {
+                                <SpaceItem>
+                                    <Tooltip Title="This app requires users to be logged in">
+                                        <Tag Color="@("blue")" Icon="lock">Protected</Tag>
+                                    </Tooltip>
+                                </SpaceItem>
+                            }
+                        </Space>
                     }
                     else
                     {
