@@ -2,234 +2,236 @@
 @using AntDesign
 
 <Layout>
-    <Content>
-        <Header Class="header">
-            <Row>
-                <Col>
-                    <Space Direction="SpaceDirection.Horizontal">
-                        <SpaceItem Class="header-item">
-                            <Breadcrumb>
-                                <BreadcrumbItem Href="/">
-                                    <Icon Type="home" Width="16" Height="16" />
-                                    <span>Home</span>
-                                </BreadcrumbItem>
-                                <BreadcrumbItem Href="/apps">
-                                    <Icon Type="appstore" Width="16" Height="16" />
-                                    <span>Apps</span>
-                                </BreadcrumbItem>
-                                <BreadcrumbItem>
-                                    <Icon Type="edit" Width="16" Height="16" />
-                                    <span>@currentApp.Name</span>
-                                </BreadcrumbItem>
-                            </Breadcrumb>
-                        </SpaceItem>
-                    </Space>
-                </Col>
-                <Col Class="right-actions">
-                    <Space Class="right-header-items">
-                        <SpaceItem>
-                            <Tooltip Title="Save app">
-                                <Button Icon="save" OnClick="Save" Type="@ButtonType.Primary" Loading="@saving">
-                                    Save
-                                </Button>
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Preview app in new tab">
-                                <Button Icon="eye" OnClick="Preview" Type="@ButtonType.Default">
-                                    Preview
-                                </Button>
-                            </Tooltip>
-                        </SpaceItem>
-                    </Space>
-                </Col>
-            </Row>
-        </Header>
-        
-        <div class="app-designer-container">
-            <Tabs DefaultActiveKey="1" Class="app-designer-tabs">
-                <TabPane Tab="Code" Key="1">
-                    <div class="editor-layout">
-                        <div class="monaco-editor-wrapper">
-                            <div id="app-monaco-editor" class="monaco-editor-container"></div>
-                        </div>
-                    </div>
-                </TabPane>
-                
-                <TabPane Tab="Settings" Key="2">
-                    <div class="settings-container">
-                        <Card Class="settings-card" Bordered="true">
-                            <TitleTemplate>
-                                <Space>
-                                    <SpaceItem>
-                                        <Icon Type="setting" Style="color: #1890ff;" />
-                                    </SpaceItem>
-                                    <SpaceItem>
-                                        <span>App Configuration</span>
-                                    </SpaceItem>
-                                </Space>
-                            </TitleTemplate>
-                            <ChildContent>
-                                <Form Model="@currentApp" Layout="@FormLayout.Vertical">
-                                    <GridRow Gutter="(24, 16)">
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="Name" Required>
-                                                <Input @bind-Value="@currentApp.Name" 
-                                                       Placeholder="Enter app name" 
-                                                       Size="@InputSize.Large" />
-                                            </FormItem>
-                                        </GridCol>
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="Display Name">
-                                                <Input @bind-Value="@currentApp.DisplayName" 
-                                                       Placeholder="Enter display name" 
-                                                       Size="@InputSize.Large" />
-                                            </FormItem>
-                                        </GridCol>
-                                    </GridRow>
+	<Content>
+		<Header Class="header">
+			<Row>
+				<Col>
+				<Space Direction="SpaceDirection.Horizontal">
+					<SpaceItem Class="header-item">
+						<Breadcrumb>
+							<BreadcrumbItem Href="/">
+								<Icon Type="home" Width="16" Height="16" />
+								<span>Home</span>
+							</BreadcrumbItem>
+							<BreadcrumbItem Href="/apps">
+								<Icon Type="appstore" Width="16" Height="16" />
+								<span>Apps</span>
+							</BreadcrumbItem>
+							<BreadcrumbItem>
+								<Icon Type="edit" Width="16" Height="16" />
+								<span>@currentApp.Name</span>
+							</BreadcrumbItem>
+						</Breadcrumb>
+					</SpaceItem>
+				</Space>
+				</Col>
+				<Col Class="right-actions">
+				<Space Class="right-header-items">
+					<SpaceItem>
+						<Tooltip Title="Save app">
+							<Button Icon="save" OnClick="Save" Type="@ButtonType.Primary" Loading="@saving">
+								Save
+							</Button>
+						</Tooltip>
+					</SpaceItem>
+					<SpaceItem>
+						<Tooltip Title="Preview app in new tab">
+							<Button Icon="eye" OnClick="Preview" Type="@ButtonType.Default">
+								Preview
+							</Button>
+						</Tooltip>
+					</SpaceItem>
+				</Space>
+				</Col>
+			</Row>
+		</Header>
 
-                                    <GridRow Gutter="(24, 16)">
-                                        <GridCol Span="24">
-                                            <FormItem Label="Description">
-                                                <TextArea @bind-Value="@currentApp.Description" 
-                                                         Placeholder="Describe your app..."
-                                                         Rows="4"
-                                                         ShowCount
-                                                         MaxLength="500"
-                                                         Size="@InputSize.Large" />
-                                            </FormItem>
-                                        </GridCol>
-                                    </GridRow>
-                                </Form>
-                            </ChildContent>
-                        </Card>
+		<div class="app-designer-container">
+			<Tabs DefaultActiveKey="1" Class="app-designer-tabs">
+				<TabPane Tab="Code" Key="1">
+					<div class="editor-layout">
+						<div class="monaco-editor-wrapper">
+							<div class="monaco-editor-container">
+								<StandaloneCodeEditor Id="app-code-editor" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+							</div>
+						</div>
+					</div>
+				</TabPane>
 
-                        <Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
-                            <TitleTemplate>
-                                <Space>
-                                    <SpaceItem>
-                                        <Icon Type="mobile" Style="color: #1890ff;" />
-                                    </SpaceItem>
-                                    <SpaceItem>
-                                        <span>PWA Settings</span>
-                                    </SpaceItem>
-                                </Space>
-                            </TitleTemplate>
-                            <ChildContent>
-                                <Form Model="@currentApp.Definition.Settings" Layout="@FormLayout.Vertical">
-                                    <FormItem Label="Enable PWA">
-                                        <Switch @bind-Value="@currentApp.Definition.Settings.EnablePwa" />
-                                    </FormItem>
-                                    
-                                    <GridRow Gutter="(24, 16)">
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="PWA Name">
-                                                <Input @bind-Value="@currentApp.Definition.Settings.PwaName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-                                            </FormItem>
-                                        </GridCol>
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="PWA Short Name">
-                                                <Input @bind-Value="@currentApp.Definition.Settings.PwaShortName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-                                            </FormItem>
-                                        </GridCol>
-                                    </GridRow>
-                                    <GridRow Gutter="(24, 16)">
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="Theme Color">
-                                                <Input @bind-Value="@currentApp.Definition.Settings.ThemeColor" Placeholder="#1890ff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-                                            </FormItem>
-                                        </GridCol>
-                                        <GridCol Xs="24" Md="12">
-                                            <FormItem Label="Background Color">
-                                                <Input @bind-Value="@currentApp.Definition.Settings.BackgroundColor" Placeholder="#ffffff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
-                                            </FormItem>
-                                        </GridCol>
-                                    </GridRow>
-                                </Form>
-                            </ChildContent>
-                        </Card>
-                    </div>
-                </TabPane>
-            </Tabs>
-        </div>
-    </Content>
+				<TabPane Tab="Settings" Key="2">
+					<div class="settings-container">
+						<Card Class="settings-card" Bordered="true">
+							<TitleTemplate>
+								<Space>
+									<SpaceItem>
+										<Icon Type="setting" Style="color: #1890ff;" />
+									</SpaceItem>
+									<SpaceItem>
+										<span>App Configuration</span>
+									</SpaceItem>
+								</Space>
+							</TitleTemplate>
+							<ChildContent>
+								<Form Model="@currentApp" Layout="@FormLayout.Vertical">
+									<GridRow Gutter="(24, 16)">
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="Name" Required>
+												<Input @bind-Value="@currentApp.Name"
+													   Placeholder="Enter app name"
+													   Size="@InputSize.Large" />
+											</FormItem>
+										</GridCol>
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="Display Name">
+												<Input @bind-Value="@currentApp.DisplayName"
+													   Placeholder="Enter display name"
+													   Size="@InputSize.Large" />
+											</FormItem>
+										</GridCol>
+									</GridRow>
+
+									<GridRow Gutter="(24, 16)">
+										<GridCol Span="24">
+											<FormItem Label="Description">
+												<TextArea @bind-Value="@currentApp.Description"
+														  Placeholder="Describe your app..."
+														  Rows="4"
+														  ShowCount
+														  MaxLength="500"
+														  Size="@InputSize.Large" />
+											</FormItem>
+										</GridCol>
+									</GridRow>
+								</Form>
+							</ChildContent>
+						</Card>
+
+						<Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
+							<TitleTemplate>
+								<Space>
+									<SpaceItem>
+										<Icon Type="mobile" Style="color: #1890ff;" />
+									</SpaceItem>
+									<SpaceItem>
+										<span>PWA Settings</span>
+									</SpaceItem>
+								</Space>
+							</TitleTemplate>
+							<ChildContent>
+								<Form Model="@currentApp.Definition.Settings" Layout="@FormLayout.Vertical">
+									<FormItem Label="Enable PWA">
+										<Switch @bind-Value="@currentApp.Definition.Settings.EnablePwa" />
+									</FormItem>
+
+									<GridRow Gutter="(24, 16)">
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="PWA Name">
+												<Input @bind-Value="@currentApp.Definition.Settings.PwaName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+											</FormItem>
+										</GridCol>
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="PWA Short Name">
+												<Input @bind-Value="@currentApp.Definition.Settings.PwaShortName" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+											</FormItem>
+										</GridCol>
+									</GridRow>
+									<GridRow Gutter="(24, 16)">
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="Theme Color">
+												<Input @bind-Value="@currentApp.Definition.Settings.ThemeColor" Placeholder="#1890ff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+											</FormItem>
+										</GridCol>
+										<GridCol Xs="24" Md="12">
+											<FormItem Label="Background Color">
+												<Input @bind-Value="@currentApp.Definition.Settings.BackgroundColor" Placeholder="#ffffff" Disabled="@(!currentApp.Definition.Settings.EnablePwa)" />
+											</FormItem>
+										</GridCol>
+									</GridRow>
+								</Form>
+							</ChildContent>
+						</Card>
+					</div>
+				</TabPane>
+			</Tabs>
+		</div>
+	</Content>
 </Layout>
 
 <style>
-    .app-designer-container {
-        height: calc(100vh - 120px);
-        display: flex;
-        flex-direction: column;
-        background-color: #fff;
-    }
+	.app-designer-container {
+		height: calc(100vh - 120px);
+		display: flex;
+		flex-direction: column;
+		background-color: #fff;
+	}
 
-    .app-designer-tabs {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
+	.app-designer-tabs {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+	}
 
-    .app-designer-tabs .ant-tabs-content-holder {
-        flex: 1;
-        overflow: hidden;
-    }
+		.app-designer-tabs .ant-tabs-content-holder {
+			flex: 1;
+			overflow: hidden;
+		}
 
-    .app-designer-tabs .ant-tabs-content {
-        height: 100%;
-    }
+		.app-designer-tabs .ant-tabs-content {
+			height: 100%;
+		}
 
-    .app-designer-tabs .ant-tabs-tabpane {
-        height: 100%;
-    }
+		.app-designer-tabs .ant-tabs-tabpane {
+			height: 100%;
+		}
 
-    .editor-layout {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
+	.editor-layout {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+	}
 
-    .monaco-editor-wrapper {
-        flex: 1;
-        position: relative;
-        min-height: 0;
-    }
+	.monaco-editor-wrapper {
+		flex: 1;
+		position: relative;
+		min-height: 0;
+	}
 
-    .monaco-editor-container {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: 100%;
-    }
+	.monaco-editor-container {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		width: 100%;
+		height: 100%;
+	}
 
-    .settings-container {
-        padding: 24px;
-        max-width: 1000px;
-        margin: 0 auto;
-        overflow-y: auto;
-        height: 100%;
-    }
+	.settings-container {
+		padding: 24px;
+		max-width: 1000px;
+		margin: 0 auto;
+		overflow-y: auto;
+		height: 100%;
+	}
 
-    .settings-card {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
-        border: 1px solid #f0f0f0;
-        border-radius: 8px;
-    }
+	.settings-card {
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+		border: 1px solid #f0f0f0;
+		border-radius: 8px;
+	}
 
-    .settings-card .ant-card-head {
-        border-bottom: 1px solid #f0f0f0;
-        background: #fafafa;
-    }
+		.settings-card .ant-card-head {
+			border-bottom: 1px solid #f0f0f0;
+			background: #fafafa;
+		}
 
-    .settings-card .ant-card-head-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #262626;
-    }
+		.settings-card .ant-card-head-title {
+			font-size: 18px;
+			font-weight: 600;
+			color: #262626;
+		}
 
-    .settings-card .ant-card-body {
-        padding: 32px;
-    }
+		.settings-card .ant-card-body {
+			padding: 32px;
+		}
 </style>

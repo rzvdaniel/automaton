@@ -1,13 +1,14 @@
 using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
+using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace Automaton.Studio.Pages.Apps;
 
 partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 {
+    private StandaloneCodeEditor codeEditor;
     private bool loading = false;
     private bool saving = false;
     private AppModel currentApp = new AppModel
@@ -18,7 +19,6 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         Definition = new AppDefinition()
     };
 
-    [Inject] private IJSRuntime JSRuntime { get; set; }
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
@@ -47,23 +47,14 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
-        if (firstRender)
+        return new StandaloneEditorConstructionOptions
         {
-            try
-            {
-                // Initialize Monaco editor with the current HTML content
-                var initialValue = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
-                await JSRuntime.InvokeVoidAsync("MonacoEditorInterop.initialize", 
-                    "app-monaco-editor", initialValue, "html");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error initializing Monaco editor: {ex.Message}");
-                await MessageService.WarningAsync("Monaco editor failed to initialize. Please refresh the page.");
-            }
-        }
+            AutomaticLayout = true,
+            Language = "html",
+            Value = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent()
+        };
     }
 
     private async Task Save()
@@ -73,7 +64,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         try
         {
             // Get the current code from Monaco editor
-            var code = await JSRuntime.InvokeAsync<string>("MonacoEditorInterop.getValue");
+            var code = await codeEditor.GetValue();
             currentApp.Definition.HtmlContent = code;
 
             await AppsService.Update(currentApp);
@@ -94,10 +85,9 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         try
         {
             // Get the current code from Monaco editor
-            var code = await JSRuntime.InvokeAsync<string>("MonacoEditorInterop.getValue");
-            
-            // Open preview in new tab
-            // We'll implement a preview page later
+            var code = await codeEditor.GetValue();
+
+            // TODO: Open preview in new tab
             await MessageService.InfoAsync("Preview feature coming soon!");
         }
         catch
@@ -116,42 +106,42 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     <title>My App</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
+display: flex;
             justify-content: center;
-            align-items: center;
+     align-items: center;
         }
         .container {
             background: white;
             padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-width: 600px;
-            width: 100%;
+          border-radius: 10px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      max-width: 600px;
+    width: 100%;
         }
         h1 {
             color: #333;
-            margin-top: 0;
+   margin-top: 0;
         }
         p {
             color: #666;
-            line-height: 1.6;
+     line-height: 1.6;
         }
         .button {
-            background: #667eea;
-            color: white;
-            border: none;
+       background: #667eea;
+    color: white;
+      border: none;
             padding: 12px 24px;
-            border-radius: 5px;
+  border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
             margin-top: 20px;
         }
-        .button:hover {
+   .button:hover {
             background: #5568d3;
         }
     </style>
@@ -163,12 +153,12 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         <p>Connect to your Flows to add backend functionality!</p>
         <button class=""button"" onclick=""alert('Hello from your app!')"">Click Me</button>
     </div>
-    
+ 
     <script>
         // Your JavaScript code here
         console.log('App loaded successfully!');
         
-        // Example: Call a Flow (coming soon)
+   // Example: Call a Flow (coming soon)
         // Automaton.executeFlow('flow-id', { inputVar: 'value' })
         //   .then(result => console.log(result));
     </script>
@@ -178,13 +168,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("MonacoEditorInterop.dispose");
-        }
-        catch
-        {
-            // Editor already disposed or not initialized
-        }
+        // BlazorMonaco handles disposal internally
+        await Task.CompletedTask;
     }
 }
