@@ -33,8 +33,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
-        public virtual DbSet<Entities.App> Apps { get; set; }
-        public virtual DbSet<Entities.AppUser> AppUsers { get; set; }
+        public virtual DbSet<WebApp> WebApps { get; set; }
+        public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -124,18 +124,18 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.CustomStepId).IsRequired();
             });
 
-            modelBuilder.Entity<Entities.App>(entity =>
+            modelBuilder.Entity<Entities.WebApp>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
                 entity.HasIndex(e => e.PublicUrl).IsUnique();
             });
 
-            modelBuilder.Entity<Entities.AppUser>(entity =>
+            modelBuilder.Entity<Entities.WebAppUser>(entity =>
             {
-                entity.HasKey(e => new { e.AppId, e.UserId });
-                entity.HasIndex(e => e.AppId, "IX_AppUser_AppId");
+                entity.HasKey(e => new { e.WebAppId, e.UserId });
+                entity.HasIndex(e => e.WebAppId, "IX_WebAppUser_WebAppId");
                 entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.AppId).IsRequired();
+                entity.Property(e => e.WebAppId).IsRequired();
             });
 
             modelBuilder.Entity<RefreshToken>(entity =>

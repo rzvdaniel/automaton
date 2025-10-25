@@ -1,7 +1,7 @@
 namespace Automaton.Studio.Server.Entities;
 
-public class AppUser
+public class WebAppUser
 {
-    public Guid AppId { get; set; }
+    public Guid WebAppId { get; set; }
     public Guid UserId { get; set; }
 }

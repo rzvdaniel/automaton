@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Automaton.Studio.Server.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAppsFeature : Migration
+    public partial class AddWebAppFeature : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,13 +16,13 @@ namespace Automaton.Studio.Server.Migrations
                 table: "RefreshTokens",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValue: new DateTime(2025, 10, 19, 19, 48, 7, 11, DateTimeKind.Local).AddTicks(7276),
+                defaultValue: new DateTime(2025, 10, 25, 12, 10, 54, 385, DateTimeKind.Local).AddTicks(8173),
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
                 oldDefaultValue: new DateTime(2025, 9, 25, 11, 17, 39, 287, DateTimeKind.Local).AddTicks(5946));
 
             migrationBuilder.CreateTable(
-                name: "Apps",
+                name: "WebApps",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -37,49 +37,49 @@ namespace Automaton.Studio.Server.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Apps", x => x.Id);
+                    table.PrimaryKey("PK_WebApps", x => x.Id);
                 })
                 .Annotation("MySQL:Charset", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "AppUsers",
+                name: "WebAppUsers",
                 columns: table => new
                 {
-                    AppId = table.Column<Guid>(type: "char(36)", nullable: false),
+                    WebAppId = table.Column<Guid>(type: "char(36)", nullable: false),
                     UserId = table.Column<Guid>(type: "char(36)", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AppUsers", x => new { x.AppId, x.UserId });
+                    table.PrimaryKey("PK_WebAppUsers", x => new { x.WebAppId, x.UserId });
                     table.ForeignKey(
-                        name: "FK_AppUsers_Apps_AppId",
-                        column: x => x.AppId,
-                        principalTable: "Apps",
+                        name: "FK_WebAppUsers_WebApps_WebAppId",
+                        column: x => x.WebAppId,
+                        principalTable: "WebApps",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
                 .Annotation("MySQL:Charset", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Apps_PublicUrl",
-                table: "Apps",
+                name: "IX_WebApps_PublicUrl",
+                table: "WebApps",
                 column: "PublicUrl",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_AppUser_AppId",
-                table: "AppUsers",
-                column: "AppId");
+                name: "IX_WebAppUser_WebAppId",
+                table: "WebAppUsers",
+                column: "WebAppId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "AppUsers");
+                name: "WebAppUsers");
 
             migrationBuilder.DropTable(
-                name: "Apps");
+                name: "WebApps");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "CreatedAt",
@@ -89,7 +89,7 @@ namespace Automaton.Studio.Server.Migrations
                 defaultValue: new DateTime(2025, 9, 25, 11, 17, 39, 287, DateTimeKind.Local).AddTicks(5946),
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValue: new DateTime(2025, 10, 19, 19, 48, 7, 11, DateTimeKind.Local).AddTicks(7276));
+                oldDefaultValue: new DateTime(2025, 10, 25, 12, 10, 54, 385, DateTimeKind.Local).AddTicks(8173));
         }
     }
 }

@@ -1,6 +1,6 @@
 namespace Automaton.Studio.Server.Entities;
 
-public class App
+public class WebApp
 {
     public Guid Id { get; set; }
     public string Name { get; set; }
@@ -12,5 +12,5 @@ public class App
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
-    public virtual ICollection<AppUser> AppUsers { get; set; }
+    public virtual ICollection<WebAppUser> WebAppUsers { get; set; }
 }

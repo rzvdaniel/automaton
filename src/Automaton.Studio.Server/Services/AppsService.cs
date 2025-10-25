@@ -27,7 +27,7 @@ public class AppsService
 
     public IEnumerable<Models.AppModel> List()
     {
-        var entities = dataContext.Apps.Where(x => x.AppUsers.Any(x => x.UserId == userId));
+        var entities = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == userId));
         var apps = entities.Select(MapToModel);
 
         return apps;
@@ -35,7 +35,7 @@ public class AppsService
 
     public Models.AppModel Get(Guid id)
     {
-        var appEntity = dataContext.Apps.SingleOrDefault(x => x.Id == id && x.AppUsers.Any(x => x.UserId == userId));
+        var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
         var app = MapToModel(appEntity);
 
         return app;
@@ -43,7 +43,7 @@ public class AppsService
 
     public async Task<Guid> Create(Models.NewApp app)
     {
-        var entity = new Entities.App
+        var entity = new Entities.WebApp
         {
             Id = Guid.NewGuid(),
             Name = app.Name,
@@ -56,15 +56,15 @@ public class AppsService
             Definition = JsonSerializer.Serialize(new Models.AppDefinition())
         };
 
-        dataContext.Apps.Add(entity);
+        dataContext.WebApps.Add(entity);
 
-        var appUser = new Entities.AppUser
+        var appUser = new Entities.WebAppUser
         {
-            AppId = entity.Id,
+            WebAppId = entity.Id,
             UserId = userId
         };
 
-        dataContext.AppUsers.Add(appUser);
+        dataContext.WebAppUsers.Add(appUser);
         dataContext.SaveChanges();
 
         // Log activity
@@ -75,7 +75,7 @@ public class AppsService
 
     public async Task Update(Guid id, Models.AppModel app)
     {
-        var entity = dataContext.Apps.SingleOrDefault(x => x.Id == id && x.AppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
 
         if (entity == null)
         {
@@ -98,7 +98,7 @@ public class AppsService
 
     public async Task Remove(Guid id)
     {
-        var app = dataContext.Apps.SingleOrDefault(x => x.Id == id && x.AppUsers.Any(x => x.UserId == userId));
+        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
         
         if (app == null)
         {
@@ -107,7 +107,7 @@ public class AppsService
 
         var appName = app.Name;
 
-        dataContext.Apps.Remove(app);
+        dataContext.WebApps.Remove(app);
         dataContext.SaveChanges();
 
         // Log activity
@@ -116,7 +116,7 @@ public class AppsService
 
     public async Task Publish(Guid id, string publicUrl)
     {
-        var entity = dataContext.Apps.SingleOrDefault(x => x.Id == id && x.AppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
 
         if (entity == null)
         {
@@ -130,7 +130,7 @@ public class AppsService
         }
 
         // Check if URL is already taken
-        if (dataContext.Apps.Any(x => x.PublicUrl == publicUrl && x.Id != id))
+        if (dataContext.WebApps.Any(x => x.PublicUrl == publicUrl && x.Id != id))
         {
             throw new InvalidOperationException("This URL is already taken");
         }
@@ -147,7 +147,7 @@ public class AppsService
 
     public async Task Unpublish(Guid id)
     {
-        var entity = dataContext.Apps.SingleOrDefault(x => x.Id == id && x.AppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
 
         if (entity == null)
         {
@@ -170,7 +170,7 @@ public class AppsService
         return !string.IsNullOrEmpty(slug) && Regex.IsMatch(slug, @"^[a-z0-9\-]+$");
     }
 
-    private static Models.AppModel MapToModel(Entities.App entity)
+    private static Models.AppModel MapToModel(Entities.WebApp entity)
     {
         if (entity == null) return null;
 

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Automaton.Studio.Server.Migrations
 {
     [DbContext(typeof(MySqlDbContext))]
-    [Migration("20251019194808_AddAppsFeature")]
-    partial class AddAppsFeature
+    [Migration("20251025101055_AddWebAppFeature")]
+    partial class AddWebAppFeature
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -131,63 +131,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("UserId", "IsActive");
 
                     b.ToTable("ApiKeys");
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.App", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Definition")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("PublicUrl")
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<DateTime>("Updated")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PublicUrl")
-                        .IsUnique();
-
-                    b.ToTable("Apps");
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppUser", b =>
-                {
-                    b.Property<Guid>("AppId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("AppId", "UserId");
-
-                    b.HasIndex(new[] { "AppId" }, "IX_AppUser_AppId");
-
-                    b.ToTable("AppUsers");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
@@ -618,6 +561,63 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("Updated")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicUrl")
+                        .IsUnique();
+
+                    b.ToTable("WebApps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("WebAppId", "UserId");
+
+                    b.HasIndex(new[] { "WebAppId" }, "IX_WebAppUser_WebAppId");
+
+                    b.ToTable("WebAppUsers");
+                });
+
             modelBuilder.Entity("Common.Authentication.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -627,7 +627,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 10, 19, 19, 48, 7, 11, DateTimeKind.Local).AddTicks(7276));
+                        .HasDefaultValue(new DateTime(2025, 10, 25, 12, 10, 54, 385, DateTimeKind.Local).AddTicks(8173));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -753,15 +753,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppUser", b =>
-                {
-                    b.HasOne("Automaton.Studio.Server.Entities.App", null)
-                        .WithMany("AppUsers")
-                        .HasForeignKey("AppId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", "Role")
@@ -848,6 +839,15 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", null)
+                        .WithMany("WebAppUsers")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", null)
@@ -884,11 +884,6 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.App", b =>
-                {
-                    b.Navigation("AppUsers");
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
                 {
                     b.Navigation("UserRoles");
@@ -922,6 +917,11 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Navigation("WebAppUsers");
                 });
 #pragma warning restore 612, 618
         }
