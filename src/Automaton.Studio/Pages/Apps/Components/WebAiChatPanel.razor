@@ -1,0 +1,246 @@
+@using AntDesign
+@using System.Collections.Generic
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using Automaton.Studio.Models
+@using Automaton.Studio.Services
+@using Automaton.Studio.Shared.Components
+@using Automaton.Mcp.Client
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults
+@using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Processors
+@using Automaton.Studio.Pages.StepDesigner.Components
+
+@implements IDisposable
+
+<div class="ai-chat-panel">
+	<PanelHeader Title="AI Web Code Generation"
+				 ShowClearButton="true"
+				 OnClearClick="ClearConversationHistory"
+				 ClearDisabled="@isGeneratingCode"
+				 ClearTooltip="Clear conversation history"
+				 ShowPinButton="true"
+				 ShowCloseButton="true"
+				 PinTooltip="Pin panel"
+				 CloseTooltip="Close panel" />
+
+	<div class="ai-chat-body" @ref="messagesContainer" id="web-ai-chat-messages">
+		<div class="messages">
+			@for (int i = 0; i < messages.Count; i++)
+			{
+				var msg = messages[i];
+				var isLast = i == messages.Count - 1;
+				
+				<ChatMessageComponent 
+					Message="@msg" 
+					Language="html"
+					IsLast="@isLast"
+					IsGeneratingCode="@isGeneratingCode"
+					OnApplyCode="@(async (codeId) => await ApplyCodeFromButton(codeId))" />
+			}
+		</div>
+	</div>
+
+	<div class="ai-chat-input">
+		<div class="input-area">
+			<TextArea @bind-Value="promptText"
+					  Placeholder="Describe the web page you want to create (HTML/CSS/JavaScript)..."
+					  Disabled="@isGeneratingCode"
+					  ShowCount="false"
+					  AutoSize="false"
+					  Rows="3"
+					  Style="resize: none; border: none; box-shadow: none; padding: 12px;"
+					  @oninput="OnInputChange"
+					  @onkeydown="OnKeyDown" />
+		</div>
+
+		<div class="input-controls">
+			<div class="left-controls">
+				<Select @bind-Value="selectedProviderModel"
+						TItemValue="string"
+						TItem="string"
+						Size="@InputSize.Small"
+						Style="width: 180px;"
+						Placeholder="Select model"
+						AllowClear="false"
+						Disabled="@isGeneratingCode">
+					<SelectOptions>
+						@if (availableProviders?.Any() != true)
+						{
+							<SelectOption TItemValue="string" TItem="string" Value="@("none")" Label="No providers configured" Disabled="true" />
+						}
+						else
+						{
+							@foreach (var provider in availableProviders)
+							{
+								@if (provider.SupportedModels?.Any() == true)
+								{
+									@foreach (var model in provider.SupportedModels)
+									{
+										var value = $"{provider.Provider}:{model}";
+										var label = $"{model}";
+										var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
+
+										<SelectOption TItemValue="string" TItem="string"
+													  Value="@value"
+													  Label="@label"
+													  Disabled="@isDisabled" />
+									}
+								}
+							}
+						}
+					</SelectOptions>
+				</Select>
+
+				<div class="language-badge">
+					<Text Type="@TextElementType.Secondary" Style="font-size: 11px;">
+						<Icon Type="code" Style="margin-right: 2px; font-size: 10px;" />
+						HTML
+					</Text>
+				</div>
+			</div>
+
+			<div class="right-controls">
+				<Button Icon="@(isGeneratingCode ? "loading" : "caret-right")"
+						Type="@ButtonType.Primary"
+						Size="@ButtonSize.Small"
+						Shape="@ButtonShape.Circle"
+						OnClick="SendPrompt"
+						Disabled="@(!IsReadyToSendRealtime)"
+						Loading="@isGeneratingCode"
+						Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+				</Button>
+			</div>
+		</div>
+
+		@if (showNoProvidersMessage)
+		{
+			<div class="no-providers-message">
+				<Alert Type="@AlertType.Warning"
+					   Message="No AI providers configured"
+					   Description="Configure your API keys in Settings to start using AI code generation."
+					   ShowIcon="true"
+					   Style="margin: 8px 0 0 0;" />
+			</div>
+		}
+	</div>
+</div>
+
+<style>
+	.ai-chat-panel {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+	}
+
+	.ai-chat-body {
+		flex: 1 1 auto;
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding: 10px;
+		background: #fff;
+		min-height: 0;
+	}
+
+	.messages {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.ai-chat-input {
+		border-top: 1px solid #e8e8e8;
+		background: #ffffff;
+		display: flex;
+		flex-direction: column;
+		flex-shrink: 0;
+		position: sticky;
+		bottom: 0;
+		z-index: 10;
+	}
+
+	.input-area {
+		background: #ffffff;
+		border-bottom: 1px solid #f0f0f0;
+	}
+
+		.input-area .ant-input {
+			border: none !important;
+			box-shadow: none !important;
+			background: transparent !important;
+			resize: none !important;
+		}
+
+			.input-area .ant-input:focus,
+			.input-area .ant-input:hover {
+				border: none !important;
+				box-shadow: none !important;
+			}
+
+	.input-controls {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 6px 12px;
+		background: #fafafa;
+		border-top: 1px solid #f0f0f0;
+	}
+
+	.left-controls {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.right-controls {
+		display: flex;
+		align-items: center;
+	}
+
+	.language-badge {
+		padding: 2px 6px;
+		background: #e3f2fd;
+		border: 1px solid #bbdefb;
+		border-radius: 12px;
+		font-size: 11px;
+		color: #1565c0;
+	}
+
+	.no-providers-message {
+		flex-shrink: 0;
+		position: sticky;
+		bottom: 0;
+		background: #fafafa;
+		z-index: 10;
+	}
+
+	.right-controls .ant-btn-circle {
+		min-width: 28px !important;
+		width: 28px !important;
+		height: 28px !important;
+		padding: 0 !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+		.right-controls .ant-btn-circle .anticon {
+			font-size: 12px;
+		}
+
+	.left-controls .ant-select-small {
+		font-size: 11px;
+	}
+
+		.left-controls .ant-select-small .ant-select-selector {
+			border: 1px solid #d9d9d9;
+			border-radius: 4px;
+			height: 24px !important;
+			min-height: 24px !important;
+		}
+
+		.left-controls .ant-select-small .ant-select-selection-item {
+			line-height: 22px !important;
+			font-size: 11px;
+		}
+</style>
