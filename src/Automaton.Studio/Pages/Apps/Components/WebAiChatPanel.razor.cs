@@ -32,79 +32,79 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
 
     private List<ChatMessage> messages = new()
     {
-        new ChatMessage("System", "AI web code generation ready. I can help you create HTML, CSS, and JavaScript pages.", DateTime.Now) 
-    { 
-Type = MessageType.System 
+        new ChatMessage("System", "AI web code generation ready. I can help you create HTML, CSS, and JavaScript pages.", DateTime.Now)
+        {
+            Type = MessageType.System
         }
     };
 
     protected override async Task OnInitializedAsync()
     {
-  await LoadProvidersAsync();
+        await LoadProvidersAsync();
     }
 
     private async Task LoadProvidersAsync()
     {
-     try
+        try
         {
-    availableProviders = (await AiApiKeyService.GetAvailableProvidersAsync(includeEnvironment: true)).ToList();
+            availableProviders = (await AiApiKeyService.GetAvailableProvidersAsync(includeEnvironment: true)).ToList();
             showNoProvidersMessage = availableProviders?.Any(p => p.HasStoredKeys || p.HasEnvironmentKey) != true;
 
-       if (availableProviders?.Any() == true)
+            if (availableProviders?.Any() == true)
             {
-       var firstAvailableProvider = availableProviders.FirstOrDefault(p => (p.HasStoredKeys || p.HasEnvironmentKey) && p.SupportedModels?.Any() == true);
-  if (firstAvailableProvider != null && firstAvailableProvider.SupportedModels?.Any() == true)
-     {
-            selectedProviderModel = $"{firstAvailableProvider.Provider}:{firstAvailableProvider.SupportedModels.First()}";
-         }
-     }
+                var firstAvailableProvider = availableProviders.FirstOrDefault(p => (p.HasStoredKeys || p.HasEnvironmentKey) && p.SupportedModels?.Any() == true);
+                if (firstAvailableProvider != null && firstAvailableProvider.SupportedModels?.Any() == true)
+                {
+                    selectedProviderModel = $"{firstAvailableProvider.Provider}:{firstAvailableProvider.SupportedModels.First()}";
+                }
+            }
 
-    StateHasChanged();
+            StateHasChanged();
         }
-      catch (Exception ex)
+        catch (Exception ex)
         {
- messages.Add(new ChatMessage("System", $"Error loading AI providers: {ex.Message}", DateTime.Now)
-       {
-      Type = MessageType.CodeError
-          });
- StateHasChanged();
+            messages.Add(new ChatMessage("System", $"Error loading AI providers: {ex.Message}", DateTime.Now)
+            {
+                Type = MessageType.CodeError
+            });
+            StateHasChanged();
         }
     }
 
     private AiProviderInfo? GetSelectedProvider()
     {
- if (string.IsNullOrEmpty(selectedProviderModel) || !selectedProviderModel.Contains(':'))
-         return null;
+        if (string.IsNullOrEmpty(selectedProviderModel) || !selectedProviderModel.Contains(':'))
+            return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
         if (Enum.TryParse<Automaton.Studio.Models.AiProvider>(providerName, out var provider))
-{
- return availableProviders?.FirstOrDefault(p => p.Provider == provider);
+        {
+            return availableProviders?.FirstOrDefault(p => p.Provider == provider);
         }
-  return null;
+        return null;
     }
 
     private string GetSelectedModel()
     {
         if (string.IsNullOrEmpty(selectedProviderModel) || !selectedProviderModel.Contains(':'))
-    return string.Empty;
+            return string.Empty;
 
         return selectedProviderModel.Split(':')[1];
     }
 
- private bool IsReadyToSendRealtime
+    private bool IsReadyToSendRealtime
     {
         get
         {
-      if (string.IsNullOrEmpty(promptText?.Trim()) || string.IsNullOrEmpty(selectedProviderModel) || isGeneratingCode)
-       return false;
-
-            var selectedProvider = GetSelectedProvider();
- if (selectedProvider == null)
+            if (string.IsNullOrEmpty(promptText?.Trim()) || string.IsNullOrEmpty(selectedProviderModel) || isGeneratingCode)
                 return false;
 
-         return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
-}
+            var selectedProvider = GetSelectedProvider();
+            if (selectedProvider == null)
+                return false;
+
+            return selectedProvider.HasStoredKeys || selectedProvider.HasEnvironmentKey;
+        }
     }
 
     private void OnInputChange(ChangeEventArgs e)
@@ -117,110 +117,110 @@ Type = MessageType.System
     {
         if (e.Key == "Enter" && !(e.CtrlKey || e.ShiftKey))
         {
-    await SendPrompt();
-   }
+            await SendPrompt();
+        }
     }
 
     private async Task SendPrompt()
     {
         if (!IsReadyToSendRealtime) return;
 
-     isGeneratingCode = true;
-   pendingCodes.Clear();
-        
+        isGeneratingCode = true;
+        pendingCodes.Clear();
+
         var userMessage = new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now);
         messages.Add(userMessage);
-   
- var generatingMessage = new ChatMessage("AI", "Generating web page code...", DateTime.Now) 
-  { 
-   IsGenerating = true, 
-            Type = MessageType.Generating 
+
+        var generatingMessage = new ChatMessage("AI", "Generating web page code...", DateTime.Now)
+        {
+            IsGenerating = true,
+            Type = MessageType.Generating
         };
- messages.Add(generatingMessage);
-  
+        messages.Add(generatingMessage);
+
         var userPrompt = promptText;
         promptText = string.Empty;
         await InvokeAsync(StateHasChanged);
-    await ScrollToBottom();
+        await ScrollToBottom();
 
         try
         {
-   // TODO: Implement actual AI generation
+            // TODO: Implement actual AI generation
             // For now, add a placeholder message
-    messages.RemoveAll(m => m.Type == MessageType.Generating);
-            
+            messages.RemoveAll(m => m.Type == MessageType.Generating);
+
             var responseMessage = new ChatMessage("AI", "AI generation will be implemented soon. This will generate complete HTML/CSS/JavaScript web pages.", DateTime.Now)
- {
-         Type = MessageType.Text
-         };
-        messages.Add(responseMessage);
-            
+            {
+                Type = MessageType.Text
+            };
+            messages.Add(responseMessage);
+
             await InvokeAsync(StateHasChanged);
             await ScrollToBottom();
         }
         catch (Exception ex)
         {
             messages.RemoveAll(m => m.Type == MessageType.Generating);
-            
-         var errorMessage = new ChatMessage("AI", "Error generating code:", DateTime.Now)
+
+            var errorMessage = new ChatMessage("AI", "Error generating code:", DateTime.Now)
             {
-     Type = MessageType.CodeError,
-     Content = ex.Message,
-             IsSuccess = false
+                Type = MessageType.CodeError,
+                Content = ex.Message,
+                IsSuccess = false
             };
-            
-      messages.Add(errorMessage);
+
+            messages.Add(errorMessage);
             logger.LogError(ex, "Error during web code generation");
         }
-finally
-     {
-     isGeneratingCode = false;
-   await InvokeAsync(StateHasChanged);
-    await ScrollToBottom();
-    }
+        finally
+        {
+            isGeneratingCode = false;
+            await InvokeAsync(StateHasChanged);
+            await ScrollToBottom();
+        }
     }
 
     private async Task ScrollToBottom()
     {
-try
+        try
         {
             await JSRuntime.InvokeVoidAsync("eval", "var element = document.getElementById('web-ai-chat-messages'); if(element) { element.scrollTop = element.scrollHeight; }");
         }
-  catch
+        catch
         {
-      // Ignore JS interop errors
+            // Ignore JS interop errors
         }
     }
 
     private async Task ClearConversationHistory()
     {
- if (isGeneratingCode) return;
+        if (isGeneratingCode) return;
 
- messages.RemoveAll(m => m.Type != MessageType.System);
+        messages.RemoveAll(m => m.Type != MessageType.System);
         pendingCodes.Clear();
 
- messages.Add(new ChatMessage("System", "Conversation history cleared. Ready to generate web pages.", DateTime.Now) 
-        { 
-            Type = MessageType.System 
-    });
+        messages.Add(new ChatMessage("System", "Conversation history cleared. Ready to generate web pages.", DateTime.Now)
+        {
+            Type = MessageType.System
+        });
 
-   await InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
     }
 
     private async Task ApplyCodeFromButton(string codeId)
     {
         if (pendingCodes.TryGetValue(codeId, out var code) && OnCodeGenerated.HasDelegate)
- {
+        {
             await OnCodeGenerated.InvokeAsync(code);
-       pendingCodes.Remove(codeId);
+            pendingCodes.Remove(codeId);
 
-      messages.Add(new ChatMessage("System", "Code applied to editor", DateTime.Now) 
-            { 
-    Type = MessageType.System 
-         });
-      await InvokeAsync(StateHasChanged);
-    await ScrollToBottom();
+            messages.Add(new ChatMessage("System", "Code applied to editor", DateTime.Now)
+            {
+                Type = MessageType.System
+            });
+            await InvokeAsync(StateHasChanged);
+            await ScrollToBottom();
         }
     }
 

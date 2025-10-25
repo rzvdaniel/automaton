@@ -19,33 +19,33 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     {
         Name = "Loading...",
         DisplayName = "",
- Description = "",
+        Description = "",
         Definition = new AppDefinition()
-  };
+    };
 
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
- [Inject] private NavigationManager NavigationManager { get; set; }
+    [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
     [Inject] private ModalService ModalService { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
     protected override async Task OnInitializedAsync()
-  {
+    {
         loading = true;
 
         try
         {
             if (Guid.TryParse(AppId, out var appGuid))
-      {
-  currentApp = await AppsService.Load(appGuid);
-    }
+            {
+                currentApp = await AppsService.Load(appGuid);
+            }
         }
-     catch
+        catch
         {
-await MessageService.ErrorAsync("Failed to load app");
-     NavigationManager.NavigateTo("/apps");
+            await MessageService.ErrorAsync("Failed to load app");
+            NavigationManager.NavigateTo("/apps");
         }
         finally
         {
@@ -55,11 +55,11 @@ await MessageService.ErrorAsync("Failed to load app");
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
     {
-   return new StandaloneEditorConstructionOptions
+        return new StandaloneEditorConstructionOptions
         {
-   AutomaticLayout = true,
+            AutomaticLayout = true,
             Language = "html",
-      Value = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent()
+            Value = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent()
         };
     }
 
@@ -67,22 +67,22 @@ await MessageService.ErrorAsync("Failed to load app");
     {
         saving = true;
 
-     try
+        try
         {
-  var code = await codeEditor.GetValue();
-currentApp.Definition.HtmlContent = code;
+            var code = await codeEditor.GetValue();
+            currentApp.Definition.HtmlContent = code;
 
             await AppsService.Update(currentApp);
-   await MessageService.SuccessAsync("App saved successfully");
+            await MessageService.SuccessAsync("App saved successfully");
         }
         catch
         {
             await MessageService.ErrorAsync("Failed to save app");
         }
         finally
-      {
-   saving = false;
-  }
+        {
+            saving = false;
+        }
     }
 
     // Publishing Methods - Phase 2 Implementation
@@ -93,14 +93,14 @@ currentApp.Definition.HtmlContent = code;
     private async Task TogglePublish()
     {
         if (currentApp.IsPublished)
-    {
-     await UnpublishApp();
-   }
+        {
+            await UnpublishApp();
+        }
         else
         {
             await PublishApp();
         }
-}
+    }
 
     /// <summary>
     /// Publish the app with a public URL
@@ -109,61 +109,62 @@ currentApp.Definition.HtmlContent = code;
     {
         publishing = true;
 
-    try
-     {
-  var model = new PublishAppModel
-         {
-       AppId = currentApp.Id,
-          DisplayName = currentApp.DisplayName,
-       PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(currentApp.DisplayName)
+        try
+        {
+            var model = new PublishAppModel
+            {
+                AppId = currentApp.Id,
+                DisplayName = currentApp.DisplayName,
+                PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(currentApp.DisplayName)
             };
 
-    var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>(
+            var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>
+            (
                 new ModalOptions
-      {
-      Title = "Publish App",
-         Width = 600,
-     OkText = "Publish",
-    CancelText = "Cancel"
-      },
-  model
+                {
+                    Title = "Publish App",
+                    Width = 600,
+                    OkText = "Publish",
+                    CancelText = "Cancel"
+                },
+                model
             );
 
-       modalRef.OnOk = async () =>
- {
-        if (string.IsNullOrWhiteSpace(model.PublicUrl))
-  {
-   await MessageService.WarningAsync("Please enter a URL slug");
-    return;
-}
+            modalRef.OnOk = async () =>
+            {
+                if (string.IsNullOrWhiteSpace(model.PublicUrl))
+                {
+                    await MessageService.WarningAsync("Please enter a URL slug");
+                    return;
+                }
 
-  try
-   {
-     await AppsService.PublishAsync(currentApp.Id, model.PublicUrl, model.RequiresAuthentication);
-   
-      // Update local model
-         currentApp.IsPublished = true;
-     currentApp.PublicUrl = model.PublicUrl;
-     currentApp.PublishedAt = DateTime.UtcNow;
-        currentApp.Version++;
-   currentApp.RequiresAuthentication = model.RequiresAuthentication;
+                try
+                {
+                    await AppsService.PublishAsync(currentApp.Id, model.PublicUrl, model.RequiresAuthentication);
 
-     await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
-          await InvokeAsync(StateHasChanged);
-      }
-       catch (Exception ex)
-    {
-     await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
-   }
- };
+                    // Update local model
+                    currentApp.IsPublished = true;
+                    currentApp.PublicUrl = model.PublicUrl;
+                    currentApp.PublishedAt = DateTime.UtcNow;
+                    currentApp.Version++;
+                    currentApp.RequiresAuthentication = model.RequiresAuthentication;
+
+                    await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception ex)
+                {
+                    await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
+                }
+            };
         }
         catch (Exception ex)
         {
-        await MessageService.ErrorAsync($"Error showing publish dialog: {ex.Message}");
-      }
+            await MessageService.ErrorAsync($"Error showing publish dialog: {ex.Message}");
+        }
         finally
         {
-          publishing = false;
+            publishing = false;
         }
     }
 
@@ -173,39 +174,37 @@ currentApp.Definition.HtmlContent = code;
     private async Task UnpublishApp()
     {
         var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
-   {
-         Title = "Unpublish App?",
-    Content = "The app will no longer be accessible via public URL. You can republish it later with the same URL.",
-    OkText = "Unpublish",
-          CancelText = "Cancel"
+        {
+            Title = "Unpublish App?",
+            Content = "The app will no longer be accessible via public URL. You can republish it later with the same URL.",
+            OkText = "Unpublish",
+            CancelText = "Cancel"
         });
 
         if (!confirmed) return;
 
-publishing = true;
+        publishing = true;
 
         try
- {
+        {
             await AppsService.UnpublishAsync(currentApp.Id);
 
-         // Update local model
-         currentApp.IsPublished = false;
+            // Update local model
+            currentApp.IsPublished = false;
             currentApp.PublishedAt = null;
 
-        await MessageService.SuccessAsync("App unpublished successfully");
+            await MessageService.SuccessAsync("App unpublished successfully");
             await InvokeAsync(StateHasChanged);
-      }
-    catch (Exception ex)
+        }
+        catch (Exception ex)
         {
-     await MessageService.ErrorAsync($"Failed to unpublish app: {ex.Message}");
-  }
+            await MessageService.ErrorAsync($"Failed to unpublish app: {ex.Message}");
+        }
         finally
         {
             publishing = false;
         }
     }
-
-    // Preview Methods - Phase 1 Implementation
 
     /// <summary>
     /// Get HTML content for preview with Automaton bridge injected
@@ -217,10 +216,10 @@ publishing = true;
             var html = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
             return InjectAutomatonBridge(html, isPreview: true);
         }
-   catch
-      {
+        catch
+        {
             return GetDefaultHtmlContent();
-}
+        }
     }
 
     /// <summary>
@@ -231,18 +230,18 @@ publishing = true;
         var bridge = isPreview ? GetPreviewBridge() : GetProductionBridge();
 
         // Try to insert before </head>
-  if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+        if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
         {
-     return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
-      }
+            return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
+        }
 
         // Try to insert before </body>
         if (htmlContent.Contains("</body>", StringComparison.OrdinalIgnoreCase))
-  {
-  return htmlContent.Replace("</body>", $"{bridge}</body>", StringComparison.OrdinalIgnoreCase);
+        {
+            return htmlContent.Replace("</body>", $"{bridge}</body>", StringComparison.OrdinalIgnoreCase);
         }
 
-// If no head or body tags, prepend to content
+        // If no head or body tags, prepend to content
         return bridge + htmlContent;
     }
 
@@ -251,7 +250,7 @@ publishing = true;
     /// </summary>
     private string GetPreviewBridge()
     {
-     return @"
+        return @"
 <script>
     // Automaton Bridge - Preview Mode
   window.Automaton = {
@@ -289,30 +288,29 @@ publishing = true;
     window.Automaton = {
         executeFlow: async function(flowId, inputs = {}) {
             try {
-              console.log('🚀 Executing flow:', flowId);
-         
-       const response = await fetch('/api/flows/execute', {
- method: 'POST',
-       headers: {
-          'Content-Type': 'application/json'
-    },
-       body: JSON.stringify({
-           flowId: flowId,
-          inputs: inputs
-         })
-      });
+                console.log('🚀 Executing flow:', flowId);
+                const response = await fetch('/api/flows/execute', {
+                    method: 'POST',
+                       headers: {
+                          'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        flowId: flowId,
+                        inputs: inputs
+                        })
+                });
   
-              if (!response.ok) {
-        const error = await response.json();
-            throw new Error(error.message || 'Flow execution failed');
-          }
+                if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Flow execution failed');
+                }
        
-          const result = await response.json();
-      console.log('✅ Flow executed successfully:', result);
+                const result = await response.json();
+                console.log('✅ Flow executed successfully:', result);
                 return result;
             } catch (error) {
-    console.error('❌ Automaton.executeFlow error:', error);
-      throw error;
+                console.error('❌ Automaton.executeFlow error:', error);
+                throw error;
             }
         },
         version: '1.0.0',
@@ -330,16 +328,16 @@ publishing = true;
     {
         try
         {
-        // Get latest code from Monaco editor
-  var code = await codeEditor.GetValue();
-  currentApp.Definition.HtmlContent = code;
-    
-    // Force re-render by updating state
-       await InvokeAsync(StateHasChanged);
-        
-  await MessageService.SuccessAsync("Preview refreshed", 1);
-  }
-      catch (Exception ex)
+            // Get latest code from Monaco editor
+            var code = await codeEditor.GetValue();
+            currentApp.Definition.HtmlContent = code;
+
+            // Force re-render by updating state
+            await InvokeAsync(StateHasChanged);
+
+            await MessageService.SuccessAsync("Preview refreshed", 1);
+        }
+        catch (Exception ex)
         {
             await MessageService.ErrorAsync($"Failed to refresh preview: {ex.Message}");
         }
@@ -347,27 +345,27 @@ publishing = true;
 
     /// <summary>
     /// Open preview in new browser tab
- /// </summary>
+    /// </summary>
     private async Task OpenPreviewInNewTab()
     {
         try
         {
             // Get current code from editor
             var code = await codeEditor.GetValue();
-       var htmlWithBridge = InjectAutomatonBridge(code, isPreview: true);
-       
+            var htmlWithBridge = InjectAutomatonBridge(code, isPreview: true);
+
             // Convert to base64 data URL
-  var bytes = Encoding.UTF8.GetBytes(htmlWithBridge);
-   var base64 = Convert.ToBase64String(bytes);
-          var dataUrl = $"data:text/html;base64,{base64}";
-        
-     // Open in new tab
+            var bytes = Encoding.UTF8.GetBytes(htmlWithBridge);
+            var base64 = Convert.ToBase64String(bytes);
+            var dataUrl = $"data:text/html;base64,{base64}";
+
+            // Open in new tab
             await JSRuntime.InvokeVoidAsync("open", dataUrl, "_blank");
         }
         catch (Exception ex)
         {
             await MessageService.ErrorAsync($"Failed to open preview: {ex.Message}");
-  }
+        }
     }
 
     /// <summary>
@@ -378,57 +376,55 @@ publishing = true;
         if (!string.IsNullOrEmpty(currentApp.PublicUrl))
         {
             // Open in new tab to avoid disposing the Blazor circuit
-await JSRuntime.InvokeVoidAsync("open", $"/web/{currentApp.PublicUrl}", "_blank");
+            await JSRuntime.InvokeVoidAsync("open", $"/web/{currentApp.PublicUrl}", "_blank");
         }
-    else
+        else
         {
             await MessageService.WarningAsync("This app has not been published yet.");
         }
     }
 
-    // AI Chat Panel Methods
-
     private async Task OnCodeGenerated(string generatedCode)
     {
-   try
+        try
         {
-      // Set the generated code in the Monaco editor
-       await codeEditor.SetValue(generatedCode);
-   
+            // Set the generated code in the Monaco editor
+            await codeEditor.SetValue(generatedCode);
+
             // Update the view model
-   currentApp.Definition.HtmlContent = generatedCode;
-       
-      // Show success message
-        await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+            currentApp.Definition.HtmlContent = generatedCode;
+
+            // Show success message
+            await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
         }
         catch (Exception ex)
         {
-          await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
-   }
+            await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
+        }
     }
 
-  private async Task<string> GetCurrentCodeForAI()
+    private async Task<string> GetCurrentCodeForAI()
     {
         try
- {
+        {
             // Get current code from Monaco editor
-  if (codeEditor != null)
-         {
-    return await codeEditor.GetValue() ?? string.Empty;
+            if (codeEditor != null)
+            {
+                return await codeEditor.GetValue() ?? string.Empty;
             }
 
             // Fallback to view model if editor not available
-  return currentApp.Definition?.HtmlContent ?? string.Empty;
+            return currentApp.Definition?.HtmlContent ?? string.Empty;
         }
-    catch
+        catch
         {
-    // Fallback to view model code if Monaco editor fails
-         return currentApp.Definition?.HtmlContent ?? string.Empty;
+            // Fallback to view model code if Monaco editor fails
+            return currentApp.Definition?.HtmlContent ?? string.Empty;
         }
     }
 
- private string GetDefaultHtmlContent()
-{
+    private string GetDefaultHtmlContent()
+    {
         return @"<!DOCTYPE html>
 <html lang=""en"">
 <head>
@@ -498,8 +494,8 @@ await JSRuntime.InvokeVoidAsync("open", $"/web/{currentApp.PublicUrl}", "_blank"
     }
 
     public async ValueTask DisposeAsync()
-  {
- // BlazorMonaco handles disposal internally
+    {
+        // BlazorMonaco handles disposal internally
         await Task.CompletedTask;
     }
 }
