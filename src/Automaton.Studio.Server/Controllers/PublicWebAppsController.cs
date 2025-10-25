@@ -78,8 +78,8 @@ public class PublicWebAppsController : ControllerBase
             // Deserialize definition to get HTML content
             var definition = JsonSerializer.Deserialize<Models.AppDefinition>(app.Definition ?? "{}");
 
-            // Always return the app data with RequiresAuthentication flag
-            // Client-side will handle the authentication check and show appropriate UI
+            // Always return the app data with RequiresAuthentication flag and authentication status
+            // Authentication is checked server-side where session/cookies are available
             return Ok(new
             {
                 app.Id,
@@ -88,7 +88,8 @@ public class PublicWebAppsController : ControllerBase
                 app.Description,
                 HtmlContent = definition?.HtmlContent ?? GetDefaultHtmlContent(),
                 app.PublishedAt,
-                app.RequiresAuthentication
+                app.RequiresAuthentication,
+                IsUserAuthenticated = isAuthenticated  // Add this so client knows
             });
         }
         catch (Exception ex)

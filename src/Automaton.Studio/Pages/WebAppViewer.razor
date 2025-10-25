@@ -1,4 +1,4 @@
-@page "/web/{slug}"
+﻿@page "/web/{slug}"
 @attribute [AllowAnonymous]
 @layout Automaton.Studio.Shared.EmptyLayout
 @using AntDesign
@@ -6,283 +6,324 @@
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Logging
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<WebAppViewer> Logger
+
+<style>
+	/* Reset any inherited styles */
+	html, body {
+		margin: 0 !important;
+		padding: 0 !important;
+		overflow: hidden !important;
+		height: 100% !important;
+		width: 100% !important;
+	}
+
+	/* Override any AntDesign layout styles */
+	.ant-layout, .ant-layout-content {
+		all: unset !important;
+	}
+
+	.web-app-container {
+		position: fixed !important;
+		top: 0 !important;
+		left: 0 !important;
+		right: 0 !important;
+		bottom: 0 !important;
+		width: 100vw !important;
+		height: 100vh !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		overflow: hidden !important;
+		z-index: 9999 !important;
+		background: white;
+	}
+
+	.web-app-iframe {
+		width: 100% !important;
+		height: 100% !important;
+		border: none !important;
+		display: block !important;
+		position: absolute !important;
+		top: 0 !important;
+		left: 0 !important;
+	}
+
+	.loading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		height: 100vh;
+		background: #fafafa;
+	}
+
+	.spinner {
+		width: 40px;
+		height: 40px;
+		border: 4px solid #f3f3f3;
+		border-top: 4px solid #1890ff;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+		margin-bottom: 16px;
+	}
+
+	@@keyframes spin {
+		0% {
+			transform: rotate(0deg);
+		}
+
+		100% {
+			transform: rotate(360deg);
+		}
+	}
+
+	.loading p {
+		color: #666;
+		font-size: 14px;
+	}
+
+	.error-container {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100vh;
+		background: #fafafa;
+	}
+
+	.error-content {
+		text-align: center;
+		padding: 40px;
+		background: white;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		max-width: 400px;
+	}
+
+		.error-content h2 {
+			margin: 0 0 8px 0;
+			color: #262626;
+			font-size: 24px;
+		}
+
+		.error-content p {
+			color: #666;
+			margin: 0 0 24px 0;
+		}
+
+	.btn-home, .btn-primary {
+		color: white;
+		border: none;
+		padding: 10px 24px;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 14px;
+		font-weight: 500;
+		margin: 0 4px;
+	}
+
+	.btn-home {
+		background: #8c8c8c;
+	}
+
+		.btn-home:hover {
+			background: #595959;
+		}
+
+	.btn-primary {
+		background: #1890ff;
+	}
+
+		.btn-primary:hover {
+			background: #40a9ff;
+		}
+</style>
 
 <div class="web-app-container">
-    @if (loading)
-    {
-  <div class="loading">
- <div class="spinner"></div>
-    <p>Loading app...</p>
-        </div>
-    }
-    else if (error != null)
-    {
-        <div class="error-container">
-   <div class="error-content">
-           <Icon Type="exclamation-circle" Style="font-size: 48px; color: #ff4d4f; margin-bottom: 16px;" />
-      <h2>@errorTitle</h2>
-      <p>@error</p>
-      @if (requiresLogin)
-     {
-         <button class="btn-primary" @onclick="GoToLogin">Log In</button>
-          }
- else
-          {
-      <button class="btn-home" @onclick="GoHome">Go Home</button>
-  }
-   </div>
-        </div>
-    }
-    else
- {
-  <iframe id="web-app-frame" 
-         srcdoc="@ProcessedHtmlContent" 
-      sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
-       class="web-app-iframe">
-      </iframe>
-    }
+	@if (loading)
+	{
+		<div class="loading">
+			<div class="spinner"></div>
+			<p>Loading app...</p>
+		</div>
+	}
+	else if (error != null)
+	{
+		<div class="error-container">
+			<div class="error-content">
+				<Icon Type="exclamation-circle" Style="font-size: 48px; color: #ff4d4f; margin-bottom: 16px;" />
+				<h2>@errorTitle</h2>
+				<p>@error</p>
+				@if (requiresLogin)
+				{
+					<button class="btn-primary" @onclick="GoToLogin">Log In</button>
+				}
+				else
+				{
+					<button class="btn-home" @onclick="GoHome">Go Home</button>
+				}
+			</div>
+		</div>
+	}
+	else
+	{
+		<iframe id="web-app-frame"
+				srcdoc="@ProcessedHtmlContent"
+				sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
+				class="web-app-iframe">
+		</iframe>
+	}
 </div>
 
 @code {
-    [Parameter] public string Slug { get; set; }
-    
-    private bool loading = true;
-    private string? error;
-    private string errorTitle = "Error";
-    private bool requiresLogin = false;
-    private string ProcessedHtmlContent = string.Empty;
-    
-    protected override async Task OnInitializedAsync()
- {
-        try
- {
-   var response = await Http.GetFromJsonAsync<WebAppResponse>($"api/web/{Slug}");
-  
- if (response != null)
-  {
-      // Check if app requires authentication
-     if (response.RequiresAuthentication)
-    {
-      // Check if user is authenticated
-     var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            
-          if (!user.Identity?.IsAuthenticated ?? true)
-      {
-         // User not authenticated, show login prompt
-     requiresLogin = true;
-      errorTitle = "Authentication Required";
-          error = "This app requires you to be logged in to access it.";
- loading = false;
-    return;
-    }
-        }
-          
-   // User is authenticated OR app is public, show the app
-   ProcessedHtmlContent = InjectAutomatonBridge(response.HtmlContent);
-        }
-        }
-        catch (HttpRequestException ex)
-        {
-            if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-   errorTitle = "App Not Found";
-     error = "This app does not exist or has not been published.";
-            }
-   else
-       {
-          errorTitle = "Error Loading App";
-   error = "An error occurred while loading this app.";
-       }
-   }
-        catch (Exception ex)
- {
-       errorTitle = "Error Loading App";
-            error = $"Error loading app: {ex.Message}";
-        }
-     finally
-        {
-  loading = false;
-        }
-    }
-    
-    private string InjectAutomatonBridge(string htmlContent)
-    {
- var bridge = @"
-        <script>
-  window.Automaton = {
-executeFlow: async function(flowId, inputs = {}) {
-   try {
-     console.log('?? Executing flow:', flowId);
-             
-    const response = await fetch('/api/flows/execute', {
-             method: 'POST',
-        headers: {
-  'Content-Type': 'application/json'
-   },
-       body: JSON.stringify({
-      flowId: flowId,
-    inputs: inputs
-   })
-       });
-            
-     if (!response.ok) {
-  const error = await response.json();
-      throw new Error(error.message || 'Flow execution failed');
-   }
-  
-    const result = await response.json();
-              console.log('? Flow executed successfully:', result);
-   return result;
-    } catch (error) {
-      console.error('? Automaton.executeFlow error:', error);
- throw error;
-      }
-        },
-   version: '1.0.0',
-   mode: 'production'
- };
-        
-      console.log('? Automaton bridge loaded (Production Mode)');
- </script>";
-    
-        // Insert before </head> if exists, otherwise prepend
-        if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
-        {
-return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
-        }
-        
-   return bridge + htmlContent;
-    }
-  
-    private void GoHome()
-    {
-   Navigation.NavigateTo("/");
-    }
-    
-    private void GoToLogin()
-    {
-      // Redirect to login with return URL
- Navigation.NavigateTo($"/account/login?returnUrl={Uri.EscapeDataString($"/web/{Slug}")}");
-    }
-  
-    private class WebAppResponse
-    {
-    public Guid Id { get; set; }
-   public string Name { get; set; }
-        public string DisplayName { get; set; }
-      public string Description { get; set; }
-  public string HtmlContent { get; set; }
-        public DateTime? PublishedAt { get; set; }
-        public bool RequiresAuthentication { get; set; }
-    }
-}
+	[Parameter] public string Slug { get; set; }
 
-<style>
-    .web-app-container {
-        position: fixed;
-   top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-    height: 100vh;
-   margin: 0;
-        padding: 0;
-        overflow: hidden;
-    }
-    
-    .web-app-iframe {
-        width: 100%;
-   height: 100%;
-     border: none;
- display: block;
-    }
-    
-    .loading {
-     display: flex;
- flex-direction: column;
-     align-items: center;
-        justify-content: center;
-        height: 100vh;
-        background: #fafafa;
-    }
-    
-    .spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid #f3f3f3;
-     border-top: 4px solid #1890ff;
-  border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 16px;
-    }
-    
-    @@keyframes spin {
-        0% { transform: rotate(0deg); }
-   100% { transform: rotate(360deg); }
-    }
-    
-    .loading p {
- color: #666;
-        font-size: 14px;
-    }
-    
-    .error-container {
-   display: flex;
-        align-items: center;
-   justify-content: center;
-        height: 100vh;
-        background: #fafafa;
-    }
-    
-    .error-content {
- text-align: center;
-    padding: 40px;
-        background: white;
-        border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-    }
-  
-    .error-content h2 {
-        margin: 0 0 8px 0;
-        color: #262626;
-        font-size: 24px;
-    }
-    
-    .error-content p {
-      color: #666;
-      margin: 0 0 24px 0;
-    }
-    
-    .btn-home, .btn-primary {
-        color: white;
-        border: none;
-        padding: 10px 24px;
-        border-radius: 4px;
-      cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-  margin: 0 4px;
-    }
-    
-    .btn-home {
-      background: #8c8c8c;
-    }
-    
-    .btn-home:hover {
-        background: #595959;
-    }
-    
- .btn-primary {
-  background: #1890ff;
-  }
-    
-    .btn-primary:hover {
-        background: #40a9ff;
-    }
-</style>
+	private bool loading = true;
+	private string? error;
+	private string errorTitle = "Error";
+	private bool requiresLogin = false;
+	private string ProcessedHtmlContent = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			Logger.LogInformation("[WebAppViewer] Loading app with slug: {Slug}", Slug);
+
+			// Get the app data from API
+			var response = await Http.GetFromJsonAsync<WebAppResponse>($"api/web/{Slug}");
+
+			if (response == null)
+			{
+				errorTitle = "App Not Found";
+				error = "This app does not exist or has not been published.";
+				return;
+			}
+
+			Logger.LogInformation("[WebAppViewer] App loaded. RequiresAuthentication: {RequiresAuth}, IsUserAuthenticated: {IsAuth}",
+						 response.RequiresAuthentication, response.IsUserAuthenticated);
+
+			// Check if app requires authentication and user is NOT authenticated
+			if (response.RequiresAuthentication && !response.IsUserAuthenticated)
+			{
+				// User not authenticated, show login prompt
+				requiresLogin = true;
+				errorTitle = "Authentication Required";
+				error = "This app requires you to be logged in to access it.";
+				return;
+			}
+
+			if (response.RequiresAuthentication && response.IsUserAuthenticated)
+			{
+				Logger.LogInformation("[WebAppViewer] Access granted - user authenticated");
+			}
+			else
+			{
+				Logger.LogInformation("[WebAppViewer] Public app - no authentication required");
+			}
+
+			// User is authenticated OR app is public, show the app
+			ProcessedHtmlContent = InjectAutomatonBridge(response.HtmlContent);
+			Logger.LogInformation("[WebAppViewer] App content prepared successfully");
+		}
+		catch (HttpRequestException ex)
+		{
+			Logger.LogError(ex, "[WebAppViewer] HTTP error loading app");
+			if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+			{
+				errorTitle = "App Not Found";
+				error = "This app does not exist or has not been published.";
+			}
+			else
+			{
+				errorTitle = "Error Loading App";
+				error = "An error occurred while loading this app.";
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.LogError(ex, "[WebAppViewer] Error loading app");
+			errorTitle = "Error Loading App";
+			error = $"Error loading app: {ex.Message}";
+		}
+		finally
+		{
+			loading = false;
+		}
+	}
+
+	private string InjectAutomatonBridge(string htmlContent)
+	{
+		var bridge = @"
+        <script>
+            window.Automaton = {
+            executeFlow: async function(flowId, inputs = {}) {
+       try {
+         console.log('🚀 Executing flow:', flowId);
+
+   const response = await fetch('/api/flows/execute', {
+             method: 'POST',
+    headers: {
+         'Content-Type': 'application/json'
+    },
+         body: JSON.stringify({
+    flowId: flowId,
+           inputs: inputs
+         })
+            });
+
+    if (!response.ok) {
+       const error = await response.json();
+ throw new Error(error.message || 'Flow execution failed');
+     }
+
+              const result = await response.json();
+    console.log('✅ Flow executed successfully:', result);
+ return result;
+      } catch (error) {
+            console.error('❌ Automaton.executeFlow error:', error);
+            throw error;
+   }
+    },
+     version: '1.0.0',
+         mode: 'production'
+            };
+
+      console.log('✅ Automaton bridge loaded (Production Mode)');
+      </script>";
+
+		// Insert before </head> if exists, otherwise prepend
+		if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+		{
+			return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
+		}
+
+		return bridge + htmlContent;
+	}
+
+	private void GoHome()
+	{
+		Navigation.NavigateTo("/");
+	}
+
+	private void GoToLogin()
+	{
+		// Redirect to login with return URL
+		Navigation.NavigateTo($"/account/login?returnUrl={Uri.EscapeDataString($"/web/{Slug}")}");
+	}
+
+	private class WebAppResponse
+	{
+		public Guid Id { get; set; }
+		public string Name { get; set; }
+		public string DisplayName { get; set; }
+		public string Description { get; set; }
+		public string HtmlContent { get; set; }
+		public DateTime? PublishedAt { get; set; }
+		public bool RequiresAuthentication { get; set; }
+		public bool IsUserAuthenticated { get; set; }
+	}
+}
