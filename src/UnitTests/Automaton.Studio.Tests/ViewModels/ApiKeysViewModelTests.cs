@@ -6,6 +6,7 @@ using AntDesign;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using NUnit.Framework;
+using Automaton.Core.Enums;
 
 namespace Automaton.Studio.Tests.ViewModels;
 

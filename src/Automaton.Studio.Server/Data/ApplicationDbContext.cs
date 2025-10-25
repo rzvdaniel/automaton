@@ -1,4 +1,5 @@
-﻿using Automaton.Studio.Server.Entities;
+﻿using Automaton.Core.Enums;
+using Automaton.Studio.Server.Entities;
 using Common.Authentication;
 using Common.EF;
 using Microsoft.AspNetCore.Identity;

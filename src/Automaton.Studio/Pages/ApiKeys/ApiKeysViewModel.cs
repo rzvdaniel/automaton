@@ -2,6 +2,7 @@ using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.JSInterop;
 using AntDesign;
+using Automaton.Core.Enums;
 
 namespace Automaton.Studio.Pages.ApiKeys;
 
@@ -20,6 +21,7 @@ public class ApiKeysViewModel
 
     public bool SuccessModalVisible { get; set; } = false;
     public string NewApiKey { get; set; } = "";
+    public ApiKeyScope NewApiKeyScope { get; set; } = ApiKeyScope.FullAccess;
 
     public ApiKeysViewModel(
         IApiKeysService apiKeysService,
@@ -68,6 +70,7 @@ public class ApiKeysViewModel
             var result = await apiKeysService.CreateApiKeyAsync(CreateRequest);
             
             NewApiKey = result.ApiKey;
+            NewApiKeyScope = result.Scope; // Store the scope for usage instructions
             CreateModalVisible = false;
             SuccessModalVisible = true;
             await LoadApiKeys(); // Refresh the list
@@ -120,6 +123,7 @@ public class ApiKeysViewModel
     {
         SuccessModalVisible = false;
         NewApiKey = "";
+        NewApiKeyScope = ApiKeyScope.FullAccess;
     }
 
     public static string GetScopeColor(ApiKeyScope scope)
@@ -129,6 +133,7 @@ public class ApiKeysViewModel
             ApiKeyScope.ReadOnly => "orange",
             ApiKeyScope.Execute => "green", 
             ApiKeyScope.Runner => "blue",
+            ApiKeyScope.WebApp => "cyan",
             ApiKeyScope.FullAccess => "purple",
             _ => "default"
         };
@@ -141,8 +146,28 @@ public class ApiKeysViewModel
             ApiKeyScope.ReadOnly => "scope-readonly",
             ApiKeyScope.Execute => "scope-execute",
             ApiKeyScope.Runner => "scope-runner",
+            ApiKeyScope.WebApp => "scope-webapp",
             ApiKeyScope.FullAccess => "scope-fullaccess",
             _ => ""
+        };
+    }
+
+    public string GetUsageInstructions()
+    {
+        return NewApiKeyScope switch
+        {
+            ApiKeyScope.Runner or ApiKeyScope.Execute or ApiKeyScope.FullAccess =>
+$@"Use this API key to authenticate console runners and execute workflows:
+automaton-runner auth --api-key {NewApiKey}
+export AUTOMATON_API_KEY=""{NewApiKey}""",
+
+            ApiKeyScope.WebApp =>
+                "This API key enables your published web apps to execute flows securely. The key is used automatically by the server when users interact with your web apps - you don't need to configure it in your web app code.",
+
+            ApiKeyScope.ReadOnly =>
+                "This API key provides read-only access to flows and execution history. Use it for monitoring, reporting, or integration with external dashboards.",
+
+            _ => "API key created successfully."
         };
     }
 }

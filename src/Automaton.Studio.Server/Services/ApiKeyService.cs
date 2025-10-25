@@ -1,3 +1,4 @@
+using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,7 @@ public class ApiKeyService
             ApiKeyScope.ReadOnly => "ak_readonly_",
             ApiKeyScope.Execute => "ak_execute_",
             ApiKeyScope.Runner => "ak_runner_",
+            ApiKeyScope.WebApp => "ak_webapp_",
             ApiKeyScope.FullAccess => "ak_fullaccess_",
             _ => "ak_"
         };
@@ -110,6 +112,21 @@ public class ApiKeyService
 
         logger.LogInformation("API key revoked: {KeyPrefix} for user {UserId}", apiKey.KeyPrefix, userId);
         return true;
+    }
+
+    /// <summary>
+    /// Get the user's active WebApp-scoped API key for flow execution from web apps
+    /// </summary>
+    public async Task<ApiKey?> GetUserWebAppApiKeyAsync(Guid userId)
+    {
+        return await dbContext.ApiKeys
+            .Include(ak => ak.User)
+            .Where(ak => ak.UserId == userId
+                && ak.Scope == ApiKeyScope.WebApp
+                && ak.IsActive
+                && (!ak.ExpiresAt.HasValue || ak.ExpiresAt.Value > DateTime.UtcNow))
+            .OrderByDescending(ak => ak.CreatedAt)
+            .FirstOrDefaultAsync();
     }
 
     private static string HashApiKey(string apiKey)

@@ -1,3 +1,4 @@
+using Automaton.Core.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automaton.Studio.Server.Entities;
@@ -39,12 +40,4 @@ public class ApiKey
 
     // Navigation properties
     public virtual ApplicationUser User { get; set; } = null!;
-}
-
-public enum ApiKeyScope
-{
-    ReadOnly = 1,    // Can read flows and executions only
-    Execute = 2,     // Can execute workflows (includes ReadOnly)
-    Runner = 3,      // Can register and operate runners (includes Execute + ReadOnly) 
-    FullAccess = 4   // All permissions - recommended for console runners and automation
 }

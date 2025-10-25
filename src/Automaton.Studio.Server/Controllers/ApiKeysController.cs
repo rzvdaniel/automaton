@@ -1,3 +1,4 @@
+using Automaton.Core.Enums;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;

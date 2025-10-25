@@ -1,5 +1,6 @@
 @page "/apikeys"
 @using Automaton.Studio.Models
+@using Automaton.Core.Enums
 
 <PageTitle>API Keys - Automaton Studio</PageTitle>
 
@@ -159,6 +160,7 @@
                         <SelectOptions>
                             <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.FullAccess" Label="Full Access - All permissions (Recommended for Console Runners)" />
                             <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Runner" Label="Runner - Can register and operate runners + execute workflows" />
+                            <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.WebApp" Label="WebApp - Can execute flows on behalf of published web apps" />
                             <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.Execute" Label="Execute - Can execute workflows + read flows" />
                             <SelectOption TItemValue="ApiKeyScope" TItem="ApiKeyScope" Value="ApiKeyScope.ReadOnly" Label="ReadOnly - Can only read flows and executions" />
                         </SelectOptions>
@@ -171,7 +173,7 @@
             </Form>
         </Modal>
 
-        <!-- API Key Success Modal -->
+                <!-- API Key Success Modal -->
         <Modal Title="API Key Created Successfully"
                @bind-Visible="ViewModel.SuccessModalVisible"
                Footer="null"
@@ -193,11 +195,9 @@
             </div>
 
             <div style="margin-top: 24px;">
-                <strong>Usage Examples:</strong>
-                <div style="margin-top: 8px;">
-                    <code>automaton-runner auth --api-key @ViewModel.NewApiKey</code>
-                    <br />
-                    <code>export AUTOMATON_API_KEY="@ViewModel.NewApiKey"</code>
+                <strong>Usage:</strong>
+                <div style="margin-top: 8px; color: #595959; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;">
+                    @ViewModel.GetUsageInstructions()
                 </div>
             </div>
 
@@ -262,4 +262,9 @@
         color: #722ed1;
         font-weight: 500;
     }
+
+    .scope-webapp {
+        color: #13c2c2;
+        font-weight: 500;
+    } 
 </style>
