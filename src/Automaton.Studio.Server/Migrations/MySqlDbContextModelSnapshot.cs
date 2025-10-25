@@ -561,6 +561,63 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("Updated")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicUrl")
+                        .IsUnique();
+
+                    b.ToTable("WebApps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("WebAppId", "UserId");
+
+                    b.HasIndex(new[] { "WebAppId" }, "IX_WebAppUser_WebAppId");
+
+                    b.ToTable("WebAppUsers");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")
@@ -807,6 +864,15 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", null)
+                        .WithMany("WebAppUsers")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", null)
@@ -876,6 +942,11 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Navigation("WebAppUsers");
                 });
 #pragma warning restore 612, 618
         }

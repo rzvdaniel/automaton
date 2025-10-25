@@ -96,6 +96,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ErrorService>();
         services.AddScoped<FlowExecutionsService>();
         services.AddScoped<CustomStepsService>();
+        services.AddScoped<Services.AppsService>();
         services.AddScoped<StudioFlowExecuteService>();
         services.AddScoped<StudioFlowConvertService>(); // Keep concrete for backwards compatibility
         services.AddScoped<IFlowConvertService<StudioFlow>, StudioFlowConvertService>(); // Add interface registration
@@ -121,6 +122,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ApiKeysViewModel>();
         services.AddScoped<AiApiKeysViewModel>();
         services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
+        services.AddScoped<Pages.Apps.AppsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<StepViewModel>();
         services.AddScoped<StepsViewModel>();

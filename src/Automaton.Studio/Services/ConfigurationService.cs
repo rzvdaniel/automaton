@@ -12,6 +12,7 @@ public class ConfigurationService
     public string BaseUrl => apiConfig.BaseUrl;
     public string FlowsUrl => apiConfig.FlowsUrl;
     public string CustomStepsUrl => apiConfig.CustomStepsUrl;
+    public string AppsUrl => apiConfig.AppsUrl;
     public string RunnersUrl => apiConfig.RunnersUrl;
     public string LogsUrl => apiConfig.LogsUrl;
     public string FlowExecutionUrl => apiConfig.FlowExecutionUrl;
