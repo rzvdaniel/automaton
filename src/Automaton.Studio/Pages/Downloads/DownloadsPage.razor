@@ -279,7 +279,7 @@
 
                         <!-- Documentation Link -->
                         <div Style="margin-top: 24px; text-align: center;">
-                            <a href="docs/index.html#/user-guide/runner-setup" target="_blank" class="doc-link">
+                            <a href="@runnerDocUrl" target="_blank" class="doc-link">
                                 <Button Type="@ButtonType.Link">
                                     <Icon Type="book" />
                                     View Complete Runner Setup Guide & Troubleshooting
@@ -366,7 +366,7 @@
 
                         <!-- Documentation Link -->
                         <div Style="margin-top: 24px; text-align: center;">
-                            <a href="docs/index.html#/user-guide/studio-setup" target="_blank" class="doc-link">
+                            <a href="@desktopDocUrl" target="_blank" class="doc-link">
                                 <Button Type="@ButtonType.Link">
                                     <Icon Type="book" />
                                     View Complete Desktop Setup Guide
@@ -395,6 +395,10 @@
     private string runnerMacosX64Url = "";
     private string runnerMacosArm64Url = "";
 
+    // Documentation URLs
+    private string runnerDocUrl = "";
+    private string desktopDocUrl = "";
+
     protected override void OnInitialized()
     {
         var clientBaseUrl = NavigationManager.BaseUri.TrimEnd('/');
@@ -414,6 +418,10 @@
         runnerLinuxArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-linux-arm64.tar.gz";
         runnerMacosX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-x64.tar.gz";
         runnerMacosArm64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-macos-arm64.tar.gz";
+
+        // Documentation URLs
+        runnerDocUrl = $"{clientBaseUrl}/docs/index.html#/user-guide/runner-setup";
+        desktopDocUrl = $"{clientBaseUrl}/docs/index.html#/user-guide/studio-setup";
     }
 
     private async Task CopyToClipboard(string text, string description)
@@ -575,7 +583,7 @@
 
     .download-path {
         display: block;
-        font-size: 11px;
+        font-size: 12px;
         margin-top: 4px;
         padding: 4px 8px;
         background: #f5f5f5;
