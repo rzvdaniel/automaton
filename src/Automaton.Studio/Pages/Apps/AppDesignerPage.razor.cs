@@ -3,6 +3,8 @@ using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using System.Text;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -22,6 +24,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
+    [Inject] private IJSRuntime JSRuntime { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -80,64 +83,238 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    private async Task Preview()
+    // Preview Methods - Phase 1 Implementation
+
+    /// <summary>
+    /// Get HTML content for preview with Automaton bridge injected
+    /// </summary>
+    private string GetPreviewHtml()
     {
         try
         {
-            // Get the current code from Monaco editor
-            var code = await codeEditor.GetValue();
-
-            // TODO: Open preview in new tab
-            await MessageService.InfoAsync("Preview feature coming soon!");
+            var html = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
+            return InjectAutomatonBridge(html, isPreview: true);
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to open preview");
+            return GetDefaultHtmlContent();
         }
     }
 
-    // AI Chat Panel Methods
-    private async Task OnCodeGenerated(string generatedCode)
+    /// <summary>
+    /// Inject Automaton JavaScript bridge into HTML content
+    /// </summary>
+    private string InjectAutomatonBridge(string htmlContent, bool isPreview = false)
+    {
+        var bridge = isPreview ? GetPreviewBridge() : GetProductionBridge();
+
+        // Try to insert before </head>
+        if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
+        {
+            return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Try to insert before </body>
+        if (htmlContent.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+        {
+            return htmlContent.Replace("</body>", $"{bridge}</body>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // If no head or body tags, prepend to content
+        return bridge + htmlContent;
+    }
+
+    /// <summary>
+    /// Get preview mode Automaton bridge (mock responses)
+    /// </summary>
+    private string GetPreviewBridge()
+    {
+        return @"
+<script>
+    // Automaton Bridge - Preview Mode
+    window.Automaton = {
+      executeFlow: async function(flowId, inputs) {
+        console.log('🔧 Preview Mode: Automaton.executeFlow called');
+   console.log('Flow ID:', flowId);
+       console.log('Inputs:', inputs);
+     
+     // Return mock response in preview mode
+    return {
+      success: true,
+          message: 'Preview mode - flow not executed',
+          data: {
+      timestamp: new Date().toISOString(),
+        previewMode: true
+          }
+            };
+      },
+        version: '1.0.0',
+        mode: 'preview'
+    };
+    
+    console.log('✅ Automaton bridge loaded (Preview Mode)');
+</script>";
+    }
+
+    /// <summary>
+    /// Get production mode Automaton bridge (real API calls)
+    /// </summary>
+    private string GetProductionBridge()
+    {
+        return @"
+<script>
+    // Automaton Bridge - Production Mode
+    window.Automaton = {
+     executeFlow: async function(flowId, inputs = {}) {
+   try {
+  console.log('🚀 Executing flow:', flowId);
+       
+       const response = await fetch('/api/flows/execute', {
+          method: 'POST',
+     headers: {
+         'Content-Type': 'application/json'
+          },
+      body: JSON.stringify({
+            flowId: flowId,
+          inputs: inputs
+    })
+   });
+      
+    if (!response.ok) {
+         const error = await response.json();
+         throw new Error(error.message || 'Flow execution failed');
+   }
+     
+  const result = await response.json();
+     console.log('✅ Flow executed successfully:', result);
+            return result;
+       } catch (error) {
+                console.error('❌ Automaton.executeFlow error:', error);
+  throw error;
+            }
+        },
+        version: '1.0.0',
+        mode: 'production'
+    };
+    
+    console.log('✅ Automaton bridge loaded (Production Mode)');
+</script>";
+ }
+
+    /// <summary>
+    /// Refresh the preview iframe
+    /// </summary>
+    private async Task RefreshPreview()
     {
         try
         {
-            // Set the generated code in the Monaco editor
-            await codeEditor.SetValue(generatedCode);
+         // Get latest code from Monaco editor
+  var code = await codeEditor.GetValue();
+            currentApp.Definition.HtmlContent = code;
+        
+            // Force re-render by updating state
+            await InvokeAsync(StateHasChanged);
             
-            // Update the view model
-            currentApp.Definition.HtmlContent = generatedCode;
-  
-            // Show success message
-            await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+            await MessageService.SuccessAsync("Preview refreshed", 1);
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
- }
+    await MessageService.ErrorAsync($"Failed to refresh preview: {ex.Message}");
+    }
+    }
+
+ /// <summary>
+    /// Open preview in new browser tab
+    /// </summary>
+    private async Task OpenPreviewInNewTab()
+    {
+        try
+        {
+// Get current code from editor
+       var code = await codeEditor.GetValue();
+            var htmlWithBridge = InjectAutomatonBridge(code, isPreview: true);
+          
+ // Convert to base64 data URL
+            var bytes = Encoding.UTF8.GetBytes(htmlWithBridge);
+          var base64 = Convert.ToBase64String(bytes);
+      var dataUrl = $"data:text/html;base64,{base64}";
+            
+      // Open in new tab
+            await JSRuntime.InvokeVoidAsync("open", dataUrl, "_blank");
+        }
+     catch (Exception ex)
+      {
+    await MessageService.ErrorAsync($"Failed to open preview: {ex.Message}");
+      }
+    }
+
+    /// <summary>
+    /// Navigate to published app (if published)
+    /// </summary>
+    private void OpenPublishedApp()
+    {
+        if (!string.IsNullOrEmpty(currentApp.PublicUrl))
+        {
+            NavigationManager.NavigateTo($"/web/{currentApp.PublicUrl}", forceLoad: true);
+        }
+        else
+        {
+         MessageService.WarningAsync("This app has not been published yet.");
+        }
+    }
+
+    /// <summary>
+    /// Legacy preview method - opens in new tab
+    /// </summary>
+    private async Task Preview()
+    {
+        await OpenPreviewInNewTab();
+    }
+
+    // AI Chat Panel Methods
+
+    private async Task OnCodeGenerated(string generatedCode)
+ {
+     try
+     {
+            // Set the generated code in the Monaco editor
+await codeEditor.SetValue(generatedCode);
+            
+            // Update the view model
+   currentApp.Definition.HtmlContent = generatedCode;
+            
+       // Show success message
+await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+    }
+        catch (Exception ex)
+        {
+    await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
+        }
     }
 
     private async Task<string> GetCurrentCodeForAI()
     {
         try
         {
-   // Get current code from Monaco editor
-    if (codeEditor != null)
-         {
-     return await codeEditor.GetValue() ?? string.Empty;
+            // Get current code from Monaco editor
+         if (codeEditor != null)
+    {
+      return await codeEditor.GetValue() ?? string.Empty;
+}
+ 
+ // Fallback to view model if editor not available
+   return currentApp.Definition?.HtmlContent ?? string.Empty;
         }
-    // Fallback to view model if editor not available
-    return currentApp.Definition?.HtmlContent ?? string.Empty;
-        }
- catch
+catch
         {
-     // Fallback to view model code if Monaco editor fails
- return currentApp.Definition?.HtmlContent ?? string.Empty;
-    }
+  // Fallback to view model code if Monaco editor fails
+      return currentApp.Definition?.HtmlContent ?? string.Empty;
+        }
     }
 
     private string GetDefaultHtmlContent()
     {
-     return @"<!DOCTYPE html>
+  return @"<!DOCTYPE html>
 <html lang=""en"">
 <head>
     <meta charset=""UTF-8"">
@@ -145,61 +322,61 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     <title>My App</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          margin: 0;
-            padding: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-       display: flex;
-justify-content: center;
-     align-items: center;
-      }
-        .container {
- background: white;
-            padding: 40px;
- border-radius: 10px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-width: 600px;
-      width: 100%;
+     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+ margin: 0;
+    padding: 20px;
+         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        display: flex;
+    justify-content: center;
+            align-items: center;
         }
+        .container {
+         background: white;
+     padding: 40px;
+            border-radius: 10px;
+ box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 600px;
+   width: 100%;
+    }
         h1 {
             color: #333;
-          margin-top: 0;
+   margin-top: 0;
         }
         p {
-            color: #666;
+     color: #666;
             line-height: 1.6;
-   }
+ }
         .button {
             background: #667eea;
             color: white;
-         border: none;
-            padding: 12px 24px;
-    border-radius: 5px;
-            cursor: pointer;
+ border: none;
+   padding: 12px 24px;
+       border-radius: 5px;
+        cursor: pointer;
             font-size: 16px;
-    margin-top: 20px;
-        }
+     margin-top: 20px;
+}
         .button:hover {
-    background: #5568d3;
+       background: #5568d3;
         }
-    </style>
+  </style>
 </head>
 <body>
     <div class=""container"">
-        <h1>Welcome to Your App! 🚀</h1>
-        <p>This is your app's starting template. You can edit this HTML, CSS, and JavaScript to build your application.</p>
-    <p>Connect to your Flows to add backend functionality!</p>
-    <button class=""button"" onclick=""alert('Hello from your app!')"">Click Me</button>
+   <h1>Welcome to Your App! 🚀</h1>
+ <p>This is your app's starting template. You can edit this HTML, CSS, and JavaScript to build your application.</p>
+<p>Connect to your Flows to add backend functionality!</p>
+        <button class=""button"" onclick=""alert('Hello from your app!')"">Click Me</button>
     </div>
     
     <script>
         // Your JavaScript code here
         console.log('App loaded successfully!');
-   
-     // Example: Call a Flow (coming soon)
-        // Automaton.executeFlow('flow-id', { inputVar: 'value' })
-        //   .then(result => console.log(result));
+  
+ // Example: Call a Flow (coming soon)
+    // Automaton.executeFlow('flow-id', { inputVar: 'value' })
+      //   .then(result => console.log(result));
     </script>
 </body>
 </html>";
@@ -207,7 +384,7 @@ justify-content: center;
 
     public async ValueTask DisposeAsync()
     {
-        // BlazorMonaco handles disposal internally
+   // BlazorMonaco handles disposal internally
         await Task.CompletedTask;
     }
 }
