@@ -51,7 +51,7 @@ public class RunnerSettingsService
                 return null;
             }
 
-            var url = $"{_configService.RunnersUrl}/{runnerId}/script-settings";
+            var url = $"{_configService.BaseUrl}{_configService.RunnersUrl}/{runnerId}/script-settings";
             _logger.Debug("Loading script engine settings from {Url}", url);
 
             var response = await _httpClient.GetAsync(url);

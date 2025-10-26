@@ -282,18 +282,11 @@ public class Program
                 }
 
                 // Add HTTP client for RunnerHostService
-                services.AddHttpClient<RunnerHostService>((sp, client) =>
-                {
-                    var configService = sp.GetRequiredService<ConfigurationService>();
-                    client.BaseAddress = new Uri(configService.BaseUrl);
-                });
+                services.AddHttpClient<RunnerHostService>();
 
                 // Add HTTP client for RunnerSettingsService
                 services.AddHttpClient<RunnerSettingsService>((sp, client) =>
                 {
-                    var configService = sp.GetRequiredService<ConfigurationService>();
-                    client.BaseAddress = new Uri(configService.BaseUrl);
-
                     // Add authentication header if API key is available
                     var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
                     var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
@@ -306,9 +299,6 @@ public class Program
                 // Add HTTP client for ScriptEngineSettingsReporter
                 services.AddHttpClient<ScriptEngineSettingsReporter>((sp, client) =>
                 {
-                    var configService = sp.GetRequiredService<ConfigurationService>();
-                    client.BaseAddress = new Uri(configService.BaseUrl);
-
                     var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
                     var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
                     if (!string.IsNullOrEmpty(apiKey))

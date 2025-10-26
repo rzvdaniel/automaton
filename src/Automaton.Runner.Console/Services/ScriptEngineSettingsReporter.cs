@@ -10,13 +10,13 @@ public class ScriptEngineSettingsReporter
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger _logger;
+    private readonly Serilog.ILogger _logger;
 
     public ScriptEngineSettingsReporter(HttpClient httpClient, IServiceProvider serviceProvider)
     {
         _httpClient = httpClient;
         _serviceProvider = serviceProvider;
-        _logger = Log.ForContext<ScriptEngineSettingsReporter>();
+        _logger = Serilog.Log.ForContext<ScriptEngineSettingsReporter>();
     }
 
     /// <summary>
@@ -53,9 +53,10 @@ public class ScriptEngineSettingsReporter
 
             if (!string.IsNullOrEmpty(runnerId))
             {
+                // Always use the latest BaseUrl from configService
                 var url = $"{baseUrl}/{runnersUrl}/{runnerId}/script-settings";
-                var json = JsonSerializer.Serialize(runnerSettings);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var json = System.Text.Json.JsonSerializer.Serialize(runnerSettings);
+                using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
                 var response = await _httpClient.PutAsync(url, content, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
