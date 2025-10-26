@@ -49,17 +49,12 @@ public class Program
             rootCommand.AddGlobalOption(verboseOption);
 
             // Default action when no command is specified - start interactive runner
-            rootCommand.SetHandler((bool verbose) =>
+            rootCommand.SetHandler(async (bool verbose) =>
             {
-                VerboseOptions.Verbose = verbose;
-                if (verbose)
-                {
-                    PythonEnvironmentDiagnostics.DetectAndPrintIfVerbose(true);
-                }
                 using var host = CreateHostBuilder(Array.Empty<string>()).Build();
                 using var scope = host.Services.CreateScope();
                 var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-                runnerService.StartInteractiveAsync().GetAwaiter().GetResult();
+                await runnerService.StartInteractiveAsync();
             }, verboseOption);
 
             // All subcommands will inherit the verbose option from the root

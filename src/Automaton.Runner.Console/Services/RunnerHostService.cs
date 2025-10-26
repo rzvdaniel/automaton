@@ -853,11 +853,18 @@ public class RunnerHostService
         WriteLine();
 
         // Runtime Information
-        WriteLine("⚙️  Runtime Information:");
+        WriteLine("⚙️ Runtime Information:");
         WriteLine($"   • Process ID: {Environment.ProcessId}");
         WriteLine($"   • Working Directory: {Environment.CurrentDirectory}");
         WriteLine($"   • .NET Version: {Environment.Version}");
         WriteLine();
+
+        // Python Environment Information (Verbose)
+        if (VerboseOptions.Verbose)
+        {
+            var detected = PythonEnvironmentDiagnostics.Detect();
+            PythonEnvironmentDiagnostics.PrintIndented(detected);
+        }
 
         // Available Commands
         WriteLine("📋 Available Commands:");
