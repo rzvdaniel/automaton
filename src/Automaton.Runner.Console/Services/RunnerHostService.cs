@@ -1,4 +1,6 @@
-﻿using Automaton.Runner.Console.Models;
+﻿using Automaton.Core.Scripting.Engines.Python;
+using Automaton.Runner.Console.Models;
+using Automaton.Runner.Console.Services;
 using Serilog;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +16,7 @@ public class RunnerHostService
     private readonly HubService hubService;
     private readonly HttpClient httpClient;
     private readonly ILogger logger;
+    private readonly ScriptEngineSettingsReporter scriptEngineSettingsReporter;
 
     private CancellationTokenSource? cancellationTokenSource;
 
@@ -22,7 +25,8 @@ public class RunnerHostService
         FileStorageService storageService,
         ApiKeyAuthenticationService apiKeyAuthService,
         HubService hubService,
-        HttpClient httpClient)
+        HttpClient httpClient,
+        ScriptEngineSettingsReporter scriptEngineSettingsReporter)
     {
         this.configService = configService;
         this.storageService = storageService;
@@ -30,6 +34,7 @@ public class RunnerHostService
         this.hubService = hubService;
         this.httpClient = httpClient;
         this.logger = Log.ForContext<RunnerHostService>();
+        this.scriptEngineSettingsReporter = scriptEngineSettingsReporter;
     }
 
     /// <summary>
@@ -248,6 +253,14 @@ public class RunnerHostService
             }
 
             // Step 4: Start the runner
+            // Autodetect Python environment and submit to server
+            var detector = new PythonEnvironmentDetector();
+            var detected = detector.Detect();
+            if (detected != null && detected.IsAutoDetectionSuccessful)
+            {
+                await scriptEngineSettingsReporter.SubmitPythonSettingsAsync(detected, CancellationToken.None);
+            }
+
             await StartRunnerAsync();
         }
         catch (Exception ex)

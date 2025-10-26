@@ -256,8 +256,8 @@ public class Program
                 // Register runner settings service for loading script engine configuration
                 services.AddScoped<RunnerSettingsService>();
 
-                // Register background service to load script engine settings at startup
-                services.AddHostedService<RunnerScriptEngineSettingsInitializer>();
+                // Register script engine settings reporter (replaces old manager)
+                services.AddSingleton<ScriptEngineSettingsReporter>();
 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
@@ -295,6 +295,20 @@ public class Program
                     client.BaseAddress = new Uri(configService.BaseUrl);
 
                     // Add authentication header if API key is available
+                    var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
+                    var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+                    }
+                });
+
+                // Add HTTP client for ScriptEngineSettingsReporter
+                services.AddHttpClient<ScriptEngineSettingsReporter>((sp, client) =>
+                {
+                    var configService = sp.GetRequiredService<ConfigurationService>();
+                    client.BaseAddress = new Uri(configService.BaseUrl);
+
                     var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
                     var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
                     if (!string.IsNullOrEmpty(apiKey))
