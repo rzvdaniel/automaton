@@ -87,6 +87,7 @@ public class RunnersController : BaseController
     /// Update script engine settings for a specific runner
     /// </summary>
     [HttpPut("{id}/script-settings")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> UpdateScriptSettings(Guid id, [FromBody] object settings, CancellationToken cancellationToken)
     {
         await runnersService.UpdateScriptEngineSettings(id, settings?.ToString(), cancellationToken);

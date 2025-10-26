@@ -125,6 +125,12 @@ public class FileStorageService
 
     public async Task<string?> LoadServerUrlAsync()
     {
+        // Check environment variable first
+        var envServerUrl = Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL");
+        if (!string.IsNullOrEmpty(envServerUrl))
+            return envServerUrl;
+
+        // Fall back to file storage
         if (!File.Exists(serverConfigFile))
             return null;
 

@@ -49,17 +49,8 @@ public class ConfigurationService
                 return cachedServerUrl;
             }
             Log.Debug("No cached server URL found");
-            
-            // Check environment variable first (works for services!)
-            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
-            {
-                Log.Debug("Using environment variable server URL: {EnvUrl}", appConfig.BaseUrl);
-                cachedServerUrl = appConfig.BaseUrl;
-                return appConfig.BaseUrl;
-            }
-            Log.Debug("No environment variable server URL found (AppConfig.BaseUrl is empty)");
-            
-            // Fall back to stored file (user preference from interactive setup)
+                        
+            // Stored file (user preference from interactive setup)
             Log.Debug("Attempting to load server URL from file storage");
             var storedServerUrl = storageService.LoadServerUrlAsync().Result;
             if (!string.IsNullOrEmpty(storedServerUrl))
@@ -69,6 +60,16 @@ public class ConfigurationService
                 return storedServerUrl;
             }
             Log.Debug("No stored file server URL found");
+
+            // Fall back to check environment variable first (works for services!)
+            if (!string.IsNullOrEmpty(appConfig.BaseUrl))
+            {
+                Log.Debug("Using environment variable server URL: {EnvUrl}", appConfig.BaseUrl);
+                cachedServerUrl = appConfig.BaseUrl;
+                return appConfig.BaseUrl;
+            }
+            Log.Debug("No environment variable server URL found (AppConfig.BaseUrl is empty)");
+
 
             Log.Warning("Server URL is not configured from any source (cached, environment, or file)");
             throw new InvalidOperationException(
