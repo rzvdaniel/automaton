@@ -230,10 +230,10 @@ public class Program
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
                 
                 // Register runner settings service for loading script engine configuration
-                services.AddScoped<Automaton.Runner.Console.Services.RunnerSettingsService>();
+                services.AddScoped<RunnerSettingsService>();
                 
                 // Register background service to load script engine settings at startup
-                services.AddHostedService<Services.RunnerScriptEngineSettingsInitializer>();
+                services.AddHostedService<RunnerScriptEngineSettingsInitializer>();
                 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
