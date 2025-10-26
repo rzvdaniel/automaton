@@ -2,6 +2,7 @@
 @using Automaton.Core.Scripting.Engines
 @using Automaton.Studio.Services
 @using Automaton.Core.Scripting
+@using Automaton.Core.Scripting.Engines.Python
 @inject OnboardingService OnboardingService
 @inject NavigationManager NavigationManager
 @inject ConfigurationService ConfigurationService
@@ -111,10 +112,10 @@
                                             <Divider>Detected Python Environment (Read-Only)</Divider>
                                             <Descriptions Bordered Size="@DescriptionsSize.Small" Column="1">
                                                 <DescriptionsItem Title="Auto-Detected Python Paths">
-                                                    @if (pythonSettings.AutoDetectedPythonPaths?.Any() == true)
+                                                    @if (autodetectedPythonSettings.AutoDetectedPythonPaths?.Any() == true)
                                                     {
                                                         <ul>
-                                                        @foreach (var path in pythonSettings.AutoDetectedPythonPaths)
+                                                        @foreach (var path in autodetectedPythonSettings.AutoDetectedPythonPaths)
                                                         {
                                                             <li>@path</li>
                                                         }
@@ -125,15 +126,15 @@
                                                         <span>-</span>
                                                     }
                                                 </DescriptionsItem>
-                                                <DescriptionsItem Title="Python Version">@(pythonSettings.PythonVersion ?? "-")</DescriptionsItem>
-                                                <DescriptionsItem Title="Python Executable">@(pythonSettings.PythonExecutablePath ?? "-")</DescriptionsItem>
-                                                <DescriptionsItem Title="Python DLL Path">@(pythonSettings.PythonDllPath ?? "-")</DescriptionsItem>
-                                                <DescriptionsItem Title="Architecture">@(pythonSettings.DetectedArchitecture ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Python Version">@(autodetectedPythonSettings.PythonVersion ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Python Executable">@(autodetectedPythonSettings.PythonExecutablePath ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Python DLL Path">@(autodetectedPythonSettings.PythonDllPath ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Architecture">@(autodetectedPythonSettings.DetectedArchitecture ?? "-")</DescriptionsItem>
                                                 <DescriptionsItem Title="Distributions">
-                                                    @if (pythonSettings.DetectedDistributions?.Any() == true)
+                                                    @if (autodetectedPythonSettings.DetectedDistributions?.Any() == true)
                                                     {
                                                         <ul>
-                                                        @foreach (var dist in pythonSettings.DetectedDistributions)
+                                                        @foreach (var dist in autodetectedPythonSettings.DetectedDistributions)
                                                         {
                                                             <li>@dist</li>
                                                         }
@@ -145,10 +146,10 @@
                                                     }
                                                 </DescriptionsItem>
                                                 <DescriptionsItem Title="Site-Packages Paths">
-                                                    @if (pythonSettings.DetectedSitePackagesPaths?.Any() == true)
+                                                    @if (autodetectedPythonSettings.DetectedSitePackagesPaths?.Any() == true)
                                                     {
                                                         <ul>
-                                                        @foreach (var sp in pythonSettings.DetectedSitePackagesPaths)
+                                                        @foreach (var sp in autodetectedPythonSettings.DetectedSitePackagesPaths)
                                                         {
                                                             <li>@sp</li>
                                                         }
@@ -159,13 +160,13 @@
                                                         <span>-</span>
                                                     }
                                                 </DescriptionsItem>
-                                                <DescriptionsItem Title="Is Auto Detection Successful">@((pythonSettings.IsAutoDetectionSuccessful == true) ? "Yes" : "No")</DescriptionsItem>
-                                                <DescriptionsItem Title="Notes">@(pythonSettings.Notes ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Is Auto Detection Successful">@((autodetectedPythonSettings.IsAutoDetectionSuccessful == true) ? "Yes" : "No")</DescriptionsItem>
+                                                <DescriptionsItem Title="Notes">@(autodetectedPythonSettings.Notes ?? "-")</DescriptionsItem>
                                                 <DescriptionsItem Title="Environment Variables">
-                                                    @if (pythonSettings.EnvironmentVariables?.Any() == true)
+                                                    @if (autodetectedPythonSettings.EnvironmentVariables?.Any() == true)
                                                     {
                                                         <ul>
-                                                        @foreach (var kv in pythonSettings.EnvironmentVariables)
+                                                        @foreach (var kv in autodetectedPythonSettings.EnvironmentVariables)
                                                         {
                                                             <li><b>@kv.Key</b>: @kv.Value</li>
                                                         }
@@ -328,6 +329,7 @@
     
     private List<string> pythonPaths = new List<string> { "" };
     private PythonEngineSettings pythonSettings = new();
+    private PythonEngineSettings autodetectedPythonSettings = new();
     // Dummy model for Form component
     private object dummyModel = new { };
 
@@ -335,10 +337,36 @@
     {
         await base.OnInitializedAsync();
         
-        // Load Python settings if in desktop mode
+        // Load user settings if in desktop mode
         if (ConfigurationService.IsDesktop)
         {
             await LoadPythonSettings();
+
+            // Autodetect Python environment for read-only display
+            var detector = new PythonEnvironmentDetector();
+            var detected = detector.Detect();
+
+            if (detected != null)
+            {
+                autodetectedPythonSettings = new PythonEngineSettings
+                {
+                    AutoDetectedPythonPaths = new List<string> { detected.PythonHome ?? string.Empty },
+                    PythonVersion = detected.PythonVersion,
+                    PythonExecutablePath = detected.PythonExe,
+                    PythonDllPath = detected.PythonDllPath,
+                    EnvironmentVariables = detected.EnvironmentVariables,
+                    IsAutoDetectionSuccessful = detected.IsAutoDetectionSuccessful,
+                    DetectedDistributions = detected.Distributions,
+                    DetectedArchitecture = detected.Architecture,
+                    DetectedSitePackagesPaths = detected.SitePackagesPaths,
+                    Notes = detected.Notes
+                };
+            }
+            else
+            {
+                autodetectedPythonSettings = new PythonEngineSettings();
+            }
+            StateHasChanged();
         }
     }
 
