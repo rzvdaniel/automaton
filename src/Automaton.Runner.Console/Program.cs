@@ -98,13 +98,13 @@ public class Program
             serverOption
         };
 
-        command.SetHandler((string? apiKey, string? server, bool verbose) =>
+        command.SetHandler(async (string? apiKey, string? server, bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.AuthenticateInteractiveAsync(apiKey, server).GetAwaiter().GetResult();
+            await runnerService.AuthenticateInteractiveAsync(apiKey, server);
         }, apiKeyOption, serverOption, verboseOption);
 
         return command;
@@ -132,13 +132,13 @@ public class Program
             forceOption
         };
 
-        command.SetHandler((string? name, bool force, bool verbose) =>
+        command.SetHandler(async (string? name, bool force, bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.RegisterInteractiveAsync(name, force).GetAwaiter().GetResult();
+            await runnerService.RegisterInteractiveAsync(name, force);
         }, nameOption, forceOption, verboseOption);
 
         return command;
@@ -148,7 +148,7 @@ public class Program
     {
         var command = new Command("status", "Show runner configuration and status");
 
-        command.SetHandler((bool verbose) =>
+        command.SetHandler(async (bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             if (verbose)
@@ -158,7 +158,7 @@ public class Program
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.ShowStatusAsync().GetAwaiter().GetResult();
+            await runnerService.ShowStatusAsync();
         }, verboseOption);
 
         return command;
@@ -178,13 +178,13 @@ public class Program
             urlOption
         };
 
-        command.SetHandler((string? url, bool verbose) =>
+        command.SetHandler(async (string? url, bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.ConfigureServerAsync(url).GetAwaiter().GetResult();
+            await runnerService.ConfigureServerAsync(url);
         }, urlOption, verboseOption);
 
         return command;
@@ -194,13 +194,13 @@ public class Program
     {
         var command = new Command("service", "Run in non-interactive service mode (for Windows services, systemd, etc.)");
 
-        command.SetHandler((bool verbose) =>
+        command.SetHandler(async (bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.StartServiceModeAsync().GetAwaiter().GetResult();
+            await runnerService.StartServiceModeAsync();
         }, verboseOption);
 
         return command;
@@ -210,13 +210,13 @@ public class Program
     {
         var command = new Command("cleanup", "Clean up stored API key and runner configuration");
 
-        command.SetHandler((bool verbose) =>
+        command.SetHandler(async (bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            runnerService.CleanupAsync().GetAwaiter().GetResult();
+            await runnerService.CleanupAsync();
         }, verboseOption);
 
         return command;
@@ -228,10 +228,10 @@ public class Program
         if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" ||
             Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development")
         {
-            System.Net.ServicePointManager.ServerCertificateValidationCallback = 
+            System.Net.ServicePointManager.ServerCertificateValidationCallback =
                 (sender, certificate, chain, sslPolicyErrors) => true;
         }
-        
+
         return new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -247,7 +247,7 @@ public class Program
             {
                 // CRITICAL: Bind AppConfig from configuration (enables environment variables like AppConfig__BaseUrl)
                 services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
-                
+
                 // Register configuration services
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
@@ -257,20 +257,20 @@ public class Program
                 services.AddSingleton<RunnerHostService>();
                 services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();
-                
+
                 // Register runner settings service for loading script engine configuration
                 services.AddScoped<RunnerSettingsService>();
-                
+
                 // Register background service to load script engine settings at startup
                 services.AddHostedService<RunnerScriptEngineSettingsInitializer>();
-                
+
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
 
                 // Configure HTTP client factory with SSL bypass for development
                 var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
                                    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
-                
+
                 if (isDevelopment)
                 {
                     // Configure all HTTP clients to bypass SSL validation in development
@@ -292,13 +292,13 @@ public class Program
                     var configService = sp.GetRequiredService<ConfigurationService>();
                     client.BaseAddress = new Uri(configService.BaseUrl);
                 });
-                
+
                 // Add HTTP client for RunnerSettingsService
                 services.AddHttpClient<RunnerSettingsService>((sp, client) =>
                 {
                     var configService = sp.GetRequiredService<ConfigurationService>();
                     client.BaseAddress = new Uri(configService.BaseUrl);
-                    
+
                     // Add authentication header if API key is available
                     var apiKeyService = sp.GetRequiredService<ApiKeyAuthenticationService>();
                     var apiKey = apiKeyService.GetValidApiKeyAsync().GetAwaiter().GetResult();
@@ -307,12 +307,12 @@ public class Program
                         client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
                     }
                 });
-                
+
                 // Add default HTTP client
                 services.AddHttpClient();
-                
+
                 // Register MediatR - scan current assembly and Core assembly
-                services.AddMediatR(cfg => 
+                services.AddMediatR(cfg =>
                 {
                     cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
                     cfg.RegisterServicesFromAssembly(typeof(Core.Services.FlowExecuteService).Assembly);
@@ -333,9 +333,9 @@ public class Program
                     var persistenceService = provider.GetService<IWorkflowExecutionPersistenceService>();
 
                     return new FlowExecuteService(
-                        flowConvertService, 
+                        flowConvertService,
                         configService.ApplicationName, // Use the proper application name from config
-                        notificationService, 
+                        notificationService,
                         persistenceService);
                 });
             });
