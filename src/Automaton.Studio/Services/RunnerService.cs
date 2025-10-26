@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -10,13 +9,11 @@ public class RunnerService
 {
     private HttpClient httpClient;
     private readonly ConfigurationService configService;
-    private readonly IMapper mapper;
     private readonly ILogger<RunnerService> logger;
 
     public RunnerService
     (
         ConfigurationService configService,
-        IMapper mapper,
         HttpClient httpClient,
         ILogger<RunnerService> logger
     )
@@ -24,7 +21,6 @@ public class RunnerService
         this.logger = logger;
         this.configService = configService;
         this.httpClient = httpClient;
-        this.mapper = mapper;
     }
 
     public async Task<ICollection<RunnerModel>> List()

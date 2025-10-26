@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Server.Data;
+﻿using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
@@ -7,7 +6,6 @@ namespace Automaton.Studio.Server.Services;
 public class FlowLogsService
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly IMapper mapper;
     private readonly string userName;
     private readonly Serilog.ILogger logger;
     private readonly ConfigurationService configurationService;
@@ -16,12 +14,10 @@ public class FlowLogsService
     (
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        ConfigurationService configurationService,
-        IMapper mapper
+        ConfigurationService configurationService
     )
     {
         this.dbContext = dbContext;
-        this.mapper = mapper;
         this.configurationService = configurationService;
         this.userName = userContextService.GetUserName();
         this.logger = Serilog.Log.ForContext<FlowLogsService>();

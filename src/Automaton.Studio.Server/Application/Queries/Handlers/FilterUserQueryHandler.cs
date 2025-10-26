@@ -1,5 +1,4 @@
 ﻿using AuthServer.Core.Queries;
-using AutoMapper;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using MediatR;
@@ -9,12 +8,10 @@ namespace AuthServer.Application.Queries.Handlers
     public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, IEnumerable<UserDetails>>
     {
         private readonly UsersService _userManagerService;
-        private readonly IMapper _mapper;
 
-        public FilterUserQueryHandler(UsersService userManagerService, IMapper mapper)
+        public FilterUserQueryHandler(UsersService userManagerService)
         {
             _userManagerService = userManagerService;
-            _mapper = mapper;
         }
 
         public async Task<IEnumerable<UserDetails>> Handle(FilterUserQuery request,
@@ -24,7 +21,12 @@ namespace AuthServer.Application.Queries.Handlers
                 request.Email, request.PageIndex, request.PageSize
             );
 
-            return _mapper.Map<IEnumerable<UserDetails>>(res);
+            return res.Select(user => new UserDetails
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Email = user.Email
+            });
         }
     }
 }

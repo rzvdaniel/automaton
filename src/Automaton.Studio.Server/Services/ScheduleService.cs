@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Enums;
+﻿using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
@@ -16,7 +15,6 @@ public class ScheduleService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
-    private readonly IMapper mapper;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -24,12 +22,10 @@ public class ScheduleService
     (
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IMapper mapper,
         IHubContext<AutomatonHub> automatonHub
     )
     {
         this.dbContext = dbContext;
-        this.mapper = mapper;
         this.automatonHub = automatonHub;
         this.userId = userContextService.GetUserId();
         logger = Serilog.Log.ForContext<ScheduleService>();

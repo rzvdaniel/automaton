@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 
 namespace Automaton.Studio.Services;
 
@@ -7,20 +6,17 @@ public class FlowSettingsService
 {
     private HttpClient httpClient;
     private readonly ConfigurationService configService;
-    private readonly IMapper mapper;
     private readonly ILogger logger;
 
     public FlowSettingsService
     (
         ConfigurationService configService,
-        IMapper mapper,
         HttpClient httpClient
     )
     {
         this.logger = Log.ForContext<FlowExecutionsService>(); ;
         this.configService = configService;
         this.httpClient = httpClient;
-        this.mapper = mapper;
     }
 
     public async Task<FlowSettings> GetDashboardDetails(Guid flowId)

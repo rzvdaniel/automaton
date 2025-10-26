@@ -1,12 +1,10 @@
-﻿using AutoMapper;
-using Automaton.Studio.Services;
+﻿using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Pages.Runners;
 
 public class FlowSettingsViewModel
 {
     private readonly FlowSettingsService flowDashboardService;
-    private readonly IMapper mapper;
 
     public Guid Id { get; set; }
     public string Name { get; set; }
@@ -15,12 +13,10 @@ public class FlowSettingsViewModel
 
     public FlowSettingsViewModel
     (
-        FlowSettingsService flowDashboardService,
-        IMapper mapper
+        FlowSettingsService flowDashboardService
     )
     {
         this.flowDashboardService = flowDashboardService;
-        this.mapper = mapper;
     }
 
     public async Task GetFlowDashboard(string flowIdString)

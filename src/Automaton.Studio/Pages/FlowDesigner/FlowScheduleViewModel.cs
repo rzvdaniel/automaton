@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Studio.Models;
+﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 
 namespace Automaton.Studio.Pages.Runners;
@@ -9,7 +8,6 @@ public class FlowScheduleViewModel
     private readonly FlowScheduleService flowScheduleService;
     private readonly RunnerService runnerService;
     public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
-    private readonly IMapper mapper;
 
     public Guid FlowId { get; set; }
     public IList<FlowScheduleModel> Schedules { get; set; } = new List<FlowScheduleModel>();
@@ -17,13 +15,11 @@ public class FlowScheduleViewModel
     public FlowScheduleViewModel
     (
         FlowScheduleService flowScheduleService,
-        RunnerService runnerService,
-        IMapper mapper
+        RunnerService runnerService
     )
     {
         this.flowScheduleService = flowScheduleService;
         this.runnerService = runnerService;
-        this.mapper = mapper;
     }
 
     public async Task GetFlowSchedules(int startIndex, int pageSize)

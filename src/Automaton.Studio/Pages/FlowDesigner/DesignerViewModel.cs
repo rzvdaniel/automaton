@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Events;
 using Automaton.Studio.Factories;
@@ -13,7 +12,6 @@ public class DesignerViewModel
 {
     private const int FlowDelay = 100;
 
-    private readonly IMapper mapper;
     private readonly StepFactory stepFactory;
     private readonly FlowService flowService;
     private readonly StudioFlowConvertService flowConvertService;
@@ -121,7 +119,6 @@ public class DesignerViewModel
 
     public DesignerViewModel
     (
-        IMapper mapper,
         ConfigurationService configurationService,
         StepFactory stepFactory,
         FlowService flowService,
@@ -129,7 +126,6 @@ public class DesignerViewModel
         StudioFlowExecuteService workflowExecuteService
     )
     {
-        this.mapper = mapper;
         this.configurationService = configurationService;
         this.stepFactory = stepFactory;
         this.flowService = flowService;

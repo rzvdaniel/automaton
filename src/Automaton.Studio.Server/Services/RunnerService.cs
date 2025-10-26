@@ -1,11 +1,11 @@
-﻿using AutoMapper;
-using Automaton.Core.Enums;
+﻿using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Mapping;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -17,16 +17,13 @@ public class RunnerService
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly Guid userId;
-    private readonly IMapper mapper;
     private readonly Serilog.ILogger logger;
 
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IMapper mapper,
         IHubContext<AutomatonHub> automatonHub)
     {
         this.dbContext = dbContext;
-        this.mapper = mapper;
         this.automatonHub = automatonHub;
         this.userId = userContextService.GetUserId();
         logger = Serilog.Log.ForContext<RunnerService>();
@@ -240,7 +237,7 @@ public class RunnerService
 
     private async Task<IEnumerable<RunnerDetails>> GetRunnersWithUpdatedStatus(IEnumerable<Runner> runnerEntities, CancellationToken cancellationToken)
     {
-        var runners = mapper.Map<IEnumerable<RunnerDetails>>(runnerEntities);
+        var runners = RunnerMapper.ToRunnerDetailsList(runnerEntities).ToList();
 
         foreach (var runner in runners)
         {
@@ -359,6 +356,6 @@ public class RunnerService
             return null;
         }
 
-        return mapper.Map<RunnerDetails>(runner);
+        return RunnerMapper.ToRunnerDetails(runner);
     }
 }

@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Logs;
+﻿using Automaton.Core.Logs;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Scripting.ErrorParsers;
 using Automaton.Core.Scripting.Languages;
@@ -14,7 +13,6 @@ namespace Automaton.Studio.Services;
 public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 {
     private readonly IMediator _mediator;
-    private readonly IMapper _mapper;
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly ConfigurationService _configurationService;
@@ -35,13 +33,11 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         ScriptEngineHost scriptHost,
         IServiceProvider serviceProvider,
         IMediator mediator,
-        IMapper mapper,
         CustomStepsService customStepsService,
         ScriptEngineConfiguration scriptConfig,
         IScriptLanguageProvider languageProvider)
     {
         _mediator = mediator;
-        _mapper = mapper;
         _configurationService = configurationService;
         _flowConvertService = flowConvertService;
         _flowExecutionsService = flowExecutionsService;

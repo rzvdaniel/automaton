@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Automaton.Core.Services;
 using Automaton.Studio.Domain;
 
@@ -7,7 +6,6 @@ namespace Automaton.Studio.Services;
 
 public class StudioFlowExecuteService : BaseFlowExecuteService<StudioFlow>
 {
-    private readonly IMapper mapper;
     private readonly IMediator mediator;
     private readonly ConfigurationService configurationService;
     
@@ -15,14 +13,12 @@ public class StudioFlowExecuteService : BaseFlowExecuteService<StudioFlow>
         StudioFlowConvertService studioFlowConvertService, 
         FlowExecutionsService flowExecutionsService,
         ConfigurationService configurationService, 
-        IMediator mediator, 
-        IMapper mapper)
+        IMediator mediator)
         : base(studioFlowConvertService, 
                new MediatRExecutionNotificationService(mediator), 
                configurationService.ApplicationName,
                new StudioWorkflowExecutionPersistenceService(flowExecutionsService))
     {
-        this.mapper = mapper;
         this.mediator = mediator;
         this.configurationService = configurationService;
     }

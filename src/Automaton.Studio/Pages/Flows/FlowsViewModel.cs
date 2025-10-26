@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.Core.Enums;
+﻿using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
@@ -12,7 +11,6 @@ public class FlowsViewModel
     private readonly FlowsService flowsService;
     private readonly RunnerService runnerService;
     private readonly FlowService flowService;
-    private readonly IMapper mapper;
 
     public ICollection<FlowModel> Flows { get; set;  } = new List<FlowModel>();
     public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
@@ -21,20 +19,29 @@ public class FlowsViewModel
     (
         FlowsService flowsService,
         RunnerService runnerService,
-        FlowService flowService,
-        IMapper mapper
+        FlowService flowService
     )
     {
         this.flowsService = flowsService;
         this.runnerService = runnerService;
         this.flowService = flowService;
-        this.mapper = mapper;
     }
 
     public async Task GetFlows()
     {
         var flowsInfo = await flowsService.List();
-        Flows = mapper.Map<ICollection<FlowModel>>(flowsInfo);
+        Flows = flowsInfo
+            .Select(flow => new FlowModel
+            {
+                Id = flow.Id,
+                Name = flow.Name,
+                Created = flow.Created,
+                Updated = flow.Updated,
+                Started = flow.Started,
+                Finished = flow.Finished,
+                Status = Enum.TryParse<WorkflowStatus>(flow.Status, out var status) ? status : WorkflowStatus.None
+            })
+            .ToList();
     }
 
     public async Task GetRunners()

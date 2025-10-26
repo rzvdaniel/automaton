@@ -1,7 +1,7 @@
-﻿using AutoMapper;
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Factories;
+using Automaton.Studio.Mapping;
 using Automaton.Studio.Models;
 using Microsoft.Extensions.Logging;
 
@@ -11,14 +11,12 @@ public class FlowService
 {
     private readonly HttpClient httpClient;
     private readonly ConfigurationService configService;
-    private readonly IMapper mapper;
     private readonly ILogger<FlowService> logger;
     private readonly StepFactory stepFactory;
 
     public FlowService
     (
         ConfigurationService configService,
-        IMapper mapper,
         HttpClient httpClient,
         ILogger<FlowService> logger,
         StepFactory stepFactory
@@ -27,7 +25,6 @@ public class FlowService
         this.logger = logger;
         this.configService = configService;
         this.httpClient = httpClient;
-        this.mapper = mapper;
         this.stepFactory = stepFactory;
     }
 
@@ -37,7 +34,7 @@ public class FlowService
         response.EnsureSuccessStatusCode();
 
         var flow = await response.Content.ReadAsAsync<Flow>();
-        var studioFlow = CreateStudioFlow(flow);
+        var studioFlow = FlowMapper.ToStudioFlow(flow, stepFactory);
 
         return studioFlow;
     }
@@ -58,17 +55,16 @@ public class FlowService
 
         flow = await response.Content.ReadAsAsync<Flow>();
 
-        var studioFlow = CreateStudioFlow(flow);
+        var studioFlow = FlowMapper.ToStudioFlow(flow, stepFactory);
 
         return studioFlow;
     }
 
     public async Task Update(StudioFlow flow)
     {
-        var flowDto = mapper.Map<Flow>(flow);
+        var flowDto = FlowMapper.ToFlow(flow);
 
         var response = await httpClient.PutAsJsonAsync($"{configService.FlowsUrl}/{flow.Id}", flowDto);
-
         response.EnsureSuccessStatusCode();
     }
 
@@ -93,57 +89,5 @@ public class FlowService
         var results = await response.Content.ReadAsAsync<IEnumerable<RunnerFlowResult>>();
 
         return results;
-    }
-
-    private StudioFlow CreateStudioFlow(Flow flow)
-    {
-        var studioFlow = new StudioFlow
-        {
-            Id = flow.Id,
-            Name = flow.Name,
-            Created = flow.Created,
-            Updated = flow.Updated,
-            StartupDefinitionId = flow.StartupDefinitionId,
-            InputVariables = flow.InputVariables,
-            OutputVariables = flow.OutputVariables,
-            Variables = flow.Variables,
-            Definitions = new List<StudioDefinition>()
-        };
-
-        var studioDefinitions = CreateStudioDefinitions(flow.Definitions, studioFlow);
-
-        studioFlow.Definitions.AddRange(studioDefinitions);
-
-        return studioFlow;
-    }
-
-    private IEnumerable<StudioDefinition> CreateStudioDefinitions(IEnumerable<Definition> definitions, StudioFlow studioFlow)
-    {
-        foreach (var definition in definitions)
-        {
-            var studioDefinition = new StudioDefinition
-            {
-                Id = definition.Id,
-                Name = definition.Name,
-                Flow = studioFlow,                
-                Steps = new List<StudioStep>(),
-            };
-
-            var studioSteps = CreateSteps(studioDefinition, definition);
-
-            studioDefinition.Steps.AddRange(studioSteps);
-
-            yield return studioDefinition;
-        }
-    }
-
-    private IEnumerable<StudioStep> CreateSteps(StudioDefinition studioDefinition, Definition definition)
-     {
-        foreach (var step in definition.Steps)
-        {
-            var studioStep = stepFactory.CreateStep(step, studioDefinition);
-
-            yield return studioStep;
-        }
     }
 }

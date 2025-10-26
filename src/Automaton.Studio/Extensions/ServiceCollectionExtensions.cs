@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Automaton.App.Account.Config;
+﻿using Automaton.App.Account.Config;
 using Automaton.App.Authentication.Config;
 using Automaton.Client.Auth.Extensions;
 using Automaton.Client.Auth.Interfaces;
@@ -9,7 +8,6 @@ using Automaton.Core.Logs;
 using Automaton.Core.Scripting;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Factories;
-using Automaton.Studio.Mapper;
 using Automaton.Studio.Pages.AiApiKeys;
 using Automaton.Studio.Pages.ApiKeys;
 using Automaton.Studio.Pages.StepDesigner;
@@ -176,12 +174,5 @@ public static class ServiceCollectionExtensions
         Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
         Serilog.Debugging.SelfLog.Enable(Console.Error);
 #endif
-
-        services.AddScoped(provider => {
-            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-            var configExpression = new MapperConfigurationExpression();
-            configExpression.AddProfile(new AutoMapperProfile(provider));
-            return new MapperConfiguration(configExpression, loggerFactory).CreateMapper();
-        });
     }
 }

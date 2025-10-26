@@ -1,8 +1,8 @@
-﻿using AutoMapper;
-using Automaton.Core.Models;
+﻿using Automaton.Core.Models;
 using Automaton.Studio.Attributes;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Services;
+using Automaton.Studio.Steps.ExecuteFlow;
 
 namespace Automaton.Studio.Steps.ExecuteFlow;
 
@@ -17,7 +17,6 @@ namespace Automaton.Studio.Steps.ExecuteFlow;
 )]
 public class ExecuteFlowStep : StudioStep
 {
-    private readonly IMapper mapper;
     private readonly FlowsService flowsService;
 
     public IEnumerable<ExecuteFlowModel> Flows { get; set; } = new List<ExecuteFlowModel>();
@@ -52,10 +51,9 @@ public class ExecuteFlowStep : StudioStep
         set => SetInputValue(nameof(OutputVariables), value);
     }
 
-    public ExecuteFlowStep(IMapper mapper, FlowsService flowsService)
+    public ExecuteFlowStep(FlowsService flowsService)
     {
         this.flowsService = flowsService;
-        this.mapper = mapper;
 
         SetInputValue(nameof(FlowId), Guid.Empty);
         SetInputValue(nameof(OutputVariables), new List<StepVariable>());
@@ -65,7 +63,13 @@ public class ExecuteFlowStep : StudioStep
     public void OnFocus()
     {
         var flowsInfo = Task.Run(this.flowsService.List).Result;
-        Flows = this.mapper.Map<ICollection<ExecuteFlowModel>>(flowsInfo);
+        Flows = flowsInfo
+            .Select(flow => new ExecuteFlowModel
+            {
+                Id = flow.Id,
+                Name = flow.Name
+            })
+            .ToList();
     }
 
     public override Type GetDesignerComponent()
