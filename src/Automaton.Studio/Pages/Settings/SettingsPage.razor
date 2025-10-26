@@ -62,7 +62,7 @@
                             </Extra>
                             <ChildContent>
                                 <Form Model="dummyModel">
-                                    <Space Direction="SpaceDirection.Vertical" Style="width: 100%;" Size="@SpaceSize.Large">
+                                    <Space Direction="SpaceDirection.Vertical" Style="width:100%;" Size="@SpaceSize.Large">
                                         <SpaceItem>
                                             <Alert Type="@AlertType.Info" ShowIcon="true" Closable="false">
                                                 <MessageTemplate>
@@ -70,25 +70,24 @@
                                                 </MessageTemplate>
                                             </Alert>
                                         </SpaceItem>
-
                                         <SpaceItem>
                                             <FormItem Label="Python Package Paths">
-                                                <Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+                                                <Space Direction="SpaceDirection.Vertical" Style="width:100%;">
                                                     @foreach (var (path, index) in pythonPaths.Select((p, i) => (p, i)))
                                                     {
-                                                        <SpaceItem Style="width: 100%;">
-                                                            <Space Style="width: 100%;">
-                                                                <SpaceItem Style="flex: 1;">
+                                                        <SpaceItem Style="width:100%;">
+                                                            <Space Style="width:100%;">
+                                                                <SpaceItem Style="flex:1;">
                                                                     <Input @bind-Value="pythonPaths[index]" 
                                                                            Placeholder="e.g., C:\Python312\Lib\site-packages"
-                                                                           Style="width: 100%;" />
+                                                                           Style="width:100%;" />
                                                                 </SpaceItem>
                                                                 <SpaceItem>
                                                                     <Button Danger 
                                                                             Icon="delete" 
                                                                             Size="@ButtonSize.Small"
                                                                             OnClick="() => RemovePythonPath(index)"
-                                                                            Disabled="@(pythonPaths.Count <= 1)" />
+                                                                            Disabled="@(pythonPaths.Count <=1)" />
                                                                 </SpaceItem>
                                                             </Space>
                                                         </SpaceItem>
@@ -102,12 +101,83 @@
                                                         </Button>
                                                     </SpaceItem>
                                                 </Space>
-                                                <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                                                <Text Type="@TextElementType.Secondary" Style="font-size:12px;">
                                                     Additional Python package search paths (e.g., custom site-packages directories). These take priority over auto-detected paths.
                                                 </Text>
                                             </FormItem>
                                         </SpaceItem>
 
+                                        <SpaceItem>
+                                            <Divider>Detected Python Environment (Read-Only)</Divider>
+                                            <Descriptions Bordered Size="@DescriptionsSize.Small" Column="1">
+                                                <DescriptionsItem Title="Auto-Detected Python Paths">
+                                                    @if (pythonSettings.AutoDetectedPythonPaths?.Any() == true)
+                                                    {
+                                                        <ul>
+                                                        @foreach (var path in pythonSettings.AutoDetectedPythonPaths)
+                                                        {
+                                                            <li>@path</li>
+                                                        }
+                                                        </ul>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>-</span>
+                                                    }
+                                                </DescriptionsItem>
+                                                <DescriptionsItem Title="Python Version">@(pythonSettings.PythonVersion ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Python Executable">@(pythonSettings.PythonExecutablePath ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Python DLL Path">@(pythonSettings.PythonDllPath ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Architecture">@(pythonSettings.DetectedArchitecture ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Distributions">
+                                                    @if (pythonSettings.DetectedDistributions?.Any() == true)
+                                                    {
+                                                        <ul>
+                                                        @foreach (var dist in pythonSettings.DetectedDistributions)
+                                                        {
+                                                            <li>@dist</li>
+                                                        }
+                                                        </ul>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>-</span>
+                                                    }
+                                                </DescriptionsItem>
+                                                <DescriptionsItem Title="Site-Packages Paths">
+                                                    @if (pythonSettings.DetectedSitePackagesPaths?.Any() == true)
+                                                    {
+                                                        <ul>
+                                                        @foreach (var sp in pythonSettings.DetectedSitePackagesPaths)
+                                                        {
+                                                            <li>@sp</li>
+                                                        }
+                                                        </ul>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>-</span>
+                                                    }
+                                                </DescriptionsItem>
+                                                <DescriptionsItem Title="Is Auto Detection Successful">@((pythonSettings.IsAutoDetectionSuccessful == true) ? "Yes" : "No")</DescriptionsItem>
+                                                <DescriptionsItem Title="Notes">@(pythonSettings.Notes ?? "-")</DescriptionsItem>
+                                                <DescriptionsItem Title="Environment Variables">
+                                                    @if (pythonSettings.EnvironmentVariables?.Any() == true)
+                                                    {
+                                                        <ul>
+                                                        @foreach (var kv in pythonSettings.EnvironmentVariables)
+                                                        {
+                                                            <li><b>@kv.Key</b>: @kv.Value</li>
+                                                        }
+                                                        </ul>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>-</span>
+                                                    }
+                                                </DescriptionsItem>
+                                            </Descriptions>
+                                        </SpaceItem>
                                         <SpaceItem>
                                             <Space>
                                                 <SpaceItem>
@@ -257,7 +327,7 @@
     private bool isSavingPythonSettings = false;
     
     private List<string> pythonPaths = new List<string> { "" };
-    
+    private PythonEngineSettings pythonSettings = new();
     // Dummy model for Form component
     private object dummyModel = new { };
 
@@ -272,29 +342,6 @@
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await CheckSetupStatus();
-        }
-    }
-
-    private async Task CheckSetupStatus()
-    {
-        try
-        {
-            hasRunners = await OnboardingService.HasRegisteredRunnersAsync();
-        }
-        catch
-        {
-            // On error, assume setup is complete to avoid showing unnecessary warnings
-            hasRunners = true;
-        }
-        
-        StateHasChanged();
-    }
-
     private async Task LoadPythonSettings()
     {
         try
@@ -303,13 +350,14 @@
             
             if (settings != null)
             {
+                pythonSettings = settings;
                 pythonPaths = settings.PythonPaths?.Any() == true 
                     ? new List<string>(settings.PythonPaths) 
                     : new List<string> { "" };
             }
             else
             {
-                // Default values
+                pythonSettings = new PythonEngineSettings();
                 pythonPaths = new List<string> { "" };
             }
             
@@ -368,7 +416,7 @@
 
     private void RemovePythonPath(int index)
     {
-        if (pythonPaths.Count > 1)
+        if (pythonPaths.Count >1)
         {
             pythonPaths.RemoveAt(index);
             StateHasChanged();

@@ -1,7 +1,6 @@
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Scripting.Engines.Python;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 using System.Text.Json;
 
 namespace Automaton.Runner.Console.Services;
@@ -55,7 +54,7 @@ public class ScriptEngineSettingsReporter
             {
                 // Always use the latest BaseUrl from configService
                 var url = $"{baseUrl}/{runnersUrl}/{runnerId}/script-settings";
-                var json = System.Text.Json.JsonSerializer.Serialize(runnerSettings);
+                var json = JsonSerializer.Serialize(runnerSettings);
                 using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
                 var response = await _httpClient.PutAsync(url, content, cancellationToken);
                 if (response.IsSuccessStatusCode)

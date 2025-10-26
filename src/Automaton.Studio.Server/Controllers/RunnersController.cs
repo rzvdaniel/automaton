@@ -88,9 +88,10 @@ public class RunnersController : BaseController
     /// </summary>
     [HttpPut("{id}/script-settings")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> UpdateScriptSettings(Guid id, [FromBody] object settings, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateScriptSettings(Guid id, [FromBody] RunnerScriptEngineSettings settings, CancellationToken cancellationToken)
     {
-        await runnersService.UpdateScriptEngineSettings(id, settings?.ToString(), cancellationToken);
+        var json = System.Text.Json.JsonSerializer.Serialize(settings);
+        await runnersService.UpdateScriptEngineSettings(id, json, cancellationToken);
         return NoContent();
     }
 
