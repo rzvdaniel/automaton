@@ -42,7 +42,7 @@
                 EnableVirtualization
                 OnChange="OnChange"
                 Total="FlowActivityViewModel.Total"
-                PageSize="100"
+                PageSize="@PageSize"
                 RemoteDataSource>
                 <ColumnDefinitions>
                     <Column Title="Application" @bind-Field="@context.Application">

@@ -9,6 +9,9 @@ namespace Automaton.Studio.Pages.FlowDesigner
 {
     public partial class FlowActivity : ComponentBase
     {
+        public const int PageStart = 1;
+        public const int PageSize = 100;
+
         [Parameter] public string FlowId { get; set; }
         [Parameter] public string FlowName { get; set; }
 
@@ -22,6 +25,8 @@ namespace Automaton.Studio.Pages.FlowDesigner
         protected override async Task OnInitializedAsync()
         {
             await base.OnInitializedAsync();
+            await FlowActivityViewModel.GetFlowActivity(FlowId, PageStart, PageSize);
+
         }
 
         async Task OnChange(QueryModel queryModel)

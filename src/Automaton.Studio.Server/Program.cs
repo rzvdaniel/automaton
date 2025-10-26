@@ -180,7 +180,6 @@ services.AddHangfire(x =>
 
 services.AddHangfireServer();
 
-services.AddScoped<FlowLogsService>();
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
 services.AddScoped<FlowsService>();

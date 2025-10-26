@@ -8,16 +8,13 @@ namespace Automaton.Studio.Server.Controllers;
 public class FlowExecutionsController : BaseController
 {
     private readonly FlowExecutionHistoryService flowExecutionService;
-    private readonly FlowLogsService logsService;
     private readonly FlowExecutionLogService flowExecutionLogService;
 
     public FlowExecutionsController(
         FlowExecutionHistoryService flowExecutionService, 
-        FlowLogsService logsService,
         FlowExecutionLogService flowExecutionLogService)
     {
         this.flowExecutionService = flowExecutionService;
-        this.logsService = logsService;
         this.flowExecutionLogService = flowExecutionLogService;
     }
 
