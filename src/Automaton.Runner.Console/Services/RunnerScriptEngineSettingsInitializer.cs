@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Automaton.Runner.Console;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -81,12 +82,25 @@ public class RunnerScriptEngineSettingsInitializer : IHostedService
     /// </summary>
     private async Task AutoDetectAndSavePythonSettingsAsync(CancellationToken cancellationToken)
     {
+        PythonEnvironmentInfo? detected = null;
+
         try
         {
             _logger.Information("Autodetecting Python environment for runner...");
             var detector = new PythonEnvironmentDetector();
-            var detected = detector.Detect();
+            detected = detector.Detect();
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to autodetect Python environment");
+        }
 
+        // Only try to save if detection succeeded
+        if (detected == null)
+            return;
+
+        try
+        {
             var pythonSettings = new PythonEngineSettings
             {
                 AutoDetectedPythonPaths = new List<string> { detected.PythonHome ?? string.Empty },

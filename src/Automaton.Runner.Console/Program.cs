@@ -11,12 +11,23 @@ using Microsoft.Extensions.Http;
 
 namespace Automaton.Runner.Console;
 
+public static class VerboseOptions
+{
+    public static bool Verbose { get; set; } = false;
+}
+
 public class Program
 {
+    private static readonly Option<bool> verboseOption = new Option<bool>(
+        aliases: new[] { "--verbose", "-v" },
+        description: "Enable verbose output (prints Python environment details)",
+        getDefaultValue: () => false
+    );
+
     public static async Task<int> Main(string[] args)
     {
         var configuration = GetConfiguration(args);
-        
+
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration)
             .CreateLogger();
@@ -35,15 +46,23 @@ public class Program
                 CreateCleanupCommand()
             };
 
+            rootCommand.AddGlobalOption(verboseOption);
+
             // Default action when no command is specified - start interactive runner
-            rootCommand.SetHandler(async () =>
+            rootCommand.SetHandler((bool verbose) =>
             {
+                VerboseOptions.Verbose = verbose;
+                if (verbose)
+                {
+                    PythonEnvironmentDiagnostics.DetectAndPrintIfVerbose(true);
+                }
                 using var host = CreateHostBuilder(Array.Empty<string>()).Build();
                 using var scope = host.Services.CreateScope();
                 var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-                await runnerService.StartInteractiveAsync();
-            });
+                runnerService.StartInteractiveAsync().GetAwaiter().GetResult();
+            }, verboseOption);
 
+            // All subcommands will inherit the verbose option from the root
             return await rootCommand.InvokeAsync(args);
         }
         catch (Exception ex)
@@ -79,13 +98,14 @@ public class Program
             serverOption
         };
 
-        command.SetHandler(async (string? apiKey, string? server) =>
+        command.SetHandler((string? apiKey, string? server, bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.AuthenticateInteractiveAsync(apiKey, server);
-        }, apiKeyOption, serverOption);
+            runnerService.AuthenticateInteractiveAsync(apiKey, server).GetAwaiter().GetResult();
+        }, apiKeyOption, serverOption, verboseOption);
 
         return command;
     }
@@ -112,13 +132,14 @@ public class Program
             forceOption
         };
 
-        command.SetHandler(async (string? name, bool force) =>
+        command.SetHandler((string? name, bool force, bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.RegisterInteractiveAsync(name, force);
-        }, nameOption, forceOption);
+            runnerService.RegisterInteractiveAsync(name, force).GetAwaiter().GetResult();
+        }, nameOption, forceOption, verboseOption);
 
         return command;
     }
@@ -127,13 +148,18 @@ public class Program
     {
         var command = new Command("status", "Show runner configuration and status");
 
-        command.SetHandler(async () =>
+        command.SetHandler((bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
+            if (verbose)
+            {
+                PythonEnvironmentDiagnostics.DetectAndPrintIfVerbose(true);
+            }
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.ShowStatusAsync();
-        });
+            runnerService.ShowStatusAsync().GetAwaiter().GetResult();
+        }, verboseOption);
 
         return command;
     }
@@ -152,13 +178,14 @@ public class Program
             urlOption
         };
 
-        command.SetHandler(async (string? url) =>
+        command.SetHandler((string? url, bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.ConfigureServerAsync(url);
-        }, urlOption);
+            runnerService.ConfigureServerAsync(url).GetAwaiter().GetResult();
+        }, urlOption, verboseOption);
 
         return command;
     }
@@ -167,13 +194,14 @@ public class Program
     {
         var command = new Command("service", "Run in non-interactive service mode (for Windows services, systemd, etc.)");
 
-        command.SetHandler(async () =>
+        command.SetHandler((bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.StartServiceModeAsync();
-        });
+            runnerService.StartServiceModeAsync().GetAwaiter().GetResult();
+        }, verboseOption);
 
         return command;
     }
@@ -182,13 +210,14 @@ public class Program
     {
         var command = new Command("cleanup", "Clean up stored API key and runner configuration");
 
-        command.SetHandler(async () =>
+        command.SetHandler((bool verbose) =>
         {
+            VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
-            await runnerService.CleanupAsync();
-        });
+            runnerService.CleanupAsync().GetAwaiter().GetResult();
+        }, verboseOption);
 
         return command;
     }
