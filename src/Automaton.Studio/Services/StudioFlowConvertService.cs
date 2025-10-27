@@ -1,8 +1,8 @@
-﻿using Automaton.Core.Extensions;
-using Automaton.Core.Interfaces;
+﻿using Automaton.Core.Interfaces;
 using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.Studio.Services;
 
@@ -45,17 +45,24 @@ public class StudioFlowConvertService : IFlowConvertService<StudioFlow>
     {
         var workflowSteps = new Dictionary<string, WorkflowStep>();
 
-        foreach (var step in steps)
+        // Create a scope to resolve scoped services (like CustomStep which requires ScriptEngineHost)
+        using (var scope = serviceProvider.CreateScope())
         {
-            var workflowStep = serviceProvider.GetService(step.FindType()) as WorkflowStep;
-            
-            if (workflowStep == null)
-            {
-                throw new InvalidOperationException($"Could not resolve WorkflowStep for type {step.FindType()?.Name ?? "null"}. Make sure the step is registered in the service container.");
-            }
+            var scopedProvider = scope.ServiceProvider;
 
-            UpdateStep(ref workflowStep, step, workflowDefinition);
-            workflowSteps.Add(step.Id, workflowStep);
+            foreach (var step in steps)
+            {
+                var stepType = step.FindType();
+                var workflowStep = scopedProvider.GetService(stepType) as WorkflowStep;
+
+                if (workflowStep == null)
+                {
+                    throw new InvalidOperationException($"Could not resolve WorkflowStep for type {stepType?.Name ?? "null"}. Make sure the step is registered in the service container.");
+                }
+
+                UpdateStep(ref workflowStep, step, workflowDefinition);
+                workflowSteps.Add(step.Id, workflowStep);
+            }
         }
 
         return workflowSteps;
