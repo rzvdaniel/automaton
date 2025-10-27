@@ -63,7 +63,7 @@ public class CustomStep : WorkflowStep
         }
         finally
         {
-            this.scriptHost.ScriptTextWritten -= OnScriptTextWrittenLocal;
+            scriptHost.ScriptTextWritten -= OnScriptTextWrittenLocal;
         }     
     }
 
