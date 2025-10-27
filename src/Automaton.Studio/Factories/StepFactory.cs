@@ -30,7 +30,16 @@ public class StepFactory
 
     public IEnumerable<StepExplorerModel> GetSteps()
     {
-        return explorerSteps.Values;
+        // Move "My Steps" (or "Custom Steps") to the top if present
+        const string myStepsCategory = "My Steps";
+        var allCategories = explorerSteps.Values.ToList();
+        var mySteps = allCategories.FirstOrDefault(x => x.Name == myStepsCategory);
+        if (mySteps != null)
+        {
+            allCategories.Remove(mySteps);
+            allCategories.Insert(0, mySteps);
+        }
+        return allCategories;
     }
 
     public IEnumerable<StepExplorerModel> GetCoreSteps()
