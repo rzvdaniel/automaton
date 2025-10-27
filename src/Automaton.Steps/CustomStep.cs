@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
+using Automaton.Steps.Enums;
 
 namespace Automaton.Steps;
 
@@ -25,9 +26,18 @@ public class CustomStep : WorkflowStep
 
     protected override Task<ExecutionResult> RunAsync(StepExecutionContext context)
     {
+        var result = ExecutionResult.Next();
+        var logs = new List<string>();
+
+        void OnScriptTextWrittenLocal(object sender, string text)
+        {
+            logger.Information("{Text}", text);
+            logs.Add(text);
+        }
+
         try
         {
-            this.scriptHost.ScriptTextWritten += OnScriptTextWritten;
+            scriptHost.ScriptTextWritten += OnScriptTextWrittenLocal;
 
             var resource = new ScriptResource()
             {
@@ -48,11 +58,12 @@ public class CustomStep : WorkflowStep
                 }
             }
 
-            return Task.FromResult(ExecutionResult.Next());
+            result.InternalLogs = logs;
+            return Task.FromResult(result);
         }
         finally
         {
-            scriptHost.ScriptTextWritten -= OnScriptTextWritten;
+            this.scriptHost.ScriptTextWritten -= OnScriptTextWrittenLocal;
         }     
     }
 
@@ -71,11 +82,6 @@ public class CustomStep : WorkflowStep
 
             CodeInputVariables.Add(variable);
         }
-    }
-
-    private void OnScriptTextWritten(object sender, string text)
-    {
-        logger.Information("{Text}", text);
     }
 
     private string GetContentType()

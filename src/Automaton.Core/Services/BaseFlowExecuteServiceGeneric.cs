@@ -153,7 +153,15 @@ namespace Automaton.Core.Services
                     var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
                     await AddLogWithNotification(workflowExecution, "Information", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
 
-                    await step.ExecuteAsync(context);
+                    var stepResult = await step.ExecuteAsync(context);
+
+                    if (stepResult.InternalLogs != null && stepResult.InternalLogs.Any())
+                    {
+                        foreach (var log in stepResult.InternalLogs)
+                        {
+                            await AddLogWithNotification(workflowExecution, "Debug", log, step.Id, step.Name, cancellationToken: cancellationToken);
+                        }
+                    }
 
                     var stepCompleteMessage = $"Completed step: {step.Name}";
                     await AddLogWithNotification(workflowExecution, "Information", stepCompleteMessage, step.Id, step.Name, cancellationToken: cancellationToken);

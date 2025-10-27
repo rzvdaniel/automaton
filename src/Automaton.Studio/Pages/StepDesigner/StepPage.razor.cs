@@ -28,8 +28,8 @@ partial class StepPage : ComponentBase, IDisposable
 
     private static readonly List<string> CustomStepLanguages =
     [
-        Automaton.Steps.CustomStepLanguage.Python,
-        Automaton.Steps.CustomStepLanguage.Batch
+        CustomStepLanguage.Python,
+        CustomStepLanguage.Batch
     ];
 
     // Computed properties for Razor UI binding

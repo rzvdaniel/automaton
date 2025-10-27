@@ -18,15 +18,11 @@ using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Pages.Runners;
 using Automaton.Studio.Services;
 using Automaton.Studio.Shared;
-using Automaton.Studio.Steps.AddVariable;
 using Automaton.Studio.Steps.EmitLog;
 using Automaton.Studio.Steps.ExecuteFlow;
 using Automaton.Studio.Steps.ExecutePython;
 using Automaton.Studio.Steps.If;
 using Automaton.Studio.Steps.Sequence;
-using Automaton.Studio.Steps.Test;
-using Automaton.Studio.Steps.TestAssert;
-using Automaton.Studio.Steps.TestReport;
 using Automaton.Studio.Steps.While;
 using Blazored.LocalStorage;
 using Microsoft.Extensions.Configuration;
@@ -133,14 +129,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowSettingsViewModel>();
 
         // Studio steps
-        // Note: Must be transient for some reason
         services.AddTransient<EmitLogStep>();
-        services.AddTransient<AddVariableStep>();
         services.AddTransient<ExecutePythonStep>();
         services.AddTransient<ExecuteFlowStep>();
-        services.AddTransient<TestStep>();
-        services.AddTransient<TestAssertStep>();
-        services.AddTransient<TestReportStep>();
         services.AddTransient<SequenceStep>();
         services.AddTransient<SequenceEndStep>();
         services.AddTransient<IfStep>();

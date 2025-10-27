@@ -1,4 +1,4 @@
-﻿namespace Automaton.Steps
+﻿namespace Automaton.Steps.Enums
 {
     public class CustomStepLanguage
     {
