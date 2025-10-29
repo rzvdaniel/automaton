@@ -1,26 +1,167 @@
 ﻿@using Automaton.Core.Models;
 @inherits BaseStepVariable
 
-<FormItem Label="@Variable.Name" Class="variable-label">
-    <Row>
-        <Col Md="23">
-            <Input Type="InputType.Text" TValue="string" Value="Variable.Value?.ToString()" OnChange="(x) => { Variable.Value = x; }" Placeholder="@Variable.Description" />
-        </Col>
-        <Col Md="1">
-            <Popover Content="@Variable.Description" Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})" Class="variable-description">
-                <Button Shape="@ButtonShape.Circle" Icon="info" Size="@ButtonSize.Small"></Button>
-            </Popover>
-        </Col>
-    </Row>
-</FormItem>
+<div class="input-variable-card">
+	<div class="variable-header">
+		<div class="variable-info">
+			<span class="variable-name">@Variable.Name</span>
+			<span class="variable-type-badge">TEXT</span>
+		</div>
+		<div class="variable-actions">
+			<Tooltip Title="@Variable.Description" Placement="@Placement.Top">
+				<Button Class="action-btn info-btn" 
+						Shape="@ButtonShape.Circle" 
+						Icon="info-circle" 
+						Size="@ButtonSize.Small"
+						Type="@ButtonType.Text">
+				</Button>
+			</Tooltip>
+		</div>
+	</div>
+	
+	<div class="variable-input-wrapper">
+		<Input Class="modern-input" 
+			   Type="InputType.Text" 
+			   TValue="string" 
+			   Value="Variable.Value?.ToString()" 
+			   OnChange="(x) => { Variable.Value = x; }" 
+			   Placeholder="@(string.IsNullOrEmpty(Variable.Description) ? $"Enter {Variable.Name}..." : Variable.Description)"
+			   Size="@InputSize.Large" />
+		@if (!string.IsNullOrEmpty(Variable.Value?.ToString()))
+		{
+			<div class="input-indicator">
+				<Icon Type="check-circle" Theme="@IconThemeType.Fill" Style="color: #52c41a; font-size: 12px;" />
+			</div>
+		}
+	</div>
+</div>
 
 <style>
-    .variable-description {
-        padding: 4px 0px 0px 4px;
-    }
+	.input-variable-card {
+		background: linear-gradient(to right, #ffffff 0%, #fafbfc 100%);
+		border: 1px solid #e1e4e8;
+		border-radius: 8px;
+		padding: 14px 16px;
+		margin-bottom: 12px;
+		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+	}
 
-    .variable-label {
-        margin: 0px;
-        padding: 0px;
-    }
+	.input-variable-card:hover {
+		border-color: #40a9ff;
+		box-shadow: 0 2px 8px rgba(64, 169, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+
+	.input-variable-card:focus-within {
+		border-color: #1890ff;
+		box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1), 0 2px 8px rgba(24, 144, 255, 0.15);
+	}
+
+	.variable-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 10px;
+	}
+
+	.variable-info {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex: 1;
+	}
+
+	.variable-name {
+		font-size: 14px;
+		font-weight: 600;
+		color: #24292f;
+		letter-spacing: -0.01em;
+	}
+
+	.variable-type-badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px 8px;
+		background: linear-gradient(135deg, #36d1dc 0%, #5b86e5 100%);
+		color: white;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.5px;
+		text-transform: uppercase;
+		box-shadow: 0 2px 4px rgba(54, 209, 220, 0.25);
+	}
+
+	.variable-actions {
+		display: flex;
+		gap: 4px;
+		align-items: center;
+	}
+
+	.action-btn {
+		transition: all 0.2s ease;
+		opacity: 0.6;
+	}
+
+	.action-btn:hover {
+		opacity: 1;
+		transform: scale(1.1);
+	}
+
+	.info-btn:hover {
+		color: #1890ff !important;
+	}
+
+	.variable-input-wrapper {
+		position: relative;
+	}
+
+	.modern-input {
+		font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace !important;
+		font-size: 13px !important;
+		border-radius: 6px !important;
+		border: 1.5px solid #d9d9d9 !important;
+		background: #ffffff !important;
+		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+		padding-right: 36px !important;
+	}
+
+	.modern-input:hover {
+		border-color: #40a9ff !important;
+		background: #fafbfc !important;
+	}
+
+	.modern-input:focus {
+		border-color: #1890ff !important;
+		box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1) !important;
+		background: #ffffff !important;
+	}
+
+	.modern-input::placeholder {
+		color: #bfbfbf;
+		font-style: italic;
+		font-size: 12px;
+	}
+
+	.input-indicator {
+		position: absolute;
+		right: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		display: flex;
+		align-items: center;
+		pointer-events: none;
+		animation: fadeIn 0.2s ease-in;
+	}
+
+	@@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-50%) scale(0.8);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(-50%) scale(1);
+		}
+	}
 </style>
