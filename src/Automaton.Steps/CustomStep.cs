@@ -47,7 +47,7 @@ public class CustomStep : WorkflowStep
                 Content = Code
             };
 
-            // ✅ UPDATED: Convert input variables to JSON strings
+            // ✅ Convert input variables to JSON strings
             // ⚠️ IMPORTANT: Only serialize non-string values
             // If value is already a string, pass it as-is to avoid double-encoding
             var inputVariablesDictionary = CodeInputVariables.ToDictionary(
@@ -60,7 +60,7 @@ public class CustomStep : WorkflowStep
             {
                 if (scriptVariables.ContainsKey(variable.Value.Id))
                 {
-                    // ✅ UPDATED: scriptVariables values are already JSON strings
+                    // ✅ scriptVariables values are already JSON strings
                     variable.Value.Value = scriptVariables[variable.Value.Id];
                     context.Workflow.SetVariable(variable.Value);
                 }

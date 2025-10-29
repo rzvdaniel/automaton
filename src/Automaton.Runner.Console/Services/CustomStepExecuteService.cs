@@ -34,7 +34,7 @@ public class CustomStepExecuteService
 
         try
         {
-            // ✅ UPDATED: Convert input variables - avoid double-encoding strings
+            // ✅ Convert input variables - avoid double-encoding strings
             // Only serialize non-string values; strings are passed as-is
             var inputVars = customStep.CodeInputVariables?
                 .ToDictionary(v => v.Name, v => InputVariableConverter.ConvertToString(v.Value))

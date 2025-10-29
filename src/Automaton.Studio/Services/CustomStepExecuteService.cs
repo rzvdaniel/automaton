@@ -152,7 +152,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
     protected void ExecuteAsync(CustomStep step)
     {
-        // ✅ UPDATED: Convert input variables - avoid double-encoding strings
+        // ✅ Convert input variables - avoid double-encoding strings
         // Only serialize non-string values; strings are passed as-is
         var inputVariablesDictionary = step.InputVariables.ToDictionary(
             x => x.Name,
@@ -177,7 +177,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 var variable = step.OutputVariables.FirstOrDefault(v => v.Name == kvp.Key);
                 if (variable != null)
                 {
-                    // ✅ UPDATED: Use value directly (already JSON string)
+                    // ✅ Use value directly (already JSON string)
                     variable.Value = kvp.Value;
                 }
             }
@@ -225,7 +225,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 Content = code
             };
 
-            // ✅ UPDATED: Convert input variables - avoid double-encoding strings
+            // ✅ Convert input variables - avoid double-encoding strings
             // Only serialize non-string values; strings are passed as-is
             var stringInputs = inputVariables.ToDictionary(
                 kvp => kvp.Key,
@@ -255,7 +255,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             ScriptErrorInfo? errorInfo = null;
             if (hasErrors)
             {
-                // ✅ UPDATED: Convert string dictionary to object dictionary for error parser
+                // ✅ Convert string dictionary to object dictionary for error parser
                 var scriptVariablesAsObject = scriptVariables.ToDictionary(
                     kvp => kvp.Key,
                     kvp => (object)kvp.Value);

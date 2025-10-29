@@ -34,7 +34,7 @@ public class ExecutePython : WorkflowStep
             Content = Code
         };
 
-        // ✅ UPDATED: Convert input variables - avoid double-encoding strings
+        // ✅ Convert input variables - avoid double-encoding strings
         // Only serialize non-string values; strings are passed as-is
         var inputVariablesDictionary = CodeInputVariables.ToDictionary(
             x => x.Name,
@@ -46,7 +46,7 @@ public class ExecutePython : WorkflowStep
         {
             if (scriptVariables.ContainsKey(variable.Name))
             {
-                // ✅ UPDATED: scriptVariables values are already JSON strings
+                // ✅ scriptVariables values are already JSON strings
                 variable.Value = scriptVariables[variable.Name];
                 context.Workflow.SetVariable(variable);
             }

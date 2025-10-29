@@ -63,7 +63,7 @@ calculated = number * 2
 ";
 
         // Act
-        // ? UPDATED: Convert object dictionary to string dictionary
+        // Convert object dictionary to string dictionary
       var stringInputs = new Dictionary<string, string>();
         var variables = engine.Execute(code, stringInputs);
 
@@ -72,7 +72,7 @@ calculated = number * 2
         variables.Should().ContainKey("number");
         variables.Should().ContainKey("calculated");
       
-        // ? UPDATED: Deserialize JSON strings for comparison
+        // Deserialize JSON strings for comparison
         JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Hello from Python!");
         JsonConvert.DeserializeObject<long>(variables["number"]).Should().Be(42L);
         JsonConvert.DeserializeObject<long>(variables["calculated"]).Should().Be(84L);
@@ -95,7 +95,7 @@ greeting_message = f'{greeting} {name}!
 result_length = len(greeting_message)
 ";
 
-        // ? UPDATED: Convert inputs to JSON strings
+        // Convert inputs to JSON strings
         var inputs = new Dictionary<string, string>
         {
             ["greeting"] = JsonConvert.SerializeObject("Hello"),
@@ -109,7 +109,7 @@ result_length = len(greeting_message)
         variables.Should().ContainKey("greeting_message");
    variables.Should().ContainKey("result_length");
         
-   // ? UPDATED: Deserialize JSON strings for comparison
+   // Deserialize JSON strings for comparison
    JsonConvert.DeserializeObject<string>(variables["greeting_message"]).Should().Be("Hello World!");
         JsonConvert.DeserializeObject<long>(variables["result_length"]).Should().Be(12L);
     }

@@ -62,7 +62,7 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
         // Delegate to Execute and wrap in ScriptExecutionResult
         var variables = Execute(code, inputs);
 
-        // ✅ UPDATED: Serialize all output variables to JSON strings
+        // ✅ Serialize all output variables to JSON strings
         var result = new ScriptExecutionResult
         {
             OutputVariables = variables

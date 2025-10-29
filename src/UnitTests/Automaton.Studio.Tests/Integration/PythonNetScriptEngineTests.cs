@@ -31,7 +31,7 @@ is_boolean = True
         variables.Should().ContainKey("calculated");
         variables.Should().ContainKey("is_boolean");
 
-        // ✅ UPDATED: Deserialize JSON strings for comparison
+        // ✅ Deserialize JSON strings for comparison
         JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Hello from Python.NET!");
         JsonConvert.DeserializeObject<long>(variables["number"]).Should().Be(42L);
         JsonConvert.DeserializeObject<long>(variables["calculated"]).Should().Be(84L);
@@ -51,7 +51,7 @@ result_length = len(greeting_message)
 doubled_number = input_number * 2
 ";
 
-        // ✅ UPDATED: Convert inputs to JSON strings
+        // ✅ Convert inputs to JSON strings
         var inputs = new Dictionary<string, string>
         {
             ["greeting"] = JsonConvert.SerializeObject("Hello"),
@@ -67,7 +67,7 @@ doubled_number = input_number * 2
         variables.Should().ContainKey("result_length");
         variables.Should().ContainKey("doubled_number");
 
-        // ✅ UPDATED: Deserialize JSON strings for comparison
+        // ✅ Deserialize JSON strings for comparison
         JsonConvert.DeserializeObject<string>(variables["greeting_message"]).Should().Be("Hello World");
         JsonConvert.DeserializeObject<long>(variables["result_length"]).Should().Be(11L);
         JsonConvert.DeserializeObject<long>(variables["doubled_number"]).Should().Be(42L);
@@ -93,7 +93,7 @@ result = 'Script completed'
 
         // Assert
         variables.Should().ContainKey("result");
-        // ✅ UPDATED: Deserialize JSON string for comparison
+        // ✅ Deserialize JSON string for comparison
         JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Script completed");
 
         capturedOutput.Should().NotBeEmpty();
@@ -134,7 +134,7 @@ json_test_passed = parsed_data['value'] == 123
         variables.Should().ContainKey("json_test_passed");
         variables.Should().ContainKey("python_version");
 
-        // ✅ UPDATED: Deserialize JSON strings for comparison
+        // ✅ Deserialize JSON strings for comparison
         JsonConvert.DeserializeObject<bool>(variables["json_test_passed"]).Should().Be(true);
         var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
         resultStr.Should().StartWith("Python");
@@ -168,7 +168,7 @@ except Exception as e:
         variables.Should().ContainKey("result");
         variables.Should().ContainKey("requests_available");
 
-        // ✅ UPDATED: Deserialize JSON strings for comparison
+        // ✅ Deserialize JSON strings for comparison
         var requestsAvailable = JsonConvert.DeserializeObject<bool>(variables["requests_available"]);
         var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
 
@@ -239,14 +239,14 @@ result = 'Modern Python syntax test completed'
         variables.Should().ContainKey("squares_dict");
         variables.Should().ContainKey("result");
 
-        // ✅ UPDATED: Deserialize JSON strings for comparison
+        // ✅ Deserialize JSON strings for comparison
         var greeting = JsonConvert.DeserializeObject<string>(variables["greeting"]);
         greeting.Should().Be("Hello, World!");
 
         var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
         resultStr.Should().Be("Modern Python syntax test completed");
 
-        // ✅ UPDATED: Deserialize list from JSON string
+        // ✅ Deserialize list from JSON string
         var numbers = JsonConvert.DeserializeObject<List<long>>(variables["numbers"]);
         numbers.Should().NotBeNull();
         numbers.Should().HaveCount(5);
