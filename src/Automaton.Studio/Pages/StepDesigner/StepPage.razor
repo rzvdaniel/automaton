@@ -305,14 +305,14 @@
                                                                 <b>Input Variables</b>
                                                             </HeaderTemplate>
                                                             <ChildContent>
-                                                                <div class="scrollable-list">
-                                                                    @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
-                                                                    {
-                                                                        <div class="variable">
-                                                                            <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" Parameters="GetVariableComponentParameters(inputVariable)" />
-                                                                        </div>
-                                                                    }
-                                                                </div>
+                                                              <div class="scrollable-list">
+     @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
+           {
+  <div class="variable">
+       <InputVariable Variable="@inputVariable" />
+         </div>
+  }
+        </div>
                                                             </ChildContent>
                                                         </Panel>
                                                     </Collapse>
