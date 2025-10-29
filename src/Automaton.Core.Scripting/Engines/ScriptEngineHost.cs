@@ -28,7 +28,9 @@ public class ScriptEngineHost : IScriptEngineHost
                 outputEngine.OutputCallback = line => ScriptTextWritten?.Invoke(this, line);
             }
 
-            return engine.Execute(resource.Content, inputs);
+            var result = engine.Execute(resource.Content, inputs);
+
+            return result;
         }
         catch (Exception ex)
         {

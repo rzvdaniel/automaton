@@ -21,58 +21,6 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        public void GetValueType_WhenTypeIsText_ShouldReturnStringType()
-        {
-            // Arrange
-            var variable = new StepVariable { Name = "test", Type = VariableType.Text };
-
-            // Act
-            var result = variable.GetValueType();
-
-            // Assert
-            Assert.That(result, Is.EqualTo(typeof(string)));
-        }
-
-        [Test]
-        public void GetValueType_WhenTypeIsBoolean_ShouldReturnBoolType()
-        {
-            // Arrange
-            var variable = new StepVariable { Name = "test", Type = VariableType.Boolean };
-
-            // Act
-            var result = variable.GetValueType();
-
-            // Assert
-            Assert.That(result, Is.EqualTo(typeof(bool)));
-        }
-
-        [Test]
-        public void GetValueType_WhenTypeIsNumber_ShouldReturnDecimalType()
-        {
-            // Arrange
-            var variable = new StepVariable { Name = "test", Type = VariableType.Number };
-
-            // Act
-            var result = variable.GetValueType();
-
-            // Assert
-            Assert.That(result, Is.EqualTo(typeof(decimal)));
-        }
-
-        [Test]
-        public void GetValueType_WhenTypeIsDate_ShouldReturnDateTimeType()
-        {
-            // Arrange
-            var variable = new StepVariable { Name = "test", Type = VariableType.Date };
-
-            // Act
-            var result = variable.GetValueType();
-
-            // Assert
-            Assert.That(result, Is.EqualTo(typeof(DateTime)));
-        }
-
-        [Test]
         public void GetValue_WithDirectValue_ShouldReturnValue()
         {
             // Arrange
@@ -144,27 +92,6 @@ namespace Automaton.Core.Tests.Models
 
             // Assert
             Assert.That(variable.Type, Is.EqualTo(VariableType.String));
-        }
-
-        [Test]
-        public void Properties_ShouldBeSettable()
-        {
-            // Arrange & Act
-            var variable = new StepVariable
-            {
-                Id = "testId",
-                Name = "testName",
-                Type = VariableType.Number,
-                Value = 42,
-                Description = "Test description"
-            };
-
-            // Assert
-            Assert.That(variable.Id, Is.EqualTo("testId"));
-            Assert.That(variable.Name, Is.EqualTo("testName"));
-            Assert.That(variable.Type, Is.EqualTo(VariableType.Number));
-            Assert.That(variable.Value, Is.EqualTo(42));
-            Assert.That(variable.Description, Is.EqualTo("Test description"));
         }
     }
 }

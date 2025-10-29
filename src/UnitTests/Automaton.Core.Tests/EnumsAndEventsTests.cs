@@ -12,10 +12,6 @@ namespace Automaton.Core.Tests.Enums
         {
             // Assert that all expected enum values exist
             Assert.That(Enum.IsDefined(typeof(VariableType), VariableType.String));
-            Assert.That(Enum.IsDefined(typeof(VariableType), VariableType.Text));
-            Assert.That(Enum.IsDefined(typeof(VariableType), VariableType.Boolean));
-            Assert.That(Enum.IsDefined(typeof(VariableType), VariableType.Number));
-            Assert.That(Enum.IsDefined(typeof(VariableType), VariableType.Date));
         }
 
         [Test]
@@ -23,10 +19,6 @@ namespace Automaton.Core.Tests.Enums
         {
             // Verify enum values maintain their expected integer representations
             Assert.That((int)VariableType.String, Is.EqualTo(0));
-            Assert.That((int)VariableType.Text, Is.EqualTo(1));
-            Assert.That((int)VariableType.Boolean, Is.EqualTo(2));
-            Assert.That((int)VariableType.Number, Is.EqualTo(3));
-            Assert.That((int)VariableType.Date, Is.EqualTo(4));
         }
     }
 

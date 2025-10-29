@@ -191,73 +191,8 @@
                                                         {
                                                             <div class="info-button">
                                                                 <Popover Content="@inputVariable.Description" 
-                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
-                                                                    <Button Shape="@ButtonShape.Circle" 
-                                                                            Icon="info" 
-                                                                            Size="@ButtonSize.Small" />
-                                                                </Popover>
-                                                            </div>
-                                                        }
-                                                    </div>
-                                                }
-                                                else if (inputVariable.Type == VariableType.Text)
-                                                {
-                                                    <div class="input-with-info">
-                                                        <div class="input-control">
-                                                            <TextArea Value="@inputVariable.Value?.ToString()" 
-                                                                      OnChange="(x) => { inputVariable.Value = x; }" 
-                                                                      Rows="3" />
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
-                                                        {
-                                                            <div class="info-button">
-                                                                <Popover Content="@inputVariable.Description" 
-                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
-                                                                    <Button Shape="@ButtonShape.Circle" 
-                                                                            Icon="info" 
-                                                                            Size="@ButtonSize.Small" />
-                                                                </Popover>
-                                                            </div>
-                                                        }
-                                                    </div>
-                                                }
-                                                else if (inputVariable.Type == VariableType.Number)
-                                                {
-                                                    <div class="input-with-info">
-                                                        <div class="input-control">
-                                                            <AntDesign.InputNumber OnChange="(decimal x) => { inputVariable.Value = x; }" 
-                                                                                   Style="width: 100%;" />
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
-                                                        {
-                                                            <div class="info-button">
-                                                                <Popover Content="@inputVariable.Description" 
-                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
-                                                                    <Button Shape="@ButtonShape.Circle" 
-                                                                            Icon="info" 
-                                                                            Size="@ButtonSize.Small" />
-                                                                </Popover>
-                                                            </div>
-                                                        }
-                                                    </div>
-                                                }
-                                                else if (inputVariable.Type == VariableType.Boolean)
-                                                {
-                                                    <div class="input-with-info">
-                                                        <div class="input-control">
-                                                            <Switch CheckedChildren="True" 
-                                                                    UnCheckedChildren="False" 
-                                                                    Checked="@(bool.Parse(inputVariable.Value?.ToString() ?? "false"))"
-                                                                    OnChange="(bool x) => { inputVariable.Value = x; }" />
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
-                                                        {
-                                                            <div class="info-button">
-                                                                <Popover Content="@inputVariable.Description" 
-                                                                         Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
-                                                                    <Button Shape="@ButtonShape.Circle" 
-                                                                            Icon="info" 
-                                                                            Size="@ButtonSize.Small" />
+                                                                    Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                    <Button Shape="@ButtonShape.Circle"  Icon="info" Size="@ButtonSize.Small" />
                                                                 </Popover>
                                                             </div>
                                                         }
@@ -561,12 +496,7 @@
     {
         return type switch
         {
-            VariableType.String => typeof(StringVariable),
-            VariableType.Text => typeof(TextVariable),
-            VariableType.Boolean => typeof(BooleanVariable),
-            VariableType.Number => typeof(NumericVariable),
-            VariableType.Date => typeof(DateVariable),
-            _ => throw new NotImplementedException()
+            _ => typeof(StringVariable)
         };
     }
 

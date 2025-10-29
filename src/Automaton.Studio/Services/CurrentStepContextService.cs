@@ -217,16 +217,11 @@ public class CurrentStepContextService : ICurrentStepContextService
         return created;
     }
 
-    private string GetDefaultValueForType(Automaton.Core.Enums.VariableType type)
+    private string GetDefaultValueForType(Core.Enums.VariableType type)
     {
         return type switch
         {
-            Automaton.Core.Enums.VariableType.String => "",
-            Automaton.Core.Enums.VariableType.Text => "",
-            Automaton.Core.Enums.VariableType.Number => "0",
-            Automaton.Core.Enums.VariableType.Boolean => "false",
-            Automaton.Core.Enums.VariableType.Date => DateTime.Now.ToString("yyyy-MM-dd"),
-            _ => ""
+            _ => string.Empty
         };
     }
 }

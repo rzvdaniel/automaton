@@ -483,11 +483,6 @@ public class StudioMcpToolProvider : IMcpToolProvider
     {
         return variableType switch
         {
-            Automaton.Core.Enums.VariableType.String => "example text",
-            Automaton.Core.Enums.VariableType.Text => "multi-line text example",
-            Automaton.Core.Enums.VariableType.Number => 42,
-            Automaton.Core.Enums.VariableType.Boolean => true,
-            Automaton.Core.Enums.VariableType.Date => DateTime.Now.ToString("yyyy-MM-dd"),
             _ => "example value"
         };
     }
@@ -495,16 +490,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
     /// <summary>
     /// Get default value for a variable type
     /// </summary>
-    private object GetDefaultValue(Automaton.Core.Enums.VariableType variableType)
+    private object GetDefaultValue(Core.Enums.VariableType variableType)
     {
         return variableType switch
         {
-            Automaton.Core.Enums.VariableType.String => "",
-            Automaton.Core.Enums.VariableType.Text => "",
-            Automaton.Core.Enums.VariableType.Number => 0,
-            Automaton.Core.Enums.VariableType.Boolean => false,
-            Automaton.Core.Enums.VariableType.Date => DateTime.MinValue.ToString("yyyy-MM-dd"),
-            _ => ""
+            _ => string.Empty
         };
     }
 

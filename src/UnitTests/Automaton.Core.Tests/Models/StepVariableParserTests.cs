@@ -46,33 +46,6 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        [Description("Concatenate numeric variables - should perform mathematical addition")]
-        public void ConcatenateNumberVariables_ShouldPerformMathematicalAddition()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = 1m, Type = VariableType.Number });
-            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = 2m, Type = VariableType.Number });
-
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A% + %B%", Type = VariableType.Number };
-            var result = stepVariableParser.Parse(stringVariable, workflow);
-
-            Assert.That(result, Is.EqualTo(3));
-        }
-
-        [Test]
-        [Description("Concatenate numeric variables with numbers")]
-        public void ConcatenateNumberVariablesWithNumbers_ShouldPerformMathematicalAddition()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = 1m, Type = VariableType.Number });
-
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A% + 1", Type = VariableType.Number };
-            var result = stepVariableParser.Parse(stringVariable, workflow);
-
-            Assert.That(result, Is.EqualTo(2));
-        }
-
-        [Test]
         [Description("Parse expression with no variables should return original value")]
         public void Parse_WithNoVariables_ShouldReturnOriginalValue()
         {
@@ -109,48 +82,6 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        [Description("Parse numeric expression with subtraction")]
-        public void Parse_NumericExpressionWithSubtraction_ShouldCalculateCorrectly()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = 10m, Type = VariableType.Number });
-            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = 3m, Type = VariableType.Number });
-
-            var numericVariable = new StepVariable { Id = "C", Name = "C", Value = "%A% - %B%", Type = VariableType.Number };
-            var result = stepVariableParser.Parse(numericVariable, workflow);
-
-            Assert.That(result, Is.EqualTo(7));
-        }
-
-        [Test]
-        [Description("Parse numeric expression with multiplication")]
-        public void Parse_NumericExpressionWithMultiplication_ShouldCalculateCorrectly()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = 4m, Type = VariableType.Number });
-            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = 5m, Type = VariableType.Number });
-
-            var numericVariable = new StepVariable { Id = "C", Name = "C", Value = "%A% * %B%", Type = VariableType.Number };
-            var result = stepVariableParser.Parse(numericVariable, workflow);
-
-            Assert.That(result, Is.EqualTo(20));
-        }
-
-        [Test]
-        [Description("Parse numeric expression with division")]
-        public void Parse_NumericExpressionWithDivision_ShouldCalculateCorrectly()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = 10m, Type = VariableType.Number });
-            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = 2m, Type = VariableType.Number });
-
-            var numericVariable = new StepVariable { Id = "C", Name = "C", Value = "%A% / %B%", Type = VariableType.Number };
-            var result = stepVariableParser.Parse(numericVariable, workflow);
-
-            Assert.That(result, Is.EqualTo(5));
-        }
-
-        [Test]
         [Description("Parse with StepVariable as input value")]
         public void Parse_WithStepVariableAsValue_ShouldParseCorrectly()
         {
@@ -163,19 +94,6 @@ namespace Automaton.Core.Tests.Models
             var result = stepVariableParser.Parse(outerVariable, workflow);
 
             Assert.That(result, Is.EqualTo("test"));
-        }
-
-        [Test]
-        public void Parse_BooleanVariableType_ShouldReturnBooleanValue()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = true, Type = VariableType.Boolean });
-
-            var boolVariable = new StepVariable { Id = "B", Name = "B", Value = "%A%", Type = VariableType.Boolean };
-            var result = stepVariableParser.Parse(boolVariable, workflow);
-
-            // Boolean variables that don't match specific types fall back to string handling
-            Assert.That(result, Is.EqualTo(true));
         }
 
         [Test]
@@ -228,27 +146,6 @@ namespace Automaton.Core.Tests.Models
         public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
         {
             Assert.Throws<ArgumentNullException>(() => new StepVariableParser(null!));
-        }
-
-        [Test]
-        [Description("Parse complex expression with multiple variable types")]
-        public void Parse_ComplexExpression_ShouldHandleCorrectly()
-        {
-            var workflow = new Workflow();
-            workflow.Variables.Add("Name", new StepVariable { Id = "Name", Name = "Name", Value = "John", Type = VariableType.String });
-            workflow.Variables.Add("Age", new StepVariable { Id = "Age", Name = "Age", Value = 25m, Type = VariableType.Number });
-
-            var stringVariable = new StepVariable 
-            { 
-                Id = "Result", 
-                Name = "Result", 
-                Value = "User %Name% is %Age% years old", 
-                Type = VariableType.String 
-            };
-            
-            var result = stepVariableParser.Parse(stringVariable, workflow);
-
-            Assert.That(result, Is.EqualTo("User John is 25 years old"));
         }
 
         [Test]

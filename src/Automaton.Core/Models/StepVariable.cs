@@ -15,10 +15,6 @@ public class StepVariable
     {
         return Type switch
         {
-            VariableType.String or VariableType.Text => typeof(string),
-            VariableType.Boolean => typeof(bool),
-            VariableType.Number => typeof(decimal),
-            VariableType.Date => typeof(DateTime),
             _ => typeof(string),
         };
     }
