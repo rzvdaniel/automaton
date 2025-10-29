@@ -1,5 +1,6 @@
 ﻿@using Automaton.Core.Models;
 @using Microsoft.AspNetCore.Components
+@using Newtonsoft.Json.Linq;
 
 <FormItem Label="@Variable.Name" Class="variable-label">
 	<Row>
@@ -23,10 +24,10 @@
 
 <!-- Modal for viewing full value -->
 <Modal Title="@($"{Variable.Name}")"
-	   @bind-Visible="isValueModalVisible"
+	 @bind-Visible="isValueModalVisible"
 	   Width="800">
 		<div class="value-viewer">
-			<pre>@(Variable.Value?.ToString() ?? "(empty)")</pre>
+			<pre>@GetFormattedValue()</pre>
 		</div>
 </Modal>
 
@@ -39,6 +40,28 @@
 	private void ShowValueModal()
 	{
 		isValueModalVisible = true;
+	}
+
+	private string GetFormattedValue()
+	{
+		if (Variable?.Value == null)
+			return "(empty)";
+
+		var valueStr = Variable.Value.ToString();
+		if (string.IsNullOrEmpty(valueStr))
+			return "(empty)";
+
+		try
+		{
+			// Try to parse as JSON and format it
+			var obj = JToken.Parse(valueStr);
+			return obj.ToString(Newtonsoft.Json.Formatting.Indented);
+		}
+		catch
+		{
+			// If not JSON, return as-is
+			return valueStr;
+		}
 	}
 }
 
@@ -88,13 +111,13 @@
 		overflow-y: auto;
 	}
 
-		.value-viewer pre {
-			margin: 0;
-			font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-			font-size: 12px;
-			line-height: 1.5;
-			color: #333;
-			white-space: pre-wrap;
-			word-wrap: break-word;
-		}
+	.value-viewer pre {
+		margin: 0;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		font-size: 12px;
+		line-height: 1.5;
+		color: #333;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	}
 </style>
