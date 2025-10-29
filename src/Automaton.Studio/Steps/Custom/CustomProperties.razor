@@ -176,33 +176,25 @@
                                             </div>
                                         </div>
                                         <div class="variable-value">
-                                            <div class="custom-variable-input">
-                                                @if (inputVariable.Type == VariableType.String)
-                                                {
-                                                    <div class="input-with-info">
-                                                        <div class="input-control">
-                                                            <Input Type="InputType.Text" 
-                                                                   TValue="string" 
-                                                                   Value="inputVariable.Value?.ToString()" 
-                                                                   OnChange="(x) => { inputVariable.Value = x; }" 
-                                                                   Placeholder="@inputVariable.Description" />
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(inputVariable.Description))
-                                                        {
-                                                            <div class="info-button">
-                                                                <Popover Content="@inputVariable.Description" 
-                                                                    Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
-                                                                    <Button Shape="@ButtonShape.Circle"  Icon="info" Size="@ButtonSize.Small" />
-                                                                </Popover>
-                                                            </div>
-                                                        }
+                                            <div class="custom-variable-input">                                               
+                                                <div class="input-with-info">
+                                                    <div class="input-control">
+                                                        <Input Type="InputType.Text" 
+                                                                TValue="string" 
+                                                                Value="inputVariable.Value?.ToString()" 
+                                                                OnChange="(x) => { inputVariable.Value = x; }" 
+                                                                Placeholder="@inputVariable.Description" />
                                                     </div>
-                                                }
-                                                else
-                                                {
-                                                    <DynamicComponent Type="GetVariableComponent(inputVariable.Type)" 
-                                                                      Parameters="GetVariableComponentParameters(inputVariable)" />
-                                                }
+                                                    @if (!string.IsNullOrEmpty(inputVariable.Description))
+                                                    {
+                                                        <div class="info-button">
+                                                            <Popover Content="@inputVariable.Description" 
+                                                                Trigger="@(new AntDesign.Trigger[] { AntDesign.Trigger.Click})">
+                                                                <Button Shape="@ButtonShape.Circle"  Icon="info" Size="@ButtonSize.Small" />
+                                                            </Popover>
+                                                        </div>
+                                                    }
+                                                </div>                   
                                             </div>
                                         </div>
                                     </div>
@@ -490,19 +482,6 @@
         {
             step.SetOutputVariable(stepVariable);
         }
-    }
-
-    private Type GetVariableComponent(VariableType type)
-    {
-        return type switch
-        {
-            _ => typeof(StringVariable)
-        };
-    }
-
-    private Dictionary<string, object> GetVariableComponentParameters(Core.Models.StepVariable customStepVariable)
-    {
-        return new Dictionary<string, object>() { { "Variable", customStepVariable } };
     }
 
     private void NavigateToStepEditor()
