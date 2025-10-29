@@ -1,0 +1,141 @@
+@using Automaton.Core.Models;
+@using Newtonsoft.Json.Linq;
+@using Microsoft.AspNetCore.Components
+
+<FormItem Label="@Variable.Name" Class="variable-label">
+	<Row>
+		<Col Md="22">
+		<div class="json-output-summary">
+			<span class="json-summary-text">@GetJsonSummary()</span>
+		</div>
+		</Col>
+		<Col Md="2">
+		<Button Type="@ButtonType.Primary"
+				Icon="file-json"
+				Size="@ButtonSize.Small"
+				OnClick="ShowJsonModal">
+			View JSON
+		</Button>
+		</Col>
+	</Row>
+</FormItem>
+
+<!-- JSON Viewer Modal -->
+<Modal Title="@($"{Variable.Name} - JSON Output")"
+	@bind-Visible="isJsonModalVisible"
+	Width="800">
+	<div class="json-viewer" style="max-height: 70vh; overflow-y: auto;">
+		<pre>@GetFormattedJson()</pre>
+	</div>
+	<Footer>
+		<Button OnClick="CopyJsonToClipboard" Icon="copy">Copy to Clipboard</Button>
+		<Button OnClick="() => isJsonModalVisible = false">Close</Button>
+	</Footer>
+</Modal>
+
+@code {
+	[Parameter]
+	public StepVariable Variable { get; set; }
+
+	private bool isJsonModalVisible = false;
+
+	private string GetJsonSummary()
+	{
+		if (Variable?.Value == null)
+			return "(empty)";
+
+		try
+		{
+			var jsonString = Variable.Value?.ToString() ?? string.Empty;
+
+			// Try to parse and get a brief summary
+			var obj = JToken.Parse(jsonString);
+
+			return obj.Type switch
+			{
+				JTokenType.Array => $"Array with {((JArray)obj).Count} items",
+				JTokenType.Object => $"Object with {((JObject)obj).Count} properties",
+				_ => jsonString.Length > 100 ? jsonString.Substring(0, 100) + "..." : jsonString
+			};
+		}
+		catch
+		{
+			// If not valid JSON, just show truncated string
+			var value = Variable.Value?.ToString() ?? string.Empty;
+			return value.Length > 100 ? value.Substring(0, 100) + "..." : value;
+		}
+	}
+
+	private string GetFormattedJson()
+	{
+		if (Variable?.Value == null)
+			return "(empty)";
+
+		try
+		{
+			var jsonString = Variable.Value?.ToString() ?? string.Empty;
+			var obj = JToken.Parse(jsonString);
+			return obj.ToString(Newtonsoft.Json.Formatting.Indented);
+		}
+		catch
+		{
+			// If not valid JSON, just return as-is
+			return Variable.Value?.ToString() ?? "(empty)";
+		}
+	}
+
+	private void ShowJsonModal()
+	{
+		isJsonModalVisible = true;
+	}
+
+	private async Task CopyJsonToClipboard()
+	{
+		var jsonString = GetFormattedJson();
+		// In Blazor, you'd typically use JavaScript interop for clipboard
+		// For now, this is a placeholder - you can implement via JS interop
+		await Task.CompletedTask;
+	}
+}
+
+<style>
+	.variable-label {
+		margin: 0px;
+		padding: 0px;
+	}
+
+	.json-output-summary {
+		display: flex;
+		align-items: center;
+		padding: 8px 12px;
+		background-color: #fafafa;
+		border: 1px solid #d9d9d9;
+		border-radius: 4px;
+		min-height: 32px;
+	}
+
+	.json-summary-text {
+		color: #666;
+		font-size: 13px;
+		word-break: break-word;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+	}
+
+	.json-viewer {
+		background-color: #f5f5f5;
+		border: 1px solid #e8e8e8;
+		border-radius: 4px;
+		padding: 16px;
+		overflow-x: auto;
+	}
+
+		.json-viewer pre {
+			margin: 0;
+			font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+			font-size: 12px;
+			line-height: 1.5;
+			color: #333;
+			white-space: pre-wrap;
+			word-wrap: break-word;
+		}
+</style>

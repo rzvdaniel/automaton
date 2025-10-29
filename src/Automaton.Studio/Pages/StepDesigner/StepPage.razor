@@ -4,6 +4,7 @@
 @using Automaton.Studio.Models
 @using Blazored.FluentValidation;
 @using Automaton.Core.Enums;
+@using Automaton.Studio.Steps.Custom.Variables
 
 <Layout>
     <Content>
@@ -318,20 +319,20 @@
                                                     <Collapse DefaultActiveKey="@(new[] { "output" })" Bordered="false" Class="variables-collapse-panel">
                                                         <Panel Key="output">
                                                             <HeaderTemplate>
-                                                                <b>Output Variables</b>
-                                                            </HeaderTemplate>
-                                                            <ChildContent>
-                                                                <div class="scrollable-list">
-                                                                    @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
-                                                                    {
-                                                                        <div class="variable">
-                                                                            <DynamicComponent Type="GetVariableComponent(outputVariable.Type)" Parameters="GetVariableComponentParameters(outputVariable)" />
-                                                                        </div>
-                                                                    }
-                                                                </div>
-                                                            </ChildContent>
-                                                        </Panel>
-                                                    </Collapse>
+                                                               <b>Output Variables</b>
+                                                               </HeaderTemplate>
+                                                             <ChildContent>
+                                                                   <div class="scrollable-list">
+                                                                  @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
+                                                             {
+                                                                <div class="variable">
+                                                                     <OutputVariable Variable="@outputVariable" />
+                                                                    </div>
+                                                               }
+                                                            </div>
+                                                        </ChildContent>
+                                                              </Panel>
+                                                           </Collapse>
                                                 </div>
                                             </div>
                                         </TabPane>
