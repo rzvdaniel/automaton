@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
+using Automaton.Core.Utilities;
 using Automaton.Steps.Enums;
 using Newtonsoft.Json;
 
@@ -47,9 +48,11 @@ public class CustomStep : WorkflowStep
             };
 
             // ✅ UPDATED: Convert input variables to JSON strings
+            // ⚠️ IMPORTANT: Only serialize non-string values
+            // If value is already a string, pass it as-is to avoid double-encoding
             var inputVariablesDictionary = CodeInputVariables.ToDictionary(
                 x => x.Name,
-                x => JsonConvert.SerializeObject(x.Value));
+                x => InputVariableConverter.ConvertToString(x.Value));
 
             var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 

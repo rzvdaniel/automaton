@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
+using Automaton.Core.Utilities;
 using Automaton.Runner.Console.Models;
 using Newtonsoft.Json;
 
@@ -33,9 +34,10 @@ public class CustomStepExecuteService
 
         try
         {
-            // ✅ UPDATED: Convert input variables to JSON strings
+            // ✅ UPDATED: Convert input variables - avoid double-encoding strings
+            // Only serialize non-string values; strings are passed as-is
             var inputVars = customStep.CodeInputVariables?
-                .ToDictionary(v => v.Name, v => JsonConvert.SerializeObject(v.Value))
+                .ToDictionary(v => v.Name, v => InputVariableConverter.ConvertToString(v.Value))
                 ?? new Dictionary<string, string>();
 
             // Convert output variable definitions
