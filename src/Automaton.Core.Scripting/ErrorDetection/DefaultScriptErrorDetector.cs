@@ -5,7 +5,7 @@
 /// </summary>
 public class DefaultScriptErrorDetector : IScriptErrorDetector
 {
-    public string? DetectError(IDictionary<string, dynamic> scriptVariables, string consoleOutput)
+    public string? DetectError(IDictionary<string, string> scriptVariables, string consoleOutput)
     {
         // Priority 1: Check for explicit error variable
         if (scriptVariables.ContainsKey("error"))

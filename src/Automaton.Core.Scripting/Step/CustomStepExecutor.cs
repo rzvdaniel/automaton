@@ -33,7 +33,7 @@ public class CustomStepExecutor
     (
         string code,
         string language,
-        Dictionary<string, object> inputVariables,
+        Dictionary<string, string> inputVariables,
         IEnumerable<string>? outputVariableNames = null
     )
     {
@@ -89,11 +89,11 @@ public class CustomStepExecutor
         }
     }
 
-    private IDictionary<string, dynamic> ExecuteScript
+    private IDictionary<string, string> ExecuteScript
     (
         string code,
         string language,
-        Dictionary<string, object> inputVariables
+        Dictionary<string, string> inputVariables
     )
     {
         var contentType = _languageProvider.GetContentType(language);
@@ -106,22 +106,24 @@ public class CustomStepExecutor
         return _scriptHost.Execute(resource, inputVariables);
     }
 
-    private Dictionary<string, object> ExtractOutputVariables
+    private Dictionary<string, string> ExtractOutputVariables
     (
         IEnumerable<string>? outputVariableNames,
-        IDictionary<string, dynamic> scriptVariables
+        IDictionary<string, string> scriptVariables
     )
     {
         if (outputVariableNames == null || !outputVariableNames.Any())
         {
-            return new Dictionary<string, object>();
+            return new Dictionary<string, string>();
         }
 
+        // Output variables are already JSON strings from ExecuteScript
+        // Just pass them through directly
         return outputVariableNames
             .ToDictionary(
                 outputVar => outputVar,
                 outputVar => scriptVariables.ContainsKey(outputVar) ? 
-                (object)(scriptVariables[outputVar]?.ToString() ?? string.Empty) : 
+                (scriptVariables[outputVar] ?? string.Empty) : 
                 string.Empty);
     }
 
@@ -130,7 +132,7 @@ public class CustomStepExecutor
         string output,
         DateTime started,
         Stopwatch stopwatch,
-        Dictionary<string, object> outputVars
+        Dictionary<string, string> outputVars
     )
     {
         var displayOutput = !string.IsNullOrEmpty(output) ? output : "Custom step executed successfully";
@@ -153,7 +155,7 @@ public class CustomStepExecutor
         string output,
         DateTime started,
         Stopwatch stopwatch,
-        Dictionary<string, object> outputVars
+        Dictionary<string, string> outputVars
     )
     {
         return new CustomStepExecutionResult
@@ -184,7 +186,7 @@ public class CustomStepExecutor
             Started = started,
             Finished = DateTime.UtcNow,
             ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-            OutputVariables = new Dictionary<string, object>()
+            OutputVariables = new Dictionary<string, string>()
         };
     }
 }

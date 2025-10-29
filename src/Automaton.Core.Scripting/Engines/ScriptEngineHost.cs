@@ -1,6 +1,4 @@
-﻿using Automaton.Core.Scripting.Step;
-
-namespace Automaton.Core.Scripting.Engines;
+﻿namespace Automaton.Core.Scripting.Engines;
 
 public class ScriptEngineHost : IScriptEngineHost
 {
@@ -13,7 +11,7 @@ public class ScriptEngineHost : IScriptEngineHost
         this.configuration = configuration;
     }
 
-    public IDictionary<string, dynamic> Execute(ScriptResource resource, IDictionary<string, object> inputs)
+    public IDictionary<string, string> Execute(ScriptResource resource, IDictionary<string, string> inputs)
     {
         try
         {

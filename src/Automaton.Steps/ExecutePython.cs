@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
+using Newtonsoft.Json;
 
 namespace Automaton.Steps;
 
@@ -32,7 +33,10 @@ public class ExecutePython : WorkflowStep
             Content = Code
         };
 
-        var inputVariablesDictionary = CodeInputVariables.ToDictionary(x => x.Name, x => (object)x.Value);
+        // ✅ UPDATED: Convert input variables to JSON strings
+        var inputVariablesDictionary = CodeInputVariables.ToDictionary(
+            x => x.Name,
+            x => JsonConvert.SerializeObject(x.Value));
 
         var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 
@@ -40,7 +44,8 @@ public class ExecutePython : WorkflowStep
         {
             if (scriptVariables.ContainsKey(variable.Name))
             {
-                variable.Value = scriptVariables[variable.Name].ToString();
+                // ✅ UPDATED: scriptVariables values are already JSON strings
+                variable.Value = scriptVariables[variable.Name];
                 context.Workflow.SetVariable(variable);
             }
         }

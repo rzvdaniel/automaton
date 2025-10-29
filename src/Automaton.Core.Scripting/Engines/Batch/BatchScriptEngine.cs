@@ -1,11 +1,12 @@
 ﻿using Automaton.Core.Scripting.Engines;
+using Newtonsoft.Json;
 using System.Diagnostics;
 
 public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
 {
     public Action<string>? OutputCallback { get; set; }
 
-    public IDictionary<string, object> Execute(string code, IDictionary<string, object> inputs)
+    public IDictionary<string, string> Execute(string code, IDictionary<string, string> inputs)
     {
         var tempFile = Path.GetTempFileName() + ".bat";
         File.WriteAllText(tempFile, code);
@@ -16,7 +17,7 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
             {
                 FileName = tempFile,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true, // Add this line
+                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -45,7 +46,7 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
         var output = string.Join("\n", outputLines);
         var error = string.Join("\n", errorLines);
 
-        var result = new Dictionary<string, object> { { "output", output } };
+        var result = new Dictionary<string, string> { { "output", output } };
         if (!string.IsNullOrWhiteSpace(error))
         {
             var errorMessage = $"ERROR: {error}";
@@ -56,16 +57,19 @@ public class BatchScriptEngine : IScriptEngine, IOutputCallbackScriptEngine
         return result;
     }
 
-    public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, object> inputs)
+    public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, string> inputs)
     {
         // Delegate to Execute and wrap in ScriptExecutionResult
         var variables = Execute(code, inputs);
 
+        // ✅ UPDATED: Serialize all output variables to JSON strings
         var result = new ScriptExecutionResult
         {
             OutputVariables = variables
                 .Where(kvp => kvp.Key != "error" && kvp.Key != "output")
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                .ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => JsonConvert.SerializeObject(kvp.Value)),  // ← JSON serialize
             StandardOutput = variables.ContainsKey("output") ? variables["output"]?.ToString() ?? string.Empty : string.Empty
         };
 

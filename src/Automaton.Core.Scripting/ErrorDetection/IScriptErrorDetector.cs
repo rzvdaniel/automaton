@@ -10,5 +10,5 @@ public interface IScriptErrorDetector
     /// Detect if an error occurred during script execution.
     /// </summary>
     /// <returns>Error message if error detected, null otherwise.</returns>
-    string? DetectError(IDictionary<string, dynamic> scriptVariables, string consoleOutput);
+    string? DetectError(IDictionary<string, string> scriptVariables, string consoleOutput);
 }

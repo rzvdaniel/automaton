@@ -7,6 +7,6 @@
     {
         event EventHandler<string> ScriptTextWritten;
 
-        IDictionary<string, dynamic> Execute(ScriptResource resource, IDictionary<string, object> inputs);
+        IDictionary<string, string> Execute(ScriptResource resource, IDictionary<string, string> inputs);
     }
 }

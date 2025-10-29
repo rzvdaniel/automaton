@@ -2,6 +2,7 @@
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Runner.Console.Models;
+using Newtonsoft.Json;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -32,10 +33,10 @@ public class CustomStepExecuteService
 
         try
         {
-            // Prepare input variables dictionary
+            // ✅ UPDATED: Convert input variables to JSON strings
             var inputVars = customStep.CodeInputVariables?
-                .ToDictionary(v => v.Name, v => v.Value)
-                ?? new Dictionary<string, object>();
+                .ToDictionary(v => v.Name, v => JsonConvert.SerializeObject(v.Value))
+                ?? new Dictionary<string, string>();
 
             // Convert output variable definitions
             var ouputVariableNames = customStep.CodeOutputVariables?
@@ -60,7 +61,9 @@ public class CustomStepExecuteService
                     Error = result.Error,
                     Started = result.Started,
                     Finished = result.Finished,
-                    OutputVariables = result.OutputVariables ?? new Dictionary<string, object>()
+                    OutputVariables = result.OutputVariables.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => (object)kvp.Value) ?? new Dictionary<string, object>()
                 };
             }
 
@@ -76,7 +79,9 @@ public class CustomStepExecuteService
                 Error = null,
                 Started = result.Started,
                 Finished = result.Finished,
-                OutputVariables = result.OutputVariables ?? new Dictionary<string, object>()
+                OutputVariables = result.OutputVariables.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (object)kvp.Value) ?? new Dictionary<string, object>()
             };
         }
         catch (Exception ex)

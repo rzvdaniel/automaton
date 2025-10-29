@@ -1,7 +1,8 @@
-using Python.Runtime;
+﻿using Python.Runtime;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
 
 namespace Automaton.Core.Scripting.Engines.Python
 {
@@ -178,7 +179,7 @@ namespace Automaton.Core.Scripting.Engines.Python
             return output;
         }
 
-        public IDictionary<string, object> Execute(string code, IDictionary<string, object> inputs)
+        public IDictionary<string, string> Execute(string code, IDictionary<string, string> inputs)
         {
             InitializePython();
 
@@ -189,16 +190,19 @@ namespace Automaton.Core.Scripting.Engines.Python
             }
         }
 
-        public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, object> inputs)
+        public ScriptExecutionResult ExecuteScript(string code, IDictionary<string, string> inputs)
         {
             // Delegate to Execute and wrap in ScriptExecutionResult
             var variables = Execute(code, inputs);
 
+            // Serialize all output variables to JSON strings
             var result = new ScriptExecutionResult
             {
                 OutputVariables = variables
                     .Where(kvp => !kvp.Key.StartsWith("error") && !kvp.Key.StartsWith("stackTrace"))
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => JsonConvert.SerializeObject(kvp.Value)),  // JSON serialize
                 StandardOutput = variables.ContainsKey("stdout") ? variables["stdout"]?.ToString() ?? string.Empty : string.Empty,
                 StandardError = variables.ContainsKey("stderr") ? variables["stderr"]?.ToString() ?? string.Empty : string.Empty
             };
@@ -222,9 +226,9 @@ namespace Automaton.Core.Scripting.Engines.Python
             return result;
         }
 
-        private IDictionary<string, object> ExecuteInGil(string code, IDictionary<string, object> inputs)
+        private IDictionary<string, string> ExecuteInGil(string code, IDictionary<string, string> inputs)
         {
-            var variables = new Dictionary<string, object>();
+            var variables = new Dictionary<string, string>();
             outputBuffer.Clear();
 
             using (Py.GIL())
@@ -391,67 +395,25 @@ _captured_output.close()
             return pyList;
         }
 
-        private object ConvertFromPython(PyObject pyObj)
+        /// <summary>
+        /// Converts a Python object to a string representation.
+        /// ✅ SIMPLIFIED: All output is returned as string (will be JSON serialized later).
+        /// No need for typed conversion - just convert to string representation.
+        /// </summary>
+        private string ConvertFromPython(PyObject pyObj)
         {
             if (pyObj.IsNone())
-                return null!;
+                return "null";
 
             try
             {
-                if (pyObj.GetPythonType().Name == "bool")
-                {
-                    return pyObj.As<bool>();
-                }
+                // For all types, convert to string which will be JSON serialized by the caller
+                return pyObj.ToString() ?? string.Empty;
             }
-            catch { }
-
-            if (PyString.IsStringType(pyObj))
-                return pyObj.As<string>();
-
-            if (PyInt.IsIntType(pyObj))
+            catch
             {
-                try { return pyObj.As<long>(); } catch { }
-                try { return pyObj.As<int>(); } catch { }
+                return string.Empty;
             }
-
-            if (PyFloat.IsFloatType(pyObj))
-            {
-                try { return pyObj.As<double>(); } catch { }
-            }
-
-            if (pyObj.IsIterable() && !PyString.IsStringType(pyObj))
-            {
-                if (pyObj.HasAttr("keys"))
-                {
-                    var dict = new Dictionary<string, object>();
-                    try
-                    {
-                        var keys = pyObj.GetAttr("keys").Invoke();
-                        for (int i = 0; i < keys.Length(); i++)
-                        {
-                            var key = keys[i];
-                            var keyStr = key.As<string>();
-                            var value = pyObj.GetItem(key);
-                            dict[keyStr] = ConvertFromPython(value);
-                        }
-                        return dict;
-                    }
-                    catch { }
-                }
-
-                try
-                {
-                    var list = new List<object>();
-                    for (int i = 0; i < pyObj.Length(); i++)
-                    {
-                        list.Add(ConvertFromPython(pyObj[i]));
-                    }
-                    return list;
-                }
-                catch { }
-            }
-
-            return pyObj.ToString() ?? string.Empty;
         }
 
         public void Dispose()

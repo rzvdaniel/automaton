@@ -18,5 +18,5 @@ public class CustomStepExecutionResult
 
     public long ExecutionTimeMs { get; set; }
 
-    public Dictionary<string, object>? OutputVariables { get; set; }
+    public Dictionary<string, string>? OutputVariables { get; set; }
 }

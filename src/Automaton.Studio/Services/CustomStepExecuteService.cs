@@ -5,6 +5,7 @@ using Automaton.Core.Scripting.Languages;
 using Automaton.Core.Scripting.Step;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
+using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Text;
 
@@ -150,7 +151,10 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
 
     protected void ExecuteAsync(CustomStep step)
     {
-        var inputVariablesDictionary = step.InputVariables.ToDictionary(x => x.Name, x => x.Value);
+        // ✅ UPDATED: Convert input variables to JSON strings
+        var inputVariablesDictionary = step.InputVariables.ToDictionary(
+            x => x.Name,
+            x => JsonConvert.SerializeObject(x.Value));
 
         // Convert output variable definitions
         var outputVariableNames = step.OutputVariables?
@@ -171,7 +175,8 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 var variable = step.OutputVariables.FirstOrDefault(v => v.Name == kvp.Key);
                 if (variable != null)
                 {
-                    variable.Value = kvp.Value?.ToString() ?? string.Empty;
+                    // ✅ UPDATED: Use value directly (already JSON string)
+                    variable.Value = kvp.Value;
                 }
             }
         }
@@ -218,8 +223,13 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 Content = code
             };
 
+            // ✅ UPDATED: Convert input variables to JSON strings
+            var stringInputs = inputVariables.ToDictionary(
+                kvp => kvp.Key,
+                kvp => JsonConvert.SerializeObject(kvp.Value));
+
             // Execute on a background thread to avoid blocking
-            var scriptVariables = await Task.Run(() => _scriptHost.Execute(resource, inputVariables));
+            var scriptVariables = await Task.Run(() => _scriptHost.Execute(resource, stringInputs));
 
             stopwatch.Stop();
 
@@ -242,7 +252,11 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             ScriptErrorInfo? errorInfo = null;
             if (hasErrors)
             {
-                errorInfo = errorParser.ParseError(standardOutput, standardError, scriptVariables);
+                // ✅ UPDATED: Convert string dictionary to object dictionary for error parser
+                var scriptVariablesAsObject = scriptVariables.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (object)kvp.Value);
+                errorInfo = errorParser.ParseError(standardOutput, standardError, scriptVariablesAsObject);
 
                 _logger.Warning("Script execution failed: {ErrorType} - {Message}",
                     errorInfo?.ErrorType ?? "Unknown",

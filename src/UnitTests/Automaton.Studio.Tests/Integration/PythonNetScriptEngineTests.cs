@@ -1,6 +1,7 @@
-using Automaton.Core.Scripting;
+﻿using Automaton.Core.Scripting;
 using Automaton.Core.Scripting.Engines.Python;
 using FluentAssertions;
+using Newtonsoft.Json;
 using NUnit.Framework;
 
 namespace Automaton.Studio.Tests.Integration;
@@ -13,7 +14,7 @@ public class PythonNetScriptEngineTests
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 result = 'Hello from Python.NET!'
 number = 42
@@ -22,18 +23,19 @@ is_boolean = True
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        var variables = engine.Execute(code, new Dictionary<string, string>());
 
         // Assert
         variables.Should().ContainKey("result");
         variables.Should().ContainKey("number");
         variables.Should().ContainKey("calculated");
         variables.Should().ContainKey("is_boolean");
-        
-        variables["result"].ToString().Should().Be("Hello from Python.NET!");
-        variables["number"].Should().Be(42L);
-        variables["calculated"].Should().Be(84L);
-        variables["is_boolean"].Should().Be(true);
+
+        // ✅ UPDATED: Deserialize JSON strings for comparison
+        JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Hello from Python.NET!");
+        JsonConvert.DeserializeObject<long>(variables["number"]).Should().Be(42L);
+        JsonConvert.DeserializeObject<long>(variables["calculated"]).Should().Be(84L);
+        JsonConvert.DeserializeObject<bool>(variables["is_boolean"]).Should().Be(true);
     }
 
     [Test]
@@ -41,7 +43,7 @@ is_boolean = True
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 # Use input variables
 greeting_message = f'{greeting} {name}'
@@ -49,11 +51,12 @@ result_length = len(greeting_message)
 doubled_number = input_number * 2
 ";
 
-        var inputs = new Dictionary<string, object>
+        // ✅ UPDATED: Convert inputs to JSON strings
+        var inputs = new Dictionary<string, string>
         {
-            ["greeting"] = "Hello",
-            ["name"] = "World",
-            ["input_number"] = 21
+            ["greeting"] = JsonConvert.SerializeObject("Hello"),
+            ["name"] = JsonConvert.SerializeObject("World"),
+            ["input_number"] = JsonConvert.SerializeObject(21)
         };
 
         // Act
@@ -63,10 +66,11 @@ doubled_number = input_number * 2
         variables.Should().ContainKey("greeting_message");
         variables.Should().ContainKey("result_length");
         variables.Should().ContainKey("doubled_number");
-        
-        variables["greeting_message"].ToString().Should().Be("Hello World");
-        variables["result_length"].Should().Be(11L);
-        variables["doubled_number"].Should().Be(42L);
+
+        // ✅ UPDATED: Deserialize JSON strings for comparison
+        JsonConvert.DeserializeObject<string>(variables["greeting_message"]).Should().Be("Hello World");
+        JsonConvert.DeserializeObject<long>(variables["result_length"]).Should().Be(11L);
+        JsonConvert.DeserializeObject<long>(variables["doubled_number"]).Should().Be(42L);
     }
 
     [Test]
@@ -75,9 +79,9 @@ doubled_number = input_number * 2
         // Arrange
         var engine = new PythonNetScriptEngine();
         var capturedOutput = new List<string>();
-        
+
         engine.OutputCallback = output => capturedOutput.Add(output);
-        
+
         var code = @"
 print('This is a test message')
 print('This is another message')
@@ -85,12 +89,13 @@ result = 'Script completed'
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        var variables = engine.Execute(code, new Dictionary<string, string>());
 
         // Assert
         variables.Should().ContainKey("result");
-        variables["result"].ToString().Should().Be("Script completed");
-        
+        // ✅ UPDATED: Deserialize JSON string for comparison
+        JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Script completed");
+
         capturedOutput.Should().NotBeEmpty();
         var allOutput = string.Join("", capturedOutput);
         allOutput.Should().Contain("This is a test message");
@@ -102,7 +107,7 @@ result = 'Script completed'
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 import os
 import sys
@@ -122,15 +127,17 @@ json_test_passed = parsed_data['value'] == 123
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        var variables = engine.Execute(code, new Dictionary<string, string>());
 
         // Assert
         variables.Should().ContainKey("result");
         variables.Should().ContainKey("json_test_passed");
         variables.Should().ContainKey("python_version");
-        
-        variables["json_test_passed"].Should().Be(true);
-        variables["result"].ToString().Should().StartWith("Python");
+
+        // ✅ UPDATED: Deserialize JSON strings for comparison
+        JsonConvert.DeserializeObject<bool>(variables["json_test_passed"]).Should().Be(true);
+        var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
+        resultStr.Should().StartWith("Python");
     }
 
     [Test]
@@ -139,7 +146,7 @@ json_test_passed = parsed_data['value'] == 123
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 try:
     import requests
@@ -150,25 +157,29 @@ except ImportError as e:
     requests_available = False
     result = f'Requests module not available: {str(e)}'
 except Exception as e:
-    requests_available = False
+ requests_available = False
     result = f'Error importing requests: {str(e)}'
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        var variables = engine.Execute(code, new Dictionary<string, string>());
 
         // Assert
         variables.Should().ContainKey("result");
         variables.Should().ContainKey("requests_available");
-        
-        if (variables["requests_available"].Equals(true))
+
+        // ✅ UPDATED: Deserialize JSON strings for comparison
+        var requestsAvailable = JsonConvert.DeserializeObject<bool>(variables["requests_available"]);
+        var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
+
+        if (requestsAvailable)
         {
-            variables["result"].ToString().Should().Contain("imported successfully");
+            resultStr.Should().Contain("imported successfully");
         }
         else
         {
             // If requests is not available, the test will show what went wrong
-            TestContext.WriteLine($"Requests import result: {variables["result"]}");
+            TestContext.WriteLine($"Requests import result: {resultStr}");
         }
     }
 
@@ -177,14 +188,14 @@ except Exception as e:
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 # This will cause a Python error
 undefined_variable = non_existent_var + 1
 ";
 
         // Act & Assert
-        var exception = Assert.Throws<Exception>(() => engine.Execute(code, new Dictionary<string, object>()));
+        var exception = Assert.Throws<Exception>(() => engine.Execute(code, new Dictionary<string, string>()));
         exception.Message.Should().StartWith("Python Error:");
     }
 
@@ -193,7 +204,7 @@ undefined_variable = non_existent_var + 1
     {
         // Arrange
         var engine = new PythonNetScriptEngine();
-        
+
         var code = @"
 # Test modern Python features
 name = 'World'
@@ -210,7 +221,7 @@ try:
     if (length := len(greeting)) > 5:
         walrus_result = f'Length is {length}'
     else:
-        walrus_result = 'Short message'
+      walrus_result = 'Short message'
     walrus_supported = True
 except SyntaxError:
     walrus_result = 'Walrus operator not supported in this Python version'
@@ -220,20 +231,25 @@ result = 'Modern Python syntax test completed'
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        var variables = engine.Execute(code, new Dictionary<string, string>());
 
         // Assert
         variables.Should().ContainKey("greeting");
         variables.Should().ContainKey("numbers");
         variables.Should().ContainKey("squares_dict");
         variables.Should().ContainKey("result");
-        
-        variables["greeting"].ToString().Should().Be("Hello, World!");
-        variables["result"].ToString().Should().Be("Modern Python syntax test completed");
-        
-        // Verify list comprehension worked
-        var numbers = variables["numbers"] as List<object>;
+
+        // ✅ UPDATED: Deserialize JSON strings for comparison
+        var greeting = JsonConvert.DeserializeObject<string>(variables["greeting"]);
+        greeting.Should().Be("Hello, World!");
+
+        var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
+        resultStr.Should().Be("Modern Python syntax test completed");
+
+        // ✅ UPDATED: Deserialize list from JSON string
+        var numbers = JsonConvert.DeserializeObject<List<long>>(variables["numbers"]);
         numbers.Should().NotBeNull();
         numbers.Should().HaveCount(5);
+        numbers.Should().Equal(new[] { 0L, 1L, 4L, 9L, 16L });
     }
 }

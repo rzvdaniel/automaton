@@ -11,9 +11,10 @@ public class ScriptExecutionResult
     public bool Success { get; set; }
 
     /// <summary>
-    /// Output variables produced by the script
-    /// </summary>
-    public IDictionary<string, object> OutputVariables { get; set; } = new Dictionary<string, object>();
+ /// Output variables produced by the script as JSON strings.
+ /// Each value is a JSON-formatted string that consumers can deserialize as needed.
+ /// </summary>
+    public IDictionary<string, string> OutputVariables { get; set; } = new Dictionary<string, string>();
 
     /// <summary>
     /// Standard output captured during execution
@@ -25,8 +26,8 @@ public class ScriptExecutionResult
     /// </summary>
     public string StandardError { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Structured error information
+  /// <summary>
+  /// Structured error information
     /// </summary>
     public ScriptErrorInfo? Error { get; set; }
 
@@ -54,7 +55,7 @@ public class ScriptErrorInfo
     /// <summary>
     /// Full stack trace with line numbers and file information
     /// </summary>
-    public string StackTrace { get; set; } = string.Empty;
+public string StackTrace { get; set; } = string.Empty;
 
     /// <summary>
     /// Standard error output (for scripts like batch that use stderr)
@@ -72,7 +73,7 @@ public class ScriptErrorInfo
     public int? ColumnNumber { get; set; }
 
     /// <summary>
-    /// The problematic code snippet (if available)
+ /// The problematic code snippet (if available)
     /// </summary>
     public string? CodeSnippet { get; set; }
 
@@ -87,49 +88,49 @@ public class ScriptErrorInfo
     public Dictionary<string, string> AdditionalContext { get; set; } = new Dictionary<string, string>();
 
     /// <summary>
-    /// Gets a formatted error message suitable for AI model consumption
-    /// </summary>
+ /// Gets a formatted error message suitable for AI model consumption
+ /// </summary>
     public string GetFormattedErrorForAI()
     {
         var parts = new List<string>();
 
-        // Error type and message
+// Error type and message
         if (!string.IsNullOrEmpty(ErrorType))
             parts.Add($"**Error Type**: {ErrorType}");
         
         if (!string.IsNullOrEmpty(Message))
-            parts.Add($"**Message**: {Message}");
+     parts.Add($"**Message**: {Message}");
 
         // Location information
-        if (LineNumber.HasValue)
+     if (LineNumber.HasValue)
         {
             var location = $"Line {LineNumber}";
             if (ColumnNumber.HasValue)
-                location += $", Column {ColumnNumber}";
-            parts.Add($"**Location**: {location}");
+          location += $", Column {ColumnNumber}";
+        parts.Add($"**Location**: {location}");
         }
 
         // Code snippet
         if (!string.IsNullOrEmpty(CodeSnippet))
             parts.Add($"**Code**:\n```\n{CodeSnippet}\n```");
 
-        // Stack trace (most important for AI)
-        if (!string.IsNullOrEmpty(StackTrace))
-            parts.Add($"**Stack Trace**:\n```\n{StackTrace}\n```");
+    // Stack trace (most important for AI)
+  if (!string.IsNullOrEmpty(StackTrace))
+  parts.Add($"**Stack Trace**:\n```\n{StackTrace}\n```");
 
         // Additional context
         if (AdditionalContext.Any())
         {
-            parts.Add("**Additional Context**:");
-            foreach (var (key, value) in AdditionalContext)
-                parts.Add($"- {key}: {value}");
+      parts.Add("**Additional Context**:");
+  foreach (var (key, value) in AdditionalContext)
+   parts.Add($"- {key}: {value}");
         }
 
-        // Inner errors
+ // Inner errors
         if (InnerError != null)
-        {
+{
             parts.Add("\n**Caused by**:");
-            parts.Add(InnerError.GetFormattedErrorForAI());
+          parts.Add(InnerError.GetFormattedErrorForAI());
         }
 
         return string.Join("\n\n", parts);

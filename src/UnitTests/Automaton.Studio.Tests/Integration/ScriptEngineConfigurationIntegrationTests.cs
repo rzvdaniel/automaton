@@ -3,6 +3,7 @@ using Automaton.Core.Scripting.Engines;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using System.Text.Json;
 
@@ -14,17 +15,17 @@ public class ScriptEngineConfigurationIntegrationTests
     [Test]
     public void ScriptEngineFactory_WithConfiguration_ConfiguresCorrectly()
     {
-        // Arrange
-        var configData = new Dictionary<string, string?>
+     // Arrange
+      var configData = new Dictionary<string, string?>
         {
             ["Scripting:PythonPaths:0"] = Path.GetTempPath(),
-            ["Scripting:EnableDebugMode"] = "true",
+   ["Scripting:EnableDebugMode"] = "true",
             ["Scripting:AutoDetectPythonPaths"] = "false"
-        };
+    };
 
-        var configuration = new ConfigurationBuilder()
+      var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
-            .Build();
+   .Build();
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
@@ -33,10 +34,10 @@ public class ScriptEngineConfigurationIntegrationTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var scriptEngineConfig = serviceProvider.GetService<ScriptEngineConfiguration>();
+    var scriptEngineConfig = serviceProvider.GetService<ScriptEngineConfiguration>();
         var scriptEngineFactory = serviceProvider.GetService<ScriptEngineFactory>();
 
-        // Assert
+   // Assert
         scriptEngineConfig.Should().NotBeNull();
         scriptEngineConfig.AutoDetectPythonPaths.Should().BeFalse();
         scriptEngineConfig.PythonPaths.Should().Contain(Path.GetTempPath());
@@ -50,7 +51,7 @@ public class ScriptEngineConfigurationIntegrationTests
         // Arrange
         var services = new ServiceCollection();
         services.AddScripting();
-        var serviceProvider = services.BuildServiceProvider();
+  var serviceProvider = services.BuildServiceProvider();
 
         var scriptEngineFactory = serviceProvider.GetService<ScriptEngineFactory>();
         var engine = scriptEngineFactory!.GetEngine("text/x-python");
@@ -62,16 +63,19 @@ calculated = number * 2
 ";
 
         // Act
-        var variables = engine.Execute(code, new Dictionary<string, object>());
+        // ? UPDATED: Convert object dictionary to string dictionary
+      var stringInputs = new Dictionary<string, string>();
+        var variables = engine.Execute(code, stringInputs);
 
         // Assert
         variables.Should().ContainKey("result");
         variables.Should().ContainKey("number");
         variables.Should().ContainKey("calculated");
-        
-        variables["result"].ToString().Should().Be("Hello from Python!");
-        variables["number"].ToString().Should().Be("42");
-        variables["calculated"].ToString().Should().Be("84");
+      
+        // ? UPDATED: Deserialize JSON strings for comparison
+        JsonConvert.DeserializeObject<string>(variables["result"]).Should().Be("Hello from Python!");
+        JsonConvert.DeserializeObject<long>(variables["number"]).Should().Be(42L);
+        JsonConvert.DeserializeObject<long>(variables["calculated"]).Should().Be(84L);
     }
 
     [Test]
@@ -82,50 +86,52 @@ calculated = number * 2
         services.AddScripting();
         var serviceProvider = services.BuildServiceProvider();
 
-        var scriptEngineFactory = serviceProvider.GetService<ScriptEngineFactory>();
+      var scriptEngineFactory = serviceProvider.GetService<ScriptEngineFactory>();
         var engine = scriptEngineFactory!.GetEngine("text/x-python");
 
         var code = @"
 # Use input variables
-greeting_message = f'{greeting} {name}!'
+greeting_message = f'{greeting} {name}!
 result_length = len(greeting_message)
 ";
 
-        var inputs = new Dictionary<string, object>
+        // ? UPDATED: Convert inputs to JSON strings
+        var inputs = new Dictionary<string, string>
         {
-            ["greeting"] = "Hello",
-            ["name"] = "World"
+            ["greeting"] = JsonConvert.SerializeObject("Hello"),
+            ["name"] = JsonConvert.SerializeObject("World")
         };
 
-        // Act
-        var variables = engine.Execute(code, inputs);
+ // Act
+ var variables = engine.Execute(code, inputs);
 
-        // Assert
+     // Assert
         variables.Should().ContainKey("greeting_message");
-        variables.Should().ContainKey("result_length");
+   variables.Should().ContainKey("result_length");
         
-        variables["greeting_message"].ToString().Should().Be("Hello World!");
-        variables["result_length"].ToString().Should().Be("12");
+   // ? UPDATED: Deserialize JSON strings for comparison
+   JsonConvert.DeserializeObject<string>(variables["greeting_message"]).Should().Be("Hello World!");
+        JsonConvert.DeserializeObject<long>(variables["result_length"]).Should().Be(12L);
     }
 
     [Test]
     public void ScriptEngineConfiguration_WithManualConfiguration_OverridesDefaults()
     {
-        // Arrange
+      // Arrange
         var services = new ServiceCollection();
         services.AddScripting(config =>
         {
-            config.AutoDetectPythonPaths = false;
-            config.AddPythonPath(Path.GetTempPath());
-        });
+          config.AutoDetectPythonPaths = false;
+ config.AddPythonPath(Path.GetTempPath());
+      });
 
-        var serviceProvider = services.BuildServiceProvider();
+     var serviceProvider = services.BuildServiceProvider();
 
-        // Act
+    // Act
         var config = serviceProvider.GetService<ScriptEngineConfiguration>();
 
         // Assert
-        config.Should().NotBeNull();
+     config.Should().NotBeNull();
         config!.AutoDetectPythonPaths.Should().BeFalse();
         config.PythonPaths.Should().Contain(Path.GetTempPath());
     }
