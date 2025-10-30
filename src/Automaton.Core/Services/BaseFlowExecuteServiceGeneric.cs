@@ -188,6 +188,9 @@ namespace Automaton.Core.Services
             // ? Populate OutputVariables from Variables before returning
             PopulateOutputVariables(workflow);
 
+            // ? Copy OutputVariables to WorkflowExecution for return to caller
+            workflowExecution.OutputVariables = workflow.OutputVariables;
+
             return workflowExecution;
         }
 

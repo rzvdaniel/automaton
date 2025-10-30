@@ -9,5 +9,15 @@ namespace Automaton.Studio.Server.Models
         public DateTime Started { get; set; }
         public DateTime Finished { get; set; }
         public WorkflowStatus Status { get; set; }
+        
+        /// <summary>
+        /// Flow output variables - actual results from the flow execution
+        /// </summary>
+        public Dictionary<string, object?> OutputVariables { get; set; } = new();
+     
+        /// <summary>
+        /// Execution logs for debugging
+        /// </summary>
+        public List<string> Logs { get; set; } = new();
     }
 }

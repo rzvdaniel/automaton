@@ -14,6 +14,12 @@ public class WorkflowExecution : IDisposable
     public WorkflowStatus Status { get; set; }
     public string Application { get; set; }
     public IReadOnlyList<ExecutionLogEntry> Logs => logs.AsReadOnly();
+    
+    /// <summary>
+    /// Flow output variables - the actual results from the flow execution
+    /// Populated at the end of workflow execution
+    /// </summary>
+    public IDictionary<string, StepVariable> OutputVariables { get; set; } = new Dictionary<string, StepVariable>();
 
     public WorkflowExecution(Guid flowId, string application)
     {
