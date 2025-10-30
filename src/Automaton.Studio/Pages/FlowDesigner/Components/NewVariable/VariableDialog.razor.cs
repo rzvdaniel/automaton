@@ -1,7 +1,6 @@
 ﻿using AntDesign;
 using Automaton.Core.Enums;
 using Blazored.FluentValidation;
-using System.Threading.Tasks;
 
 namespace Automaton.Studio.Pages.FlowDesigner.Components.NewVariable;
 
@@ -29,5 +28,21 @@ public partial class VariableDialog : FeedbackComponent<VariableModel>
 
         // Cancel closing dialog if validation fails
         args.Cancel = !validator.Validate(options => options.IncludeAllRuleSets());
+    }
+
+    // ✅ Helper methods for value input
+    private string GetValuePlaceholder(VariableModel variable)
+    {
+        return "Enter value (API key, text, etc.)...";
+    }
+
+    private bool IsLongValue(object value)
+    {
+        // Consider value "long" if it's a string with more than 100 characters
+        if (value is string str)
+        {
+            return str.Length > 100;
+        }
+        return false;
     }
 }
