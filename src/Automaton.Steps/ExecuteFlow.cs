@@ -9,6 +9,7 @@ public class ExecuteFlow : WorkflowStep
     private readonly ConfigService configService;
     private readonly HttpClient httpClient;
     private readonly FlowExecuteService flowExecuteService;
+    private readonly StepVariableParser variableParser;
 
     public Guid FlowId { get; set; }
     public IList<StepVariable> InputVariables { get; set; }
@@ -24,25 +25,45 @@ public class ExecuteFlow : WorkflowStep
         this.configService = configService;
         this.httpClient = httpClient;
         this.flowExecuteService = workflowExecuteService;
+        this.variableParser = new StepVariableParser();
     }
 
-    protected override Task<ExecutionResult> RunAsync(StepExecutionContext context)
+    protected override async Task<ExecutionResult> RunAsync(StepExecutionContext context)
     {
-        Task.Run(async () =>
+        try
         {
-            var flow = await Load(FlowId);
+            // Load the child flow
+            var childFlow = await Load(FlowId);
 
-            var inputVariables = InputVariables.ToDictionary(x => x.Name, x => x);
+            if (childFlow == null)
+            {
+                logger.Error("Failed to load child flow {FlowId}", FlowId);
+                return ExecutionResult.Stop();
+            }
 
-            SetFlowInputVariables(flow, inputVariables);
+            logger.Information("Executing child flow '{FlowName}' (ID: {FlowId})", childFlow.Name, FlowId);
 
-            // Be explicit about which overload to use to avoid ambiguity
-            await flowExecuteService.Execute(flow, CancellationToken.None);
+            // ✅ Map parent workflow variables → child flow InputVariables
+            MapParentToChildInputs(context.Workflow, childFlow);
 
-            SetStepOutputVariables(flow.OutputVariables, context);
-        });
+            // ✅ Execute child flow
+            var childExecution = await flowExecuteService.Execute(childFlow, CancellationToken.None);
 
-        return Task.FromResult(ExecutionResult.Next());
+            logger.Information(
+                "Child flow '{FlowName}' completed with status: {Status}", 
+                childFlow.Name, 
+                childExecution.Status);
+
+            // ✅ Map child flow OutputVariables → parent workflow variables
+            MapChildToParentOutputs(childFlow, context.Workflow);
+
+            return ExecutionResult.Next();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing child flow {FlowId}", FlowId);
+            return ExecutionResult.Stop();
+        }
     }
 
     private async Task<Flow> Load(Guid id)
@@ -53,25 +74,98 @@ public class ExecuteFlow : WorkflowStep
         return flow;
     }
 
-    private static void SetFlowInputVariables(Flow flow, IDictionary<string?, StepVariable?> inputVariables)
+    /// <summary>
+    /// Map parent workflow variables to child flow InputVariables.
+    /// Supports %variable% references for flexible mapping.
+    /// </summary>
+    private void MapParentToChildInputs(Workflow parentWorkflow, Flow childFlow)
     {
-        foreach (var key in inputVariables.Keys)
+        if (InputVariables == null || !InputVariables.Any())
         {
-            if (flow.InputVariables.ContainsKey(key))
+            logger.Debug("No input variable mappings defined for ExecuteFlow step");
+            return;
+        }
+
+        logger.Information("Mapping {Count} input variables from parent to child flow", InputVariables.Count);
+
+        foreach (var inputMapping in InputVariables)
+        {
+            try
             {
-                flow.InputVariables[key] = inputVariables[key];
+                // Resolve value from parent workflow (supports %variable% references)
+                var resolvedValue = variableParser.Parse(inputMapping, parentWorkflow);
+
+                // Find matching InputVariable in child flow by name
+                var childInputVar = childFlow.InputVariables.Values
+                    .FirstOrDefault(v => v.Name.Equals(inputMapping.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (childInputVar != null)
+                {
+                    childInputVar.Value = resolvedValue;
+
+                    logger.Information(
+                        "Mapped input variable '{Name}': {ParentValue} → child flow",
+                        inputMapping.Name,
+                        inputMapping.Value);
+                }
+                else
+                {
+                    logger.Warning(
+                        "Input variable '{Name}' not found in child flow InputVariables",
+                        inputMapping.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to map input variable '{Name}'", inputMapping.Name);
             }
         }
     }
 
-    private void SetStepOutputVariables(IDictionary<string?, StepVariable?> outputVariables, StepExecutionContext context)
+    /// <summary>
+    /// Map child flow OutputVariables back to parent workflow Variables.
+    /// Makes child outputs available to subsequent steps in parent flow.
+    /// </summary>
+    private void MapChildToParentOutputs(Flow childFlow, Workflow parentWorkflow)
     {
-        foreach (var variable in OutputVariables)
+        if (OutputVariables == null || !OutputVariables.Any())
         {
-            if (outputVariables.ContainsKey(variable.Name))
+            logger.Debug("No output variable mappings defined for ExecuteFlow step");
+            return;
+        }
+
+        logger.Information("Mapping {Count} output variables from child to parent flow", OutputVariables.Count);
+
+        foreach (var outputMapping in OutputVariables)
+        {
+            try
             {
-                variable.Value = outputVariables[variable.Name].Value;
-                context.Workflow.SetVariable(variable);
+                // Find matching OutputVariable in child flow by name
+                var childOutputVar = childFlow.OutputVariables.Values
+                    .FirstOrDefault(v => v.Name.Equals(outputMapping.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (childOutputVar != null)
+                {
+                    // Set value in parent workflow Variables (makes it available to next steps)
+                    outputMapping.Value = childOutputVar.Value;
+                    outputMapping.Type = childOutputVar.Type;
+     
+                    parentWorkflow.SetVariable(outputMapping);
+
+                    logger.Information(
+                        "Mapped output variable '{Name}': child flow → parent Variables",
+                        outputMapping.Name);
+                }
+                else
+                {
+                    logger.Warning(
+                        "Output variable '{Name}' not found in child flow OutputVariables",
+                        outputMapping.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to map output variable '{Name}'", outputMapping.Name);
             }
         }
     }
