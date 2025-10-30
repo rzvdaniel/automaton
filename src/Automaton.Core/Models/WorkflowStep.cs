@@ -114,6 +114,25 @@ public abstract class WorkflowStep
             var variable = input.Value;
             var value = variable.Value;
 
+            // ✅ NEW: Auto-populate step inputs from Workflow.Variables
+            // If step input has no value, try to find matching variable by name
+            // Variables includes InputVariables + outputs from all previous steps
+            if (value == null || string.IsNullOrEmpty(value.ToString()))
+            {
+                var runtimeVar = context.Workflow.Variables.Values
+                    .FirstOrDefault(v => v.Name.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (runtimeVar != null)
+                {
+                    value = runtimeVar.Value;
+
+                    logger.Information(
+                        "Auto-populated step input '{Name}' from workflow Variables (type: {Type})",
+                        variable.Name,
+                        runtimeVar.Type);
+                }
+            }
+
             if (ShouldParseProperty(stepVariable))
             {
                 value = StepVariableParser.Parse(variable, context.Workflow);
@@ -145,14 +164,14 @@ public abstract class WorkflowStep
             if (typeof(IEnumerable<StepVariable>).IsAssignableFrom(stepVariable.PropertyType))
             {
                 if (value is IEnumerable<StepVariable> enumerableValue)
-                { 
+                {
                     var list = new List<StepVariable>();
                     foreach (var item in enumerableValue)
                     {
-                        var stepVar = new StepVariable 
+                        var stepVar = new StepVariable
                         {
                             Id = item.Id,
-                            Name = item.Name, 
+                            Name = item.Name,
                             Value = item.Value,
                             Description = item.Description,
                             Type = item.Type
