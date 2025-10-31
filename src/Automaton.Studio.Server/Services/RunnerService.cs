@@ -16,36 +16,39 @@ public class RunnerService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
-    private readonly Guid userId;
+    private readonly UserContextService userContextService;  // ✅ Store service, not userId
     private readonly Serilog.ILogger logger;
 
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
-        IHubContext<AutomatonHub> automatonHub)
+      IHubContext<AutomatonHub> automatonHub)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
-        this.userId = userContextService.GetUserId();
+        this.userContextService = userContextService;  // ✅ Store service reference
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
+    // ✅ Helper property to get current userId (respects impersonation)
+    private Guid UserId => userContextService.GetUserId();
+
     public async Task<IEnumerable<RunnerDetails>> List(CancellationToken cancellationToken)
     {
-        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == userId));
+        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId));
 
         return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
     }
 
     public async Task<IEnumerable<RunnerDetails>> List(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
-        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == userId) && runnerIds.Contains(x.Id));
+        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId) && runnerIds.Contains(x.Id));
 
         return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
     }
 
     public Runner Get(Guid id)
     {
-        var runner = dbContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
+        var runner = dbContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
 
         // Because we update Runner's ConnectionId on the fly,
         // when retrieving data we get the cached version of it
@@ -71,10 +74,10 @@ public class RunnerService
     {
         logger.Information("=== ADD RUNNER DEBUG ===");
         logger.Information("Runner model: ID={Id}, Name={Name}", runnerModel.Id, runnerModel.Name);
-        logger.Information("UserId from context: {UserId}", userId);
-        logger.Information("UserId is empty: {IsEmpty}", userId == Guid.Empty);
+        logger.Information("UserId from context: {UserId}", UserId);
+        logger.Information("UserId is empty: {IsEmpty}", UserId == Guid.Empty);
 
-        if (userId == Guid.Empty)
+        if (UserId == Guid.Empty)
         {
             logger.Error("Cannot add runner: userId is empty/null. User context not properly set from authentication");
             logger.Error("This usually means API key authentication claims are not being properly converted to user context");
@@ -92,7 +95,7 @@ public class RunnerService
         var runnerUser = new RunnerUser
         {
             RunnerId = runner.Id,
-            UserId = userId
+            UserId = UserId
         };
 
         dbContext.RunnerUsers.Add(runnerUser);
@@ -100,7 +103,7 @@ public class RunnerService
         var result = dbContext.SaveChanges();
 
         logger.Information("Runner created successfully: ID={RunnerId}, Name={Name}, UserId={UserId}, Changes={Changes}",
-            runner.Id, runner.Name, userId, result);
+            runner.Id, runner.Name, UserId, result);
         logger.Information("=== END ADD RUNNER DEBUG ===");
 
         return result;
@@ -110,7 +113,7 @@ public class RunnerService
     {
         var runner = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == runnerId && x.RunnerUsers.Any(x => x.UserId == userId));
+            .SingleOrDefault(x => x.Id == runnerId && x.RunnerUsers.Any(x => x.UserId == UserId));
 
         runner.ConnectionId = connectionId;
 
@@ -128,7 +131,7 @@ public class RunnerService
     {
         var entity = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
+            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
 
         entity.Name = runner.Name;
 
@@ -146,7 +149,7 @@ public class RunnerService
     {
         var exists = dbContext.Runners.Any(x =>
             x.Name.ToLower() == name.ToLower() &&
-            x.RunnerUsers.Any(x => x.UserId == userId));
+            x.RunnerUsers.Any(x => x.UserId == UserId));
 
         return exists;
     }
@@ -154,8 +157,8 @@ public class RunnerService
     public bool ExistsById(Guid id)
     {
         var exists = dbContext.Runners.Any(x =>
-            x.Id == id &&
-            x.RunnerUsers.Any(x => x.UserId == userId));
+         x.Id == id &&
+            x.RunnerUsers.Any(x => x.UserId == UserId));
 
         return exists;
     }
@@ -164,7 +167,7 @@ public class RunnerService
     {
         var entity = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
+            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
 
         if (entity != null)
         {
@@ -281,7 +284,7 @@ public class RunnerService
 
             // ✅ Include OutputVariables from flow execution
             OutputVariables = flowExecution.OutputVariables
-                .ToDictionary(k => k.Key,v => (object?)v.Value.Value),
+                .ToDictionary(k => k.Key, v => (object?)v.Value.Value),
 
             // ✅ Include execution logs for debugging
             Logs = flowExecution.Logs
@@ -309,7 +312,7 @@ public class RunnerService
     {
         var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
 
         if (runner == null || string.IsNullOrWhiteSpace(runner.ScriptEngineSettings))
         {
@@ -320,8 +323,8 @@ public class RunnerService
         {
             var settings = JsonSerializer.Deserialize<RunnerScriptEngineSettings>(
                 runner.ScriptEngineSettings,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
+               new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                   );
 
             return settings;
         }
@@ -339,7 +342,7 @@ public class RunnerService
     {
         var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
 
         if (runner == null)
         {
@@ -358,7 +361,7 @@ public class RunnerService
     {
         var runner = await dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower() && x.RunnerUsers.Any(x => x.UserId == userId), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower() && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
 
         if (runner == null)
         {

@@ -20,20 +20,24 @@ public class FlowsServiceFactory
     /// <summary>
     /// Create a FlowsService scoped to a specific user (for impersonation).
     /// Used by web apps to execute flows with the app owner's permissions.
+    /// 
+    /// NOTE: The returned service uses the controller's scope, not a new scope.
+    /// This ensures the DbContext stays alive for the entire request.
     /// </summary>
     public FlowsService CreateForUser(Guid userId)
     {
         logger.Debug("Creating FlowsService for user: {UserId}", userId);
 
-        using var scope = serviceProvider.CreateScope();
-
-        var userContextService = scope.ServiceProvider.GetRequiredService<UserContextService>();
+        // ? FIX: Don't create a new scope - use the current request scope
+        // The controller's scope will handle disposal at the end of the request
+        var userContextService = serviceProvider.GetRequiredService<UserContextService>();
 
         // Set impersonation context
-        using var impersonation = userContextService.ImpersonateUser(userId);
+        userContextService.ImpersonateUser(userId);
 
         // Create FlowsService with impersonated context
-        var flowsService = scope.ServiceProvider.GetRequiredService<FlowsService>();
+        // This will use the same scope as the controller, so DbContext stays alive
+        var flowsService = serviceProvider.GetRequiredService<FlowsService>();
 
         logger.Debug("FlowsService created for user: {UserId}", userId);
 

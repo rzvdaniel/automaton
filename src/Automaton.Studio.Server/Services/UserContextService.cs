@@ -48,37 +48,22 @@ public class UserContextService
     }
 
     /// <summary>
-    /// Create a scoped context for executing operations as a different user (impersonation).
+    /// Set impersonation context for the current request.
     /// Used for web apps to execute flows as the app owner rather than the viewer.
+    /// Impersonation is automatically cleared at the end of the request scope.
     /// </summary>
-    public IDisposable ImpersonateUser(Guid userId)
+    public void ImpersonateUser(Guid userId)
     {
-        logger.Debug("Starting user impersonation: {UserId}", userId);
+        logger.Debug("Setting user impersonation: {UserId}", userId);
         impersonatedUserId = userId;
-        return new ImpersonationToken(() =>
-        {
-            logger.Debug("Ending user impersonation: {UserId}", userId);
-            impersonatedUserId = null;
-        });
     }
 
-    private class ImpersonationToken : IDisposable
+    /// <summary>
+    /// Clear impersonation context (restore to authenticated user).
+    /// </summary>
+    public void ClearImpersonation()
     {
-        private readonly Action onDispose;
-        private bool disposed = false;
-
-        public ImpersonationToken(Action onDispose)
-        {
-            this.onDispose = onDispose;
-        }
-
-        public void Dispose()
-        {
-            if (!disposed)
-            {
-                onDispose();
-                disposed = true;
-            }
-        }
+        logger.Debug("Clearing user impersonation");
+        impersonatedUserId = null;
     }
 }
