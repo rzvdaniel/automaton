@@ -112,7 +112,7 @@ public class FlowExecutionController : ControllerBase
                 return NotFound(new { message = "Flow not found" });
             }
 
-            // ✅ NEW: Apply input variables from request to flow's InputVariables
+            // Apply input variables from request to flow's InputVariables
             if (request.Inputs != null && request.Inputs.Any())
             {
                 _logger.LogInformation("Applying {Count} input variables to flow {FlowId}", request.Inputs.Count, flowGuid);
@@ -125,7 +125,7 @@ public class FlowExecutionController : ControllerBase
 
                     if (matchingVar != null)
                     {
-                        matchingVar.Value = Convert.ToString(input.Value); // Change to string conversion
+                        matchingVar.Value = input.Value; // already string
                         _logger.LogInformation("Set input variable '{Name}' = {Value}", input.Key, input.Value);
                     }
                     else
@@ -157,7 +157,7 @@ public class FlowExecutionController : ControllerBase
                 // User specified runner names - find matching online runners
                 var requestedRunners = onlineRunners
                     .Where(r => request.RunnerNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase))
-                  .ToList();
+                    .ToList();
 
                 if (!requestedRunners.Any())
                 {
@@ -197,7 +197,7 @@ public class FlowExecutionController : ControllerBase
             _logger.LogInformation("Flow executed. FlowId: {FlowId}, Success: {Success}, Status: {Status}, WebApp: {Slug}",
               flowGuid, success, firstResult?.Status, webAppSlug);
 
-            // ✅ Return strongly-typed response with OutputVariables
+            // Return strongly-typed response with OutputVariables
             return Ok(new FlowExecutionResponse
             {
                 Success = success,
@@ -207,10 +207,10 @@ public class FlowExecutionController : ControllerBase
                 ExecutedAt = DateTime.UtcNow,
                 Message = success ? "Flow executed successfully" : "Flow execution failed or incomplete",
 
-                // ✅ Include actual flow output variables (what web apps need!)
+                // Include actual flow output variables (what web apps need!)
                 OutputVariables = firstResult?.OutputVariables ?? new Dictionary<string, object?>(),
 
-                // ✅ Include logs (optional, for debugging)
+                // Include logs (optional, for debugging)
                 Logs = firstResult?.Logs
             });
         }
@@ -265,7 +265,7 @@ public class FlowExecutionController : ControllerBase
                 return NotFound(new { message = "Flow not found" });
             }
 
-            // ✅ Apply input variables from request
+            // Apply input variables from request
             if (request.Inputs != null && request.Inputs.Any())
             {
                 _logger.LogInformation("Applying {Count} input variables to flow {FlowId}", request.Inputs.Count, flowGuid);
@@ -277,7 +277,7 @@ public class FlowExecutionController : ControllerBase
 
                     if (matchingVar != null)
                     {
-                        matchingVar.Value = Convert.ToString(input.Value); // Change to string conversion
+                        matchingVar.Value = input.Value; // already string
                         _logger.LogInformation("Set input variable '{Name}' = {Value}", input.Key, input.Value);
                     }
                     else
@@ -287,44 +287,44 @@ public class FlowExecutionController : ControllerBase
                 }
             }
 
-            // ✅ Execute flow directly (no runner needed!)
+            // Execute flow directly (no runner needed!)
             _logger.LogInformation("Executing flow {FlowId} locally (no runner)", flowGuid);
-     var workflowExecution = await flowExecuteService.Execute(flow, cancellationToken);
+            var workflowExecution = await flowExecuteService.Execute(flow, cancellationToken);
 
-  var success = workflowExecution.Status == WorkflowStatus.Success;
+            var success = workflowExecution.Status == WorkflowStatus.Success;
 
             _logger.LogInformation("Local flow executed. FlowId: {FlowId}, Success: {Success}, Status: {Status}",
          flowGuid, success, workflowExecution.Status);
 
- // ✅ Return response with OutputVariables
-        return Ok(new FlowExecutionResponse
-    {
-         Success = success,
-   FlowId = flowGuid,
-      Status = workflowExecution.Status.ToString(),
-          RunnerCount = 0, // No runners used
-    ExecutedAt = DateTime.UtcNow,
-          Message = success ? "Flow executed successfully (local)" : "Flow execution failed or incomplete",
+            // Return response with OutputVariables
+            return Ok(new FlowExecutionResponse
+            {
+                Success = success,
+                FlowId = flowGuid,
+                Status = workflowExecution.Status.ToString(),
+                RunnerCount = 0, // No runners used
+                ExecutedAt = DateTime.UtcNow,
+                Message = success ? "Flow executed successfully (local)" : "Flow execution failed or incomplete",
 
-                // ✅ Include OutputVariables
-        OutputVariables = workflowExecution.OutputVariables
-          .ToDictionary(k => k.Key, v => (object?)v.Value.Value),
+                // Include OutputVariables
+                OutputVariables = workflowExecution.OutputVariables
+              .ToDictionary(k => k.Key, v => (object?)v.Value.Value),
 
-      // ✅ Include logs
+                // Include logs
                 Logs = workflowExecution.Logs
-         .Select(log => $"[{log.Timestamp:HH:mm:ss}] [{log.Level}] {log.Message}")
-     .ToList()
+             .Select(log => $"[{log.Timestamp:HH:mm:ss}] [{log.Level}] {log.Message}")
+         .ToList()
             });
         }
         catch (Exception ex)
         {
- _logger.LogError(ex, "Error executing flow locally. FlowId: {FlowId}", request.FlowId);
-   return StatusCode(500, new
+            _logger.LogError(ex, "Error executing flow locally. FlowId: {FlowId}", request.FlowId);
+            return StatusCode(500, new
             {
-        success = false,
-         message = "An error occurred while executing the flow",
-    error = ex.Message
-    });
+                success = false,
+                message = "An error occurred while executing the flow",
+                error = ex.Message
+            });
         }
     }
 
@@ -364,7 +364,7 @@ public class FlowExecutionController : ControllerBase
 public class ExecuteFlowRequest
 {
     public required string FlowId { get; set; }
-    public Dictionary<string, object>? Inputs { get; set; }
+    public Dictionary<string, string>? Inputs { get; set; }
 
     /// <summary>
     /// Optional list of runner names to execute the flow on.

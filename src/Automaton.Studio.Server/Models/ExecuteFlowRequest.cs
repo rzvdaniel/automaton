@@ -13,11 +13,11 @@ public class ExecuteFlowRequest
     /// <summary>
     /// Input variables to pass to the flow (maps to Flow.InputVariables)
     /// </summary>
-   public Dictionary<string, object>? Inputs { get; set; }
+    public Dictionary<string, string>? Inputs { get; set; }
 
     /// <summary>
     /// Optional list of runner names to execute the flow on.
- /// If not specified, the first available online runner will be used.
+    /// If not specified, the first available online runner will be used.
     /// </summary>
     public List<string>? RunnerNames { get; set; }
 }

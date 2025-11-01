@@ -166,7 +166,7 @@ var ownerFlowsService = flowsServiceFactory.CreateForUser(appOwnerId.Value);
 
        if (matchingVar != null)
      {
-     matchingVar.Value = Convert.ToString(input.Value);
+     matchingVar.Value = input.Value;
     logger.LogDebug("Set input '{Key}' = {Value}", input.Key, input.Value);
          }
     else
@@ -279,7 +279,7 @@ public class WebAppFlowExecutionRequest
     /// <summary>
     /// Input variables to pass to the flow
     /// </summary>
-    public Dictionary<string, object>? Inputs { get; set; }
+    public Dictionary<string, string>? Inputs { get; set; }
 
     /// <summary>
     /// Optional list of runner names to execute the flow on.
