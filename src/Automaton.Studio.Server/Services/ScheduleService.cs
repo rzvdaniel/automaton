@@ -208,7 +208,16 @@ public class ScheduleService
             RunnerId = runnerId,
             Started = flowExecution.Started,
             Finished = flowExecution.Finished,
-            Status = flowExecution.Status
+            Status = flowExecution.Status,
+            
+            // ✅ Include OutputVariables from flow execution
+            OutputVariables = flowExecution.OutputVariables
+                .ToDictionary(k => k.Key,v => (object?)v.Value.Value),
+            
+            // ✅ Include execution logs for debugging
+            Logs = flowExecution.Logs
+                .Select(log => $"[{log.Timestamp:HH:mm:ss}] [{log.Level}] {log.Message}")
+                .ToList()
         };
     }
 

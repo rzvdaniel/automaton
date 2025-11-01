@@ -259,4 +259,36 @@ public partial class FlowVariables : ComponentBase
             StateHasChanged();
         }
     }
+
+    // ✅ NEW: Helper methods for inline value editing
+    private void OnInputVariableValueChanged(StepVariable variable, object value)
+    {
+        // Find the actual variable in the flow and update it
+        var flowVariable = Flow.InputVariables.Values.FirstOrDefault(v => v.Name == variable.Name);
+        if (flowVariable != null)
+        {
+            flowVariable.Value = value;
+            StateHasChanged();
+        }
+    }
+
+    private string GetPlaceholder(StepVariable variable)
+    {
+        if (!string.IsNullOrEmpty(variable.Description))
+        {
+            return variable.Description;
+        }
+
+        return $"Enter {variable.Name}...";
+    }
+
+    private bool IsLongValue(object value)
+    {
+        // Consider value "long" if it's a string with more than 100 characters
+        if (value is string str)
+        {
+            return str.Length > 100;
+        }
+        return false;
+    }
 }

@@ -21,9 +21,20 @@ public class FlowConvertService : IFlowConvertService<Flow>
             Id = flow.Id,
             Name = flow.Name,
             Variables = flow.Variables,
+            InputVariables = flow.InputVariables,
             OutputVariables = flow.OutputVariables,
             StartupDefinitionId = flow.StartupDefinitionId
         };
+
+        // ✅ Merge InputVariables into Variables for step access
+        // This allows steps to automatically receive flow input parameters by name matching
+        foreach (var inputVar in flow.InputVariables)
+        {
+            if (!workflow.Variables.ContainsKey(inputVar.Key))
+            {
+                workflow.Variables[inputVar.Key] = inputVar.Value;
+            }
+        }
 
         foreach (var definition in flow.Definitions)
         {

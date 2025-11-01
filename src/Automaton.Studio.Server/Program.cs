@@ -1,4 +1,4 @@
-using Automaton.Core.Scripting;
+﻿using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Areas.Identity;
 using Automaton.Studio.Server.Authentication;
 using Automaton.Studio.Server.Data;
@@ -60,10 +60,22 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 
 services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
 {
+    // ✅ CORS is ONLY for browser-based web apps
+    // ✅ Runners use API Key authentication (X-API-Key header) - NO CORS needed!
     builder
-        .AllowAnyOrigin()
+     .WithOrigins(
+            "https://localhost:5001",  // ✅ Automaton Studio Desktop (web UI)
+            "https://localhost:7091",  // ✅ Studio Server (self)
+            "http://localhost:5001",   // ✅ HTTP variant
+            "http://localhost:7091"    // ✅ HTTP variant
+                                     // 🎯 Add more origins here for published web apps as needed
+        )
         .AllowAnyMethod()
-        .AllowAnyHeader();
+        .AllowAnyHeader()
+        .AllowCredentials();  // ✅ Required for cookie-based authentication (web apps)
+
+    // 📝 NOTE: Console Runners don't need to be in this list!
+    //    They authenticate via X-API-Key header which bypasses CORS entirely.
 }));
 
 services.AddMvc();
@@ -183,6 +195,7 @@ services.AddHangfireServer();
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
 services.AddScoped<FlowsService>();
+services.AddScoped<FlowsServiceFactory>();
 services.AddScoped<RunnerService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();
@@ -256,6 +269,8 @@ else
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseCors("CorsPolicy"); // ✅ Enable CORS before authentication
 
 app.UseAuthentication();
 app.UseRouting();

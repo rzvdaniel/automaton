@@ -111,15 +111,15 @@
                             {
                                 @foreach (var variable in InputVariables)
                                 {
-                                    <div class="variable-card">
+                                    <div class="variable-card editable-variable-card">
                                         <div class="variable-header">
                                             <div class="variable-info">
                                                 <div class="variable-name">@variable.Name</div>
                                                 <div class="variable-type">@variable.Type</div>
                                             </div>
                                             <div class="variable-actions">
-                                                <Tooltip Title="Edit variable">
-                                                    <Button Icon="edit" 
+                                                <Tooltip Title="Edit variable (name, type, description)">
+                                                    <Button Icon="form" 
                                                             Size="@ButtonSize.Small" 
                                                             Type="@ButtonType.Text"
                                                             OnClick="@(() => EditInputVariable(variable))" />
@@ -133,15 +133,54 @@
                                                 </Tooltip>
                                             </div>
                                         </div>
-                                        @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
-                                        {
-                                            <div class="variable-value">
-                                                <Text Code>@variable.Value.ToString()</Text>
-                                            </div>
-                                        }
+
+                                        <!-- ✅ NEW: Inline Value Editor for String type -->
+                                        <div class="variable-value-editor">
+                                            @if (IsLongValue(variable.Value))
+                                            {
+                                                <!-- Multi-line input for long values -->
+                                                <div class="value-editor-container">
+                                                    <TextArea Value="@variable.Value?.ToString()" 
+                                                              Placeholder="@GetPlaceholder(variable)"
+                                                              Rows="3"
+                                                              ShowCount="false"
+                                                              OnChange="@((string value) => OnInputVariableValueChanged(variable, value))"
+                                                              Class="value-textarea" />
+                                                    @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
+                                                    {
+                                                        <div class="value-indicator">
+                                                            <Icon Type="check-circle" Theme="@IconThemeType.Fill" Style="color: #52c41a; font-size: 12px;" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <!-- Hint to use modal for longer input -->
+                                                <div class="editor-hint">
+                                                    <Icon Type="info-circle" Style="font-size: 12px; color: #1890ff; margin-right: 4px;" />
+                                                    <span>For longer values, click <Icon Type="form" Style="font-size: 12px;" /> above to open full editor</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <!-- Single-line input for String values -->
+                                                <div class="value-editor-container">
+                                                    <Input Value="@variable.Value?.ToString()" 
+                                                           Placeholder="@GetPlaceholder(variable)"
+                                                           OnChange="@((string value) => OnInputVariableValueChanged(variable, value))"
+                                                           Class="value-input" />
+                                                    @if (!string.IsNullOrEmpty(variable.Value?.ToString()))
+                                                    {
+                                                        <div class="value-indicator">
+                                                            <Icon Type="check-circle" Theme="@IconThemeType.Fill" Style="color: #52c41a; font-size: 12px;" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+            
                                         @if (!string.IsNullOrEmpty(variable.Description))
                                         {
                                             <div class="variable-description">
+                                                <Icon Type="info-circle" Style="font-size: 12px; margin-right: 4px;" />
                                                 <Text Type="@TextElementType.Secondary">@variable.Description</Text>
                                             </div>
                                         }
@@ -393,8 +432,129 @@
     .ant-tooltip-inner {
         padding: 4px 8px;
         font-size: 12px;
-        border-radius: 4px;
+      border-radius: 4px;
+  }
+
+    /* ✅ NEW: Editable Variable Card Styling */
+    .editable-variable-card {
+   background: linear-gradient(to right, #ffffff 0%, #fafbfc 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    .editable-variable-card:hover {
+        border-color: #40a9ff;
+ box-shadow: 0 2px 8px rgba(64, 169, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .editable-variable-card:focus-within {
+        border-color: #1890ff;
+   box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1), 0 2px 8px rgba(24, 144, 255, 0.15);
+    }
+
+    /* Variable Value Editor */
+    .variable-value-editor {
+     margin-top: 12px;
+        padding-top: 12px;
+     border-top: 1px solid #f0f0f0;
+    }
+
+    .value-editor-container {
+      position: relative;
+        margin-bottom: 8px;
+    }
+
+    .value-input {
+   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace !important;
+        font-size: 13px !important;
+   border-radius: 6px !important;
+border: 1.5px solid #d9d9d9 !important;
+  background: #ffffff !important;
+   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+   padding-right: 36px !important;
+    }
+
+    .value-input:hover {
+        border-color: #40a9ff !important;
+        background: #fafbfc !important;
+    }
+
+    .value-input:focus {
+ border-color: #1890ff !important;
+        box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1) !important;
+  background: #ffffff !important;
+    }
+
+    .value-textarea {
+ font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace !important;
+font-size: 13px !important;
+        border-radius: 6px !important;
+        border: 1.5px solid #d9d9d9 !important;
+background: #ffffff !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        padding-right: 36px !important;
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .value-textarea:hover {
+        border-color: #40a9ff !important;
+        background: #fafbfc !important;
+    }
+
+    .value-textarea:focus {
+border-color: #1890ff !important;
+        box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1) !important;
+        background: #ffffff !important;
+    }
+
+    .value-indicator {
+        position: absolute;
+     right: 12px;
+top: 12px;
+   display: flex;
+        align-items: center;
+        pointer-events: none;
+        animation: fadeIn 0.2s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+         opacity: 0;
+            transform: scale(0.8);
+        }
+      to {
+            opacity: 1;
+       transform: scale(1);
+        }
+    }
+
+    .editor-hint {
+  display: flex;
+ align-items: center;
+        gap: 4px;
+    font-size: 11px;
+     color: #8c8c8c;
+        margin-top: 6px;
+        padding: 6px 8px;
+      background-color: #f6f8fa;
+        border-radius: 4px;
+        border: 1px solid #e1e4e8;
+    }
+
+  .editor-hint span {
+        display: flex;
+ align-items: center;
+  gap: 4px;
+    }
+
+  /* Variable Description with Icon */
+    .variable-description {
+        display: flex;
+      align-items: flex-start;
+        gap: 4px;
+        margin-top: 8px;
+  }
 </style>
 
 

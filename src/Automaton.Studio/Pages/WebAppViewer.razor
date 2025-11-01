@@ -173,10 +173,53 @@
 		<iframe id="web-app-frame"
 				srcdoc="@ProcessedHtmlContent"
 				sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
-				class="web-app-iframe">
+				class="web-app-iframe"
+				onload="setupIframeDebugger()">
 		</iframe>
 	}
 </div>
+
+<script>
+	// Helper function to access iframe's Automaton object from parent window
+	window.setupIframeDebugger = function() {
+		console.log('[WebAppViewer] iframe loaded, setting up debugger');
+		
+		const iframe = document.getElementById('web-app-frame');
+		if (!iframe) {
+			console.error('[WebAppViewer] Could not find iframe!');
+			return;
+		}
+
+		const iframeWindow = iframe.contentWindow;
+		if (!iframeWindow) {
+			console.error('[WebAppViewer] Could not access iframe window!');
+			return;
+		}
+
+		// Expose iframe's Automaton to parent for debugging
+		window.AutomatonApp = iframeWindow.Automaton;
+		
+		console.log('[WebAppViewer] ✅ iframe Automaton object exposed as window.AutomatonApp');
+		console.log('[WebAppViewer] Run window.AutomatonApp.diagnostics() to check SDK state');
+		console.log('[WebAppViewer] Current appSlug:', iframeWindow.Automaton?.appSlug);
+		
+		// Also add a convenience function
+		window.checkIframeAutomaton = function() {
+			const iframe = document.getElementById('web-app-frame');
+			const iframeWindow = iframe?.contentWindow;
+			console.group('[WebAppViewer] iframe Automaton Debug');
+			console.log('iframe exists:', !!iframe);
+			console.log('iframe.contentWindow exists:', !!iframeWindow);
+			console.log('Automaton object exists:', !!iframeWindow?.Automaton);
+			console.log('appSlug:', iframeWindow?.Automaton?.appSlug);
+			console.log('executeFlow exists:', typeof iframeWindow?.Automaton?.executeFlow);
+			console.log('Full Automaton object:', iframeWindow?.Automaton);
+			console.groupEnd();
+		};
+		
+		console.log('[WebAppViewer] 🔍 Run window.checkIframeAutomaton() to debug');
+	};
+</script>
 
 @code {
 	[Parameter] public string Slug { get; set; }
@@ -203,8 +246,8 @@
 				return;
 			}
 
-			Logger.LogInformation("[WebAppViewer] App loaded. RequiresAuthentication: {RequiresAuth}, IsUserAuthenticated: {IsAuth}",
-						 response.RequiresAuthentication, response.IsUserAuthenticated);
+			Logger.LogInformation("[WebAppViewer] App loaded. Slug: {Slug}, RequiresAuthentication: {RequiresAuth}, IsUserAuthenticated: {IsAuth}",
+						 Slug, response.RequiresAuthentication, response.IsUserAuthenticated);
 
 			// Check if app requires authentication and user is NOT authenticated
 			if (response.RequiresAuthentication && !response.IsUserAuthenticated)
@@ -226,8 +269,15 @@
 			}
 
 			// User is authenticated OR app is public, show the app
-			ProcessedHtmlContent = InjectAutomatonBridge(response.HtmlContent);
-			Logger.LogInformation("[WebAppViewer] App content prepared successfully");
+			// Pass the slug (human-friendly!) instead of GUID
+			Logger.LogInformation("[WebAppViewer] About to inject Automaton bridge with slug: {Slug}", Slug);
+			Logger.LogInformation("[WebAppViewer] Slug value: '{SlugValue}', Type: {SlugType}, IsNull: {IsNull}, IsEmpty: {IsEmpty}",
+				Slug, Slug?.GetType().Name, Slug == null, string.IsNullOrEmpty(Slug));
+			
+			ProcessedHtmlContent = InjectAutomatonBridge(response.HtmlContent, Slug);
+			
+			Logger.LogInformation("[WebAppViewer] App content prepared successfully with slug: {Slug}", Slug);
+			Logger.LogInformation("[WebAppViewer] Processed HTML length: {Length} characters", ProcessedHtmlContent?.Length ?? 0);
 		}
 		catch (HttpRequestException ex)
 		{
@@ -255,94 +305,37 @@
 		}
 	}
 
-	private string InjectAutomatonBridge(string htmlContent)
+	private string InjectAutomatonBridge(string htmlContent, string appSlug)
 	{
-		// Get the current app slug from the Slug parameter
-		var appSlug = Slug;
+		Logger.LogInformation("[WebAppViewer] InjectAutomatonBridge called with slug: '{Slug}'", appSlug);
+		Logger.LogInformation("[WebAppViewer] HTML content length: {Length}", htmlContent?.Length ?? 0);
+		
+		// Inject Automaton SDK with appSlug initialization (human-friendly!)
+		// IMPORTANT: Initialize appSlug BEFORE loading SDK
+		var sdkInjection = $@"
+    <script>
+  // Initialize Automaton object and set appSlug FIRST
+    console.log('[WebAppViewer] Setting appSlug to: {appSlug}');
+      window.Automaton = window.Automaton || {{}};
+  window.Automaton.appSlug = '{appSlug}';
+        console.log('[Automaton] Initialized appSlug:', '{appSlug}');
+        console.log('[Automaton] window.Automaton.appSlug value:', window.Automaton.appSlug);
+    console.log('[Automaton] Type of appSlug:', typeof window.Automaton.appSlug);
+    </script>
+    <script src=""/js/automaton-sdk.js""></script>";
 
-		var bridge = $@"
-  <script>
-window.Automaton = {{
-
-         executeFlow: async function(flowId, inputs = {{}} , runnerNames = null) {{
-
-     try {{
-       console.log('🚀 Executing flow:', flowId);
-    if (runnerNames) {{
-
-      console.log('📍 Target runners:', runnerNames);
-       }}
-
- const body = {{
-
-        flowId: flowId,
-
- inputs: inputs
-
-          }};
-
-  if (runnerNames && Array.isArray(runnerNames) && runnerNames.length > 0) {{
-
-     body.runnerNames = runnerNames;
-
-       }}
-
-       const response = await fetch('/api/flows/execute', {{
-
-    method: 'POST',
-
-               headers: {{
-
-         'Content-Type': 'application/json',
-
-        'X-WebApp-Slug': '{appSlug}'  // Send app slug for server-side authentication
-
-     }},
-
-       body: JSON.stringify(body)
-
-       }});
-
-   if (!response.ok) {{
-
-          const error = await response.json();
-
-       throw new Error(error.message || 'Flow execution failed');
-
-  }}
-
-            const result = await response.json();
-
-    console.log('✅ Flow executed successfully:', result);
-
-      return result;
-
-}} catch (error) {{
-       console.error('❌ Automaton.executeFlow error:', error);
-    throw error;
-        }}
-
-   }},
-
-   version: '1.0.0',
-
-           mode: 'production'
-
-       }};
-
-     console.log('✅ Automaton bridge loaded (Production Mode)');
-
-     console.log('📱 Web App Slug: {appSlug}');
-
-        </script>";
+		Logger.LogInformation("[WebAppViewer] SDK injection script prepared");
+		Logger.LogInformation("[WebAppViewer] Injection contains slug: '{Slug}'", appSlug);
 
 		// Insert before </head> if exists, otherwise prepend
 		if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
 		{
-			return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
+			Logger.LogInformation("[WebAppViewer] Inserting SDK before </head>");
+			return htmlContent.Replace("</head>", $"{sdkInjection}</head>", StringComparison.OrdinalIgnoreCase);
 		}
 
-		return bridge + htmlContent;
+		Logger.LogInformation("[WebAppViewer] Prepending SDK to HTML (no </head> found)");
+		return sdkInjection + htmlContent;
 	}
 
 	private void GoHome()

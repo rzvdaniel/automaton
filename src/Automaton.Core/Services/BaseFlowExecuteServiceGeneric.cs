@@ -185,7 +185,76 @@ namespace Automaton.Core.Services
             var endMessage = $"End workflow: {workflow.Name}";
             await AddLogWithNotification(workflowExecution, "Information", endMessage, cancellationToken: cancellationToken);
 
+            // Populate OutputVariables from Variables before returning
+            PopulateOutputVariables(workflow);
+
+            // Copy OutputVariables to WorkflowExecution for return to caller
+            workflowExecution.OutputVariables = workflow.OutputVariables;
+
             return workflowExecution;
+        }
+
+        /// <summary>
+        /// Populate flow output variables with actual values from runtime variables.
+        /// Supports both direct name matching and variable references (%variablename%).
+        /// </summary>
+        protected virtual void PopulateOutputVariables(Workflow workflow)
+        {
+            if (workflow.OutputVariables == null || !workflow.OutputVariables.Any())
+            {
+                logger.Debug("No output variables defined for workflow {WorkflowId}", workflow.Id);
+                return;
+            }
+
+            var variableResolver = new StepVariableParser();
+
+            foreach (var outputVar in workflow.OutputVariables.Values)
+            {
+                try
+                {
+                    // Check if Value contains %variablename% reference
+                    var valueStr = outputVar.Value?.ToString();
+                    if (!string.IsNullOrEmpty(valueStr) && valueStr.Contains("%"))
+                    {
+                        // Resolve variable reference (e.g., "%headlines%" ? actual value)
+                        var resolvedValue = variableResolver.Parse(outputVar, workflow);
+                        outputVar.Value = resolvedValue;
+
+                        logger.Information(
+                            "Resolved output variable '{Name}' from reference '{Original}' to value", 
+                            outputVar.Name, 
+                            valueStr);
+                    }
+                    else
+                    {
+                        // Try to find matching runtime variable by name
+                        var runtimeVar = workflow.Variables.Values
+                            .FirstOrDefault(v => v.Name.Equals(outputVar.Name, StringComparison.OrdinalIgnoreCase));
+
+                        if (runtimeVar != null)
+                        {
+                            outputVar.Value = runtimeVar.Value;
+                            outputVar.Type = runtimeVar.Type;
+
+                            logger.Information(
+                                "Populated output variable '{Name}' with value from runtime variable", 
+                                outputVar.Name);
+                        }
+                        else
+                        {
+                            logger.Warning(
+                                "Output variable '{Name}' defined but no matching runtime variable found", 
+                                outputVar.Name);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, 
+                        "Failed to populate output variable '{Name}'", 
+                        outputVar.Name);
+                }
+            }
         }
 
         /// <summary>
