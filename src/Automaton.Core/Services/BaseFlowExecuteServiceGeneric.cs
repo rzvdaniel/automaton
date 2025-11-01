@@ -35,7 +35,7 @@ namespace Automaton.Core.Services
         /// <summary>
         /// Executes a domain-specific flow by converting it to a workflow first
         /// </summary>
-        public virtual async Task<WorkflowExecution> Execute(TFlow flow, int executeDelay = 0, CancellationToken cancellationToken = default)
+        public virtual async Task<WorkflowExecution> Execute(TFlow flow, int executeDelay =0, CancellationToken cancellationToken = default)
         {
             var workflow = flowConvertService.ConvertFlow(flow);
 
@@ -98,7 +98,7 @@ namespace Automaton.Core.Services
         /// <summary>
         /// IFlowExecuteService implementation - works with Workflow directly
         /// </summary>
-        public virtual async Task<WorkflowExecution> Execute(Workflow workflow, int executeDelay = 0, CancellationToken cancellationToken = default)
+        public virtual async Task<WorkflowExecution> Execute(Workflow workflow, int executeDelay =0, CancellationToken cancellationToken = default)
         {
             return await ExecuteWorkflow(workflow, executeDelay, cancellationToken);
         }
@@ -116,7 +116,7 @@ namespace Automaton.Core.Services
         /// <summary>
         /// Core workflow execution logic
         /// </summary>
-        protected virtual async Task<WorkflowExecution> ExecuteWorkflow(Workflow workflow, int executeDelay = 0, CancellationToken cancellationToken = default)
+        protected virtual async Task<WorkflowExecution> ExecuteWorkflow(Workflow workflow, int executeDelay =0, CancellationToken cancellationToken = default)
         {
             using var workflowExecution = new WorkflowExecution(workflow.Id, applicationName);
             var definition = workflow.GetStartupDefinition();
@@ -142,7 +142,7 @@ namespace Automaton.Core.Services
 
                 try
                 {
-                    if (executeDelay > 0)
+                    if (executeDelay >0)
                     {
                         await Task.Delay(executeDelay, cancellationToken);
                     }
@@ -189,7 +189,15 @@ namespace Automaton.Core.Services
             PopulateOutputVariables(workflow);
 
             // Copy OutputVariables to WorkflowExecution for return to caller
-            workflowExecution.OutputVariables = workflow.OutputVariables;
+            // KEY CHANGE: return outputs keyed by variable Name for downstream consumers (fallback to Id if name missing)
+            var nameKeyedOutputs = new Dictionary<string, StepVariable>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sv in workflow.OutputVariables.Values)
+            {
+                var key = !string.IsNullOrWhiteSpace(sv.Name) ? sv.Name! : sv.Id;
+                // Last-in wins if duplicate names; ensures stable result
+                nameKeyedOutputs[key] = sv;
+            }
+            workflowExecution.OutputVariables = nameKeyedOutputs;
 
             return workflowExecution;
         }
@@ -277,13 +285,13 @@ namespace Automaton.Core.Services
             Exception exception = null,
             CancellationToken cancellationToken = default)
         {
-            // 1. Add to workflow execution for persistence
+            //1. Add to workflow execution for persistence
             workflowExecution.AddLog(level, message, stepId, stepName, exception);
 
-            // 2. Log to Serilog for server-side logging
+            //2. Log to Serilog for server-side logging
             LogToSerilog(level, message, exception);
 
-            // 3. Send real-time notification
+            //3. Send real-time notification
             try
             {
                 await notificationService.SendLogUpdate(

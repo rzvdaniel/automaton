@@ -5,6 +5,8 @@ using Automaton.Runner.Console.Connection;
 using static System.Console;
 using Microsoft.Extensions.DependencyInjection;
 using Automaton.Runner.Console.Models;
+using Automaton.Core.Models;
+using Automaton.Core.Enums;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -195,18 +197,27 @@ public class HubService
                 .Build();
 
             // Register hub methods
-            connection.On<Guid, Task>(RunWorkflowMethod, async (workflowId) =>
+            connection.On<Guid, WorkflowExecution>(RunWorkflowMethod, (workflowId) =>
             {
                 try
                 {
                     WriteLine($"▶️ Executing workflow: {workflowId}");
-                    var result = await flowExecutionService.ExecuteWorkflowAsync(workflowId);
+                    var result = flowExecutionService.ExecuteWorkflowAsync(workflowId).GetAwaiter().GetResult();
                     WriteLine($"✅ Workflow completed: {result.Status}");
+                    return result;
                 }
                 catch (Exception ex)
                 {
                     logger.Error(ex, "Error executing workflow {WorkflowId}", workflowId);
                     WriteLine($"❌ Workflow failed: {ex.Message}");
+
+                    // Return a failed execution so the server gets a response
+                    var failed = new WorkflowExecution(workflowId, configService.ApplicationName)
+                    {
+                        Status = WorkflowStatus.Error
+                    };
+                    failed.AddLog("Error", ex.Message);
+                    return failed;
                 }
             });
 

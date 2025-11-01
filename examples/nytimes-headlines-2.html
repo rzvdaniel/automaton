@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NYTimes Headlines</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    ul { list-style-type: none; padding: 0; }
+    li { margin: 10px 0; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    #status { color: #666; }
+    #error { color: red; display: none; }
+  </style>
+</head>
+<body>
+  <h1>NYTimes Headlines</h1>
+  <div id="status">Loading...</div>
+  <div id="error"></div>
+  <ul id="headlines"></ul>
+  <button onclick="load()">Reload</button>
+
+  <script>
+    const flowIdentifier = 'Headlines2';
+    const inputs = {};
+
+    function fixJson(jsonString) {
+      // Replace single quotes with double quotes for simple cases
+      return jsonString.replace(/'/g, '"');
+    }
+
+    async function load() {
+      const status = document.getElementById('status');
+      const error = document.getElementById('error');
+      const list = document.getElementById('headlines');
+      
+      status.textContent = 'Loading...';
+      error.style.display = 'none';
+      list.innerHTML = '';
+
+      const url = `https://localhost:7091/api/web-apps/headlines2/flows/${encodeURIComponent(flowIdentifier)}/execute`;
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputs })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed');
+
+        let headlines = data.outputVariables?.headlines || [];
+
+        if (typeof headlines === 'string') {
+          headlines = JSON.parse(fixJson(headlines));
+        }
+
+        if (!Array.isArray(headlines)) headlines = [headlines];
+
+        headlines.forEach(h => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = h.url || '#';
+          a.target = '_blank';
+          a.textContent = h.title || 'No title';
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+
+        status.textContent = `Loaded ${headlines.length} headlines.`;
+      } catch (e) {
+        error.textContent = e.message;
+        error.style.display = 'block';
+        status.textContent = '';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+  </script>
+</body>
+</html>
