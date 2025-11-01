@@ -185,10 +185,10 @@ namespace Automaton.Core.Services
             var endMessage = $"End workflow: {workflow.Name}";
             await AddLogWithNotification(workflowExecution, "Information", endMessage, cancellationToken: cancellationToken);
 
-            // ? Populate OutputVariables from Variables before returning
+            // Populate OutputVariables from Variables before returning
             PopulateOutputVariables(workflow);
 
-            // ? Copy OutputVariables to WorkflowExecution for return to caller
+            // Copy OutputVariables to WorkflowExecution for return to caller
             workflowExecution.OutputVariables = workflow.OutputVariables;
 
             return workflowExecution;

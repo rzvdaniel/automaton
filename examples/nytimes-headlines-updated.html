@@ -389,125 +389,179 @@ margin-bottom: 10px;
     <script>
    // ==========================================
         // Configuration
-        // ==========================================
+    // ==========================================
    const CONFIG = {
-        // ?? YOUR FLOW ID
-     flowId: 'c71361c2-a9ff-427e-8eb1-cb4c16c3dbeb',
+        // ⚙️ YOUR FLOW NAME (human-friendly!) or GUID
+     flowIdentifier: 'Headlines',  // ✅ Use flow name instead of GUID!
+     // OR use GUID if you prefer: flowIdentifier: 'c71361c2-a9ff-427e-8eb1-cb4c16c3dbeb',
 
-     // ? Optional: Additional input parameters (if your flow needs them)
+ // ✅ Optional: Additional input parameters (if your flow needs them)
        // The API key should be stored in the flow's InputVariables on the backend
-            inputs: {
-          // Example: max_articles: 10
-            },
+    inputs: {
+     // Example: max_articles: 10
+     },
 
-    // ? Optional: Specify runners (leave null to use first available)
+    // ✅ Optional: Specify runners (leave null to use first available)
  runnerNames: null  // Or ['Local', 'Production-Runner']
-   };
+ };
 
+  // ==========================================
+  // State Management
         // ==========================================
-      // State Management
-        // ==========================================
-        let executionStartTime = 0;
+   let executionStartTime = 0;
 
       // ==========================================
         // Main Function - Fetch Headlines
   // ==========================================
-        async function fetchHeadlines() {
-            executionStartTime = Date.now();
+   async function fetchHeadlines() {
+        executionStartTime = Date.now();
 
-   // Show loading state
-     showElement('loadingContainer');
-            hideElement('errorContainer');
-            hideElement('emptyState');
+ // Show loading state
+   showElement('loadingContainer');
+         hideElement('errorContainer');
+    hideElement('emptyState');
   hideElement('statsBar');
-            document.getElementById('headlinesGrid').innerHTML = '';
+  document.getElementById('headlinesGrid').innerHTML = '';
 
-            try {
-      console.log('?? Fetching headlines from flow:', CONFIG.flowId);
+  try {
+console.log('🚀 Fetching headlines using flow:', CONFIG.flowIdentifier);
 
-          // ? OPTION 1: Use Automaton SDK (Recommended)
-      if (window.Automaton && window.Automaton.executeFlow) {
-           console.log('?? Using Automaton SDK');
-const result = await window.Automaton.executeFlow(
-     CONFIG.flowId,
-                CONFIG.inputs,
-        CONFIG.runnerNames
-         );
-
-     handleFlowResult(result);
-     } else {
-     // ? OPTION 2: Direct HTTP call (Fallback)
-         console.log('?? SDK not available, using direct HTTP call');
-         await fetchHeadlinesDirectHTTP();
-        }
+   // ✅ USING DIRECT HTTP CALL (No SDK needed!)
+                await fetchHeadlinesDirectHTTP();
 
    } catch (error) {
-console.error('? Error fetching headlines:', error);
-         hideElement('loadingContainer');
-    showError(error.message);
-            }
+console.error('❌ Error fetching headlines:', error);
+   hideElement('loadingContainer');
+ showError(error.message);
+ }
       }
 
-        // ==========================================
-        // Direct HTTP Method (Fallback)
-        // ==========================================
-     async function fetchHeadlinesDirectHTTP() {
-            // Check if appId is available (set by WebAppViewer)
-            const appId = window.Automaton?.appId;
+      // ==========================================
+   // Direct HTTP Method - No SDK Required!
+  // ==========================================
+async function fetchHeadlinesDirectHTTP() {
+  // ✅ Get app slug from URL
+    // Since we're in an iframe, we need to get the URL from the parent window
+  // URL format: /web/{slug}
+     // Example: /web/nytimes-headlines
+ 
+  let appSlug;
+    
+    try {
+        // Try to get from parent window (iframe context)
+    if (window.parent && window.parent !== window) {
+     const parentUrl = window.parent.location.pathname;
+         const pathParts = parentUrl.split('/');
+   appSlug = pathParts[2]; // Gets 'nytimes-headlines' from /web/nytimes-headlines
+ console.log(`📱 App Slug from parent window: ${appSlug}`);
+  } else {
+      // Fallback: direct access (not in iframe)
+ const pathParts = window.location.pathname.split('/');
+      appSlug = pathParts[2];
+     console.log(`📱 App Slug from current window: ${appSlug}`);
+      }
+    } catch (e) {
+        // If we can't access parent (cross-origin), try current window
+        console.warn('⚠️ Cannot access parent window, trying current window');
+        const pathParts = window.location.pathname.split('/');
+      appSlug = pathParts[2];
+    }
 
-  if (!appId) {
-   throw new Error('App ID not available. This app must be accessed through Automaton platform.');
-            }
+        if (!appSlug || appSlug === 'srcdoc') {
+      throw new Error('App slug not found in URL. Make sure you\'re accessing the app through /web/{slug}');
+      }
 
-console.log('?? Request: POST /api/web-apps/{appId}/flows/{flowId}/execute');
+      console.log(`📱 Using App Slug: ${appSlug}`);
 
-            const response = await fetch(`/api/web-apps/${appId}/flows/${CONFIG.flowId}/execute`, {
-     method: 'POST',
-         headers: {
-          'Content-Type': 'application/json'
-             },
-           body: JSON.stringify({
-      inputs: CONFIG.inputs || {},
-         runnerNames: CONFIG.runnerNames
-           })
-            });
+   // ✅ Build the API URL with correct server address
+   // The API server runs on port 7091, not the web app port
+   const apiBaseUrl = 'https://localhost:7091';
+   const apiUrl = `${apiBaseUrl}/api/web-apps/${appSlug}/flows/${CONFIG.flowIdentifier}/execute`;
+   
+   console.log(`🔧 API Base URL: ${apiBaseUrl}`);
+ console.log(`🔧 Full API URL: ${apiUrl}`);
 
-            console.log('?? Response status:', response.status);
+      // ✅ Prepare request body - ensure proper structure
+   const requestBody = {
+   inputs: CONFIG.inputs || {},  // Always send an object, even if empty
+ };
+  
+       // Only add runnerNames if provided
+  if (CONFIG.runnerNames && CONFIG.runnerNames.length > 0) {
+   requestBody.runnerNames = CONFIG.runnerNames;
+       }
 
-   if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-            throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-     }
+     console.log(`📡 Making POST request to: ${apiUrl}`);
+   console.log(`📦 Request body:`, JSON.stringify(requestBody, null, 2));
 
-         const result = await response.json();
-      console.log('? Flow executed successfully:', result);
+       // ✅ Make the HTTP call using fetch
+     const response = await fetch(apiUrl, {
+      method: 'POST',
+       headers: {
+    'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+ });
 
-            handleFlowResult(result);
-        }
+   console.log(`📥 Response status: ${response.status} ${response.statusText}`);
 
-        // ==========================================
-        // Handle Flow Result
-        // ==========================================
-      function handleFlowResult(data) {
+ // ✅ Handle HTTP errors
+  if (!response.ok) {
+  let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+  let responseText = '';
+            
+        try {
+          // Try to get response text first
+   responseText = await response.text();
+       console.error('❌ Response text:', responseText);
+ 
+      // Try to parse as JSON
+      try {
+const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorMessage;
+        console.error('❌ Server error (parsed):', errorData);
+                } catch (jsonError) {
+   console.error('❌ Response is not JSON:', responseText);
+        errorMessage = `${errorMessage} - ${responseText}`;
+      }
+  } catch (e) {
+  console.error('❌ Could not read error response:', e);
+ }
+    
+     throw new Error(errorMessage);
+  }
+
+ // ✅ Parse the response
+          const result = await response.json();
+    console.log('✅ Flow executed successfully:', result);
+
+    // ✅ Handle the result
+         handleFlowResult(result);
+  }
+
+      // ==========================================
+     // Handle Flow Result
+  // ==========================================
+   function handleFlowResult(data) {
    // Calculate execution time
             const executionTime = Date.now() - executionStartTime;
 
     // Hide loading
-          hideElement('loadingContainer');
+  hideElement('loadingContainer');
 
        // Check if flow was successful
-      if (!data.success) {
-           throw new Error(data.message || 'Flow execution failed');
+  if (!data.success) {
+         throw new Error(data.message || 'Flow execution failed');
    }
 
     // Extract headlines from OutputVariables
-            // ? Adjust property name based on your flow's output
-            const headlines = data.outputVariables?.headlines
+    // ✅ Adjust property name based on your flow's output
+    const headlines = data.outputVariables?.headlines
         || data.outputVariables?.result
    || data.outputVariables?.articles
   || [];
 
-            console.log('?? Headlines received:', headlines?.length || 0);
+      console.log('📰 Headlines received:', headlines?.length || 0);
 
           // Update stats
      updateStats(headlines.length, executionTime, data.status);
@@ -515,130 +569,135 @@ console.log('?? Request: POST /api/web-apps/{appId}/flows/{flowId}/execute');
 // Display headlines
    if (headlines && headlines.length > 0) {
 displayHeadlines(headlines);
-            } else {
-              showElement('emptyState');
+  } else {
+  showElement('emptyState');
    }
 
   // Update last updated timestamp
-          updateTimestamp();
+  updateTimestamp();
         }
 
-        // ==========================================
+    // ==========================================
  // Display Functions
         // ==========================================
         function displayHeadlines(headlines) {
-            const grid = document.getElementById('headlinesGrid');
+ const grid = document.getElementById('headlinesGrid');
   grid.innerHTML = '';
 
-            headlines.forEach((headline, index) => {
+ headlines.forEach((headline, index) => {
    const card = createHeadlineCard(headline, index + 1);
    grid.appendChild(card);
-      });
+ });
 
-            // Animate cards in
-            const cards = grid.querySelectorAll('.headline-card');
-      cards.forEach((card, index) => {
-       setTimeout(() => {
-              card.style.animation = 'fadeIn 0.5s ease-in';
-   }, index * 50);
+      // Animate cards in
+    const cards = grid.querySelectorAll('.headline-card');
+ cards.forEach((card, index) => {
+   setTimeout(() => {
+    card.style.animation = 'fadeIn 0.5s ease-in';
+ }, index * 50);
     });
         }
 
-        function createHeadlineCard(headline, number) {
-            const card = document.createElement('div');
+      function createHeadlineCard(headline, number) {
+     const card = document.createElement('div');
   card.className = 'headline-card';
 
-            // Handle different data structures
-            const title = headline.title || headline.Title || headline.headline || 'Untitled';
-    const url = headline.url || headline.Url || headline.link || '#';
+  // Handle different data structures
+         const title = headline.title || headline.Title || headline.headline || 'Untitled';
+const url = headline.url || headline.Url || headline.link || '#';
 
          card.innerHTML = `
 <div class="headline-number">${number}</div>
      <div class="headline-title">${escapeHtml(title)}</div>
  <div class="headline-meta">
       <a href="${escapeHtml(url)}" target="_blank" class="headline-link">
-          Read Full Article
+Read Full Article
     </a>
      </div>
-       `;
+  `;
 
-            // Add click handler for the entire card
-          card.addEventListener('click', (e) => {
+  // Add click handler for the entire card
+ card.addEventListener('click', (e) => {
  if (e.target.tagName !== 'A') {
          window.open(url, '_blank');
-                }
+    }
  });
 
-          return card;
-    }
+   return card;
+ }
 
         function updateStats(count, executionTime, status) {
        document.getElementById('headlineCount').textContent = count;
       document.getElementById('executionTime').textContent = `${executionTime}ms`;
 
-     const statusIcon = status === 'Success' ? '?' : '??';
-            document.getElementById('flowStatus').textContent = statusIcon;
+     const statusIcon = status === 'Success' ? '✅' : '⚠️';
+   document.getElementById('flowStatus').textContent = statusIcon;
 
-            showElement('statsBar');
-        }
+  showElement('statsBar');
+    }
 
         function updateTimestamp() {
      const now = new Date();
-            const options = {
-            hour: '2-digit',
-          minute: '2-digit',
+         const options = {
+ hour: '2-digit',
+      minute: '2-digit',
      second: '2-digit',
     month: 'short',
-           day: 'numeric'
+  day: 'numeric'
          };
-            const timestamp = now.toLocaleString('en-US', options);
+      const timestamp = now.toLocaleString('en-US', options);
   document.getElementById('lastUpdated').textContent = `Last updated: ${timestamp}`;
  }
 
-        function showError(message) {
+     function showError(message) {
       document.getElementById('errorMessage').textContent = message;
          showElement('errorContainer');
-        }
+   }
 
-    // ==========================================
-        // Utility Functions
-        // ==========================================
+  // ==========================================
+   // Utility Functions
+     // ==========================================
         function showElement(id) {
-            const element = document.getElementById(id);
+ const element = document.getElementById(id);
 if (element) element.style.display = 'block';
       }
 
         function hideElement(id) {
-            const element = document.getElementById(id);
-       if (element) element.style.display = 'none';
-        }
+     const element = document.getElementById(id);
+    if (element) element.style.display = 'none';
+     }
 
         function escapeHtml(text) {
        const div = document.createElement('div');
 div.textContent = text;
-   return div.innerHTML;
+return div.innerHTML;
       }
 
         // ==========================================
    // Initialization
         // ==========================================
    // Fetch headlines when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('?? Page loaded, fetching headlines...');
-
-  // Check if Automaton SDK is available
-  if (window.Automaton) {
-       console.log('? Automaton SDK detected');
-    console.log('?? App ID:', window.Automaton.appId);
+    document.addEventListener('DOMContentLoaded', () => {
+   console.log('🌐 Page loaded, fetching headlines...');
+        console.log('🔧 Using DIRECT HTTP method (No SDK required)');
+    
+    // Detect context
+      const isInIframe = window.parent && window.parent !== window;
+            console.log('📍 Running in iframe:', isInIframe);
+    
+    if (isInIframe) {
+        try {
+         console.log('📍 Parent URL:', window.parent.location.pathname);
+        } catch (e) {
+   console.log('📍 Cannot access parent URL (cross-origin)');
+      }
     } else {
-      console.warn('?? Automaton SDK not loaded - falling back to direct HTTP');
-            }
-
-            fetchHeadlines();
-        });
+ console.log('📍 Current URL:', window.location.pathname);
+    }
+      
+     fetchHeadlines();
+  });
 
 // Optional: Auto-refresh every 5 minutes
       // setInterval(fetchHeadlines, 5 * 60 * 1000);
-    </script>
-</body>
-</html>
+</script>

@@ -19,6 +19,9 @@ public class RunnerService
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
     private readonly Serilog.ILogger logger;
 
+    // ✅ Helper property to get current userId (respects impersonation)
+    private Guid UserId => userContextService.GetUserId();
+
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
       IHubContext<AutomatonHub> automatonHub)
@@ -28,9 +31,6 @@ public class RunnerService
         this.userContextService = userContextService;  // ✅ Store service reference
         logger = Serilog.Log.ForContext<RunnerService>();
     }
-
-    // ✅ Helper property to get current userId (respects impersonation)
-    private Guid UserId => userContextService.GetUserId();
 
     public async Task<IEnumerable<RunnerDetails>> List(CancellationToken cancellationToken)
     {

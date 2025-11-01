@@ -114,7 +114,7 @@ public abstract class WorkflowStep
             var variable = input.Value;
             var value = variable.Value;
 
-            // ✅ NEW: Auto-populate step inputs from Workflow.Variables
+            // Auto-populate step inputs from Workflow.Variables
             // If step input has no value, try to find matching variable by name
             // Variables includes InputVariables + outputs from all previous steps
             if (value == null || string.IsNullOrEmpty(value.ToString()))

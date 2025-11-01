@@ -21,7 +21,7 @@ public class FlowConvertService : IFlowConvertService<Flow>
             Id = flow.Id,
             Name = flow.Name,
             Variables = flow.Variables,
-            InputVariables = flow.InputVariables,  // ✅ Copy InputVariables
+            InputVariables = flow.InputVariables,
             OutputVariables = flow.OutputVariables,
             StartupDefinitionId = flow.StartupDefinitionId
         };
