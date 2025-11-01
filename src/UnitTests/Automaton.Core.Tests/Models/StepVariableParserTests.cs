@@ -89,7 +89,7 @@ namespace Automaton.Core.Tests.Models
             workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "test", Type = VariableType.String });
 
             var innerVariable = new StepVariable { Id = "Inner", Name = "Inner", Value = "%A%", Type = VariableType.String };
-            var outerVariable = new StepVariable { Id = "Outer", Name = "Outer", Value = innerVariable, Type = VariableType.String };
+            var outerVariable = new StepVariable { Id = "Outer", Name = "Outer", Value = innerVariable.Value, Type = VariableType.String };
             
             var result = stepVariableParser.Parse(outerVariable, workflow);
 

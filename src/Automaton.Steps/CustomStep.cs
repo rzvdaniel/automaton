@@ -77,18 +77,37 @@ public class CustomStep : WorkflowStep
 
     protected override void SetupProperties(StepExecutionContext context)
     {
-        Code = GetInputValue<string>(nameof(Code));
+        Code = GetInputString(nameof(Code));
+        Language = GetInputString(nameof(Language));
 
-        Language = GetInputValue<string>(nameof(Language));
-
-        var codeInputVariables = GetInputValue<IList<StepVariable>>(nameof(CodeInputVariables));
-
-        foreach (var variable in codeInputVariables)
+        var inputsVariable = Inputs.Values.FirstOrDefault(v => v.Name == nameof(CodeInputVariables));
+        
+        if (inputsVariable != null && inputsVariable.Value != null)
         {
-            var variableValue = StepVariableParser.Parse(variable, context.Workflow);
-            variable.Value = variableValue;
-
-            CodeInputVariables.Add(variable);
+            if (inputsVariable.Value is string s && s.TrimStart().StartsWith("{"))
+            {
+                var dict = JsonConvert.DeserializeObject<Dictionary<string, StepVariable>>(s);
+                if (dict != null)
+                {
+                    foreach (var kvp in dict)
+                    {
+                        var variable = kvp.Value;
+                        var variableValue = StepVariableParser.Parse(variable, context.Workflow);
+                        variable.Value = variableValue;
+                        CodeInputVariables.Add(variable);
+                    }
+                }
+            }
+            else if (inputsVariable.Value is string json && json.TrimStart().StartsWith("["))
+            {
+                var list = JsonConvert.DeserializeObject<IList<StepVariable>>(json) ?? new List<StepVariable>();
+                foreach (var variable in list)
+                {
+                    var variableValue = StepVariableParser.Parse(variable, context.Workflow);
+                    variable.Value = variableValue;
+                    CodeInputVariables.Add(variable);
+                }
+            }
         }
     }
 

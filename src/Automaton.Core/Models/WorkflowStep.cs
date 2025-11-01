@@ -1,8 +1,6 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Extensions;
-using Newtonsoft.Json.Linq;
 using Serilog;
-using System.Linq.Dynamic.Core;
 using System.Reflection;
 
 namespace Automaton.Core.Models;
@@ -72,30 +70,12 @@ public abstract class WorkflowStep
         return NextStepId != null ? WorkflowDefinition.Steps[NextStepId] : null;
     }
 
-    public void SetOutputVariable(string key, object value, Workflow workflow)
+    public void SetOutputVariable(string key, string? value, Workflow workflow)
     {
         var variable = Outputs[key];
         variable.Value = value;
 
         workflow.SetVariable(variable);
-    }
-
-    protected T GetInputValue<T>(string name)
-    {
-        var existingVariable = Inputs.Values.FirstOrDefault(v => v.Name == name);
-
-        if (existingVariable != null && existingVariable.Value is JArray inputArray)
-        {
-            // We need to return back the value of the same instance 
-            // so it can be updated from the UI.
-            // ToObject<T>() create a new object which is not
-            // bound to the UI controls, unless we assign it to existingVariable.Value 
-            existingVariable.Value = inputArray.ToObject<T>();
-
-            return existingVariable.GetValue<T>();
-        }
-
-        return existingVariable.GetValue<T>();
     }
 
     protected StepVariable? GetInputVariable(string name)
@@ -105,19 +85,22 @@ public abstract class WorkflowStep
         return input;
     }
 
+    protected string? GetInputString(string name)
+    {
+        return GetInputVariable(name)?.Value;
+    }
+
     protected virtual void SetupProperties(StepExecutionContext context)
     {
         foreach (var input in Inputs)
         {
             var stepType = GetType();
-            var stepVariable = stepType.GetProperty(input.Value.Name);
+            var stepProperty = stepType.GetProperty(input.Value.Name);
             var variable = input.Value;
             var value = variable.Value;
 
             // Auto-populate step inputs from Workflow.Variables
-            // If step input has no value, try to find matching variable by name
-            // Variables includes InputVariables + outputs from all previous steps
-            if (value == null || string.IsNullOrEmpty(value.ToString()))
+            if (string.IsNullOrEmpty(value))
             {
                 var runtimeVar = context.Workflow.Variables.Values
                     .FirstOrDefault(v => v.Name.Equals(variable.Name, StringComparison.OrdinalIgnoreCase));
@@ -127,15 +110,15 @@ public abstract class WorkflowStep
                     value = runtimeVar.Value;
 
                     logger.Information(
-                        "Auto-populated step input '{Name}' from workflow Variables (type: {Type})",
-                        variable.Name,
-                        runtimeVar.Type);
+                        "Auto-populated step input '{Name}' from workflow Variables",
+                        variable.Name);
                 }
             }
 
-            if (ShouldParseProperty(stepVariable))
+            // Do string replacement parsing if not ignored
+            if (ShouldParseProperty(stepProperty))
             {
-                value = StepVariableParser.Parse(variable, context.Workflow);
+                variable.Value = value = StepVariableParser.Parse(variable, context.Workflow);
             }
 
             if (value == null)
@@ -143,57 +126,25 @@ public abstract class WorkflowStep
                 continue;
             }
 
-            if (value is JArray array)
+            // Only strings are supported on public step properties
+            if (stepProperty.PropertyType == typeof(string))
             {
-                value = array.ToObject(stepVariable.PropertyType);
-            }
-
-            if (stepVariable.PropertyType.Name == nameof(Guid))
-            {
-                Guid.TryParse(value.ToString(), out var guidValue);
-                value = guidValue;
-            }
-
-            // TODO! Use stepVariable.PropertyType == typeof(string) instead?
-            if (stepVariable.PropertyType.Name == nameof(String))
-            {
-                value = value?.ToString();
-            }
-
-            // Check if the stepVariable is a collection
-            if (typeof(IEnumerable<StepVariable>).IsAssignableFrom(stepVariable.PropertyType))
-            {
-                if (value is IEnumerable<StepVariable> enumerableValue)
-                {
-                    var list = new List<StepVariable>();
-                    foreach (var item in enumerableValue)
-                    {
-                        var stepVar = new StepVariable
-                        {
-                            Id = item.Id,
-                            Name = item.Name,
-                            Value = item.Value,
-                            Description = item.Description,
-                            Type = item.Type
-                        };
-
-                        list.Add(item);
-                    }
-
-                    value = list;
-                }
-            }
-
-            // Check if the value is of the correct type before setting it
-            if (stepVariable.PropertyType.IsAssignableFrom(value.GetType()))
-            {
-                stepVariable.SetValue(this, value);
+                stepProperty.SetValue(this, value);
             }
             else
             {
-                // Handle the type mismatch case, e.g., log an error or throw an exception
-                logger.Error("Type mismatch: Cannot assign value of type {0} to property of type {1}", value.GetType(), stepVariable.PropertyType);
-                throw new InvalidCastException($"Cannot assign value of type {value.GetType()} to property of type {stepVariable.PropertyType}");
+                // If step exposes non-string property, attempt simple Guid coercion
+                if (stepProperty.PropertyType == typeof(Guid))
+                {
+                    if (Guid.TryParse(value, out var guidValue))
+                    {
+                        stepProperty.SetValue(this, guidValue);
+                        continue;
+                    }
+                }
+
+                logger.Error("Type mismatch: Cannot assign string to property of type {Type}", stepProperty.PropertyType);
+                throw new InvalidCastException($"Cannot assign string to property of type {stepProperty.PropertyType}");
             }
         }
     }

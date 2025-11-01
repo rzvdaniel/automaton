@@ -1,6 +1,6 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Steps.Sequence;
-using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -79,14 +79,63 @@ public abstract class StudioStep : INotifyPropertyChanged
 
     public abstract Type GetPropertiesComponent();
 
-    public T GetInputValue<T>(string name)
+    // String accessor
+    public string GetInputValue(string name)
     {
         var existingVariable = Inputs.Values.FirstOrDefault(v => v.Name == name);
-
-        return existingVariable.GetValue<T>();
+        return existingVariable?.Value ?? string.Empty;
     }
 
-    public void SetInputValue(string name, object value)
+    // Generic accessor for backward compatibility (converts from stored string)
+    public T GetInputValue<T>(string name)
+    {
+        var s = GetInputValue(name);
+        object result = default(T);
+
+        if (typeof(T) == typeof(string))
+        {
+            result = s ?? string.Empty;
+        }
+        else if (typeof(T) == typeof(Guid) || typeof(T) == typeof(Guid?))
+        {
+            if (Guid.TryParse(s, out var g)) result = g;
+        }
+        else if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
+        {
+            if (int.TryParse(s, out var i)) result = i;
+        }
+        else if (typeof(T) == typeof(double) || typeof(T) == typeof(double?))
+        {
+            if (double.TryParse(s, out var d)) result = d;
+        }
+        else if (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(IList<>))
+        {
+            try
+            {
+                result = JsonConvert.DeserializeObject<T>(string.IsNullOrWhiteSpace(s) ? "[]" : s);
+            }
+            catch
+            {
+                result = Activator.CreateInstance<T>();
+            }
+        }
+        else
+        {
+            try
+            {
+                result = JsonConvert.DeserializeObject<T>(s);
+            }
+            catch
+            {
+                result = default(T);
+            }
+        }
+
+        return (T)result;
+    }
+
+    // String setter
+    public void SetInputValue(string name, string value)
     {
         var existingVariable = Inputs.Values.FirstOrDefault(v => v.Name == name);
 
@@ -101,11 +150,22 @@ public abstract class StudioStep : INotifyPropertyChanged
         }
     }
 
-    public object GetOutputValue(string name)
+    // Object setter overload: stores JSON for non-strings
+    public void SetInputValue(string name, object value)
+    {
+        if (value is string str)
+        {
+            SetInputValue(name, str);
+            return;
+        }
+        var json = JsonConvert.SerializeObject(value);
+        SetInputValue(name, json);
+    }
+
+    public string GetOutputValue(string name)
     {
         var output = Outputs.Values.FirstOrDefault(v => v.Name == name);
-
-        return output.Value;
+        return output?.Value ?? string.Empty;
     }
 
     /// <summary>
@@ -118,7 +178,7 @@ public abstract class StudioStep : INotifyPropertyChanged
         if (Outputs.ContainsKey(variable.Id))
         {
             Outputs[variable.Id] = variable;
-        } 
+        }
         else
         {
             Outputs.Add(variable.Id, variable);

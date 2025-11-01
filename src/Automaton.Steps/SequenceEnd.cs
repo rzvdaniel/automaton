@@ -4,7 +4,7 @@ namespace Automaton.Steps;
 
 public class SequenceEnd : WorkflowStep
 {
-    public string SequenceStepId { get; set; }
+    public string? SequenceStepId { get; set; }
 
     /// <summary>
     /// Need to override ExecuteAsync because we do not want SequenceStepId to be
@@ -12,7 +12,7 @@ public class SequenceEnd : WorkflowStep
     /// </summary>
     public override async Task<ExecutionResult> ExecuteAsync(StepExecutionContext context)
     {
-        SequenceStepId = GetInputValue<string>(nameof(SequenceStepId));
+        SequenceStepId = GetInputString(nameof(SequenceStepId));
 
         var result = await RunAsync(context);
 

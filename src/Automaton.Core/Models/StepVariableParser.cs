@@ -1,6 +1,4 @@
 ﻿using Serilog;
-using System.Linq.Dynamic.Core;
-using System.Linq.Expressions;
 using System.Text.RegularExpressions;
 
 namespace Automaton.Core.Models
@@ -21,41 +19,18 @@ namespace Automaton.Core.Models
         {
         }
 
-        public object? Parse(StepVariable variable, Workflow workflow)
+        // String-only parser: replaces %var% with string values from workflow variables
+        public string Parse(StepVariable variable, Workflow workflow)
         {
-            var expression = variable.Value;
-
-            if (expression == null)
-            {
-                throw new ArgumentException();
-            }
-
-            var stringExpression = expression is StepVariable customStepVariable ?
-                customStepVariable.Value.ToString() :
-                expression.ToString();
-
+            var stringExpression = variable.Value ?? string.Empty;
             var variableNames = GetVariableNames(stringExpression);
 
-            if (variable.GetValueType() == typeof(string))
-            {
-                return ParseString(stringExpression, variableNames, workflow);
-            }
-
-            var parameterExpressions = GetParameterExpressions(variableNames, workflow);
-            var sanitizedExpression = stringExpression.Replace(Percentage, string.Empty);
-
-            var workflowVariables = workflow.GetVariables(variableNames);
-            var variableValues = workflowVariables.Select(x => x.Value);
-
-            var lambdaExpresion = DynamicExpressionParser.ParseLambda(parameterExpressions.ToArray(), variable.GetValueType(), sanitizedExpression);
-            var expressionValue = lambdaExpresion.Compile().DynamicInvoke(variableValues.ToArray());
-
-            return expressionValue;
+            return ParseString(stringExpression, variableNames, workflow);
         }
 
         private string ParseString(string expression, IEnumerable<string> variableNames, Workflow workflow)
         {
-            foreach(var variableName in variableNames)
+            foreach (var variableName in variableNames)
             {
                 var variable = workflow.GetVariableByName(variableName);
 
@@ -65,7 +40,8 @@ namespace Automaton.Core.Models
                     continue;
                 }
 
-                expression = expression.Replace($"%{variableName}%", variable.GetValue<string>());
+                var value = variable.Value ?? string.Empty;
+                expression = expression.Replace($"%{variableName}%", value);
             }
 
             return expression;
@@ -78,23 +54,6 @@ namespace Automaton.Core.Models
             var variableNames = matches.Select(x => x.Value.Replace(Percentage, string.Empty));
 
             return variableNames;
-        }
-
-        private static IEnumerable<ParameterExpression> GetParameterExpressions(IEnumerable<string> variableNames, Workflow workflow)
-        {
-            var variableExpressions = new List<ParameterExpression>();
-
-            foreach (var name in variableNames)
-            {
-                if (workflow.VariableWithNameExists(name))
-                {
-                    var variable = workflow.GetVariableByName(name);
-                    var variableExpression = Expression.Parameter(variable.GetValueType(), variable.Id);
-                    variableExpressions.Add(variableExpression);
-                }
-            }
-
-            return variableExpressions;
         }
     }
 }

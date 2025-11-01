@@ -116,7 +116,7 @@ public partial class FlowVariables : ComponentBase
             { 
                 Id = Guid.NewGuid().ToString(),
                 Name = newVariable.Name, 
-                Value = newVariable.Value,
+                Value = newVariable.Value?.ToString(),
                 Type = newVariable.Type,
                 Description = newVariable.Description
             });
@@ -151,7 +151,7 @@ public partial class FlowVariables : ComponentBase
             { 
                 Id = variable.Id,
                 Name = updatedVariable.Name, 
-                Value = updatedVariable.Value,
+                Value = updatedVariable.Value?.ToString(),
                 Type = updatedVariable.Type,
                 Description = updatedVariable.Description
             });
@@ -197,7 +197,7 @@ public partial class FlowVariables : ComponentBase
             { 
                 Id = Guid.NewGuid().ToString(),
                 Name = newVariable.Name, 
-                Value = newVariable.Value,
+                Value = newVariable.Value?.ToString(),
                 Type = newVariable.Type,
                 Description = newVariable.Description
             });
@@ -232,7 +232,7 @@ public partial class FlowVariables : ComponentBase
             { 
                 Id = variable.Id,
                 Name = updatedVariable.Name, 
-                Value = updatedVariable.Value,
+                Value = updatedVariable.Value?.ToString(),
                 Type = updatedVariable.Type,
                 Description = updatedVariable.Description
             });
@@ -267,7 +267,7 @@ public partial class FlowVariables : ComponentBase
         var flowVariable = Flow.InputVariables.Values.FirstOrDefault(v => v.Name == variable.Name);
         if (flowVariable != null)
         {
-            flowVariable.Value = value;
+            flowVariable.Value = value?.ToString();
             StateHasChanged();
         }
     }

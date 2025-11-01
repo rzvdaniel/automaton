@@ -21,68 +21,47 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        public void GetValue_WithDirectValue_ShouldReturnValue()
+        public void Value_WithDirectValue_ShouldReturnValue()
         {
             // Arrange
             var variable = new StepVariable { Name = "test", Value = "testValue" };
 
             // Act
-            var result = variable.GetValue<string>();
+            var result = variable.Value;
 
             // Assert
             Assert.That(result, Is.EqualTo("testValue"));
         }
 
         [Test]
-        public void GetValue_WithJArrayValue_ShouldConvertAndReturnValue()
+        public void Value_WithJArrayValue_ShouldStoreAsJsonString()
         {
             // Arrange
             var jsonArray = JArray.FromObject(new[] { "item1", "item2" });
-            var variable = new StepVariable { Name = "test", Value = jsonArray };
+            var variable = new StepVariable { Name = "test", Value = jsonArray.ToString(Newtonsoft.Json.Formatting.None) };
 
             // Act
-            var result = variable.GetValue<string[]>();
+            var result = variable.Value;
 
             // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.Length, Is.EqualTo(2));
-            Assert.That(result[0], Is.EqualTo("item1"));
-            Assert.That(result[1], Is.EqualTo("item2"));
+            Assert.That(result, Is.EqualTo("[\"item1\",\"item2\"]"));
         }
 
         [Test]
-        public void GetValue_WithJObjectValue_ShouldConvertAndReturnValue()
+        public void Value_WithJObjectValue_ShouldStoreAsJsonString()
         {
             // Arrange
             var testObject = new { Name = "TestName", Value = 42 };
             var jsonObject = JObject.FromObject(testObject);
-            var variable = new StepVariable { Name = "test", Value = jsonObject };
+            var variable = new StepVariable { Name = "test", Value = jsonObject.ToString(Newtonsoft.Json.Formatting.None) };
 
             // Act
-            var result = variable.GetValue<dynamic>();
+            var result = variable.Value;
 
             // Assert
-            Assert.That(result, Is.Not.Null);
-            Assert.That((string)result.Name, Is.EqualTo("TestName"));
-            Assert.That((int)result.Value, Is.EqualTo(42));
+            Assert.That(result, Does.Contain("\"TestName\""));
+            Assert.That(result, Does.Contain("42"));
         }
-
-        // Commenting out the JArray and JObject tests that cause stack overflow in the current implementation
-        // These would need fixes to the StepVariable.GetValue method to handle recursive calls properly
-        
-        /*
-        [Test]
-        public void GetValue_WithJArrayValue_ShouldConvertCorrectly()
-        {
-            // This test causes stack overflow due to recursive GetValue calls
-        }
-
-        [Test]
-        public void GetValue_WithJObjectValue_ShouldConvertCorrectly()
-        {
-            // This test causes stack overflow due to recursive GetValue calls
-        }
-        */
 
         [Test]
         public void Constructor_ShouldSetDefaultType()

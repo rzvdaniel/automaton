@@ -166,7 +166,7 @@ var ownerFlowsService = flowsServiceFactory.CreateForUser(appOwnerId.Value);
 
        if (matchingVar != null)
      {
-     matchingVar.Value = input.Value;
+     matchingVar.Value = Convert.ToString(input.Value);
     logger.LogDebug("Set input '{Key}' = {Value}", input.Key, input.Value);
          }
     else

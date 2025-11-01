@@ -125,7 +125,7 @@ public class FlowExecutionController : ControllerBase
 
                     if (matchingVar != null)
                     {
-                        matchingVar.Value = input.Value;
+                        matchingVar.Value = Convert.ToString(input.Value); // Change to string conversion
                         _logger.LogInformation("Set input variable '{Name}' = {Value}", input.Key, input.Value);
                     }
                     else
@@ -277,7 +277,7 @@ public class FlowExecutionController : ControllerBase
 
                     if (matchingVar != null)
                     {
-                        matchingVar.Value = input.Value;
+                        matchingVar.Value = Convert.ToString(input.Value); // Change to string conversion
                         _logger.LogInformation("Set input variable '{Name}' = {Value}", input.Key, input.Value);
                     }
                     else

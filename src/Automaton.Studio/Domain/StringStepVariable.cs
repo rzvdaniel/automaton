@@ -4,18 +4,17 @@ namespace Automaton.Studio.Domain
 {
     public class StringStepVariable : StepVariable
     {
-        private string stringValue;
+        public string StringValue { get; set; }
 
-        public string StringValue
-        {
-            get => stringValue;
-            set => stringValue = value;
-        }
-
-        public override object Value
+        public override string? Value
         {
             get => StringValue;
-            set => StringValue = (string)value;
+            set => StringStepVariable_set(value);
+        }
+
+        private void StringStepVariable_set(string? value)
+        {
+            StringValue = value ?? string.Empty;
         }
     }
 }
