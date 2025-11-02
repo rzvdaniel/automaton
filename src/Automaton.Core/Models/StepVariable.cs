@@ -9,9 +9,4 @@ public class StepVariable
     public VariableType Type { get; set; } = VariableType.String;
     public virtual string? Value { get; set; }
     public string? Description { get; set; }
-
-    public Type GetValueType()
-    {
-        return typeof(string);
-    }
 }

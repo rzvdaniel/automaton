@@ -8,19 +8,6 @@ namespace Automaton.Core.Tests.Models
     public class StepVariableTests
     {
         [Test]
-        public void GetValueType_WhenTypeIsString_ShouldReturnStringType()
-        {
-            // Arrange
-            var variable = new StepVariable { Name = "test", Type = VariableType.String };
-
-            // Act
-            var result = variable.GetValueType();
-
-            // Assert
-            Assert.That(result, Is.EqualTo(typeof(string)));
-        }
-
-        [Test]
         public void Value_WithDirectValue_ShouldReturnValue()
         {
             // Arrange
