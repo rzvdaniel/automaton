@@ -23,10 +23,10 @@ namespace Automaton.Core.Tests.Models
         public void ConcatenateStringVariables_ShouldReplaceVariables()
         {
             var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "a", Type = VariableType.String });
-            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = "b", Type = VariableType.String });
+            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "a" });
+            workflow.Variables.Add("B", new StepVariable { Id = "B", Name = "B", Value = "b" });
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%%B%", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%%B%" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             Assert.That(result, Is.EqualTo("ab"));
@@ -37,9 +37,9 @@ namespace Automaton.Core.Tests.Models
         public void ConcatenateStringVariablesAndStrings_ShouldReplaceVariablesAndKeepLiterals()
         {
             var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "a", Type = VariableType.String });
+            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "a" });
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%bc", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%bc" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             Assert.That(result, Is.EqualTo("abc"));
@@ -50,7 +50,7 @@ namespace Automaton.Core.Tests.Models
         public void Parse_WithNoVariables_ShouldReturnOriginalValue()
         {
             var workflow = new Workflow();
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "plain text", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "plain text" };
             
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
@@ -62,7 +62,7 @@ namespace Automaton.Core.Tests.Models
         public void Parse_WithNullValue_ShouldThrowArgumentException()
         {
             var workflow = new Workflow();
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = null, Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = null };
 
             Assert.Throws<ArgumentException>(() => stepVariableParser.Parse(stringVariable, workflow));
         }
@@ -72,10 +72,10 @@ namespace Automaton.Core.Tests.Models
         public void Parse_StringWithMultipleVariables_ShouldReplaceAll()
         {
             var workflow = new Workflow();
-            workflow.Variables.Add("First", new StepVariable { Id = "First", Name = "First", Value = "Hello", Type = VariableType.String });
-            workflow.Variables.Add("Second", new StepVariable { Id = "Second", Name = "Second", Value = "World", Type = VariableType.String });
+            workflow.Variables.Add("First", new StepVariable { Id = "First", Name = "First", Value = "Hello" });
+            workflow.Variables.Add("Second", new StepVariable { Id = "Second", Name = "Second", Value = "World" });
 
-            var stringVariable = new StepVariable { Id = "Result", Name = "Result", Value = "%First% %Second%!", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "Result", Name = "Result", Value = "%First% %Second%!" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             Assert.That(result, Is.EqualTo("Hello World!"));
@@ -86,10 +86,10 @@ namespace Automaton.Core.Tests.Models
         public void Parse_WithStepVariableAsValue_ShouldParseCorrectly()
         {
             var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "test", Type = VariableType.String });
+            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "test" });
 
-            var innerVariable = new StepVariable { Id = "Inner", Name = "Inner", Value = "%A%", Type = VariableType.String };
-            var outerVariable = new StepVariable { Id = "Outer", Name = "Outer", Value = innerVariable.Value, Type = VariableType.String };
+            var innerVariable = new StepVariable { Id = "Inner", Name = "Inner", Value = "%A%" };
+            var outerVariable = new StepVariable { Id = "Outer", Name = "Outer", Value = innerVariable.Value };
             
             var result = stepVariableParser.Parse(outerVariable, workflow);
 
@@ -102,7 +102,7 @@ namespace Automaton.Core.Tests.Models
         {
             var workflow = new Workflow();
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Hello %NonExistent% World", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Hello %NonExistent% World" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             // Should continue processing and return string with unresolved variable
@@ -119,7 +119,7 @@ namespace Automaton.Core.Tests.Models
             var workflow = new Workflow();
             // Don't add the variable to simulate null return from GetVariableByName
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Test %Missing% value", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Test %Missing% value" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             Assert.That(result, Is.EqualTo("Test %Missing% value"));
@@ -133,9 +133,9 @@ namespace Automaton.Core.Tests.Models
             // This test verifies that existing code using the parameterless constructor still works
             var parser = new StepVariableParser();
             var workflow = new Workflow();
-            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "test", Type = VariableType.String });
+            workflow.Variables.Add("A", new StepVariable { Id = "A", Name = "A", Value = "test" });
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "%A%" };
             var result = parser.Parse(stringVariable, workflow);
 
             Assert.That(result, Is.EqualTo("test"));
@@ -154,7 +154,7 @@ namespace Automaton.Core.Tests.Models
         {
             var workflow = new Workflow();
 
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Test %% empty", Type = VariableType.String };
+            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = "Test %% empty" };
             var result = stepVariableParser.Parse(stringVariable, workflow);
 
             // Should handle empty variable name gracefully

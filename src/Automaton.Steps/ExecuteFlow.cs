@@ -148,7 +148,6 @@ public class ExecuteFlow : WorkflowStep
                 {
                     // Set value in parent workflow Variables (makes it available to next steps)
                     outputMapping.Value = childOutputVar.Value;
-                    outputMapping.Type = childOutputVar.Type;
      
                     parentWorkflow.SetVariable(outputMapping);
 

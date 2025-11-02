@@ -15,19 +15,6 @@
 		<FormItem Label="Name">
 			<Input @bind-Value="@context.Name" Placeholder=@Placeholders.EnterVariableName />
 		</FormItem>
-		<FormItem Label="Type">
-			<Select @bind-Value="context.Type"
-					Placeholder="Select type..."
-					TItemValue="VariableType"
-					TItem="VariableType">
-				<SelectOptions>
-					@foreach (var variableType in VariableTypes)
-					{
-						<SelectOption TItemValue="VariableType" TItem="VariableType" Value=@variableType Label=@variableType.ToString() />
-					}
-				</SelectOptions>
-			</Select>
-		</FormItem>
 
 		<!-- ✅ Value field with TextArea for long values like API keys -->
 		<FormItem Label="Value">

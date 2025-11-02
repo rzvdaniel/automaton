@@ -24,8 +24,6 @@ partial class StepPage : ComponentBase, IDisposable
     private StandaloneCodeEditor codeEditor;
     private TextArea logsTextArea;
     
-    public IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
-
     private static readonly List<string> CustomStepLanguages =
     [
         CustomStepLanguage.Python,
@@ -379,7 +377,6 @@ partial class StepPage : ComponentBase, IDisposable
             .Select(v => new VariableInfo
             {
                 Name = v.Name ?? string.Empty,
-                Type = v.Type.ToString(),
                 Description = v.Description ?? string.Empty
             }).ToList() ?? new List<VariableInfo>();
     }
@@ -390,7 +387,6 @@ partial class StepPage : ComponentBase, IDisposable
             .Select(v => new VariableInfo
             {
                 Name = v.Name ?? string.Empty,
-                Type = v.Type.ToString(),
                 Description = v.Description ?? string.Empty
             }).ToList() ?? new List<VariableInfo>();
     }

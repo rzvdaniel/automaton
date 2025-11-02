@@ -47,12 +47,12 @@ public interface ICurrentStepContextService
     /// <summary>
     /// Create input variables for the current step
     /// </summary>
-    Task<int> CreateInputVariablesAsync(List<(string Name, string Type, string Description)> variables);
+    Task<int> CreateInputVariablesAsync(List<(string Name, string Description)> variables);
     
     /// <summary>
     /// Create output variables for the current step
     /// </summary>
-    Task<int> CreateOutputVariablesAsync(List<(string Name, string Type, string Description)> variables);
+    Task<int> CreateOutputVariablesAsync(List<(string Name, string Description)> variables);
     
     /// <summary>
     /// Event fired when step context changes
@@ -157,23 +157,19 @@ public class CurrentStepContextService : ICurrentStepContextService
         }
     }
 
-    public async Task<int> CreateInputVariablesAsync(List<(string Name, string Type, string Description)> variables)
+    public async Task<int> CreateInputVariablesAsync(List<(string Name, string Description)> variables)
     {
         if (_currentStep == null) return 0;
 
         var created = 0;
-        foreach (var (name, type, description) in variables)
+        foreach (var (name, description) in variables)
         {
-            if (!Enum.TryParse<Automaton.Core.Enums.VariableType>(type, out var varType))
-                continue;
-
             var variable = new Automaton.Core.Models.StepVariable
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = name,
-                Type = varType,
                 Description = description,
-                Value = GetDefaultValueForType(varType)
+                Value = string.Empty
             };
 
             _currentStep.Definition.CodeInputVariables ??= new List<StepVariable>();
@@ -187,23 +183,19 @@ public class CurrentStepContextService : ICurrentStepContextService
         return created;
     }
 
-    public async Task<int> CreateOutputVariablesAsync(List<(string Name, string Type, string Description)> variables)
+    public async Task<int> CreateOutputVariablesAsync(List<(string Name, string Description)> variables)
     {
         if (_currentStep == null) return 0;
 
         var created = 0;
-        foreach (var (name, type, description) in variables)
+        foreach (var (name, description) in variables)
         {
-            if (!Enum.TryParse<Automaton.Core.Enums.VariableType>(type, out var varType))
-                continue;
-
             var variable = new Automaton.Core.Models.StepVariable
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = name,
-                Type = varType,
                 Description = description,
-                Value = GetDefaultValueForType(varType)
+                Value = string.Empty
             };
 
             _currentStep.Definition.CodeOutputVariables ??= new List<StepVariable>();
@@ -215,14 +207,6 @@ public class CurrentStepContextService : ICurrentStepContextService
         
         await Task.CompletedTask;
         return created;
-    }
-
-    private string GetDefaultValueForType(Core.Enums.VariableType type)
-    {
-        return type switch
-        {
-            _ => string.Empty
-        };
     }
 }
 

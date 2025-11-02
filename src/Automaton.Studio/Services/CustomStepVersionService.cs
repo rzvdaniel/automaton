@@ -100,7 +100,6 @@ public class CustomStepVersionService
                 {
                     Id = templateVar.Id,
                     Name = templateVar.Name,
-                    Type = templateVar.Type,
                     Description = templateVar.Description,
                     // Preserve existing value if variable name matches
                     Value = existingInputValues.TryGetValue(templateVar.Name, out var existingValue) 

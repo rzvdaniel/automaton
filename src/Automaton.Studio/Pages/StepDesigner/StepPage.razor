@@ -360,19 +360,6 @@
                                         <Column Title="Name" TData="string">
                                             <Input Type="InputType.Text" @bind-Value="inputVariable.Name" AutoFocus />
                                         </Column>
-                                        <Column Title="Type" TData="string">
-                                            <Select @bind-Value="inputVariable.Type"
-                                                    Placeholder="Select type..."
-                                                    TItemValue="VariableType"
-                                                    TItem="VariableType">
-                                                <SelectOptions>
-                                                    @foreach (var variableType in VariableTypes)
-                                                    {
-                                                        <SelectOption TItemValue="VariableType" TItem="VariableType" Value=@variableType Label=@variableType.ToString() />
-                                                    }
-                                                </SelectOptions>
-                                            </Select>
-                                        </Column>
                                         <ActionColumn Title="Action">
                                             <Tooltip Title="Delete variable">
                                                 <Popconfirm Title="Sure to delete?"
@@ -422,19 +409,6 @@
                                         
                                         <Column Title="Name" TData="string">
                                             <Input Type="InputType.Text" @bind-Value="outputVariable.Name" />
-                                        </Column>
-                                        <Column Title="Type" TData="string">
-                                            <Select @bind-Value="outputVariable.Type"
-                                                    Placeholder="Select type..."
-                                                    TItemValue="VariableType"
-                                                    TItem="VariableType">
-                                                <SelectOptions>
-                                                    @foreach (var variableType in VariableTypes)
-                                                    {
-                                                        <SelectOption TItemValue="VariableType" TItem="VariableType" Value=@variableType Label=@variableType.ToString() />
-                                                    }
-                                                </SelectOptions>
-                                            </Select>
                                         </Column>
                                         <ActionColumn Title="Action">
                                             <Tooltip Title="Delete variable">

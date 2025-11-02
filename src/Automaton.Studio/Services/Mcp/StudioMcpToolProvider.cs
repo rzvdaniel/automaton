@@ -438,17 +438,15 @@ public class StudioMcpToolProvider : IMcpToolProvider
                 },
                 inputVariables = inputVariables?.Select(v => new { 
                     name = v.Name, 
-                    type = v.Type.ToString(), 
-                    description = v.Description ?? "",
+                    description = v.Description ?? string.Empty,
                     required = true,
-                    example = GetExampleValue(v.Type)
+                    example = "example value"
                 }).ToArray() ?? Array.Empty<object>(),
                 outputVariables = outputVariables?.Select(v => new { 
                     name = v.Name, 
-                    type = v.Type.ToString(), 
-                    description = v.Description ?? "",
+                    description = v.Description ?? string.Empty,
                     required = true,
-                    defaultValue = GetDefaultValue(v.Type)
+                    defaultValue = string.Empty
                 }).ToArray() ?? Array.Empty<object>(),
                 loggingGuidance = new
                 {
@@ -474,28 +472,6 @@ public class StudioMcpToolProvider : IMcpToolProvider
                 Error = $"Failed to get step variables: {ex.Message}" 
             };
         }
-    }
-
-    /// <summary>
-    /// Get example value for a variable type
-    /// </summary>
-    private object GetExampleValue(Automaton.Core.Enums.VariableType variableType)
-    {
-        return variableType switch
-        {
-            _ => "example value"
-        };
-    }
-
-    /// <summary>
-    /// Get default value for a variable type
-    /// </summary>
-    private object GetDefaultValue(Core.Enums.VariableType variableType)
-    {
-        return variableType switch
-        {
-            _ => string.Empty
-        };
     }
 
     private async Task<McpToolResult> SaveCodeAsync(JsonElement arguments, string? currentStepId)
@@ -581,8 +557,8 @@ public class StudioMcpToolProvider : IMcpToolProvider
 
         try
         {
-            var inputVars = new List<(string Name, string Type, string Description)>();
-            var outputVars = new List<(string Name, string Type, string Description)>();
+            var inputVars = new List<(string Name, string Description)>();
+            var outputVars = new List<(string Name, string Description)>();
 
             // Parse input variables
             if (arguments.TryGetProperty("inputVariables", out var inputVarsElement))
@@ -590,12 +566,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
                 foreach (var varElement in inputVarsElement.EnumerateArray())
                 {
                     var name = varElement.GetProperty("name").GetString();
-                    var type = varElement.GetProperty("type").GetString();
                     var description = varElement.GetProperty("description").GetString();
                     
-                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(type))
+                    if (!string.IsNullOrEmpty(name))
                     {
-                        inputVars.Add((name, type, description ?? ""));
+                        inputVars.Add((name, description ?? ""));
                     }
                 }
             }
@@ -611,7 +586,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
                     
                     if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(type))
                     {
-                        outputVars.Add((name, type, description ?? ""));
+                        outputVars.Add((name, description ?? ""));
                     }
                 }
             }
@@ -631,8 +606,8 @@ public class StudioMcpToolProvider : IMcpToolProvider
                     message = "Variables created successfully",
                     inputVariablesCreated = createdInputs,
                     outputVariablesCreated = createdOutputs,
-                    inputVariables = inputVars.Select(v => new { name = v.Name, type = v.Type, description = v.Description }),
-                    outputVariables = outputVars.Select(v => new { name = v.Name, type = v.Type, description = v.Description })
+                    inputVariables = inputVars.Select(v => new { name = v.Name, description = v.Description }),
+                    outputVariables = outputVars.Select(v => new { name = v.Name, description = v.Description })
                 }, new JsonSerializerOptions { WriteIndented = true })
             };
         }

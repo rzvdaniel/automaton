@@ -452,7 +452,7 @@
     public void AddCodeInputVariable()
     {
         var variableName = $"Variable{step.CodeInputVariables?.Count}";
-        step.CodeInputVariables.Add(new StepVariable { Name = variableName, Type = VariableType.String });
+        step.CodeInputVariables.Add(new StepVariable { Name = variableName });
     }
 
     public void DeleteCodeInputVariable(string name)

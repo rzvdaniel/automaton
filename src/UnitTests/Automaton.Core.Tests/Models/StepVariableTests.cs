@@ -49,15 +49,5 @@ namespace Automaton.Core.Tests.Models
             Assert.That(result, Does.Contain("\"TestName\""));
             Assert.That(result, Does.Contain("42"));
         }
-
-        [Test]
-        public void Constructor_ShouldSetDefaultType()
-        {
-            // Arrange & Act
-            var variable = new StepVariable { Name = "test" };
-
-            // Assert
-            Assert.That(variable.Type, Is.EqualTo(VariableType.String));
-        }
     }
 }

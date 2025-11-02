@@ -21,10 +21,6 @@ public class CustomValidator : AbstractValidator<CustomStep>
 
     private static bool InvalidVariableValue(StepVariable variable)
     {
-        return variable.Type switch
-        {
-            VariableType.String => string.IsNullOrEmpty(variable.Value?.ToString()),
-            _ => false,
-        };
+        return string.IsNullOrEmpty(variable.Value?.ToString());
     }
 }

@@ -71,7 +71,6 @@ namespace Automaton.Studio.Server.Services
                     variable.Id,
                     variable.Name,
                     variable.Value,
-                    variable.Type
                 }
             };
 

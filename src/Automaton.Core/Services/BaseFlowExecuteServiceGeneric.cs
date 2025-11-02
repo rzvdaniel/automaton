@@ -242,7 +242,6 @@ namespace Automaton.Core.Services
                         if (runtimeVar != null)
                         {
                             outputVar.Value = runtimeVar.Value;
-                            outputVar.Type = runtimeVar.Type;
 
                             logger.Information(
                                 "Populated output variable '{Name}' with value from runtime variable", 
