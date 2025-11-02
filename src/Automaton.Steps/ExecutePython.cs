@@ -1,8 +1,6 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
-using Automaton.Core.Utilities;
-using Newtonsoft.Json;
 
 namespace Automaton.Steps;
 
@@ -35,10 +33,7 @@ public class ExecutePython : WorkflowStep
         };
 
         // ✅ Convert input variables - avoid double-encoding strings
-        // Only serialize non-string values; strings are passed as-is
-        var inputVariablesDictionary = CodeInputVariables.ToDictionary(
-            x => x.Name,
-            x => InputVariableConverter.ConvertToString(x.Value));
+        var inputVariablesDictionary = CodeInputVariables.ToDictionary(x => x.Name, x => x.Value);
 
         var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 

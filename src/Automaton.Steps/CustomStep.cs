@@ -1,7 +1,6 @@
 ﻿using Automaton.Core.Attributes;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
-using Automaton.Core.Utilities;
 using Automaton.Steps.Enums;
 using Newtonsoft.Json;
 
@@ -47,12 +46,7 @@ public class CustomStep : WorkflowStep
                 Content = Code
             };
 
-            // ✅ Convert input variables to JSON strings
-            // ⚠️ IMPORTANT: Only serialize non-string values
-            // If value is already a string, pass it as-is to avoid double-encoding
-            var inputVariablesDictionary = CodeInputVariables.ToDictionary(
-                x => x.Name,
-                x => InputVariableConverter.ConvertToString(x.Value));
+            var inputVariablesDictionary = CodeInputVariables.ToDictionary(x => x.Name, x => x.Value);
 
             var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 
@@ -105,7 +99,7 @@ public class CustomStep : WorkflowStep
             }
             else if (inputsVariable.Value is string json && json.TrimStart().StartsWith("["))
             {
-                var list = JsonConvert.DeserializeObject<IList<StepVariable>>(json) ?? new List<StepVariable>();
+                var list = JsonConvert.DeserializeObject<IList<StepVariable>>(json) ?? [];
                 foreach (var variable in list)
                 {
                     var variableValue = StepVariableParser.Parse(variable, context.Workflow);

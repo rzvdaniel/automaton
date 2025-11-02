@@ -3,10 +3,8 @@ using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Scripting.ErrorParsers;
 using Automaton.Core.Scripting.Languages;
 using Automaton.Core.Scripting.Step;
-using Automaton.Core.Utilities;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
-using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Text;
 
@@ -153,10 +151,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     protected void ExecuteAsync(CustomStep step)
     {
         // ✅ Convert input variables - avoid double-encoding strings
-        // Only serialize non-string values; strings are passed as-is
-        var inputVariablesDictionary = step.InputVariables.ToDictionary(
-            x => x.Name,
-            x => InputVariableConverter.ConvertToString(x.Value));
+        var inputVariablesDictionary = step.InputVariables.ToDictionary(x => x.Name, x => x.Value);
 
         // Convert output variable definitions
         var outputVariableNames = step.OutputVariables?
@@ -226,10 +221,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             };
 
             // ✅ Convert input variables - avoid double-encoding strings
-            // Only serialize non-string values; strings are passed as-is
-            var stringInputs = inputVariables.ToDictionary(
-                kvp => kvp.Key,
-                kvp => InputVariableConverter.ConvertToString(kvp.Value));
+            var stringInputs = inputVariables.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             // Execute on a background thread to avoid blocking
             var scriptVariables = await Task.Run(() => _scriptHost.Execute(resource, stringInputs));
