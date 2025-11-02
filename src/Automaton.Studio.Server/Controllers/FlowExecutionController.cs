@@ -208,7 +208,7 @@ public class FlowExecutionController : ControllerBase
                 Message = success ? "Flow executed successfully" : "Flow execution failed or incomplete",
 
                 // Include actual flow output variables (what web apps need!)
-                OutputVariables = firstResult?.OutputVariables ?? new Dictionary<string, object?>(),
+                OutputVariables = firstResult?.OutputVariables ?? [],
 
                 // Include logs (optional, for debugging)
                 Logs = firstResult?.Logs
@@ -308,7 +308,7 @@ public class FlowExecutionController : ControllerBase
 
                 // Include OutputVariables
                 OutputVariables = workflowExecution.OutputVariables
-              .ToDictionary(k => k.Key, v => (object?)v.Value.Value),
+                    .ToDictionary(k => k.Key, v => v.Value.Value),
 
                 // Include logs
                 Logs = workflowExecution.Logs

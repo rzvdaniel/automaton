@@ -284,7 +284,7 @@ public class RunnerService
 
             // ✅ Include OutputVariables from flow execution
             OutputVariables = flowExecution.OutputVariables
-                .ToDictionary(k => k.Key, v => (object?)v.Value.Value),
+                .ToDictionary(k => k.Key, v => v.Value.Value),
 
             // ✅ Include execution logs for debugging
             Logs = flowExecution.Logs

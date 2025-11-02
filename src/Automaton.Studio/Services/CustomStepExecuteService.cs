@@ -87,7 +87,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             {
                 Success = true,
                 ConsoleOutput = consoleOutput.ToString(),
-                OutputVariables = step.OutputVariables?.ToDictionary(v => v.Name, v => (object)v.Value) ?? new Dictionary<string, object>(),
+                OutputVariables = step.OutputVariables?.ToDictionary(v => v.Name, v => v.Value) ?? [],
                 Started = started,
                 Finished = finished
             };
@@ -105,7 +105,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 Success = false,
                 ConsoleOutput = consoleOutput.ToString(),
                 Error = ex.Message,
-                OutputVariables = new Dictionary<string, object>(),
+                OutputVariables = [],
                 Started = started,
                 Finished = finished
             };
@@ -207,7 +207,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
     (
         string code,
         string language,
-        Dictionary<string, object> inputVariables,
+        Dictionary<string, string> inputVariables,
         string stepId
     )
     {
@@ -270,7 +270,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
             var internalKeys = new[] { "error", "stackTrace", "errorOutput", "stdout", "stderr" };
             var cleanVariables = scriptVariables
                 .Where(kvp => !internalKeys.Contains(kvp.Key))
-                .ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             // Build error list from structured error info
             var errorsList = new List<string>();
@@ -313,7 +313,7 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
                 Success = false,
                 Output = $"**Execution Exception**\n\n{ex.Message}",
                 Errors = new[] { errorInfo.GetFormattedErrorForAI() },
-                OutputVariables = new Dictionary<string, object>(),
+                OutputVariables = [],
                 ExecutionTime = $"{stopwatch.ElapsedMilliseconds}ms",
                 ErrorInfo = errorInfo
             };
@@ -329,7 +329,7 @@ public class LocalCustomStepExecutionResult
     public bool Success { get; set; }
     public string ConsoleOutput { get; set; } = string.Empty;
     public string? Error { get; set; }
-    public Dictionary<string, object> OutputVariables { get; set; } = new();
+    public Dictionary<string, string> OutputVariables { get; set; } = [];
     public DateTime Started { get; set; }
     public DateTime Finished { get; set; }
 }

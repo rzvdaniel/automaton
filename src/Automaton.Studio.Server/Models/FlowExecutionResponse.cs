@@ -1,6 +1,3 @@
-using Automaton.Core.Enums;
-using Automaton.Core.Models;
-
 namespace Automaton.Studio.Server.Models;
 
 /// <summary>
@@ -42,10 +39,7 @@ public class FlowExecutionResponse
     /// Flow output variables - the actual results from the flow
     /// This is what web apps are interested in!
     /// </summary>
-    public Dictionary<string, object?> OutputVariables { get; set; } = new();
+    public Dictionary<string, string?> OutputVariables { get; set; } = [];
 
-    /// <summary>
-    /// Execution logs (optional, for debugging)
-    /// </summary>
-  public List<string>? Logs { get; set; }
+    public List<string>? Logs { get; set; }
 }

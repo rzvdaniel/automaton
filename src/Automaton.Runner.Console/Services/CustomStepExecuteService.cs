@@ -63,9 +63,7 @@ public class CustomStepExecuteService
                     Error = result.Error,
                     Started = result.Started,
                     Finished = result.Finished,
-                    OutputVariables = result.OutputVariables.ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => (object)kvp.Value) ?? new Dictionary<string, object>()
+                    OutputVariables = result.OutputVariables ?? []
                 };
             }
 
@@ -81,9 +79,7 @@ public class CustomStepExecuteService
                 Error = null,
                 Started = result.Started,
                 Finished = result.Finished,
-                OutputVariables = result.OutputVariables.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => (object)kvp.Value) ?? new Dictionary<string, object>()
+                OutputVariables = result.OutputVariables ?? []
             };
         }
         catch (Exception ex)
@@ -100,7 +96,7 @@ public class CustomStepExecuteService
                 Error = $"Execution exception: {ex.Message}",
                 Started = DateTime.UtcNow,
                 Finished = DateTime.UtcNow,
-                OutputVariables = new Dictionary<string, object>()
+                OutputVariables = []
             };
         }
     }

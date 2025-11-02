@@ -13,11 +13,11 @@ namespace Automaton.Studio.Server.Models
         /// <summary>
         /// Flow output variables - actual results from the flow execution
         /// </summary>
-        public Dictionary<string, object?> OutputVariables { get; set; } = new();
+        public Dictionary<string, string?> OutputVariables { get; set; } = [];
      
         /// <summary>
         /// Execution logs for debugging
         /// </summary>
-        public List<string> Logs { get; set; } = new();
+        public List<string> Logs { get; set; } = [];
     }
 }

@@ -252,7 +252,7 @@ public class HubService
                         Error = $"Handler exception: {ex.Message}",
                         Started = DateTime.UtcNow,
                         Finished = DateTime.UtcNow,
-                        OutputVariables = new Dictionary<string, object>()
+                        OutputVariables = []
                     };
                 }
             });

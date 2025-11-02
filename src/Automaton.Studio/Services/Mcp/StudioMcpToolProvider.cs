@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Automaton.Studio.Services;
 using Automaton.Mcp.Client.Services;
 using Automaton.Studio.Models;
 
@@ -293,7 +292,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
             _logger.LogInformation("Executing {Language} code for step {StepId}", language, stepId);
             
             // Prepare input variables with realistic test data
-            var inputVariables = new Dictionary<string, object>();
+            var inputVariables = new Dictionary<string, string>();
             if (arguments.TryGetProperty("inputVariables", out var inputVarsProp))
             {
                 foreach (var prop in inputVarsProp.EnumerateObject())
@@ -305,8 +304,8 @@ public class StudioMcpToolProvider : IMcpToolProvider
             {
                 // Provide default test data following Studio's patterns
                 inputVariables["input_text"] = "Test data for processing";
-                inputVariables["input_number"] = 42;
-                inputVariables["input_data"] = new Dictionary<string, object> { ["key"] = "value" };
+                inputVariables["input_number"] = "42";
+                inputVariables["input_data"] = JsonSerializer.Serialize(new Dictionary<string, string> { ["key"] = "value" });
             }
 
             // Use the existing Studio execution service
@@ -337,7 +336,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
                     stackTrace = executionResult.ErrorInfo.StackTrace,
                     formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
                 } : null,
-                outputVariables = executionResult.OutputVariables ?? new Dictionary<string, object>(),
+                outputVariables = executionResult.OutputVariables ?? [],
                 executionTime = executionResult.ExecutionTime ?? "0ms",
                 inputVariablesUsed = inputVariables,
                 codeAnalysis = new

@@ -12,7 +12,7 @@ public class RunnerCustomStepResult
     public string? Error { get; set; }
     public DateTime Started { get; set; }
     public DateTime Finished { get; set; }
-    public Dictionary<string, object>? OutputVariables { get; set; }
+    public Dictionary<string, string>? OutputVariables { get; set; }
 }
 
 /// <summary>
@@ -25,5 +25,5 @@ public class CustomStepExecutionResponse
     public string? Error { get; set; }
     public DateTime Started { get; set; }
     public DateTime Finished { get; set; }
-    public Dictionary<string, object>? OutputVariables { get; set; }
+    public Dictionary<string, string>? OutputVariables { get; set; }
 }

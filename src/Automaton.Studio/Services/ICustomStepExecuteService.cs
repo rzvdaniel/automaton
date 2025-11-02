@@ -13,6 +13,6 @@ public interface ICustomStepExecuteService
     Task<CodeExecutionResult> ExecuteCustomStepCodeAsync(
         string code, 
         string language, 
-        Dictionary<string, object> inputVariables, 
+        Dictionary<string, string> inputVariables, 
         string stepId);
 }
