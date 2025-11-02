@@ -149,7 +149,7 @@ namespace Automaton.Core.Scripting.Engines.Python
                                         currentPath.InvokeMethod("insert", new PyInt(0), pyPath);
                                     }
                                 }
-                                catch { }
+                                catch {}
                             }
                         }
                     }
@@ -202,7 +202,7 @@ namespace Automaton.Core.Scripting.Engines.Python
                     .Where(kvp => !kvp.Key.StartsWith("error") && !kvp.Key.StartsWith("stackTrace"))
                     .ToDictionary(
                         kvp => kvp.Key,
-                        kvp => JsonConvert.SerializeObject(kvp.Value)),  // JSON serialize
+                        kvp => kvp.Value), // pass-through; values are already JSON from ConvertFromPython
                 StandardOutput = variables.ContainsKey("stdout") ? variables["stdout"]?.ToString() ?? string.Empty : string.Empty,
                 StandardError = variables.ContainsKey("stderr") ? variables["stderr"]?.ToString() ?? string.Empty : string.Empty
             };
@@ -396,9 +396,9 @@ _captured_output.close()
         }
 
         /// <summary>
-        /// Converts a Python object to a string representation.
-        /// ✅ SIMPLIFIED: All output is returned as string (will be JSON serialized later).
-        /// No need for typed conversion - just convert to string representation.
+        /// Converts a Python object to a string representation that is valid JSON.
+        /// Uses Python's json.dumps to ensure double-quoted JSON for lists/dicts/strings/primitives.
+        /// Falls back to JSON-encoding of the object's string representation.
         /// </summary>
         private string ConvertFromPython(PyObject pyObj)
         {
@@ -407,12 +407,21 @@ _captured_output.close()
 
             try
             {
-                // For all types, convert to string which will be JSON serialized by the caller
-                return pyObj.ToString() ?? string.Empty;
+                using var json = Py.Import("json");
+                using var dumped = json.InvokeMethod("dumps", pyObj);
+                return dumped.As<string>() ?? "null";
             }
             catch
             {
-                return string.Empty;
+                try
+                {
+                    var s = pyObj.ToString() ?? string.Empty;
+                    return JsonConvert.SerializeObject(s);
+                }
+                catch
+                {
+                    return "null";
+                }
             }
         }
 
