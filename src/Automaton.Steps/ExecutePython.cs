@@ -42,16 +42,20 @@ public class ExecutePython : WorkflowStep
 
         var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 
+        SetCodeOutputVariables(context, scriptVariables);
+
+        return Task.FromResult(ExecutionResult.Next());
+    }
+
+    private void SetCodeOutputVariables(StepExecutionContext context, IDictionary<string, string> scriptVariables)
+    {
         foreach (var variable in CodeOutputVariables)
         {
-            if (scriptVariables.ContainsKey(variable.Name))
+            if (scriptVariables.TryGetValue(variable.Name, out string? value))
             {
-                // ✅ scriptVariables values are already JSON strings
-                variable.Value = scriptVariables[variable.Name];
+                variable.Value = value;
                 context.Workflow.SetVariable(variable);
             }
         }
-
-        return Task.FromResult(ExecutionResult.Next());
     }
 }

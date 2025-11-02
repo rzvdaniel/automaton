@@ -25,11 +25,6 @@
     const flowIdentifier = 'Headlines2';
     const inputs = {};
 
-    function fixJson(jsonString) {
-      // Replace single quotes with double quotes for simple cases
-      return jsonString.replace(/'/g, '"');
-    }
-
     async function load() {
       const status = document.getElementById('status');
       const error = document.getElementById('error');
@@ -56,7 +51,7 @@
         let headlines = data.outputVariables?.headlines || [];
 
         if (typeof headlines === 'string') {
-          headlines = JSON.parse(fixJson(headlines));
+          headlines = JSON.parse(headlines);
         }
 
         if (!Array.isArray(headlines)) headlines = [headlines];

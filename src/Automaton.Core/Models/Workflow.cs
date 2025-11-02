@@ -59,7 +59,7 @@ public class Workflow
         }
         else
         {
-            Variables.Add(variable.Name, variable);
+            Variables.Add(variable.Id, variable);
         }
 
         SetWorkflowVariable?.Invoke(this, new SetVariableNotification(variable));

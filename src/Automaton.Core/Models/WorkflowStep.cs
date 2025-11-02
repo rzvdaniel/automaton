@@ -70,14 +70,6 @@ public abstract class WorkflowStep
         return NextStepId != null ? WorkflowDefinition.Steps[NextStepId] : null;
     }
 
-    public void SetOutputVariable(string key, string? value, Workflow workflow)
-    {
-        var variable = Outputs[key];
-        variable.Value = value;
-
-        workflow.SetVariable(variable);
-    }
-
     protected StepVariable? GetInputVariable(string name)
     {
         var input = Inputs.Values.FirstOrDefault(v => v.Name == name);

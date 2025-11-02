@@ -56,15 +56,7 @@ public class CustomStep : WorkflowStep
 
             var scriptVariables = scriptHost.Execute(resource, inputVariablesDictionary);
 
-            foreach (var variable in Outputs)
-            {
-                if (scriptVariables.ContainsKey(variable.Value.Id))
-                {
-                    // ✅ scriptVariables values are already JSON strings
-                    variable.Value.Value = scriptVariables[variable.Value.Id];
-                    context.Workflow.SetVariable(variable.Value);
-                }
-            }
+            SetOutputVariables(context, scriptVariables);
 
             result.InternalLogs = logs;
             return Task.FromResult(result);
@@ -72,6 +64,19 @@ public class CustomStep : WorkflowStep
         finally
         {
             scriptHost.ScriptTextWritten -= OnScriptTextWrittenLocal;
+        }
+    }
+
+    private void SetOutputVariables(StepExecutionContext context, IDictionary<string, string> scriptVariables)
+    {
+        foreach (var variable in Outputs)
+        {
+            if (scriptVariables.ContainsKey(variable.Value.Name))
+            {
+                variable.Value.Value = scriptVariables[variable.Value.Name];
+
+                context.Workflow.SetVariable(variable.Value);
+            }
         }
     }
 
