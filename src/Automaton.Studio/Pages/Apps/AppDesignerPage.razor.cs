@@ -207,118 +207,20 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     }
 
     /// <summary>
-    /// Get HTML content for preview with Automaton bridge injected
+    /// Get HTML content for preview
     /// </summary>
     private string GetPreviewHtml()
     {
         try
         {
             var html = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
-            return InjectAutomatonBridge(html, isPreview: true);
+
+            return html;
         }
         catch
         {
             return GetDefaultHtmlContent();
         }
-    }
-
-    /// <summary>
-    /// Inject Automaton JavaScript bridge into HTML content
-    /// </summary>
-    private string InjectAutomatonBridge(string htmlContent, bool isPreview = false)
-    {
-        var bridge = isPreview ? GetPreviewBridge() : GetProductionBridge();
-
-        // Try to insert before </head>
-        if (htmlContent.Contains("</head>", StringComparison.OrdinalIgnoreCase))
-        {
-            return htmlContent.Replace("</head>", $"{bridge}</head>", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // Try to insert before </body>
-        if (htmlContent.Contains("</body>", StringComparison.OrdinalIgnoreCase))
-        {
-            return htmlContent.Replace("</body>", $"{bridge}</body>", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // If no head or body tags, prepend to content
-        return bridge + htmlContent;
-    }
-
-    /// <summary>
-    /// Get preview mode Automaton bridge (mock responses)
-    /// </summary>
-    private string GetPreviewBridge()
-    {
-        return @"
-<script>
-    // Automaton Bridge - Preview Mode
-  window.Automaton = {
-        executeFlow: async function(flowId, inputs) {
-            console.log('🔧 Preview Mode: Automaton.executeFlow called');
-       console.log('Flow ID:', flowId);
-   console.log('Inputs:', inputs);
-      
-            // Return mock response in preview mode
-     return {
-         success: true,
-                message: 'Preview mode - flow not executed',
- data: {
-       timestamp: new Date().toISOString(),
-        previewMode: true
-        }
-            };
-    },
-        version: '1.0.0',
-        mode: 'preview'
-    };
-    
-    console.log('✅ Automaton bridge loaded (Preview Mode)');
-</script>";
-    }
-
-    /// <summary>
-    /// Get production mode Automaton bridge (real API calls)
-    /// </summary>
-    private string GetProductionBridge()
-    {
-        return @"
-<script>
-    // Automaton Bridge - Production Mode
-    window.Automaton = {
-        executeFlow: async function(flowId, inputs = {}) {
-            try {
-                console.log('🚀 Executing flow:', flowId);
-                const response = await fetch('/api/flows/execute', {
-                    method: 'POST',
-                       headers: {
-                          'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        flowId: flowId,
-                        inputs: inputs
-                        })
-                });
-  
-                if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || 'Flow execution failed');
-                }
-       
-                const result = await response.json();
-                console.log('✅ Flow executed successfully:', result);
-                return result;
-            } catch (error) {
-                console.error('❌ Automaton.executeFlow error:', error);
-                throw error;
-            }
-        },
-        version: '1.0.0',
-        mode: 'production'
-    };
-    
-    console.log('✅ Automaton bridge loaded (Production Mode)');
-</script>";
     }
 
     /// <summary>
@@ -340,31 +242,6 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         catch (Exception ex)
         {
             await MessageService.ErrorAsync($"Failed to refresh preview: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Open preview in new browser tab
-    /// </summary>
-    private async Task OpenPreviewInNewTab()
-    {
-        try
-        {
-            // Get current code from editor
-            var code = await codeEditor.GetValue();
-            var htmlWithBridge = InjectAutomatonBridge(code, isPreview: true);
-
-            // Convert to base64 data URL
-            var bytes = Encoding.UTF8.GetBytes(htmlWithBridge);
-            var base64 = Convert.ToBase64String(bytes);
-            var dataUrl = $"data:text/html;base64,{base64}";
-
-            // Open in new tab
-            await JSRuntime.InvokeVoidAsync("open", dataUrl, "_blank");
-        }
-        catch (Exception ex)
-        {
-            await MessageService.ErrorAsync($"Failed to open preview: {ex.Message}");
         }
     }
 

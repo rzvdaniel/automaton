@@ -64,8 +64,8 @@ public class WebAppFlowExecutionController : ControllerBase
             request ??= new WebAppFlowExecutionRequest();
 
             logger.LogDebug("Request inputs count: {Count}, RunnerNames: {Runners}",
-    request.Inputs?.Count ?? 0,
-          request.RunnerNames != null ? string.Join(", ", request.RunnerNames) : "none");
+                request.Inputs?.Count ?? 0,
+                request.RunnerNames != null ? string.Join(", ", request.RunnerNames) : "none");
 
             // 1. Get web app by slug and verify it's published
             var webApp = await dbContext.WebApps
@@ -122,16 +122,16 @@ public class WebAppFlowExecutionController : ControllerBase
                 logger.LogDebug("Resolving flow name '{FlowName}' for owner {OwnerId}", flowIdentifier, appOwnerId);
 
                 var flow = await dbContext.Flows
-          .Include(f => f.FlowUsers)  // ? Eagerly load navigation property
-        .FirstOrDefaultAsync(f =>
-                          f.Name == flowIdentifier &&
-                         f.FlowUsers.Any(u => u.UserId == appOwnerId),
-                 cancellationToken);
+                    .Include(f => f.FlowUsers)
+                    .FirstOrDefaultAsync(f =>
+                        f.Name == flowIdentifier &&
+                        f.FlowUsers.Any(u => u.UserId == appOwnerId),
+                        cancellationToken);
 
                 if (flow == null)
                 {
                     logger.LogWarning("Flow '{FlowName}' not found for app owner {OwnerId}",
-           flowIdentifier, appOwnerId);
+                        flowIdentifier, appOwnerId);
                     return NotFound(new { message = $"Flow '{flowIdentifier}' not found" });
                 }
 
@@ -162,7 +162,7 @@ public class WebAppFlowExecutionController : ControllerBase
                 foreach (var input in request.Inputs)
                 {
                     var matchingVar = flowToExecute.InputVariables.Values
-              .FirstOrDefault(v => v.Name.Equals(input.Key, StringComparison.OrdinalIgnoreCase));
+                        .FirstOrDefault(v => v.Name.Equals(input.Key, StringComparison.OrdinalIgnoreCase));
 
                     if (matchingVar != null)
                     {
@@ -198,8 +198,8 @@ public class WebAppFlowExecutionController : ControllerBase
             {
                 // User specified runner names - find matching online runners
                 var requestedRunners = onlineRunners
-            .Where(r => request.RunnerNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase))
-           .ToList();
+                    .Where(r => request.RunnerNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
 
                 if (!requestedRunners.Any())
                 {
@@ -217,7 +217,7 @@ public class WebAppFlowExecutionController : ControllerBase
 
                 selectedRunnerIds = requestedRunners.Select(r => r.Id).ToList();
                 logger.LogInformation("Using specified runners: {Runners}",
-                  string.Join(", ", requestedRunners.Select(r => r.Name)));
+                    string.Join(", ", requestedRunners.Select(r => r.Name)));
             }
             else
             {
@@ -229,7 +229,7 @@ public class WebAppFlowExecutionController : ControllerBase
 
             // 10. Execute flow as app owner (using owner's permissions and runners)
             logger.LogInformation("Executing flow {FlowId} on {RunnerCount} runner(s) on behalf of user {OwnerId}",
-             flowId, selectedRunnerIds.Count, appOwnerId);
+                flowId, selectedRunnerIds.Count, appOwnerId);
 
             var results = await ownerFlowsService.Execute(flowId, selectedRunnerIds, cancellationToken);
 
@@ -238,8 +238,8 @@ public class WebAppFlowExecutionController : ControllerBase
             var success = firstResult?.Status == WorkflowStatus.Success;
 
             logger.LogInformation(
-       "Flow execution complete: FlowId={FlowId}, Success={Success}, Status={Status}, AppSlug={AppSlug}, OwnerId={OwnerId}",
-   flowId, success, firstResult?.Status, appSlug, appOwnerId);
+               "Flow execution complete: FlowId={FlowId}, Success={Success}, Status={Status}, AppSlug={AppSlug}, OwnerId={OwnerId}",
+                flowId, success, firstResult?.Status, appSlug, appOwnerId);
 
             // 12. Return result
             return Ok(new WebAppFlowExecutionResponse

@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -26,6 +27,20 @@ public class AppsController : BaseController
         if (app is null)
         {
             return NotFound();
+        }
+
+        return Ok(app);
+    }
+
+    [HttpGet("slug/{slug}")]
+    [AllowAnonymous]
+    public ActionResult<Models.AppModel> GetBySlug(string slug)
+    {
+        var app = appsService.GetBySlug(slug);
+
+        if (app is null)
+        {
+            return NotFound(new { message = "App not found or not published" });
         }
 
         return Ok(app);

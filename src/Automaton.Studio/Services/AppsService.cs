@@ -50,6 +50,17 @@ public class AppsService
         return app;
     }
 
+    public async Task<AppModel> LoadBySlug(string slug)
+    {
+        var response = await httpClient.GetAsync($"{configService.AppsUrl}/slug/{slug}");
+
+        response.EnsureSuccessStatusCode();
+
+        var app = await response.Content.ReadAsAsync<AppModel>();
+
+        return app;
+    }
+
     public async Task<AppModel> Create(NewApp app)
     {
         var response = await httpClient.PostAsJsonAsync(configService.AppsUrl, app);
