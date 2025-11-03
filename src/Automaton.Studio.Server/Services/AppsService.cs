@@ -65,15 +65,17 @@ public class AppsService
     /// <summary>
     /// Get published app metadata by slug for access validation.
     /// Returns app info without requiring ownership (for authentication checks).
+    /// Used by both AppsController and WebAppFlowExecutionController.
     /// </summary>
-    public Models.PublishedAppInfo GetPublishedAppInfo(string slug)
+    public async Task<Models.PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
     {
-        var appEntity = dataContext.WebApps
+        var appEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
-            .FirstOrDefault(x =>
+            .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
-                x.IsPublished);
+                x.IsPublished,
+                cancellationToken);
 
         if (appEntity == null)
         {

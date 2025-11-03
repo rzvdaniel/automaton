@@ -43,10 +43,9 @@ public class AppsController : BaseController
     /// Get published app by public URL slug.
     /// Used by WebAppViewer to load apps accessed via /web/{slug} URLs.
     /// Validates authentication requirements and loads app as the owner.
-    /// Note: We check authentication ourselves based on app settings
     /// </summary>
     [HttpGet("slug/{slug}")]
-    [AllowAnonymous]
+    [AllowAnonymous] // We check authentication ourselves based on app settings
     public async Task<ActionResult<Models.AppModel>> GetBySlug(string slug)
     {
         try
@@ -54,11 +53,12 @@ public class AppsController : BaseController
             logger.LogInformation("[AppsController] Loading app by slug: {Slug}", slug);
 
             // 1. Get published app metadata (without requiring ownership)
-            var appInfo = appsService.GetPublishedAppInfo(slug);
+            var appInfo = await appsService.GetPublishedAppInfoAsync(slug);
 
             if (appInfo == null)
             {
                 logger.LogWarning("[AppsController] App not found or not published: {Slug}", slug);
+
                 return NotFound(new { message = "App not found or not published" });
             }
 
@@ -68,14 +68,18 @@ public class AppsController : BaseController
 
             if (appInfo.RequiresAuthentication && !isUserAuthenticated)
             {
-                logger.LogWarning("[AppsController] Unauthenticated access to protected app: {AppName} (slug: {Slug})", appInfo.Name, slug);
+                logger.LogWarning("[AppsController] Unauthenticated access to protected app: {AppName} (slug: {Slug})",
+                    appInfo.Name, slug);
+
                 return Unauthorized(new { message = "This app requires authentication" });
             }
 
             // 3. Validate app has owner
             if (appInfo.OwnerId == null)
             {
-                logger.LogError("[AppsController] App has no owner: {AppName} (slug: {Slug})", appInfo.Name, slug);
+                logger.LogError("[AppsController] App has no owner: {AppName} (slug: {Slug})",
+                    appInfo.Name, slug);
+
                 return StatusCode(500, new { message = "App configuration error: no owner" });
             }
 

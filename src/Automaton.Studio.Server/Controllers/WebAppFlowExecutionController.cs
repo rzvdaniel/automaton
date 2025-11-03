@@ -1,9 +1,7 @@
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -15,18 +13,18 @@ namespace Automaton.Studio.Server.Controllers;
 [Route("api/web-apps")]
 public class WebAppFlowExecutionController : ControllerBase
 {
-    private readonly ApplicationDbContext dbContext;
+    private readonly AppsService appsService;
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly RunnerService runnerService;
     private readonly ILogger<WebAppFlowExecutionController> logger;
 
     public WebAppFlowExecutionController(
-        ApplicationDbContext dbContext,
+        AppsService appsService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         RunnerService runnerService,
         ILogger<WebAppFlowExecutionController> logger)
     {
-        this.dbContext = dbContext;
+        this.appsService = appsService;
         this.flowsServiceFactory = flowsServiceFactory;
         this.runnerService = runnerService;
         this.logger = logger;
@@ -67,10 +65,8 @@ public class WebAppFlowExecutionController : ControllerBase
                 request.Inputs?.Count ?? 0,
                 request.RunnerNames != null ? string.Join(", ", request.RunnerNames) : "none");
 
-            // 1. Get web app by slug and verify it's published
-            var webApp = await dbContext.WebApps
-                 .Include(wa => wa.WebAppUsers)
-                .FirstOrDefaultAsync(wa => wa.PublicUrl == appSlug && wa.IsPublished, cancellationToken);
+            // 1. Get web app by slug and verify it's published (using AppsService)
+            var webApp = await appsService.GetPublishedAppInfoAsync(appSlug, cancellationToken);
 
             if (webApp == null)
             {
@@ -100,15 +96,16 @@ public class WebAppFlowExecutionController : ControllerBase
                 logger.LogInformation("Anonymous access to public app '{AppName}'", webApp.Name);
             }
 
-            // 3. Get app owner
-            var appOwnerId = webApp.WebAppUsers.FirstOrDefault()?.UserId;
-            if (appOwnerId == null)
+            // 3. Validate app has owner
+            if (webApp.OwnerId == null)
             {
                 logger.LogError("Web app '{AppName}' (slug: {AppSlug}) has no owner", webApp.Name, appSlug);
                 return StatusCode(500, new { message = "Web app configuration error: no owner" });
             }
 
-            // 4. Resolve flow identifier (can be name or GUID)
+            var appOwnerId = webApp.OwnerId.Value;
+
+            // 4. Resolve flow identifier (can be name or GUID) - using impersonated FlowsService
             Guid flowId;
             if (Guid.TryParse(flowIdentifier, out var parsedGuid))
             {
@@ -118,24 +115,21 @@ public class WebAppFlowExecutionController : ControllerBase
             }
             else
             {
-                // It's a flow name - look up by owner and name
+                // It's a flow name - resolve using impersonated FlowsService
                 logger.LogDebug("Resolving flow name '{FlowName}' for owner {OwnerId}", flowIdentifier, appOwnerId);
 
-                var flow = await dbContext.Flows
-                    .Include(f => f.FlowUsers)
-                    .FirstOrDefaultAsync(f =>
-                        f.Name == flowIdentifier &&
-                        f.FlowUsers.Any(u => u.UserId == appOwnerId),
-                        cancellationToken);
+                // Create FlowsService scoped to app owner for flow name resolution
+                var ownerFlowsService = flowsServiceFactory.CreateForUser(appOwnerId);
+                var resolvedFlowId = await ownerFlowsService.ResolveFlowNameToId(flowIdentifier, cancellationToken);
 
-                if (flow == null)
+                if (resolvedFlowId == null)
                 {
                     logger.LogWarning("Flow '{FlowName}' not found for app owner {OwnerId}",
                         flowIdentifier, appOwnerId);
                     return NotFound(new { message = $"Flow '{flowIdentifier}' not found" });
                 }
 
-                flowId = flow.Id;
+                flowId = resolvedFlowId.Value;
                 logger.LogInformation("Resolved flow name '{FlowName}' to ID: {FlowId}", flowIdentifier, flowId);
             }
 
@@ -143,10 +137,10 @@ public class WebAppFlowExecutionController : ControllerBase
 
             // 5. Create FlowsService scoped to app owner (impersonation for this request)
             // This sets the impersonation context for the rest of the request
-            var ownerFlowsService = flowsServiceFactory.CreateForUser(appOwnerId.Value);
+            var ownerFlowsServiceForExecution = flowsServiceFactory.CreateForUser(appOwnerId);
 
             // 6. Get flow (using owner's permissions)
-            var flowToExecute = ownerFlowsService.Get(flowId);
+            var flowToExecute = ownerFlowsServiceForExecution.Get(flowId);
             if (flowToExecute == null)
             {
                 logger.LogWarning("Flow not found or not accessible: {FlowId}", flowId);
@@ -231,7 +225,7 @@ public class WebAppFlowExecutionController : ControllerBase
             logger.LogInformation("Executing flow {FlowId} on {RunnerCount} runner(s) on behalf of user {OwnerId}",
                 flowId, selectedRunnerIds.Count, appOwnerId);
 
-            var results = await ownerFlowsService.Execute(flowId, selectedRunnerIds, cancellationToken);
+            var results = await ownerFlowsServiceForExecution.Execute(flowId, selectedRunnerIds, cancellationToken);
 
             // 11. Process results
             var firstResult = results.FirstOrDefault();

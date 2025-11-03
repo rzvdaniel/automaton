@@ -134,6 +134,24 @@ public class FlowsService
         return exists;
     }
 
+    /// <summary>
+    /// Resolve flow name to flow ID for the current user (respects impersonation).
+    /// </summary>
+    /// <param name="flowName">Flow name to resolve</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Flow ID if found, null otherwise</returns>
+    public async Task<Guid?> ResolveFlowNameToId(string flowName, CancellationToken cancellationToken = default)
+    {
+        var flow = await dbContext.Flows
+            .Include(f => f.FlowUsers)
+            .FirstOrDefaultAsync(f =>
+                f.Name == flowName &&
+                f.FlowUsers.Any(u => u.UserId == userId),
+                cancellationToken);
+
+        return flow?.Id;
+    }
+
     public async Task<IEnumerable<RunnerFlowResult>> Execute(Guid flowId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
         var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId && x.FlowUsers.Any(x => x.UserId == userId));
