@@ -13,18 +13,18 @@ namespace Automaton.Studio.Server.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/web-apps")]
-public class WebAppFlowExecutionController : ControllerBase
+public class AppsFlowExecutionController : ControllerBase
 {
     private readonly AppsService appsService;
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly RunnerService runnerService;
-    private readonly ILogger<WebAppFlowExecutionController> logger;
+    private readonly ILogger<AppsFlowExecutionController> logger;
 
-    public WebAppFlowExecutionController(
+    public AppsFlowExecutionController(
         AppsService appsService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         RunnerService runnerService,
-        ILogger<WebAppFlowExecutionController> logger)
+        ILogger<AppsFlowExecutionController> logger)
     {
         this.appsService = appsService;
         this.flowsServiceFactory = flowsServiceFactory;
