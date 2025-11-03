@@ -16,13 +16,13 @@ namespace Automaton.Studio.Server.Controllers;
 public class WebAppFlowExecutionController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
-    private readonly FlowsServiceFactory flowsServiceFactory;
+    private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly RunnerService runnerService;
     private readonly ILogger<WebAppFlowExecutionController> logger;
 
     public WebAppFlowExecutionController(
         ApplicationDbContext dbContext,
-        FlowsServiceFactory flowsServiceFactory,
+        UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         RunnerService runnerService,
         ILogger<WebAppFlowExecutionController> logger)
     {

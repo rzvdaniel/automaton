@@ -1,5 +1,7 @@
-using Automaton.Core.Enums;
+﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -9,8 +11,11 @@ public class AppsService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
-    private readonly Guid userId;
+    private readonly UserContextService userContextService;
     private readonly Serilog.ILogger logger;
+
+    // ✅ Helper property to get current userId (respects impersonation)
+    private Guid UserId => userContextService.GetUserId();
 
     public AppsService(
         ApplicationDbContext dataContext,
@@ -19,14 +24,14 @@ public class AppsService
     )
     {
         this.dataContext = dataContext;
+        this.userContextService = userContextService;
         this.recentActivityService = recentActivityService;
-        this.userId = userContextService.GetUserId();
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
     public IEnumerable<Models.AppModel> List()
     {
-        var entities = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == userId));
+        var entities = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == UserId));
         var apps = entities.Select(MapToModel);
 
         return apps;
@@ -34,21 +39,57 @@ public class AppsService
 
     public Models.AppModel Get(Guid id)
     {
-        var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
+        var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
         var app = MapToModel(appEntity);
 
         return app;
     }
 
+    /// <summary>
+    /// Get app by public URL slug. Validates published status and ownership.
+    /// Returns app only if it's published and owned by the current user (respects impersonation).
+    /// </summary>
     public Models.AppModel GetBySlug(string slug)
     {
-        var appEntity = dataContext.WebApps.FirstOrDefault(x =>
-            x.WebAppUsers.Any(x => x.UserId == userId) &&
-            x.PublicUrl != null &&
-            x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
-            x.IsPublished);
+        var appEntity = dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstOrDefault(x =>
+                x.PublicUrl != null &&
+                x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
+                x.IsPublished &&
+                x.WebAppUsers.Any(u => u.UserId == UserId));
 
         return MapToModel(appEntity);
+    }
+
+    /// <summary>
+    /// Get published app metadata by slug for access validation.
+    /// Returns app info without requiring ownership (for authentication checks).
+    /// </summary>
+    public Models.PublishedAppInfo GetPublishedAppInfo(string slug)
+    {
+        var appEntity = dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstOrDefault(x =>
+                x.PublicUrl != null &&
+                x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
+                x.IsPublished);
+
+        if (appEntity == null)
+        {
+            return null;
+        }
+
+        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId;
+
+        return new Models.PublishedAppInfo
+        {
+            Id = appEntity.Id,
+            Name = appEntity.Name,
+            PublicUrl = appEntity.PublicUrl,
+            RequiresAuthentication = appEntity.RequiresAuthentication,
+            OwnerId = ownerId
+        };
     }
 
     public async Task<Guid> Create(Models.NewApp app)
@@ -73,7 +114,7 @@ public class AppsService
         var appUser = new Entities.WebAppUser
         {
             WebAppId = entity.Id,
-            UserId = userId
+            UserId = UserId
         };
 
         dataContext.WebAppUsers.Add(appUser);
@@ -87,7 +128,7 @@ public class AppsService
 
     public async Task Update(Guid id, Models.AppModel app)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
 
         if (entity == null)
         {
@@ -110,7 +151,7 @@ public class AppsService
 
     public async Task Remove(Guid id)
     {
-        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
+        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
 
         if (app == null)
         {
@@ -128,7 +169,7 @@ public class AppsService
 
     public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
 
         if (entity == null)
         {
@@ -165,7 +206,7 @@ public class AppsService
 
     public async Task Unpublish(Guid id)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == userId));
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
 
         if (entity == null)
         {
