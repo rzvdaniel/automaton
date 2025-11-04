@@ -4,24 +4,13 @@
 @using Automaton.Studio.Components
 @inherits AntDesign.FeedbackComponent<NewApp>
 
-
 <Form Model="@Options" Layout="@FormLayout.Vertical">
     <FormItem Label="Name">
         <Input @bind-Value="@Options.Name" Placeholder="Enter app name (e.g., 'MyDashboard')" />
     </FormItem>
 
     <FormItem Label="Default Runner (optional)">
-        <RunnerSelector Multiple="false" SelectedValue="Options.ExecutionRunnerId" SelectedValueChanged="EventCallback.Factory.Create<Guid?>(this, v => Options.ExecutionRunnerId = v)" Style="width:100%" />
+        <RunnerSelector Multiple="false" @bind-SelectedValue="Options.ExecutionRunnerId" Style="width:100%" />
         <Text Type="TextElementType.Secondary">Optional: select a default runner to use for preview and initial execution.</Text>
     </FormItem>
 </Form>
-
-@code {
-
-    protected override async Task OnInitializedAsync()
-    {
-
-
-        await base.OnInitializedAsync();
-    }
-}

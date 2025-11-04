@@ -9,10 +9,10 @@
 
 <div class="publish-dialog">
 	<Alert Type="@AlertType.Info"
-		 Message="Publishing your app"
-		 Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
-		 ShowIcon="true"
-		 Style="margin-bottom:16px;" />
+		   Message="Publishing your app"
+		   Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
+		   ShowIcon="true"
+		   Style="margin-bottom:16px;" />
 
 	<Form Model="@Options" Layout="@FormLayout.Vertical">
 		<FormItem Label="App Display Name">
@@ -23,9 +23,9 @@
 			<Space Direction="SpaceDirection.Vertical" Style="width:100%;">
 				<SpaceItem>
 					<Input @bind-Value="@Options.PublicUrl"
-						 Placeholder="my-app-name"
-						 Size="@InputSize.Large"
-						 @oninput="OnSlugInput" />
+						   Placeholder="my-app-name"
+						   Size="@InputSize.Large"
+						   @oninput="OnSlugInput" />
 				</SpaceItem>
 				<SpaceItem>
 					<Text Type="@TextElementType.Secondary" Style="font-size:12px;">
@@ -63,7 +63,7 @@
 		</FormItem>
 
 		<FormItem Label="Execution Runner (optional)">
-			<RunnerSelector Multiple="false" SelectedValue="Options.ExecutionRunnerId" SelectedValueChanged="EventCallback.Factory.Create<Guid?>(this, v => Options.ExecutionRunnerId = v)" Style="width:100%" />
+			<RunnerSelector Multiple="false" @bind-SelectedValue="Options.ExecutionRunnerId" Style="width:100%" />
 			<AntDesign.Text Type="@TextElementType.Secondary" Style="font-size:12px;">
 				Optional: select the runner that should execute flows triggered by this app. If left blank, calls must specify runner names.
 			</AntDesign.Text>
@@ -71,37 +71,9 @@
 
 
 		<Alert Type="@AlertType.Warning"
-			 Message="URL slug rules"
-			 Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
-			 ShowIcon="true"
-			 Style="margin-top:8px;" />
+			   Message="URL slug rules"
+			   Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
+			   ShowIcon="true"
+			   Style="margin-top:8px;" />
 	</Form>
 </div>
-
-@code {
-
-	protected override async Task OnInitializedAsync()
-	{
-		// Generate initial slug from display name if PublicUrl is empty
-		if (string.IsNullOrEmpty(Options.PublicUrl) && !string.IsNullOrEmpty(Options.DisplayName))
-		{
-			Options.PublicUrl = AppsService.GenerateSlugPreview(Options.DisplayName);
-		}
-
-
-
-		await base.OnInitializedAsync();
-	}
-
- private void OnSlugInput(ChangeEventArgs e)
- {
-	 var input = e.Value?.ToString() ?? string.Empty;
-
-	 // Clean the input on the fly
-	 var cleaned = AppsService.GenerateSlugPreview(input);
-	 Options.PublicUrl = cleaned;
-
-	 StateHasChanged();
- }
-
-}

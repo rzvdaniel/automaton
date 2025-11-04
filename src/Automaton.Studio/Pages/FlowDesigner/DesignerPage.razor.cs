@@ -154,12 +154,6 @@ partial class DesignerPage : ComponentBase
         }
     }
 
-    private void OnRunnersSelectionChanged(IEnumerable<Guid> runnerIds)
-    {
-        selectedRunners = runnerIds?.ToList() ?? new List<Guid>();
-        StateHasChanged();
-    }
-
     private string GetExecutionResultMessage(IEnumerable<RunnerFlowResult> results)
     {
         var successCount = results.Count(r => r.Status == WorkflowStatus.Success);

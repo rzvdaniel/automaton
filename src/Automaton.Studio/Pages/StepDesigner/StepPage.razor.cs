@@ -71,14 +71,6 @@ partial class StepPage : ComponentBase, IDisposable
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    private void OnRunnersSelectionChanged(IEnumerable<Guid> runnerIds)
-    {
-        selectedRunners = runnerIds?.ToList() ?? new List<Guid>();
-        StateHasChanged();
-    }
-
-    
-
     public void AddInputVariable()
     {
         StepDesignerViewModel.AddInputVariable();
