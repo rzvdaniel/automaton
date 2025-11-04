@@ -82,9 +82,7 @@
 
                                 <!-- Runner Selection -->
                                 <SpaceItem>
-                                    <RunnerSelector SelectedValues="selectedRunners"
-                                                    SelectedValuesChanged="EventCallback.Factory.Create<IEnumerable<Guid>>(this, OnRunnersSelectionChanged)"
-                                                    Style="width:200px" />
+                                    <RunnerSelector Multiple="true" @bind-SelectedValues="selectedRunners" Style="width:300px" />
                                 </SpaceItem>
                                 
                                 <!-- Enhanced Help Section -->

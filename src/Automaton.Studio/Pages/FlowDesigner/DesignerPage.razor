@@ -5,6 +5,7 @@
 @using Automaton.Studio.Pages.FlowDesigner.Components;
 @using Automaton.Studio.Domain;
 @using Automaton.Studio.Models;
+@using Automaton.Studio.Components;
 
 <Layout>
     <Header Class="header">
@@ -80,7 +81,7 @@
 
                             <!-- Runner Selection -->
                             <SpaceItem>
-                                 <RunnerSelector Multiple="true" SelectedValues="selectedRunners" SelectedValuesChanged="EventCallback.Factory.Create<IEnumerable<Guid>>(this, OnRunnersSelectionChanged)" Style="width:200px" />
+                                 <RunnerSelector @bind-SelectedValues="selectedRunners" Style="width:200px" Multiple="true" />
                             </SpaceItem>
                             
                             <!-- Enhanced Help Section -->

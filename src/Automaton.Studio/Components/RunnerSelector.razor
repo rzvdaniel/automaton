@@ -49,7 +49,7 @@ else
 			Placeholder="@Placeholder"
 			DataSource="AvailableRunners"
 			TItem="RunnerModel"
-			TItemValue="Guid?"
+			TItemValue="Guid ?"
 			ValueProperty="r => r.Id"
 			LabelProperty="r => r.Name"
 			DisabledPredicate="r => r.Status == RunnerStatus.Offline"
@@ -73,10 +73,32 @@ else
 
 @code {
 	private IEnumerable<RunnerModel> AvailableRunners { get; set; } = new List<RunnerModel>();
-	[Parameter] public bool Multiple { get; set; } = false;
 
-	// Single-selection
 	private Guid? _selectedValue;
+
+	// Internal mutable copy used for binding
+	private List<Guid> _boundValues = new();
+
+	private IEnumerable<Guid> BoundValues
+	{
+		get => _boundValues;
+		set
+		{
+			var newList = (value ?? Enumerable.Empty<Guid>()).ToList();
+			if (!_boundValues.SequenceEqual(newList))
+			{
+				_boundValues = newList;
+				// notify parent
+				_ = SelectedValuesChanged.InvokeAsync(_boundValues);
+			}
+		}
+	}
+
+	[Inject] private Automaton.Studio.Services.RunnerService RunnerService { get; set; }
+
+	[Parameter] 
+	public bool Multiple { get; set; } = false;
+
 	[Parameter]
 	public Guid? SelectedValue
 	{
@@ -90,28 +112,13 @@ else
 			}
 		}
 	}
-	[Parameter] public EventCallback<Guid?> SelectedValueChanged { get; set; }
 
-	// Multiple-selection parameter (one-way input) and event callback
-	[Parameter] public IEnumerable<Guid> SelectedValues { get; set; } = new List<Guid>();
+	[Parameter]
+	public EventCallback<Guid?> SelectedValueChanged { get; set; }
+
+	// Multiple-selection API for parent
+	[Parameter] public IEnumerable<Guid>? SelectedValues { get; set; }
 	[Parameter] public EventCallback<IEnumerable<Guid>> SelectedValuesChanged { get; set; }
-
-	// Internal bound property used by Select binding
-	private IEnumerable<Guid> _boundValues = new List<Guid>();
-	private IEnumerable<Guid> BoundValues
-	{
-		get => _boundValues;
-		set
-		{
-			var newVals = value ?? new List<Guid>();
-			if (!_boundValues.SequenceEqual(newVals))
-			{
-				_boundValues = newVals;
-				// notify parent
-				_ = SelectedValuesChanged.InvokeAsync(_boundValues);
-			}
-		}
-	}
 
 	[Parameter] public string Placeholder { get; set; } = "Select runners...";
 	[Parameter] public string Style { get; set; } = "width:200px";
@@ -119,17 +126,14 @@ else
 
 	private bool isLoading = false;
 
-	[Inject] private Automaton.Studio.Services.RunnerService RunnerService { get; set; }
-
-	protected override async Task OnParametersSetAsync()
+	protected override void OnParametersSet()
 	{
-		// keep internal bound values in sync with incoming SelectedValues
-		var incoming = SelectedValues ?? new List<Guid>();
+		// sync incoming values into internal copy
+		var incoming = SelectedValues?.ToList() ?? new List<Guid>();
 		if (!_boundValues.SequenceEqual(incoming))
 		{
-			_boundValues = incoming.ToList();
+			_boundValues = incoming;
 		}
-		await base.OnParametersSetAsync();
 	}
 
 	protected override async Task OnInitializedAsync()
@@ -158,28 +162,47 @@ else
 		}
 	}
 
-	private string GetRunnerStatusIcon(RunnerStatus status)
+	private string GetRunnerStatusIcon(RunnerStatus status) => status switch
 	{
-		return status switch
-		{
-			RunnerStatus.Online => "check-circle",
-			RunnerStatus.Offline => "close-circle",
-			_ => "question-circle",
-		};
-	}
+		RunnerStatus.Online => "check-circle",
+		RunnerStatus.Offline => "close-circle",
+		_ => "question-circle",
+	};
 
-	private string GetRunnerStatusClass(RunnerStatus status)
-	{
-		return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
-	}
+	private string GetRunnerStatusClass(RunnerStatus status) => $"runner-status-icon runner-status-{status.ToString().ToLower()}";
 }
 
 <style>
-	.runner-status-icon.runner-status-online { color: #52c41a !important; }
-	.runner-status-icon.runner-status-offline { color: #ff4d4f !important; }
-	.runner-status-icon.runner-status-none { color: #d9d9d9 !important; }
-	.runner-item { display: inline-flex; align-items: center; gap:8px; }
-	.runner-label-inline { display: inline-flex; align-items: center; gap:8px; }
-	.runner-label { vertical-align: middle; }
-	.runner-placeholder { color: #8c8c8c; font-size:13px; }
+	.runner-status-icon.runner-status-online {
+		color: #52c41a !important;
+	}
+
+	.runner-status-icon.runner-status-offline {
+		color: #ff4d4f !important;
+	}
+
+	.runner-status-icon.runner-status-none {
+		color: #d9d9d9 !important;
+	}
+
+	.runner-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.runner-label-inline {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.runner-label {
+		vertical-align: middle;
+	}
+
+	.runner-placeholder {
+		color: #8c8c8c;
+		font-size: 13px;
+	}
 </style>
