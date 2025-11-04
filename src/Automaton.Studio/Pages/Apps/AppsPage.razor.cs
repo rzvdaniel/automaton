@@ -73,7 +73,8 @@ partial class AppsPage : ComponentBase
             AppId = id,
             DisplayName = app.DisplayName,
             PublicUrl = app.PublicUrl ?? string.Empty,
-            RequiresAuthentication = true // Default to protected
+            RequiresAuthentication = true, // Default to protected
+            ExecutionRunnerId = app.ExecutionRunnerId
         };
 
         var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>(

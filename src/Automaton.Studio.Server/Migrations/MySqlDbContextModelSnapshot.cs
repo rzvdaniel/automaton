@@ -610,6 +610,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("ExecutionRunnerId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("tinyint(1)");
 
@@ -664,7 +667,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 10, 25, 18, 26, 36, 401, DateTimeKind.Local).AddTicks(5620));
+                        .HasDefaultValue(new DateTime(2025, 11, 4, 18, 44, 39, 651, DateTimeKind.Local).AddTicks(4637));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

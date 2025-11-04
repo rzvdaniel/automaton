@@ -23,11 +23,14 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         Definition = new AppDefinition()
     };
 
+    private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
+
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
     [Inject] private ModalService ModalService { get; set; }
+    [Inject] private RunnerService RunnerService { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -41,6 +44,8 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             {
                 currentApp = await AppsService.Load(appGuid);
             }
+
+            // Do not load runners here — load after first render to avoid JSInterop DotNetObjectReference disposal with Monaco editor
         }
         catch
         {
@@ -50,6 +55,29 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         finally
         {
             loading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadRunners();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task LoadRunners()
+    {
+        try
+        {
+            availableRunners = await RunnerService.List();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            availableRunners = [];
         }
     }
 
@@ -72,6 +100,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             var code = await codeEditor.GetValue();
             currentApp.Definition.HtmlContent = code;
 
+            // Persist the current app including ExecutionRunnerId (if changed)
             await AppsService.Update(currentApp);
             await MessageService.SuccessAsync("App saved successfully");
         }
@@ -83,6 +112,21 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             saving = false;
         }
+    }
+
+    private string GetRunnerStatusIcon(Automaton.Core.Enums.RunnerStatus status)
+    {
+        return status switch
+        {
+            Automaton.Core.Enums.RunnerStatus.Online => "check-circle",
+            Automaton.Core.Enums.RunnerStatus.Offline => "close-circle",
+            _ => "question-circle",
+        };
+    }
+
+    private string GetRunnerStatusClass(Automaton.Core.Enums.RunnerStatus status)
+    {
+        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
     }
 
     // Publishing Methods - Phase 2 Implementation
@@ -115,7 +159,8 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             {
                 AppId = currentApp.Id,
                 DisplayName = currentApp.DisplayName,
-                PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(currentApp.DisplayName)
+                PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(currentApp.DisplayName),
+                ExecutionRunnerId = currentApp.ExecutionRunnerId
             };
 
             var modalRef = await ModalService.CreateModalAsync<PublishAppDialog, PublishAppModel>
@@ -140,7 +185,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
                 try
                 {
-                    await AppsService.PublishAsync(currentApp.Id, model.PublicUrl, model.RequiresAuthentication);
+                    await AppsService.PublishAsync(currentApp.Id, model.PublicUrl, model.RequiresAuthentication, model.ExecutionRunnerId);
 
                     // Update local model
                     currentApp.IsPublished = true;
@@ -148,6 +193,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                     currentApp.PublishedAt = DateTime.UtcNow;
                     currentApp.Version++;
                     currentApp.RequiresAuthentication = model.RequiresAuthentication;
+                    currentApp.ExecutionRunnerId = model.ExecutionRunnerId;
 
                     await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
                     await InvokeAsync(StateHasChanged);

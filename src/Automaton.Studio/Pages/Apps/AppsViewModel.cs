@@ -31,7 +31,8 @@ public class AppsViewModel
             IsPublished = newApp.IsPublished,
             PublicUrl = newApp.PublicUrl,
             Created = newApp.Created,
-            Updated = newApp.Updated
+            Updated = newApp.Updated,
+            ExecutionRunnerId = newApp.ExecutionRunnerId
         });
     }
 

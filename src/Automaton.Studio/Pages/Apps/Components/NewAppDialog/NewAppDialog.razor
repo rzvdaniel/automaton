@@ -1,21 +1,37 @@
 @using Automaton.Studio.Models
 @using Automaton.Studio.Services
+@using Automaton.Core.Enums
 @inherits AntDesign.FeedbackComponent<NewApp>
 
 @inject RunnerService RunnerService
 
-<Form Model="@Options">
+<Form Model="@Options" Layout="@FormLayout.Vertical">
     <FormItem Label="Name">
         <Input @bind-Value="@Options.Name" Placeholder="Enter app name (e.g., 'MyDashboard')" />
     </FormItem>
 
     <FormItem Label="Default Runner (optional)">
-        <Select @bind-Value="Options.ExecutionRunnerId" TItemValue="Guid?" TItem="Guid?" Style="width:100%">
-            <SelectOption TItemValue="Guid?" TItem="Guid?" Value="@( (Guid?)null )">None</SelectOption>
-            @foreach (var r in runners)
-            {
-                <SelectOption TItemValue="Guid?" TItem="Guid?" Value="@((Guid?)r.Id)">@r.Name (@(r.Status == Automaton.Core.Enums.RunnerStatus.Online ? "online" : "offline"))</SelectOption>
-            }
+        <Select @bind-Value="Options.ExecutionRunnerId"
+                Placeholder="Select default runner (optional)"
+                DataSource="runners"
+                TItem="Automaton.Studio.Models.RunnerModel"
+                TItemValue="Guid?"
+                ValueProperty="r => r.Id"
+                LabelProperty="r => r.Name"
+                DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
+                Style="width:100%">
+            <ItemTemplate Context="runnerContext">
+                <span>
+                    <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+                    <span class="runner-label">@runnerContext.Name</span>
+                </span>
+            </ItemTemplate>
+            <LabelTemplate Context="runnerContext">
+                <span>
+                    <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+                    <span class="runner-label">@runnerContext.Name</span>
+                </span>
+            </LabelTemplate>
         </Select>
         <Text Type="TextElementType.Secondary">Optional: select a default runner to use for preview and initial execution.</Text>
     </FormItem>
@@ -37,4 +53,37 @@
 
         await base.OnInitializedAsync();
     }
+
+    private string GetRunnerStatusIcon(RunnerStatus status)
+    {
+        return status switch
+        {
+            RunnerStatus.Online => "check-circle",
+            RunnerStatus.Offline => "close-circle",
+            _ => "question-circle",
+        };
+    }
+
+    private string GetRunnerStatusClass(RunnerStatus status)
+    {
+        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
+    }
 }
+
+<style>
+    .runner-status-icon.runner-status-online {
+        color: #52c41a !important; /* Green for online */
+    }
+
+    .runner-status-icon.runner-status-offline {
+        color: #ff4d4f !important; /* Red for offline */
+    }
+
+    .runner-status-icon.runner-status-none {
+        color: #d9d9d9 !important; /* Gray for none/unknown */
+    }
+
+    /* Align icon and label */
+    .runner-status-icon { vertical-align: middle; margin-right:8px; }
+    .runner-label { vertical-align: middle; }
+</style>
