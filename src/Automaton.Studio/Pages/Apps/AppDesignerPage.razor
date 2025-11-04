@@ -1,6 +1,7 @@
 @page "/appdesigner/{appId}"
 @using AntDesign
 @using Automaton.Studio.Pages.Apps.Components
+@using Automaton.Studio.Components
 
 <Layout>
 	<Content>
@@ -33,7 +34,7 @@
 							</Tag>
 						</SpaceItem>
 						<SpaceItem>
-							<Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
+							<Text Type="TextElementType.Secondary" Style="font-size: 12px;">
 								<Icon Type="link" />
 								/web/@currentApp.PublicUrl
 							</Text>
@@ -69,8 +70,8 @@
 
 					<SpaceItem>
 						<Button Icon="@(currentApp.IsPublished ? "stop" : "cloud-upload")"
-								OnClick="TogglePublish"
-								Loading="@publishing">
+							OnClick="TogglePublish"
+							Loading="@publishing">
 							@(currentApp.IsPublished ? "Unpublish" : "Publish")
 						</Button>
 					</SpaceItem>
@@ -79,8 +80,8 @@
 					{
 						<SpaceItem>
 							<Button Icon="eye"
-									OnClick="OpenPublishedApp"
-									Type="@ButtonType.Default">
+								OnClick="OpenPublishedApp"
+								Type="@ButtonType.Default">
 								View Published
 							</Button>
 						</SpaceItem>
@@ -128,6 +129,11 @@
 						<div class="preview-container">
 							<div class="preview-toolbar">
 								<Space>
+									<!-- Show and allow changing selected runner for preview -->
+									<SpaceItem>
+										Execution runner: <RunnerSelector @bind-SelectedValue="currentApp.ExecutionRunnerId" Style="width:200px" />
+									</SpaceItem>
+
 									<SpaceItem>
 										<Tooltip Title="Refresh preview">
 											<Button Icon="reload" OnClick="RefreshPreview" Size="@ButtonSize.Small">
@@ -154,7 +160,7 @@
 									srcdoc="@GetPreviewHtml()"
 									sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
 									class="preview-iframe">
-							</iframe>
+								</iframe>
 						</div>
 					</TabPane>
 
@@ -170,38 +176,44 @@
 											<span>App Configuration</span>
 										</SpaceItem>
 									</Space>
-								</TitleTemplate>
-								<ChildContent>
-									<Row Gutter="(24, 16)">
-										<Col Xs="24" Md="12">
-										<FormItem Label="Name" Required>
-											<Input @bind-Value="@currentApp.Name"
-												   Placeholder="Enter app name"
-												   Size="@InputSize.Large" />
-										</FormItem>
-										</Col>
-										<Col Xs="24" Md="12">
-										<FormItem Label="Display Name">
-											<Input @bind-Value="@currentApp.DisplayName"
-												   Placeholder="Enter display name"
-												   Size="@InputSize.Large" />
-										</FormItem>
-										</Col>
-									</Row>
+							</TitleTemplate>
+							<ChildContent>
+								<Row Gutter="(24, 16)">
+									<Col Xs="24" Md="12">
+									<FormItem Label="Name" Required>
+										<Input @bind-Value="@currentApp.Name"
+											   Placeholder="Enter app name"
+											   Size="@InputSize.Large" />
+									</FormItem>
+									</Col>
+									<Col Xs="24" Md="12">
+									<FormItem Label="Display Name">
+										<Input @bind-Value="@currentApp.DisplayName"
+											   Placeholder="Enter display name"
+											   Size="@InputSize.Large" />
+									</FormItem>
+									</Col>
+								</Row>
 
-									<Row Gutter="(24, 16)">
-										<Col Span="24">
-										<FormItem Label="Description">
-											<TextArea @bind-Value="@currentApp.Description"
-													  Placeholder="Describe your app..."
-													  Rows="4"
-													  ShowCount
-													  MaxLength="500"
-													  Size="@InputSize.Large" />
-										</FormItem>
-										</Col>
-									</Row>
-								</ChildContent>
+								<Row Gutter="(24, 16)">
+									<Col Span="24">
+									<FormItem Label="Description">
+										<TextArea @bind-Value="@currentApp.Description"
+											  Placeholder="Describe your app..."
+											  Rows="4"
+											  ShowCount
+											  MaxLength="500"
+											  Size="@InputSize.Large" />
+									</FormItem>
+									</Col>
+								</Row>
+								<Row>
+									<FormItem Label="Runner for Preview/Execution">
+										<RunnerSelector @bind-SelectedValue="currentApp.ExecutionRunnerId" Style="width:100%" />
+										<Text Type="TextElementType.Secondary">Optional: select runner used for preview and any executions initiated from this app.</Text>
+									</FormItem>
+								</Row>
+							</ChildContent>
 							</Card>
 
 							<Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
@@ -246,6 +258,8 @@
 									</Row>
 								</ChildContent>
 							</Card>
+
+							
 						</div>
 					</TabPane>
 				</Tabs>
