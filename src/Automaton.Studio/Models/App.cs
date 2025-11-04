@@ -58,4 +58,5 @@ public class AppListItem
 public class NewApp
 {
     public string Name { get; set; }
+    public Guid? ExecutionRunnerId { get; set; }
 }

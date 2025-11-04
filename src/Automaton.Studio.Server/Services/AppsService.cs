@@ -97,6 +97,18 @@ public class AppsService
 
     public async Task<Guid> Create(Models.NewApp app)
     {
+        // If an execution runner id was provided, ensure it belongs to the owner (current user)
+        if (app.ExecutionRunnerId.HasValue)
+        {
+            var runnerExists = dataContext.Runners
+                .Any(r => r.Id == app.ExecutionRunnerId.Value && r.RunnerUsers.Any(u => u.UserId == UserId));
+
+            if (!runnerExists)
+            {
+                throw new InvalidOperationException("Execution runner not found or you do not have access to it.");
+            }
+        }
+
         var entity = new Entities.WebApp
         {
             Id = Guid.NewGuid(),
@@ -109,7 +121,8 @@ public class AppsService
             Version = 1,
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            Definition = JsonSerializer.Serialize(new Models.AppDefinition())
+            Definition = JsonSerializer.Serialize(new Models.AppDefinition()),
+            ExecutionRunnerId = app.ExecutionRunnerId
         };
 
         dataContext.WebApps.Add(entity);

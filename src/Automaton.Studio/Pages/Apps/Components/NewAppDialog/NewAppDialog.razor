@@ -1,8 +1,40 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Services
 @inherits AntDesign.FeedbackComponent<NewApp>
+
+@inject RunnerService RunnerService
 
 <Form Model="@Options">
     <FormItem Label="Name">
-        <Input @bind-Value="@context.Name" Placeholder="Enter app name (e.g., 'MyDashboard')" />
+        <Input @bind-Value="@Options.Name" Placeholder="Enter app name (e.g., 'MyDashboard')" />
+    </FormItem>
+
+    <FormItem Label="Default Runner (optional)">
+        <Select @bind-Value="Options.ExecutionRunnerId" TItemValue="Guid?" TItem="Guid?" Style="width:100%">
+            <SelectOption TItemValue="Guid?" TItem="Guid?" Value="@( (Guid?)null )">None</SelectOption>
+            @foreach (var r in runners)
+            {
+                <SelectOption TItemValue="Guid?" TItem="Guid?" Value="@((Guid?)r.Id)">@r.Name (@(r.Status == Automaton.Core.Enums.RunnerStatus.Online ? "online" : "offline"))</SelectOption>
+            }
+        </Select>
+        <Text Type="TextElementType.Secondary">Optional: select a default runner to use for preview and initial execution.</Text>
     </FormItem>
 </Form>
+
+@code {
+    private IEnumerable<Automaton.Studio.Models.RunnerModel> runners = new List<Automaton.Studio.Models.RunnerModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            runners = await RunnerService.List();
+        }
+        catch
+        {
+            runners = new List<Automaton.Studio.Models.RunnerModel>();
+        }
+
+        await base.OnInitializedAsync();
+    }
+}
