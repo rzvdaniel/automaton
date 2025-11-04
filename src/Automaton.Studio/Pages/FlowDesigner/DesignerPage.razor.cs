@@ -19,15 +19,13 @@ partial class DesignerPage : ComponentBase
     private bool isStepCreatedHandlerAttached;
     private StudioStep selectedStep;
     private string rightPanelActiveTab = "ai"; // Default to AI Chat tab
-    private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
 
     // Computed properties for Razor UI binding
     private bool HasSelectedRunners => selectedRunners.Any();
-    private bool HasAvailableRunners => availableRunners.Any();
     private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
-    private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
+    private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners);
 
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
@@ -143,14 +141,11 @@ partial class DesignerPage : ComponentBase
         try
         {
             isLoadingRunners = true;
-            StateHasChanged();
-            
-            availableRunners = await RunnerService.List();
+            StateHasChanged();            
         }
         catch (Exception ex)
         {
             MessageService.Error($"Failed to load runners: {ex.Message}");
-            availableRunners = new List<RunnerModel>();
         }
         finally
         {
@@ -159,9 +154,9 @@ partial class DesignerPage : ComponentBase
         }
     }
 
-    private void OnRunnersSelectionChanged(IEnumerable<RunnerModel> runners)
+    private void OnRunnersSelectionChanged(IEnumerable<Guid> runnerIds)
     {
-        selectedRunners = runners?.Select(x => x.Id) ?? [];
+        selectedRunners = runnerIds?.ToList() ?? new List<Guid>();
         StateHasChanged();
     }
 
@@ -288,20 +283,7 @@ partial class DesignerPage : ComponentBase
         activeTabKey = key;
     }
 
-    private string GetRunnerStatusIcon(RunnerStatus status)
-    {
-        return status switch
-        {
-            RunnerStatus.Online => "check-circle",
-            RunnerStatus.Offline => "close-circle",
-            _ => "question-circle"
-        };
-    }
 
-    private string GetRunnerStatusClass(RunnerStatus status)
-    {
-        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
-    }
 
     public void Dispose()
     {
@@ -379,7 +361,7 @@ partial class DesignerPage : ComponentBase
 
     private void OnRunButtonClickWhenDisabled()
     {
-        var action = DesignerViewModel.GetRunButtonAction(HasSelectedRunners, HasAvailableRunners);
+        var action = DesignerViewModel.GetRunButtonAction(HasSelectedRunners);
         
         switch (action)
         {

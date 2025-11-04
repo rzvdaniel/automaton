@@ -5,6 +5,7 @@
 @using Blazored.FluentValidation;
 @using Automaton.Core.Enums;
 @using Automaton.Studio.Steps.Custom.Variables
+@using Automaton.Studio.Components
 
 <Layout>
     <Content>
@@ -81,45 +82,16 @@
 
                                 <!-- Runner Selection -->
                                 <SpaceItem>
-                                    <Select Mode="SelectMode.Multiple"
-                                            Placeholder="Select runners..."
-                                            DataSource="availableRunners"
-                                            TItem="RunnerModel"
-                                            TItemValue="Guid"
-                                            ValueProperty="r => r.Id"
-                                            LabelProperty="r => r.Name"
-                                            DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-                                            Values="@selectedRunners"
-                                            OnSelectedItemsChanged="@OnRunnersSelectionChanged"
-                                            AllowClear
-                                            Style="width: 200px">
-                                        <ItemTemplate Context="runnerContext">
-                                            <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                  class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                            @runnerContext.Name
-                                        </ItemTemplate>
-                                        <LabelTemplate Context="runnerContext">
-                                            <Icon Type="@GetRunnerStatusIcon(runnerContext.Status)"
-                                                  class="@(GetRunnerStatusClass(runnerContext.Status))" />
-                                            @runnerContext.Name
-                                        </LabelTemplate>
-                                    </Select>
+                                    <RunnerSelector SelectedValues="selectedRunners"
+                                                    SelectedValuesChanged="EventCallback.Factory.Create<IEnumerable<Guid>>(this, OnRunnersSelectionChanged)"
+                                                    Style="width:200px" />
                                 </SpaceItem>
                                 
                                 <!-- Enhanced Help Section -->
                                 @if (!ExecutionCapabilities.CanExecute)
                                 {
                                     <SpaceItem>
-                                        @if (!HasAvailableRunners)
-                                        {
-                                            <!-- No Runners Available - Show Download Link -->
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <Tooltip Title="No runners installed. Please install a runner first from Downloads page">
-                                                    <Icon Type="info-circle" Style="color: #faad14;" Width="16" Height="16" />
-                                                </Tooltip>
-                                            </div>
-                                        }
-                                        else if (!HasSelectedRunners)
+                                        @if (!HasSelectedRunners)
                                         {
                                             <!-- Runners Available but None Selected -->
                                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -849,20 +821,5 @@
         display: flex;
         flex-wrap: nowrap;
         gap: 8px;
-    }
-
-    .runner-status-icon.runner-status-online {
-        color: #52c41a !important; /* Green for online */
-        margin-right: 4px;
-    }
-
-    .runner-status-icon.runner-status-offline {
-        color: #ff4d4f !important; /* Red for offline */
-        margin-right: 4px;
-    }
-
-    .runner-status-icon.runner-status-none {
-        color: #d9d9d9 !important; /* Gray for none/unknown */
-        margin-right: 4px;
     }
 </style>

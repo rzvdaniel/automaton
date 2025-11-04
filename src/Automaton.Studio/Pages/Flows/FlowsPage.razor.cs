@@ -22,7 +22,6 @@ namespace Automaton.Studio.Pages.Flows
             try
             {
                 await FlowsViewModel.GetFlows();
-                await FlowsViewModel.GetRunners();
             }
             catch
             {
@@ -76,21 +75,6 @@ namespace Automaton.Studio.Pages.Flows
                     await MessageService.ErrorAsync($"Flow {newFlowModel.Name} could not be created");
                 }
             };
-        }
-
-        private string GetRunnerStatusIcon(RunnerStatus status)
-        {
-            return status switch
-            {
-                RunnerStatus.Online => "check-circle",
-                RunnerStatus.Offline => "close-circle",
-                _ => "question-circle"
-            };
-        }
-
-        private string GetRunnerStatusClass(RunnerStatus status)
-        {
-            return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
         }
 
         private List<EnhancedEmpty.EmptyActionModel> GetFlowSecondaryActions()

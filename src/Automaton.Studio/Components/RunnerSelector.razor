@@ -1,0 +1,185 @@
+@using AntDesign
+@using Automaton.Studio.Models
+@using Automaton.Core.Enums
+@using Automaton.Studio.Services
+
+@namespace Automaton.Studio.Components
+
+@if (isLoading)
+{
+	<div style="display:inline-flex; align-items:center; gap:8px;">
+		<Spin />
+		<span class="runner-placeholder">Loading runners...</span>
+	</div>
+}
+else if (AvailableRunners == null || !AvailableRunners.Any())
+{
+	<span class="runner-placeholder">No runners available</span>
+}
+else if (Multiple)
+{
+	<Select Mode="SelectMode.Multiple"
+			Placeholder="@Placeholder"
+			DataSource="AvailableRunners"
+			TItem="RunnerModel"
+			TItemValue="Guid"
+			ValueProperty="r => r.Id"
+			LabelProperty="r => r.Name"
+			DisabledPredicate="r => r.Status == RunnerStatus.Offline"
+			@bind-Values="BoundValues"
+			AllowClear="@AllowClear"
+			Style="@Style">
+		<ItemTemplate Context="runnerContext">
+			<span class="runner-item">
+				<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+				<span class="runner-label">@runnerContext.Name</span>
+			</span>
+		</ItemTemplate>
+		<LabelTemplate Context="runnerContext">
+			<span class="runner-label-inline">
+				<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+				<span class="runner-label">@runnerContext.Name</span>
+			</span>
+		</LabelTemplate>
+	</Select>
+}
+else
+{
+	<Select Mode="SelectMode.Default"
+			Placeholder="@Placeholder"
+			DataSource="AvailableRunners"
+			TItem="RunnerModel"
+			TItemValue="Guid?"
+			ValueProperty="r => r.Id"
+			LabelProperty="r => r.Name"
+			DisabledPredicate="r => r.Status == RunnerStatus.Offline"
+			@bind-Value="SelectedValue"
+			AllowClear="@AllowClear"
+			Style="@Style">
+		<ItemTemplate Context="runnerContext">
+			<span class="runner-item">
+				<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+				<span class="runner-label">@runnerContext.Name</span>
+			</span>
+		</ItemTemplate>
+		<LabelTemplate Context="runnerContext">
+			<span class="runner-label-inline">
+				<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
+				<span class="runner-label">@runnerContext.Name</span>
+			</span>
+		</LabelTemplate>
+	</Select>
+}
+
+@code {
+	private IEnumerable<RunnerModel> AvailableRunners { get; set; } = new List<RunnerModel>();
+	[Parameter] public bool Multiple { get; set; } = false;
+
+	// Single-selection
+	private Guid? _selectedValue;
+	[Parameter]
+	public Guid? SelectedValue
+	{
+		get => _selectedValue;
+		set
+		{
+			if (!EqualityComparer<Guid?>.Default.Equals(_selectedValue, value))
+			{
+				_selectedValue = value;
+				_ = SelectedValueChanged.InvokeAsync(value);
+			}
+		}
+	}
+	[Parameter] public EventCallback<Guid?> SelectedValueChanged { get; set; }
+
+	// Multiple-selection parameter (one-way input) and event callback
+	[Parameter] public IEnumerable<Guid> SelectedValues { get; set; } = new List<Guid>();
+	[Parameter] public EventCallback<IEnumerable<Guid>> SelectedValuesChanged { get; set; }
+
+	// Internal bound property used by Select binding
+	private IEnumerable<Guid> _boundValues = new List<Guid>();
+	private IEnumerable<Guid> BoundValues
+	{
+		get => _boundValues;
+		set
+		{
+			var newVals = value ?? new List<Guid>();
+			if (!_boundValues.SequenceEqual(newVals))
+			{
+				_boundValues = newVals;
+				// notify parent
+				_ = SelectedValuesChanged.InvokeAsync(_boundValues);
+			}
+		}
+	}
+
+	[Parameter] public string Placeholder { get; set; } = "Select runners...";
+	[Parameter] public string Style { get; set; } = "width:200px";
+	[Parameter] public bool AllowClear { get; set; } = true;
+
+	private bool isLoading = false;
+
+	[Inject] private Automaton.Studio.Services.RunnerService RunnerService { get; set; }
+
+	protected override async Task OnParametersSetAsync()
+	{
+		// keep internal bound values in sync with incoming SelectedValues
+		var incoming = SelectedValues ?? new List<Guid>();
+		if (!_boundValues.SequenceEqual(incoming))
+		{
+			_boundValues = incoming.ToList();
+		}
+		await base.OnParametersSetAsync();
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadRunnersAsync();
+	}
+
+	public async Task LoadRunnersAsync()
+	{
+		try
+		{
+			isLoading = true;
+			StateHasChanged();
+
+			var list = await RunnerService.List();
+			AvailableRunners = list ?? new List<RunnerModel>();
+		}
+		catch
+		{
+			AvailableRunners = new List<RunnerModel>();
+		}
+		finally
+		{
+			isLoading = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private string GetRunnerStatusIcon(RunnerStatus status)
+	{
+		return status switch
+		{
+			RunnerStatus.Online => "check-circle",
+			RunnerStatus.Offline => "close-circle",
+			_ => "question-circle",
+		};
+	}
+
+	private string GetRunnerStatusClass(RunnerStatus status)
+	{
+		return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
+	}
+}
+
+<style>
+	.runner-status-icon.runner-status-online { color: #52c41a !important; }
+	.runner-status-icon.runner-status-offline { color: #ff4d4f !important; }
+	.runner-status-icon.runner-status-none { color: #d9d9d9 !important; }
+	.runner-item { display: inline-flex; align-items: center; gap:8px; }
+	.runner-label-inline { display: inline-flex; align-items: center; gap:8px; }
+	.runner-label { vertical-align: middle; }
+	.runner-placeholder { color: #8c8c8c; font-size:13px; }
+</style>

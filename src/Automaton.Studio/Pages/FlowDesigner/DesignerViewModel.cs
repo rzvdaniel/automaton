@@ -57,15 +57,11 @@ public class DesignerViewModel
     /// <summary>
     /// Gets the message to show when the run button is disabled
     /// </summary>
-    public string GetRunButtonDisabledMessage(bool hasSelectedRunners, bool hasAvailableRunners)
+    public string GetRunButtonDisabledMessage(bool hasSelectedRunners)
     {
         // Debug and desktop modes - should always be enabled
         if (CanExecuteLocally)
             return string.Empty;
-
-        // Web release mode needs runners
-        if (!hasAvailableRunners)
-            return "No runners available - Install a runner to execute workflows";
         
         if (!hasSelectedRunners)
             return "Select one or more runners to execute this workflow";
@@ -76,13 +72,10 @@ public class DesignerViewModel
     /// <summary>
     /// Determines what action to take when run button is clicked while disabled
     /// </summary>
-    public string GetRunButtonAction(bool hasSelectedRunners, bool hasAvailableRunners)
+    public string GetRunButtonAction(bool hasSelectedRunners)
     {
         if (CanExecuteLocally)
             return "run";
-
-        if (!hasAvailableRunners)
-            return "download-runner";
         
         if (!hasSelectedRunners)
             return "select-runners";

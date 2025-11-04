@@ -15,7 +15,6 @@ partial class StepPage : ComponentBase, IDisposable
     private bool loading = false;
     private bool runningCode = false;
     private bool autoScroll = true;
-    private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
 
@@ -32,9 +31,8 @@ partial class StepPage : ComponentBase, IDisposable
 
     // Computed properties for Razor UI binding
     private bool HasSelectedRunners => selectedRunners.Any();
-    private bool HasAvailableRunners => availableRunners.Any();
     private ExecutionCapabilities ExecutionCapabilities => StepDesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
-    private string RunButtonDisabledMessage => StepDesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners, HasAvailableRunners);
+    private string RunButtonDisabledMessage => StepDesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners);
 
     [Inject] private StepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
@@ -52,7 +50,6 @@ partial class StepPage : ComponentBase, IDisposable
         CurrentStepContextService.CodeChanged += OnCodeChangedByMcpTools;
 
         await StepDesignerViewModel.Load(Guid.Parse(StepId));
-        await LoadRunners();
 
         // Register current step with the context service
         CurrentStepContextService.SetCurrentStep(
@@ -74,47 +71,13 @@ partial class StepPage : ComponentBase, IDisposable
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    private async Task LoadRunners()
+    private void OnRunnersSelectionChanged(IEnumerable<Guid> runnerIds)
     {
-        try
-        {
-            isLoadingRunners = true;
-            StateHasChanged();
-            
-            availableRunners = await RunnerService.List();
-        }
-        catch (Exception ex)
-        {
-            await MessageService.ErrorAsync($"Failed to load runners: {ex.Message}");
-            availableRunners = new List<RunnerModel>();
-        }
-        finally
-        {
-            isLoadingRunners = false;
-            StateHasChanged();
-        }
-    }
-
-    private void OnRunnersSelectionChanged(IEnumerable<RunnerModel> runners)
-    {
-        selectedRunners = runners?.Select(x => x.Id) ?? [];
+        selectedRunners = runnerIds?.ToList() ?? new List<Guid>();
         StateHasChanged();
     }
 
-    private string GetRunnerStatusIcon(RunnerStatus status)
-    {
-        return status switch
-        {
-            RunnerStatus.Online => "check-circle",
-            RunnerStatus.Offline => "close-circle",
-            _ => "question-circle"
-        };
-    }
-
-    private string GetRunnerStatusClass(RunnerStatus status)
-    {
-        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
-    }
+    
 
     public void AddInputVariable()
     {
@@ -443,7 +406,7 @@ partial class StepPage : ComponentBase, IDisposable
 
     private void OnRunButtonClickWhenDisabled()
     {
-        var action = StepDesignerViewModel.GetRunButtonAction(HasSelectedRunners, HasAvailableRunners);
+        var action = StepDesignerViewModel.GetRunButtonAction(HasSelectedRunners);
         
         switch (action)
         {

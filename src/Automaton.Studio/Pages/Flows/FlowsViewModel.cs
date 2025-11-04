@@ -9,11 +9,9 @@ namespace Automaton.Studio.Pages.Flows;
 public class FlowsViewModel
 {
     private readonly FlowsService flowsService;
-    private readonly RunnerService runnerService;
     private readonly FlowService flowService;
 
     public ICollection<FlowModel> Flows { get; set;  } = new List<FlowModel>();
-    public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
 
     public FlowsViewModel
     (
@@ -23,7 +21,6 @@ public class FlowsViewModel
     )
     {
         this.flowsService = flowsService;
-        this.runnerService = runnerService;
         this.flowService = flowService;
     }
 
@@ -42,11 +39,6 @@ public class FlowsViewModel
                 Status = Enum.TryParse<WorkflowStatus>(flow.Status, out var status) ? status : WorkflowStatus.None
             })
             .ToList();
-    }
-
-    public async Task GetRunners()
-    {
-        Runners = await runnerService.List();
     }
 
     public async Task CreateFlow(string name)
@@ -104,11 +96,9 @@ public class FlowsViewModel
 
         foreach (var result in results)
         {
-            var runner = Runners.SingleOrDefault(x => x.Id == result.RunnerId);
-
             var runnerMessage = result.Status == WorkflowStatus.None ?
-                $"Runner {runner.Name} did not respond" :
-                $"Runner {runner.Name} returned {result.Status}";
+                $"Runner {result.RunnerId} did not respond" :
+                $"Runner {result.RunnerId} returned {result.Status}";
 
             resultText.AppendLine(runnerMessage);
         }

@@ -2,10 +2,10 @@
 @using Automaton.Studio.Services
 @using AntDesign
 @using Automaton.Core.Enums
+@using Automaton.Studio.Components
 @inherits AntDesign.FeedbackComponent<PublishAppModel>
 
 @inject AppsService AppsService
-@inject RunnerService RunnerService
 
 <div class="publish-dialog">
 	<Alert Type="@AlertType.Info"
@@ -63,40 +63,12 @@
 		</FormItem>
 
 		<FormItem Label="Execution Runner (optional)">
-			<Select @bind-Value="Options.ExecutionRunnerId"
-				Placeholder="Select a runner (optional)"
-				DataSource="runners"
-				TItem="Automaton.Studio.Models.RunnerModel"
-				TItemValue="Guid?"
-				ValueProperty="r => r.Id"
-				LabelProperty="r => r.Name"
-				DisabledPredicate="r => r.Status == Automaton.Core.Enums.RunnerStatus.Offline"
-				Style="width:100%">
-				<ItemTemplate Context="runnerContext">
-					<span>
-						<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
-						<span class="runner-label">@runnerContext.Name</span>
-						<span class="text-secondary">(@(runnerContext.Status == RunnerStatus.Online ? "online" : "offline"))</span>
-					</span>
-				</ItemTemplate>
-				<LabelTemplate Context="runnerContext">
-					<span>
-						<Icon Type="@GetRunnerStatusIcon(runnerContext.Status)" class="@($"{GetRunnerStatusClass(runnerContext.Status)} runner-status-icon")" />
-						<span class="runner-label">@runnerContext.Name</span>
-					</span>
-				</LabelTemplate>
-			</Select>
+			<RunnerSelector Multiple="false" SelectedValue="Options.ExecutionRunnerId" SelectedValueChanged="EventCallback.Factory.Create<Guid?>(this, v => Options.ExecutionRunnerId = v)" Style="width:100%" />
 			<AntDesign.Text Type="@TextElementType.Secondary" Style="font-size:12px;">
 				Optional: select the runner that should execute flows triggered by this app. If left blank, calls must specify runner names.
 			</AntDesign.Text>
 		</FormItem>
 
-		@if (IsSelectedRunnerOffline)
-		{
-			<Alert Type="@AlertType.Warning" ShowIcon="true" Style="margin-top:8px;">
-				The selected execution runner is currently offline. Flows executed by this app will fail until the runner is online. You can still publish, but executions will not succeed until the runner reconnects.
-			</Alert>
-		}
 
 		<Alert Type="@AlertType.Warning"
 			 Message="URL slug rules"
@@ -107,7 +79,6 @@
 </div>
 
 @code {
- private IEnumerable<Automaton.Studio.Models.RunnerModel> runners = new List<Automaton.Studio.Models.RunnerModel>();
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -117,15 +88,7 @@
 			Options.PublicUrl = AppsService.GenerateSlugPreview(Options.DisplayName);
 		}
 
-		// Load owner's runners for selection
-		try
-		{
-			runners = await RunnerService.List();
-		}
-		catch
-		{
-			// Ignore errors and leave dropdown empty
-		}
+
 
 		await base.OnInitializedAsync();
 	}
@@ -141,34 +104,4 @@
 	 StateHasChanged();
  }
 
- private bool IsSelectedRunnerOffline => Options.ExecutionRunnerId != null &&
-	 runners.Any(r => r.Id == Options.ExecutionRunnerId && r.Status == Automaton.Core.Enums.RunnerStatus.Offline);
-
- private string GetRunnerStatusIcon(RunnerStatus status)
- {
-	 return status switch
-	 {
-		 RunnerStatus.Online => "check-circle",
-		 RunnerStatus.Offline => "close-circle",
-		 _ => "question-circle"
-	 };
- }
-
- private string GetRunnerStatusClass(RunnerStatus status)
- {
-	 return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
- }
 }
-
-<style>
-	.publish-dialog { padding:8px0; }
-	.text-secondary { color: #8c8c8c; margin-left:4px; }
-
-	/* Runner icon and label alignment */
-	.runner-status-icon { vertical-align: middle; margin-right:8px; }
-	.runner-label { vertical-align: middle; }
-
-	.runner-status-icon.runner-status-online { color: #52c41a !important; }
-	.runner-status-icon.runner-status-offline { color: #ff4d4f !important; }
-	.runner-status-icon.runner-status-none { color: #d9d9d9 !important; }
-</style>
