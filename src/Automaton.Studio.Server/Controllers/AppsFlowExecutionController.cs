@@ -121,13 +121,25 @@ public class AppsFlowExecutionController : ControllerBase
         // 5. Get owner's runners (impersonation already set) and select
         var allRunners = await runnerService.List(cancellationToken);
         var onlineRunners = allRunners.Where(r => r.Status == RunnerStatus.Online).ToList();
+
+        // If there are no online runners at all then we cannot proceed
         if (!onlineRunners.Any())
         {
             logger.LogWarning("No online runners available for owner {OwnerId}", ownerId);
             return BadRequest(new { success = false, message = "No online runners available to execute the flow" });
         }
 
-        var selectedRunnerIds = SelectRunners(onlineRunners, request.RunnerNames);
+        List<Guid> selectedRunnerIds;
+
+        try
+        {
+            selectedRunnerIds = SelectRunners(onlineRunners, request.RunnerNames, webApp.ExecutionRunnerId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Runner selection failed for app {AppId}", webApp.Id);
+            return BadRequest(new { success = false, message = ex.Message });
+        }
 
         // 6. Execute and return
         var results = await ownerFlowsService.Execute(flowId, selectedRunnerIds, cancellationToken);
@@ -177,17 +189,30 @@ public class AppsFlowExecutionController : ControllerBase
         return missing;
     }
 
-    private static List<Guid> SelectRunners(IEnumerable<RunnerDetails> onlineRunners, List<string>? requestedNames)
+    private static List<Guid> SelectRunners(IEnumerable<RunnerDetails> onlineRunners, List<string>? requestedNames, Guid? executionRunnerId)
     {
         if (requestedNames != null && requestedNames.Any())
         {
             var requestedSet = new HashSet<string>(requestedNames, StringComparer.OrdinalIgnoreCase);
-            var matched = onlineRunners.Where(r => requestedSet.Contains(r.Name)).Select(r => r.Id).ToList();
-            return matched.Any() ? matched : new List<Guid>();
+            var matched = onlineRunners.Where(r => requestedSet.Contains(r.Name) && r.Status == RunnerStatus.Online).Select(r => r.Id).ToList();
+            
+            if (!matched.Any())
+                throw new InvalidOperationException("None of the specified runners are online");
+            
+            return matched;
         }
 
-        // default to first runner
-        return new List<Guid> { onlineRunners.First().Id };
+        if (executionRunnerId != null)
+        {
+            var runner = onlineRunners.FirstOrDefault(r => r.Id == executionRunnerId.Value);
+
+            if (runner == null || runner.Status != RunnerStatus.Online)
+                throw new InvalidOperationException("Configured execution runner is not online");
+
+            return new List<Guid> { executionRunnerId.Value };
+        }
+
+        throw new InvalidOperationException("No runner specified. Provide RunnerNames or set an execution runner on the app.");
     }
 }
 

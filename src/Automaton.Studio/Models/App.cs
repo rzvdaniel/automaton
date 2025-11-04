@@ -14,6 +14,9 @@ public class AppModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
+    // Optional runner to execute flows initiated by this app
+    public Guid? ExecutionRunnerId { get; set; }
+
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }
 
@@ -47,6 +50,9 @@ public class AppListItem
     public bool RequiresAuthentication { get; set; } = true;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+
+    // Optional ExecutionRunnerId for quick access in UI
+    public Guid? ExecutionRunnerId { get; set; }
 }
 
 public class NewApp

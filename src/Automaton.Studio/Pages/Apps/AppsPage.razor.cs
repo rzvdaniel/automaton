@@ -97,7 +97,7 @@ partial class AppsPage : ComponentBase
 
             try
             {
-                await AppsViewModel.PublishApp(id, model.PublicUrl, model.RequiresAuthentication);
+                await AppsViewModel.PublishApp(id, model.PublicUrl, model.RequiresAuthentication, model.ExecutionRunnerId);
 
                 var accessType = model.RequiresAuthentication ? "Protected" : "Public";
                 await MessageService.SuccessAsync($"App published! ({accessType}) Access it at /web/{model.PublicUrl}");

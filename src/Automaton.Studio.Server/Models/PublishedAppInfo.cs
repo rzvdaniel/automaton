@@ -11,4 +11,5 @@ public class PublishedAppInfo
     public string PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; }
     public Guid? OwnerId { get; set; }
+    public Guid? ExecutionRunnerId { get; set; }
 }

@@ -13,6 +13,8 @@ public class WebApp
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; } = 1;
+
+    public Guid? ExecutionRunnerId { get; set; }
     
     // Access control (future use)
     public bool RequiresAuthentication { get; set; } = false;

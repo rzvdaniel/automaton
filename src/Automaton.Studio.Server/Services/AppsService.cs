@@ -90,7 +90,8 @@ public class AppsService
             Name = appEntity.Name,
             PublicUrl = appEntity.PublicUrl,
             RequiresAuthentication = appEntity.RequiresAuthentication,
-            OwnerId = ownerId
+            OwnerId = ownerId,
+            ExecutionRunnerId = appEntity.ExecutionRunnerId
         };
     }
 
@@ -169,7 +170,7 @@ public class AppsService
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
     }
 
-    public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true)
+    public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
     {
         var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
 
@@ -190,17 +191,30 @@ public class AppsService
             throw new InvalidOperationException("This URL is already taken");
         }
 
+        // If an execution runner id was provided, ensure it belongs to the owner
+        if (executionRunnerId.HasValue)
+        {
+            var runnerExists = dataContext.Runners
+                .Any(r => r.Id == executionRunnerId.Value && r.RunnerUsers.Any(u => u.UserId == UserId));
+
+            if (!runnerExists)
+            {
+                throw new InvalidOperationException("Execution runner not found or you do not have access to it.");
+            }
+        }
+
         entity.IsPublished = true;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
         entity.RequiresAuthentication = requiresAuthentication;
+        entity.ExecutionRunnerId = executionRunnerId;
         entity.Version++;
         entity.Updated = DateTime.UtcNow;
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth})",
-     id, publicUrl, entity.Version, requiresAuthentication);
+        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth}, Runner: {Runner})",
+            id, publicUrl, entity.Version, requiresAuthentication, executionRunnerId);
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
@@ -282,6 +296,7 @@ public class AppsService
             RequiresAuthentication = entity.RequiresAuthentication,
             Created = entity.Created,
             Updated = entity.Updated,
+            ExecutionRunnerId = entity.ExecutionRunnerId,
             Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }

@@ -3,12 +3,15 @@
 @using AntDesign
 @inherits AntDesign.FeedbackComponent<PublishAppModel>
 
+@inject AppsService AppsService
+@inject RunnerService RunnerService
+
 <div class="publish-dialog">
 	<Alert Type="@AlertType.Info"
-		   Message="Publishing your app"
-		   Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
-		   ShowIcon="true"
-		   Style="margin-bottom: 16px;" />
+		 Message="Publishing your app"
+		 Description="Your app will be accessible at a public URL. Choose a memorable slug for easy sharing."
+		 ShowIcon="true"
+		 Style="margin-bottom:16px;" />
 
 	<Form Model="@Options" Layout="@FormLayout.Vertical">
 		<FormItem Label="App Display Name">
@@ -16,16 +19,16 @@
 		</FormItem>
 
 		<FormItem Label="Public URL Slug" Required>
-			<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+			<Space Direction="SpaceDirection.Vertical" Style="width:100%;">
 				<SpaceItem>
 					<Input @bind-Value="@Options.PublicUrl"
-						   Placeholder="my-app-name"
-						   Size="@InputSize.Large"
-						   @oninput="OnSlugInput" />
+						 Placeholder="my-app-name"
+						 Size="@InputSize.Large"
+						 @oninput="OnSlugInput" />
 				</SpaceItem>
 				<SpaceItem>
-					<Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-						<Icon Type="link" Style="margin-right: 4px;" />
+					<Text Type="@TextElementType.Secondary" Style="font-size:12px;">
+						<Icon Type="link" Style="margin-right:4px;" />
 						Your app will be available at: <Text Strong>/web/@(string.IsNullOrEmpty(Options.PublicUrl) ? "your-app-slug" : Options.PublicUrl)</Text>
 					</Text>
 				</SpaceItem>
@@ -33,7 +36,7 @@
 		</FormItem>
 
 		<FormItem Label="Access Control">
-			<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+			<Space Direction="SpaceDirection.Vertical" Style="width:100%;">
 				<SpaceItem>
 					<Checkbox @bind-Checked="@Options.RequiresAuthentication">
 						Require users to be logged in to Automaton
@@ -42,15 +45,15 @@
 				<SpaceItem>
 					@if (Options.RequiresAuthentication)
 					{
-						<AntDesign.Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-							<Icon Type="lock" Style="margin-right: 4px; color: #52c41a;" />
+						<AntDesign.Text Type="@TextElementType.Secondary" Style="font-size:12px;">
+							<Icon Type="lock" Style="margin-right:4px; color: #52c41a;" />
 							Protected: Only authenticated Automaton users can access this app
 						</AntDesign.Text>
 					}
 					else
 					{
-						<AntDesign.Text Type="@TextElementType.Warning" Style="font-size: 12px;">
-							<Icon Type="unlock" Style="margin-right: 4px; color: #fa8c16;" />
+						<AntDesign.Text Type="@TextElementType.Warning" Style="font-size:12px;">
+							<Icon Type="unlock" Style="margin-right:4px; color: #fa8c16;" />
 							Public: Anyone with the link can access this app (no login required)
 						</AntDesign.Text>
 					}
@@ -58,22 +61,49 @@
 			</Space>
 		</FormItem>
 
+		<FormItem Label="Execution Runner (optional)">
+			<Select @bind-Value="Options.ExecutionRunnerId" TItemValue="Guid?" TItem="Guid?" Style="width:100%;">
+				<SelectOption TItemValue="Guid?" TItem="Guid?" Value="@( (Guid?)null )">None (choose at runtime)</SelectOption>
+				@foreach (var r in runners)
+				{
+					<SelectOption TItemValue="Guid?" TItem="Guid?" Value="@((Guid?)r.Id)">@r.Name (@(r.Status == Automaton.Core.Enums.RunnerStatus.Online ? "online" : "offline"))</SelectOption>
+				}
+			</Select>
+			<AntDesign.Text Type="@TextElementType.Secondary" Style="font-size:12px;">
+				Optional: select the runner that should execute flows triggered by this app. If left blank, calls must specify runner names.
+			</AntDesign.Text>
+		</FormItem>
+
 		<Alert Type="@AlertType.Warning"
-			   Message="URL slug rules"
-			   Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
-			   ShowIcon="true"
-			   Style="margin-top: 8px;" />
+			 Message="URL slug rules"
+			 Description="Only lowercase letters, numbers, and hyphens are allowed. Spaces and special characters will be removed."
+			 ShowIcon="true"
+			 Style="margin-top:8px;" />
 	</Form>
 </div>
 
 @code {
-	protected override void OnInitialized()
+ private IEnumerable<Automaton.Studio.Models.RunnerModel> runners = new List<Automaton.Studio.Models.RunnerModel>();
+
+	protected override async Task OnInitializedAsync()
 	{
 		// Generate initial slug from display name if PublicUrl is empty
 		if (string.IsNullOrEmpty(Options.PublicUrl) && !string.IsNullOrEmpty(Options.DisplayName))
 		{
 			Options.PublicUrl = AppsService.GenerateSlugPreview(Options.DisplayName);
 		}
+
+		// Load owner's runners for selection
+		try
+		{
+			runners = await RunnerService.List();
+		}
+		catch
+		{
+			// Ignore errors and leave dropdown empty
+		}
+
+		await base.OnInitializedAsync();
 	}
 
 	private void OnSlugInput(ChangeEventArgs e)
@@ -90,6 +120,6 @@
 
 <style>
 	.publish-dialog {
-		padding: 8px 0;
+		padding:8px0;
 	}
 </style>

@@ -86,9 +86,9 @@ public class AppsService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<string> PublishAsync(Guid id, string publicUrl, bool requiresAuthentication = true)
+    public async Task<string> PublishAsync(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
     {
-        var request = new { PublicUrl = publicUrl, RequiresAuthentication = requiresAuthentication };
+        var request = new { PublicUrl = publicUrl, RequiresAuthentication = requiresAuthentication, ExecutionRunnerId = executionRunnerId };
         var response = await httpClient.PostAsJsonAsync($"{configService.AppsUrl}/{id}/publish", request);
 
         response.EnsureSuccessStatusCode();

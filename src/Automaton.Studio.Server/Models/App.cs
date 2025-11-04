@@ -13,6 +13,6 @@ public class AppModel
     public bool RequiresAuthentication { get; set; } = true;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
-
+    public Guid? ExecutionRunnerId { get; set; }
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }

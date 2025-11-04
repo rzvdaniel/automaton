@@ -46,9 +46,9 @@ public class AppsViewModel
         }
     }
 
-    public async Task PublishApp(Guid id, string publicUrl, bool requiresAuthentication = true)
+    public async Task PublishApp(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
     {
-        await appsService.PublishAsync(id, publicUrl, requiresAuthentication);
+        await appsService.PublishAsync(id, publicUrl, requiresAuthentication, executionRunnerId);
 
         var app = Apps.FirstOrDefault(a => a.Id == id);
         if (app != null)
