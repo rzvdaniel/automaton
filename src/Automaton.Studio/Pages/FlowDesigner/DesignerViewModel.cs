@@ -19,51 +19,19 @@ public class DesignerViewModel
     private readonly ConfigurationService configurationService;
     private CancellationTokenSource cancelFlowTokenSource;
     private bool flowRunning;
+    public IEnumerable<Guid> SelectedRunners { get; set; } = new List<Guid>();
+    public bool HasSelectedRunners => SelectedRunners.Any();
+    public bool CanRunFlow => HasSelectedRunners;
 
     public StudioFlow Flow { get; set; }
     public StudioDefinition ActiveDefinition { get; set; }
 
     /// <summary>
-    /// Determines if running in debug mode (development)
-    /// </summary>
-    public bool IsDebugMode
-    {
-        get
-        {
-#if DEBUG
-            return true;
-#else
-            return false;
-#endif
-        }
-    }
-
-    /// <summary>
-    /// Determines if running on desktop platform
-    /// </summary>
-    public bool IsDesktopMode => configurationService.IsDesktop;
-
-    /// <summary>
-    /// Determines if we're in a development environment (regardless of platform)
-    /// </summary>
-    public bool IsDevelopmentEnvironment => IsDebugMode;
-
-    /// <summary>
-    /// Determines if local execution should be allowed
-    /// Priority: Desktop always allowed, then development mode for testing
-    /// </summary>
-    public bool CanExecuteLocally => IsDesktopMode || IsDevelopmentEnvironment;
-
-    /// <summary>
     /// Gets the message to show when the run button is disabled
     /// </summary>
-    public string GetRunButtonDisabledMessage(bool hasSelectedRunners)
-    {
-        // Debug and desktop modes - should always be enabled
-        if (CanExecuteLocally)
-            return string.Empty;
-        
-        if (!hasSelectedRunners)
+    public string GetRunButtonDisabledMessage()
+    {        
+        if (!HasSelectedRunners)
             return "Select one or more runners to execute this workflow";
         
         return string.Empty;
@@ -72,40 +40,12 @@ public class DesignerViewModel
     /// <summary>
     /// Determines what action to take when run button is clicked while disabled
     /// </summary>
-    public string GetRunButtonAction(bool hasSelectedRunners)
-    {
-        if (CanExecuteLocally)
-            return "run";
-        
-        if (!hasSelectedRunners)
+    public string GetRunButtonAction()
+    {        
+        if (!HasSelectedRunners)
             return "select-runners";
         
         return "run";
-    }
-
-    /// <summary>
-    /// Determines if the run button should be enabled
-    /// </summary>
-    public bool CanRunFlow(bool hasSelectedRunners)
-    {
-        // Can run locally (desktop/debug) regardless of runner selection
-        if (CanExecuteLocally)
-            return true;
-
-        // Web release mode: can only run if runners are selected
-        return hasSelectedRunners;
-    }
-
-    /// <summary>
-    /// Determines what execution modes are available
-    /// </summary>
-    public ExecutionCapabilities GetExecutionCapabilities(bool hasSelectedRunners)
-    {
-        return new ExecutionCapabilities
-        {
-            CanRunLocally = CanExecuteLocally,
-            HasSelectedRunners = hasSelectedRunners
-        };
     }
 
     public event EventHandler<StepEventArgs> StepCreated;
@@ -138,28 +78,6 @@ public class DesignerViewModel
     public async Task SaveFlow()
     {
         await flowService.Update(Flow);
-    }
-
-    public async Task<WorkflowExecution> RunFlow()
-    {
-        if (!CanExecuteLocally)
-        {
-            throw new Exception("Can not execute flow locally from designer");
-        }
-
-        cancelFlowTokenSource = new CancellationTokenSource();
-
-        flowRunning = true;
-
-        try
-        {
-            var workflowExecution = await workflowExecuteService.Execute(Flow, FlowDelay, cancelFlowTokenSource.Token);
-            return workflowExecution;
-        }
-        finally
-        {
-            flowRunning = false;
-        }
     }
 
     public void StopFlow()

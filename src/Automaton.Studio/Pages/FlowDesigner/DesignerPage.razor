@@ -49,14 +49,14 @@
                             <SpaceItem>
                                 @if (DesignerViewModel.IsFlowNotRunning())
                                 {
-                                    @if (ExecutionCapabilities.CanExecute)
+                                    @if (DesignerViewModel.CanRunFlow)
                                     {
                                         <!-- Enabled Run Button -->
-                                        <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
+                                        <Tooltip Title="Will execute on all selected runners">
                                             <Button Icon="caret-right" 
                                                     Type="@ButtonType.Primary"
                                                     OnClick="RunFlow">
-                                                @ExecutionCapabilities.GetButtonText()
+                                                Run on Runners
                                             </Button>
                                         </Tooltip>
                                     }
@@ -81,24 +81,22 @@
 
                             <!-- Runner Selection -->
                             <SpaceItem>
-                                 <RunnerSelector @bind-SelectedValues="selectedRunners" Style="width:200px" Multiple="true" />
+                                 <RunnerSelector @bind-SelectedValues="DesignerViewModel.SelectedRunners" Style="width:200px" Multiple="true" />
                             </SpaceItem>
                             
                             <!-- Enhanced Help Section -->
-                            @if (!ExecutionCapabilities.CanExecute)
-                            {
-                                <SpaceItem>
-                                    @if (!HasSelectedRunners)
-                                    {
-                                        <!-- Runners Available but None Selected -->
-                                        <div style="display: flex; align-items: center; gap: 8px;" Width="16" Height="16">
-                                            <Tooltip Title="Select runners above to execute this workflow">
-                                                <Icon Type="info-circle" Style="color: #1890ff;" />
-                                            </Tooltip>
-                                        </div>
-                                    }
-                                </SpaceItem>
-                            }
+                           
+                            <SpaceItem>
+                                @if (!DesignerViewModel.HasSelectedRunners)
+                                {
+                                    <!-- Runners Available but None Selected -->
+                                    <div style="display: flex; align-items: center; gap: 8px;" Width="16" Height="16">
+                                        <Tooltip Title="Select runners above to execute this workflow">
+                                            <Icon Type="info-circle" Style="color: #1890ff;" />
+                                        </Tooltip>
+                                    </div>
+                                }
+                            </SpaceItem>
                             
                         </Space>
                     </SpaceItem>

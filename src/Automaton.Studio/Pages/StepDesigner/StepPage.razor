@@ -51,18 +51,17 @@
                         <SpaceItem>
                             <Space Size="SpaceSize.Small" Class="execution-controls">
                                 
-                                <!-- Unified Run Button with Enhanced UX -->
                                 <SpaceItem>
-                                    @if (ExecutionCapabilities.CanExecute)
+                                    @if (StepDesignerViewModel.CanRunFlow)
                                     {
                                         <!-- Enabled Run Button -->
-                                        <Tooltip Title="@ExecutionCapabilities.GetExecutionDescription()">
+                                        <Tooltip Title="Will execute on all selected runners">
                                             <Button Icon="caret-right" 
                                                     Type="@ButtonType.Primary"
                                                     OnClick="Run"
                                                     Loading="@runningCode"
                                                     Disabled="@runningCode">
-                                                @ExecutionCapabilities.GetButtonText()
+                                            Run on Runners
                                             </Button>
                                         </Tooltip>
                                     }
@@ -82,14 +81,14 @@
 
                                 <!-- Runner Selection -->
                                 <SpaceItem>
-                                    <RunnerSelector Multiple="true" @bind-SelectedValues="selectedRunners" Style="width:200px" />
+                                    <RunnerSelector Multiple="true" @bind-SelectedValues="StepDesignerViewModel.SelectedRunners" Style="width:200px" />
                                 </SpaceItem>
                                 
                                 <!-- Enhanced Help Section -->
-                                @if (!ExecutionCapabilities.CanExecute)
+                                @if (!StepDesignerViewModel.CanRunFlow)
                                 {
                                     <SpaceItem>
-                                        @if (!HasSelectedRunners)
+                                        @if (!StepDesignerViewModel.HasSelectedRunners)
                                         {
                                             <!-- Runners Available but None Selected -->
                                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -99,8 +98,7 @@
                                             </div>
                                         }
                                     </SpaceItem>
-                                }
-                                
+                                }                             
                             </Space>
                         </SpaceItem>
                     </Space>

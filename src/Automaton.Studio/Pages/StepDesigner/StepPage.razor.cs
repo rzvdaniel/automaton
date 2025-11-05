@@ -1,7 +1,5 @@
 ﻿using AntDesign;
-using Automaton.Core.Enums;
 using Automaton.Studio.Domain;
-using Automaton.Studio.Steps.Custom.Variables;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using BlazorMonaco.Editor;
@@ -15,7 +13,6 @@ partial class StepPage : ComponentBase, IDisposable
     private bool loading = false;
     private bool runningCode = false;
     private bool autoScroll = true;
-    private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
 
     private Form<CustomStep> form;
@@ -29,10 +26,7 @@ partial class StepPage : ComponentBase, IDisposable
         CustomStepLanguage.Batch
     ];
 
-    // Computed properties for Razor UI binding
-    private bool HasSelectedRunners => selectedRunners.Any();
-    private ExecutionCapabilities ExecutionCapabilities => StepDesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
-    private string RunButtonDisabledMessage => StepDesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners);
+    private string RunButtonDisabledMessage => StepDesignerViewModel.GetRunButtonDisabledMessage();
 
     [Inject] private StepViewModel StepDesignerViewModel { get; set; }
     [Inject] private MessageService MessageService { get; set; }
@@ -179,14 +173,6 @@ partial class StepPage : ComponentBase, IDisposable
 
     private async Task Run()
     {
-        var capabilities = ExecutionCapabilities;
-
-        if (!capabilities.CanExecute)
-        {
-            await MessageService.WarningAsync("Please select at least one runner to execute the step.");
-            return;
-        }
-
         try
         {
             runningCode = true;
@@ -214,15 +200,7 @@ partial class StepPage : ComponentBase, IDisposable
                 _ = MessageService.WarningAsync("Validation warnings detected, but continuing with execution...", 2);
             }
 
-            // Execute mutually exclusively - either locally OR on runners, not both
-            if (capabilities.ShouldRunLocally)
-            {
-                await ExecuteLocally();
-            }
-            else if (capabilities.ShouldRunOnRunners)
-            {
-                await ExecuteOnRunners();
-            }
+            await ExecuteOnRunners();
 
             runningCode = false;
             _ = MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
@@ -234,17 +212,11 @@ partial class StepPage : ComponentBase, IDisposable
         }
     }
 
-    private async Task ExecuteLocally()
-    {
-        StepDesignerViewModel.Execute();
-        await Task.CompletedTask;
-    }
-
     private async Task ExecuteOnRunners()
     {
         try
         {
-            var results = await StepDesignerViewModel.ExecuteOnRunners(selectedRunners);
+            var results = await StepDesignerViewModel.ExecuteOnRunners();
             var resultsList = results.ToList();
             
             // Small delay to ensure DOM updates before auto-scrolling
@@ -398,7 +370,7 @@ partial class StepPage : ComponentBase, IDisposable
 
     private void OnRunButtonClickWhenDisabled()
     {
-        var action = StepDesignerViewModel.GetRunButtonAction(HasSelectedRunners);
+        var action = StepDesignerViewModel.GetRunButtonAction();
         
         switch (action)
         {

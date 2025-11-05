@@ -19,13 +19,9 @@ partial class DesignerPage : ComponentBase
     private bool isStepCreatedHandlerAttached;
     private StudioStep selectedStep;
     private string rightPanelActiveTab = "ai"; // Default to AI Chat tab
-    private IEnumerable<Guid> selectedRunners = new List<Guid>();
     private bool isLoadingRunners = false;
 
-    // Computed properties for Razor UI binding
-    private bool HasSelectedRunners => selectedRunners.Any();
-    private ExecutionCapabilities ExecutionCapabilities => DesignerViewModel.GetExecutionCapabilities(HasSelectedRunners);
-    private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage(HasSelectedRunners);
+    private string RunButtonDisabledMessage => DesignerViewModel.GetRunButtonDisabledMessage();
 
     [Parameter] public string FlowId { get; set; }
     [Parameter] public string FlowName { get; set; }
@@ -64,30 +60,13 @@ partial class DesignerPage : ComponentBase
 
     public async Task RunFlow()
     {
-        var capabilities = ExecutionCapabilities;
-
-        if (!capabilities.CanExecute)
-        {
-            MessageService.Warning("Please select at least one runner to execute the flow.");
-            return;
-        }
-
         // Clear logs for new execution
         WorkflowLogsManager.ClearLogs();
 
         try
         {
-            // Execute mutually exclusively - either locally OR on runners, not both
-            if (capabilities.ShouldRunLocally)
-            {
-                var localExecution = await ExecuteLocally();
-                await ShowLocalExecutionResult(localExecution);
-            }
-            else if (capabilities.ShouldRunOnRunners)
-            {
-                var runnerResults = await ExecuteOnRunners();
-                await ShowRunnerExecutionResults(runnerResults);
-            }
+            var runnerResults = await ExecuteOnRunners();
+            await ShowRunnerExecutionResults(runnerResults);
         }
         catch (Exception ex)
         {
@@ -100,30 +79,11 @@ partial class DesignerPage : ComponentBase
         DesignerViewModel.StopFlow();
     }
 
-    private async Task<WorkflowExecution> ExecuteLocally()
-    {
-        var execution = await DesignerViewModel.RunFlow();
-        if (execution != null)
-        {
-            WorkflowLogsManager.SetCurrentExecution(execution.Id);
-        }
-        return execution;
-    }
-
     private async Task<IEnumerable<RunnerFlowResult>> ExecuteOnRunners()
     {
         Guid.TryParse(FlowId, out var flowId);
-        var results = await FlowService.Run(flowId, selectedRunners);
+        var results = await FlowService.Run(flowId, DesignerViewModel.SelectedRunners);
         return results;
-    }
-
-    private async Task ShowLocalExecutionResult(WorkflowExecution execution)
-    {
-        if (execution != null)
-        {
-            MessageService.Success($"Local execution completed with status: {execution.Status}", 5);
-        }
-        await Task.CompletedTask;
     }
 
     private async Task ShowRunnerExecutionResults(IEnumerable<RunnerFlowResult> results)
@@ -355,7 +315,7 @@ partial class DesignerPage : ComponentBase
 
     private void OnRunButtonClickWhenDisabled()
     {
-        var action = DesignerViewModel.GetRunButtonAction(HasSelectedRunners);
+        var action = DesignerViewModel.GetRunButtonAction();
         
         switch (action)
         {
