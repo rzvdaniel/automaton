@@ -150,10 +150,7 @@ public class RunnerHostService
             logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
             logger.Debug("=== END ENVIRONMENT VARIABLES ===");
 
-            // Step 1: Ask for default server confirmation or new one
-            await PromptForServerConfigurationAsync();
-
-            // Step 2: Check Authentication
+            // Check Authentication
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -224,7 +221,7 @@ public class RunnerHostService
             // Set up HTTP client authentication
             await SetupHttpClientAuth();
 
-            // Step 3: Check/Configure Runner Registration
+            // Check/Configure Runner Registration
             if (!configService.IsRunnerRegistered())
             {
                 WriteLine("🔧 Runner registration required...");
@@ -252,7 +249,7 @@ public class RunnerHostService
                 WriteLine($"✅ Runner registered: {configService.ApplicationName} (ID: {configService.RunnerId})");
             }
 
-            // Step 4: Start the runner
+            // Start the runner
             // Autodetect Python environment and submit to server
             var detector = new PythonEnvironmentDetector();
             var detected = detector.Detect();

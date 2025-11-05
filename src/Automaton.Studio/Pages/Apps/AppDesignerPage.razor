@@ -29,16 +29,18 @@
 					@if (currentApp.IsPublished)
 					{
 						<SpaceItem>
-							<Tag Color="@("green")" Icon="check-circle">
-								Published
-							</Tag>
-						</SpaceItem>
-						<SpaceItem>
 							<Text Type="TextElementType.Secondary" Style="font-size: 12px;">
 								<Icon Type="link" />
 								/web/@currentApp.PublicUrl
 							</Text>
 						</SpaceItem>
+
+						<SpaceItem>
+							<Tag Color="@("green")" Icon="check-circle">
+								Published
+							</Tag>
+						</SpaceItem>
+
 						@if (!currentApp.RequiresAuthentication)
 						{
 							<SpaceItem>
