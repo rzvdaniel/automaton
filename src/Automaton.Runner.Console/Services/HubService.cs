@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Automaton.Runner.Console.Models;
 using Automaton.Core.Models;
 using Automaton.Core.Enums;
+using System.Threading;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -121,11 +122,21 @@ public class HubService
                 wasDisconnected = true;
                 
                 // Try to connect using the resilient policy (which includes circuit breaker)
-                await BuildAndConnectWithRetry(apiKey, hubUrl);
+                var attempts = await BuildAndConnectWithRetry(apiKey, hubUrl);
                 
                 // If we get here, connection succeeded
-                logger.Information("Successfully connected via continuous retry loop");
-                WriteLine("✅ Connection established successfully after retries!");
+                logger.Information("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
+
+                // Conditional console output based on attempts
+                if (attempts <= 1)
+                {
+                    WriteLine("✅ Connected to server successfully");
+                }
+                else
+                {
+                    WriteLine($"✅ Connection established successfully after {attempts} attempt{(attempts > 1 ? "s" : "") }!");
+                }
+
                 isReconnecting = false;
                 wasDisconnected = false;
                 
@@ -161,12 +172,17 @@ public class HubService
         logger.Information("Continuous retry loop terminated");
     }
 
-    private async Task BuildAndConnectWithRetry(string apiKey, string hubUrl)
+    private async Task<int> BuildAndConnectWithRetry(string apiKey, string hubUrl)
     {
+        var attempts = 0;
+
         await resilientConnectionPolicy.GetPolicy().ExecuteAsync(async () =>
         {
+            Interlocked.Increment(ref attempts);
             await BuildAndConnect(apiKey, hubUrl);
         });
+
+        return attempts;
     }
 
     private async Task BuildAndConnect(string apiKey, string hubUrl)
@@ -310,7 +326,7 @@ public class HubService
 
             await connection.StartAsync();
 
-            WriteLine("✅ Connected to server successfully");
+            // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Information("Connected to hub at {HubUrl}", hubUrl);
         }
         catch (Exception ex)
@@ -347,7 +363,7 @@ public class HubService
         }
         
         WriteLine($"❌ Connection failed: {friendlyMessage}");
-        WriteLine();
+            WriteLine();
         
         // Provide specific troubleshooting guidance
         switch (ex)
