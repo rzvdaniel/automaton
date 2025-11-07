@@ -34,11 +34,54 @@ public class IframeMessageHandler : IAsyncDisposable
         {
             var exists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
             logger.Information("[IframeMessageHandler] automatonMessageHandler exists: {Exists}", exists);
-            
+
             if (!exists)
             {
-                logger.Error("[IframeMessageHandler] automatonMessageHandler.js not loaded! Cannot initialize.");
-                return;
+                logger.Warning("[IframeMessageHandler] automatonMessageHandler.js not present - attempting to load dynamically");
+
+                // Dynamically inject the script tag into the host page so it's available
+                try
+                {
+                    // Insert script element to load automatonMessageHandler.js from web root
+                    var injectScript = @"(function(){
+                        if (typeof window.automatonMessageHandler !== 'undefined') return true;
+                        var s = document.createElement('script');
+                        s.src = '/automatonMessageHandler.js';
+                        s.async = true;
+                        document.head.appendChild(s);
+                        return true;
+                    })();";
+
+                    await jsRuntime.InvokeAsync<object>("eval", injectScript);
+
+                    // Poll for existence with timeout
+                    var attempts = 0;
+                    var maxAttempts = 50; // ~5s with 100ms delay
+                    while (attempts < maxAttempts)
+                    {
+                        attempts++;
+                        var nowExists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
+                        if (nowExists)
+                        {
+                            logger.Information("[IframeMessageHandler] automatonMessageHandler loaded dynamically after {Attempts} attempts", attempts);
+                            exists = true;
+                            break;
+                        }
+
+                        await Task.Delay(100);
+                    }
+
+                    if (!exists)
+                    {
+                        logger.Error("[IframeMessageHandler] Failed to load automatonMessageHandler.js dynamically within timeout");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "[IframeMessageHandler] Error injecting automatonMessageHandler.js dynamically");
+                    throw;
+                }
             }
         }
         catch (Exception ex)
@@ -72,9 +115,9 @@ public class IframeMessageHandler : IAsyncDisposable
             {
                 PropertyNameCaseInsensitive = true
             };
-            
+
             var message = System.Text.Json.JsonSerializer.Deserialize<MessageData>(messageJson, options);
-            
+
             if (message?.Type != "apiRequest" || message.Payload == null)
             {
                 logger.Warning("[IframeMessageHandler] Invalid message type or missing payload. Type: {Type}, Payload null: {PayloadNull}", 
@@ -100,7 +143,7 @@ public class IframeMessageHandler : IAsyncDisposable
 
             var responseJson = System.Text.Json.JsonSerializer.Serialize(response);
             logger.Information("[IframeMessageHandler] Returning response to JavaScript");
-            
+
             return responseJson;
         }
         catch (Exception ex)
@@ -133,7 +176,20 @@ public class IframeMessageHandler : IAsyncDisposable
 
         if (dotNetRef != null)
         {
-            await jsRuntime.InvokeVoidAsync("automatonMessageHandler.dispose");
+            try
+            {
+                var exists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
+                if (exists)
+                {
+                    await jsRuntime.InvokeVoidAsync("automatonMessageHandler.dispose");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Ignore JS errors during dispose but log for diagnostics
+                logger.Warning(ex, "[IframeMessageHandler] Error while disposing JavaScript handler");
+            }
+
             dotNetRef.Dispose();
         }
     }

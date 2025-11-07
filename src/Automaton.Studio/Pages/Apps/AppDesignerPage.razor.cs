@@ -85,17 +85,12 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !previewHandlerInitialized)
         {
             await LoadRunners();
-            
-            // Initialize preview handler once (only if app is loaded and published)
-            if (currentApp?.IsPublished == true && !previewHandlerInitialized)
-            {
-                await InitializePreviewHandler();
-            }
+            // Always initialize the preview handler so the iframe can communicate
+            await InitializePreviewHandler();
         }
-
         await base.OnAfterRenderAsync(firstRender);
     }
 
