@@ -8,3 +8,6 @@
   - [Platform Pages](user-guide/platform-pages.md)
   - [Working with Flows](user-guide/flows.md)
   - [Managing Runners](user-guide/runners.md)
+  - [Web Apps](user-guide/web-apps.md)
+    - [Quick Reference](user-guide/web-apps-quick-reference.md)
+    - [Why Use the SDK?](user-guide/web-apps-why-sdk.md)
