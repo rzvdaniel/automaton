@@ -2,6 +2,8 @@
 @attribute [AllowAnonymous]
 @layout Automaton.Studio.Shared.EmptyLayout
 @using AntDesign
+@using Automaton.Studio.Models
+@namespace Automaton.Studio.Pages.Apps
 
 <div class="web-app-container">
 	@if (loading)
@@ -31,6 +33,13 @@
 	}
 	else
 	{
+		<!-- DEBUG: Manual init button -->
+        <div style="position: absolute; top: 10px; right: 10px; z-index: 9999;">
+            <Button Type="@ButtonType.Primary" OnClick="ManualInit">
+                Init Handler (Debug)
+            </Button>
+        </div>
+
 		<iframe id="web-app-frame"
 				srcdoc="@GetAppHtml()"
 				sandbox="allow-scripts allow-forms allow-same-origin allow-modals"

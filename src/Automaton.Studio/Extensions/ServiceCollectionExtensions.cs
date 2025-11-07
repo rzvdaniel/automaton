@@ -91,6 +91,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowExecutionsService>();
         services.AddScoped<CustomStepsService>();
         services.AddScoped<Services.AppsService>();
+        services.AddScoped<IframeProxyService>();
+        services.AddScoped<IframeMessageHandler>();
         services.AddScoped<StudioFlowExecuteService>();
         services.AddScoped<StudioFlowConvertService>(); // Keep concrete for backwards compatibility
         services.AddScoped<IFlowConvertService<StudioFlow>, StudioFlowConvertService>(); // Add interface registration
