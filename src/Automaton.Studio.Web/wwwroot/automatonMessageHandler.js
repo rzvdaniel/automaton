@@ -1,6 +1,8 @@
 /**
  * Blazor-friendly iframe message handler
- * Simple global listener that calls back to Blazor C#
+ * Secure postMessage listener that calls back to Blazor C#
+ * 
+ * SECURITY: Only accepts messages from same-origin iframes (srcdoc has 'null' origin)
  */
 
 console.log('[MessageHandler] Script loading...');
@@ -10,49 +12,72 @@ window.automatonMessageHandler = {
 
     init: function (helper) {
         this.dotnetHelper = helper;
-        console.log('[MessageHandler] init() called with helper:', helper);
+        console.log('[MessageHandler] init() called');
         
         window.addEventListener('message', async (e) => {
-            console.log('[MessageHandler] Message event:', e.origin, e.data?.type);
+            // SECURITY: Only accept messages from same origin or srcdoc iframes
+            // srcdoc iframes have origin 'null' which is safe because they inherit parent's security context
+            const isSameOrigin = e.origin === window.origin;
+            const isSrcdocIframe = e.origin === 'null';
             
-            // Respond to ping messages immediately
-            if (e.data?.type === 'ping' && e.source) {
-                console.log('[MessageHandler] Ping received, sending pong');
-                e.source.postMessage({ type: 'pong' }, '*');
+            if (!isSameOrigin && !isSrcdocIframe) {
+                console.warn('[MessageHandler] SECURITY: Rejected message from foreign origin:', e.origin);
                 return;
             }
-            
-            // Accept 'null' origin (srcdoc) or same origin
-            if (e.origin !== 'null' && e.origin !== window.origin) {
-                console.warn('[MessageHandler] REJECTED - wrong origin');
+
+            // SECURITY: Verify message is from an iframe, not external window
+            if (e.source === window || e.source === window.parent) {
+                console.warn('[MessageHandler] SECURITY: Rejected message from parent/self');
                 return;
             }
 
             const { type, payload } = e.data || {};
-            if (type !== 'apiRequest') {
-                console.log('[MessageHandler] IGNORED - not apiRequest');
+
+            // Handle ping/pong for initialization handshake
+            if (type === 'ping' && e.source) {
+                console.log('[MessageHandler] Ping received, sending pong');
+                e.source.postMessage({ type: 'pong' }, '*');
                 return;
             }
 
-            console.log('[MessageHandler] ? API REQUEST! ID:', payload?.id);
+            // Only process API requests
+            if (type !== 'apiRequest') {
+                return;
+            }
 
+            console.log('[MessageHandler] API REQUEST ID:', payload?.id);
+
+            // SECURITY: Validate payload structure before processing
+            if (!payload || !payload.id || !payload.path) {
+                console.error('[MessageHandler] SECURITY: Invalid payload structure');
+                if (e.source) {
+                    e.source.postMessage({
+                        type: 'apiResponse',
+                        id: payload?.id || 'unknown',
+                        result: { 
+                            error: 'Invalid request', 
+                            message: 'Missing required fields', 
+                            success: false 
+                        }
+                    }, '*');
+                }
+                return;
+            }
+
+            // SECURITY: Path validation happens in C# (IframeProxyService)
+            // Only /api/web-apps/* endpoints are allowed
             try {
-                // Call C# method
                 const messageJson = JSON.stringify(e.data);
-                console.log('[MessageHandler] Calling C# HandleMessage...');
                 const result = await this.dotnetHelper.invokeMethodAsync('HandleMessage', messageJson);
-                console.log('[MessageHandler] ? C# returned:', result);
                 
-                // Send response back
                 const response = JSON.parse(result);
                 if (e.source) {
                     e.source.postMessage(response, '*');
-                    console.log('[MessageHandler] ? Response sent to iframe');
+                    console.log('[MessageHandler] Response sent to iframe');
                 }
             } catch (err) {
-                console.error('[MessageHandler] ? ERROR:', err);
+                console.error('[MessageHandler] ERROR:', err);
                 
-                // Send error response
                 if (e.source && payload) {
                     e.source.postMessage({
                         type: 'apiResponse',
@@ -67,7 +92,7 @@ window.automatonMessageHandler = {
             }
         });
         
-        console.log('[MessageHandler] ? Event listener registered!');
+        console.log('[MessageHandler] Event listener registered');
     },
 
     dispose: function () {
@@ -76,4 +101,4 @@ window.automatonMessageHandler = {
     }
 };
 
-console.log('[MessageHandler] ? Script loaded! Object available:', !!window.automatonMessageHandler);
+console.log('[MessageHandler] Script loaded');
