@@ -7,7 +7,7 @@ using Microsoft.JSInterop;
 
 namespace Automaton.Studio.Pages.Apps;
 
-partial class WebAppViewer : ComponentBase, IAsyncDisposable
+partial class WebAppViewer
 {
     [Inject] AppsService AppsService { get; set; } = default!;
     [Inject] NavigationManager Navigation { get; set; } = default!;
@@ -23,15 +23,14 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
     private bool requiresLogin = false;
     private AppModel? currentApp;
     private bool handlerInitialized = false;
+    private ElementReference iframeElement;
 
     // Client-side automatonApi.js script to inject into iframe
-    // NOTE: APP_SLUG will be replaced with actual slug value
     private const string AutomatonApiScriptTemplate = @"
 <script>
 (function(window) {
   'use strict';
 
-  // App slug is injected by the server
   const APP_SLUG = '{{APP_SLUG}}';
   console.log('[AutomatonAPI-IFRAME] Initializing for app:', APP_SLUG);
 
@@ -81,9 +80,34 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
 
       window.addEventListener('message', responseHandler);
       
-      // Use '*' as targetOrigin for srcdoc iframes (origin is null)
-      window.parent.postMessage({ type: 'apiRequest', payload: payload }, '*');
-      console.log('[AutomatonAPI-IFRAME] Message posted to parent');
+      // Retry ping/pong handshake
+      let retries = 0;
+      const maxRetries = 50;
+      
+      function sendWhenReady() {
+        window.parent.postMessage({ type: 'ping' }, '*');
+        
+        const pingTimeout = setTimeout(() => {
+          retries++;
+          if (retries < maxRetries) {
+            sendWhenReady();
+          } else {
+            reject(new Error('Parent handler not ready after 5 seconds'));
+          }
+        }, 100);
+        
+        function pongHandler(e) {
+          if (e.data?.type === 'pong') {
+            clearTimeout(pingTimeout);
+            window.removeEventListener('message', pongHandler);
+            window.parent.postMessage({ type: 'apiRequest', payload: payload }, '*');
+            console.log('[AutomatonAPI-IFRAME] Message posted to parent');
+          }
+        }
+        window.addEventListener('message', pongHandler);
+      }
+      
+      sendWhenReady();
     });
   }
 
@@ -131,7 +155,6 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
                 return;
             }
 
-            // Validate app is published (server should already filter this, but double-check)
             if (!currentApp.IsPublished)
             {
                 Logger.LogWarning("[WebAppViewer] App '{AppName}' is not published", currentApp.Name);
@@ -140,7 +163,6 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
                 return;
             }
 
-            // Check authentication requirements
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var isUserAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
 
@@ -187,34 +209,48 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Only initialize handler if:
-        // 1. First render
-        // 2. App loaded successfully (currentApp != null)
-        // 3. No errors
-        // 4. Handler not already initialized
-        if (firstRender && currentApp != null && string.IsNullOrEmpty(error) && !handlerInitialized)
+        // Don't rely on firstRender - use our own flag
+        // This handles prerendering where firstRender=true but data isn't loaded yet
+        if (!handlerInitialized && currentApp != null && string.IsNullOrEmpty(error))
         {
+            Logger.LogWarning("[WebAppViewer] ===== ATTEMPTING INITIALIZATION ===== (firstRender: {FirstRender})", firstRender);
+            
             try
             {
-                Logger.LogInformation("[WebAppViewer] App loaded: {AppName}, initializing message handler", currentApp.Name);
-
-                // Initialize the C# message handler
-                await MessageHandler.InitializeAsync();
-
-                handlerInitialized = true;
-                Logger.LogInformation("[WebAppViewer] Message handler initialized successfully for {AppName}", currentApp.Name);
+                await InitializeHandlerAsync();
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[WebAppViewer] Failed to initialize message handler for {AppName}", currentApp?.Name ?? Slug);
-                // Don't fail the whole page if handler initialization fails
-                // The app will still load, but API calls from iframe won't work
+                Logger.LogError(ex, "[WebAppViewer] Failed in OnAfterRenderAsync");
             }
         }
-        else if (firstRender)
+    }
+
+    private async Task InitializeHandlerAsync()
+    {
+        // Double-check to prevent multiple initializations (in case OnAfterRenderAsync is called multiple times)
+        if (handlerInitialized)
         {
-            Logger.LogWarning("[WebAppViewer] Skipping handler init - currentApp={CurrentAppNull}, error={HasError}, initialized={Initialized}",
-                currentApp == null, !string.IsNullOrEmpty(error), handlerInitialized);
+            Logger.LogWarning("[WebAppViewer] Handler already initialized, skipping");
+            return;
+        }
+
+        // Set flag FIRST to prevent race conditions
+        handlerInitialized = true;
+
+        Logger.LogWarning("[WebAppViewer] ===== INITIALIZING HANDLER =====");
+
+        try
+        {
+            await MessageHandler.InitializeAsync();
+            Logger.LogInformation("[WebAppViewer] Message handler initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            // Reset flag on failure so it can retry
+            handlerInitialized = false;
+            Logger.LogError(ex, "[WebAppViewer] Failed to initialize handler");
+            throw;
         }
     }
 
@@ -222,13 +258,9 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
     {
         if (currentApp?.Definition?.HtmlContent != null)
         {
-            // Create the automatonApi script with the actual app slug
             var automatonApiScript = AutomatonApiScriptTemplate.Replace("{{APP_SLUG}}", Slug);
-            
-            // Inject automatonApi script into the HTML
             var html = currentApp.Definition.HtmlContent;
-            
-            // Try to inject before </body>, </html>, or at the end
+
             if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
             {
                 html = html.Replace("</body>", $"{automatonApiScript}</body>", StringComparison.OrdinalIgnoreCase);
@@ -255,7 +287,6 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
 
     private void GoToLogin()
     {
-        // Redirect to login with return URL
         var returnUrl = Uri.EscapeDataString($"/web/{Slug}");
         Navigation.NavigateTo($"/account/login?returnUrl={returnUrl}");
     }
@@ -265,30 +296,6 @@ partial class WebAppViewer : ComponentBase, IAsyncDisposable
         if (MessageHandler != null)
         {
             await MessageHandler.DisposeAsync();
-        }
-    }
-
-    // DEBUG: Manual initialization for testing
-    private async Task ManualInit()
-    {
-        try
-        {
-            Logger.LogInformation("[WebAppViewer] MANUAL INIT - currentApp null? {IsNull}", currentApp == null);
-            
-            if (currentApp == null)
-            {
-                Logger.LogWarning("[WebAppViewer] Cannot init - currentApp is null!");
-                return;
-            }
-
-            Logger.LogInformation("[WebAppViewer] Manual init for app: {AppName}", currentApp.Name);
-            await MessageHandler.InitializeAsync();
-            handlerInitialized = true;
-            Logger.LogInformation("[WebAppViewer] Manual init completed!");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "[WebAppViewer] Manual init failed");
         }
     }
 }

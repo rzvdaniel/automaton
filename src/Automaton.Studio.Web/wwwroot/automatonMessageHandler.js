@@ -15,6 +15,13 @@ window.automatonMessageHandler = {
         window.addEventListener('message', async (e) => {
             console.log('[MessageHandler] Message event:', e.origin, e.data?.type);
             
+            // Respond to ping messages immediately
+            if (e.data?.type === 'ping' && e.source) {
+                console.log('[MessageHandler] Ping received, sending pong');
+                e.source.postMessage({ type: 'pong' }, '*');
+                return;
+            }
+            
             // Accept 'null' origin (srcdoc) or same origin
             if (e.origin !== 'null' && e.origin !== window.origin) {
                 console.warn('[MessageHandler] REJECTED - wrong origin');

@@ -29,6 +29,24 @@ public class IframeMessageHandler : IAsyncDisposable
     {
         logger.Information("[IframeMessageHandler] Initializing message handler");
 
+        // Check if automatonMessageHandler exists
+        try
+        {
+            var exists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
+            logger.Information("[IframeMessageHandler] automatonMessageHandler exists: {Exists}", exists);
+            
+            if (!exists)
+            {
+                logger.Error("[IframeMessageHandler] automatonMessageHandler.js not loaded! Cannot initialize.");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "[IframeMessageHandler] Error checking for automatonMessageHandler");
+            throw;
+        }
+
         // Create DotNet reference for callbacks
         dotNetRef = DotNetObjectReference.Create(this);
 
