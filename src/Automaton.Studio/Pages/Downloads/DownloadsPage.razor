@@ -1,4 +1,4 @@
-@page "/downloads"
+﻿@page "/downloads"
 @using Microsoft.AspNetCore.Components
 @using Automaton.Studio.Services
 @inject IJSRuntime JSRuntime
@@ -44,194 +44,682 @@
 		<div class="home-container">
 
 			<!-- Hero Section -->
-			<div class="downloads-header">
-				<div class="downloads-header-content">
-					<div class="downloads-header-icon">
-						<Icon Type="download" Style="font-size: 48px; color: white;" />
+			<div class="downloads-hero">
+				<div class="hero-content">
+					<div class="hero-badge">
+						<Icon Type="lightning" Style="font-size: 24px; color: #fff;" />
+						<span>One Command Setup</span>
 					</div>
-					<div class="downloads-header-text">
-						<Title Level="1" Style="margin-bottom: 8px;">Download Automaton Runner</Title>
-						<Paragraph Class="downloads-subtitle">
-							Automate your workflows with cross-platform runners
-						</Paragraph>
-					</div>
+					<h1>Automaton Runner</h1>
+					<p class="hero-subtitle">Execute your automation workflows anywhere</p>
+					<p class="hero-description">
+						Cross-platform command-line runner for workflow automation. Deploy on servers, CI/CD pipelines, Docker, or as a system service.
+					</p>
 				</div>
 			</div>
 
-			<!-- Quick Comparison (Runner Only) -->
-			<Card Class="comparison-card" Style="margin-bottom: 32px;">
-				<TitleTemplate>
-					<Icon Type="experiment" Style="margin-right: 8px;" />
-					<span>What is Automaton Runner?</span>
-				</TitleTemplate>
-				<ChildContent>
-					<Row Gutter="24">
-						<Col Span="24">
-						<div class="comparison-option">
-							<div class="option-icon runner-icon">
-								<Icon Type="code" Style="font-size: 32px; color: #52c41a;" />
-							</div>
-							<Title Level="4">Console Runner</Title>
-							<Paragraph Type="@TextElementType.Secondary">
-								<strong>Best for:</strong> Server deployments, automation, CI/CD, Docker, and headless execution
-							</Paragraph>
-							<ul class="feature-list">
-								<li>? Cross-platform (Windows, Linux, macOS)</li>
-								<li>? Headless execution</li>
-								<li>? CI/CD & Docker ready</li>
-								<li>? Auto-setup with one command</li>
-							</ul>
-							<Button Type="@ButtonType.Primary" Block="true" OnClick="@(() => ScrollToSection("runner-section"))">
-								<Icon Type="download" />
-								Download Console Runner
-							</Button>
-						</div>
-						</Col>
-					</Row>
-				</ChildContent>
-			</Card>
-
-			<!-- Console Runner Section -->
-			<div id="runner-section" class="download-section" Style="margin-top: 32px;">
-				<Card Class="runner-card">
-					<TitleTemplate>
-						<Icon Type="code" Style="margin-right: 8px; color: #52c41a;" />
-						<span>Console Runner (Cross-Platform)</span>
-					</TitleTemplate>
+			<!-- Key Features -->
+			<Row Gutter="24" Style="margin-bottom: 48px;">
+				<Col Xs="24" Sm="12" Md="6">
+				<Card Class="feature-card">
 					<ChildContent>
-						<!-- Primary: Installation Scripts -->
-						<div class="install-primary">
-							<Title Level="4">
-								<Icon Type="rocket" Style="margin-right: 8px; color: #52c41a;" />
-								Quick Installation (Recommended)
-							</Title>
-							<Paragraph>One command to download, install, and configure:</Paragraph>
-
-							<Row Gutter="16" Style="margin-top: 16px;">
-								<Col Span="12">
-								<Card Size="@CardSize.Small" Class="script-card">
-									<TitleTemplate>
-										<Icon Type="windows" Style="margin-right: 8px;" />
-										<span>Windows (PowerShell)</span>
-									</TitleTemplate>
-									<ChildContent>
-										<Paragraph><strong>Run as Administrator:</strong></Paragraph>
-										<div class="code-container">
-											<div class="command-display">
-												<Text Code Class="code-block">@windowsInstallCommand</Text>
-												<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsInstallCommand, "Windows install command"))">
-													Copy
-												</Button>
-											</div>
-										</div>
-									</ChildContent>
-								</Card>
-								</Col>
-								<Col Span="12">
-								<Card Size="@CardSize.Small" Class="script-card">
-									<TitleTemplate>
-										<Icon Type="code" Style="margin-right: 8px;" />
-										<span>Linux / macOS</span>
-									</TitleTemplate>
-									<ChildContent>
-										<Paragraph><strong>Terminal command:</strong></Paragraph>
-										<div class="code-container">
-											<div class="command-display">
-												<Text Code Class="code-block">@unixInstallCommand</Text>
-												<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixInstallCommand, "Unix install command"))">
-													Copy
-												</Button>
-											</div>
-										</div>
-									</ChildContent>
-								</Card>
-								</Col>
-							</Row>
-
-							<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
-								<MessageTemplate>
-									<strong>After installation:</strong> Just run <code>automaton-runner</code> for guided setup!
-								</MessageTemplate>
-							</Alert>
+						<div class="feature-icon">
+							<Icon Type="desktop" Style="font-size: 32px; color: #1890ff;" />
 						</div>
-
-						<!-- Manual Downloads (Collapsed) -->
-						<Collapse Accordion="true" Style="margin-top: 24px;">
-							<Panel Header="Advanced: Manual Downloads" Key="1">
-								<Paragraph Type="@TextElementType.Secondary">
-									Download binaries directly for manual installation:
-								</Paragraph>
-								<Row Gutter="16">
-									<Col Span="8">
-									<Card Size="@CardSize.Small">
-										<TitleTemplate>Windows</TitleTemplate>
-										<ChildContent>
-											<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
-												<SpaceItem>
-													<DownloadButton Url="@runnerWindowsX64Url" FileName="automaton-runner-win-x64.zip" Block="true">
-														x64 (.zip)
-													</DownloadButton>
-												</SpaceItem>
-												<SpaceItem>
-													<DownloadButton Url="@runnerWindowsArm64Url" FileName="automaton-runner-win-arm64.zip" Block="true">
-														ARM64 (.zip)
-													</DownloadButton>
-												</SpaceItem>
-											</Space>
-										</ChildContent>
-									</Card>
-									</Col>
-									<Col Span="8">
-									<Card Size="@CardSize.Small">
-										<TitleTemplate>Linux</TitleTemplate>
-										<ChildContent>
-											<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
-												<SpaceItem>
-													<DownloadButton Url="@runnerLinuxX64Url" FileName="automaton-runner-linux-x64.tar.gz" Block="true">
-														x64 (.tar.gz)
-													</DownloadButton>
-												</SpaceItem>
-												<SpaceItem>
-													<DownloadButton Url="@runnerLinuxArm64Url" FileName="automaton-runner-linux-arm64.tar.gz" Block="true">
-														ARM64 (.tar.gz)
-													</DownloadButton>
-												</SpaceItem>
-											</Space>
-										</ChildContent>
-									</Card>
-									</Col>
-									<Col Span="8">
-									<Card Size="@CardSize.Small">
-										<TitleTemplate>macOS</TitleTemplate>
-										<ChildContent>
-											<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
-												<SpaceItem>
-													<DownloadButton Url="@runnerMacosX64Url" FileName="automaton-runner-macos-x64.tar.gz" Block="true">
-														Intel (.tar.gz)
-													</DownloadButton>
-												</SpaceItem>
-												<SpaceItem>
-													<DownloadButton Url="@runnerMacosArm64Url" FileName="automaton-runner-macos-arm64.tar.gz" Block="true">
-														Apple Silicon (.tar.gz)
-													</DownloadButton>
-												</SpaceItem>
-											</Space>
-										</ChildContent>
-									</Card>
-									</Col>
-								</Row>
-							</Panel>
-						</Collapse>
-
-						<!-- Documentation Link -->
-						<div Style="margin-top: 24px; text-align: center;">
-							<Button Type="@ButtonType.Link" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/runner-setup"))">
-								<Icon Type="book" />
-								View Complete Runner Setup Guide & Troubleshooting
-							</Button>
+						<div class="feature-content">
+							<Title Level="5">Cross-Platform</Title>
+							<Paragraph Type="@TextElementType.Secondary">
+								Windows, Linux, and macOS support with native performance
+							</Paragraph>
 						</div>
 					</ChildContent>
 				</Card>
+				</Col>
+				<Col Xs="24" Sm="12" Md="6">
+				<Card Class="feature-card">
+					<ChildContent>
+						<div class="feature-icon">
+							<Icon Type="rocket" Style="font-size: 32px; color: #52c41a;" />
+						</div>
+						<div class="feature-content">
+							<Title Level="5">One-Command Setup</Title>
+							<Paragraph Type="@TextElementType.Secondary">
+								Fully automated installation with interactive configuration
+							</Paragraph>
+						</div>
+					</ChildContent>
+				</Card>
+				</Col>
+				<Col Xs="24" Sm="12" Md="6">
+				<Card Class="feature-card">
+					<ChildContent>
+						<div class="feature-icon">
+							<Icon Type="cloud" Style="font-size: 32px; color: #faad14;" />
+						</div>
+						<div class="feature-content">
+							<Title Level="5">Cloud & Docker Ready</Title>
+							<Paragraph Type="@TextElementType.Secondary">
+								Deploy on any cloud provider or containerized environment
+							</Paragraph>
+						</div>
+					</ChildContent>
+				</Card>
+				</Col>
+				<Col Xs="24" Sm="12" Md="6">
+				<Card Class="feature-card">
+					<ChildContent>
+						<div class="feature-icon">
+							<Icon Type="api" Style="font-size: 32px, color: #722ed1;" />
+						</div>
+						<div class="feature-content">
+							<Title Level="5">Secure & Reliable</Title>
+							<Paragraph Type="@TextElementType.Secondary">
+								API key authentication with auto-recovery and reconnection
+							</Paragraph>
+						</div>
+					</ChildContent>
+				</Card>
+				</Col>
+			</Row>
+
+			<!-- Quick Installation -->
+			<Card Class="installation-card quick-install" Style="margin-bottom: 32px;">
+				<TitleTemplate>
+					<Icon Type="rocket" Style="margin-right: 8px; color: #52c41a;" />
+					<span>Quick Installation (Recommended)</span>
+				</TitleTemplate>
+				<ChildContent>
+					<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 24px;">
+						One command to download, install, and configure the runner for immediate use:
+					</Paragraph>
+
+					<Row Gutter="16" Style="margin-bottom: 24px;">
+						<Col Xs="24" Sm="12">
+						<Card Size="@CardSize.Small" Class="install-method-card">
+							<TitleTemplate>
+								<Icon Type="windows" Style="margin-right: 8px;" />
+								<span>Windows (PowerShell)</span>
+							</TitleTemplate>
+							<ChildContent>
+								<Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 12px;">
+									Run as Administrator in PowerShell
+								</Paragraph>
+								<div class="code-container">
+									<div class="command-display">
+										<Text Code Class="code-block">@windowsInstallCommand</Text>
+										<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsInstallCommand, "Windows install command"))">
+											Copy
+										</Button>
+									</div>
+								</div>
+								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px;">
+									<MessageTemplate>
+										The installer will guide you through setup interactively
+									</MessageTemplate>
+								</Alert>
+							</ChildContent>
+						</Card>
+						</Col>
+						<Col Xs="24" Sm="12">
+						<Card Size="@CardSize.Small" Class="install-method-card">
+							<TitleTemplate>
+								<Icon Type="code" Style="margin-right: 8px;" />
+								<span>Linux / macOS</span>
+							</TitleTemplate>
+							<ChildContent>
+								<Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 12px;">
+									Run in your terminal (bash or zsh)
+								</Paragraph>
+								<div class="code-container">
+									<div class="command-display">
+										<Text Code Class="code-block">@unixInstallCommand</Text>
+										<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixInstallCommand, "Unix install command"))">
+											Copy
+										</Button>
+									</div>
+								</div>
+								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px;">
+									<MessageTemplate>
+										The installer will guide you through setup interactively
+									</MessageTemplate>
+								</Alert>
+							</ChildContent>
+						</Card>
+						</Col>
+					</Row>
+
+					<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-bottom: 24px;">
+						<MessageTemplate>
+							<strong>✨ After installation:</strong> Run <code>automaton-runner</code> to start your workflow runner. The runner will interactively guide you through configuration with your API key.
+						</MessageTemplate>
+					</Alert>
+				</ChildContent>
+			</Card>
+
+			<!-- Service Installation Option -->
+			<Card Class="installation-card service-install" Style="margin-bottom: 32px;">
+				<TitleTemplate>
+					<Icon Type="cluster" Style="margin-right: 8px; color: #1890ff;" />
+					<span>Production Setup: Run as System Service</span>
+				</TitleTemplate>
+				<ChildContent>
+					<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 24px;">
+						For production deployments, run the runner as a background system service. It will automatically start on system boot and restart on failures.
+					</Paragraph>
+
+					<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
+						<MessageTemplate>
+							<strong>📋 Recommended Workflow:</strong><br/>
+							1. Install the runner using Quick Installation above<br/>
+							2. Run <code>automaton-runner</code> once to configure your API key and runner name<br/>
+							3. Use the service setup instructions below to run it as a system service
+						</MessageTemplate>
+					</Alert>
+
+					<Tabs DefaultActiveKey="windows-service">
+						<TabPane Key="windows-service" Tab="@("Windows (NSSM)")">
+							<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+								Windows uses NSSM (Non-Sucking Service Manager) to run the runner as a service. We provide an automated setup script that handles everything for you.
+							</Paragraph>
+
+							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
+								<MessageTemplate>
+									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration (API key, server URL, runner name) and configure the service automatically!
+								</MessageTemplate>
+							</Alert>
+
+							<Collapse Accordion="true">
+								<Panel Header="Automatic Setup (Recommended)" Key="auto">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+										Run this script to automatically configure the Windows service. It will detect your existing configuration:
+									</Paragraph>
+									<div class="code-container">
+										<div class="command-display">
+											<Text Code Class="code-block">powershell -Command "iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex"</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("powershell -Command \"iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex\"", "Windows service setup command"))">
+												Copy
+											</Button>
+										</div>
+									</div>
+
+									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
+										<MessageTemplate>
+											<strong>✅ What the script does:</strong><br/>
+											• Auto-detects your API key from environment variables<br/>
+											• Detects your runner registration (name and ID)<br/>
+											• Detects your configured server URL<br/>
+											• Downloads and installs NSSM if needed<br/>
+											• Creates the Windows service with optimal settings<br/>
+											• Optionally starts the service immediately
+										</MessageTemplate>
+									</Alert>
+
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
+										<strong>Requirements:</strong>
+									</Paragraph>
+									<ul>
+										<li>Run the runner once first: <code>automaton-runner</code></li>
+										<li>This configures your API key, server URL, and runner name</li>
+										<li>Then run the setup-service script with Administrator privileges</li>
+									</ul>
+								</Panel>
+
+								<Panel Header="Manual Setup (Advanced)" Key="manual">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+										If you prefer to set up the service manually, use these steps:
+									</Paragraph>
+
+									<Collapse Accordion="true">
+										<Panel Header="Step 1: Install NSSM (One-time setup)" Key="1">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												NSSM is a service manager tool. Install it using Chocolatey (easiest):
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">choco install nssm</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("choco install nssm", "Install NSSM command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
+												Or download manually from <a href="https://nssm.cc/download" target="_blank">nssm.cc</a>
+											</Paragraph>
+										</Panel>
+										<Panel Header="Step 2: Create the Service" Key="2">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												After running <code>automaton-runner</code> once to configure, create the service (Run PowerShell as Administrator):
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">nssm install AutomatonRunner "C:\Program Files\Automaton\Runner\automaton-runner.exe"</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm install AutomatonRunner \"C:\\Program Files\\Automaton\\Runner\\automaton-runner.exe\"", "Create service command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+										<Panel Header="Step 3: Configure Auto-Start" Key="3">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Enable automatic startup on system boot:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">nssm set AutomatonRunner Start SERVICE_AUTO_START</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm set AutomatonRunner Start SERVICE_AUTO_START", "Enable auto-start command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+										<Panel Header="Step 4: Start the Service" Key="4">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Start the service now:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">nssm start AutomatonRunner</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm start AutomatonRunner", "Start service command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
+												Check status:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">nssm status AutomatonRunner</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm status AutomatonRunner", "Check status command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+									</Collapse>
+								</Panel>
+							</Collapse>
+						</TabPane>
+
+						<TabPane Key="linux-service" Tab="@("Linux (systemd)")">
+							<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+								Linux uses systemd for service management. We provide an automated setup script that handles everything for you.
+							</Paragraph>
+
+							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
+								<MessageTemplate>
+									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration and configure the systemd service automatically!
+								</MessageTemplate>
+							</Alert>
+
+							<Collapse Accordion="true">
+								<Panel Header="Automatic Setup (Recommended)" Key="auto">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+										Run this script with sudo to automatically configure the systemd service. It will detect your existing configuration:
+									</Paragraph>
+									<div class="code-container">
+										<div class="command-display">
+											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "Linux service setup command"))">
+												Copy
+											</Button>
+										</div>
+									</div>
+
+									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
+										<MessageTemplate>
+											<strong>✅ What the script does:</strong><br/>
+											• Auto-detects your API key from environment variables<br/>
+											• Detects your runner registration (name and ID)<br/>
+											• Detects your configured server URL<br/>
+											• Creates the systemd service file<br/>
+											• Enables auto-start on system boot<br/>
+											• Optionally starts the service immediately
+										</MessageTemplate>
+									</Alert>
+
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
+										<strong>Requirements:</strong>
+									</Paragraph>
+									<ul>
+										<li>Run the runner once first: <code>automaton-runner</code></li>
+										<li>This configures your API key, server URL, and runner name</li>
+										<li>Then run the setup-service script with sudo privileges</li>
+									</ul>
+								</Panel>
+
+								<Panel Header="Manual Setup (Advanced)" Key="manual">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+										If you prefer to set up the service manually, use these steps:
+									</Paragraph>
+
+									<Collapse Accordion="true">
+										<Panel Header="Step 1: Create Service File" Key="1">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Create the systemd service file:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo nano /etc/systemd/system/automaton-runner.service</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo nano /etc/systemd/system/automaton-runner.service", "Create service file command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												Add this content (replace YOUR_USERNAME):
+											</Paragraph>
+											<div class="code-container" Style="max-height: 300px; overflow-y: auto;">
+												<Text Code Class="code-block">@linuxServiceContent</Text>
+											</div>
+										</Panel>
+										<Panel Header="Step 2: Enable and Start Service" Key="2">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Load and enable the service:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo systemctl daemon-reload</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl daemon-reload", "Reload systemd command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												Enable auto-start:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo systemctl enable automaton-runner</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl enable automaton-runner", "Enable auto-start command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												Start the service:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo systemctl start automaton-runner</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl start automaton-runner", "Start service command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+										<Panel Header="Step 3: Monitor the Service" Key="3">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Check status:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo systemctl status automaton-runner</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl status automaton-runner", "Check status command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												View real-time logs:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo journalctl -u automaton-runner -f</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo journalctl -u automaton-runner -f", "View logs command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+									</Collapse>
+								</Panel>
+							</Collapse>
+						</TabPane>
+
+						<TabPane Key="macos-service" Tab="@("macOS (launchd)")">
+							<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+								macOS uses launchd for service management. We provide an automated setup script that handles everything for you.
+							</Paragraph>
+
+							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
+								<MessageTemplate>
+									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration and configure the launchd service automatically!
+								</MessageTemplate>
+							</Alert>
+
+							<Collapse Accordion="true">
+								<Panel Header="Automatic Setup (Recommended)" Key="auto">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+										Run this script with sudo to automatically configure the launchd service. It will detect your existing configuration:
+									</Paragraph>
+									<div class="code-container">
+										<div class="command-display">
+											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "macOS service setup command"))">
+												Copy
+											</Button>
+										</div>
+									</div>
+
+									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
+										<MessageTemplate>
+											<strong>✅ What the script does:</strong><br/>
+											• Auto-detects your API key from environment variables<br/>
+											• Detects your runner registration (name and ID)<br/>
+											• Detects your configured server URL<br/>
+											• Creates the launchd plist file<br/>
+											• Sets correct permissions<br/>
+											• Loads the daemon<br/>
+											• Optionally starts the service immediately
+										</MessageTemplate>
+									</Alert>
+
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
+										<strong>Requirements:</strong>
+									</Paragraph>
+									<ul>
+										<li>Run the runner once first: <code>automaton-runner</code></li>
+										<li>This configures your API key, server URL, and runner name</li>
+										<li>Then run the setup-service script with sudo privileges</li>
+									</ul>
+								</Panel>
+
+								<Panel Header="Manual Setup (Advanced)" Key="manual">
+									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+										If you prefer to set up the service manually, use these steps:
+									</Paragraph>
+
+									<Collapse Accordion="true">
+										<Panel Header="Step 1: Create Launch Daemon" Key="1">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Create the launch daemon plist file:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo nano /Library/LaunchDaemons/com.automaton.runner.plist</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo nano /Library/LaunchDaemons/com.automaton.runner.plist", "Create plist file command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												Add this content:
+											</Paragraph>
+											<div class="code-container" Style="max-height: 400px; overflow-y: auto;">
+												<Text Code Class="code-block">@macosServiceContent</Text>
+											</div>
+										</Panel>
+										<Panel Header="Step 2: Set Permissions" Key="2">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Set correct file permissions:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo chown root:wheel /Library/LaunchDaemons/com.automaton.runner.plist && sudo chmod 644 /Library/LaunchDaemons/com.automaton.runner.plist</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo chown root:wheel /Library/LaunchDaemons/com.automaton.runner.plist && sudo chmod 644 /Library/LaunchDaemons/com.automaton.runner.plist", "Set permissions command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+										<Panel Header="Step 3: Load and Start" Key="3">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												Load the daemon:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist", "Load daemon command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+												Verify it's running:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">sudo launchctl list | grep automaton</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo launchctl list | grep automaton", "Check daemon command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+										<Panel Header="Step 4: Monitor Logs" Key="4">
+											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
+												View logs in real-time:
+											</Paragraph>
+											<div class="code-container">
+												<div class="command-display">
+													<Text Code Class="code-block">tail -f /var/log/automaton-runner.log</Text>
+													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("tail -f /var/log/automaton-runner.log", "View logs command"))">
+														Copy
+													</Button>
+												</div>
+											</div>
+										</Panel>
+									</Collapse>
+								</Panel>
+							</Collapse>
+						</TabPane>
+					</Tabs>
+				</ChildContent>
+			</Card>
+
+			<!-- Manual Installation -->
+			<Card Class="installation-card manual-install">
+				<TitleTemplate>
+					<Icon Type="file-zip" Style="margin-right: 8px; color: #faad14;" />
+					<span>Manual Installation</span>
+				</TitleTemplate>
+				<ChildContent>
+					<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 24px;">
+						Download binaries directly if you prefer manual installation or need custom deployment:
+					</Paragraph>
+
+					<Row Gutter="16">
+						<Col Xs="24" Sm="8">
+						<Card Size="@CardSize.Small">
+							<TitleTemplate>
+								<Icon Type="windows" Style="margin-right: 4px;" />
+								Windows
+							</TitleTemplate>
+							<ChildContent>
+								<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+									<SpaceItem>
+										<DownloadButton Url="@runnerWindowsX64Url" FileName="automaton-runner-win-x64.zip" Block="true">
+											x64 (.zip)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<DownloadButton Url="@runnerWindowsArm64Url" FileName="automaton-runner-win-arm64.zip" Block="true">
+											ARM64 (.zip)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; text-align: center;">
+											~30 MB each
+										</Paragraph>
+									</SpaceItem>
+								</Space>
+							</ChildContent>
+						</Card>
+						</Col>
+						<Col Xs="24" Sm="8">
+						<Card Size="@CardSize.Small">
+							<TitleTemplate>
+								<Icon Type="linux" Style="margin-right: 4px;" />
+								Linux
+							</TitleTemplate>
+							<ChildContent>
+								<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+									<SpaceItem>
+										<DownloadButton Url="@runnerLinuxX64Url" FileName="automaton-runner-linux-x64.tar.gz" Block="true">
+											x64 (.tar.gz)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<DownloadButton Url="@runnerLinuxArm64Url" FileName="automaton-runner-linux-arm64.tar.gz" Block="true">
+											ARM64 (.tar.gz)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; text-align: center;">
+											~25 MB each
+										</Paragraph>
+									</SpaceItem>
+								</Space>
+							</ChildContent>
+						</Card>
+						</Col>
+						<Col Xs="24" Sm="8">
+						<Card Size="@CardSize.Small">
+							<TitleTemplate>
+								<Icon Type="apple" Style="margin-right: 4px;" />
+								macOS
+							</TitleTemplate>
+							<ChildContent>
+								<Space Direction="SpaceDirection.Vertical" Style="width: 100%;">
+									<SpaceItem>
+										<DownloadButton Url="@runnerMacosX64Url" FileName="automaton-runner-macos-x64.tar.gz" Block="true">
+											Intel (.tar.gz)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<DownloadButton Url="@runnerMacosArm64Url" FileName="automaton-runner-macos-arm64.tar.gz" Block="true">
+											Apple Silicon (.tar.gz)
+										</DownloadButton>
+									</SpaceItem>
+									<SpaceItem>
+										<Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; text-align: center;">
+											~25 MB each
+										</Paragraph>
+									</SpaceItem>
+								</Space>
+							</ChildContent>
+						</Card>
+						</Col>
+					</Row>
+
+					<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 24px;">
+						After download: Extract the archive and run <code>automaton-runner</code> to start configuration.
+					</Paragraph>
+				</ChildContent>
+			</Card>
+
+			<!-- Documentation Link -->
+			<div Style="margin-top: 48px; text-align: center; padding: 32px; background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-radius: 12px;">
+				<Icon Type="book" Style="font-size: 48px; color: #1890ff; margin-bottom: 16px;" />
+				<Title Level="3" Style="margin-bottom: 8px;">Need More Information?</Title>
+				<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 24px;">
+					Check out our comprehensive documentation for advanced configuration, troubleshooting, and best practices
+				</Paragraph>
+				<Button Type="@ButtonType.Primary" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/docs/#/user-guide/runner-setup"))">
+					<Icon Type="book" />
+					View Complete Runner Guide
+				</Button>
 			</div>
 		</div>
 	</Content>
@@ -247,6 +735,55 @@
 	private string runnerLinuxArm64Url = "";
 	private string runnerMacosX64Url = "";
 	private string runnerMacosArm64Url = "";
+
+	// Service configuration content
+	private string linuxServiceContent = @"[Unit]
+Description=Automaton Runner
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME
+Environment=""AppConfig__BaseUrl=https://studio.automaton.monster""
+Environment=""AUTOMATON_API_KEY=ak_your_api_key_here""
+ExecStart=/usr/local/bin/automaton-runner
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target";
+
+	private string macosServiceContent = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+    <key>Label</key>
+    <string>com.automaton.runner</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/automaton-runner</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/automaton-runner.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/automaton-runner-error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>AppConfig__BaseUrl</key>
+        <string>https://studio.automaton.monster</string>
+        <key>AUTOMATON_API_KEY</key>
+        <string>ak_your_api_key_here</string>
+    </dict>
+</dict>
+</plist>";
 
 	protected override void OnInitialized()
 	{
@@ -296,88 +833,95 @@
 		padding: 0 24px 40px 24px;
 	}
 
-	.downloads-header {
-		margin-bottom: 24px;
-		padding: 24px 0;
-	}
-
-	.downloads-header-content {
-		display: flex;
-		align-items: center;
-		gap: 24px;
-	}
-
-	.downloads-header-icon {
-		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 80px;
-		height: 80px;
-		background-color: #1890ff;
-		border-radius: 16px;
-	}
-
-	.downloads-header-text {
-		flex: 1;
-	}
-
-	.downloads-subtitle {
-		font-size: 16px;
-		color: #666;
-		margin-bottom: 0;
-	}
-
-	.comparison-card {
-		background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
-		border: 2px solid #1890ff;
-	}
-
-	.comparison-option {
+	.downloads-hero {
+		background: linear-gradient(135deg, #1890ff 0%, #0050b3 100%);
+		border-radius: 12px;
+		padding: 48px 32px;
+		margin-bottom: 48px;
+		color: white;
 		text-align: center;
-		padding: 16px;
 	}
 
-	.option-icon {
-		width: 80px;
-		height: 80px;
-		margin: 0 auto 16px;
-		display: flex;
+	.hero-badge {
+		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		border-radius: 50%;
+		gap: 8px;
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: 20px;
+		padding: 8px 16px;
+		margin-bottom: 16px;
+		font-size: 14px;
+		font-weight: 500;
 	}
 
-	.runner-icon {
-		background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
-	}
-
-	.feature-list {
-		list-style: none;
-		padding: 0;
+	.downloads-hero h1 {
+		font-size: 48px;
+		font-weight: 700;
 		margin: 16px 0;
+		color: white;
+	}
+
+	.hero-subtitle {
+		font-size: 24px;
+		font-weight: 500;
+		margin-bottom: 16px;
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.hero-description {
+		font-size: 16px;
+		color: rgba(255, 255, 255, 0.85);
+		max-width: 600px;
+		margin: 0 auto;
+	}
+
+	.feature-card {
+		background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+		border: 1px solid #e6e8eb;
+		transition: all 0.3s ease;
+		height: 100%;
+	}
+
+	.feature-card:hover {
+		border-color: #1890ff;
+		box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+		transform: translateY(-2px);
+	}
+
+	.feature-icon {
+		margin-bottom: 16px;
+	}
+
+	.feature-content {
 		text-align: left;
 	}
 
-		.feature-list li {
-			padding: 4px 0;
-		}
-
-	.download-section {
-		scroll-margin-top: 80px;
+	.installation-card {
+		background: #ffffff;
+		border: 2px solid #f0f0f0;
+		border-radius: 12px;
+		transition: border-color 0.3s ease;
 	}
 
-	.runner-card {
-		border: 2px solid #52c41a;
-		background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+	.installation-card:hover {
+		border-color: #1890ff;
 	}
 
-	.install-primary {
-		margin-bottom: 24px;
+	.quick-install {
+		border-color: #52c41a;
 	}
 
-	.script-card {
-		text-align: center;
+	.service-install {
+		border-color: #1890ff;
+	}
+
+	.manual-install {
+		border-color: #faad14;
+	}
+
+	.install-method-card {
+		background: linear-gradient(135deg, #f9f9f9 0%, #ffffff 100%);
+		border: 1px solid #e6e8eb;
 	}
 
 	.code-container {
@@ -385,7 +929,7 @@
 		border: 1px solid #e1e4e8;
 		border-radius: 6px;
 		padding: 12px;
-		margin-top: 8px;
+		font-family: 'SFMono-Regular', Consolas, monospace;
 	}
 
 	.command-display {
@@ -400,5 +944,20 @@
 		font-family: 'SFMono-Regular', Consolas, monospace;
 		font-size: 13px;
 		word-break: break-all;
+		margin: 0;
+	}
+
+	:deep(.ant-tabs-tab) {
+		border-radius: 6px 6px 0 0 !important;
+	}
+
+	:deep(.ant-collapse-header) {
+		background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%) !important;
+		border-radius: 6px !important;
+		margin-bottom: 8px !important;
+	}
+
+	:deep(.ant-collapse-header:hover) {
+		background: linear-gradient(135deg, #f0f0f0 0%, #f5f5f5 100%) !important;
 	}
 </style>
