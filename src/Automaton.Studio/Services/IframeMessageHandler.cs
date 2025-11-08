@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using System.Text.Json;
 
 namespace Automaton.Studio.Services;
 
@@ -52,19 +53,6 @@ public class IframeMessageHandler : IAsyncDisposable
                     })();";
 
                     await jsRuntime.InvokeAsync<object>("eval", injectScript);
-
-                    // Wait a short, fixed delay for the script to load
-                    await Task.Delay(300);
-                    exists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
-                    if (!exists)
-                    {
-                        logger.Error("[IframeMessageHandler] Failed to load automatonMessageHandler.js dynamically after delay");
-                        return;
-                    }
-                    else
-                    {
-                        logger.Information("[IframeMessageHandler] automatonMessageHandler loaded dynamically after delay");
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -100,12 +88,12 @@ public class IframeMessageHandler : IAsyncDisposable
         try
         {
             // Parse the message with case-insensitive property names
-            var options = new System.Text.Json.JsonSerializerOptions
+            var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             };
 
-            var message = System.Text.Json.JsonSerializer.Deserialize<MessageData>(messageJson, options);
+            var message = JsonSerializer.Deserialize<MessageData>(messageJson, options);
 
             if (message?.Type != "apiRequest" || message.Payload == null)
             {
@@ -130,7 +118,7 @@ public class IframeMessageHandler : IAsyncDisposable
                 result = result
             };
 
-            var responseJson = System.Text.Json.JsonSerializer.Serialize(response);
+            var responseJson = JsonSerializer.Serialize(response);
             logger.Information("[IframeMessageHandler] Returning response to JavaScript");
 
             return responseJson;
@@ -156,7 +144,7 @@ public class IframeMessageHandler : IAsyncDisposable
             }
         };
 
-        return System.Text.Json.JsonSerializer.Serialize(response);
+        return JsonSerializer.Serialize(response);
     }
 
     public async ValueTask DisposeAsync()
