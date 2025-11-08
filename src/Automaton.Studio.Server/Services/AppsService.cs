@@ -55,7 +55,7 @@ public class AppsService
             .Include(x => x.WebAppUsers)
             .FirstOrDefault(x =>
                 x.PublicUrl != null &&
-                x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
+                x.PublicUrl.ToLower() == slug.ToLower() &&
                 x.IsPublished &&
                 x.WebAppUsers.Any(u => u.UserId == UserId));
 
@@ -73,7 +73,7 @@ public class AppsService
             .Include(x => x.WebAppUsers)
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
-                x.PublicUrl.Equals(slug, StringComparison.OrdinalIgnoreCase) &&
+                x.PublicUrl.ToLower() == slug.ToLower() &&
                 x.IsPublished,
                 cancellationToken);
 

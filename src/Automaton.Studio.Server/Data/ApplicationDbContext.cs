@@ -9,12 +9,10 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Automaton.Studio.Server.Data
 {
-    public class ApplicationDbContext(IConfiguration configuration) :
-        IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>,
-        ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>(), 
-        IDataContext
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>,
+        ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>, IDataContext
     {
-        protected readonly IConfiguration configuration = configuration;
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
         private IDbContextTransaction _transaction;
 
@@ -40,6 +38,7 @@ namespace Automaton.Studio.Server.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
+            // No-op, configuration is handled by DI
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

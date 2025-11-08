@@ -39,7 +39,12 @@ var configurationService = new ConfigurationService(configurationBuilder);
 
 var services = applicationBuilder.Services;
 
-services.AddDbContext<ApplicationDbContext, MySqlDbContext>();
+services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseMySql(
+        configurationManager.GetConnectionString("MySqlConnection"),
+        new MySqlServerVersion(new Version(8, 0, 36)) // Use your actual MySQL version here
+    )
+);
 
 services.AddDatabaseDeveloperPageExceptionFilter();
 
