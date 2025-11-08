@@ -42,15 +42,14 @@ var services = applicationBuilder.Services;
 services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
         configurationManager.GetConnectionString("MySqlConnection"),
-        new MySqlServerVersion(new Version(8, 0, 36)) // Use your actual MySQL version here
+        new MySqlServerVersion(new Version(8, 0, 36))
     )
 );
 
 services.AddDatabaseDeveloperPageExceptionFilter();
 
 // Register AI Providers Configuration
-services.Configure<AiProvidersConfig>(
-    applicationBuilder.Configuration.GetSection("AiProviders"));
+services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {
@@ -65,22 +64,15 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 
 services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
 {
-    // ✅ CORS is ONLY for browser-based web apps
-    // ✅ Runners use API Key authentication (X-API-Key header) - NO CORS needed!
+    // CORS is ONLY for browser-based web apps
+    // Runners use API Key authentication (X-API-Key header) - NO CORS needed!
     builder
      .WithOrigins(
-            "https://localhost:5001",  // ✅ Automaton Studio Desktop (web UI)
-            "https://localhost:7091",  // ✅ Studio Server (self)
-            "http://localhost:5001",   // ✅ HTTP variant
-            "http://localhost:7091"    // ✅ HTTP variant
-                                     // 🎯 Add more origins here for published web apps as needed
+            "https://localhost:5001",
+            "https://localhost:7091"
         )
         .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials();  // ✅ Required for cookie-based authentication (web apps)
-
-    // 📝 NOTE: Console Runners don't need to be in this list!
-    //    They authenticate via X-API-Key header which bypasses CORS entirely.
+        .AllowAnyHeader();
 }));
 
 services.AddMvc();
