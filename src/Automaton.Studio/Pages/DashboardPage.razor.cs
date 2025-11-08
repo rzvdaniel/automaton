@@ -130,6 +130,11 @@ namespace Automaton.Studio.Pages
             }
         }
 
+        private void NavigateToCreateApp()
+        {
+            NavigationManager.NavigateTo("/apps");
+        }
+
         private void NavigateToCreateFlow()
         {
             NavigationManager.NavigateTo("/flows");

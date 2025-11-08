@@ -492,6 +492,9 @@
 
     private RenderFragment _createMenuOverlay =>
         @<Menu>
+            <MenuItem OnClick="@(() => NavigateToCreateApp())">
+            <Icon Type="appstore" /> Apps
+            </MenuItem>
             <MenuItem OnClick="@(() => NavigateToCreateFlow())">
                 <Icon Type="profile" /> Flows
             </MenuItem>
