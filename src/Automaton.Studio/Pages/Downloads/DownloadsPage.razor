@@ -148,7 +148,6 @@
 									<div class="command-display">
 										<Text Code Class="code-block">@windowsInstallCommand</Text>
 										<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(windowsInstallCommand, "Windows install command"))">
-											Copy
 										</Button>
 									</div>
 								</div>
@@ -174,7 +173,6 @@
 									<div class="command-display">
 										<Text Code Class="code-block">@unixInstallCommand</Text>
 										<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(unixInstallCommand, "Unix install command"))">
-											Copy
 										</Button>
 									</div>
 								</div>
@@ -222,13 +220,7 @@
 								Windows uses NSSM (Non-Sucking Service Manager) to run the runner as a service. We provide an automated setup script that handles everything for you.
 							</Paragraph>
 
-							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
-								<MessageTemplate>
-									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration (API key, server URL, runner name) and configure the service automatically!
-								</MessageTemplate>
-							</Alert>
-
-							<Collapse Accordion="true">
+							<Collapse Accordion="true" DefaultActiveKey="@(new string[] { "auto" })">
 								<Panel Header="Automatic Setup (Recommended)" Key="auto">
 									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
 										Run this script to automatically configure the Windows service. It will detect your existing configuration:
@@ -237,7 +229,6 @@
 										<div class="command-display">
 											<Text Code Class="code-block">powershell -Command "iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex"</Text>
 											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("powershell -Command \"iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex\"", "Windows service setup command"))">
-												Copy
 											</Button>
 										</div>
 									</div>
@@ -278,7 +269,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">choco install nssm</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("choco install nssm", "Install NSSM command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -294,7 +284,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">nssm install AutomatonRunner "C:\Program Files\Automaton\Runner\automaton-runner.exe"</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm install AutomatonRunner \"C:\\Program Files\\Automaton\\Runner\\automaton-runner.exe\"", "Create service command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -307,7 +296,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">nssm set AutomatonRunner Start SERVICE_AUTO_START</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm set AutomatonRunner Start SERVICE_AUTO_START", "Enable auto-start command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -320,7 +308,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">nssm start AutomatonRunner</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm start AutomatonRunner", "Start service command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -331,7 +318,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">nssm status AutomatonRunner</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm status AutomatonRunner", "Check status command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -346,13 +332,7 @@
 								Linux uses systemd for service management. We provide an automated setup script that handles everything for you.
 							</Paragraph>
 
-							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
-								<MessageTemplate>
-									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration and configure the systemd service automatically!
-								</MessageTemplate>
-							</Alert>
-
-							<Collapse Accordion="true">
+							<Collapse Accordion="true" DefaultActiveKey="@(new string[] { "auto" })">
 								<Panel Header="Automatic Setup (Recommended)" Key="auto">
 									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
 										Run this script with sudo to automatically configure the systemd service. It will detect your existing configuration:
@@ -361,7 +341,6 @@
 										<div class="command-display">
 											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
 											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "Linux service setup command"))">
-												Copy
 											</Button>
 										</div>
 									</div>
@@ -402,7 +381,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo nano /etc/systemd/system/automaton-runner.service</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo nano /etc/systemd/system/automaton-runner.service", "Create service file command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -421,7 +399,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo systemctl daemon-reload</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl daemon-reload", "Reload systemd command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -432,7 +409,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo systemctl enable automaton-runner</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl enable automaton-runner", "Enable auto-start command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -443,7 +419,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo systemctl start automaton-runner</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl start automaton-runner", "Start service command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -456,7 +431,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo systemctl status automaton-runner</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl status automaton-runner", "Check status command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -467,7 +441,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo journalctl -u automaton-runner -f</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo journalctl -u automaton-runner -f", "View logs command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -482,13 +455,7 @@
 								macOS uses launchd for service management. We provide an automated setup script that handles everything for you.
 							</Paragraph>
 
-							<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
-								<MessageTemplate>
-									<strong>✨ Automated Setup:</strong> The setup-service script will auto-detect your existing runner configuration and configure the launchd service automatically!
-								</MessageTemplate>
-							</Alert>
-
-							<Collapse Accordion="true">
+							<Collapse Accordion="true" DefaultActiveKey="@(new string[] { "auto" })">
 								<Panel Header="Automatic Setup (Recommended)" Key="auto">
 									<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
 										Run this script with sudo to automatically configure the launchd service. It will detect your existing configuration:
@@ -497,7 +464,6 @@
 										<div class="command-display">
 											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
 											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "macOS service setup command"))">
-												Copy
 											</Button>
 										</div>
 									</div>
@@ -539,7 +505,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo nano /Library/LaunchDaemons/com.automaton.runner.plist</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo nano /Library/LaunchDaemons/com.automaton.runner.plist", "Create plist file command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -558,7 +523,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo chown root:wheel /Library/LaunchDaemons/com.automaton.runner.plist && sudo chmod 644 /Library/LaunchDaemons/com.automaton.runner.plist</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo chown root:wheel /Library/LaunchDaemons/com.automaton.runner.plist && sudo chmod 644 /Library/LaunchDaemons/com.automaton.runner.plist", "Set permissions command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -571,7 +535,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo launchctl load /Library/LaunchDaemons/com.automaton.runner.plist", "Load daemon command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -582,7 +545,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">sudo launchctl list | grep automaton</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo launchctl list | grep automaton", "Check daemon command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
@@ -595,7 +557,6 @@
 												<div class="command-display">
 													<Text Code Class="code-block">tail -f /var/log/automaton-runner.log</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("tail -f /var/log/automaton-runner.log", "View logs command"))">
-														Copy
 													</Button>
 												</div>
 											</div>
