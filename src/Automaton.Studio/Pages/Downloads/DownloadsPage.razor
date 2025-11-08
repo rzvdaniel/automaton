@@ -151,11 +151,6 @@
 										</Button>
 									</div>
 								</div>
-								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px;">
-									<MessageTemplate>
-										The installer will guide you through setup interactively
-									</MessageTemplate>
-								</Alert>
 							</ChildContent>
 						</Card>
 						</Col>
@@ -176,11 +171,6 @@
 										</Button>
 									</div>
 								</div>
-								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px;">
-									<MessageTemplate>
-										The installer will guide you through setup interactively
-									</MessageTemplate>
-								</Alert>
 							</ChildContent>
 						</Card>
 						</Col>
@@ -227,8 +217,8 @@
 									</Paragraph>
 									<div class="code-container">
 										<div class="command-display">
-											<Text Code Class="code-block">powershell -Command "iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex"</Text>
-											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("powershell -Command \"iwr -useb https://studio.automaton.monster/downloads/runner/setup-service.ps1 | iex\"", "Windows service setup command"))">
+											<Text Code Class="code-block">@windowsServiceCommand</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(@windowsServiceCommand, "Windows service setup command"))">
 											</Button>
 										</div>
 									</div>
@@ -339,8 +329,8 @@
 									</Paragraph>
 									<div class="code-container">
 										<div class="command-display">
-											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
-											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "Linux service setup command"))">
+											<Text Code Class="code-block">@unixServiceCommand</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(@unixServiceCommand, "Linux service setup command"))">
 											</Button>
 										</div>
 									</div>
@@ -414,14 +404,14 @@
 											</div>
 											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
 												Start the service:
-											</Paragraph>
-											<div class="code-container">
-												<div class="command-display">
-													<Text Code Class="code-block">sudo systemctl start automaton-runner</Text>
-													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl start automaton-runner", "Start service command"))">
-													</Button>
-												</div>
-											</div>
+                                            </Paragraph>
+                                            <div class="code-container">
+                                                <div class="command-display">
+                                                    <Text Code Class="code-block">sudo systemctl start automaton-runner</Text>
+                                                    <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl start automaton-runner", "Start service command"))">
+                                                    </Button>
+                                                </div>
+                                            </div>
 										</Panel>
 										<Panel Header="Step 3: Monitor the Service" Key="3">
 											<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 12px;">
@@ -462,8 +452,8 @@
 									</Paragraph>
 									<div class="code-container">
 										<div class="command-display">
-											<Text Code Class="code-block">curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash</Text>
-											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("curl -sSL https://studio.automaton.monster/downloads/runner/setup-service.sh | sudo bash", "macOS service setup command"))">
+											<Text Code Class="code-block">@unixServiceCommand</Text>
+											<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard(@unixServiceCommand, "macOS service setup command"))">
 											</Button>
 										</div>
 									</div>
@@ -690,6 +680,8 @@
 	// Runner URLs
 	private string windowsInstallCommand = "";
 	private string unixInstallCommand = "";
+	private string windowsServiceCommand  = "";
+	private string unixServiceCommand = "";
 	private string runnerWindowsX64Url = "";
 	private string runnerWindowsArm64Url = "";
 	private string runnerLinuxX64Url = "";
@@ -753,6 +745,9 @@ WantedBy=multi-user.target";
 		// Runner installation scripts
 		windowsInstallCommand = $"iwr -useb {clientBaseUrl}/downloads/runner/install.ps1 | iex";
 		unixInstallCommand = $"curl -sSL {clientBaseUrl}/downloads/runner/install.sh | bash";
+
+		windowsServiceCommand = $"iwr -useb {clientBaseUrl}/downloads/runner/setup-service.ps1 | iex";
+		unixServiceCommand = $"curl -sSL {clientBaseUrl}/downloads/runner/setup-service.sh | bash";
 
 		// Runner manual downloads
 		runnerWindowsX64Url = $"{clientBaseUrl}/downloads/runner/latest/automaton-runner-win-x64.zip";
@@ -886,39 +881,64 @@ WantedBy=multi-user.target";
 	}
 
 	.code-container {
-		background: #f6f8fa;
-		border: 1px solid #e1e4e8;
-		border-radius: 6px;
-		padding: 12px;
-		font-family: 'SFMono-Regular', Consolas, monospace;
+		background: #1e1e1e;
+		border: 1px solid #333333;
+		border-radius: 8px;
+		padding: 0;
+		font-family: 'SFMono-Regular', Consolas, 'Monaco', monospace;
+		overflow: hidden;
 	}
 
 	.command-display {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 8px;
+		gap: 0;
+		padding: 12px 16px;
+		min-height: 44px;
 	}
 
 	.code-block {
 		flex: 1;
-		font-family: 'SFMono-Regular', Consolas, monospace;
+		font-family: 'SFMono-Regular', Consolas, 'Monaco', monospace;
 		font-size: 13px;
+		line-height: 1.5;
+		color: #d4d4d4;
 		word-break: break-all;
 		margin: 0;
+		user-select: all;
+		white-space: pre-wrap;
 	}
 
-	:deep(.ant-tabs-tab) {
-		border-radius: 6px 6px 0 0 !important;
+	.command-display :deep(.ant-btn) {
+		background: transparent !important;
+		border: none !important;
+		color: #858585 !important;
+		padding: 4px 8px !important;
+		margin-left: 8px !important;
+		flex-shrink: 0;
+		transition: color 0.2s ease !important;
 	}
 
-	:deep(.ant-collapse-header) {
-		background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%) !important;
-		border-radius: 6px !important;
-		margin-bottom: 8px !important;
+	.command-display :deep(.ant-btn:hover) {
+		color: #d4d4d4 !important;
+	}
+
+	.command-display :deep(.ant-btn:active) {
+		color: #52c41a !important;
 	}
 
 	:deep(.ant-collapse-header:hover) {
 		background: linear-gradient(135deg, #f0f0f0 0%, #f5f5f5 100%) !important;
 	}
 </style>
+
+<script>
+	// Mobile responsive - hide button label on small screens
+	if (window.innerWidth < 576) {
+		document.querySelectorAll('.command-display').forEach(el => {
+			el.style.flexDirection = 'column';
+			el.style.alignItems = 'flex-start';
+		});
+	}
+</script>
