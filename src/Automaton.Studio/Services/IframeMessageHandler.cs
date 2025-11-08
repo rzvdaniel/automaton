@@ -1,5 +1,4 @@
 using Microsoft.JSInterop;
-using Serilog;
 
 namespace Automaton.Studio.Services;
 
@@ -54,27 +53,17 @@ public class IframeMessageHandler : IAsyncDisposable
 
                     await jsRuntime.InvokeAsync<object>("eval", injectScript);
 
-                    // Poll for existence with timeout
-                    var attempts = 0;
-                    var maxAttempts = 50; // ~5s with 100ms delay
-                    while (attempts < maxAttempts)
-                    {
-                        attempts++;
-                        var nowExists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
-                        if (nowExists)
-                        {
-                            logger.Information("[IframeMessageHandler] automatonMessageHandler loaded dynamically after {Attempts} attempts", attempts);
-                            exists = true;
-                            break;
-                        }
-
-                        await Task.Delay(100);
-                    }
-
+                    // Wait a short, fixed delay for the script to load
+                    await Task.Delay(300);
+                    exists = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.automatonMessageHandler !== 'undefined'");
                     if (!exists)
                     {
-                        logger.Error("[IframeMessageHandler] Failed to load automatonMessageHandler.js dynamically within timeout");
+                        logger.Error("[IframeMessageHandler] Failed to load automatonMessageHandler.js dynamically after delay");
                         return;
+                    }
+                    else
+                    {
+                        logger.Information("[IframeMessageHandler] automatonMessageHandler loaded dynamically after delay");
                     }
                 }
                 catch (Exception ex)
