@@ -12,6 +12,7 @@ public class AppsService
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
     private readonly UserContextService userContextService;
+    private readonly ProjectContextService projectContextService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -20,19 +21,31 @@ public class AppsService
     public AppsService(
         ApplicationDbContext dataContext,
         UserContextService userContextService,
-        RecentActivityService recentActivityService
+        RecentActivityService recentActivityService,
+        ProjectContextService projectContextService
     )
     {
         this.dataContext = dataContext;
         this.userContextService = userContextService;
         this.recentActivityService = recentActivityService;
+        this.projectContextService = projectContextService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
     public IEnumerable<Models.AppModel> List()
     {
-        var entities = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == UserId));
-        var apps = entities.Select(MapToModel);
+        // Get current project context (null if user has no project or hasn't selected one)
+        var currentProjectId = projectContextService.GetCurrentProjectIdAsync().Result;
+        
+        var query = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == UserId));
+        
+        // Filter by project only if user has selected a project
+        if (currentProjectId.HasValue)
+        {
+            query = query.Where(x => x.ProjectId == currentProjectId.Value);
+        }
+        
+        var apps = query.Select(MapToModel);
 
         return apps;
     }
@@ -109,6 +122,9 @@ public class AppsService
             }
         }
 
+        // Assign to current project if one is selected
+        var currentProjectId = await projectContextService.GetCurrentProjectIdAsync();
+
         var entity = new Entities.WebApp
         {
             Id = Guid.NewGuid(),
@@ -122,7 +138,8 @@ public class AppsService
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             Definition = JsonSerializer.Serialize(new Models.AppDefinition()),
-            ExecutionRunnerId = app.ExecutionRunnerId
+            ExecutionRunnerId = app.ExecutionRunnerId,
+            ProjectId = currentProjectId
         };
 
         dataContext.WebApps.Add(entity);

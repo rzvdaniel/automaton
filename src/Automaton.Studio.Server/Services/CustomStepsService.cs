@@ -12,6 +12,7 @@ public class CustomStepsService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
+    private readonly ProjectContextService projectContextService;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
@@ -23,11 +24,13 @@ public class CustomStepsService
         ApplicationDbContext dataContext,
         UserContextService userContextService,
         RecentActivityService recentActivityService,
+        ProjectContextService projectContextService,
         IHubContext<AutomatonHub> automatonHub
     )
     {
         this.dataContext = dataContext;
         this.recentActivityService = recentActivityService;
+        this.projectContextService = projectContextService;
         this.automatonHub = automatonHub;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<CustomStepsService>();
@@ -35,8 +38,18 @@ public class CustomStepsService
 
     public IEnumerable<CustomStep> List()
     {
-        var entities = dataContext.CustomSteps.Where(x => x.CustomStepUsers.Any(x => x.UserId == userId));
-        var steps = entities.Select(MapToModel);
+        // Get current project context (null if user has no project or hasn't selected one)
+        var currentProjectId = projectContextService.GetCurrentProjectIdAsync().Result;
+        
+        var query = dataContext.CustomSteps.Where(x => x.CustomStepUsers.Any(x => x.UserId == userId));
+        
+        // Filter by project only if user has selected a project
+        if (currentProjectId.HasValue)
+        {
+            query = query.Where(x => x.ProjectId == currentProjectId.Value);
+        }
+        
+        var steps = query.Select(MapToModel);
 
         return steps;
     }
@@ -51,6 +64,9 @@ public class CustomStepsService
 
     public async Task<Guid> Create(NewCustomStep step)
     { 
+        // Assign to current project if one is selected
+        var currentProjectId = await projectContextService.GetCurrentProjectIdAsync();
+        
         var entity = new Entities.CustomStep
         {
             Id = Guid.NewGuid(),
@@ -62,7 +78,8 @@ public class CustomStepsService
             DisplayName = string.Empty,
             Description = string.Empty,
             MoreInfo = string.Empty,
-            Definition = JsonSerializer.Serialize(new CustomStepDefinition())
+            Definition = JsonSerializer.Serialize(new CustomStepDefinition()),
+            ProjectId = currentProjectId
         };
 
         dataContext.CustomSteps.Add(entity);

@@ -14,6 +14,7 @@ public class FlowsService
     private readonly RunnerService runnerService;
     private readonly ScheduleService scheduleService;
     private readonly RecentActivityService recentActivityService;
+    private readonly ProjectContextService projectContextService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -23,23 +24,37 @@ public class FlowsService
         RunnerService runnerService,
         ScheduleService scheduleService,
         RecentActivityService recentActivityService,
-        UserContextService userContextService
+        UserContextService userContextService,
+        ProjectContextService projectContextService
     )
     {
         this.dbContext = dbContext;
         this.runnerService = runnerService;
         this.scheduleService = scheduleService;
         this.recentActivityService = recentActivityService;
+        this.projectContextService = projectContextService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<FlowsService>();
     }
 
     public IEnumerable<FlowInfo> List()
     {
+        // Get current project context (null if user has no project or hasn't selected one)
+        var currentProjectId = projectContextService.GetCurrentProjectIdAsync().Result;
+        
+        var query = dbContext.Flows
+            .Where(m => m.FlowUsers.Any(x => x.UserId == userId));
+        
+        // Filter by project only if user has selected a project
+        if (currentProjectId.HasValue)
+        {
+            query = query.Where(m => m.ProjectId == currentProjectId.Value);
+        }
+        
+        query = query.Include(m => m.FlowUsers);
+        
         var flows =
-            from m in dbContext.Flows
-                .Where(m => m.FlowUsers.Any(x => x.UserId == userId))
-                .Include(m => m.FlowUsers)
+            from m in query
             from s in dbContext.FlowExecutions
                 .Where(s => m.Id == s.FlowId)
                 .DefaultIfEmpty()
@@ -74,13 +89,17 @@ public class FlowsService
         flow.Created = DateTime.UtcNow;
         flow.Updated = DateTime.UtcNow;
 
+        // Assign to current project if one is selected
+        var currentProjectId = await projectContextService.GetCurrentProjectIdAsync();
+
         var flowEntity = new Entities.Flow
         {
             Id = flow.Id,
             Name = flow.Name,
             Body = JsonSerializer.Serialize(flow),
             Created = flow.Created,
-            Updated = flow.Updated
+            Updated = flow.Updated,
+            ProjectId = currentProjectId
         };
 
         dbContext.Flows.Add(flowEntity);

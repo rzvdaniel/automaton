@@ -17,6 +17,7 @@ public class RunnerService
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
+    private readonly ProjectContextService projectContextService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -24,19 +25,30 @@ public class RunnerService
 
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
-      IHubContext<AutomatonHub> automatonHub)
+        ProjectContextService projectContextService,
+        IHubContext<AutomatonHub> automatonHub)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
         this.userContextService = userContextService;  // ✅ Store service reference
+        this.projectContextService = projectContextService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
     public async Task<IEnumerable<RunnerDetails>> List(CancellationToken cancellationToken)
     {
-        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId));
+        // Get current project context (null if user has no project or hasn't selected one)
+        var currentProjectId = await projectContextService.GetCurrentProjectIdAsync();
+        
+        var query = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId));
+        
+        // Filter by project only if user has selected a project
+        if (currentProjectId.HasValue)
+        {
+            query = query.Where(x => x.ProjectId == currentProjectId.Value);
+        }
 
-        return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
+        return await GetRunnersWithUpdatedStatus(query, cancellationToken);
     }
 
     public async Task<IEnumerable<RunnerDetails>> List(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
@@ -84,10 +96,14 @@ public class RunnerService
             throw new InvalidOperationException("User context not available. Authentication may not have been properly processed. UserId is empty.");
         }
 
+        // Assign to current project if one is selected
+        var currentProjectId = projectContextService.GetCurrentProjectIdAsync().Result;
+
         var runner = new Runner()
         {
             Id = runnerModel.Id,
-            Name = runnerModel.Name
+            Name = runnerModel.Name,
+            ProjectId = currentProjectId
         };
 
         dbContext.Runners.Add(runner);
