@@ -257,20 +257,22 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 // Load CORS origins from configuration
-var corsOrigins = configurationManager.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-    ?? new[] { "https://localhost:5001", "https://localhost:7091" };
+var corsOrigins = configurationManager.GetSection("Cors:AllowedOrigins").Get<string[]>();
 
-services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
+if (corsOrigins != null && corsOrigins.Length > 0)
 {
-    // CORS is ONLY for browser-based web apps
-    // Runners use API Key authentication (X-API-Key header) - NO CORS needed!
-    builder
-        .WithOrigins(corsOrigins)
-        .AllowAnyMethod()
-        .AllowAnyHeader();
-}));
+    services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
+    {
+        // CORS is ONLY for browser-based web apps
+        // Runners use API Key authentication (X-API-Key header) - NO CORS needed!
+        builder
+            .WithOrigins(corsOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    }));
 
-app.UseCors("CorsPolicy"); // ✅ Enable CORS before authentication
+    app.UseCors("CorsPolicy"); // ✅ Enable CORS before authentication
+}
 
 app.UseAuthentication();
 app.UseRouting();
