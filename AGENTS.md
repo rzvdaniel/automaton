@@ -7,15 +7,15 @@ This document provides a comprehensive summary of the Automaton project, intende
 Automaton is a .NET-based automation platform that combines a visual workflow designer, a secure execution runner, and an integrated web app builder. It is implemented as a Blazor web front-end (`Automaton.Studio.Web`), a backend server (`Automaton.Studio.Server`), shared core libraries (`Automaton.Core`), and a cross-platform console runner (`Automaton.Runner.Console`) that executes flows.
 
 Primary goals:
+- Offer an integrated Web Apps platform so users can build frontends (HTML/CSS/JS) that call Flows as their backend.
 - Enable users to author, test, and run automation Flows composed of built-in and custom Steps.
 - Provide a secure, scalable execution surface (Runners) for flows with API-driven integration points.
-- Offer an integrated Web Apps platform so users can build frontends (HTML/CSS/JS) that call Flows as their backend.
 
 Core capabilities:
+- Web Apps: author, preview, and publish frontend apps inside the Studio and execute flows from those apps via a secure client helper (`window.automatonApi`).
 - Visual Flow Designer with drag-and-drop step placement, variable mapping, triggers, and execution controls.
 - Custom Steps authoring (Python, PowerShell, Batch) with an integrated Step Designer including code editor, test variables, and logs.
 - Cross-platform Runner (`Automaton.Runner.Console`) for executing flows; installers and service scripts are provided for production deployment.
-- Web Apps: author, preview, and publish frontend apps inside the Studio and execute flows from those apps via a secure client helper (`window.automatonApi`).
 
 This README is based on the actual implementation found in the repository (`src/Automaton.Studio/**`, `src/Automaton.Runner.Console`, `src/Automaton.Core`, `src/Automaton.Steps`, and `examples/`).
 
