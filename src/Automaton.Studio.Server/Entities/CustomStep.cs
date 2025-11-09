@@ -13,6 +13,10 @@ public class CustomStep
     public bool VisibleInExplorer { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+    
+    // Project/Organization foreign key
+    public Guid? ProjectId { get; set; }
 
     public virtual ICollection<CustomStepUser> CustomStepUsers { get; set; }
+    public virtual Project Project { get; set; }
 }

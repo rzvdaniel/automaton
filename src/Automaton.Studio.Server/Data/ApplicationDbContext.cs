@@ -17,6 +17,8 @@ namespace Automaton.Studio.Server.Data
         private IDbContextTransaction _transaction;
 
         public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+        public virtual DbSet<Project> Projects { get; set; }
+        public virtual DbSet<UserProjectRole> UserProjectRoles { get; set; }
         public virtual DbSet<Flow> Flows { get; set; }
         public virtual DbSet<FlowUser> FlowUsers { get; set; }
         public virtual DbSet<FlowExecution> FlowExecutions { get; set; }
@@ -63,6 +65,13 @@ namespace Automaton.Studio.Server.Data
             modelBuilder.Entity<Flow>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProjectId);
             });
 
             modelBuilder.Entity<FlowUser>(entity =>
@@ -89,6 +98,13 @@ namespace Automaton.Studio.Server.Data
             modelBuilder.Entity<Runner>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProjectId);
             });
 
             modelBuilder.Entity<RunnerUser>(entity =>
@@ -115,6 +131,13 @@ namespace Automaton.Studio.Server.Data
             modelBuilder.Entity<CustomStep>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProjectId);
             });
 
             modelBuilder.Entity<CustomStepUser>(entity =>
@@ -129,6 +152,17 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => new { e.Id });
                 entity.HasIndex(e => e.PublicUrl).IsUnique();
+                
+                entity.Property(e => e.PublishingScope)
+                    .IsRequired()
+                    .HasDefaultValue(PublishingScope.Anonymous);
+
+                entity.HasOne(e => e.Project)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProjectId);
             });
 
             modelBuilder.Entity<Entities.WebAppUser>(entity =>
@@ -244,6 +278,46 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Description).HasMaxLength(500);
                 
                 entity.HasIndex(e => e.Key).IsUnique();
+            });
+
+            // Configure Project entity
+            modelBuilder.Entity<Project>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.AdminUserId).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                entity.HasOne(e => e.AdminUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AdminUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => e.AdminUserId);
+                entity.HasIndex(e => e.CreatedAt);
+            });
+
+            // Configure UserProjectRole entity
+            modelBuilder.Entity<UserProjectRole>(entity =>
+            {
+                entity.HasKey(e => new { e.UserId, e.ProjectId });
+                entity.Property(e => e.Role).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.UserProjectRoles)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => new { e.UserId, e.ProjectId, e.Role });
             });
         }
 

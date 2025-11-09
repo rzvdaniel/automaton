@@ -1,3 +1,5 @@
+using Automaton.Core.Enums;
+
 namespace Automaton.Studio.Server.Entities;
 
 public class WebApp
@@ -16,12 +18,17 @@ public class WebApp
 
     public Guid? ExecutionRunnerId { get; set; }
     
-    // Access control (future use)
-    public bool RequiresAuthentication { get; set; } = false;
+    // Access control
+    public bool RequiresAuthentication { get; set; } = false; // Deprecated - use PublishingScope
+    public PublishingScope PublishingScope { get; set; } = PublishingScope.Anonymous;
     public string? AllowedRoles { get; set; }
+    
+    // Project/Organization foreign key
+    public Guid? ProjectId { get; set; }
     
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
     public virtual ICollection<WebAppUser> WebAppUsers { get; set; }
+    public virtual Project Project { get; set; }
 }

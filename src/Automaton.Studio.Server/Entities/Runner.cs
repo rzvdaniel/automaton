@@ -17,6 +17,10 @@ public class Runner
     /// Stores RunnerScriptEngineSettings as JSON string
     /// </summary>
     public string? ScriptEngineSettings { get; set; }
+    
+    // Project/Organization foreign key
+    public Guid? ProjectId { get; set; }
 
     public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; }
+    public virtual Project Project { get; set; }
 }
