@@ -1,7 +1,10 @@
+using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -12,27 +15,31 @@ namespace Automaton.Studio.Server.Controllers;
 public class PublicWebAppsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly ProjectContextService _projectContextService;
     private readonly ILogger<PublicWebAppsController> _logger;
 
     public PublicWebAppsController(
         ApplicationDbContext context,
+        ProjectContextService projectContextService,
         ILogger<PublicWebAppsController> logger)
     {
         _context = context;
+        _projectContextService = projectContextService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Get published web app by slug (public access, authentication checked client-side)
+    /// Get published web app by slug with project-based access control
     /// </summary>
     [HttpGet("{slug}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPublishedApp(string slug)
     {
         try
         {
-            // Query published app by slug
+            // Query published app by slug with project information
             var app = await _context.WebApps
                 .Where(w => w.IsPublished && w.PublicUrl == slug)
                 .Select(w => new
@@ -43,7 +50,9 @@ public class PublicWebAppsController : ControllerBase
                     w.Description,
                     w.Definition,
                     w.PublishedAt,
-                    w.RequiresAuthentication
+                    w.RequiresAuthentication, // Deprecated but kept for backwards compatibility
+                    w.PublishingScope,
+                    w.ProjectId
                 })
                 .FirstOrDefaultAsync();
 
@@ -53,33 +62,77 @@ public class PublicWebAppsController : ControllerBase
                 return NotFound(new { message = "App not found or not published" });
             }
 
-            // Log access attempt with authentication status
+            // Check authentication status
             var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = Guid.TryParse(userIdString, out var parsedUserId) ? parsedUserId : Guid.Empty;
 
-            if (app.RequiresAuthentication)
+            // Enforce PublishingScope access control
+            switch (app.PublishingScope)
             {
-                if (isAuthenticated)
-                {
-                    _logger.LogInformation("Authenticated user '{User}' accessing protected app '{AppName}' (slug: {Slug})",
-                        User.Identity?.Name, app.Name, slug);
-                }
-                else
-                {
-                    _logger.LogWarning("Unauthenticated access attempt to protected app '{AppName}' (slug: {Slug})", app.Name, slug);
-                    // Don't return 401 - let client handle authentication check
-                }
-            }
-            else
-            {
-                _logger.LogInformation("Public access to app '{AppName}' (slug: {Slug}) - Auth: {IsAuth}",
-                    app.Name, slug, isAuthenticated);
+                case PublishingScope.Anonymous:
+                    // Public access - anyone can view
+                    _logger.LogInformation("Public access to app '{AppName}' (slug: {Slug}) - Auth: {IsAuth}",
+                        app.Name, slug, isAuthenticated);
+                    break;
+
+                case PublishingScope.ProjectMember:
+                    // Requires authentication AND project membership
+                    if (!isAuthenticated)
+                    {
+                        _logger.LogWarning("Unauthenticated access attempt to project-restricted app '{AppName}' (slug: {Slug})",
+                            app.Name, slug);
+                        return StatusCode(403, new 
+                        { 
+                            message = "This app requires authentication",
+                            requiresAuth = true
+                        });
+                    }
+
+                    // Check if user is a member of the app's project
+                    if (app.ProjectId.HasValue)
+                    {
+                        var hasAccess = await _context.UserProjectRoles
+                            .AnyAsync(upr => upr.UserId == userId && upr.ProjectId == app.ProjectId.Value);
+
+                        if (!hasAccess)
+                        {
+                            _logger.LogWarning(
+                                "User {UserId} attempted to access project-restricted app '{AppName}' (slug: {Slug}) " +
+                                "but is not a member of project {ProjectId}",
+                                userId, app.Name, slug, app.ProjectId.Value);
+                            
+                            return StatusCode(403, new 
+                            { 
+                                message = "You don't have access to this app. It is restricted to project members.",
+                                requiresProjectMembership = true
+                            });
+                        }
+
+                        _logger.LogInformation(
+                            "User {UserId} accessing project-restricted app '{AppName}' (slug: {Slug}) - Project: {ProjectId}",
+                            userId, app.Name, slug, app.ProjectId.Value);
+                    }
+                    else
+                    {
+                        // App has ProjectMember scope but no project assigned
+                        // This shouldn't happen, but we'll treat it as requiring any authenticated user
+                        _logger.LogWarning(
+                            "App '{AppName}' (slug: {Slug}) has ProjectMember scope but no ProjectId",
+                            app.Name, slug);
+                    }
+                    break;
+
+                default:
+                    _logger.LogWarning("Unknown PublishingScope {Scope} for app '{AppName}' (slug: {Slug})",
+                        app.PublishingScope, app.Name, slug);
+                    break;
             }
 
             // Deserialize definition to get HTML content
             var definition = JsonSerializer.Deserialize<Models.AppDefinition>(app.Definition ?? "{}");
 
-            // Always return the app data with RequiresAuthentication flag and authentication status
-            // Authentication is checked server-side where session/cookies are available
+            // Return the app data with access control metadata
             return Ok(new
             {
                 app.Id,
@@ -88,8 +141,9 @@ public class PublicWebAppsController : ControllerBase
                 app.Description,
                 HtmlContent = definition?.HtmlContent ?? GetDefaultHtmlContent(),
                 app.PublishedAt,
-                app.RequiresAuthentication,
-                IsUserAuthenticated = isAuthenticated  // Add this so client knows
+                app.RequiresAuthentication, // Deprecated but kept for backwards compatibility
+                PublishingScope = app.PublishingScope.ToString(),
+                IsUserAuthenticated = isAuthenticated
             });
         }
         catch (Exception ex)
