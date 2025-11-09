@@ -6,6 +6,7 @@ using Common.Authentication;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
+using Microsoft.EntityFrameworkCore.Update;
 
 namespace Automaton.Studio.Server.Application.Queries.Handlers
 {
@@ -36,6 +37,7 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
         {
             var refreshToken = await dataContext
                 .Set<RefreshToken>()
+                .AsTracking()
                 .SingleOrDefaultAsync(x => x.Token == request.Token, cancellationToken);
 
             if (refreshToken == null)
@@ -57,10 +59,23 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
             try
             {
                 dataContext.BeginTransaction();
-                dataContext.Set<RefreshToken>().Remove(refreshToken);
+                
+                // Detach the old token and remove it
+                dataContext.Entry(refreshToken).State = EntityState.Deleted;
+                
+                // Add the new token
                 await dataContext.Set<RefreshToken>().AddAsync(newRefreshToken, cancellationToken);
+                
+                // SaveChanges instead of SaveChangesAsync to respect the transaction
                 await dataContext.SaveChangesAsync(cancellationToken);
+                
                 dataContext.Commit();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                dataContext.Rollback();
+                logger.LogWarning($"Concurrency issue refreshing token for user {user.Id}. The token may have been already refreshed or revoked elsewhere.");
+                throw new Exception("Refresh token refresh operation failed. Please try again.", ex);
             }
             catch
             {
