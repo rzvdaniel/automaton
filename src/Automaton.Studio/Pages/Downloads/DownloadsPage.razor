@@ -151,6 +151,11 @@
 										</Button>
 									</div>
 								</div>
+								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px; margin-bottom: 12px;">
+									<MessageTemplate>
+										<strong>💡 Tip:</strong> You can also <a href="/downloads/runner/install.ps1" download="install.ps1">download the script</a> and run it locally: <code>.\install.ps1</code>
+									</MessageTemplate>
+								</Alert>
 							</ChildContent>
 						</Card>
 						</Col>
@@ -171,6 +176,11 @@
 										</Button>
 									</div>
 								</div>
+								<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px; margin-bottom: 12px;">
+									<MessageTemplate>
+										<strong>💡 Tip:</strong> You can also <a href="/downloads/runner/install.sh" download="install.sh">download the script</a> and run it locally: <code>./install.sh</code>
+									</MessageTemplate>
+								</Alert>
 							</ChildContent>
 						</Card>
 						</Col>
@@ -195,15 +205,6 @@
 						For production deployments, run the runner as a background system service. It will automatically start on system boot and restart on failures.
 					</Paragraph>
 
-					<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 24px;">
-						<MessageTemplate>
-							<strong>📋 Recommended Workflow:</strong><br/>
-							1. Install the runner using Quick Installation above<br/>
-							2. Run <code>automaton-runner</code> once to configure your API key and runner name<br/>
-							3. Use the service setup instructions below to run it as a system service
-						</MessageTemplate>
-					</Alert>
-
 					<Tabs DefaultActiveKey="windows-service">
 						<TabPane Key="windows-service" Tab="@("Windows (NSSM)")">
 							<Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
@@ -222,6 +223,12 @@
 											</Button>
 										</div>
 									</div>
+
+									<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px; margin-bottom: 12px;">
+										<MessageTemplate>
+											<strong>💡 Tip:</strong> You can also <a href="/downloads/runner/setup-service.ps1" download="setup-service.ps1">download the script</a> and run it locally: <code>.\setup-service.ps1</code>
+										</MessageTemplate>
+									</Alert>
 
 									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
 										<MessageTemplate>
@@ -275,6 +282,11 @@
 													<Text Code Class="code-block">nssm install AutomatonRunner "C:\Program Files\Automaton\Runner\automaton-runner.exe"</Text>
 													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("nssm install AutomatonRunner \"C:\\Program Files\\Automaton\\Runner\\automaton-runner.exe\"", "Create service command"))">
 													</Button>
+													<Alert Type="@AlertType.Warning" ShowIcon="true" Style="margin-top: 12px;">
+														<MessageTemplate>
+															Please ensure the path to <code>automaton-runner.exe</code> is correct. Adjust if needed.
+														</MessageTemplate>
+													</Alert>
 												</div>
 											</div>
 										</Panel>
@@ -335,6 +347,12 @@
 										</div>
 									</div>
 
+									<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px; margin-bottom: 12px;">
+										<MessageTemplate>
+											<strong>💡 Tip:</strong> You can also <a href="/downloads/runner/setup-service.sh" download="setup-service.sh">download the script</a> and run it locally: <code>sudo ./setup-service.sh</code>
+										</MessageTemplate>
+									</Alert>
+
 									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
 										<MessageTemplate>
 											<strong>✅ What the script does:</strong><br/>
@@ -394,15 +412,15 @@
 											</div>
 											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
 												Enable auto-start:
-											</Paragraph>
-											<div class="code-container">
-												<div class="command-display">
-													<Text Code Class="code-block">sudo systemctl enable automaton-runner</Text>
-													<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl enable automaton-runner", "Enable auto-start command"))">
-													</Button>
-												</div>
-											</div>
-											<Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
+                                            </Paragraph>
+                                            <div class="code-container">
+                                                <div class="command-display">
+                                                    <Text Code Class="code-block">sudo systemctl enable automaton-runner</Text>
+                                                    <Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyToClipboard("sudo systemctl enable automaton-runner", "Enable auto-start command"))">
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 12px;">
 												Start the service:
                                             </Paragraph>
                                             <div class="code-container">
@@ -457,6 +475,12 @@
 											</Button>
 										</div>
 									</div>
+
+									<Alert Type="@AlertType.Info" ShowIcon="true" Style="margin-top: 12px; margin-bottom: 12px;">
+										<MessageTemplate>
+											<strong>💡 Tip:</strong> You can also <a href="/downloads/runner/setup-service.sh" download="setup-service.sh">download the script</a> and run it locally: <code>sudo ./setup-service.sh</code>
+										</MessageTemplate>
+									</Alert>
 
 									<Alert Type="@AlertType.Success" ShowIcon="true" Style="margin-top: 16px;">
 										<MessageTemplate>
