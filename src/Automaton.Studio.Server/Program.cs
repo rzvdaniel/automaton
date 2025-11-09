@@ -199,6 +199,8 @@ services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
+services.AddScoped<ProjectService>();
+services.AddScoped<ProjectContextService>();
 services.AddScoped<EmailService>();
 services.AddScoped<InstallService>();
 services.AddScoped<SettingsService>();
