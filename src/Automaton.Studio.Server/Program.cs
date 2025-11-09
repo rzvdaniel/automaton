@@ -218,6 +218,21 @@ services.AddScripting();
 services.AddAutomatonSteps();
 services.AddAutomatonCore();
 
+// Load CORS origins from configuration and register if configured
+var corsOrigins = configurationManager.GetSection("Cors:AllowedOrigins").Get<string[]>();
+if (corsOrigins != null && corsOrigins.Length > 0)
+{
+    services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
+    {
+        // CORS is ONLY for browser-based web apps
+        // Runners use API Key authentication (X-API-Key header) - NO CORS needed!
+        builder
+            .WithOrigins(corsOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    }));
+}
+
 var app = applicationBuilder.Build();
 
 app.ApplyMigrations();
@@ -256,22 +271,10 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-// Load CORS origins from configuration
-var corsOrigins = configurationManager.GetSection("Cors:AllowedOrigins").Get<string[]>();
-
+// Enable CORS before authentication (only if configured)
 if (corsOrigins != null && corsOrigins.Length > 0)
 {
-    services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
-    {
-        // CORS is ONLY for browser-based web apps
-        // Runners use API Key authentication (X-API-Key header) - NO CORS needed!
-        builder
-            .WithOrigins(corsOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    }));
-
-    app.UseCors("CorsPolicy"); // ✅ Enable CORS before authentication
+    app.UseCors("CorsPolicy");
 }
 
 app.UseAuthentication();
