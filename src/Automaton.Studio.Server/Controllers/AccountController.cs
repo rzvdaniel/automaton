@@ -15,16 +15,19 @@ public class AccountController : BaseController
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
     private readonly EmailService emailService;
+    private readonly ProjectService projectService;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext, 
         UsersService userManagerService,
-        EmailService emailService)
+        EmailService emailService,
+        ProjectService projectService)
     {
         this.configurationService = configurationService;
         this.dataContext = dataContext;
         this.userManagerService = userManagerService;
         this.emailService = emailService;
+        this.projectService = projectService;
     }
 
     [HttpPost]
@@ -41,9 +44,11 @@ public class AccountController : BaseController
             return BadRequest(ModelState);
         }
 
+        var userId = Guid.NewGuid();
+        
         await userManagerService.CreateUser(new ApplicationUser
         {
-            Id = Guid.NewGuid(),
+            Id = userId,
             Name = registerUserCommand.Name,
             Email = registerUserCommand.Email,
             UserName = registerUserCommand.Email,
@@ -51,6 +56,19 @@ public class AccountController : BaseController
         }, registerUserCommand.Password);
 
         await dataContext.SaveChangesAsync();
+
+        // Create default project for new user
+        try
+        {
+            await projectService.CreateDefaultProjectForUserAsync(userId, registerUserCommand.Name);
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't fail registration if project creation fails
+            // User can create project manually later
+            var logger = HttpContext.RequestServices.GetService<ILogger<AccountController>>();
+            logger?.LogError(ex, "Failed to create default project for user {UserId}", userId);
+        }
 
         var userDetails = new EmailData { Template = "AutomatonRegisterUser", 
             From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport }, 

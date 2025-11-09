@@ -358,4 +358,40 @@ public class ProjectService
 
         return true;
     }
+
+    /// <summary>
+    /// Create a default project for a new user (used during registration)
+    /// </summary>
+    public async Task<Guid> CreateDefaultProjectForUserAsync(Guid userId, string userName)
+    {
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            Name = $"{userName}'s Project",
+            Description = "Default project",
+            AdminUserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        dbContext.Projects.Add(project);
+
+        // Add user as owner
+        var userProjectRole = new UserProjectRole
+        {
+            UserId = userId,
+            ProjectId = project.Id,
+            Role = ProjectRole.Owner,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        dbContext.UserProjectRoles.Add(userProjectRole);
+
+        await dbContext.SaveChangesAsync();
+
+        logger.Information("Created default project {ProjectId} '{ProjectName}' for new user {UserId}",
+            project.Id, project.Name, userId);
+
+        return project.Id;
+    }
 }
