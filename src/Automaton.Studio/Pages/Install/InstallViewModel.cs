@@ -1,12 +1,12 @@
-﻿using Automaton.App.Authentication.Models;
-using Automaton.App.Authentication.Services;
+﻿using Automaton.Studio.Pages.Install.Models;
+using Automaton.Studio.Pages.Install.Services;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.App.Authentication.Pages.Register;
+namespace Automaton.Studio.Pages.Install;
 
-public class UserRegisterViewModel
+public class InstallViewModel
 {
-    private readonly AccountService registrationService;
+    private readonly InstallService installService;
 
     [Required]
     [StringLength(256)]
@@ -27,23 +27,20 @@ public class UserRegisterViewModel
     [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
     public string ConfirmPassword { get; set; }
 
-    [MustBeTrue(ErrorMessage = "You must agree with the terms and privacy policy.")]
-    public bool AgreeWithTermsPrivacyPolicy { get; set; }
-
-    public UserRegisterViewModel(AccountService registrationService)
+    public InstallViewModel(InstallService installService)
     {
-        this.registrationService = registrationService;
+        this.installService = installService;
     }
 
-    public async Task Register()
+    public async Task Install()
     {
-        var userDetails = new UserRegister
+        var userDetails = new InstallCommand
         {
             Name = Name,
             Email = Email,
             Password = Password
         };
 
-        await registrationService.Register(userDetails);
+        await installService.Install(userDetails);
     }
 }

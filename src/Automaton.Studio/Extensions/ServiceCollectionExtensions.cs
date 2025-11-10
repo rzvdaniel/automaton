@@ -1,5 +1,4 @@
-﻿using Automaton.App.Authentication.Config;
-using Automaton.Client.Auth.Extensions;
+﻿using Automaton.Client.Auth.Extensions;
 using Automaton.Client.Auth.Interfaces;
 using Automaton.Client.Auth.Services;
 using Automaton.Core.Interfaces;
@@ -35,6 +34,7 @@ using Automaton.Studio.Pages.Flows.Designer;
 using Automaton.Studio.Pages.Steps.Designer;
 using Automaton.Studio.Pages.Account.Models;
 using Automaton.Studio.Pages.Authentication.Config;
+using Automaton.Studio.Pages.Install.Config;
 
 namespace Automaton.Studio.Extensions;
 

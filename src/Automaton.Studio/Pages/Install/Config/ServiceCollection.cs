@@ -1,9 +1,8 @@
-﻿using Automaton.App.Install.Pages.Register;
-using Automaton.App.Install.Services;
+﻿using Automaton.Studio.Pages.Install.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Automaton.App.Authentication.Config;
+namespace Automaton.Studio.Pages.Install.Config;
 
 public static class ServiceCollection
 {

@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Automaton.App.Authentication.Resources {
+namespace Automaton.Studio.Pages.Install.Resources {
     using System;
     
     
@@ -19,7 +19,7 @@ namespace Automaton.App.Authentication.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "18.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     public class Errors {
@@ -39,7 +39,7 @@ namespace Automaton.App.Authentication.Resources {
         public static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Automaton.App.Authentication.Resources.Errors", typeof(Errors).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Automaton.Studio.Pages.Install.Resources.Errors", typeof(Errors).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -61,16 +61,7 @@ namespace Automaton.App.Authentication.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Must agree with Terms and Privacy Policy.
-        /// </summary>
-        public static string AgreeWithTermsPrivacyPolicy {
-            get {
-                return ResourceManager.GetString("AgreeWithTermsPrivacyPolicy", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Password confirmtation is required.
+        ///   Looks up a localized string similar to Password confirmation is required.
         /// </summary>
         public static string ConfirmPasswordRequired {
             get {
@@ -97,15 +88,6 @@ namespace Automaton.App.Authentication.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to First name is required.
-        /// </summary>
-        public static string FirstNameRequired {
-            get {
-                return ResourceManager.GetString("FirstNameRequired", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Sending forgot password details failed.
         /// </summary>
         public static string ForgotPasswordFailed {
@@ -115,20 +97,20 @@ namespace Automaton.App.Authentication.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Last name is required.
+        ///   Looks up a localized string similar to Installation failed.
         /// </summary>
-        public static string LastNameRequired {
+        public static string InstallationFailed {
             get {
-                return ResourceManager.GetString("LastNameRequired", resourceCulture);
+                return ResourceManager.GetString("InstallationFailed", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Invalid login attempt.
+        ///   Looks up a localized string similar to Name is required.
         /// </summary>
-        public static string LoginFailed {
+        public static string NameRequired {
             get {
-                return ResourceManager.GetString("LoginFailed", resourceCulture);
+                return ResourceManager.GetString("NameRequired", resourceCulture);
             }
         }
         
@@ -138,33 +120,6 @@ namespace Automaton.App.Authentication.Resources {
         public static string PasswordRequired {
             get {
                 return ResourceManager.GetString("PasswordRequired", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Reseting your password failed.
-        /// </summary>
-        public static string ResetPasswordFailed {
-            get {
-                return ResourceManager.GetString("ResetPasswordFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to User name is required.
-        /// </summary>
-        public static string UserNameRequired {
-            get {
-                return ResourceManager.GetString("UserNameRequired", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to User registration failed.
-        /// </summary>
-        public static string UserRegistrationFailed {
-            get {
-                return ResourceManager.GetString("UserRegistrationFailed", resourceCulture);
             }
         }
     }

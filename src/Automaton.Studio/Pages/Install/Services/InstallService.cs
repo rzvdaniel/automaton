@@ -1,9 +1,9 @@
-﻿using Automaton.App.Install.Models;
-using Automaton.Client.Auth.Services;
+﻿using Automaton.Client.Auth.Services;
+using Automaton.Studio.Pages.Install.Models;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace Automaton.App.Install.Services;
+namespace Automaton.Studio.Pages.Install.Services;
 
 public class InstallService
 {

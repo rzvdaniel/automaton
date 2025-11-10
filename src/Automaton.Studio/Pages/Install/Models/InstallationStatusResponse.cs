@@ -1,4 +1,4 @@
-namespace Automaton.App.Install.Models;
+namespace Automaton.Studio.Pages.Install.Models;
 
 public class InstallationStatusResponse
 {

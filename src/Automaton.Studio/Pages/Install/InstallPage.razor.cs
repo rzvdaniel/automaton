@@ -1,26 +1,32 @@
 ﻿using AntDesign;
-using Automaton.App.Authentication.Config;
+using Automaton.Studio.Pages.Install.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
-namespace Automaton.App.Authentication.Pages.Register;
+namespace Automaton.Studio.Pages.Install;
 
-partial class UserRegisterPage : ComponentBase
+partial class InstallPage : ComponentBase
 {
     private bool loading = false;
+    private bool installationComplete;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private UserRegisterViewModel UserRegisterViewModel { get; set; } = default!;
+    [Inject] private InstallViewModel InstallViewModel { get; set; } = default!;
     [Inject] private MessageService MessageService { get; set; }
-    [Inject] private ConfigurationService ConfigurationService { get; set; }
+    [Inject] private InstallService InstallService { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        if (ConfigurationService.NoUserSignUp)
+        try
         {
-            NavigationManager.NavigateTo("/registernotavailable");
+            installationComplete = await InstallService.IsInstallationComplete();
         }
-
+        catch
+        {
+            // If we can't check status, assume installation is not complete
+            installationComplete = false;
+        }
+        
         await base.OnInitializedAsync();
     }
 
@@ -30,13 +36,13 @@ partial class UserRegisterPage : ComponentBase
         {
             loading = true;
 
-            await UserRegisterViewModel.Register();
+            await InstallViewModel.Install();
 
             NavigationManager.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.UserRegistrationFailed);
+            await MessageService.ErrorAsync(Resources.Errors.InstallationFailed);
         }
         finally
         {

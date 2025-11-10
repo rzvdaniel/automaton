@@ -1,7 +1,5 @@
 ﻿using AntDesign;
-using Automaton.App.Authentication.Config;
 using Automaton.Studio.Pages.Authentication.Config;
-using Automaton.Studio.Pages.Authentication.Register;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
