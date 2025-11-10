@@ -10,7 +10,6 @@ using Automaton.Studio.Domain;
 using Automaton.Studio.Factories;
 using Automaton.Studio.Pages.AiApiKeys;
 using Automaton.Studio.Pages.ApiKeys;
-using Automaton.Studio.Pages.StepDesigner;
 using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Pages.Runners;
 using Automaton.Studio.Services;
@@ -34,6 +33,7 @@ using Automaton.Studio.Config;
 using Automaton.Studio.Pages.Flows.FlowDesigner;
 using Automaton.Studio.Pages.Flows.Designer.Components.StepExplorer;
 using Automaton.Studio.Pages.Flows.Designer;
+using Automaton.Studio.Pages.Steps.Designer;
 
 namespace Automaton.Studio.Extensions;
 
@@ -117,7 +117,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RunnersViewModel>();
         services.AddScoped<ApiKeysViewModel>();
         services.AddScoped<AiApiKeysViewModel>();
-        services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
+        services.AddScoped<Pages.Steps.CustomStepsViewModel>();
         services.AddScoped<Pages.Apps.AppsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<StepViewModel>();

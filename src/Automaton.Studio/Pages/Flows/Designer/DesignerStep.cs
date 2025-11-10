@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Automaton.Studio.Domain;
+using CustomStep = Automaton.Studio.Steps.Custom.CustomStep;
 
 namespace Automaton.Studio.Pages.Flows.Designer;
 
@@ -29,7 +30,7 @@ public class DesignerStep : ComponentBase
         builder.AddAttribute(1, "Step", Step);
         
         // Only add OnStepUpdated callback for CustomStep designers
-        if (Step is Steps.Custom.CustomStep)
+        if (Step is CustomStep)
         {
             builder.AddAttribute(2, "OnStepUpdated", OnStepUpdated);
         }

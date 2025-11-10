@@ -1,7 +1,6 @@
 using Automaton.Mcp.Client.Models;
-using Automaton.Studio.Pages.StepDesigner.Components.ToolResults.Utilities;
+using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Automaton.Studio.Services;

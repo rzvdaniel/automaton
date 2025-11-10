@@ -1,6 +1,6 @@
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
-using Automaton.Studio.Pages.StepDesigner.Components;
+using Automaton.Studio.Pages.Steps.Designer.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
