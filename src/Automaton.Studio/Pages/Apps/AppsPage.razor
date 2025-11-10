@@ -25,6 +25,14 @@
             <Col Class="right-actions">
                 <Space Class="right-header-items">
                     <SpaceItem>
+                        <Tooltip Title="@(_isGridView ? "Switch to table view" : "Switch to grid view")">
+                            <Button Icon="@(_isGridView ? "unordered-list" : "appstore")" 
+                                    OnClick="@(() => ToggleViewMode())">
+                                @(_isGridView ? "List" : "Grid")
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                    <SpaceItem>
                         <Tooltip Title="Create new app">
                             <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ShowNewAppDialog())">
                                 Create App
@@ -64,108 +72,456 @@
         }
         else
         {
-            <Table TItem="AppListItem" DataSource="@AppsViewModel.Apps" Class="autoscroll-list" Loading="@loading">
-                <Column Title="Name" @bind-Field="@context.Name">
-                    @context.Name
-                </Column>
-
-                <Column Title="Display Name" @bind-Field="@context.DisplayName">
-                    @context.DisplayName
-                </Column>
-
-                <Column Title="Status" @bind-Field="@context.IsPublished">
-                    @if (context.IsPublished)
+            @if (_isGridView)
+            {          
+                <div class="illustrated-grid">
+                    @foreach (var app in @AppsViewModel.Apps)
                     {
-                        <Space Size="@SpaceSize.Small">
-                            <SpaceItem>
-                                <Tag Color="@("green")">Published</Tag>
-                            </SpaceItem>
-                            @if (!context.RequiresAuthentication)
-                            {
-                                <SpaceItem>
-                                    <Tooltip Title="This app is accessible to anyone with the link">
-                                        <Tag Color="@("orange")" Icon="unlock">Public</Tag>
-                                    </Tooltip>
-                                </SpaceItem>
-                            }
-                            else
-                            {
-                                <SpaceItem>
-                                    <Tooltip Title="This app requires users to be logged in">
-                                        <Tag Color="@("blue")" Icon="lock">Protected</Tag>
-                                    </Tooltip>
-                                </SpaceItem>
-                            }
-                        </Space>
-                    }
-                    else
-                    {
-                        <Tag Color="@("default")">Draft</Tag>
-                    }
-                </Column>
-
-                <Column Title="Created" @bind-Field="@context.Created">
-                    @context.Created.ToString("yyyy-MM-dd HH:mm")
-                </Column>
-
-                <Column Title="Updated" @bind-Field="@context.Updated">
-                    @context.Updated.ToString("yyyy-MM-dd HH:mm")
-                </Column>
-
-                <ActionColumn Title="Action">
-                    <div>
-                        <Space>
-                            <SpaceItem>
-                                <Tooltip Title="Edit app">
-                                    <Button Icon="edit" @onclick="@(() => EditApp(context.Id))">Edit</Button>
-                                </Tooltip>
-                            </SpaceItem>
-                            @if (context.IsPublished)
-                            {
-                                <SpaceItem>
-                                    <Tooltip Title="View published app">
-                                        <Button Icon="eye" @onclick="@(() => ViewApp(context.PublicUrl))">View</Button>
-                                    </Tooltip>
-                                </SpaceItem>
-                            }
-                        </Space>
-
-                        <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
-                            <Overlay>
-                                <Menu>
-                                    @if (!context.IsPublished)
+                        <div class="illustrated-card" @onclick="@(() => EditApp(app.Id))">
+                            <div class="illustrated-hero">
+                                <div class="illustrated-badge">@(app.IsPublished ? "Live" : "Draft")</div>
+                            </div>
+                            <div class="illustrated-content">
+                                <div class="illustrated-header">
+                                    <div>
+                                        <h3 class="illustrated-title">@app.DisplayName</h3>
+                                        <p class="illustrated-name">@app.Name</p>
+                                    </div>
+                                    <div class="card-actions" @onclick:stopPropagation>
+                                        <Tooltip Title="Edit">
+                                            <Button Type="@ButtonType.Text" Icon="edit" @onclick="@(() => EditApp(app.Id))" />
+                                        </Tooltip>
+                                        @if (app.IsPublished)
+                                        {
+                                            <Tooltip Title="View">
+                                                <Button Type="@ButtonType.Text" Icon="eye" @onclick="@(() => ViewApp(app.PublicUrl))" />
+                                            </Tooltip>
+                                            <Tooltip Title="Unpublish">
+                                                <Button Type="@ButtonType.Text" Icon="cloud-download" @onclick="@(() => UnpublishApp(app.Id))" />
+                                            </Tooltip>
+                                        }
+                                        else
+                                        {
+                                            <Tooltip Title="Publish">
+                                                <Button Type="@ButtonType.Text" Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(app.Id))" />
+                                            </Tooltip>
+                                        }
+                                        <Popconfirm Title="Delete?" OnConfirm="() => DeleteApp(app.Id)" OkText="Yes" CancelText="No">
+                                            <Tooltip Title="Delete">
+                                                <Button Type="@ButtonType.Text" Icon="delete" Danger />
+                                            </Tooltip>
+                                        </Popconfirm>
+                                    </div>
+                                </div>
+                                <div class="illustrated-status">
+                                    @if (app.IsPublished)
                                     {
-                                        <MenuItem Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(context.Id))">
-                                            Publish
-                                        </MenuItem>
+                                        <Tag Color="@("green")" style="font-size: 11px;">Published</Tag>
+                                        @if (!app.RequiresAuthentication)
+                                        {
+                                            <Tag Color="@("orange")" Icon="unlock" style="font-size: 11px;">Public</Tag>
+                                        }
+                                        else
+                                        {
+                                            <Tag Color="@("blue")" Icon="lock" style="font-size: 11px;">Protected</Tag>
+                                        }
                                     }
                                     else
                                     {
-                                        <MenuItem Icon="cloud-download" @onclick="@(() => UnpublishApp(context.Id))">
-                                            Unpublish
-                                        </MenuItem>
+                                        <Tag Color="@("default")" style="font-size: 11px;">Draft</Tag>
                                     }
-                                    <Popconfirm Title="Sure to delete?"
-                                                OnConfirm="()=> DeleteApp(context.Id)"
-                                                OkText="Yes"
-                                                CancelText="No">
-                                        <MenuItem Icon="delete">                               
-                                            Delete
-                                        </MenuItem>
-                                    </Popconfirm>
-                                </Menu>
-                            </Overlay>
-                            <ChildContent>
-                                <Tooltip Title="More actions">
-                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                        <Icon Type="more" Theme="IconThemeType.Outline" />
-                                    </a>
-                                </Tooltip>
-                            </ChildContent>
-                        </Dropdown>
-                    </div>
-                </ActionColumn>
-            </Table>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <Table TItem="AppListItem" DataSource="@AppsViewModel.Apps" Class="autoscroll-list" Loading="@loading">
+                    <Column Title="Name" @bind-Field="@context.Name">
+                        @context.Name
+                    </Column>
+
+                    <Column Title="Display Name" @bind-Field="@context.DisplayName">
+                        @context.DisplayName
+                    </Column>
+
+                    <Column Title="Status" @bind-Field="@context.IsPublished">
+                        @if (context.IsPublished)
+                        {
+                            <Space Size="@SpaceSize.Small">
+                                <SpaceItem>
+                                    <Tag Color="@("green")">Published</Tag>
+                                </SpaceItem>
+                                @if (!context.RequiresAuthentication)
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="This app is accessible to anyone with the link">
+                                            <Tag Color="@("orange")" Icon="unlock">Public</Tag>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                                else
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="This app requires users to be logged in">
+                                            <Tag Color="@("blue")" Icon="lock">Protected</Tag>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                            </Space>
+                        }
+                        else
+                        {
+                            <Tag Color="@("default")">Draft</Tag>
+                        }
+                    </Column>
+
+                    <Column Title="Created" @bind-Field="@context.Created">
+                        @context.Created.ToString("yyyy-MM-dd HH:mm")
+                    </Column>
+
+                    <Column Title="Updated" @bind-Field="@context.Updated">
+                        @context.Updated.ToString("yyyy-MM-dd HH:mm")
+                    </Column>
+
+                    <ActionColumn Title="Action">
+                        <div>
+                            <Space>
+                                <SpaceItem>
+                                    <Tooltip Title="Edit app">
+                                        <Button Icon="edit" @onclick="@(() => EditApp(context.Id))">Edit</Button>
+                                    </Tooltip>
+                                </SpaceItem>
+                                @if (context.IsPublished)
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="View published app">
+                                            <Button Icon="eye" @onclick="@(() => ViewApp(context.PublicUrl))">View</Button>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                            </Space>
+
+                            <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                                <Overlay>
+                                    <Menu>
+                                        @if (!context.IsPublished)
+                                        {
+                                            <MenuItem Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(context.Id))">
+                                                Publish
+                                            </MenuItem>
+                                        }
+                                        else
+                                        {
+                                            <MenuItem Icon="cloud-download" @onclick="@(() => UnpublishApp(context.Id))">
+                                                Unpublish
+                                            </MenuItem>
+                                        }
+                                        <Popconfirm Title="Sure to delete?"
+                                                    OnConfirm="()=> DeleteApp(context.Id)"
+                                                    OkText="Yes"
+                                                    CancelText="No">
+                                            <MenuItem Icon="delete">                               
+                                                Delete
+                                            </MenuItem>
+                                        </Popconfirm>
+                                    </Menu>
+                                </Overlay>
+                                <ChildContent>
+                                    <Tooltip Title="More actions">
+                                        <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                            <Icon Type="more" Theme="IconThemeType.Outline" />
+                                        </a>
+                                    </Tooltip>
+                                </ChildContent>
+                            </Dropdown>
+                        </div>
+                    </ActionColumn>
+                </Table>
+            }
         }
     </Content>
 </Layout>
+
+@code {
+    private bool _isGridView = true;
+
+    private void ToggleViewMode()
+    {
+        _isGridView = !_isGridView;
+    }
+}
+
+<style>
+    /* ===== ILLUSTRATED HERO DESIGN ===== */
+    .illustrated-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 32px;
+        padding: 24px 0;
+    }
+
+    .illustrated-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .illustrated-card:hover {
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        transform: translateY(-8px);
+    }
+
+    .illustrated-hero {
+        height: 180px;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        padding: 12px;
+    }
+
+    .illustrated-badge {
+        background: rgba(0, 0, 0, 0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        backdrop-filter: blur(8px);
+    }
+
+    .illustrated-content {
+        padding: 20px;
+    }
+
+    .illustrated-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    .illustrated-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: #000;
+    }
+
+    .illustrated-name {
+        margin: 4px 0 0 0;
+        font-size: 13px;
+        color: #8c8c8c;
+    }
+
+    .illustrated-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* ===== LAYERED DEPTH DESIGN ===== */
+    .layered-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 32px;
+        padding: 24px 0;
+    }
+
+    .layered-card {
+        background: white;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .layered-card:hover {
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
+        transform: translateY(-10px);
+    }
+
+    .layered-blob {
+        position: absolute;
+        top: -80px;
+        right: -80px;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        filter: blur(40px);
+        opacity: 0.3;
+        transition: all 0.4s ease;
+    }
+
+    .layered-card:hover .layered-blob {
+        transform: scale(1.2);
+        opacity: 0.4;
+    }
+
+    .layered-icon {
+        font-size: 32px;
+        color: white;
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(10px);
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .layered-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        position: relative;
+        z-index: 2;
+    }
+
+    .layered-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #000;
+    }
+
+    .layered-name {
+        margin: 4px 0 16px 0;
+        font-size: 13px;
+        color: #8c8c8c;
+        position: relative;
+        z-index: 2;
+    }
+
+    .layered-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .status-dot.published { background: #52c41a; }
+    .status-dot.draft { background: #bfbfbf; }
+
+    .layered-footer {
+        margin-top: auto;
+        padding-top: 16px;
+        border-top: 1px solid #f0f0f0;
+        font-size: 12px;
+        color: #bfbfbf;
+        position: relative;
+        z-index: 2;
+    }
+
+    /* ===== MINIMALIST FOCUS DESIGN ===== */
+    .focus-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 28px;
+        padding: 24px 0;
+    }
+
+    .focus-card {
+        background: #f9f9f9;
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s ease;
+        border: 1px solid #f0f0f0;
+        cursor: pointer;
+    }
+
+    .focus-card:hover {
+        background: white;
+        border-color: #e6e6e6;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        transform: translateY(-6px);
+    }
+
+    .focus-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .focus-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 28px;
+        flex-shrink: 0;
+    }
+
+    .focus-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #000;
+    }
+
+    .focus-name {
+        margin: 0 0 16px 0;
+        font-size: 13px;
+        color: #8c8c8c;
+    }
+
+    .focus-status {
+        margin-bottom: 16px;
+    }
+
+    .focus-footer {
+        margin-top: auto;
+        padding-top: 12px;
+        border-top: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #bfbfbf;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .illustrated-grid, .layered-grid, .focus-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .illustrated-grid, .layered-grid, .focus-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+    }
+</style>
