@@ -1,5 +1,4 @@
-﻿using Automaton.App.Authentication.Services;
-using System.Threading.Tasks;
+﻿using Automaton.Studio.Pages.Authentication.Services;
 
 namespace Automaton.Studio.Shared
 {

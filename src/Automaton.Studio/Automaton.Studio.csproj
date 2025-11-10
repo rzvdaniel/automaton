@@ -27,8 +27,6 @@
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.7" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Automaton.App.Account\Automaton.App.Account.csproj" />
-    <ProjectReference Include="..\Automaton.App.Authentication\Automaton.App.Authentication.csproj" />
     <ProjectReference Include="..\Automaton.App.Install\Automaton.App.Install.csproj" />
     <ProjectReference Include="..\Automaton.Client.Auth\Automaton.Client.Auth.csproj" />
     <ProjectReference Include="..\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj" />
@@ -40,6 +38,11 @@
     <SupportedPlatform Include="browser" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Update="Pages\Authentication\Resources\Errors.Designer.cs">
+      <DependentUpon>Errors.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+    </Compile>
     <Compile Update="Resources\AppInfo.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
@@ -83,6 +86,11 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Update="Pages\Authentication\Resources\Errors.resx">
+      <SubType>Designer</SubType>
+      <LastGenOutput>Errors.Designer.cs</LastGenOutput>
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
     <EmbeddedResource Update="Resources\AppInfo.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>AppInfo.Designer.cs</LastGenOutput>

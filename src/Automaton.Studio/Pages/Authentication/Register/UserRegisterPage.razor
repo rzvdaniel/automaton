@@ -1,0 +1,97 @@
+﻿@attribute [AllowAnonymous]
+@page "/register"
+
+<Layout>
+    <Content Id="register-user">
+        <div class="auth-container">
+            <!-- Form Panel -->
+            <div class="form-panel">
+                <div class="form-content">
+                    <Form Loading="loading"
+                          Model="@UserRegisterViewModel"
+                          Layout="@FormLayout.Vertical"
+                          OnFinish="OnFinish"
+                          OnFinishFailed="OnFinishFailed"
+                          Class="auth-form">
+
+                        <ChildContent>
+                            <div class="form-header">
+                                <Title Level="1" Class="form-title">Create Account</Title>
+                                <p class="form-subtitle">
+                                    Already have an account? <a href="/login" class="signin-link">Sign in</a>
+                                </p>
+                            </div>
+
+                            <FormItem Label="Name">
+                                <Input @bind-Value="@context.Name" Size="@InputSize.Large" />
+                            </FormItem>
+
+                            <FormItem Label="Email">
+                                <Input @bind-Value="@context.Email" Size="@InputSize.Large" />
+                            </FormItem>
+
+                            <FormItem Label="Password">
+                                <InputPassword @bind-Value="@context.Password" Size="@InputSize.Large" />
+                            </FormItem>
+
+                            <FormItem Label="Confirm Password">
+                                <InputPassword @bind-Value="@context.ConfirmPassword" Size="@InputSize.Large" />
+                            </FormItem>
+
+                            <FormItem>
+                                <Checkbox @bind-Value="@context.AgreeWithTermsPrivacyPolicy">
+                                    I agree with <a href="/#" class="terms-link">Terms</a> and <a href="/#" class="terms-link">Privacy Policy</a>
+                                </Checkbox>
+                            </FormItem>
+
+                            <FormItem>
+                                <Button Type="ButtonType.Primary" HtmlType="submit" Size="@ButtonSize.Large" Block>
+                                    Create Account
+                                </Button>
+                            </FormItem>
+                        </ChildContent>
+                    </Form>
+                </div>
+            </div>
+
+            <!-- Information Panel -->
+            <div class="info-panel">
+                <div class="info-content">
+                    <div class="brand-section">
+                        <h1 class="brand-title">Start Your Journey</h1>
+                        <p class="brand-subtitle">Join thousands automating their workflows</p>
+                    </div>
+                    
+                    <div class="hero-visual">
+                        <div class="workflow-diagram">
+                            <div class="flow-node start-node">Sign Up</div>
+                            <div class="flow-connector"></div>
+                            <div class="flow-node process-node">Design Workflows</div>
+                            <div class="flow-connector"></div>
+                            <div class="flow-node action-node">Deploy & Execute</div>
+                            <div class="flow-connector"></div>
+                            <div class="flow-node end-node">Automate Success</div>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number">10x</div>
+                                <div class="stat-label">Faster Development</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">AI</div>
+                                <div class="stat-label">Powered Workflows</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Content>
+</Layout>
+
+
+
+
+
+

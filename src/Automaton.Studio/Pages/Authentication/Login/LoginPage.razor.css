@@ -1,0 +1,230 @@
+/* Main container */
+.auth-container {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+/* Desktop layout - two columns */
+@media (min-width: 1024px) {
+    .auth-container {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Mobile layout - hide info panel */
+@media (max-width: 1023px) {
+    .info-panel {
+        display: none;
+    }
+}
+
+/* Information Panel */
+.info-panel {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+}
+
+.info-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.info-content {
+    z-index: 1;
+    text-align: center;
+    max-width: 500px;
+}
+
+.brand-section {
+    margin-bottom: 48px;
+}
+
+.brand-title {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    color: white;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.brand-subtitle {
+    font-size: 1.125rem;
+    opacity: 0.9;
+    margin: 0;
+    font-weight: 300;
+    color: #CBD5E1;
+}
+
+/* Hero Visual */
+.hero-visual {
+    position: relative;
+    margin-top: 2rem;
+}
+
+.code-editor-mockup {
+    background: #1E293B;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+.editor-header {
+    background: #1A1F36;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #334155;
+}
+
+.editor-tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tab {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: #64748B;
+    font-size: 0.875rem;
+    border-radius: 6px 6px 0 0;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+.tab.active {
+    background: #1E293B;
+    color: #F8FAFC;
+}
+
+.editor-content {
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.code-line {
+    display: flex;
+    margin-bottom: 0.25rem;
+}
+
+.line-number {
+    width: 2rem;
+    color: #64748B;
+    text-align: right;
+    margin-right: 1rem;
+    user-select: none;
+}
+
+.code-text {
+    flex: 1;
+    color: #F8FAFC;
+}
+
+.keyword { color: #C792EA; }
+.function { color: #82AAFF; }
+.parameter { color: #FFCB6B; }
+.string { color: #C3E88D; }
+.comment { color: #64748B; }
+
+/* Form Panel */
+.form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    background: white;
+    min-height: 100vh;
+}
+
+.form-content {
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-form {
+    width: 100%;
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.form-title {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #1f2937;
+}
+
+.form-subtitle {
+    color: #6b7280;
+    margin: 0;
+    font-size: 16px;
+}
+
+.signup-link {
+    color: #1890ff;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.signup-link:hover {
+    color: #40a9ff;
+    text-decoration: underline;
+}
+
+/* Form styling improvements */
+.remember-me-container {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.forgot-password a {
+    color: #1890ff;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile adjustments */
+@media (max-width: 1023px) {
+    .form-panel {
+        padding: 32px 24px;
+        min-height: 100vh;
+    }
+}
+
+@media (max-width: 768px) {
+    .form-title {
+        font-size: 24px;
+    }
+}
+
+/* Legacy compatibility */
+.site-layout-content {
+    height: 100%;
+}
+
+.ant-layout {
+    height: 100%;
+}
