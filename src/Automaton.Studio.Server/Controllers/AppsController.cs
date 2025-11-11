@@ -208,9 +208,9 @@ public class AppsController : BaseController
                 return BadRequest(new { message = "Invalid filename" });
             }
 
-            // Clean up old images for this app to prevent disk space exhaustion
+            // Delete all old images for this app (keep only the new one)
             var appThumbnailsDir = Path.Combine(webHostEnvironment.WebRootPath, "app-thumbnails", id.ToString());
-            await CleanupOldAppImagesAsync(appThumbnailsDir);
+            await DeleteAllAppImagesAsync(appThumbnailsDir);
 
             // Create directory if it doesn't exist
             Directory.CreateDirectory(appThumbnailsDir);
@@ -291,7 +291,7 @@ public class AppsController : BaseController
     /// Clean up old images for an app to prevent disk space exhaustion.
     /// Keeps only the 5 most recent images.
     /// </summary>
-    private async Task CleanupOldAppImagesAsync(string appThumbnailsDir)
+    private async Task DeleteAllAppImagesAsync(string appThumbnailsDir)
     {
         try
         {
@@ -303,20 +303,16 @@ public class AppsController : BaseController
                 .OrderByDescending(f => f.CreationTimeUtc)
                 .ToList();
 
-            const int maxImagesToKeep = 5;
-            if (files.Count > maxImagesToKeep)
+            foreach (var file in files)
             {
-                foreach (var file in files.Skip(maxImagesToKeep))
+                try
                 {
-                    try
-                    {
-                        file.Delete();
-                        logger.LogInformation("[AppsController] Cleaned up old image: {FilePath}", file.FullName);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "[AppsController] Failed to delete old image: {FilePath}", file.FullName);
-                    }
+                    file.Delete();
+                    logger.LogInformation("[AppsController] Deleted old image: {FilePath}", file.FullName);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[AppsController] Failed to delete old image: {FilePath}", file.FullName);
                 }
             }
         }
