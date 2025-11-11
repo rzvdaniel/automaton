@@ -35,8 +35,9 @@ packages/
 #Ignore git-related files
 *.orig
 
-#wwwroot
-#wwwroot/
+#wwwroot - ignore app-thumbnails but keep folder structure and README
+wwwroot/app-thumbnails/*
+!wwwroot/app-thumbnails/README.md
 
 #npm
 node_modules/
@@ -51,4 +52,4 @@ App_Data/
 *.db-wal
 
 # Created by developers using GNU/Linux
-.directory
+.directory.directory
