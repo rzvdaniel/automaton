@@ -9,45 +9,48 @@
     <MenuItem Key="0" Icon="home" RouterLink="/">
         <b>Home</b>
     </MenuItem>
-    <MenuItem Key="1" Icon="appstore" RouterLink="/apps">
+    <MenuItem Key="1" Icon="team" RouterLink="/projects">
+        <b>Projects</b>
+    </MenuItem>
+    <MenuItem Key="2" Icon="appstore" RouterLink="/apps">
         <b>Apps</b>
     </MenuItem>
-    <MenuItem Key="2" Icon="profile" RouterLink="/flows">
+    <MenuItem Key="3" Icon="profile" RouterLink="/flows">
         <b>Flows</b>
     </MenuItem>
-    <MenuItem Key="3" Icon="play-square" RouterLink="/runners">
+    <MenuItem Key="4" Icon="play-square" RouterLink="/runners">
         <b>Runners</b>
     </MenuItem>
-    <MenuItem Key="4" Icon="experiment" RouterLink="/customsteps/">
+    <MenuItem Key="5" Icon="experiment" RouterLink="/customsteps/">
         <b>Steps</b>
     </MenuItem>
-    <MenuItem Key="5" Icon="key" RouterLink="/apikeys">
+    <MenuItem Key="6" Icon="key" RouterLink="/apikeys">
         <b>API Keys</b>
     </MenuItem>
-    <MenuItem Key="6" Icon="robot" RouterLink="/ai-keys">
+    <MenuItem Key="7" Icon="robot" RouterLink="/ai-keys">
         <b>AI Keys</b>
     </MenuItem>
-    <MenuItem Key="7" Icon="setting" RouterLink="/settings">
+    <MenuItem Key="8" Icon="setting" RouterLink="/settings">
         <b>Settings</b>
     </MenuItem>
-    <MenuItem Key="8" Icon="download" RouterLink="/downloads">
+    <MenuItem Key="9" Icon="download" RouterLink="/downloads">
         <b>Downloads</b>
     </MenuItem>
-    <MenuItem Key="9" Icon="book" RouterLink="/docs">
+    <MenuItem Key="10" Icon="book" RouterLink="/docs">
         <b>Docs</b>
     </MenuItem>
 
     @if (shouldShowOnboarding)
     {
-        <MenuItem Key="10" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
+        <MenuItem Key="11" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
             <b>Get Started</b>
         </MenuItem>
     }
 
-    <MenuItem Key="11" Icon="user" RouterLink="/account/">
+    <MenuItem Key="12" Icon="user" RouterLink="/account/">
         <b>Account</b>
     </MenuItem>
-    <MenuItem Key="12" Icon="poweroff" OnClick="Logout">
+    <MenuItem Key="13" Icon="poweroff" OnClick="Logout">
         <b>Logout</b>
     </MenuItem>
 </Menu>

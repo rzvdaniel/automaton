@@ -56,10 +56,14 @@ public class ProjectListItem
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
     public string OwnerName { get; set; } = string.Empty;
     public int MemberCount { get; set; }
+    public int AppCount { get; set; }
+    public int FlowCount { get; set; }
     public ProjectRole? CurrentUserRole { get; set; }
     public DateTime CreatedAt { get; set; }
+    public bool IsOwner { get; set; }
 }
 
 public class ProjectMemberDto

@@ -125,6 +125,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AiApiKeysViewModel>();
         services.AddScoped<Pages.Steps.CustomStepsViewModel>();
         services.AddScoped<Pages.Apps.AppsViewModel>();
+        services.AddScoped<Pages.Projects.ProjectsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<StepViewModel>();
         services.AddScoped<StepsViewModel>();
