@@ -35,6 +35,14 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
+        
+        // Project/Organization entities
+        public virtual DbSet<Project> Projects { get; set; }
+        public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
+        public virtual DbSet<ProjectApp> ProjectApps { get; set; }
+        public virtual DbSet<ProjectFlow> ProjectFlows { get; set; }
+        public virtual DbSet<ProjectRunner> ProjectRunners { get; set; }
+        public virtual DbSet<ProjectCustomStep> ProjectCustomSteps { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -244,6 +252,154 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Description).HasMaxLength(500);
                 
                 entity.HasIndex(e => e.Key).IsUnique();
+            });
+            
+            // Project/Organization entity configurations
+            modelBuilder.Entity<Project>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).HasMaxLength(1000);
+                entity.Property(e => e.OwnerId).IsRequired();
+                entity.Property(e => e.Created).IsRequired();
+                entity.Property(e => e.Updated).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                
+                // Name must be unique across all projects
+                entity.HasIndex(e => e.Name).IsUnique();
+                entity.HasIndex(e => e.OwnerId);
+                entity.HasIndex(e => new { e.OwnerId, e.IsActive });
+                
+                // Configure relationship with Owner
+                entity.HasOne(e => e.Owner)
+                    .WithMany(u => u.OwnedProjects)
+                    .HasForeignKey(e => e.OwnerId)
+                    .OnDelete(DeleteBehavior.Restrict); // Don't cascade delete projects when user is deleted
+            });
+            
+            modelBuilder.Entity<ProjectMember>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.UserId });
+                entity.Property(e => e.Role).IsRequired();
+                entity.Property(e => e.JoinedAt).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.ProjectId, e.UserId, e.IsActive });
+                
+                // Configure relationships
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.Members)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.ProjectMemberships)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.Inviter)
+                    .WithMany()
+                    .HasForeignKey(e => e.InvitedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectApp>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.WebAppId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.WebAppId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectApps)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.WebApp)
+                    .WithMany(a => a.ProjectApps)
+                    .HasForeignKey(e => e.WebAppId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectFlow>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.FlowId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.FlowId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectFlows)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.Flow)
+                    .WithMany()
+                    .HasForeignKey(e => e.FlowId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectRunner>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.RunnerId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.RunnerId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectRunners)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.Runner)
+                    .WithMany()
+                    .HasForeignKey(e => e.RunnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectCustomStep>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.CustomStepId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.CustomStepId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectCustomSteps)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.CustomStep)
+                    .WithMany()
+                    .HasForeignKey(e => e.CustomStepId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
         }
 

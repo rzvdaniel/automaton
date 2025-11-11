@@ -173,11 +173,17 @@ namespace Automaton.Studio.Server.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("CurrentProjectId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("varchar(256)");
 
                     b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsEnterpriseEnabled")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("LockoutEnabled")
@@ -450,6 +456,187 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Logs");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("Updated")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("OwnerId", "IsActive");
+
+                    b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "WebAppId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("WebAppId");
+
+                    b.ToTable("ProjectApps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectCustomStep", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("CustomStepId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "CustomStepId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("CustomStepId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectCustomSteps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectFlow", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("FlowId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "FlowId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("FlowId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectFlows");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectMember", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("InvitedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectId", "UserId");
+
+                    b.HasIndex("InvitedBy");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProjectId", "UserId", "IsActive");
+
+                    b.ToTable("ProjectMembers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectRunner", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "RunnerId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("RunnerId");
+
+                    b.ToTable("ProjectRunners");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -629,6 +816,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("PublicUrl")
                         .HasColumnType("varchar(255)");
 
@@ -637,6 +827,9 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<bool>("RequiresAuthentication")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
@@ -676,7 +869,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 11, 16, 55, 35, 479, DateTimeKind.Local).AddTicks(7532));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 17, 23, 42, 950, DateTimeKind.Local).AddTicks(4989));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -863,6 +1056,147 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
+                        .WithMany("OwnedProjects")
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectApps")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                        .WithMany("ProjectApps")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("WebApp");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectCustomStep", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "CustomStep")
+                        .WithMany()
+                        .HasForeignKey("CustomStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectCustomSteps")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("CustomStep");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectFlow", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Flow", "Flow")
+                        .WithMany()
+                        .HasForeignKey("FlowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectFlows")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Flow");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectMember", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                        .WithMany()
+                        .HasForeignKey("InvitedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("Members")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany("ProjectMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Inviter");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectRunner", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectRunners")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
+                        .WithMany()
+                        .HasForeignKey("RunnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Runner");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
@@ -944,6 +1278,10 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("OwnedProjects");
+
+                    b.Navigation("ProjectMemberships");
+
                     b.Navigation("UserRoles");
                 });
 
@@ -962,6 +1300,19 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("FlowExecutionUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+                {
+                    b.Navigation("Members");
+
+                    b.Navigation("ProjectApps");
+
+                    b.Navigation("ProjectCustomSteps");
+
+                    b.Navigation("ProjectFlows");
+
+                    b.Navigation("ProjectRunners");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Runner", b =>
                 {
                     b.Navigation("RunnerUsers");
@@ -974,6 +1325,8 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
                 {
+                    b.Navigation("ProjectApps");
+
                     b.Navigation("WebAppUsers");
                 });
 #pragma warning restore 612, 618
