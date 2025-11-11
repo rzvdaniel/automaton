@@ -156,12 +156,20 @@ public class AppsController : BaseController
         return NoContent();
     }
 
-    [AllowAnonymous]
     [HttpPost("{id}/upload-background")]
     public async Task<IActionResult> UploadBackgroundImage(Guid id, [FromForm] IFormFile file)
     {
         try
         {
+            // Verify the user owns this app
+            var app = appsService.Get(id);
+            if (app == null)
+            {
+                logger.LogWarning("[AppsController] Upload attempt by user {User} to app not owned: {AppId}", 
+                    User.Identity?.Name ?? "Unknown", id);
+                return NotFound(new { message = "App not found" });
+            }
+
             if (file == null || file.Length == 0)
             {
                 return BadRequest(new { message = "No file provided" });
@@ -171,41 +179,151 @@ public class AppsController : BaseController
             const long maxFileSize = 2 * 1024 * 1024;
             if (file.Length > maxFileSize)
             {
+                logger.LogWarning("[AppsController] File size exceeds limit for app {AppId}: {Size} bytes", id, file.Length);
                 return BadRequest(new { message = "File size exceeds 2MB limit" });
             }
 
-            // Validate file type
+            // Validate file type - check both MIME type and extension
             var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            
             if (!allowedMimeTypes.Contains(file.ContentType))
             {
+                logger.LogWarning("[AppsController] Invalid MIME type for app {AppId}: {MimeType}", id, file.ContentType);
                 return BadRequest(new { message = "Invalid file type. Only image files are allowed." });
             }
 
-            // Create directory if it doesn't exist
+            // Validate file extension to prevent executable uploads
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                logger.LogWarning("[AppsController] Invalid file extension for app {AppId}: {Extension}", id, fileExtension);
+                return BadRequest(new { message = "Invalid file extension. Only .jpg, .png, .gif, and .webp are allowed." });
+            }
+
+            // Prevent path traversal attacks by validating filename
+            if (Path.GetFileName(file.FileName) != file.FileName || file.FileName.Contains(".."))
+            {
+                logger.LogWarning("[AppsController] Suspicious filename detected for app {AppId}: {FileName}", id, file.FileName);
+                return BadRequest(new { message = "Invalid filename" });
+            }
+
+            // Clean up old images for this app to prevent disk space exhaustion
             var appThumbnailsDir = Path.Combine(webHostEnvironment.WebRootPath, "app-thumbnails", id.ToString());
+            await CleanupOldAppImagesAsync(appThumbnailsDir);
+
+            // Create directory if it doesn't exist
             Directory.CreateDirectory(appThumbnailsDir);
 
-            // Generate unique filename
-            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            // Generate unique filename using GUID only - don't use user-provided filename
+            var fileName = $"{Guid.NewGuid()}{fileExtension}";
             var filePath = Path.Combine(appThumbnailsDir, fileName);
 
-            // Save file
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            // Security check: ensure the full path is within the allowed directory
+            var fullPath = Path.GetFullPath(filePath);
+            var fullDirPath = Path.GetFullPath(appThumbnailsDir);
+            
+            if (!fullPath.StartsWith(fullDirPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             {
-                await file.CopyToAsync(stream);
+                logger.LogError("[AppsController] Path traversal attempt detected for app {AppId}", id);
+                return BadRequest(new { message = "Invalid file path" });
+            }
+
+            // Validate file content by checking magic bytes for images
+            using (var stream = file.OpenReadStream())
+            {
+                if (!IsValidImageFile(stream, fileExtension))
+                {
+                    logger.LogWarning("[AppsController] File content doesn't match image format for app {AppId}", id);
+                    return BadRequest(new { message = "File content is not a valid image" });
+                }
+                
+                // Reset stream position before saving
+                stream.Seek(0, SeekOrigin.Begin);
+
+                // Save file
+                using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
             }
 
             // Return the relative URL
             var imageUrl = $"/app-thumbnails/{id}/{fileName}";
 
-            logger.LogInformation("Background image uploaded for app {AppId}: {FileName}", id, fileName);
+            logger.LogInformation("[AppsController] Background image uploaded for app {AppId}: {FileName} by user {User}", 
+                id, fileName, User.Identity?.Name);
 
             return Ok(new { imageUrl = imageUrl });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error uploading background image for app {AppId}", id);
+            logger.LogError(ex, "[AppsController] Error uploading background image for app {AppId}", id);
             return StatusCode(500, new { message = "Failed to upload image" });
+        }
+    }
+
+    /// <summary>
+    /// Validate image file by checking magic bytes (file signatures)
+    /// </summary>
+    private bool IsValidImageFile(Stream stream, string extension)
+    {
+        const int maxBytesToRead = 12;
+        var buffer = new byte[maxBytesToRead];
+        
+        int bytesRead = stream.Read(buffer, 0, maxBytesToRead);
+        if (bytesRead < 4)
+            return false;
+
+        return extension.ToLowerInvariant() switch
+        {
+            ".png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
+            ".jpg" or ".jpeg" => buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF,
+            ".gif" => buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46,
+            ".webp" => bytesRead >= 12 && 
+                      buffer[0] == 0x52 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x46 &&
+                      buffer[8] == 0x57 && buffer[9] == 0x45 && buffer[10] == 0x42 && buffer[11] == 0x50,
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Clean up old images for an app to prevent disk space exhaustion.
+    /// Keeps only the 5 most recent images.
+    /// </summary>
+    private async Task CleanupOldAppImagesAsync(string appThumbnailsDir)
+    {
+        try
+        {
+            if (!Directory.Exists(appThumbnailsDir))
+                return;
+
+            var directoryInfo = new DirectoryInfo(appThumbnailsDir);
+            var files = directoryInfo.GetFiles("*.*", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(f => f.CreationTimeUtc)
+                .ToList();
+
+            const int maxImagesToKeep = 5;
+            if (files.Count > maxImagesToKeep)
+            {
+                foreach (var file in files.Skip(maxImagesToKeep))
+                {
+                    try
+                    {
+                        file.Delete();
+                        logger.LogInformation("[AppsController] Cleaned up old image: {FilePath}", file.FullName);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "[AppsController] Failed to delete old image: {FilePath}", file.FullName);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error cleaning up old images in {Directory}", appThumbnailsDir);
+            // Don't throw - cleanup failure shouldn't prevent upload
         }
     }
 }

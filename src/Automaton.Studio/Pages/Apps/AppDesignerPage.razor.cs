@@ -2,6 +2,7 @@ using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Automaton.Studio.Pages.Apps.Components.PublishAppDialog;
+using Automaton.Client.Auth.Interfaces;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -18,6 +19,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     private bool loading = false;
     private bool saving = false;
     private bool publishing = false;
+    private Dictionary<string, string> uploadHeaders = new();
     private AppModel currentApp = new AppModel
     {
         Name = "Loading...",
@@ -42,6 +44,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private ILogger<AppDesignerPage> Logger { get; set; }
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
+    [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -53,6 +56,9 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             // Load automatonApi.js for preview
             await LoadAutomatonApiScript();
+            
+            // Initialize upload headers with JWT token
+            await InitializeUploadHeaders();
             
             if (Guid.TryParse(AppId, out var appGuid))
             {
@@ -82,6 +88,32 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             Logger.LogError(ex, "[AppDesigner] Failed to load automatonApi.js");
             automatonApiScript = null;
+        }
+    }
+
+    private async Task InitializeUploadHeaders()
+    {
+        try
+        {
+            var accessToken = await AuthenticationStorage.GetAccessToken();
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                uploadHeaders = new Dictionary<string, string>
+                {
+                    { "Authorization", $"Bearer {accessToken}" }
+                };
+                Logger.LogInformation("[AppDesigner] Upload headers initialized with JWT token");
+            }
+            else
+            {
+                Logger.LogWarning("[AppDesigner] No access token found in authentication storage");
+                uploadHeaders = new Dictionary<string, string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AppDesigner] Failed to initialize upload headers");
+            uploadHeaders = new Dictionary<string, string>();
         }
     }
 
