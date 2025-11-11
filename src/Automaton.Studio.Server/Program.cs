@@ -204,6 +204,11 @@ services.AddScoped<AnthropicProvider>();
 services.AddScoped<GoogleProvider>();
 services.AddScoped<AiProviderFactory>();
 
+// Project/Organization services
+services.AddScoped<ProjectService>();
+services.AddScoped<ProjectMemberService>();
+services.AddScoped<ProjectResourceService>();
+
 services.AddScoped(service => configurationService);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
