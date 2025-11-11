@@ -1,0 +1,132 @@
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@using Automaton.Studio.Enums
+@inject ProjectContextService ProjectContext
+@inject NavigationManager Navigation
+
+<div class="project-switcher">
+    @if (ProjectContext.CurrentProject != null)
+    {
+        <div class="current-project-indicator">
+            <Icon Type="team" Theme="outline" />
+            <Dropdown>
+                <Overlay>
+                    <Menu>
+                        <MenuItem OnClick="@(() => SwitchToPersonal())">
+                            <Icon Type="user" Theme="outline" />
+                            <span style="margin-left: 8px;">Personal Workspace</span>
+                        </MenuItem>
+                        <MenuDivider />
+                        @foreach (var project in ProjectContext.GetProjects())
+                        {
+                            <MenuItem OnClick="@(() => SwitchProject(project.Id))" Disabled="@(project.Id == ProjectContext.CurrentProject?.Id)">
+                                <Icon Type="team" Theme="@(project.Id == ProjectContext.CurrentProject?.Id ? "filled" : "outline")" />
+                                <span style="margin-left: 8px;">@project.DisplayName</span>
+                                @if (project.Id == ProjectContext.CurrentProject?.Id)
+                                {
+                                    <Icon Type="check" Theme="outline" style="margin-left: auto; color: #52c41a;" />
+                                }
+                            </MenuItem>
+                        }
+                        @if (ProjectContext.GetProjects().Any())
+                        {
+                            <MenuDivider />
+                        }
+                        <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                            <Icon Type="setting" Theme="outline" />
+                            <span style="margin-left: 8px;">Manage Projects</span>
+                        </MenuItem>
+                    </Menu>
+                </Overlay>
+                <ChildContent>
+                    <a class="ant-dropdown-link" @onclick:preventDefault>
+                        <span class="project-name">@ProjectContext.CurrentProject.DisplayName</span>
+                        <Tag Color="@GetRoleColor(ProjectContext.CurrentProject.CurrentUserRole)" style="margin-left: 8px;">
+                            @ProjectContext.CurrentProject.CurrentUserRole
+                        </Tag>
+                        <Icon Type="down" />
+                    </a>
+                </ChildContent>
+            </Dropdown>
+        </div>
+    }
+    else
+    {
+        <div class="no-project-indicator">
+            <Icon Type="user" Theme="outline" />
+            <Dropdown>
+                <Overlay>
+                    <Menu>
+                        <MenuItem Disabled>
+                            <Icon Type="user" Theme="filled" />
+                            <span style="margin-left: 8px;">Personal Workspace</span>
+                            <Icon Type="check" Theme="outline" style="margin-left: auto; color: #52c41a;" />
+                        </MenuItem>
+                        @if (ProjectContext.GetProjects().Any())
+                        {
+                            <MenuDivider />
+                            @foreach (var project in ProjectContext.GetProjects())
+                            {
+                                <MenuItem OnClick="@(() => SwitchProject(project.Id))">
+                                    <Icon Type="team" Theme="outline" />
+                                    <span style="margin-left: 8px;">@project.DisplayName</span>
+                                </MenuItem>
+                            }
+                        }
+                        <MenuDivider />
+                        <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                            <Icon Type="plus-circle" Theme="outline" />
+                            <span style="margin-left: 8px;">Create or Join Project</span>
+                        </MenuItem>
+                    </Menu>
+                </Overlay>
+                <ChildContent>
+                    <a class="ant-dropdown-link" @onclick:preventDefault>
+                        <span class="workspace-name">Personal</span>
+                        <Icon Type="down" />
+                    </a>
+                </ChildContent>
+            </Dropdown>
+        </div>
+    }
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await ProjectContext.LoadProjectsAsync();
+        ProjectContext.OnCurrentProjectChanged += OnProjectChanged;
+    }
+    
+    private void OnProjectChanged(ProjectListItem? project)
+    {
+        StateHasChanged();
+    }
+    
+    private async Task SwitchProject(Guid projectId)
+    {
+        await ProjectContext.SetCurrentProjectAsync(projectId);
+    }
+    
+    private async Task SwitchToPersonal()
+    {
+        await ProjectContext.SetCurrentProjectAsync(null);
+    }
+    
+    private string GetRoleColor(ProjectRole? role)
+    {
+        return role switch
+        {
+            ProjectRole.ProjectAdmin => "red",
+            ProjectRole.Developer => "blue",
+            ProjectRole.AppUser => "green",
+            ProjectRole.Viewer => "default",
+            _ => "default"
+        };
+    }
+    
+    public void Dispose()
+    {
+        ProjectContext.OnCurrentProjectChanged -= OnProjectChanged;
+    }
+}

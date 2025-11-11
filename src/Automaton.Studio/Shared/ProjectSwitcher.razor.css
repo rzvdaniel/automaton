@@ -1,0 +1,46 @@
+.project-switcher {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.current-project-indicator,
+.no-project-indicator {
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.current-project-indicator anticon,
+.no-project-indicator anticon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.ant-dropdown-link {
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.ant-dropdown-link:hover {
+    color: #fff;
+}
+
+.project-name,
+.workspace-name {
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.ant-dropdown-link anticon[type="down"] {
+    margin-left: 8px;
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+
+.ant-dropdown-link:hover anticon[type="down"] {
+    transform: rotate(180deg);
+}
