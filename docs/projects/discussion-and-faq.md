@@ -249,23 +249,22 @@ public class ProjectRunner
 
 ### 8. How granular should role permissions be?
 
-**Current proposal:** 5 roles
+**Current proposal:** 4 roles
 1. ProjectAdmin
 2. Developer
 3. AppUser
-4. FlowUser
-5. Viewer
+4. Viewer
 
 **Question:** Is this enough? Should we have:
 - AppEditor (can edit apps, not create)
 - FlowEditor (can edit flows, not create)
 - StepCreator (can create steps, not apps/flows)
 
-**Decision:** Start with 5 roles. Add granular permissions in Phase 2 if needed.
+**Decision:** Start with 4 roles. Add granular permissions in Phase 2 if needed.
 
 **Rationale:**
 - **Simplicity:** More roles = more confusion
-- **80/20 rule:** 5 roles cover 90% of use cases
+- **80/20 rule:** 4 roles cover 90% of use cases
 - **Custom roles:** Phase 3 can add "Create Custom Role" feature
 
 **When to add granular permissions:**
@@ -470,7 +469,7 @@ A: No. Personal apps are only visible to you, unless you add them to a project.
 | Feature | Automaton | GitHub Orgs | Slack Workspaces | Jira Projects |
 |---------|-----------|-------------|------------------|---------------|
 | **Hierarchy** | Flat (P1) | Org → Repos | Workspace → Channels | Project → Issues |
-| **Roles** | 5 roles | Owner/Admin/Member | 4 roles | Custom roles |
+| **Roles** | 4 roles | Owner/Admin/Member | 4 roles | Custom roles |
 | **Multi-membership** | Yes | Yes | Yes | Yes |
 | **Resource isolation** | Yes | Yes | Yes | Yes |
 | **Billing** | Per user (P1) | Per org | Per workspace | Per project |
@@ -494,7 +493,7 @@ A: No. Personal apps are only visible to you, unless you add them to a project.
 - ❌ **Overwhelming:** Too many permission options
 
 **Automaton's approach:**
-- Start simple (5 roles, flat projects)
+- Start simple (4 roles, flat projects)
 - Iterate based on feedback
 - Add complexity only when needed
 
@@ -687,7 +686,7 @@ _cache.Remove($"project_members_{projectId}");
 This document addresses key design decisions and open questions for the Project/Organization feature. It should evolve as the feature is developed and feedback is received.
 
 **Key Takeaways:**
-- Start simple (5 roles, flat projects, invite-only)
+- Start simple (4 roles, flat projects, invite-only)
 - Iterate based on real usage (don't over-engineer)
 - Security first (validate permissions everywhere)
 - Backward compatible (existing users unaffected)

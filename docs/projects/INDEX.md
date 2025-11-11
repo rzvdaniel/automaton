@@ -355,7 +355,7 @@ This is the central index for all Project/Organization multi-tenancy documentati
 | Question | Document | Section |
 |----------|----------|---------|
 | What is a Project? | [README](./README.md) | Key Concepts |
-| What are the 5 roles? | [README](./README.md) | Key Concepts |
+| What are the 4 roles? | [README](./README.md) | Key Concepts |
 | How does authorization work? | [Architecture Diagrams](./architecture-diagrams.md) | Authorization Flow |
 | What's the database schema? | [Main TAD](./project-organization-tad.md) | Database Schema Design |
 | How do I implement Phase 1? | [Implementation Guide](./implementation-guide.md) | Phase 1 |

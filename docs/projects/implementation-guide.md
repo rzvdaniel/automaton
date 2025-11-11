@@ -207,19 +207,17 @@ public static class ProjectRole
     public const string ProjectAdmin = "ProjectAdmin";
     public const string Developer = "Developer";
     public const string AppUser = "AppUser";
-    public const string FlowUser = "FlowUser";
     public const string Viewer = "Viewer";
     
     public const string Admins = ProjectAdmin;
     public const string Creators = $"{ProjectAdmin},{Developer}";
-    public const string AllMembers = $"{ProjectAdmin},{Developer},{AppUser},{FlowUser},{Viewer}";
+    public const string AllMembers = $"{ProjectAdmin},{Developer},{AppUser},{Viewer}";
     
     public static readonly string[] AllRoles = 
     {
         ProjectAdmin,
         Developer,
         AppUser,
-        FlowUser,
         Viewer
     };
     

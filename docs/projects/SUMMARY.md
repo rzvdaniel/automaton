@@ -21,7 +21,7 @@ This documentation suite provides a **complete, production-ready** specification
 
 ### Technical Capabilities
 - **Project Workspaces** - Isolated containers for apps, flows, runners, and steps
-- **5 Role-Based Permissions** - ProjectAdmin, Developer, AppUser, FlowUser, Viewer
+- **4 Role-Based Permissions** - ProjectAdmin, Developer, AppUser, Viewer
 - **Flexible Access Control** - Resources can be Personal, Project-scoped, or Public
 - **Member Management** - Invite users, assign roles, control permissions
 - **Role-Based Dashboards** - Personalized UI based on user's role in each project
@@ -53,12 +53,11 @@ This documentation suite provides a **complete, production-ready** specification
 - Has members with specific roles
 - Owner creates and manages the project
 
-**5 Roles**
+**4 Roles**
 1. **ProjectAdmin** - Full project management
 2. **Developer** - Create/edit apps, flows, steps
 3. **AppUser** - Execute apps only (no dev tools)
-4. **FlowUser** - Execute flows only
-5. **Viewer** - Read-only access
+4. **Viewer** - Read-only access
 
 **3 Access Scopes**
 1. **Personal** - User-owned (backward compatible)
@@ -83,7 +82,7 @@ Project
 ProjectMember
   ├─ Project (many:1)
   ├─ User (many:1)
-  └─ Role (enum: ProjectAdmin, Developer, AppUser, FlowUser, Viewer)
+  └─ Role (enum: ProjectAdmin, Developer, AppUser, Viewer)
 ```
 
 ### API Endpoints (Sample)
@@ -140,7 +139,7 @@ GET    /api/projects/{id}/apps          List project apps
 
 **Key Takeaways:**
 - Enterprise feature enabling team collaboration
-- 5 roles for different user types
+- 4 roles for different user types
 - 8-week implementation timeline
 - No breaking changes for existing users
 
@@ -256,7 +255,6 @@ Users can create isolated projects for teams/departments. Each project contains:
 | **ProjectAdmin** | Everything | Everything | Everything | Project, Members |
 | **Developer** | Apps, Flows, Runners, Steps | Apps, Flows, Steps | Apps, Flows | - |
 | **AppUser** | Apps only | - | Apps only | - |
-| **FlowUser** | Flows only | - | Flows only | - |
 | **Viewer** | Everything | - | - | - |
 
 ### 3. Member Management
@@ -275,7 +273,6 @@ Users can create isolated projects for teams/departments. Each project contains:
 ### 5. Dashboard Personalization
 - **Developer View** - Full creation tools + project resources
 - **AppUser View** - Card-based app portal, no dev tools
-- **FlowUser View** - Execute-only flow interface
 - **Context Switching** - Easy switching between projects via dropdown
 
 ---

@@ -117,7 +117,7 @@ Defined in `UserRole.cs`:
 
 ### What Needs to Change
 ❌ No Project/Organization entity
-❌ No role-based permissions (Developer, AppUser, FlowUser)
+❌ No role-based permissions (Developer, AppUser)
 ❌ No project-level resource isolation
 ❌ Dashboard shows all tools, not personalized by role
 ❌ WebApp "Protected" mode applies to all authenticated users, not project members
@@ -169,12 +169,11 @@ Defined in `UserRole.cs`:
 
 **Mode 2: Enterprise (New Behavior)**
 - **Project Owner** creates Projects
-- Invites users with roles: Admin, Developer, AppUser, FlowUser
+- Invites users with roles: Admin, Developer, AppUser
 - Resources belong to Projects, not individual users
 - Users see personalized dashboards based on role:
   - **Developer Role**: Full creation tools + project apps
   - **AppUser Role**: Only Apps (card-based portal)
-  - **FlowUser Role**: Only Flows (execute-only view)
 - Apps can be "Project-Protected" (only project members)
 
 ### Backward Compatibility Strategy
@@ -274,16 +273,13 @@ public static class ProjectRole
     // Can only view and execute Apps
     public const string AppUser = "AppUser";
     
-    // Can only view and execute Flows (via API/schedule)
-    public const string FlowUser = "FlowUser";
-    
     // Read-only access (view only, no execute)
     public const string Viewer = "Viewer";
     
     // Helper groups
     public const string Admins = $"{ProjectAdmin}";
     public const string Creators = $"{ProjectAdmin},{Developer}";
-    public const string AllMembers = $"{ProjectAdmin},{Developer},{AppUser},{FlowUser},{Viewer}";
+    public const string AllMembers = $"{ProjectAdmin},{Developer},{AppUser},{Viewer}";
 }
 ```
 
@@ -515,33 +511,33 @@ CREATE INDEX IX_WebApps_ProjectId ON WebApps(ProjectId) WHERE ProjectId IS NOT N
 
 ### Permission Matrix
 
-| Resource Type | Personal Owner | Project Admin | Developer | AppUser | FlowUser | Viewer |
-|---------------|----------------|---------------|-----------|---------|----------|--------|
-| **Project**   |                |               |           |         |          |        |
-| - View        | ✅             | ✅            | ✅        | ✅      | ✅       | ✅     |
-| - Edit Settings| ✅            | ✅            | ❌        | ❌      | ❌       | ❌     |
-| - Add Members | ✅             | ✅            | ❌        | ❌      | ❌       | ❌     |
-| - Delete      | ✅             | ❌            | ❌        | ❌      | ❌       | ❌     |
-| **Apps**      |                |               |           |         |          |        |
-| - View List   | ✅             | ✅            | ✅        | ✅      | ❌       | ✅     |
-| - Create      | ✅             | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Delete      | ✅ (own)       | ✅            | ✅ (own)  | ❌      | ❌       | ❌     |
-| - Execute     | ✅             | ✅            | ✅        | ✅      | ❌       | ❌     |
-| **Flows**     |                |               |           |         |          |        |
-| - View List   | ✅             | ✅            | ✅        | ❌      | ✅       | ✅     |
-| - Create      | ✅             | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Delete      | ✅ (own)       | ✅            | ✅ (own)  | ❌      | ❌       | ❌     |
-| - Execute     | ✅             | ✅            | ✅        | ❌      | ✅       | ❌     |
-| **Runners**   |                |               |           |         |          |        |
-| - View        | ✅             | ✅            | ✅        | ❌      | ❌       | ✅     |
-| - Register    | ✅             | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Configure   | ✅ (own)       | ✅            | ✅        | ❌      | ❌       | ❌     |
-| **Custom Steps**|              |               |           |         |          |        |
-| - View        | ✅             | ✅            | ✅        | ❌      | ❌       | ✅     |
-| - Create      | ✅             | ✅            | ✅        | ❌      | ❌       | ❌     |
-| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌       | ❌     |
+| Resource Type | Personal Owner | Project Admin | Developer | AppUser | Viewer |
+|---------------|----------------|---------------|-----------|---------|--------|
+| **Project**   |                |               |           |         |        |
+| - View        | ✅             | ✅            | ✅        | ✅      | ✅     |
+| - Edit Settings| ✅            | ✅            | ❌        | ❌      | ❌     |
+| - Add Members | ✅             | ✅            | ❌        | ❌      | ❌     |
+| - Delete      | ✅             | ❌            | ❌        | ❌      | ❌     |
+| **Apps**      |                |               |           |         |        |
+| - View List   | ✅             | ✅            | ✅        | ✅      | ✅     |
+| - Create      | ✅             | ✅            | ✅        | ❌      | ❌     |
+| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌     |
+| - Delete      | ✅ (own)       | ✅            | ✅ (own)  | ❌      | ❌     |
+| - Execute     | ✅             | ✅            | ✅        | ✅      | ❌     |
+| **Flows**     |                |               |           |         |        |
+| - View List   | ✅             | ✅            | ✅        | ❌      | ✅     |
+| - Create      | ✅             | ✅            | ✅        | ❌      | ❌     |
+| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌     |
+| - Delete      | ✅ (own)       | ✅            | ✅ (own)  | ❌      | ❌     |
+| - Execute     | ✅             | ✅            | ✅        | ❌      | ❌     |
+| **Runners**   |                |               |           |         |        |
+| - View        | ✅             | ✅            | ✅        | ❌      | ✅     |
+| - Register    | ✅             | ✅            | ✅        | ❌      | ❌     |
+| - Configure   | ✅ (own)       | ✅            | ✅        | ❌      | ❌     |
+| **Custom Steps**|              |               |           |         |        |
+| - View        | ✅             | ✅            | ✅        | ❌      | ✅     |
+| - Create      | ✅             | ✅            | ✅        | ❌      | ❌     |
+| - Edit        | ✅ (own)       | ✅            | ✅        | ❌      | ❌     |
 
 ### Authorization Implementation Strategy
 
@@ -1141,7 +1137,6 @@ Deliverables:
 
 Deliverables:
 - ✅ AppUser dashboard: Card-based app portal
-- ✅ FlowUser dashboard: Execute-only view
 - ✅ Developer dashboard: Full tools + project context
 - ✅ Statistics: Project-level analytics
 - ✅ Onboarding guide: "Get Started with Projects"
@@ -1387,10 +1382,10 @@ Test Flows:
 ### 9. Role Granularity
 
 **Should we have more fine-grained permissions?**
-- Current: ProjectAdmin, Developer, AppUser, FlowUser, Viewer
+- Current: ProjectAdmin, Developer, AppUser, Viewer
 - Future: Custom roles? (e.g., "App Editor" who can edit but not create)
 
-**Recommendation:** Start simple (5 roles). Phase 2+ add custom roles.
+**Recommendation:** Start simple (4 roles). Phase 2+ add custom roles.
 
 ### 10. Runner Assignment
 

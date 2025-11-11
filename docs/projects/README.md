@@ -67,7 +67,7 @@ This directory contains comprehensive documentation for the **Project/Organizati
 **Design decisions, alternatives, and frequently asked questions**
 
 **Contents:**
-- Design decision rationale (why "Project"? why 5 roles?)
+- Design decision rationale (why "Project"? why 4 roles?)
 - Alternative approaches considered
 - Common questions from users, admins, and developers
 - Industry comparisons (GitHub, Slack, Jira)
@@ -100,8 +100,7 @@ This directory contains comprehensive documentation for the **Project/Organizati
 1. **ProjectAdmin** - Full control (manage members, settings)
 2. **Developer** - Create/edit apps, flows, steps (full dev tools)
 3. **AppUser** - Execute apps only (consumer view)
-4. **FlowUser** - Execute flows only
-5. **Viewer** - Read-only access
+4. **Viewer** - Read-only access
 
 **Access Scopes**
 - **Personal** - User-owned resources (current behavior)
@@ -141,7 +140,7 @@ Projects
 ProjectMembers
   - ProjectId (PK, FK)
   - UserId (PK, FK)
-  - Role (ProjectAdmin/Developer/AppUser/FlowUser/Viewer)
+  - Role (ProjectAdmin/Developer/AppUser/Viewer)
 
 ProjectApps
   - ProjectId (PK, FK)
@@ -185,15 +184,15 @@ GET    /api/projects/{id}/apps
 
 ### Permission Examples
 
-| Action | ProjectAdmin | Developer | AppUser | FlowUser | Viewer |
-|--------|--------------|-----------|---------|----------|--------|
-| Create App | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Edit App | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Execute App | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Create Flow | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Execute Flow | ✅ | ✅ | ❌ | ✅ | ❌ |
-| View Logs | ✅ | ✅ | ❌ | ❌ | ✅ |
-| Add Members | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Action | ProjectAdmin | Developer | AppUser | Viewer |
+|--------|--------------|-----------|---------|--------|
+| Create App | ✅ | ✅ | ❌ | ❌ |
+| Edit App | ✅ | ✅ | ❌ | ❌ |
+| Execute App | ✅ | ✅ | ✅ | ❌ |
+| Create Flow | ✅ | ✅ | ❌ | ❌ |
+| Execute Flow | ✅ | ✅ | ❌ | ❌ |
+| View Logs | ✅ | ✅ | ❌ | ✅ |
+| Add Members | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
@@ -303,9 +302,6 @@ A project member with permission to execute apps but not create/edit them. Consu
 
 **Developer**
 A project member with full access to development tools (create/edit apps, flows, steps).
-
-**FlowUser**
-A project member with permission to execute flows but not apps. Typically used for API/scheduled executions.
 
 **Personal Workspace**
 User's private area for creating resources not shared with projects.

@@ -263,7 +263,6 @@ This document provides visual representations of the Project/Organization archit
        ├─ ProjectAdmin → ✅ Allow (all permissions)
        ├─ Developer    → ✅ Allow (can access apps)
        ├─ AppUser      → ✅ Allow (can access apps)
-       ├─ FlowUser     → ❌ Deny (apps not allowed)
        └─ Viewer       → 🔍 Read-only (depends on action)
        │
        ▼
