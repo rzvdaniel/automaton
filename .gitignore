@@ -35,8 +35,9 @@ packages/
 #Ignore git-related files
 *.orig
 
-#wwwroot - ignore app-thumbnails but keep folder structure and README
-wwwroot/app-thumbnails/*
+#wwwroot - ignore app-thumbnails subdirectories but keep README.md
+wwwroot/app-thumbnails/**
+!wwwroot/app-thumbnails/
 !wwwroot/app-thumbnails/README.md
 
 #npm
@@ -52,4 +53,4 @@ App_Data/
 *.db-wal
 
 # Created by developers using GNU/Linux
-.directory.directory
+.directory
