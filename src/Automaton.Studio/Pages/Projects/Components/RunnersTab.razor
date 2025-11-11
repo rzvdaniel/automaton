@@ -37,13 +37,16 @@
 
         @if (ViewModel.Runners.Count == 0)
         {
-            <Empty Description="No runners in this project yet">
-                @if (ViewModel.IsResourceManager)
-                {
-                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
-                        Add First Runner
-                    </Button>
-                }
+            <Empty>
+                <DescriptionTemplate>No runners in this project yet</DescriptionTemplate>
+                <ChildContent>
+                    @if (ViewModel.IsResourceManager)
+                    {
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
+                            Add First Runner
+                        </Button>
+                    }
+                </ChildContent>
             </Empty>
         }
     }
@@ -57,9 +60,9 @@
     <FormItem Label="Runner ID">
         <Input @bind-Value="@selectedRunnerId" Placeholder="Enter Runner GUID" />
     </FormItem>
-    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available runners.
-    </Paragraph>
+    </Text>
 </Modal>
 
 @code {
@@ -101,7 +104,8 @@
             Title = "Remove Runner",
             Content = "Are you sure you want to remove this runner from the project?",
             OkText = "Remove",
-            OkType = "danger"
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true }
         });
 
         if (confirmed && ViewModel.Project != null)
@@ -111,5 +115,5 @@
     }
 
     [Inject]
-    private IModalService Modal { get; set; } = default!;
+    private ModalService Modal { get; set; } = default!;
 }

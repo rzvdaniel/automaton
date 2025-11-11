@@ -44,7 +44,8 @@ public class ProjectContextService
     {
         try
         {
-            _userProjects = await _projectsService.ListProjectsAsync();
+            var projects = await _projectsService.ListProjectsAsync();
+            _userProjects = projects?.ToList();
             _logger.Information("Loaded {Count} projects for user", _userProjects?.Count ?? 0);
         }
         catch (Exception ex)

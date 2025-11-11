@@ -37,13 +37,16 @@
 
         @if (ViewModel.CustomSteps.Count == 0)
         {
-            <Empty Description="No custom steps in this project yet">
-                @if (ViewModel.IsResourceManager)
-                {
-                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
-                        Add First Custom Step
-                    </Button>
-                }
+            <Empty>
+                <DescriptionTemplate>No custom steps in this project yet</DescriptionTemplate>
+                <ChildContent>
+                    @if (ViewModel.IsResourceManager)
+                    {
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
+                            Add First Custom Step
+                        </Button>
+                    }
+                </ChildContent>
             </Empty>
         }
     }
@@ -57,9 +60,9 @@
     <FormItem Label="Custom Step ID">
         <Input @bind-Value="@selectedStepId" Placeholder="Enter Custom Step GUID" />
     </FormItem>
-    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available custom steps.
-    </Paragraph>
+    </Text>
 </Modal>
 
 @code {
@@ -101,7 +104,8 @@
             Title = "Remove Custom Step",
             Content = "Are you sure you want to remove this custom step from the project?",
             OkText = "Remove",
-            OkType = "danger"
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true }
         });
 
         if (confirmed && ViewModel.Project != null)
@@ -111,5 +115,5 @@
     }
 
     [Inject]
-    private IModalService Modal { get; set; } = default!;
+    private ModalService Modal { get; set; } = default!;
 }

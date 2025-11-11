@@ -22,7 +22,7 @@
                Message="Warning" 
                Description="Deleting a project is permanent and cannot be undone. All project data will be lost."
                Style="margin-bottom: 16px;" 
-               ShowIcon />
+               ShowIcon="true" />
         
         @if (ViewModel.Project?.IsOwner == true)
         {
@@ -32,9 +32,9 @@
         }
         else
         {
-            <Paragraph Type="@ParagraphType.Secondary">
+            <div style="color: rgba(0, 0, 0, 0.45);">
                 Only the project owner can delete this project.
-            </Paragraph>
+            </div>
         }
     </Card>
 </div>
@@ -47,7 +47,7 @@
     private NavigationManager NavigationManager { get; set; } = default!;
 
     [Inject]
-    private IModalService Modal { get; set; } = default!;
+    private ModalService Modal { get; set; } = default!;
 
     private UpdateProjectRequest settingsModel = new();
 
@@ -85,7 +85,8 @@
             Title = "Delete Project",
             Content = $"Are you sure you want to delete '{ViewModel.Project?.DisplayName}'? This action cannot be undone.",
             OkText = "Delete Project",
-            OkType = "danger",
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true },
             CancelText = "Cancel"
         });
 

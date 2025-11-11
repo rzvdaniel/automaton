@@ -59,7 +59,7 @@ public class ProjectSettingsViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading project: {ex.Message}");
+            _messageService.Error($"Error loading project: {ex.Message}");
         }
         finally
         {
@@ -71,12 +71,13 @@ public class ProjectSettingsViewModel
     {
         try
         {
-            Members = await _membersService.ListMembersAsync(projectId);
+            var members = await _membersService.ListMembersAsync(projectId);
+            Members = members?.ToList() ?? new List<ProjectMemberDto>();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading members for project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading members: {ex.Message}");
+            _messageService.Error($"Error loading members: {ex.Message}");
         }
     }
 
@@ -84,12 +85,13 @@ public class ProjectSettingsViewModel
     {
         try
         {
-            Apps = await _resourcesService.ListAppsAsync(projectId);
+            var apps = await _resourcesService.ListAppsAsync(projectId);
+            Apps = apps?.ToList() ?? new List<ProjectAppDto>();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading apps for project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading apps: {ex.Message}");
+            _messageService.Error($"Error loading apps: {ex.Message}");
         }
     }
 
@@ -97,12 +99,13 @@ public class ProjectSettingsViewModel
     {
         try
         {
-            Flows = await _resourcesService.ListFlowsAsync(projectId);
+            var flows = await _resourcesService.ListFlowsAsync(projectId);
+            Flows = flows?.ToList() ?? new List<ProjectFlowDto>();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading flows for project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading flows: {ex.Message}");
+            _messageService.Error($"Error loading flows: {ex.Message}");
         }
     }
 
@@ -110,12 +113,13 @@ public class ProjectSettingsViewModel
     {
         try
         {
-            Runners = await _resourcesService.ListRunnersAsync(projectId);
+            var runners = await _resourcesService.ListRunnersAsync(projectId);
+            Runners = runners?.ToList() ?? new List<ProjectRunnerDto>();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading runners for project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading runners: {ex.Message}");
+            _messageService.Error($"Error loading runners: {ex.Message}");
         }
     }
 
@@ -123,12 +127,13 @@ public class ProjectSettingsViewModel
     {
         try
         {
-            CustomSteps = await _resourcesService.ListCustomStepsAsync(projectId);
+            var steps = await _resourcesService.ListCustomStepsAsync(projectId);
+            CustomSteps = steps?.ToList() ?? new List<ProjectCustomStepDto>();
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error loading custom steps for project {ProjectId}", projectId);
-            await _messageService.Error($"Error loading custom steps: {ex.Message}");
+            _messageService.Error($"Error loading custom steps: {ex.Message}");
         }
     }
 
@@ -137,13 +142,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _membersService.AddMemberAsync(projectId, request);
-            await _messageService.Success("Member added successfully");
+            _messageService.Success("Member added successfully");
             await LoadMembersAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error adding member to project {ProjectId}", projectId);
-            await _messageService.Error($"Error adding member: {ex.Message}");
+            _messageService.Error($"Error adding member: {ex.Message}");
         }
     }
 
@@ -153,13 +158,13 @@ public class ProjectSettingsViewModel
         {
             var request = new UpdateProjectMemberRequest { Role = newRole };
             await _membersService.UpdateMemberRoleAsync(projectId, userId, request);
-            await _messageService.Success("Member role updated successfully");
+            _messageService.Success("Member role updated successfully");
             await LoadMembersAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error updating member role in project {ProjectId}", projectId);
-            await _messageService.Error($"Error updating member role: {ex.Message}");
+            _messageService.Error($"Error updating member role: {ex.Message}");
         }
     }
 
@@ -168,13 +173,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _membersService.RemoveMemberAsync(projectId, userId);
-            await _messageService.Success("Member removed successfully");
+            _messageService.Success("Member removed successfully");
             await LoadMembersAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error removing member from project {ProjectId}", projectId);
-            await _messageService.Error($"Error removing member: {ex.Message}");
+            _messageService.Error($"Error removing member: {ex.Message}");
         }
     }
 
@@ -183,13 +188,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.AddAppAsync(projectId, appId);
-            await _messageService.Success("App added to project successfully");
+            _messageService.Success("App added to project successfully");
             await LoadAppsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error adding app {AppId} to project {ProjectId}", appId, projectId);
-            await _messageService.Error($"Error adding app: {ex.Message}");
+            _messageService.Error($"Error adding app: {ex.Message}");
         }
     }
 
@@ -198,13 +203,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.RemoveAppAsync(projectId, appId);
-            await _messageService.Success("App removed from project successfully");
+            _messageService.Success("App removed from project successfully");
             await LoadAppsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error removing app {AppId} from project {ProjectId}", appId, projectId);
-            await _messageService.Error($"Error removing app: {ex.Message}");
+            _messageService.Error($"Error removing app: {ex.Message}");
         }
     }
 
@@ -213,13 +218,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.AddFlowAsync(projectId, flowId);
-            await _messageService.Success("Flow added to project successfully");
+            _messageService.Success("Flow added to project successfully");
             await LoadFlowsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error adding flow {FlowId} to project {ProjectId}", flowId, projectId);
-            await _messageService.Error($"Error adding flow: {ex.Message}");
+            _messageService.Error($"Error adding flow: {ex.Message}");
         }
     }
 
@@ -228,13 +233,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.RemoveFlowAsync(projectId, flowId);
-            await _messageService.Success("Flow removed from project successfully");
+            _messageService.Success("Flow removed from project successfully");
             await LoadFlowsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error removing flow {FlowId} from project {ProjectId}", flowId, projectId);
-            await _messageService.Error($"Error removing flow: {ex.Message}");
+            _messageService.Error($"Error removing flow: {ex.Message}");
         }
     }
 
@@ -243,13 +248,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.AddRunnerAsync(projectId, runnerId);
-            await _messageService.Success("Runner added to project successfully");
+            _messageService.Success("Runner added to project successfully");
             await LoadRunnersAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error adding runner {RunnerId} to project {ProjectId}", runnerId, projectId);
-            await _messageService.Error($"Error adding runner: {ex.Message}");
+            _messageService.Error($"Error adding runner: {ex.Message}");
         }
     }
 
@@ -258,13 +263,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.RemoveRunnerAsync(projectId, runnerId);
-            await _messageService.Success("Runner removed from project successfully");
+            _messageService.Success("Runner removed from project successfully");
             await LoadRunnersAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error removing runner {RunnerId} from project {ProjectId}", runnerId, projectId);
-            await _messageService.Error($"Error removing runner: {ex.Message}");
+            _messageService.Error($"Error removing runner: {ex.Message}");
         }
     }
 
@@ -273,13 +278,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.AddCustomStepAsync(projectId, stepId);
-            await _messageService.Success("Custom step added to project successfully");
+            _messageService.Success("Custom step added to project successfully");
             await LoadCustomStepsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error adding custom step {StepId} to project {ProjectId}", stepId, projectId);
-            await _messageService.Error($"Error adding custom step: {ex.Message}");
+            _messageService.Error($"Error adding custom step: {ex.Message}");
         }
     }
 
@@ -288,13 +293,13 @@ public class ProjectSettingsViewModel
         try
         {
             await _resourcesService.RemoveCustomStepAsync(projectId, stepId);
-            await _messageService.Success("Custom step removed from project successfully");
+            _messageService.Success("Custom step removed from project successfully");
             await LoadCustomStepsAsync(projectId);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Error removing custom step {StepId} from project {ProjectId}", stepId, projectId);
-            await _messageService.Error($"Error removing custom step: {ex.Message}");
+            _messageService.Error($"Error removing custom step: {ex.Message}");
         }
     }
 
@@ -303,7 +308,7 @@ public class ProjectSettingsViewModel
         try
         {
             await _projectsService.UpdateProjectAsync(projectId, request);
-            await _messageService.Success("Project updated successfully");
+            _messageService.Success("Project updated successfully");
             
             // Reload project
             Project = await _projectsService.GetProjectAsync(projectId);
@@ -311,7 +316,7 @@ public class ProjectSettingsViewModel
         catch (Exception ex)
         {
             Log.Error(ex, "Error updating project {ProjectId}", projectId);
-            await _messageService.Error($"Error updating project: {ex.Message}");
+            _messageService.Error($"Error updating project: {ex.Message}");
         }
     }
 }

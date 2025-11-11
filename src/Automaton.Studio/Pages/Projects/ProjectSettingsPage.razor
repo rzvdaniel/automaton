@@ -5,7 +5,7 @@
 <Layout>
     <Header Class="header">
         <Row>
-            <Col Flex="none">
+            <Col Flex=@("none")>
                 <Space Size="SpaceSize.Large">
                     <SpaceItem Class="header-item">
                         <Breadcrumb>
@@ -41,13 +41,13 @@
         @if (ViewModel.IsLoading)
         {
             <div style="text-align: center; padding: 100px 0;">
-                <Spin Size="large" />
+                <Spin Size="@SpinSize.Large" />
                 <div style="margin-top: 16px;">Loading project...</div>
             </div>
         }
         else if (ViewModel.Project == null)
         {
-            <Result Status="404"
+            <Result Status="@ResultStatus.Http404"
                     Title="Project Not Found"
                     SubTitle="The project you're looking for doesn't exist or you don't have access to it.">
                 <Extra>
@@ -65,8 +65,10 @@
                     <Title Level="2" Style="margin-bottom: 8px;">@ViewModel.Project.DisplayName</Title>
                     @if (!string.IsNullOrEmpty(ViewModel.Project.Description))
                     {
-                        <Paragraph Type="@ParagraphType.Secondary">
-                            @ViewModel.Project.Description
+                        <Paragraph>
+                            <Text Type="@TextElementType.Secondary">
+                                @ViewModel.Project.Description
+                            </Text>
                         </Paragraph>
                     }
                 </div>

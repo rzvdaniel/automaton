@@ -15,7 +15,7 @@
     <Table TItem="ProjectMemberDto" DataSource="@ViewModel.Members" Loading="@ViewModel.IsLoading">
         <Column Title="Email" TData="string" @bind-Field="@context.Email" Sortable />
         <Column Title="Username" TData="string" @bind-Field="@context.UserName" />
-        <Column Title="Role">
+        <Column Title="Role" TData="ProjectRole">
             <Tag Color="@GetRoleColor(context.Role)">
                 @context.Role
             </Tag>
@@ -45,7 +45,7 @@
             }
             else if (context.IsOwner)
             {
-                <Tag Color="gold">Owner</Tag>
+                <Tag Color="@("gold")">Owner</Tag>
             }
         </ActionColumn>
     </Table>
@@ -61,11 +61,11 @@
             <Input @bind-Value="@addMemberModel.Email" Placeholder="user@example.com" />
         </FormItem>
         <FormItem Label="Role">
-            <Select @bind-Value="@addMemberModel.Role" Style="width: 100%;">
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.Developer" Label="Developer" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.AppUser" Label="App User" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.Viewer" Label="Viewer" />
+            <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@addMemberModel.Role" Style="width: 100%;">
+                <SelectOption Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
+                <SelectOption Value="ProjectRole.Developer" Label="Developer" />
+                <SelectOption Value="ProjectRole.AppUser" Label="App User" />
+                <SelectOption Value="ProjectRole.Viewer" Label="Viewer" />
             </Select>
         </FormItem>
         <FormItem>
@@ -85,11 +85,11 @@
     {
         <p>Update role for <strong>@selectedMember.Email</strong></p>
         <FormItem Label="New Role">
-            <Select @bind-Value="@newRole" Style="width: 100%;">
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.Developer" Label="Developer" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.AppUser" Label="App User" />
-                <SelectOption TItemValue="ProjectRole" TItem="ProjectRole" Value="ProjectRole.Viewer" Label="Viewer" />
+            <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@newRole" Style="width: 100%;">
+                <SelectOption Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
+                <SelectOption Value="ProjectRole.Developer" Label="Developer" />
+                <SelectOption Value="ProjectRole.AppUser" Label="App User" />
+                <SelectOption Value="ProjectRole.Viewer" Label="Viewer" />
             </Select>
         </FormItem>
     }
@@ -147,7 +147,8 @@
             Title = "Remove Member",
             Content = $"Are you sure you want to remove {member.Email} from this project?",
             OkText = "Remove",
-            OkType = "danger",
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true },
             CancelText = "Cancel"
         });
 
@@ -170,5 +171,5 @@
     }
 
     [Inject]
-    private IModalService Modal { get; set; } = default!;
+    private ModalService Modal { get; set; } = default!;
 }

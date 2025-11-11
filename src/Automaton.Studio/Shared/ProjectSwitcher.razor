@@ -8,23 +8,23 @@
     @if (ProjectContext.CurrentProject != null)
     {
         <div class="current-project-indicator">
-            <Icon Type="team" Theme="outline" />
+            <Icon Type="team" Theme="@IconThemeType.Outline" />
             <Dropdown>
                 <Overlay>
                     <Menu>
                         <MenuItem OnClick="@(() => SwitchToPersonal())">
-                            <Icon Type="user" Theme="outline" />
+                            <Icon Type="user" Theme="@IconThemeType.Outline" />
                             <span style="margin-left: 8px;">Personal Workspace</span>
                         </MenuItem>
                         <MenuDivider />
                         @foreach (var project in ProjectContext.GetProjects())
                         {
                             <MenuItem OnClick="@(() => SwitchProject(project.Id))" Disabled="@(project.Id == ProjectContext.CurrentProject?.Id)">
-                                <Icon Type="team" Theme="@(project.Id == ProjectContext.CurrentProject?.Id ? "filled" : "outline")" />
+                                <Icon Type="team" Theme="@(project.Id == ProjectContext.CurrentProject?.Id ? IconThemeType.Fill : IconThemeType.Outline)" />
                                 <span style="margin-left: 8px;">@project.DisplayName</span>
                                 @if (project.Id == ProjectContext.CurrentProject?.Id)
                                 {
-                                    <Icon Type="check" Theme="outline" style="margin-left: auto; color: #52c41a;" />
+                                    <Icon Type="check" Theme="@IconThemeType.Outline" style="margin-left: auto; color: #52c41a;" />
                                 }
                             </MenuItem>
                         }
@@ -33,7 +33,7 @@
                             <MenuDivider />
                         }
                         <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
-                            <Icon Type="setting" Theme="outline" />
+                            <Icon Type="setting" Theme="@IconThemeType.Outline" />
                             <span style="margin-left: 8px;">Manage Projects</span>
                         </MenuItem>
                     </Menu>
@@ -53,14 +53,14 @@
     else
     {
         <div class="no-project-indicator">
-            <Icon Type="user" Theme="outline" />
+            <Icon Type="user" Theme="@IconThemeType.Outline" />
             <Dropdown>
                 <Overlay>
                     <Menu>
                         <MenuItem Disabled>
-                            <Icon Type="user" Theme="filled" />
+                            <Icon Type="user" Theme="@IconThemeType.Fill" />
                             <span style="margin-left: 8px;">Personal Workspace</span>
-                            <Icon Type="check" Theme="outline" style="margin-left: auto; color: #52c41a;" />
+                            <Icon Type="check" Theme="@IconThemeType.Outline" style="margin-left: auto; color: #52c41a;" />
                         </MenuItem>
                         @if (ProjectContext.GetProjects().Any())
                         {
@@ -68,14 +68,14 @@
                             @foreach (var project in ProjectContext.GetProjects())
                             {
                                 <MenuItem OnClick="@(() => SwitchProject(project.Id))">
-                                    <Icon Type="team" Theme="outline" />
+                                    <Icon Type="team" Theme="@IconThemeType.Outline" />
                                     <span style="margin-left: 8px;">@project.DisplayName</span>
                                 </MenuItem>
                             }
                         }
                         <MenuDivider />
                         <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
-                            <Icon Type="plus-circle" Theme="outline" />
+                            <Icon Type="plus-circle" Theme="@IconThemeType.Outline" />
                             <span style="margin-left: 8px;">Create or Join Project</span>
                         </MenuItem>
                     </Menu>
