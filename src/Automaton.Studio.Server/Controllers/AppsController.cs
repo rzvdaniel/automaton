@@ -9,15 +9,18 @@ public class AppsController : BaseController
     private readonly AppsService appsService;
     private readonly UserImpersonationServiceFactory<AppsService> appsServiceFactory;
     private readonly ILogger<AppsController> logger;
+    private readonly IWebHostEnvironment webHostEnvironment;
 
     public AppsController(
         AppsService appsService,
         UserImpersonationServiceFactory<AppsService> appsServiceFactory,
-        ILogger<AppsController> logger)
+        ILogger<AppsController> logger,
+        IWebHostEnvironment webHostEnvironment)
     {
         this.appsService = appsService;
         this.appsServiceFactory = appsServiceFactory;
         this.logger = logger;
+        this.webHostEnvironment = webHostEnvironment;
     }
 
     [HttpGet]
@@ -151,6 +154,59 @@ public class AppsController : BaseController
         await appsService.Unpublish(id);
 
         return NoContent();
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{id}/upload-background")]
+    public async Task<IActionResult> UploadBackgroundImage(Guid id, [FromForm] IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "No file provided" });
+            }
+
+            // Validate file size (2MB max)
+            const long maxFileSize = 2 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                return BadRequest(new { message = "File size exceeds 2MB limit" });
+            }
+
+            // Validate file type
+            var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            if (!allowedMimeTypes.Contains(file.ContentType))
+            {
+                return BadRequest(new { message = "Invalid file type. Only image files are allowed." });
+            }
+
+            // Create directory if it doesn't exist
+            var appThumbnailsDir = Path.Combine(webHostEnvironment.WebRootPath, "app-thumbnails", id.ToString());
+            Directory.CreateDirectory(appThumbnailsDir);
+
+            // Generate unique filename
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(appThumbnailsDir, fileName);
+
+            // Save file
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Return the relative URL
+            var imageUrl = $"/app-thumbnails/{id}/{fileName}";
+
+            logger.LogInformation("Background image uploaded for app {AppId}: {FileName}", id, fileName);
+
+            return Ok(new { imageUrl = imageUrl });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error uploading background image for app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to upload image" });
+        }
     }
 }
 

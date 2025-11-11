@@ -210,10 +210,12 @@
 									</Col>
 								</Row>
 								<Row>
-									<FormItem Label="Runner for Preview/Execution">
-										<RunnerSelector @bind-SelectedValue="currentApp.ExecutionRunnerId" Style="width:100%" />
-										<Text Type="TextElementType.Secondary">Optional: select runner used for preview and any executions initiated from this app.</Text>
-									</FormItem>
+									<Col Span="24">
+										<FormItem Label="Runner for Preview/Execution">
+											<RunnerSelector @bind-SelectedValue="currentApp.ExecutionRunnerId" Style="width:100%" />
+											<Text Type="TextElementType.Secondary">Optional: select runner used for preview and any executions initiated from this app.</Text>
+										</FormItem>
+									</Col>
 								</Row>
 							</ChildContent>
 							</Card>
@@ -261,7 +263,80 @@
 								</ChildContent>
 							</Card>
 
-							
+							<Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
+								<TitleTemplate>
+									<Space>
+										<SpaceItem>
+											<Icon Type="picture" Style="color: #1890ff;" />
+										</SpaceItem>
+										<SpaceItem>
+											<span>Card Appearance</span>
+										</SpaceItem>
+									</Space>
+								</TitleTemplate>
+								<ChildContent>
+									<Alert Message="Customize how this app appears on the Apps page" Type="@AlertType.Info" Style="margin-bottom: 16px;" />
+									
+									<Row Gutter="(24, 16)">
+										<Col Xs="24" Md="12">
+										<FormItem Label="Background Color">
+											<InputGroup Compact>
+												<Input @bind-Value="@currentApp.BackgroundColor" 
+													   Placeholder="#ffffff"
+													   Style="width: calc(100% - 40px);" />
+												<input type="color" 
+													   @bind="currentApp.BackgroundColor" 
+													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
+											</InputGroup>
+										</FormItem>
+										</Col>
+									</Row>
+									
+									<Row Gutter="(24, 16)">
+										<Col Span="24">
+											<FormItem Label="Upload Image">
+												<div class="image-upload-wrapper">
+													@if (!string.IsNullOrEmpty(currentApp.BackgroundImageUrl))
+													{
+														<div class="image-preview" style="@GetPreviewImageStyle()">
+															<img src="@currentApp.BackgroundImageUrl" alt="Background preview" />
+														</div>
+													}
+													<Upload Name="file"
+															Accept="image/*"
+															ListType="@UploadListType.Picture"
+															Action="@GetUploadAction()"
+															OnChange="OnBackgroundImageUpload"
+															ShowUploadList="true">
+														<Button Icon="cloud-upload">Click to Upload Image</Button>
+													</Upload>
+													<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 8px;">
+														Recommended: 500x300px, PNG or JPG (max 2MB)
+													</Text>
+												</div>
+											</FormItem>
+										</Col>
+									</Row>
+
+									<Row Gutter="(24, 16)">
+										<Col Xs="24" Md="12">
+										<FormItem Label="Image Opacity">
+											<Slider @bind-Value="@currentApp.BackgroundImageOpacity" Min="0" Max="1" Step="0.1" />
+											<Text Type="TextElementType.Secondary">@($"{(currentApp.BackgroundImageOpacity * 100):F0}%")</Text>
+										</FormItem>
+
+										@if (!string.IsNullOrEmpty(currentApp.BackgroundImageUrl))
+										{
+											<FormItem Label="">
+												<Button Block Danger OnClick="RemoveBackgroundImage">Remove Image</Button>
+											</FormItem>
+										}
+										</Col>
+											
+									</Row>
+									
+								</ChildContent>
+							</Card>
 						</div>
 					</TabPane>
 				</Tabs>
@@ -422,5 +497,28 @@
 		.settings-card .ant-card-body {
 			padding: 20px;
 		}
+	}
+
+	.image-upload-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.image-preview {
+		position: relative;
+		border-radius: 8px;
+		overflow: hidden;
+		background: #f0f0f0;
+		height: 200px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.image-preview img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 </style>

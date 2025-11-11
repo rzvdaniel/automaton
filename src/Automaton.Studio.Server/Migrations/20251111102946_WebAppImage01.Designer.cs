@@ -3,6 +3,7 @@ using System;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -10,17 +11,69 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Automaton.Studio.Server.Migrations
 {
-    [DbContext(typeof(MySqlDbContext))]
-    [Migration("20250917143641_First")]
-    partial class First
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20251111102946_WebAppImage01")]
+    partial class WebAppImage01
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "9.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("EncryptedApiKey")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastUsedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.HasIndex("UserId", "Provider");
+
+                    b.ToTable("AiApiKeys");
+                });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
                 {
@@ -134,7 +187,7 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("datetime");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .HasColumnType("longtext");
@@ -368,6 +421,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -450,6 +505,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("ScriptEngineSettings")
+                        .HasColumnType("longtext");
+
                     b.HasKey("Id");
 
                     b.ToTable("Runners");
@@ -511,6 +569,112 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Settings");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("AllowedRoles")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("BackgroundColor")
+                        .HasColumnType("longtext");
+
+                    b.Property<double>("BackgroundImageOpacity")
+                        .HasColumnType("double");
+
+                    b.Property<string>("BackgroundImageUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid?>("ExecutionRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PublicUrl")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("RequiresAuthentication")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("Updated")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicUrl")
+                        .IsUnique();
+
+                    b.ToTable("WebApps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("WebAppId", "UserId");
+
+                    b.HasIndex(new[] { "WebAppId" }, "IX_WebAppUser_WebAppId");
+
+                    b.ToTable("WebAppUsers");
+                });
+
             modelBuilder.Entity("Common.Authentication.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -520,7 +684,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 9, 17, 16, 36, 40, 404, DateTimeKind.Local).AddTicks(1481));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 11, 29, 45, 346, DateTimeKind.Local).AddTicks(9609));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -546,6 +710,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
 
@@ -567,6 +733,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
@@ -622,6 +790,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
@@ -721,6 +900,15 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", null)
+                        .WithMany("WebAppUsers")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", null)
@@ -790,6 +978,11 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+                {
+                    b.Navigation("WebAppUsers");
                 });
 #pragma warning restore 612, 618
         }

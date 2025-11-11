@@ -6,65 +6,67 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Automaton.Studio.Server.Migrations
 {
     /// <inheritdoc />
-    public partial class AddWebAppPublishing : Migration
+    public partial class WebAppImage : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "AllowedRoles",
+                name: "BackgroundColor",
                 table: "WebApps",
                 type: "longtext",
-                nullable: true);
+                nullable: true)
+                .Annotation("MySql:CharSet", "utf8mb4");
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "PublishedAt",
+            migrationBuilder.AddColumn<double>(
+                name: "BackgroundImageOpacity",
                 table: "WebApps",
-                type: "datetime(6)",
-                nullable: true);
+                type: "double",
+                nullable: false,
+                defaultValue: 0.0);
+
+            migrationBuilder.AddColumn<string>(
+                name: "BackgroundImageUrl",
+                table: "WebApps",
+                type: "longtext",
+                nullable: true)
+                .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.AddColumn<bool>(
-                name: "RequiresAuthentication",
+                name: "UseBackgroundImage",
                 table: "WebApps",
                 type: "tinyint(1)",
                 nullable: false,
                 defaultValue: false);
-
-            migrationBuilder.AddColumn<int>(
-                name: "Version",
-                table: "WebApps",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "CreatedAt",
                 table: "RefreshTokens",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValue: new DateTime(2025, 10, 25, 18, 26, 36, 401, DateTimeKind.Local).AddTicks(5620),
+                defaultValue: new DateTime(2025, 11, 11, 10, 19, 40, 96, DateTimeKind.Local).AddTicks(8553),
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValue: new DateTime(2025, 10, 20, 10, 28, 53, 972, DateTimeKind.Local).AddTicks(6400));
+                oldDefaultValue: new DateTime(2025, 11, 11, 10, 13, 44, 909, DateTimeKind.Local).AddTicks(1149));
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "AllowedRoles",
+                name: "BackgroundColor",
                 table: "WebApps");
 
             migrationBuilder.DropColumn(
-                name: "PublishedAt",
+                name: "BackgroundImageOpacity",
                 table: "WebApps");
 
             migrationBuilder.DropColumn(
-                name: "RequiresAuthentication",
+                name: "BackgroundImageUrl",
                 table: "WebApps");
 
             migrationBuilder.DropColumn(
-                name: "Version",
+                name: "UseBackgroundImage",
                 table: "WebApps");
 
             migrationBuilder.AlterColumn<DateTime>(
@@ -72,10 +74,10 @@ namespace Automaton.Studio.Server.Migrations
                 table: "RefreshTokens",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValue: new DateTime(2025, 10, 20, 10, 28, 53, 972, DateTimeKind.Local).AddTicks(6400),
+                defaultValue: new DateTime(2025, 11, 11, 10, 13, 44, 909, DateTimeKind.Local).AddTicks(1149),
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValue: new DateTime(2025, 10, 25, 18, 26, 36, 401, DateTimeKind.Local).AddTicks(5620));
+                oldDefaultValue: new DateTime(2025, 11, 11, 10, 19, 40, 96, DateTimeKind.Local).AddTicks(8553));
         }
     }
 }

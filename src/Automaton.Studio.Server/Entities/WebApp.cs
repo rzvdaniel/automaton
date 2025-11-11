@@ -19,6 +19,10 @@ public class WebApp
     // Access control (future use)
     public bool RequiresAuthentication { get; set; } = false;
     public string? AllowedRoles { get; set; }
+
+    public string? BackgroundColor { get; set; } = "#ffffff";
+    public string? BackgroundImageUrl { get; set; }
+    public double BackgroundImageOpacity { get; set; } = 1.0;
     
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }

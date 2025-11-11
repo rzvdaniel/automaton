@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using Automaton.Studio.Pages.Authentication.Config;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -40,6 +41,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private IWebHostEnvironment WebHostEnvironment { get; set; }
     [Inject] private ILogger<AppDesignerPage> Logger { get; set; }
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
+    [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -505,6 +507,83 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     </script>
 </body>
 </html>";
+    }
+
+    private async Task OnBackgroundImageUpload(UploadInfo fileInfo)
+    {
+        try
+        {
+            if (fileInfo.File.State == UploadState.Success)
+            {
+                // The file is uploaded via the API endpoint
+                // The response should contain the image URL (relative path)
+                try
+                {
+                    var response = fileInfo.File.GetResponse<UploadImageResponse>();
+                    if (response != null && !string.IsNullOrEmpty(response.ImageUrl))
+                    {
+                        // Store the relative path from server, but display it with full server URL
+                        currentApp.BackgroundImageUrl = $"{ConfigurationService.BaseUrl}{response.ImageUrl}";
+                        await MessageService.SuccessAsync("Image uploaded successfully");
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    else
+                    {
+                        await MessageService.ErrorAsync("Invalid response from server: missing image URL");
+                    }
+                }
+                catch (Exception parseEx)
+                {
+                    Logger.LogError(parseEx, "[AppDesigner] Failed to parse upload response");
+                    await MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
+                }
+            }
+            else
+            {
+                // Upload failed for some other reason
+                await MessageService.ErrorAsync("Image upload failed. Please check the file size and format (max 2MB, PNG/JPG only)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AppDesigner] Error uploading image");
+            await MessageService.ErrorAsync($"Error uploading image: {ex.Message}");
+        }
+    }
+
+    private async Task RemoveBackgroundImage()
+    {
+        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove Image?",
+            Content = "The background image will be removed from this app.",
+            OkText = "Remove",
+            CancelText = "Cancel"
+        });
+
+        if (confirmed)
+        {
+            currentApp.BackgroundImageUrl = null;
+            await MessageService.SuccessAsync("Image removed");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetPreviewImageStyle()
+    {
+        var opacity = currentApp.BackgroundImageOpacity;
+        return $"position: relative; margin-bottom: 16px; border-radius: 8px; overflow: hidden; opacity: {opacity};";
+    }
+
+    private string GetUploadAction()
+    {
+        return $"{ConfigurationService.BaseUrl}/api/apps/{currentApp.Id}/upload-background";
+    }
+
+    public class UploadImageResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("imageUrl")]
+        public string ImageUrl { get; set; }
     }
 
     public async ValueTask DisposeAsync()

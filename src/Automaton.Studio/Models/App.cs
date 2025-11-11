@@ -17,6 +17,16 @@ public class AppModel
     // Optional runner to execute flows initiated by this app
     public Guid? ExecutionRunnerId { get; set; }
 
+    // Background customization for card display
+    public string? BackgroundColor { get; set; } = "#ffffff";
+    public string? BackgroundImageUrl { get; set; }
+    public double BackgroundImageOpacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Indicates whether a background image is set (derived from BackgroundImageUrl).
+    /// </summary>
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageUrl);
+
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }
 
@@ -53,6 +63,16 @@ public class AppListItem
 
     // Optional ExecutionRunnerId for quick access in UI
     public Guid? ExecutionRunnerId { get; set; }
+
+    // Background customization for card display
+    public string? BackgroundColor { get; set; } = "#ffffff";
+    public string? BackgroundImageUrl { get; set; }
+    public double BackgroundImageOpacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Indicates whether a background image is set (derived from BackgroundImageUrl).
+    /// </summary>
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageUrl);
 }
 
 public class NewApp

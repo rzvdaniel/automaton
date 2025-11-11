@@ -158,6 +158,9 @@ public class AppsService
         entity.PublicUrl = app.PublicUrl;
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(app.Definition);
+        entity.BackgroundImageUrl = app.BackgroundImageUrl;
+        entity.BackgroundColor = app.BackgroundColor;
+        entity.BackgroundImageOpacity = app.BackgroundImageOpacity;
 
         dataContext.SaveChanges();
 
@@ -310,6 +313,9 @@ public class AppsService
             Created = entity.Created,
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
+            BackgroundImageUrl = entity.BackgroundImageUrl,
+            BackgroundColor = entity.BackgroundColor,
+            BackgroundImageOpacity = entity.BackgroundImageOpacity,
             Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }

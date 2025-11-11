@@ -3,6 +3,7 @@ using System;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -10,17 +11,19 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Automaton.Studio.Server.Migrations
 {
-    [DbContext(typeof(MySqlDbContext))]
-    [Migration("20251025162637_AddWebAppPublishing")]
-    partial class AddWebAppPublishing
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20251111091941_WebAppImage")]
+    partial class WebAppImage
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "9.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
                 {
@@ -184,7 +187,7 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("datetime");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .HasColumnType("longtext");
@@ -418,6 +421,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -598,6 +603,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("AllowedRoles")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("BackgroundColor")
+                        .HasColumnType("longtext");
+
+                    b.Property<double>("BackgroundImageOpacity")
+                        .HasColumnType("double");
+
+                    b.Property<string>("BackgroundImageUrl")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime(6)");
 
@@ -612,6 +626,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("longtext");
+
+                    b.Property<Guid?>("ExecutionRunnerId")
+                        .HasColumnType("char(36)");
 
                     b.Property<bool>("IsPublished")
                         .HasColumnType("tinyint(1)");
@@ -631,6 +648,9 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("UseBackgroundImage")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("Version")
                         .HasColumnType("int");
@@ -667,7 +687,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 10, 25, 18, 26, 36, 401, DateTimeKind.Local).AddTicks(5620));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 10, 19, 40, 96, DateTimeKind.Local).AddTicks(8553));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -693,6 +713,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
 
@@ -714,6 +736,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");

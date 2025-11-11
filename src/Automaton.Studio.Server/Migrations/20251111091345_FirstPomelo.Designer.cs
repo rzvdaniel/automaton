@@ -3,6 +3,7 @@ using System;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -10,17 +11,19 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Automaton.Studio.Server.Migrations
 {
-    [DbContext(typeof(MySqlDbContext))]
-    [Migration("20251025101055_AddWebAppFeature")]
-    partial class AddWebAppFeature
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20251111091345_FirstPomelo")]
+    partial class FirstPomelo
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "9.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
                 {
@@ -184,7 +187,7 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("datetime");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .HasColumnType("longtext");
@@ -418,6 +421,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -500,6 +505,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("ScriptEngineSettings")
+                        .HasColumnType("longtext");
+
                     b.HasKey("Id");
 
                     b.ToTable("Runners");
@@ -561,11 +569,39 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Settings");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("AllowedRoles")
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime(6)");
@@ -582,6 +618,9 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("ExecutionRunnerId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("tinyint(1)");
 
@@ -592,8 +631,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("PublicUrl")
                         .HasColumnType("varchar(255)");
 
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("RequiresAuthentication")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -627,7 +675,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 10, 25, 12, 10, 54, 385, DateTimeKind.Local).AddTicks(8173));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 10, 13, 44, 909, DateTimeKind.Local).AddTicks(1149));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -653,6 +701,8 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
 
@@ -674,6 +724,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
                         .HasColumnType("longtext");
