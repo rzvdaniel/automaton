@@ -164,16 +164,16 @@ partial class AppsPage : ComponentBase
         };
     }
 
-    private void ExecuteApp(AppListItem app)
+    private async Task ExecuteApp(AppListItem app)
     {
         if (app.IsPublished)
         {
-            // Open published app in new tab
-            NavigationManager.NavigateTo($"/web/{app.PublicUrl}", forceLoad: true);
+            // Open published app in new tab to avoid disposing the Blazor circuit
+            await JSRuntime.InvokeVoidAsync("open", $"/web/{app.PublicUrl}", "_blank");
         }
         else
         {
-            MessageService.InfoAsync("This app has not been published yet. Please publish it first to execute.");
+            await MessageService.InfoAsync("This app has not been published yet. Please publish it first to execute.");
         }
     }
 
