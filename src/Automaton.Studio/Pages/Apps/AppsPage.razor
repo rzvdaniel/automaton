@@ -263,9 +263,9 @@
             styles.Add($"background-size: cover");
             styles.Add($"background-position: center");
             
-            // Add color overlay with opacity
+            // Apply opacity to the background image
             var opacityPercent = (int)(app.BackgroundImageOpacity * 100);
-            styles.Add($"position: relative");
+            styles.Add($"opacity: {app.BackgroundImageOpacity}");
         }
         
         if (!string.IsNullOrEmpty(app.BackgroundColor))
