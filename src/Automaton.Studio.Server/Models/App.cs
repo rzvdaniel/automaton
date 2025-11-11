@@ -15,10 +15,10 @@ public class AppModel
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
     
-    // Background customization for card display
     public string? BackgroundColor { get; set; } = "#ffffff";
     public string? BackgroundImageUrl { get; set; }
     public double BackgroundImageOpacity { get; set; } = 1.0;
+    public string? TitleFontColor { get; set; } = "#ffffff";
     
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }

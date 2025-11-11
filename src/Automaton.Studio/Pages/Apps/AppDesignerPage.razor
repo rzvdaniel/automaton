@@ -279,6 +279,21 @@
 									
 									<Row Gutter="(24, 16)">
 										<Col Xs="24" Md="12">
+										<FormItem Label="Title Font Color">
+											<InputGroup Compact>
+												<Input @bind-Value="@currentApp.TitleFontColor" 
+													   Placeholder="#ffffff"
+													   Style="width: calc(100% - 40px);" />
+												<input type="color" 
+													   @bind="currentApp.TitleFontColor" 
+													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
+											</InputGroup>
+										</FormItem>
+										</Col>
+									</Row>
+									
+									<Row Gutter="(24, 16)">
+										<Col Xs="24" Md="12">
 										<FormItem Label="Background Color">
 											<InputGroup Compact>
 												<Input @bind-Value="@currentApp.BackgroundColor" 

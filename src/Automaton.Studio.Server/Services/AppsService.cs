@@ -158,9 +158,14 @@ public class AppsService
         entity.PublicUrl = app.PublicUrl;
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(app.Definition);
+        
+        // Persist background customization properties
         entity.BackgroundImageUrl = app.BackgroundImageUrl;
         entity.BackgroundColor = app.BackgroundColor;
         entity.BackgroundImageOpacity = app.BackgroundImageOpacity;
+        
+        // Persist title customization properties
+        entity.TitleFontColor = app.TitleFontColor;
 
         dataContext.SaveChanges();
 
@@ -316,6 +321,7 @@ public class AppsService
             BackgroundImageUrl = entity.BackgroundImageUrl,
             BackgroundColor = entity.BackgroundColor,
             BackgroundImageOpacity = entity.BackgroundImageOpacity,
+            TitleFontColor = entity.TitleFontColor,
             Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }

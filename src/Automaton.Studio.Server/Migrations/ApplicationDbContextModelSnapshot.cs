@@ -643,6 +643,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<bool>("RequiresAuthentication")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<string>("TitleFontColor")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
 
@@ -681,7 +684,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 11, 11, 29, 45, 346, DateTimeKind.Local).AddTicks(9609));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 16, 24, 40, 484, DateTimeKind.Local).AddTicks(1618));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

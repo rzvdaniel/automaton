@@ -23,6 +23,7 @@ public class WebApp
     public string? BackgroundColor { get; set; } = "#ffffff";
     public string? BackgroundImageUrl { get; set; }
     public double BackgroundImageOpacity { get; set; } = 1.0;
+    public string? TitleFontColor { get; set; } = "#ffffff";
     
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }

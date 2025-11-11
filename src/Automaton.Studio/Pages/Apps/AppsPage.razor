@@ -74,63 +74,21 @@
         {
             @if (_isGridView)
             {          
-                <div class="illustrated-grid">
+                <div class="app-grid">
                     @foreach (var app in @AppsViewModel.Apps)
                     {
-                        <div class="illustrated-card" @onclick="@(() => EditApp(app.Id))" style="@GetCardBackgroundStyle(app)">
-                            <div class="illustrated-hero">
-                                <div class="illustrated-badge">@(app.IsPublished ? "Live" : "Draft")</div>
-                            </div>
-                            <div class="illustrated-content">
-                                <div class="illustrated-header">
-                                    <div>
-                                        <h3 class="illustrated-title">@app.DisplayName</h3>
-                                        <p class="illustrated-name">@app.Name</p>
-                                    </div>
-                                    <div class="card-actions" @onclick:stopPropagation>
-                                        <Tooltip Title="Edit">
-                                            <Button Type="@ButtonType.Text" Icon="edit" @onclick="@(() => EditApp(app.Id))" />
-                                        </Tooltip>
-                                        @if (app.IsPublished)
-                                        {
-                                            <Tooltip Title="View">
-                                                <Button Type="@ButtonType.Text" Icon="eye" @onclick="@(() => ViewApp(app.PublicUrl))" />
-                                            </Tooltip>
-                                            <Tooltip Title="Unpublish">
-                                                <Button Type="@ButtonType.Text" Icon="cloud-download" @onclick="@(() => UnpublishApp(app.Id))" />
-                                            </Tooltip>
-                                        }
-                                        else
-                                        {
-                                            <Tooltip Title="Publish">
-                                                <Button Type="@ButtonType.Text" Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(app.Id))" />
-                                            </Tooltip>
-                                        }
-                                        <Popconfirm Title="Delete?" OnConfirm="() => DeleteApp(app.Id)" OkText="Yes" CancelText="No">
-                                            <Tooltip Title="Delete">
-                                                <Button Type="@ButtonType.Text" Icon="delete" Danger />
-                                            </Tooltip>
-                                        </Popconfirm>
-                                    </div>
-                                </div>
-                                <div class="illustrated-status">
-                                    @if (app.IsPublished)
-                                    {
-                                        <Tag Color="@("green")" style="font-size: 11px;">Published</Tag>
-                                        @if (!app.RequiresAuthentication)
-                                        {
-                                            <Tag Color="@("orange")" Icon="unlock" style="font-size: 11px;">Public</Tag>
-                                        }
-                                        else
-                                        {
-                                            <Tag Color="@("blue")" Icon="lock" style="font-size: 11px;">Protected</Tag>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <Tag Color="@("default")" style="font-size: 11px;">Draft</Tag>
-                                    }
-                                </div>
+                        <div class="app-card" style="@GetCardBackgroundStyle(app)" @onclick="@(() => ExecuteApp(app))">
+                            <div class="app-card-content">
+                                <h2 class="app-card-title" style="@GetTitleStyle(app)">
+                                    @GetAppDisplayTitle(app)
+                                </h2>
+                                
+                                @if (!string.IsNullOrEmpty(app.Description))
+                                {
+                                    <Tooltip Title="@app.Description">
+                                        <Icon Type="info-circle" Class="app-card-description-icon" />
+                                    </Tooltip>
+                                }
                             </div>
                         </div>
                     }
@@ -245,319 +203,88 @@
     </Content>
 </Layout>
 
-@code {
-    private bool _isGridView = true;
-
-    private void ToggleViewMode()
-    {
-        _isGridView = !_isGridView;
-    }
-
-    private string GetCardBackgroundStyle(AppListItem app)
-    {
-        var styles = new List<string>();
-        
-        if (!string.IsNullOrEmpty(app.BackgroundImageUrl))
-        {
-            styles.Add($"background-image: url('{app.BackgroundImageUrl}')");
-            styles.Add($"background-size: cover");
-            styles.Add($"background-position: center");
-            
-            // Apply opacity to the background image
-            var opacityPercent = (int)(app.BackgroundImageOpacity * 100);
-            styles.Add($"opacity: {app.BackgroundImageOpacity}");
-        }
-        
-        if (!string.IsNullOrEmpty(app.BackgroundColor))
-        {
-            styles.Add($"background-color: {app.BackgroundColor}");
-        }
-        
-        return string.Join("; ", styles);
-    }
-}
-
 <style>
-    /* ===== ILLUSTRATED HERO DESIGN ===== */
-    .illustrated-grid {
+    .app-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 32px;
         padding: 24px 0;
     }
 
-    .illustrated-card {
+    .app-card {
         background: white;
         border-radius: 16px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
         overflow: hidden;
         cursor: pointer;
+        min-height: 280px;
+        display: flex;
+        align-items: flex-end;
+        position: relative;
     }
 
-    .illustrated-card:hover {
+    .app-card:hover {
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
         transform: translateY(-8px);
     }
 
-    .illustrated-hero {
-        height: 180px;
-        background-size: cover;
-        background-position: center;
-        position: relative;
-        display: flex;
-        align-items: flex-start;
-        padding: 12px;
-    }
-
-    .illustrated-hero::before {
+    .app-card::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.3);
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 100%);
+        pointer-events: none;
         z-index: 1;
     }
 
-    .illustrated-badge {
-        background: rgba(0, 0, 0, 0.4);
-        color: white;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        backdrop-filter: blur(8px);
+    .app-card-content {
         position: relative;
         z-index: 2;
+        padding: 32px 24px;
+        width: 100%;
     }
 
-    .illustrated-content {
-        padding: 20px;
-    }
-
-    .illustrated-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 12px;
-    }
-
-    .illustrated-title {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 700;
-        color: #000;
-    }
-
-    .illustrated-name {
-        margin: 4px 0 0 0;
-        font-size: 13px;
-        color: #8c8c8c;
-    }
-
-    .illustrated-status {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    /* ===== LAYERED DEPTH DESIGN ===== */
-    .layered-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 32px;
-        padding: 24px 0;
-    }
-
-    .layered-card {
-        background: white;
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-    }
-
-    .layered-card:hover {
-        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
-        transform: translateY(-10px);
-    }
-
-    .layered-blob {
-        position: absolute;
-        top: -80px;
-        right: -80px;
-        width: 200px;
-        height: 200px;
-        border-radius: 50%;
-        filter: blur(40px);
-        opacity: 0.3;
-        transition: all 0.4s ease;
-    }
-
-    .layered-card:hover .layered-blob {
-        transform: scale(1.2);
-        opacity: 0.4;
-    }
-
-    .layered-icon {
-        font-size: 32px;
-        color: white;
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 0, 0, 0.2);
-        backdrop-filter: blur(10px);
-        margin-bottom: 20px;
-        position: relative;
-        z-index: 2;
-    }
-
-    .layered-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        position: relative;
-        z-index: 2;
-    }
-
-    .layered-title {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        color: #000;
-    }
-
-    .layered-name {
-        margin: 4px 0 16px 0;
-        font-size: 13px;
-        color: #8c8c8c;
-        position: relative;
-        z-index: 2;
-    }
-
-    .layered-status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 20px;
-        position: relative;
-        z-index: 2;
-    }
-
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-    }
-
-    .status-dot.published { background: #52c41a; }
-    .status-dot.draft { background: #bfbfbf; }
-
-    .layered-footer {
-        margin-top: auto;
-        padding-top: 16px;
-        border-top: 1px solid #f0f0f0;
-        font-size: 12px;
-        color: #bfbfbf;
-        position: relative;
-        z-index: 2;
-    }
-
-    /* ===== MINIMALIST FOCUS DESIGN ===== */
-    .focus-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 28px;
-        padding: 24px 0;
-    }
-
-    .focus-card {
-        background: #f9f9f9;
-        border-radius: 16px;
-        padding: 24px;
-        display: flex;
-        flex-direction: column;
-        transition: all 0.3s ease;
-        border: 1px solid #f0f0f0;
-        cursor: pointer;
-    }
-
-    .focus-card:hover {
-        background: white;
-        border-color: #e6e6e6;
-        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
-        transform: translateY(-6px);
-    }
-
-    .focus-header {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 16px;
-    }
-
-    .focus-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 28px;
-        flex-shrink: 0;
-    }
-
-    .focus-title {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-        color: #000;
-    }
-
-    .focus-name {
+    .app-card-title {
         margin: 0 0 16px 0;
-        font-size: 13px;
-        color: #8c8c8c;
-    }
-
-    .focus-status {
-        margin-bottom: 16px;
-    }
-
-    .focus-footer {
-        margin-top: auto;
-        padding-top: 12px;
-        border-top: 1px solid #f0f0f0;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.3;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        font-size: 12px;
-        color: #bfbfbf;
+        gap: 12px;
+    }
+
+    .app-card-description-icon {
+        font-size: 20px;
+        opacity: 0.9;
+        cursor: help;
+        flex-shrink: 0;
     }
 
     /* Responsive */
     @@media (max-width: 768px) {
-        .illustrated-grid, .layered-grid, .focus-grid {
+        .app-grid {
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 24px;
+        }
+
+        .app-card-title {
+            font-size: 22px;
         }
     }
 
     @@media (max-width: 480px) {
-        .illustrated-grid, .layered-grid, .focus-grid {
+        .app-grid {
             grid-template-columns: 1fr;
             gap: 20px;
+        }
+
+        .app-card-title {
+            font-size: 20px;
         }
     }
 </style>

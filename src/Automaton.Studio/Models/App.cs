@@ -21,6 +21,9 @@ public class AppModel
     public string? BackgroundColor { get; set; } = "#ffffff";
     public string? BackgroundImageUrl { get; set; }
     public double BackgroundImageOpacity { get; set; } = 1.0;
+    
+    // Title customization
+    public string? TitleFontColor { get; set; } = "#ffffff";
 
     /// <summary>
     /// Indicates whether a background image is set (derived from BackgroundImageUrl).
@@ -60,6 +63,7 @@ public class AppListItem
     public bool RequiresAuthentication { get; set; } = true;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+    public string Description { get; set; }
 
     // Optional ExecutionRunnerId for quick access in UI
     public Guid? ExecutionRunnerId { get; set; }
@@ -68,6 +72,9 @@ public class AppListItem
     public string? BackgroundColor { get; set; } = "#ffffff";
     public string? BackgroundImageUrl { get; set; }
     public double BackgroundImageOpacity { get; set; } = 1.0;
+    
+    // Title customization
+    public string? TitleFontColor { get; set; } = "#ffffff";
 
     /// <summary>
     /// Indicates whether a background image is set (derived from BackgroundImageUrl).
