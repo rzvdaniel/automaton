@@ -109,6 +109,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITextSimilarityService, TextSimilarityService>();
         services.AddScoped<IAiMessageFormattingService, AiMessageFormattingService>();
 
+        // Project services
+        services.AddScoped<ProjectsClientService>();
+        services.AddScoped<ProjectMembersClientService>();
+        services.AddScoped<ProjectResourcesClientService>();
+
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
         services.AddScoped<IWorkflowExecutionPersistenceService, StudioWorkflowExecutionPersistenceService>();

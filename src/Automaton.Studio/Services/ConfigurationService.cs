@@ -19,6 +19,7 @@ public class ConfigurationService
     public string FlowScheduleUrl => apiConfig.FlowScheduleUrl;
     public string FlowLogsUrl => apiConfig.FlowLogsUrl;
     public string ApiKeysUrl => apiConfig.ApiKeysUrl;
+    public string ProjectsUrl => apiConfig.ProjectsUrl;
     public bool IsDesktop => appConfig.IsDesktop;
     public string ApplicationName => appConfig.ApplicationName;
     public string ApplicationType => appConfig.ApplicationType;

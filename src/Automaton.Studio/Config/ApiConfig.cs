@@ -12,4 +12,5 @@ public class ApiConfig
     public string FlowScheduleUrl { get; set; }
     public string FlowLogsUrl { get; set; }
     public string ApiKeysUrl { get; set; }
+    public string ProjectsUrl { get; set; }
 }
