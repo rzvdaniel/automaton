@@ -17,18 +17,13 @@ public class AppModel
     // Optional runner to execute flows initiated by this app
     public Guid? ExecutionRunnerId { get; set; }
 
-    // Background customization for card display
-    public string? BackgroundColor { get; set; } = "#ffffff";
-    public string? BackgroundImageUrl { get; set; }
-    public double BackgroundImageOpacity { get; set; } = 1.0;
-    
-    // Title customization
-    public string? TitleFontColor { get; set; } = "#ffffff";
+    // Appearance configuration
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
 
     /// <summary>
-    /// Indicates whether a background image is set (derived from BackgroundImageUrl).
+    /// Indicates whether a background image is set (derived from Appearance.BackgroundImageUrl).
     /// </summary>
-    public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageUrl);
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(Appearance?.BackgroundImageUrl);
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }
@@ -68,18 +63,13 @@ public class AppListItem
     // Optional ExecutionRunnerId for quick access in UI
     public Guid? ExecutionRunnerId { get; set; }
 
-    // Background customization for card display
-    public string? BackgroundColor { get; set; } = "#ffffff";
-    public string? BackgroundImageUrl { get; set; }
-    public double BackgroundImageOpacity { get; set; } = 1.0;
-    
-    // Title customization
-    public string? TitleFontColor { get; set; } = "#ffffff";
+    // Appearance configuration
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
 
     /// <summary>
-    /// Indicates whether a background image is set (derived from BackgroundImageUrl).
+    /// Indicates whether a background image is set (derived from Appearance.BackgroundImageUrl).
     /// </summary>
-    public bool HasBackgroundImage => !string.IsNullOrEmpty(BackgroundImageUrl);
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(Appearance?.BackgroundImageUrl);
 }
 
 public class NewApp

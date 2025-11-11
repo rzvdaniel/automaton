@@ -177,21 +177,28 @@ partial class AppsPage : ComponentBase
         }
     }
 
-    private string GetCardBackgroundStyle(AppListItem app)
+    private string GetCardBackgroundColor(AppListItem app)
     {
-        var styles = new List<string>();
-        
-        if (!string.IsNullOrEmpty(app.BackgroundImageUrl))
+        // Only apply background color to the card itself
+        if (!string.IsNullOrEmpty(app.Appearance?.BackgroundColor))
         {
-            styles.Add($"background-image: url('{app.BackgroundImageUrl}')");
-            styles.Add($"background-size: cover");
-            styles.Add($"background-position: center");
-            styles.Add($"opacity: {app.BackgroundImageOpacity}");
+            return $"background-color: {app.Appearance.BackgroundColor};";
         }
         
-        if (!string.IsNullOrEmpty(app.BackgroundColor))
+        return "background-color: #ffffff;";
+    }
+
+    private string GetCardBackgroundImage(AppListItem app)
+    {
+        // Apply background image with opacity to the separate background layer
+        var styles = new List<string>();
+        
+        if (!string.IsNullOrEmpty(app.Appearance?.BackgroundImageUrl))
         {
-            styles.Add($"background-color: {app.BackgroundColor}");
+            styles.Add($"background-image: url('{app.Appearance.BackgroundImageUrl}')");
+            styles.Add($"background-size: cover");
+            styles.Add($"background-position: center");
+            styles.Add($"opacity: {app.Appearance.BackgroundImageOpacity}");
         }
         
         return string.Join("; ", styles);
@@ -201,9 +208,9 @@ partial class AppsPage : ComponentBase
     {
         var styles = new List<string>();
         
-        if (!string.IsNullOrEmpty(app.TitleFontColor))
+        if (!string.IsNullOrEmpty(app.Appearance?.TitleFontColor))
         {
-            styles.Add($"color: {app.TitleFontColor}");
+            styles.Add($"color: {app.Appearance.TitleFontColor}");
         }
         else
         {

@@ -555,7 +555,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                     if (response != null && !string.IsNullOrEmpty(response.ImageUrl))
                     {
                         // Store the relative path from server, but display it with full server URL
-                        currentApp.BackgroundImageUrl = $"{ConfigurationService.BaseUrl}{response.ImageUrl}";
+                        currentApp.Appearance.BackgroundImageUrl = $"{ConfigurationService.BaseUrl}{response.ImageUrl}";
                         await MessageService.SuccessAsync("Image uploaded successfully");
                         await InvokeAsync(StateHasChanged);
                     }
@@ -570,9 +570,9 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                     await MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
                 }
             }
-            else
+            else if (fileInfo.File.State == UploadState.Fail)
             {
-                // Upload failed for some other reason
+                // Upload failed - show error message once
                 await MessageService.ErrorAsync("Image upload failed. Please check the file size and format (max 2MB, PNG/JPG only)");
             }
         }
@@ -595,7 +595,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
         if (confirmed)
         {
-            currentApp.BackgroundImageUrl = null;
+            currentApp.Appearance.BackgroundImageUrl = null;
             await MessageService.SuccessAsync("Image removed");
             await InvokeAsync(StateHasChanged);
         }
@@ -603,7 +603,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
     private string GetPreviewImageStyle()
     {
-        var opacity = currentApp.BackgroundImageOpacity;
+        var opacity = currentApp.Appearance.BackgroundImageOpacity;
         return $"position: relative; margin-bottom: 16px; border-radius: 8px; overflow: hidden; opacity: {opacity};";
     }
 

@@ -77,7 +77,11 @@
                 <div class="app-grid">
                     @foreach (var app in @AppsViewModel.Apps)
                     {
-                        <div class="app-card" style="@GetCardBackgroundStyle(app)" @onclick="@(() => ExecuteApp(app))">
+                        <div class="app-card" style="@GetCardBackgroundColor(app)" @onclick="@(() => ExecuteApp(app))">
+                            <!-- Background image layer with opacity -->
+                            <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
+                            
+                            <!-- Content layer - not affected by background opacity -->
                             <div class="app-card-content">
                                 <h2 class="app-card-title" style="@GetTitleStyle(app)">
                                     @GetAppDisplayTitle(app)
@@ -229,7 +233,21 @@
         transform: translateY(-8px);
     }
 
-    .app-card::before {
+    /* Background image layer with independent opacity */
+    .app-card-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-size: cover;
+        background-position: center;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* Gradient overlay on top of background image */
+    .app-card-background::after {
         content: '';
         position: absolute;
         top: 0;
@@ -238,9 +256,9 @@
         bottom: 0;
         background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 100%);
         pointer-events: none;
-        z-index: 1;
     }
 
+    /* Content layer - not affected by background opacity */
     .app-card-content {
         position: relative;
         z-index: 2;

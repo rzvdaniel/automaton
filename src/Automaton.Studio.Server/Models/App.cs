@@ -15,10 +15,8 @@ public class AppModel
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
     
-    public string? BackgroundColor { get; set; } = "#ffffff";
-    public string? BackgroundImageUrl { get; set; }
-    public double BackgroundImageOpacity { get; set; } = 1.0;
-    public string? TitleFontColor { get; set; } = "#ffffff";
+    // Appearance configuration stored as JSON
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
     
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }

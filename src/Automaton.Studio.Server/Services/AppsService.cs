@@ -159,13 +159,8 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(app.Definition);
         
-        // Persist background customization properties
-        entity.BackgroundImageUrl = app.BackgroundImageUrl;
-        entity.BackgroundColor = app.BackgroundColor;
-        entity.BackgroundImageOpacity = app.BackgroundImageOpacity;
-        
-        // Persist title customization properties
-        entity.TitleFontColor = app.TitleFontColor;
+        // Persist appearance configuration as JSON
+        entity.Appearance = JsonSerializer.Serialize(app.Appearance);
 
         dataContext.SaveChanges();
 
@@ -304,6 +299,10 @@ public class AppsService
     {
         if (entity == null) return null;
 
+        var appearance = string.IsNullOrEmpty(entity.Appearance)
+            ? new Models.AppAppearance()
+            : JsonSerializer.Deserialize<Models.AppAppearance>(entity.Appearance) ?? new Models.AppAppearance();
+
         return new Models.AppModel
         {
             Id = entity.Id,
@@ -318,10 +317,7 @@ public class AppsService
             Created = entity.Created,
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
-            BackgroundImageUrl = entity.BackgroundImageUrl,
-            BackgroundColor = entity.BackgroundColor,
-            BackgroundImageOpacity = entity.BackgroundImageOpacity,
-            TitleFontColor = entity.TitleFontColor,
+            Appearance = appearance,
             Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }

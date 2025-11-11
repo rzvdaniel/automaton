@@ -281,11 +281,11 @@
 										<Col Xs="24" Md="12">
 										<FormItem Label="Title Font Color">
 											<InputGroup Compact>
-												<Input @bind-Value="@currentApp.TitleFontColor" 
+												<Input @bind-Value="@currentApp.Appearance.TitleFontColor" 
 													   Placeholder="#ffffff"
 													   Style="width: calc(100% - 40px);" />
 												<input type="color" 
-													   @bind="currentApp.TitleFontColor" 
+													   @bind="currentApp.Appearance.TitleFontColor" 
 													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
 											</InputGroup>
 										</FormItem>
@@ -296,11 +296,11 @@
 										<Col Xs="24" Md="12">
 										<FormItem Label="Background Color">
 											<InputGroup Compact>
-												<Input @bind-Value="@currentApp.BackgroundColor" 
+												<Input @bind-Value="@currentApp.Appearance.BackgroundColor" 
 													   Placeholder="#ffffff"
 													   Style="width: calc(100% - 40px);" />
 												<input type="color" 
-													   @bind="currentApp.BackgroundColor" 
+													   @bind="currentApp.Appearance.BackgroundColor" 
 													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
 											</InputGroup>
 										</FormItem>
@@ -311,10 +311,10 @@
 										<Col Span="24">
 											<FormItem Label="Upload Image">
 												<div class="image-upload-wrapper">
-													@if (!string.IsNullOrEmpty(currentApp.BackgroundImageUrl))
+													@if (!string.IsNullOrEmpty(currentApp.Appearance.BackgroundImageUrl))
 													{
 														<div class="image-preview" style="@GetPreviewImageStyle()">
-															<img src="@currentApp.BackgroundImageUrl" alt="Background preview" />
+															<img src="@currentApp.Appearance.BackgroundImageUrl" alt="Background preview" />
 														</div>
 													}
 													<Upload Name="file"
@@ -337,11 +337,11 @@
 									<Row Gutter="(24, 16)">
 										<Col Xs="24" Md="12">
 										<FormItem Label="Image Opacity">
-											<Slider @bind-Value="@currentApp.BackgroundImageOpacity" Min="0" Max="1" Step="0.1" />
-											<Text Type="TextElementType.Secondary">@($"{(currentApp.BackgroundImageOpacity * 100):F0}%")</Text>
+											<Slider @bind-Value="@currentApp.Appearance.BackgroundImageOpacity" Min="0" Max="1" Step="0.1" />
+											<Text Type="TextElementType.Secondary">@($"{(currentApp.Appearance.BackgroundImageOpacity * 100):F0}%")</Text>
 										</FormItem>
 
-										@if (!string.IsNullOrEmpty(currentApp.BackgroundImageUrl))
+										@if (!string.IsNullOrEmpty(currentApp.Appearance.BackgroundImageUrl))
 										{
 											<FormItem Label="">
 												<Button Block Danger OnClick="RemoveBackgroundImage">Remove Image</Button>

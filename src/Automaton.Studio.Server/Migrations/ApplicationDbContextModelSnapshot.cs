@@ -600,13 +600,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("AllowedRoles")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("BackgroundColor")
-                        .HasColumnType("longtext");
-
-                    b.Property<double>("BackgroundImageOpacity")
-                        .HasColumnType("double");
-
-                    b.Property<string>("BackgroundImageUrl")
+                    b.Property<string>("Appearance")
+                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<DateTime>("Created")
@@ -642,9 +637,6 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<bool>("RequiresAuthentication")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("TitleFontColor")
-                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
@@ -684,7 +676,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 11, 16, 24, 40, 484, DateTimeKind.Local).AddTicks(1618));
+                        .HasDefaultValue(new DateTime(2025, 11, 11, 16, 55, 35, 479, DateTimeKind.Local).AddTicks(7532));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
