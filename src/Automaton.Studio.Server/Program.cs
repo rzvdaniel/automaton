@@ -96,6 +96,23 @@ services.AddAuthorization(options =>
     // Policy for anonymous endpoints (validation, etc.)
     options.AddPolicy("AllowAnonymous", policy =>
         policy.RequireAssertion(_ => true));
+
+    // Project-based authorization policies
+    options.AddPolicy("ProjectAdmin", policy =>
+        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectAdminRequirement()));
+
+    options.AddPolicy("ProjectResourceManager", policy =>
+        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectResourceManagerRequirement()));
+
+    options.AddPolicy("ProjectAppExecutor", policy =>
+        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectAppExecutorRequirement()));
+
+    options.AddPolicy("ProjectMember", policy =>
+        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
+            Automaton.Studio.Server.Enums.ProjectRole.ProjectAdmin,
+            Automaton.Studio.Server.Enums.ProjectRole.Developer,
+            Automaton.Studio.Server.Enums.ProjectRole.AppUser,
+            Automaton.Studio.Server.Enums.ProjectRole.Viewer)));
 });
 
 services.AddHttpClient();
@@ -208,6 +225,12 @@ services.AddScoped<AiProviderFactory>();
 services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
 services.AddScoped<ProjectResourceService>();
+
+// Project authorization handlers
+services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectMemberHandler>();
+services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectAdminHandler>();
+services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectResourceManagerHandler>();
+services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectAppExecutorHandler>();
 
 services.AddScoped(service => configurationService);
 
