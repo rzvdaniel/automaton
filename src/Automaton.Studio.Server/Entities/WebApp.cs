@@ -19,6 +19,9 @@ public class WebApp
     // Access control (future use)
     public bool RequiresAuthentication { get; set; } = false;
     public string? AllowedRoles { get; set; }
+
+    // Appearance settings stored as JSON
+    public string Appearance { get; set; } = "{}";
     
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }

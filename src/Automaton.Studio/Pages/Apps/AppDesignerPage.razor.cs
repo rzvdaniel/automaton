@@ -2,12 +2,14 @@ using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Automaton.Studio.Pages.Apps.Components.PublishAppDialog;
+using Automaton.Client.Auth.Interfaces;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using Automaton.Studio.Pages.Authentication.Config;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -17,6 +19,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     private bool loading = false;
     private bool saving = false;
     private bool publishing = false;
+    private Dictionary<string, string> uploadHeaders = new();
     private AppModel currentApp = new AppModel
     {
         Name = "Loading...",
@@ -40,6 +43,8 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private IWebHostEnvironment WebHostEnvironment { get; set; }
     [Inject] private ILogger<AppDesignerPage> Logger { get; set; }
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
+    [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
+    [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -51,6 +56,9 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             // Load automatonApi.js for preview
             await LoadAutomatonApiScript();
+            
+            // Initialize upload headers with JWT token
+            await InitializeUploadHeaders();
             
             if (Guid.TryParse(AppId, out var appGuid))
             {
@@ -80,6 +88,32 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             Logger.LogError(ex, "[AppDesigner] Failed to load automatonApi.js");
             automatonApiScript = null;
+        }
+    }
+
+    private async Task InitializeUploadHeaders()
+    {
+        try
+        {
+            var accessToken = await AuthenticationStorage.GetAccessToken();
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                uploadHeaders = new Dictionary<string, string>
+                {
+                    { "Authorization", $"Bearer {accessToken}" }
+                };
+                Logger.LogInformation("[AppDesigner] Upload headers initialized with JWT token");
+            }
+            else
+            {
+                Logger.LogWarning("[AppDesigner] No access token found in authentication storage");
+                uploadHeaders = new Dictionary<string, string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AppDesigner] Failed to initialize upload headers");
+            uploadHeaders = new Dictionary<string, string>();
         }
     }
 
@@ -505,6 +539,83 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     </script>
 </body>
 </html>";
+    }
+
+    private async Task OnBackgroundImageUpload(UploadInfo fileInfo)
+    {
+        try
+        {
+            if (fileInfo.File.State == UploadState.Success)
+            {
+                // The file is uploaded via the API endpoint
+                // The response should contain the image URL (relative path)
+                try
+                {
+                    var response = fileInfo.File.GetResponse<UploadImageResponse>();
+                    if (response != null && !string.IsNullOrEmpty(response.ImageUrl))
+                    {
+                        // Store the relative path from server, but display it with full server URL
+                        currentApp.Appearance.BackgroundImageUrl = $"{ConfigurationService.BaseUrl}{response.ImageUrl}";
+                        await MessageService.SuccessAsync("Image uploaded successfully");
+                        await InvokeAsync(StateHasChanged);
+                    }
+                    else
+                    {
+                        await MessageService.ErrorAsync("Invalid response from server: missing image URL");
+                    }
+                }
+                catch (Exception parseEx)
+                {
+                    Logger.LogError(parseEx, "[AppDesigner] Failed to parse upload response");
+                    await MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
+                }
+            }
+            else if (fileInfo.File.State == UploadState.Fail)
+            {
+                // Upload failed - show error message once
+                await MessageService.ErrorAsync("Image upload failed. Please check the file size and format (max 2MB, PNG/JPG only)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AppDesigner] Error uploading image");
+            await MessageService.ErrorAsync($"Error uploading image: {ex.Message}");
+        }
+    }
+
+    private async Task RemoveBackgroundImage()
+    {
+        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove Image?",
+            Content = "The background image will be removed from this app.",
+            OkText = "Remove",
+            CancelText = "Cancel"
+        });
+
+        if (confirmed)
+        {
+            currentApp.Appearance.BackgroundImageUrl = null;
+            await MessageService.SuccessAsync("Image removed");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetPreviewImageStyle()
+    {
+        var opacity = currentApp.Appearance.BackgroundImageOpacity;
+        return $"position: relative; margin-bottom: 16px; border-radius: 8px; overflow: hidden; opacity: {opacity};";
+    }
+
+    private string GetUploadAction()
+    {
+        return $"{ConfigurationService.BaseUrl}/api/apps/{currentApp.Id}/upload-background";
+    }
+
+    public class UploadImageResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("imageUrl")]
+        public string ImageUrl { get; set; }
     }
 
     public async ValueTask DisposeAsync()

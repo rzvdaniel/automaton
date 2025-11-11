@@ -4,7 +4,20 @@ This document provides a comprehensive summary of the Automaton project, intende
 
 ## Project Overview
 
-Automaton is a lightweight, cross-platform automation platform designed to streamline and orchestrate software tasks. It provides a visual interface for creating and managing task flows, while supporting extensibility through Python scripting and modular logic components.
+Automaton is a .NET-based automation platform that combines a visual workflow designer, a secure execution runner, and an integrated web app builder. It is implemented as a Blazor web front-end (`Automaton.Studio.Web`), a backend server (`Automaton.Studio.Server`), shared core libraries (`Automaton.Core`), and a cross-platform console runner (`Automaton.Runner.Console`) that executes flows.
+
+Primary goals:
+- Offer an integrated Web Apps platform so users can build frontends (HTML/CSS/JS) that call Flows as their backend.
+- Enable users to author, test, and run automation Flows composed of built-in and custom Steps.
+- Provide a secure, scalable execution surface (Runners) for flows with API-driven integration points.
+
+Core capabilities:
+- Web Apps: author, preview, and publish frontend apps inside the Studio and execute flows from those apps via a secure client helper (`window.automatonApi`).
+- Visual Flow Designer with drag-and-drop step placement, variable mapping, triggers, and execution controls.
+- Custom Steps authoring (Python, PowerShell, Batch) with an integrated Step Designer including code editor, test variables, and logs.
+- Cross-platform Runner (`Automaton.Runner.Console`) for executing flows; installers and service scripts are provided for production deployment.
+
+This README is based on the actual implementation found in the repository (`src/Automaton.Studio/**`, `src/Automaton.Runner.Console`, `src/Automaton.Core`, `src/Automaton.Steps`, and `examples/`).
 
 ### Site Map and Key Features
 
@@ -36,6 +49,8 @@ This section provides a sitemap of the Automaton Studio application and a map of
 
 #### Key Features
 
+*   **Apps (Web App Platform):**
+    *   Author, preview, publish, and manage small web apps (HTML/CSS/JS) that call Flows as their backend. Includes an App Designer with Monaco editor, preview iframe, PWA options, and AI-assisted code helpers.
 *   **Dashboard:** The main landing page.
 *   **Flows Management:**
     *   List, create, and manage automation flows.
@@ -52,7 +67,7 @@ This section provides a sitemap of the Automaton Studio application and a map of
 *   **API Keys Management:**
     *   Create, manage, and revoke API keys for authentication.
 *   **Downloads:**
-    *   A hub for downloading different versions of the runner and the desktop application.
+    *   A hub for downloading different versions of the runner and service setup scripts.
 *   **Settings:**
     *   Configure application settings.
 *   **Onboarding:**
@@ -66,13 +81,27 @@ This section provides a sitemap of the Automaton Studio application and a map of
 
 The Automaton project is a .NET solution composed of several key components:
 
-- **`Automaton.Studio`**: The main application for designing and managing automation flows. It has several versions:
-    - **`Automaton.Studio.Web`**: The web-based version of the studio.
+ - **`Automaton.Studio`**: Shared UI components, pages, and modules used by the Studio front-end. It contains the primary UI surface and is the umbrella project for Studio functionality. The concrete web implementation is provided in:
+    - **`Automaton.Studio.Web`**: The web-based implementation of the Studio (main web UI).
     - **`Automaton.Studio.Server`**: The backend server for the studio, handling business logic and data persistence.
 - **`Automaton.Runner.Console`**: A cross-platform command-line runner.
 - **`Automaton.Core`**: A shared library containing the core logic for workflows, steps, and data models.
 - **`Automaton.Steps`**: A library of built-in, reusable steps for use in automation flows.
 - **`UnitTests`**: Contains the unit tests for the project.
+ - **`Automaton.Core`**: A shared library containing the core logic for workflows, steps, and data models.
+ - **`Automaton.Core.Scripting`**: Scripting helpers and runtime integrations used by custom steps and the Step Designer.
+ - **`Automaton.Mcp.Client`**: Client libraries for the MCP (model-context-protocol) integrations and inter-process communication used across Studio and Runner components.
+ - **`Automaton.Steps`**: A library of built-in, reusable steps for use in automation flows.
+ - **UI modules**: lightweight UI/feature modules used by the Studio front-end and account flows:
+     - `Automaton.App.Account`
+     - `Automaton.App.Authentication`
+     - `Automaton.App.Install`
+     - `Automaton.Client.Auth`
+ - **`UnitTests`**: Contains the unit tests for the project. Key test projects include:
+     - `Automaton.Core.Tests`
+     - `Automaton.Runner.Console.Tests`
+     - `Automaton.Studio.Server.Tests`
+     - `Automaton.Studio.Tests`
 
 ## Development Environment Setup
 
@@ -147,9 +176,6 @@ The server is the backend for the studio. The Swagger API documentation can be f
   var user = authState.User;
   var claims = user.Claims?.ToList();
   ```
-
-### Automaton Studio (Desktop)
-- **Mixed Blazor and WPF controls**: It's possible to mix Blazor and WPF controls. In `MainWindow.xaml`, you can add WPF controls, and in `MainWindow.xaml.cs`, you can interact with the Blazor application's state.
 
 ### API Key Scopes
 The console runner accepts any API key starting with `ak_` and at least 10 characters long. The specific scope and permissions are determined by your Automaton Studio server configuration.

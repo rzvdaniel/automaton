@@ -158,6 +158,9 @@ public class AppsService
         entity.PublicUrl = app.PublicUrl;
         entity.Updated = DateTime.UtcNow;
         entity.Definition = JsonSerializer.Serialize(app.Definition);
+        
+        // Persist appearance configuration as JSON
+        entity.Appearance = JsonSerializer.Serialize(app.Appearance);
 
         dataContext.SaveChanges();
 
@@ -296,6 +299,10 @@ public class AppsService
     {
         if (entity == null) return null;
 
+        var appearance = string.IsNullOrEmpty(entity.Appearance)
+            ? new Models.AppAppearance()
+            : JsonSerializer.Deserialize<Models.AppAppearance>(entity.Appearance) ?? new Models.AppAppearance();
+
         return new Models.AppModel
         {
             Id = entity.Id,
@@ -310,6 +317,7 @@ public class AppsService
             Created = entity.Created,
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
+            Appearance = appearance,
             Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }

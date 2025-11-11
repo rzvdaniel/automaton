@@ -17,6 +17,14 @@ public class AppModel
     // Optional runner to execute flows initiated by this app
     public Guid? ExecutionRunnerId { get; set; }
 
+    // Appearance configuration
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
+
+    /// <summary>
+    /// Indicates whether a background image is set (derived from Appearance.BackgroundImageUrl).
+    /// </summary>
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(Appearance?.BackgroundImageUrl);
+
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }
 
@@ -50,9 +58,18 @@ public class AppListItem
     public bool RequiresAuthentication { get; set; } = true;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+    public string Description { get; set; }
 
     // Optional ExecutionRunnerId for quick access in UI
     public Guid? ExecutionRunnerId { get; set; }
+
+    // Appearance configuration
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
+
+    /// <summary>
+    /// Indicates whether a background image is set (derived from Appearance.BackgroundImageUrl).
+    /// </summary>
+    public bool HasBackgroundImage => !string.IsNullOrEmpty(Appearance?.BackgroundImageUrl);
 }
 
 public class NewApp

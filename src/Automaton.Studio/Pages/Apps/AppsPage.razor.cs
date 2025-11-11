@@ -11,6 +11,7 @@ namespace Automaton.Studio.Pages.Apps;
 partial class AppsPage : ComponentBase
 {
     public bool loading;
+    private bool _isGridView = true;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private AppsViewModel AppsViewModel { get; set; } = default!;
@@ -36,6 +37,11 @@ partial class AppsPage : ComponentBase
         }
 
         await base.OnInitializedAsync();
+    }
+
+    private void ToggleViewMode()
+    {
+        _isGridView = !_isGridView;
     }
 
     private void EditApp(Guid id)
@@ -158,48 +164,106 @@ partial class AppsPage : ComponentBase
         };
     }
 
-    private List<EnhancedEmpty.EmptyActionModel> GetAppSecondaryActions()
+    private async Task ExecuteApp(AppListItem app)
     {
-        return new List<EnhancedEmpty.EmptyActionModel>
+        if (app.IsPublished)
         {
-            new() { Text = "Browse Templates", Icon = "eye", OnClick = () => Task.FromResult(0) }
-        };
+            // Open published app in new tab to avoid disposing the Blazor circuit
+            await JSRuntime.InvokeVoidAsync("open", $"/web/{app.PublicUrl}", "_blank");
+        }
+        else
+        {
+            await MessageService.InfoAsync("This app has not been published yet. Please publish it first to execute.");
+        }
+    }
+
+    private string GetCardBackgroundColor(AppListItem app)
+    {
+        // Only apply background color to the card itself
+        if (!string.IsNullOrEmpty(app.Appearance?.BackgroundColor))
+        {
+            return $"background-color: {app.Appearance.BackgroundColor};";
+        }
+        
+        return "background-color: #ffffff;";
+    }
+
+    private string GetCardBackgroundImage(AppListItem app)
+    {
+        // Apply background image with opacity to the separate background layer
+        var styles = new List<string>();
+        
+        if (!string.IsNullOrEmpty(app.Appearance?.BackgroundImageUrl))
+        {
+            styles.Add($"background-image: url('{app.Appearance.BackgroundImageUrl}')");
+            styles.Add($"background-size: cover");
+            styles.Add($"background-position: center");
+            styles.Add($"opacity: {app.Appearance.BackgroundImageOpacity}");
+        }
+        
+        return string.Join("; ", styles);
+    }
+
+    private string GetTitleStyle(AppListItem app)
+    {
+        var styles = new List<string>();
+        
+        if (!string.IsNullOrEmpty(app.Appearance?.TitleFontColor))
+        {
+            styles.Add($"color: {app.Appearance.TitleFontColor}");
+        }
+        else
+        {
+            styles.Add("color: #ffffff");
+        }
+        
+        return string.Join("; ", styles);
+    }
+
+    private string GetAppDisplayTitle(AppListItem app)
+    {
+        return !string.IsNullOrEmpty(app.DisplayName) ? app.DisplayName : app.Name;
     }
 
     private List<string> GetAppActionCardBullets()
     {
         return new List<string>
         {
-            "HTML, CSS, and JavaScript support",
-            "Connect to existing Flows for backend logic",
-            "Publish apps for public access",
-            "PWA support for mobile deployment"
+            "Create interactive web applications",
+            "Connect to existing Flows",
+            "Publish to public URLs",
+            "Beautiful UI with custom styling"
         };
+    }
+
+    private List<EnhancedEmpty.EmptyActionModel> GetAppSecondaryActions()
+    {
+        return new List<EnhancedEmpty.EmptyActionModel>();
     }
 
     private List<EnhancedEmpty.FeatureCardModel> GetAppFeatureCards()
     {
         return new List<EnhancedEmpty.FeatureCardModel>
         {
-            new()
-            {
-                Title = "Create powerful web applications",
-                Description = "Build web apps using HTML, CSS, and JavaScript. Use the integrated code editor to develop and test your applications.",
-                Icon = "code",
+            new() 
+            { 
+                Title = "Build web apps instantly", 
+                Description = "Create interactive applications with HTML, CSS, and JavaScript without complex infrastructure.", 
+                Icon = "rocket",
                 IconColor = "#1890ff"
             },
-            new()
-            {
-                Title = "Connect to your Flows",
-                Description = "Use your existing Flows as backend services. Your apps can invoke Flows to retrieve data, process information, and more.",
+            new() 
+            { 
+                Title = "Connect to your Flows", 
+                Description = "Execute your automation flows from web applications and get results in real-time.", 
                 Icon = "api",
                 IconColor = "#52c41a"
             },
-            new()
-            {
-                Title = "Publish and share",
-                Description = "Publish your apps with a public URL and share them with users. Apps can be accessed without authentication for external users.",
-                Icon = "share-alt",
+            new() 
+            { 
+                Title = "Publish and share", 
+                Description = "Deploy your apps publicly with simple URLs and optional authentication.", 
+                Icon = "cloud-upload",
                 IconColor = "#fa8c16"
             }
         };
@@ -209,10 +273,10 @@ partial class AppsPage : ComponentBase
     {
         return new List<EnhancedEmpty.HelpLinkModel>
         {
-            new() { Text = "Apps overview", Url = "#", Icon = "appstore", Description = "Learn about creating and managing web apps." },
-            new() { Text = "Building your first app", Url = "#", Icon = "code", Description = "A guide to creating your first web application." },
-            new() { Text = "Connecting to Flows", Url = "#", Icon = "api", Description = "Learn how to connect your apps to Flows." },
-            new() { Text = "Publishing apps", Url = "#", Icon = "cloud-upload", Description = "Guide on publishing and sharing your apps." }
+            new() { Text = "Apps overview", Url = "#", Icon = "file-text", Description = "Learn about building web apps" },
+            new() { Text = "Getting started", Url = "#", Icon = "play-circle", Description = "Your first app in 5 minutes" },
+            new() { Text = "Flow integration", Url = "#", Icon = "link", Description = "Connect apps to your workflows" },
+            new() { Text = "Publishing guide", Url = "#", Icon = "cloud", Description = "Deploy apps publicly" }
         };
     }
 }

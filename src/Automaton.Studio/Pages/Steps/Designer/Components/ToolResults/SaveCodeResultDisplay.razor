@@ -1,0 +1,24 @@
+@using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults
+@using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Processors
+
+@if (!string.IsNullOrEmpty(Result.Summary))
+{
+    <div class="tool-result-summary">
+        @((MarkupString)FormatSummaryForDisplay(Result.Summary))
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] 
+    public ToolResultViewModel Result { get; set; } = default!;
+
+    private string FormatSummaryForDisplay(string summary)
+    {
+        return summary
+            .Replace("**", "<strong>", StringComparison.Ordinal)
+            .Replace("**", "</strong>", StringComparison.Ordinal)
+            .Replace("`", "<code>", StringComparison.Ordinal)
+            .Replace("`", "</code>", StringComparison.Ordinal)
+            .Replace("\n", "<br>", StringComparison.Ordinal);
+    }
+}

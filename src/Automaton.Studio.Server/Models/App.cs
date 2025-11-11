@@ -14,5 +14,9 @@ public class AppModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
+    
+    // Appearance configuration stored as JSON
+    public AppAppearance Appearance { get; set; } = new AppAppearance();
+    
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }

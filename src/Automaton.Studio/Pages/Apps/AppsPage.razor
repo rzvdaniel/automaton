@@ -25,6 +25,14 @@
             <Col Class="right-actions">
                 <Space Class="right-header-items">
                     <SpaceItem>
+                        <Tooltip Title="@(_isGridView ? "Switch to table view" : "Switch to grid view")">
+                            <Button Icon="@(_isGridView ? "unordered-list" : "appstore")" 
+                                    OnClick="@(() => ToggleViewMode())">
+                                @(_isGridView ? "List" : "Grid")
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                    <SpaceItem>
                         <Tooltip Title="Create new app">
                             <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ShowNewAppDialog())">
                                 Create App
@@ -64,108 +72,237 @@
         }
         else
         {
-            <Table TItem="AppListItem" DataSource="@AppsViewModel.Apps" Class="autoscroll-list" Loading="@loading">
-                <Column Title="Name" @bind-Field="@context.Name">
-                    @context.Name
-                </Column>
-
-                <Column Title="Display Name" @bind-Field="@context.DisplayName">
-                    @context.DisplayName
-                </Column>
-
-                <Column Title="Status" @bind-Field="@context.IsPublished">
-                    @if (context.IsPublished)
+            @if (_isGridView)
+            {          
+                <div class="app-grid">
+                    @foreach (var app in @AppsViewModel.Apps)
                     {
-                        <Space Size="@SpaceSize.Small">
-                            <SpaceItem>
-                                <Tag Color="@("green")">Published</Tag>
-                            </SpaceItem>
-                            @if (!context.RequiresAuthentication)
-                            {
-                                <SpaceItem>
-                                    <Tooltip Title="This app is accessible to anyone with the link">
-                                        <Tag Color="@("orange")" Icon="unlock">Public</Tag>
+                        <div class="app-card" style="@GetCardBackgroundColor(app)" @onclick="@(() => ExecuteApp(app))">
+                            <!-- Background image layer with opacity -->
+                            <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
+                            
+                            <!-- Content layer - not affected by background opacity -->
+                            <div class="app-card-content">
+                                <h2 class="app-card-title" style="@GetTitleStyle(app)">
+                                    @GetAppDisplayTitle(app)
+                                </h2>
+                                
+                                @if (!string.IsNullOrEmpty(app.Description))
+                                {
+                                    <Tooltip Title="@app.Description">
+                                        <Icon Type="info-circle" Class="app-card-description-icon" />
                                     </Tooltip>
-                                </SpaceItem>
-                            }
-                            else
-                            {
-                                <SpaceItem>
-                                    <Tooltip Title="This app requires users to be logged in">
-                                        <Tag Color="@("blue")" Icon="lock">Protected</Tag>
-                                    </Tooltip>
-                                </SpaceItem>
-                            }
-                        </Space>
+                                }
+                            </div>
+                        </div>
                     }
-                    else
-                    {
-                        <Tag Color="@("default")">Draft</Tag>
-                    }
-                </Column>
+                </div>
+            }
+            else
+            {
+                <Table TItem="AppListItem" DataSource="@AppsViewModel.Apps" Class="autoscroll-list" Loading="@loading">
+                    <Column Title="Name" @bind-Field="@context.Name">
+                        @context.Name
+                    </Column>
 
-                <Column Title="Created" @bind-Field="@context.Created">
-                    @context.Created.ToString("yyyy-MM-dd HH:mm")
-                </Column>
+                    <Column Title="Display Name" @bind-Field="@context.DisplayName">
+                        @context.DisplayName
+                    </Column>
 
-                <Column Title="Updated" @bind-Field="@context.Updated">
-                    @context.Updated.ToString("yyyy-MM-dd HH:mm")
-                </Column>
-
-                <ActionColumn Title="Action">
-                    <div>
-                        <Space>
-                            <SpaceItem>
-                                <Tooltip Title="Edit app">
-                                    <Button Icon="edit" @onclick="@(() => EditApp(context.Id))">Edit</Button>
-                                </Tooltip>
-                            </SpaceItem>
-                            @if (context.IsPublished)
-                            {
+                    <Column Title="Status" @bind-Field="@context.IsPublished">
+                        @if (context.IsPublished)
+                        {
+                            <Space Size="@SpaceSize.Small">
                                 <SpaceItem>
-                                    <Tooltip Title="View published app">
-                                        <Button Icon="eye" @onclick="@(() => ViewApp(context.PublicUrl))">View</Button>
+                                    <Tag Color="@("green")">Published</Tag>
+                                </SpaceItem>
+                                @if (!context.RequiresAuthentication)
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="This app is accessible to anyone with the link">
+                                            <Tag Color="@("orange")" Icon="unlock">Public</Tag>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                                else
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="This app requires users to be logged in">
+                                            <Tag Color="@("blue")" Icon="lock">Protected</Tag>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                            </Space>
+                        }
+                        else
+                        {
+                            <Tag Color="@("default")">Draft</Tag>
+                        }
+                    </Column>
+
+                    <Column Title="Created" @bind-Field="@context.Created">
+                        @context.Created.ToString("yyyy-MM-dd HH:mm")
+                    </Column>
+
+                    <Column Title="Updated" @bind-Field="@context.Updated">
+                        @context.Updated.ToString("yyyy-MM-dd HH:mm")
+                    </Column>
+
+                    <ActionColumn Title="Action">
+                        <div>
+                            <Space>
+                                <SpaceItem>
+                                    <Tooltip Title="Edit app">
+                                        <Button Icon="edit" @onclick="@(() => EditApp(context.Id))">Edit</Button>
                                     </Tooltip>
                                 </SpaceItem>
-                            }
-                        </Space>
+                                @if (context.IsPublished)
+                                {
+                                    <SpaceItem>
+                                        <Tooltip Title="View published app">
+                                            <Button Icon="eye" @onclick="@(() => ViewApp(context.PublicUrl))">View</Button>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                }
+                            </Space>
 
-                        <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
-                            <Overlay>
-                                <Menu>
-                                    @if (!context.IsPublished)
-                                    {
-                                        <MenuItem Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(context.Id))">
-                                            Publish
-                                        </MenuItem>
-                                    }
-                                    else
-                                    {
-                                        <MenuItem Icon="cloud-download" @onclick="@(() => UnpublishApp(context.Id))">
-                                            Unpublish
-                                        </MenuItem>
-                                    }
-                                    <Popconfirm Title="Sure to delete?"
-                                                OnConfirm="()=> DeleteApp(context.Id)"
-                                                OkText="Yes"
-                                                CancelText="No">
-                                        <MenuItem Icon="delete">                               
-                                            Delete
-                                        </MenuItem>
-                                    </Popconfirm>
-                                </Menu>
-                            </Overlay>
-                            <ChildContent>
-                                <Tooltip Title="More actions">
-                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                        <Icon Type="more" Theme="IconThemeType.Outline" />
-                                    </a>
-                                </Tooltip>
-                            </ChildContent>
-                        </Dropdown>
-                    </div>
-                </ActionColumn>
-            </Table>
+                            <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                                <Overlay>
+                                    <Menu>
+                                        @if (!context.IsPublished)
+                                        {
+                                            <MenuItem Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(context.Id))">
+                                                Publish
+                                            </MenuItem>
+                                        }
+                                        else
+                                        {
+                                            <MenuItem Icon="cloud-download" @onclick="@(() => UnpublishApp(context.Id))">
+                                                Unpublish
+                                            </MenuItem>
+                                        }
+                                        <Popconfirm Title="Sure to delete?"
+                                                    OnConfirm="()=> DeleteApp(context.Id)"
+                                                    OkText="Yes"
+                                                    CancelText="No">
+                                            <MenuItem Icon="delete">                               
+                                                Delete
+                                            </MenuItem>
+                                        </Popconfirm>
+                                    </Menu>
+                                </Overlay>
+                                <ChildContent>
+                                    <Tooltip Title="More actions">
+                                        <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                            <Icon Type="more" Theme="IconThemeType.Outline" />
+                                        </a>
+                                    </Tooltip>
+                                </ChildContent>
+                            </Dropdown>
+                        </div>
+                    </ActionColumn>
+                </Table>
+            }
         }
     </Content>
 </Layout>
+
+<style>
+    .app-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 32px;
+        padding: 24px 0;
+    }
+
+    .app-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+        overflow: hidden;
+        cursor: pointer;
+        min-height: 280px;
+        display: flex;
+        align-items: flex-end;
+        position: relative;
+    }
+
+    .app-card:hover {
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        transform: translateY(-8px);
+    }
+
+    /* Background image layer with independent opacity */
+    .app-card-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-size: cover;
+        background-position: center;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* Gradient overlay on top of background image */
+    .app-card-background::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 100%);
+        pointer-events: none;
+    }
+
+    /* Content layer - not affected by background opacity */
+    .app-card-content {
+        position: relative;
+        z-index: 2;
+        padding: 32px 24px;
+        width: 100%;
+    }
+
+    .app-card-title {
+        margin: 0 0 16px 0;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .app-card-description-icon {
+        font-size: 20px;
+        opacity: 0.9;
+        cursor: help;
+        flex-shrink: 0;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .app-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .app-card-title {
+            font-size: 22px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .app-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .app-card-title {
+            font-size: 20px;
+        }
+    }
+</style>

@@ -35,8 +35,10 @@ packages/
 #Ignore git-related files
 *.orig
 
-#wwwroot
-#wwwroot/
+#wwwroot - ignore app-thumbnails subdirectories but keep README.md
+wwwroot/app-thumbnails/**
+!wwwroot/app-thumbnails/
+!wwwroot/app-thumbnails/README.md
 
 #npm
 node_modules/

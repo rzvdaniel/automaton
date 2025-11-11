@@ -1,17 +1,17 @@
-@using Automaton.App.Account.Account;
-@using Automaton.App.Install.Pages.Register;
-@using Automaton.App.Authentication.Pages.Login;
+@using Automaton.Studio.Pages.Account;
+@using Automaton.Studio.Pages.Install;
+@using Automaton.Studio.Pages.Authentication.Login;
 @using Automaton.Client.Auth.Services;
 @using Automaton.Core.Logs;
 @using Automaton.Studio.Services;
-@using Automaton.Studio.Shared
-@using Automaton.Studio.Pages
-@using Automaton.Studio.Logging
+@using Automaton.Studio.Shared;
+@using Automaton.Studio.Pages;
+@using Automaton.Studio.Logging;
 @using Serilog;
 @using Serilog.Formatting.Json;
 @using Serilog.Sinks.Http.HttpClients;
 
-<Router 
+<Router
     AppAssembly="@this.GetType().Assembly"
         AdditionalAssemblies="new[] { typeof(AccountPage).Assembly, typeof(LoginPage).Assembly, typeof(InstallPage).Assembly }"
         PreferExactMatches="@true">

@@ -1,4 +1,4 @@
-﻿using Automaton.App.Authentication.Services;
+﻿using Automaton.Studio.Pages.Authentication.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Shared;

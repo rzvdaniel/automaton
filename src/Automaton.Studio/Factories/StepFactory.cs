@@ -1,7 +1,7 @@
 ﻿using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Extensions;
-using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
+using Automaton.Studio.Pages.Flows.Designer.Components.StepExplorer;
 using Automaton.Studio.Services;
 using System.Reflection;
 

@@ -1,6 +1,4 @@
-﻿using Automaton.App.Account.Config;
-using Automaton.App.Authentication.Config;
-using Automaton.Client.Auth.Extensions;
+﻿using Automaton.Client.Auth.Extensions;
 using Automaton.Client.Auth.Interfaces;
 using Automaton.Client.Auth.Services;
 using Automaton.Core.Interfaces;
@@ -10,10 +8,6 @@ using Automaton.Studio.Domain;
 using Automaton.Studio.Factories;
 using Automaton.Studio.Pages.AiApiKeys;
 using Automaton.Studio.Pages.ApiKeys;
-using Automaton.Studio.Pages.StepDesigner;
-using Automaton.Studio.Pages.CustomSteps;
-using Automaton.Studio.Pages.FlowDesigner;
-using Automaton.Studio.Pages.FlowDesigner.Components.StepExplorer;
 using Automaton.Studio.Pages.Flows;
 using Automaton.Studio.Pages.Runners;
 using Automaton.Studio.Services;
@@ -34,6 +28,13 @@ using Automaton.Mcp.Client.Extensions;
 using Automaton.Mcp.Client.Services;
 using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Config;
+using Automaton.Studio.Pages.Flows.FlowDesigner;
+using Automaton.Studio.Pages.Flows.Designer.Components.StepExplorer;
+using Automaton.Studio.Pages.Flows.Designer;
+using Automaton.Studio.Pages.Steps.Designer;
+using Automaton.Studio.Pages.Account.Models;
+using Automaton.Studio.Pages.Authentication.Config;
+using Automaton.Studio.Pages.Install.Config;
 
 namespace Automaton.Studio.Extensions;
 
@@ -117,13 +118,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RunnersViewModel>();
         services.AddScoped<ApiKeysViewModel>();
         services.AddScoped<AiApiKeysViewModel>();
-        services.AddScoped<Pages.CustomSteps.CustomStepsViewModel>();
+        services.AddScoped<Pages.Steps.CustomStepsViewModel>();
         services.AddScoped<Pages.Apps.AppsViewModel>();
         services.AddScoped<DesignerViewModel>();
         services.AddScoped<StepViewModel>();
         services.AddScoped<StepsViewModel>();
         services.AddScoped<CoreStepsViewModel>();
-        services.AddScoped<Pages.FlowDesigner.Components.StepExplorer.CustomStepsViewModel>();
+        services.AddScoped<CustomStepsViewModel>();
         services.AddScoped<MainLayoutViewModel>();
         services.AddScoped<FlowActivityViewModel>();
         services.AddScoped<FlowLogsViewModel>();

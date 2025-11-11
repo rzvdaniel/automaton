@@ -1,5 +1,4 @@
 ﻿using Automaton.Core.Enums;
-using Automaton.Studio.Domain;
 
 namespace Automaton.Studio.Pages.Flows;
 
