@@ -1,0 +1,115 @@
+@using Automaton.Studio.Models
+
+<div class="flows-tab">
+    @if (ViewModel.IsResourceManager)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddFlowModal">
+                <Icon Type="plus" />
+                Add Flow to Project
+            </Button>
+        </div>
+    }
+
+    @if (!flowsLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadFlows">
+                <Icon Type="reload" /> Load Flows
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectFlowDto" DataSource="@ViewModel.Flows">
+            <Column Title="Flow Name" TData="string" @bind-Field="@context.FlowName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveFlow(context.FlowId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.Flows.Count == 0)
+        {
+            <Empty Description="No flows in this project yet">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddFlowModal">
+                        Add First Flow
+                    </Button>
+                }
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add Flow Modal -->
+<Modal Title="Add Flow to Project"
+       @bind-Visible="@addFlowModalVisible"
+       OnOk="@HandleAddFlow"
+       OnCancel="@(() => addFlowModalVisible = false)">
+    <FormItem Label="Flow ID">
+        <Input @bind-Value="@selectedFlowId" Placeholder="Enter Flow GUID" />
+    </FormItem>
+    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+        Note: In a production version, this would be a dropdown of available flows.
+    </Paragraph>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+
+    private bool flowsLoaded = false;
+    private bool addFlowModalVisible = false;
+    private string selectedFlowId = string.Empty;
+
+    private async Task LoadFlows()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadFlowsAsync(ViewModel.Project.Id);
+            flowsLoaded = true;
+        }
+    }
+
+    private void ShowAddFlowModal()
+    {
+        selectedFlowId = string.Empty;
+        addFlowModalVisible = true;
+    }
+
+    private async Task HandleAddFlow()
+    {
+        if (ViewModel.Project != null && Guid.TryParse(selectedFlowId, out var flowId))
+        {
+            await ViewModel.AddFlowAsync(ViewModel.Project.Id, flowId);
+            addFlowModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveFlow(Guid flowId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove Flow",
+            Content = "Are you sure you want to remove this flow from the project?",
+            OkText = "Remove",
+            OkType = "danger"
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveFlowAsync(ViewModel.Project.Id, flowId);
+        }
+    }
+
+    [Inject]
+    private IModalService Modal { get; set; } = default!;
+}

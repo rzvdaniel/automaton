@@ -1,0 +1,115 @@
+@using Automaton.Studio.Models
+
+<div class="customsteps-tab">
+    @if (ViewModel.IsResourceManager)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
+                <Icon Type="plus" />
+                Add Custom Step to Project
+            </Button>
+        </div>
+    }
+
+    @if (!stepsLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadSteps">
+                <Icon Type="reload" /> Load Custom Steps
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectCustomStepDto" DataSource="@ViewModel.CustomSteps">
+            <Column Title="Step Name" TData="string" @bind-Field="@context.StepName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveStep(context.CustomStepId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.CustomSteps.Count == 0)
+        {
+            <Empty Description="No custom steps in this project yet">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
+                        Add First Custom Step
+                    </Button>
+                }
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add Custom Step Modal -->
+<Modal Title="Add Custom Step to Project"
+       @bind-Visible="@addStepModalVisible"
+       OnOk="@HandleAddStep"
+       OnCancel="@(() => addStepModalVisible = false)">
+    <FormItem Label="Custom Step ID">
+        <Input @bind-Value="@selectedStepId" Placeholder="Enter Custom Step GUID" />
+    </FormItem>
+    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+        Note: In a production version, this would be a dropdown of available custom steps.
+    </Paragraph>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+
+    private bool stepsLoaded = false;
+    private bool addStepModalVisible = false;
+    private string selectedStepId = string.Empty;
+
+    private async Task LoadSteps()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadCustomStepsAsync(ViewModel.Project.Id);
+            stepsLoaded = true;
+        }
+    }
+
+    private void ShowAddStepModal()
+    {
+        selectedStepId = string.Empty;
+        addStepModalVisible = true;
+    }
+
+    private async Task HandleAddStep()
+    {
+        if (ViewModel.Project != null && Guid.TryParse(selectedStepId, out var stepId))
+        {
+            await ViewModel.AddCustomStepAsync(ViewModel.Project.Id, stepId);
+            addStepModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveStep(Guid stepId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove Custom Step",
+            Content = "Are you sure you want to remove this custom step from the project?",
+            OkText = "Remove",
+            OkType = "danger"
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveCustomStepAsync(ViewModel.Project.Id, stepId);
+        }
+    }
+
+    [Inject]
+    private IModalService Modal { get; set; } = default!;
+}

@@ -1,0 +1,99 @@
+@using Automaton.Studio.Models
+
+<div class="settings-tab">
+    <Card Title="Project Settings" Style="margin-bottom: 24px;">
+        <Form Model="@settingsModel" Layout="@FormLayout.Vertical">
+            <FormItem Label="Display Name">
+                <Input @bind-Value="@settingsModel.DisplayName" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="@settingsModel.Description" Rows="4" />
+            </FormItem>
+            <FormItem>
+                <Button Type="@ButtonType.Primary" OnClick="@HandleUpdateSettings">
+                    Save Changes
+                </Button>
+            </FormItem>
+        </Form>
+    </Card>
+
+    <Card Title="Danger Zone">
+        <Alert Type="@AlertType.Warning" 
+               Message="Warning" 
+               Description="Deleting a project is permanent and cannot be undone. All project data will be lost."
+               Style="margin-bottom: 16px;" 
+               ShowIcon />
+        
+        @if (ViewModel.Project?.IsOwner == true)
+        {
+            <Button Danger OnClick="@ShowDeleteConfirm">
+                <Icon Type="delete" /> Delete Project
+            </Button>
+        }
+        else
+        {
+            <Paragraph Type="@ParagraphType.Secondary">
+                Only the project owner can delete this project.
+            </Paragraph>
+        }
+    </Card>
+</div>
+
+@code {
+    [Parameter]
+    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private IModalService Modal { get; set; } = default!;
+
+    private UpdateProjectRequest settingsModel = new();
+
+    protected override void OnParametersSet()
+    {
+        if (ViewModel.Project != null)
+        {
+            settingsModel = new UpdateProjectRequest
+            {
+                DisplayName = ViewModel.Project.DisplayName,
+                Description = ViewModel.Project.Description
+            };
+        }
+    }
+
+    private async Task HandleUpdateSettings()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.UpdateProjectAsync(ViewModel.Project.Id, settingsModel);
+            
+            // Reload settings model
+            settingsModel = new UpdateProjectRequest
+            {
+                DisplayName = ViewModel.Project.DisplayName,
+                Description = ViewModel.Project.Description
+            };
+        }
+    }
+
+    private async Task ShowDeleteConfirm()
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Delete Project",
+            Content = $"Are you sure you want to delete '{ViewModel.Project?.DisplayName}'? This action cannot be undone.",
+            OkText = "Delete Project",
+            OkType = "danger",
+            CancelText = "Cancel"
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            // Note: Delete functionality would be implemented here
+            // For now, navigate back to projects list
+            NavigationManager.NavigateTo("/projects");
+        }
+    }
+}

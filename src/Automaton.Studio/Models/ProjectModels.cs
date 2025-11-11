@@ -48,6 +48,7 @@ public class ProjectDto
     public int RunnerCount { get; set; }
     public int CustomStepCount { get; set; }
     public ProjectRole? CurrentUserRole { get; set; }
+    public bool IsOwner { get; set; }
 }
 
 public class ProjectListItem
@@ -75,6 +76,7 @@ public class ProjectMemberDto
     public DateTime JoinedAt { get; set; }
     public string? InvitedBy { get; set; }
     public bool IsActive { get; set; }
+    public bool IsOwner { get; set; }
 }
 
 public class ProjectMembershipDto
@@ -93,6 +95,7 @@ public class ProjectAppDto
     public string AppName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
 }
 
 public class ProjectFlowDto
@@ -102,6 +105,7 @@ public class ProjectFlowDto
     public string FlowName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
 }
 
 public class ProjectRunnerDto
@@ -111,6 +115,7 @@ public class ProjectRunnerDto
     public string RunnerName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
 }
 
 public class ProjectCustomStepDto
@@ -120,4 +125,5 @@ public class ProjectCustomStepDto
     public string StepName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
 }

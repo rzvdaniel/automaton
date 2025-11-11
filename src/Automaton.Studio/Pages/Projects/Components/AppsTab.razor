@@ -1,0 +1,115 @@
+@using Automaton.Studio.Models
+
+<div class="apps-tab">
+    @if (ViewModel.IsResourceManager)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
+                <Icon Type="plus" />
+                Add App to Project
+            </Button>
+        </div>
+    }
+
+    @if (!appsLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadApps">
+                <Icon Type="reload" /> Load Apps
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectAppDto" DataSource="@ViewModel.Apps">
+            <Column Title="App Name" TData="string" @bind-Field="@context.AppName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveApp(context.WebAppId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.Apps.Count == 0)
+        {
+            <Empty Description="No apps in this project yet">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
+                        Add First App
+                    </Button>
+                }
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add App Modal -->
+<Modal Title="Add App to Project"
+       @bind-Visible="@addAppModalVisible"
+       OnOk="@HandleAddApp"
+       OnCancel="@(() => addAppModalVisible = false)">
+    <FormItem Label="App ID">
+        <Input @bind-Value="@selectedAppId" Placeholder="Enter App GUID" />
+    </FormItem>
+    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+        Note: In a production version, this would be a dropdown of available apps.
+    </Paragraph>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+
+    private bool appsLoaded = false;
+    private bool addAppModalVisible = false;
+    private string selectedAppId = string.Empty;
+
+    private async Task LoadApps()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadAppsAsync(ViewModel.Project.Id);
+            appsLoaded = true;
+        }
+    }
+
+    private void ShowAddAppModal()
+    {
+        selectedAppId = string.Empty;
+        addAppModalVisible = true;
+    }
+
+    private async Task HandleAddApp()
+    {
+        if (ViewModel.Project != null && Guid.TryParse(selectedAppId, out var appId))
+        {
+            await ViewModel.AddAppAsync(ViewModel.Project.Id, appId);
+            addAppModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveApp(Guid appId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove App",
+            Content = "Are you sure you want to remove this app from the project?",
+            OkText = "Remove",
+            OkType = "danger"
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveAppAsync(ViewModel.Project.Id, appId);
+        }
+    }
+
+    [Inject]
+    private IModalService Modal { get; set; } = default!;
+}

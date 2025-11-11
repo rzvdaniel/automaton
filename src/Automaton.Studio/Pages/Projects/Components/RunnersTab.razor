@@ -1,0 +1,115 @@
+@using Automaton.Studio.Models
+
+<div class="runners-tab">
+    @if (ViewModel.IsResourceManager)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
+                <Icon Type="plus" />
+                Add Runner to Project
+            </Button>
+        </div>
+    }
+
+    @if (!runnersLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadRunners">
+                <Icon Type="reload" /> Load Runners
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectRunnerDto" DataSource="@ViewModel.Runners">
+            <Column Title="Runner Name" TData="string" @bind-Field="@context.RunnerName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveRunner(context.RunnerId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.Runners.Count == 0)
+        {
+            <Empty Description="No runners in this project yet">
+                @if (ViewModel.IsResourceManager)
+                {
+                    <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
+                        Add First Runner
+                    </Button>
+                }
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add Runner Modal -->
+<Modal Title="Add Runner to Project"
+       @bind-Visible="@addRunnerModalVisible"
+       OnOk="@HandleAddRunner"
+       OnCancel="@(() => addRunnerModalVisible = false)">
+    <FormItem Label="Runner ID">
+        <Input @bind-Value="@selectedRunnerId" Placeholder="Enter Runner GUID" />
+    </FormItem>
+    <Paragraph Type="@ParagraphType.Secondary" Style="font-size: 12px;">
+        Note: In a production version, this would be a dropdown of available runners.
+    </Paragraph>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+
+    private bool runnersLoaded = false;
+    private bool addRunnerModalVisible = false;
+    private string selectedRunnerId = string.Empty;
+
+    private async Task LoadRunners()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadRunnersAsync(ViewModel.Project.Id);
+            runnersLoaded = true;
+        }
+    }
+
+    private void ShowAddRunnerModal()
+    {
+        selectedRunnerId = string.Empty;
+        addRunnerModalVisible = true;
+    }
+
+    private async Task HandleAddRunner()
+    {
+        if (ViewModel.Project != null && Guid.TryParse(selectedRunnerId, out var runnerId))
+        {
+            await ViewModel.AddRunnerAsync(ViewModel.Project.Id, runnerId);
+            addRunnerModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveRunner(Guid runnerId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove Runner",
+            Content = "Are you sure you want to remove this runner from the project?",
+            OkText = "Remove",
+            OkType = "danger"
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveRunnerAsync(ViewModel.Project.Id, runnerId);
+        }
+    }
+
+    [Inject]
+    private IModalService Modal { get; set; } = default!;
+}
