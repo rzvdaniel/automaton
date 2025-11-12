@@ -28,7 +28,7 @@
             <ActionColumn Title="Actions">
                 @if (ViewModel.IsResourceManager)
                 {
-                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveStep(context.CustomStepId))">
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveStep(context.StepId))">
                         <Icon Type="delete" /> Remove
                     </Button>
                 }
@@ -57,9 +57,11 @@
        @bind-Visible="@addStepModalVisible"
        OnOk="@HandleAddStep"
        OnCancel="@(() => addStepModalVisible = false)">
-    <FormItem Label="Custom Step ID">
-        <Input @bind-Value="@selectedStepId" Placeholder="Enter Custom Step GUID" />
-    </FormItem>
+    <Form TModel="AddStepModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="Custom Step ID">
+            <Input @bind-Value="@selectedStepId" Placeholder="Enter Custom Step GUID" />
+        </FormItem>
+    </Form>
     <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available custom steps.
     </Text>
@@ -116,4 +118,9 @@
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
+
+    private class AddStepModel
+    {
+        public string StepId { get; set; } = string.Empty;
+    }
 }

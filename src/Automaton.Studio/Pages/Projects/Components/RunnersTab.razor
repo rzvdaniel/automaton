@@ -57,9 +57,11 @@
        @bind-Visible="@addRunnerModalVisible"
        OnOk="@HandleAddRunner"
        OnCancel="@(() => addRunnerModalVisible = false)">
-    <FormItem Label="Runner ID">
-        <Input @bind-Value="@selectedRunnerId" Placeholder="Enter Runner GUID" />
-    </FormItem>
+    <Form TModel="AddRunnerModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="Runner ID">
+            <Input @bind-Value="@selectedRunnerId" Placeholder="Enter Runner GUID" />
+        </FormItem>
+    </Form>
     <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available runners.
     </Text>
@@ -116,4 +118,9 @@
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
+
+    private class AddRunnerModel
+    {
+        public string RunnerId { get; set; } = string.Empty;
+    }
 }

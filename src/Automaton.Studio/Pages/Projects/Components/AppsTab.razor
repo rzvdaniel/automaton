@@ -28,7 +28,7 @@
             <ActionColumn Title="Actions">
                 @if (ViewModel.IsResourceManager)
                 {
-                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveApp(context.WebAppId))">
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveApp(context.AppId))">
                         <Icon Type="delete" /> Remove
                     </Button>
                 }
@@ -57,9 +57,11 @@
        @bind-Visible="@addAppModalVisible"
        OnOk="@HandleAddApp"
        OnCancel="@(() => addAppModalVisible = false)">
-    <FormItem Label="App ID">
-        <Input @bind-Value="@selectedAppId" Placeholder="Enter App GUID" />
-    </FormItem>
+    <Form TModel="AddAppModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="App ID">
+            <Input @bind-Value="@selectedAppId" Placeholder="Enter App GUID" />
+        </FormItem>
+    </Form>
     <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available apps.
     </Text>
@@ -116,4 +118,9 @@
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
+
+    private class AddAppModel
+    {
+        public string AppId { get; set; } = string.Empty;
+    }
 }

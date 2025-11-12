@@ -91,7 +91,7 @@ public class ProjectMembershipDto
 public class ProjectAppDto
 {
     public Guid ProjectId { get; set; }
-    public Guid WebAppId { get; set; }
+    public Guid AppId { get; set; }
     public string AppName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;
@@ -121,7 +121,7 @@ public class ProjectRunnerDto
 public class ProjectCustomStepDto
 {
     public Guid ProjectId { get; set; }
-    public Guid CustomStepId { get; set; }
+    public Guid StepId { get; set; }
     public string StepName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public string AddedBy { get; set; } = string.Empty;

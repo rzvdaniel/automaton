@@ -57,9 +57,11 @@
        @bind-Visible="@addFlowModalVisible"
        OnOk="@HandleAddFlow"
        OnCancel="@(() => addFlowModalVisible = false)">
-    <FormItem Label="Flow ID">
-        <Input @bind-Value="@selectedFlowId" Placeholder="Enter Flow GUID" />
-    </FormItem>
+    <Form TModel="AddFlowModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="Flow ID">
+            <Input @bind-Value="@selectedFlowId" Placeholder="Enter Flow GUID" />
+        </FormItem>
+    </Form>
     <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
         Note: In a production version, this would be a dropdown of available flows.
     </Text>
@@ -116,4 +118,9 @@
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
+
+    private class AddFlowModel
+    {
+        public string FlowId { get; set; } = string.Empty;
+    }
 }
