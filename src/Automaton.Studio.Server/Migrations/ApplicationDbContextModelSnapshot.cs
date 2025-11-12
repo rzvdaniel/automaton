@@ -869,7 +869,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 11, 17, 23, 42, 950, DateTimeKind.Local).AddTicks(4989));
+                        .HasDefaultValue(new DateTime(2025, 11, 12, 10, 4, 54, 535, DateTimeKind.Local).AddTicks(4931));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

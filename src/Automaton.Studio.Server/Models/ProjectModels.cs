@@ -144,8 +144,8 @@ public class ProjectRunnerDto
 public class ProjectCustomStepDto
 {
     public Guid ProjectId { get; set; }
-    public Guid CustomStepId { get; set; }
-    public string CustomStepName { get; set; } = string.Empty;
+    public Guid StepId { get; set; }
+    public string StepName { get; set; } = string.Empty;
     public DateTime AddedAt { get; set; }
     public Guid? AddedBy { get; set; }
     public string AddedByName { get; set; } = string.Empty;

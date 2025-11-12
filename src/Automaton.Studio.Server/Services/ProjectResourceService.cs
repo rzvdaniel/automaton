@@ -435,8 +435,8 @@ public class ProjectResourceService
         return new ProjectCustomStepDto
         {
             ProjectId = projectId,
-            CustomStepId = customStepId,
-            CustomStepName = customStep.Name,
+            StepId = customStepId,
+            StepName = customStep.Name,
             AddedAt = projectCustomStep.AddedAt,
             AddedBy = UserId,
             AddedByName = userContextService.GetUserName()
@@ -490,8 +490,8 @@ public class ProjectResourceService
             .Select(pcs => new ProjectCustomStepDto
             {
                 ProjectId = pcs.ProjectId,
-                CustomStepId = pcs.CustomStepId,
-                CustomStepName = pcs.CustomStep.Name,
+                StepId = pcs.CustomStepId,
+                StepName = pcs.CustomStep.Name,
                 AddedAt = pcs.AddedAt,
                 AddedBy = pcs.AddedBy,
                 AddedByName = pcs.AddedByUser != null ? pcs.AddedByUser.UserName ?? string.Empty : string.Empty
