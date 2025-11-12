@@ -1,0 +1,106 @@
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@inject DashboardContextService DashboardContext
+@inject NavigationManager NavigationManager
+
+<PageHeader Title="My Apps" Subtitle="Your assigned applications">
+    <Extra>
+        <Text Type="@TextElementType.Secondary">
+            @DashboardContext.ProjectApps.Count @(DashboardContext.ProjectApps.Count == 1 ? "app" : "apps") available
+        </Text>
+    </Extra>
+</PageHeader>
+
+@if (DashboardContext.IsLoading)
+{
+    <div class="loading-container">
+        <Spin Size="large" />
+        <p>Loading your apps...</p>
+    </div>
+}
+else if (!DashboardContext.ProjectApps.Any())
+{
+    <Empty Description="No apps assigned">
+        <ChildContent>
+            <p>You don't have any apps assigned yet.</p>
+            <p>Contact your project administrator to get access to apps.</p>
+        </ChildContent>
+    </Empty>
+}
+else
+{
+    <div class="app-portal-grid">
+        <Row Gutter="(16, 16)">
+            @foreach (var app in DashboardContext.ProjectApps)
+            {
+                <Col Xs="24" Sm="12" Md="8" Lg="6">
+                    <Card Hoverable="true" 
+                          Class="app-card"
+                          OnClick="@(() => LaunchApp(app.WebAppId))">
+                        <Body>
+                            <div class="app-card-icon">
+                                <Icon Type="appstore" Theme="outline" Style="font-size: 48px; color: #1890ff;" />
+                            </div>
+                            <Title Level="4" Style="margin-top: 16px; margin-bottom: 8px;">@app.AppName</Title>
+                            @if (!string.IsNullOrEmpty(app.Description))
+                            {
+                                <Paragraph Ellipsis="@(new EllipsisConfig { Rows = 2 })">
+                                    @app.Description
+                                </Paragraph>
+                            }
+                            <div class="app-card-actions">
+                                <Button Type="@ButtonType.Primary" Block="true" Icon="@IconType.Outline.PlayCircle">
+                                    Launch
+                                </Button>
+                            </div>
+                        </Body>
+                    </Card>
+                </Col>
+            }
+        </Row>
+    </div>
+}
+
+<style>
+    .loading-container {
+        text-align: center;
+        padding: 80px 0;
+    }
+
+    .loading-container p {
+        margin-top: 16px;
+        color: rgba(0, 0, 0, 0.45);
+    }
+
+    .app-portal-grid {
+        padding: 24px 0;
+    }
+
+    .app-card {
+        height: 100%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .app-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-4px);
+    }
+
+    .app-card-icon {
+        text-align: center;
+        padding: 24px 0 8px;
+    }
+
+    .app-card-actions {
+        margin-top: 16px;
+    }
+</style>
+
+@code {
+    private void LaunchApp(Guid appId)
+    {
+        // Navigate to the app execution page
+        NavigationManager.NavigateTo($"/appdesigner/{appId}");
+    }
+}

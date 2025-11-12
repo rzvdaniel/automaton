@@ -114,6 +114,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ProjectMembersClientService>();
         services.AddScoped<ProjectResourcesClientService>();
         services.AddScoped<ProjectContextService>();
+        services.AddScoped<DashboardContextService>();
 
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
