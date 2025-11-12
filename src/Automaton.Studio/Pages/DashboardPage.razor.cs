@@ -1,6 +1,7 @@
 ﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Automaton.Core.Enums;
+using Automaton.Studio.Enums;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages
@@ -16,10 +17,14 @@ namespace Automaton.Studio.Pages
         private IEnumerable<FlowInfo>? recentFlows;
         private int activityCount = 10;
         private int executionCount = 15;
+        private ProjectRole? currentUserRole;
+        private bool isInProjectContext;
 
         [Inject] NavigationManager NavigationManager { get; set; }
         [Inject] OnboardingService OnboardingService { get; set; }
         [Inject] DashboardService DashboardService { get; set; }
+        [Inject] ProjectContextService ProjectContextService { get; set; }
+        [Inject] DashboardContextService DashboardContextService { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
@@ -32,8 +37,41 @@ namespace Automaton.Studio.Pages
                 shouldShowOnboarding = false;
             }
 
+            // Detect user role in current project
+            await DetectUserRoleAsync();
+
+            // Load dashboard context for role-based data
+            await DashboardContextService.LoadDashboardDataAsync();
+
             // Load dashboard data
             await LoadDashboardData();
+        }
+
+        private async Task DetectUserRoleAsync()
+        {
+            try
+            {
+                var currentProject = ProjectContextService.CurrentProject;
+                isInProjectContext = currentProject != null;
+
+                if (isInProjectContext)
+                {
+                    currentUserRole = currentProject!.CurrentUserRole;
+                    Console.WriteLine($"User role in project: {currentUserRole}");
+                }
+                else
+                {
+                    // Personal workspace - user is a creator/developer
+                    currentUserRole = null;
+                    Console.WriteLine("User in personal workspace");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error detecting user role: {ex.Message}");
+                currentUserRole = null;
+                isInProjectContext = false;
+            }
         }
 
         private async Task LoadDashboardData()

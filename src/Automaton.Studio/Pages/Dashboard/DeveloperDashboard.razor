@@ -1,0 +1,349 @@
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@inject ProjectContextService ProjectContext
+@inject DashboardService DashboardService
+@inject NavigationManager Navigation
+
+<div class="developer-dashboard">
+    <!-- Welcome Header -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <Icon Type="code" Style="font-size: 48px; color: white;" />
+            </div>
+            <div class="header-text">
+                <Title Level="1" Style="margin-bottom: 8px; color: white;">
+                    @if (ProjectContext.IsInProjectContext())
+                    {
+                        @($"Project: {ProjectContext.CurrentProject?.DisplayName}")
+                    }
+                    else
+                    {
+                        @("Developer Dashboard")
+                    }
+                </Title>
+                <Paragraph Style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 0;">
+                    Build, manage, and deploy your automation workflows
+                </Paragraph>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions Section -->
+    <div class="section">
+        <Title Level="3" Style="margin-bottom: 24px;">Quick Actions</Title>
+        <Row Gutter="(16, 16)">
+            <Col Xs="24" Sm="12" Md="8">
+                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/apps"))">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);">
+                        <Icon Type="appstore" Style="font-size: 32px; color: white;" />
+                    </div>
+                    <Title Level="4">Create App</Title>
+                    <Paragraph Type="@TextElementType.Secondary">
+                        Build a new web application
+                    </Paragraph>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="8">
+                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/flows"))">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);">
+                        <Icon Type="profile" Style="font-size: 32px, color: white;" />
+                    </div>
+                    <Title Level="4">Create Flow</Title>
+                    <Paragraph Type="@TextElementType.Secondary">
+                        Design an automation workflow
+                    </Paragraph>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="8">
+                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/customsteps"))">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);">
+                        <Icon Type="experiment" Style="font-size: 32px; color: white;" />
+                    </div>
+                    <Title Level="4">Create Custom Step</Title>
+                    <Paragraph Type="@TextElementType.Secondary">
+                        Build reusable automation steps
+                    </Paragraph>
+                </Card>
+            </Col>
+        </Row>
+    </div>
+
+    <!-- Project Statistics -->
+    @if (dashboardStats != null)
+    {
+        @* <div class="section">
+            <Title Level="3" Style="margin-bottom: 24px;">
+                @if (ProjectContext.IsInProjectContext())
+                {
+                    @("Project Statistics")
+                }
+                else
+                {
+                    @("Your Statistics")
+                }
+            </Title>
+            <Row Gutter="(16, 16)">
+                <Col Xs="24" Sm="12" Md="6">
+                    <Card Class="stat-card">
+                        <Statistic Title="Total Flows"
+                                  Value="@dashboardStats.TotalFlows"
+                                  Prefix="@flowIcon" />
+                    </Card>
+                </Col>
+                <Col Xs="24" Sm="12" Md="6">
+                    <Card Class="stat-card">
+                        <Statistic Title="Online Runners"
+                                  Value="@($"{dashboardStats.OnlineRunners}/{dashboardStats.TotalRunners}")"
+                                  Prefix="@runnerIcon" />
+                    </Card>
+                </Col>
+                <Col Xs="24" Sm="12" Md="6">
+                    <Card Class="stat-card">
+                        <Statistic Title="Success Rate"
+                                  Value="@dashboardStats.SuccessRate"
+                                  Suffix="%"
+                                  Prefix="@successIcon" />
+                    </Card>
+                </Col>
+                <Col Xs="24" Sm="12" Md="6">
+                    <Card Class="stat-card">
+                        <Statistic Title="Recent Executions"
+                                  Value="@dashboardStats.RecentExecutions"
+                                  Prefix="@executionIcon" />
+                    </Card>
+                </Col>
+            </Row>
+        </div> *@
+    }
+
+    <!-- Recent Activity Links -->
+    <div class="section">
+        <Title Level="3" Style="margin-bottom: 24px;">Development Tools</Title>
+        <Row Gutter="(16, 16)">
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/apps"))">
+                    <div class="tool-icon">
+                        <Icon Type="appstore" Style="font-size: 24px; color: #1890ff;" />
+                    </div>
+                    <Title Level="5">Apps</Title>
+                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                        Manage web applications
+                    </Paragraph>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/flows"))">
+                    <div class="tool-icon">
+                        <Icon Type="profile" Style="font-size: 24px; color: #52c41a;" />
+                    </div>
+                    <Title Level="5">Flows</Title>
+                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                        Manage automation flows
+                    </Paragraph>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/runners"))">
+                    <div class="tool-icon">
+                        <Icon Type="play-square" Style="font-size: 24px; color: #722ed1;" />
+                    </div>
+                    <Title Level="5">Runners</Title>
+                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                        Manage execution runners
+                    </Paragraph>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/customsteps"))">
+                    <div class="tool-icon">
+                        <Icon Type="experiment" Style="font-size: 24px; color: #fa8c16;" />
+                    </div>
+                    <Title Level="5">Custom Steps</Title>
+                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                        Manage custom steps
+                    </Paragraph>
+                </Card>
+            </Col>
+        </Row>
+    </div>
+
+    @if (ProjectContext.IsInProjectContext() && projectRole == Automaton.Studio.Enums.ProjectRole.ProjectAdmin)
+    {
+        <!-- Project Admin Tools -->
+        @* <div class="section">
+            <Title Level="3" Style="margin-bottom: 24px;">Project Administration</Title>
+            <Row Gutter="(16, 16)">
+                <Col Xs="24" Sm="12">
+                    <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects/settings/{ProjectContext.GetCurrentProjectId()}"))">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div class="tool-icon">
+                                <Icon Type="team" Style="font-size: 24px; color: #1890ff;" />
+                            </div>
+                            <div>
+                                <Title Level="5" Style="margin-bottom: 4px;">Manage Members</Title>
+                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                    Add or remove project members
+                                </Paragraph>
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+                <Col Xs="24" Sm="12">
+                    <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects/settings/{ProjectContext.GetCurrentProjectId()}"))">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div class="tool-icon">
+                                <Icon Type="setting" Style="font-size: 24px; color: #722ed1;" />
+                            </div>
+                            <div>
+                                <Title Level="5" Style="margin-bottom: 4px;">Project Settings</Title>
+                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                    Configure project details
+                                </Paragraph>
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+            </Row>
+        </div> *@
+    }
+</div>
+
+@code {
+    private DashboardStats? dashboardStats;
+    private Automaton.Studio.Enums.ProjectRole? projectRole;
+
+    private RenderFragment flowIcon = @<Icon Type="profile" Style="color: #1890ff;" />;
+    private RenderFragment runnerIcon = @<Icon Type="play-square" Style="color: #52c41a;" />;
+    private RenderFragment successIcon = @<Icon Type="check-circle" Style="color: #52c41a;" />;
+    private RenderFragment executionIcon = @<Icon Type="bar-chart" Style="color: #722ed1;" />;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load dashboard stats
+        dashboardStats = await DashboardService.GetDashboardStatsAsync();
+
+        // Get current project role
+        if (ProjectContext.IsInProjectContext())
+        {
+            projectRole = ProjectContext.CurrentProject?.CurrentUserRole;
+        }
+    }
+}
+
+<style>
+    .developer-dashboard {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+        border-radius: 12px;
+        padding: 48px 40px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 12px rgba(82, 196, 26, 0.2);
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+    }
+
+    .header-text {
+        flex: 1;
+    }
+
+    .section {
+        margin-bottom: 48px;
+    }
+
+    .action-card {
+        text-align: center;
+        padding: 32px 24px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+
+    .action-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .action-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .tool-card {
+        padding: 20px;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+
+    .tool-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .tool-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0f2f5;
+        margin: 0 auto 12px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-header {
+            padding: 32px 24px;
+        }
+
+        .header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .section {
+            margin-bottom: 32px;
+        }
+    }
+</style>

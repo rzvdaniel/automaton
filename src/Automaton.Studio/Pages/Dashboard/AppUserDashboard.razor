@@ -1,0 +1,350 @@
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@inject DashboardContextService DashboardContext
+@inject NavigationManager Navigation
+@inject AppsService AppsService
+
+<div class="app-user-dashboard">
+    <!-- Welcome Header -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <div class="header-icon">
+                <Icon Type="appstore" Style="font-size: 48px; color: white;" />
+            </div>
+            <div class="header-text">
+                <Title Level="1" Style="margin-bottom: 8px; color: white;">My Applications</Title>
+                <Paragraph Style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 0;">
+                    Access your project applications below
+                </Paragraph>
+            </div>
+        </div>
+    </div>
+
+    @if (DashboardContext.IsLoading)
+    {
+        <div class="loading-container">
+            <Spin Size="SpinSize.Large" />
+        </div>
+    }
+    else if (!DashboardContext.ProjectApps.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-content">
+                <div class="empty-icon">
+                    <Icon Type="appstore" Style="font-size: 72px; color: #d9d9d9;" />
+                </div>
+                <Title Level="3" Style="color: #8c8c8c;">No Applications Available</Title>
+                <Paragraph Style="color: #8c8c8c; margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
+                    There are no applications in this project yet. Contact your project administrator to add applications.
+                </Paragraph>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Search and Filter Bar -->
+        @* <div class="filter-bar">
+            <Input Placeholder="Search applications..."
+                   Prefix="@searchIcon"
+                   @bind-Value="searchText"
+                   @bind-Value:event="oninput"
+                   Size="@InputSize.Large"
+                   Style="max-width: 500px;" />
+        </div> *@
+
+        <!-- Apps Grid -->
+        <div class="apps-grid">
+            @foreach (var app in FilteredApps)
+            {
+                <div class="app-card" @onclick="@(() => OpenApp(app))">
+                    <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
+                    <div class="app-card-content">
+                        <div class="app-icon">
+                            <Icon Type="appstore" Style="font-size: 32px; color: #1890ff;" />
+                        </div>
+                        <h3 class="app-name">@app.AppName</h3>
+                        <Button Type="@ButtonType.Primary"
+                                Size="@ButtonSize.Large"
+                                Block
+                                Icon="arrow-right"
+                                Class="launch-button">
+                            Open App
+                        </Button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string searchText = string.Empty;
+    private List<AppModel>? fullAppDetails;
+    private RenderFragment searchIcon = @<Icon Type="search" />;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DashboardContext.OnDashboardDataChanged += StateHasChanged;
+        await LoadAppDetails();
+    }
+
+    private async Task LoadAppDetails()
+    {
+        try
+        {
+            // Load full app details for each project app
+            fullAppDetails = new List<AppModel>();
+            foreach (var projectApp in DashboardContext.ProjectApps)
+            {
+                try
+                {
+                    var appDetail = await AppsService.Load(projectApp.AppId);
+                    fullAppDetails.Add(appDetail);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading app {projectApp.AppId}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading app details: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<ProjectAppDto> FilteredApps
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return DashboardContext.ProjectApps;
+            }
+
+            return DashboardContext.ProjectApps.Where(app =>
+                app.AppName.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private async Task OpenApp(ProjectAppDto app)
+    {
+        // Try to find the app in full details to get the public URL
+        var appDetail = fullAppDetails?.FirstOrDefault(a => a.Id == app.AppId);
+
+        if (appDetail != null && appDetail.IsPublished && !string.IsNullOrEmpty(appDetail.PublicUrl))
+        {
+            // Navigate to published app
+            Navigation.NavigateTo($"/web/{appDetail.PublicUrl}", forceLoad: false);
+        }
+        else
+        {
+            // Navigate to app designer (fallback)
+            Navigation.NavigateTo($"/appdesigner/{app.AppId}");
+        }
+    }
+
+    private string GetCardBackgroundImage(ProjectAppDto app)
+    {
+        var appDetail = fullAppDetails?.FirstOrDefault(a => a.Id == app.AppId);
+
+        if (appDetail != null && !string.IsNullOrEmpty(appDetail.Appearance?.BackgroundImageUrl))
+        {
+            return $"background-image: url('{appDetail.Appearance.BackgroundImageUrl}'); opacity: {appDetail.Appearance.BackgroundImageOpacity};";
+        }
+
+        // Default gradient background
+        var hash = Math.Abs(app.AppId.GetHashCode());
+        var colors = new[]
+        {
+            "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+            "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+            "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+            "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+            "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
+            "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
+            "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)"
+        };
+
+        var gradient = colors[hash % colors.Length];
+        return $"background: {gradient}; opacity: 0.15;";
+    }
+
+    public void Dispose()
+    {
+        DashboardContext.OnDashboardDataChanged -= StateHasChanged;
+    }
+}
+
+<style>
+    .app-user-dashboard {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+        border-radius: 12px;
+        padding: 48px 40px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+    }
+
+    .header-text {
+        flex: 1;
+    }
+
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+
+    .empty-state {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        background: white;
+        border-radius: 12px;
+        padding: 48px;
+    }
+
+    .empty-content {
+        text-align: center;
+        max-width: 600px;
+    }
+
+    .empty-icon {
+        margin-bottom: 24px;
+    }
+
+    .filter-bar {
+        margin-bottom: 32px;
+        display: flex;
+        justify-content: center;
+    }
+
+    .apps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 24px;
+        padding-bottom: 40px;
+    }
+
+    .app-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+        overflow: hidden;
+        cursor: pointer;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    .app-card:hover {
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+        transform: translateY(-8px);
+    }
+
+    .app-card-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-size: cover;
+        background-position: center;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .app-card-content {
+        position: relative;
+        z-index: 1;
+        padding: 32px 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        height: 100%;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 1) 60%);
+    }
+
+    .app-icon {
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+        border-radius: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+    }
+
+    .app-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #262626;
+        margin: 0 0 auto 0;
+        line-height: 1.4;
+    }
+
+    .launch-button {
+        margin-top: 24px;
+        font-weight: 600;
+        height: 48px;
+        font-size: 16px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-header {
+            padding: 32px 24px;
+        }
+
+        .header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .apps-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .app-card {
+            min-height: 280px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .apps-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

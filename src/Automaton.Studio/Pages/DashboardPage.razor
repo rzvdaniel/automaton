@@ -3,6 +3,8 @@
 @using Automaton.Studio.Services
 @using Automaton.Studio.Models
 @using Automaton.Core.Enums
+@using Automaton.Studio.Enums
+@using Automaton.Studio.Pages.Dashboard;
 
 <Layout>
     <Header Class="header">
@@ -37,8 +39,26 @@
     </Header>
 
     <Content Class="content-padding home-content content-background">
-        <div class="home-container">
-            <!-- Header Section -->
+        @if (isInProjectContext && currentUserRole.HasValue)
+        {
+            @if (currentUserRole == ProjectRole.AppUser)
+            {
+                <AppUserDashboard />
+            }
+            else if (currentUserRole == ProjectRole.Viewer)
+            {
+                <ViewerDashboard />
+            }
+            else if (currentUserRole == ProjectRole.Developer || currentUserRole == ProjectRole.ProjectAdmin)
+            {
+                <DeveloperDashboard />
+            }
+        }
+        else
+        {
+            <!-- Default dashboard for personal workspace -->
+             <div class="home-container">
+             <!-- Header Section -->
             <div class="home-header">
                 <div class="home-header-content">
                     <div class="home-header-icon">
@@ -107,8 +127,8 @@
             }
 
             <!-- Main Content Tabs -->
-            <Tabs DefaultActiveKey="resources" Class="home-tabs">
-                <TabPane Key="resources" Tab="Resources">
+             <Tabs DefaultActiveKey="resources" Class="home-tabs">
+                @*<TabPane Key="resources" Tab="Resources">
                     <div class="resources-content">
                         <!-- Quick Start Section -->
                         <div class="section">
@@ -205,7 +225,7 @@
                             </Row>
                         </div>
                     </div>
-                </TabPane>
+                </TabPane> *@
 
                 <TabPane Key="recent-flows" Tab="Recent Flows">
                     <div class="flows-content">
@@ -484,7 +504,8 @@
                     </div>
                 </TabPane>
             </Tabs>
-        </div>
+            </div>
+        }
     </Content>
 </Layout>
 
