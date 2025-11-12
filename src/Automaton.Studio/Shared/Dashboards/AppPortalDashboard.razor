@@ -14,13 +14,13 @@
 @if (DashboardContext.IsLoading)
 {
     <div class="loading-container">
-        <Spin Size="large" />
+        <Spin Size="SpinSize.Large" />
         <p>Loading your apps...</p>
     </div>
 }
 else if (!DashboardContext.ProjectApps.Any())
 {
-    <Empty Description="No apps assigned">
+    <Empty Description="@string.Empty">
         <ChildContent>
             <p>You don't have any apps assigned yet.</p>
             <p>Contact your project administrator to get access to apps.</p>
@@ -36,18 +36,18 @@ else
                 <Col Xs="24" Sm="12" Md="8" Lg="6">
                     <Card Hoverable="true" 
                           Class="app-card"
-                          OnClick="@(() => LaunchApp(app.WebAppId))">
+                          OnClick="@(() => LaunchApp(app.AppId))">
                         <Body>
                             <div class="app-card-icon">
-                                <Icon Type="appstore" Theme="outline" Style="font-size: 48px; color: #1890ff;" />
+                                <Icon Type="appstore" Theme="IconThemeType.Outline" Style="font-size: 48px; color: #1890ff;" />
                             </div>
                             <Title Level="4" Style="margin-top: 16px; margin-bottom: 8px;">@app.AppName</Title>
-                            @if (!string.IsNullOrEmpty(app.Description))
+                            @* @if (!string.IsNullOrEmpty(app.Description))
                             {
                                 <Paragraph Ellipsis="@(new EllipsisConfig { Rows = 2 })">
                                     @app.Description
                                 </Paragraph>
-                            }
+                            } *@
                             <div class="app-card-actions">
                                 <Button Type="@ButtonType.Primary" Block="true" Icon="@IconType.Outline.PlayCircle">
                                     Launch

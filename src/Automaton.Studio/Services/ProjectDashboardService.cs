@@ -1,5 +1,5 @@
+using Automaton.Studio.Enums;
 using Automaton.Studio.Models;
-using Automaton.Studio.Services.ClientServices;
 
 namespace Automaton.Studio.Services;
 
@@ -107,7 +107,7 @@ public class ProjectDashboardService
         {
             if (_projectContext.GetCurrentProjectId() is Guid projectId)
             {
-                ProjectApps = await _projectResources.ListAppsAsync(projectId);
+                ProjectApps = [.. await _projectResources.ListAppsAsync(projectId)];
                 _logger.Information("Loaded {Count} project apps for AppUser", ProjectApps.Count);
             }
         }

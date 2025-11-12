@@ -58,7 +58,7 @@ public class DashboardContextService
                 if (IsAppUser)
                 {
                     var projectId = _projectContext.GetCurrentProjectId()!.Value;
-                    ProjectApps = await _projectResources.ListAppsAsync(projectId);
+                    ProjectApps = [.. await _projectResources.ListAppsAsync(projectId)];
                     _logger.Information("Loaded {Count} project apps for AppUser", ProjectApps.Count);
                 }
                 else
