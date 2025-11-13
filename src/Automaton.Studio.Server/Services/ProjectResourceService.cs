@@ -16,18 +16,21 @@ public class ProjectResourceService
     private readonly UserContextService userContextService;
     private readonly ProjectService projectService;
     private readonly Serilog.ILogger logger;
+    private readonly ProjectAuditService auditService;
 
     private Guid UserId => userContextService.GetUserId();
 
     public ProjectResourceService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        ProjectService projectService)
+        ProjectService projectService,
+        ProjectAuditService auditService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
         this.projectService = projectService;
         this.logger = Serilog.Log.ForContext<ProjectResourceService>();
+        this.auditService = auditService;
     }
 
     #region Apps
@@ -41,6 +44,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add app to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, appId, UserId, cancellationToken);
             return null;
         }
 
@@ -80,6 +84,8 @@ public class ProjectResourceService
 
         logger.Information("Added app {AppId} to project {ProjectId} by user {UserId}", appId, projectId, UserId);
 
+        await auditService.LogResourceLinkedAsync(projectId, appId, "App", cancellationToken);
+
         return new ProjectAppDto
         {
             ProjectId = projectId,
@@ -99,6 +105,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove app from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, appId, UserId, cancellationToken);
             return false;
         }
 
@@ -123,6 +130,10 @@ public class ProjectResourceService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("Removed app {AppId} from project {ProjectId} by user {UserId}", appId, projectId, UserId);
+
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, appId, "AppRemoved", cancellationToken);
+
         return true;
     }
 
@@ -172,6 +183,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add flow to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, flowId, UserId, cancellationToken);
             return null;
         }
 
@@ -204,6 +216,8 @@ public class ProjectResourceService
 
         logger.Information("Added flow {FlowId} to project {ProjectId} by user {UserId}", flowId, projectId, UserId);
 
+        await auditService.LogResourceLinkedAsync(projectId, flowId, "Flow", cancellationToken);
+
         return new ProjectFlowDto
         {
             ProjectId = projectId,
@@ -223,6 +237,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove flow from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, flowId, UserId, cancellationToken);
             return false;
         }
 
@@ -238,6 +253,8 @@ public class ProjectResourceService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("Removed flow {FlowId} from project {ProjectId} by user {UserId}", flowId, projectId, UserId);
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, flowId, "FlowRemoved", cancellationToken);
         return true;
     }
 
@@ -286,6 +303,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add runner to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, runnerId, UserId, cancellationToken);
             return null;
         }
 
@@ -318,6 +336,8 @@ public class ProjectResourceService
 
         logger.Information("Added runner {RunnerId} to project {ProjectId} by user {UserId}", runnerId, projectId, UserId);
 
+        await auditService.LogResourceLinkedAsync(projectId, runnerId, "Runner", cancellationToken);
+
         return new ProjectRunnerDto
         {
             ProjectId = projectId,
@@ -337,6 +357,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove runner from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, runnerId, UserId, cancellationToken);
             return false;
         }
 
@@ -352,6 +373,8 @@ public class ProjectResourceService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("Removed runner {RunnerId} from project {ProjectId} by user {UserId}", runnerId, projectId, UserId);
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, runnerId, "RunnerRemoved", cancellationToken);
         return true;
     }
 
@@ -400,6 +423,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to add custom step to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, customStepId, UserId, cancellationToken);
             return null;
         }
 
@@ -432,6 +456,8 @@ public class ProjectResourceService
 
         logger.Information("Added custom step {CustomStepId} to project {ProjectId} by user {UserId}", customStepId, projectId, UserId);
 
+        await auditService.LogResourceLinkedAsync(projectId, customStepId, "CustomStep", cancellationToken);
+
         return new ProjectCustomStepDto
         {
             ProjectId = projectId,
@@ -451,6 +477,7 @@ public class ProjectResourceService
         if (!await CanManageResourcesAsync(projectId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to remove custom step from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, customStepId, UserId, cancellationToken);
             return false;
         }
 
@@ -466,6 +493,9 @@ public class ProjectResourceService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("Removed custom step {CustomStepId} from project {ProjectId} by user {UserId}", customStepId, projectId, UserId);
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, customStepId, "CustomStepRemoved", cancellationToken);
+
         return true;
     }
 

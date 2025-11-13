@@ -26,6 +26,7 @@ using System.Transactions;
 using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.AiCodeGeneration;
+using Automaton.Studio.Server.Services;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -226,6 +227,7 @@ services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
 services.AddScoped<ProjectResourceService>();
 services.AddScoped<InvitationTokenService>();
+services.AddScoped<ProjectAuditService>();
 
 // Project authorization handlers
 services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectMemberHandler>();
