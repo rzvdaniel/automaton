@@ -14,6 +14,7 @@ public class FlowsService
     private readonly RunnerService runnerService;
     private readonly ScheduleService scheduleService;
     private readonly RecentActivityService recentActivityService;
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -23,22 +24,26 @@ public class FlowsService
         RunnerService runnerService,
         ScheduleService scheduleService,
         RecentActivityService recentActivityService,
-        UserContextService userContextService
+        UserContextService userContextService,
+        ResourceAuthorizationService authorizationService
     )
     {
         this.dbContext = dbContext;
         this.runnerService = runnerService;
         this.scheduleService = scheduleService;
         this.recentActivityService = recentActivityService;
+        this.authorizationService = authorizationService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<FlowsService>();
     }
 
     public IEnumerable<FlowInfo> List()
     {
+        // Use authorization service to get accessible flows (personal + project-based)
+        var accessibleFlows = authorizationService.GetAccessibleFlowsQuery();
+
         var flows =
-            from m in dbContext.Flows
-                .Where(m => m.FlowUsers.Any(x => x.UserId == userId))
+            from m in accessibleFlows
                 .Include(m => m.FlowUsers)
             from s in dbContext.FlowExecutions
                 .Where(s => m.Id == s.FlowId)
@@ -61,7 +66,9 @@ public class FlowsService
 
     public Flow Get(Guid id)
     {
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id && x.FlowUsers.Any(x => x.UserId == userId));
+        // Use authorization service query to check access (personal + project-based)
+        var entity = authorizationService.GetAccessibleFlowsQuery()
+            .SingleOrDefault(x => x.Id == id);
 
         var flow = DeserializeFlow(entity.Body);
 
@@ -103,7 +110,18 @@ public class FlowsService
 
     public async Task Update(Guid id, Flow flow)
     {
-        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id && x.FlowUsers.Any(x => x.UserId == userId));
+        // Check if user can update this flow (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateFlowAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
+        }
+
+        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"Flow {id} not found");
+        }
 
         entity.Name = flow.Name;
         entity.Body = JsonSerializer.Serialize(flow);
@@ -117,7 +135,28 @@ public class FlowsService
 
     public async Task Remove(Guid id)
     {
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == id && x.FlowUsers.Any(x => x.UserId == userId));
+        // Check if user can delete this flow (must be personal owner AND not part of any project)
+        if (!await authorizationService.CanDeleteFlowAsync(id))
+        {
+            // Check if it's because the flow is part of a project
+            var isPartOfProject = await dbContext.ProjectFlows
+                .AnyAsync(pf => pf.FlowId == id);
+
+            if (isPartOfProject)
+            {
+                throw new InvalidOperationException($"Cannot delete flow {id} because it is part of one or more projects. Remove it from all projects first.");
+            }
+
+            throw new UnauthorizedAccessException($"You do not have permission to delete flow {id}");
+        }
+
+        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+
+        if (flow == null)
+        {
+            throw new InvalidOperationException($"Flow {id} not found");
+        }
+
         var flowName = flow.Name;
 
         dbContext.Flows.Remove(flow);
@@ -142,27 +181,32 @@ public class FlowsService
     /// <returns>Flow ID if found, null otherwise</returns>
     public async Task<Guid?> ResolveFlowNameToId(string flowName, CancellationToken cancellationToken = default)
     {
-        var flow = await dbContext.Flows
-            .Include(f => f.FlowUsers)
-            .FirstOrDefaultAsync(f =>
-                f.Name == flowName &&
-                f.FlowUsers.Any(u => u.UserId == userId),
-                cancellationToken);
+        // Use authorization service query to check access (personal + project-based)
+        var flow = await authorizationService.GetAccessibleFlowsQuery()
+            .FirstOrDefaultAsync(f => f.Name == flowName, cancellationToken);
 
         return flow?.Id;
     }
 
     public async Task<IEnumerable<RunnerFlowResult>> Execute(Guid flowId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
-        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId && x.FlowUsers.Any(x => x.UserId == userId));
+        // Check if user can execute this flow (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanExecuteFlowAsync(flowId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to execute flow {flowId}");
+        }
+
+        var flow = dbContext.Flows.SingleOrDefault(x => x.Id == flowId);
+
+        if (flow == null)
+        {
+            throw new InvalidOperationException($"Flow {flowId} not found");
+        }
         
         var result = await runnerService.ExecuteFlow(flowId, runnerIds, cancellationToken);
 
         // Log activity
-        if (flow != null)
-        {
-            await recentActivityService.LogFlowActivityAsync(ActivityType.FlowExecuted, flow.Name, flowId, cancellationToken);
-        }
+        await recentActivityService.LogFlowActivityAsync(ActivityType.FlowExecuted, flow.Name, flowId, cancellationToken);
 
         return result;
     }

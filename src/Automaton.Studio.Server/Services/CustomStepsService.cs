@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
 
@@ -13,6 +14,7 @@ public class CustomStepsService
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
     private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
     private const string DefaultIcon = "user";
@@ -23,19 +25,22 @@ public class CustomStepsService
         ApplicationDbContext dataContext,
         UserContextService userContextService,
         RecentActivityService recentActivityService,
-        IHubContext<AutomatonHub> automatonHub
+        IHubContext<AutomatonHub> automatonHub,
+        ResourceAuthorizationService authorizationService
     )
     {
         this.dataContext = dataContext;
         this.recentActivityService = recentActivityService;
         this.automatonHub = automatonHub;
+        this.authorizationService = authorizationService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<CustomStepsService>();
     }
 
     public IEnumerable<CustomStep> List()
     {
-        var entities = dataContext.CustomSteps.Where(x => x.CustomStepUsers.Any(x => x.UserId == userId));
+        // Use authorization service to get accessible custom steps (personal + project-based)
+        var entities = authorizationService.GetAccessibleCustomStepsQuery();
         var steps = entities.Select(MapToModel);
 
         return steps;
@@ -43,7 +48,9 @@ public class CustomStepsService
 
     public CustomStep Get(Guid id)
     {
-        var stepEntity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
+        // Use authorization service query to check access (personal + project-based)
+        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefault(x => x.Id == id);
         var step = MapToModel(stepEntity);
  
         return step;
@@ -85,7 +92,18 @@ public class CustomStepsService
 
     public async Task Update(Guid id, CustomStep step)
     {
-        var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
+        // Check if user can update this custom step (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateCustomStepAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update custom step {id}");
+        }
+
+        var entity = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"Custom step {id} not found");
+        }
 
         entity.Name = step.Name;
         entity.DisplayName = step.DisplayName;
@@ -105,7 +123,28 @@ public class CustomStepsService
 
     public async Task Remove(Guid id)
     {
-        var customStep = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id && x.CustomStepUsers.Any(x => x.UserId == userId));
+        // Check if user can delete this custom step (must be personal owner AND not part of any project)
+        if (!await authorizationService.CanDeleteCustomStepAsync(id))
+        {
+            // Check if it's because the step is part of a project
+            var isPartOfProject = await dataContext.ProjectCustomSteps
+                .AnyAsync(pcs => pcs.CustomStepId == id);
+
+            if (isPartOfProject)
+            {
+                throw new InvalidOperationException($"Cannot delete custom step {id} because it is part of one or more projects. Remove it from all projects first.");
+            }
+
+            throw new UnauthorizedAccessException($"You do not have permission to delete custom step {id}");
+        }
+
+        var customStep = dataContext.CustomSteps.SingleOrDefault(x => x.Id == id);
+
+        if (customStep == null)
+        {
+            throw new InvalidOperationException($"Custom step {id} not found");
+        }
+
         var stepName = customStep.Name;
 
         dataContext.CustomSteps.Remove(customStep);

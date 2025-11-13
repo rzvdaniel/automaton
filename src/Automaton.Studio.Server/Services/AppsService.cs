@@ -12,6 +12,7 @@ public class AppsService
     private readonly ApplicationDbContext dataContext;
     private readonly RecentActivityService recentActivityService;
     private readonly UserContextService userContextService;
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -20,18 +21,21 @@ public class AppsService
     public AppsService(
         ApplicationDbContext dataContext,
         UserContextService userContextService,
-        RecentActivityService recentActivityService
+        RecentActivityService recentActivityService,
+        ResourceAuthorizationService authorizationService
     )
     {
         this.dataContext = dataContext;
         this.userContextService = userContextService;
         this.recentActivityService = recentActivityService;
+        this.authorizationService = authorizationService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
     public IEnumerable<Models.AppModel> List()
     {
-        var entities = dataContext.WebApps.Where(x => x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Use authorization service to get accessible apps (personal + project-based)
+        var entities = authorizationService.GetAccessibleAppsQuery();
         var apps = entities.Select(MapToModel);
 
         return apps;
@@ -39,7 +43,9 @@ public class AppsService
 
     public Models.AppModel Get(Guid id)
     {
-        var appEntity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Use authorization service query to check access (personal + project-based)
+        var appEntity = authorizationService.GetAccessibleAppsQuery()
+            .SingleOrDefault(x => x.Id == id);
         var app = MapToModel(appEntity);
 
         return app;
@@ -144,7 +150,13 @@ public class AppsService
 
     public async Task Update(Guid id, Models.AppModel app)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Check if user can update this app (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateAppAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
+        }
+
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {
@@ -170,7 +182,22 @@ public class AppsService
 
     public async Task Remove(Guid id)
     {
-        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Check if user can delete this app (must be personal owner AND not part of any project)
+        if (!await authorizationService.CanDeleteAppAsync(id))
+        {
+            // Check if it's because the app is part of a project
+            var isPartOfProject = await dataContext.ProjectApps
+                .AnyAsync(pa => pa.WebAppId == id);
+
+            if (isPartOfProject)
+            {
+                throw new InvalidOperationException($"Cannot delete app {id} because it is part of one or more projects. Remove it from all projects first.");
+            }
+
+            throw new UnauthorizedAccessException($"You do not have permission to delete app {id}");
+        }
+
+        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
 
         if (app == null)
         {
@@ -188,7 +215,13 @@ public class AppsService
 
     public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Check if user can update this app (needed for publishing)
+        if (!await authorizationService.CanUpdateAppAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to publish app {id}");
+        }
+
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {
@@ -238,7 +271,13 @@ public class AppsService
 
     public async Task Unpublish(Guid id)
     {
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id && x.WebAppUsers.Any(x => x.UserId == UserId));
+        // Check if user can update this app (needed for unpublishing)
+        if (!await authorizationService.CanUpdateAppAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to unpublish app {id}");
+        }
+
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {

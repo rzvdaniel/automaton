@@ -17,6 +17,7 @@ public class RunnerService
     private readonly ApplicationDbContext dbContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -24,31 +25,38 @@ public class RunnerService
 
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
-      IHubContext<AutomatonHub> automatonHub)
+        IHubContext<AutomatonHub> automatonHub,
+        ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
         this.userContextService = userContextService;  // ✅ Store service reference
+        this.authorizationService = authorizationService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
     public async Task<IEnumerable<RunnerDetails>> List(CancellationToken cancellationToken)
     {
-        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId));
+        // Use authorization service to get accessible runners (personal + project-based)
+        var runners = authorizationService.GetAccessibleRunnersQuery();
 
         return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
     }
 
     public async Task<IEnumerable<RunnerDetails>> List(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
-        var runners = dbContext.Runners.Where(x => x.RunnerUsers.Any(x => x.UserId == UserId) && runnerIds.Contains(x.Id));
+        // Use authorization service to get accessible runners (personal + project-based)
+        var runners = authorizationService.GetAccessibleRunnersQuery()
+            .Where(x => runnerIds.Contains(x.Id));
 
         return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
     }
 
     public Runner Get(Guid id)
     {
-        var runner = dbContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
+        // Use authorization service query to check access (personal + project-based)
+        var runner = authorizationService.GetAccessibleRunnersQuery()
+            .SingleOrDefault(x => x.Id == id);
 
         // Because we update Runner's ConnectionId on the fly,
         // when retrieving data we get the cached version of it
@@ -111,9 +119,20 @@ public class RunnerService
 
     public async Task UpdateConnection(Guid runnerId, string connectionId, CancellationToken cancellationToken)
     {
+        // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateRunnerAsync(runnerId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update runner {runnerId}");
+        }
+
         var runner = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == runnerId && x.RunnerUsers.Any(x => x.UserId == UserId));
+            .SingleOrDefault(x => x.Id == runnerId);
+
+        if (runner == null)
+        {
+            throw new InvalidOperationException($"Runner {runnerId} not found");
+        }
 
         runner.ConnectionId = connectionId;
 
@@ -129,9 +148,20 @@ public class RunnerService
 
     public async Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
     {
+        // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateRunnerAsync(id, cancellationToken))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update runner {id}");
+        }
+
         var entity = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
+            .SingleOrDefault(x => x.Id == id);
+
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"Runner {id} not found");
+        }
 
         entity.Name = runner.Name;
 
@@ -165,9 +195,24 @@ public class RunnerService
 
     public async Task Delete(Guid id, CancellationToken cancellationToken)
     {
+        // Check if user can delete this runner (must be personal owner AND not part of any project)
+        if (!await authorizationService.CanDeleteRunnerAsync(id, cancellationToken))
+        {
+            // Check if it's because the runner is part of a project
+            var isPartOfProject = await dbContext.ProjectRunners
+                .AnyAsync(pr => pr.RunnerId == id, cancellationToken);
+
+            if (isPartOfProject)
+            {
+                throw new InvalidOperationException($"Cannot delete runner {id} because it is part of one or more projects. Remove it from all projects first.");
+            }
+
+            throw new UnauthorizedAccessException($"You do not have permission to delete runner {id}");
+        }
+
         var entity = dbContext.Runners
             .Include(x => x.RunnerUsers)
-            .SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId));
+            .SingleOrDefault(x => x.Id == id);
 
         if (entity != null)
         {
@@ -310,9 +355,14 @@ public class RunnerService
     /// </summary>
     public async Task<RunnerScriptEngineSettings?> GetScriptEngineSettings(Guid id, CancellationToken cancellationToken)
     {
+        // Check if user can access this runner (personal owner OR project member)
+        if (!await authorizationService.CanAccessRunnerAsync(id, cancellationToken))
+        {
+            return null;
+        }
+
         var runner = await dbContext.Runners
-            .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (runner == null || string.IsNullOrWhiteSpace(runner.ScriptEngineSettings))
         {
@@ -340,13 +390,18 @@ public class RunnerService
     /// </summary>
     public async Task UpdateScriptEngineSettings(Guid id, string? settingsJson, CancellationToken cancellationToken)
     {
+        // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
+        if (!await authorizationService.CanUpdateRunnerAsync(id, cancellationToken))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update runner {id}");
+        }
+
         var runner = await dbContext.Runners
-            .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (runner == null)
         {
-            throw new InvalidOperationException($"Runner {id} not found or user does not have access");
+            throw new InvalidOperationException($"Runner {id} not found");
         }
 
         runner.ScriptEngineSettings = settingsJson;
@@ -359,9 +414,9 @@ public class RunnerService
 
     public async Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var runner = await dbContext.Runners
-            .Include(x => x.RunnerUsers)
-            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower() && x.RunnerUsers.Any(x => x.UserId == UserId), cancellationToken);
+        // Use authorization service query to check access (personal + project-based)
+        var runner = await authorizationService.GetAccessibleRunnersQuery()
+            .FirstOrDefaultAsync(x => x.Name.ToLower() == name.ToLower(), cancellationToken);
 
         if (runner == null)
         {
