@@ -640,4 +640,99 @@ public class ResourceAuthorizationService
     }
 
     #endregion
+
+    #region Projects Authorization
+
+    /// <summary>
+    /// Check if user can access a project (read, view)
+    /// User can access if they are an active member of the project
+    /// </summary>
+    public async Task<bool> CanAccessProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        return await CanAccessProjectAsync(projectId, UserId, cancellationToken);
+    }
+
+    public async Task<bool> CanAccessProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var isMember = await dbContext.ProjectMembers
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
+
+        return isMember;
+    }
+
+    /// <summary>
+    /// Check if user can update a project (modify settings)
+    /// Only ProjectAdmin can update project settings
+    /// </summary>
+    public async Task<bool> CanUpdateProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        return await CanUpdateProjectAsync(projectId, UserId, cancellationToken);
+    }
+
+    public async Task<bool> CanUpdateProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await dbContext.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
+
+        return membership != null && membership.Role == ProjectRole.ProjectAdmin;
+    }
+
+    /// <summary>
+    /// Check if user can delete a project
+    /// Only the project owner can delete (deactivate) a project
+    /// </summary>
+    public async Task<bool> CanDeleteProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        return await CanDeleteProjectAsync(projectId, UserId, cancellationToken);
+    }
+
+    public async Task<bool> CanDeleteProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var project = await dbContext.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+
+        return project != null && project.OwnerId == userId;
+    }
+
+    /// <summary>
+    /// Check if user has a specific role or higher in a project
+    /// Role hierarchy: ProjectAdmin (0) > Developer (1) > AppUser (2) > Viewer (3)
+    /// </summary>
+    public async Task<bool> HasRoleInProjectAsync(Guid projectId, Guid userId, ProjectRole minimumRole, CancellationToken cancellationToken = default)
+    {
+        var membership = await dbContext.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
+
+        if (membership == null)
+        {
+            return false;
+        }
+
+        // Role hierarchy: ProjectAdmin (0) > Developer (1) > AppUser (2) > Viewer (3)
+        // Lower enum value = higher privilege
+        return membership.Role <= minimumRole;
+    }
+
+    /// <summary>
+    /// Get user's role in a project
+    /// </summary>
+    public async Task<ProjectRole?> GetUserRoleInProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await dbContext.ProjectMembers
+            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
+
+        return membership?.Role;
+    }
+
+    /// <summary>
+    /// Get user's membership in a project
+    /// </summary>
+    public async Task<Entities.ProjectMember?> GetUserProjectMembershipAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ProjectMembers
+            .Include(pm => pm.Project)
+            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
+    }
+
+    #endregion
 }

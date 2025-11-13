@@ -14,16 +14,19 @@ public class ProjectService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly Serilog.ILogger logger;
 
     private Guid UserId => userContextService.GetUserId();
 
     public ProjectService(
         ApplicationDbContext dbContext,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
+        this.authorizationService = authorizationService;
         this.logger = Serilog.Log.ForContext<ProjectService>();
     }
 
@@ -57,24 +60,27 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto?> GetProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
-        var membership = await dbContext.ProjectMembers
-            .Include(pm => pm.Project)
-                .ThenInclude(p => p.Owner)
-            .Include(pm => pm.Project)
-                .ThenInclude(p => p.Members)
-            .Include(pm => pm.Project)
-                .ThenInclude(p => p.ProjectApps)
-            .Include(pm => pm.Project)
-                .ThenInclude(p => p.ProjectFlows)
-            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
-
-        if (membership == null)
+        // Check if user can access this project
+        if (!await authorizationService.CanAccessProjectAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to access project {ProjectId} without membership", UserId, projectId);
             return null;
         }
 
-        var project = membership.Project;
+        var project = await dbContext.Projects
+            .Include(p => p.Owner)
+            .Include(p => p.Members)
+            .Include(p => p.ProjectApps)
+            .Include(p => p.ProjectFlows)
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+
+        if (project == null)
+        {
+            return null;
+        }
+
+        // Get user's role in the project
+        var userRole = await authorizationService.GetUserRoleInProjectAsync(projectId, UserId, cancellationToken);
 
         return new ProjectDto
         {
@@ -90,7 +96,7 @@ public class ProjectService
             MemberCount = project.Members.Count(m => m.IsActive),
             AppCount = project.ProjectApps.Count,
             FlowCount = project.ProjectFlows.Count,
-            CurrentUserRole = membership.Role
+            CurrentUserRole = userRole ?? ProjectRole.Viewer
         };
     }
 
@@ -163,8 +169,8 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto?> UpdateProjectAsync(Guid projectId, UpdateProjectRequest request, CancellationToken cancellationToken = default)
     {
-        var membership = await GetUserProjectMembershipAsync(projectId, cancellationToken);
-        if (membership == null || membership.Role != ProjectRole.ProjectAdmin)
+        // Check if user can update this project (must be ProjectAdmin)
+        if (!await authorizationService.CanUpdateProjectAsync(projectId, UserId, cancellationToken))
         {
             logger.Warning("User {UserId} attempted to update project {ProjectId} without admin role", UserId, projectId);
             return null;
@@ -191,6 +197,9 @@ public class ProjectService
 
         logger.Information("Updated project {ProjectId} by user {UserId}", projectId, UserId);
 
+        // Get user's role in the project
+        var userRole = await authorizationService.GetUserRoleInProjectAsync(projectId, UserId, cancellationToken);
+
         return new ProjectDto
         {
             Id = project.Id,
@@ -205,7 +214,7 @@ public class ProjectService
             MemberCount = project.Members.Count(m => m.IsActive),
             AppCount = project.ProjectApps.Count,
             FlowCount = project.ProjectFlows.Count,
-            CurrentUserRole = membership.Role
+            CurrentUserRole = userRole ?? ProjectRole.Viewer
         };
     }
 
@@ -214,12 +223,18 @@ public class ProjectService
     /// </summary>
     public async Task<bool> DeleteProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
+        // Check if user can delete this project (must be owner)
+        if (!await authorizationService.CanDeleteProjectAsync(projectId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to delete project {ProjectId} without ownership", UserId, projectId);
+            return false;
+        }
+
         var project = await dbContext.Projects
-            .FirstOrDefaultAsync(p => p.Id == projectId && p.OwnerId == UserId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
 
         if (project == null)
         {
-            logger.Warning("User {UserId} attempted to delete project {ProjectId} without ownership", UserId, projectId);
             return false;
         }
 
@@ -237,16 +252,7 @@ public class ProjectService
     /// </summary>
     public async Task<bool> HasRoleAsync(Guid projectId, Guid userId, ProjectRole minimumRole, CancellationToken cancellationToken = default)
     {
-        var membership = await dbContext.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
-
-        if (membership == null)
-        {
-            return false;
-        }
-
-        // Role hierarchy: ProjectAdmin > Developer > AppUser > Viewer
-        return membership.Role <= minimumRole;
+        return await authorizationService.HasRoleInProjectAsync(projectId, userId, minimumRole, cancellationToken);
     }
 
     /// <summary>
@@ -254,9 +260,7 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectMember?> GetUserProjectMembershipAsync(Guid projectId, CancellationToken cancellationToken = default)
     {
-        return await dbContext.ProjectMembers
-            .Include(pm => pm.Project)
-            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
+        return await authorizationService.GetUserProjectMembershipAsync(projectId, UserId, cancellationToken);
     }
 
     /// <summary>
@@ -264,9 +268,6 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectRole?> GetUserRoleAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var membership = await dbContext.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.ProjectId == projectId && pm.UserId == userId && pm.IsActive, cancellationToken);
-
-        return membership?.Role;
+        return await authorizationService.GetUserRoleInProjectAsync(projectId, userId, cancellationToken);
     }
 }
