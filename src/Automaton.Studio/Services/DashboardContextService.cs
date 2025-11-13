@@ -28,14 +28,6 @@ public class DashboardContextService
         _projectContext = projectContext;
         _projectResources = projectResources;
         _logger = Log.ForContext<DashboardContextService>();
-
-        // Subscribe to project context changes
-        _projectContext.OnCurrentProjectChanged += HandleProjectChanged;
-    }
-
-    private async void HandleProjectChanged(ProjectListItem? project)
-    {
-        await LoadDashboardDataAsync();
     }
 
     public async Task LoadDashboardDataAsync()
