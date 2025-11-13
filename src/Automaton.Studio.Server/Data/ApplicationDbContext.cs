@@ -43,6 +43,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ProjectFlow> ProjectFlows { get; set; }
         public virtual DbSet<ProjectRunner> ProjectRunners { get; set; }
         public virtual DbSet<ProjectCustomStep> ProjectCustomSteps { get; set; }
+        public virtual DbSet<InvitationToken> InvitationTokens { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -382,24 +383,40 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => new { e.ProjectId, e.CustomStepId });
                 entity.Property(e => e.AddedAt).IsRequired();
-                
+
                 entity.HasIndex(e => e.ProjectId);
                 entity.HasIndex(e => e.CustomStepId);
-                
+
                 entity.HasOne(e => e.Project)
                     .WithMany(p => p.ProjectCustomSteps)
                     .HasForeignKey(e => e.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
-                    
+
                 entity.HasOne(e => e.CustomStep)
                     .WithMany()
                     .HasForeignKey(e => e.CustomStepId)
                     .OnDelete(DeleteBehavior.Cascade);
-                    
+
                 entity.HasOne(e => e.AddedByUser)
                     .WithMany()
                     .HasForeignKey(e => e.AddedBy)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Invitation tokens
+            modelBuilder.Entity<Entities.InvitationToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Token).IsRequired();
+                entity.Property(e => e.Email).IsRequired();
+                entity.Property(e => e.ProjectId).IsRequired();
+                entity.Property(e => e.InvitedBy).IsRequired();
+                entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.Token).IsUnique();
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.Email);
             });
         }
 

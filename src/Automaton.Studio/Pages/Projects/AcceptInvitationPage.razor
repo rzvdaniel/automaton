@@ -1,0 +1,247 @@
+@attribute [AllowAnonymous]
+@page "/projects/invite/{Token}"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="invite-page">
+    <h3>Project invitation</h3>
+
+    @if (loading)
+    {
+        <div class="loading">Validating invitation...</div>
+    }
+    else if (!isValid)
+    {
+        <div class="alert alert-danger">This invitation is invalid or expired.</div>
+    }
+    else if (isAuthenticated && matchesEmail)
+    {
+        <div class="alert alert-info">Your account matches the invitation. Accepting now...</div>
+    }
+    else if (!isAuthenticated && requirePasswordSetup)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h4>You are invited to join <strong>@inviteProjectName</strong></h4>
+                <p>Role: <strong>@inviteRole</strong></p>
+
+                <EditForm Model="form" OnValidSubmit="OnSubmitAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-2">
+                        <label>Name</label>
+                        <InputText class="form-control" @bind-Value="form.Name" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Password</label>
+                        <InputText class="form-control" @bind-Value="form.Password" type="password" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Confirm Password</label>
+                        <InputText class="form-control" @bind-Value="form.ConfirmPassword" type="password" />
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" disabled="@submitting">@((submitting) ? "Processing..." : "Accept invitation & set password")</button>
+                </EditForm>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="alert alert-danger mt-2">@error</div>
+                }
+            </div>
+        </div>
+    }
+    else if (!isAuthenticated && !requirePasswordSetup)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h4>You are invited to join <strong>@inviteProjectName</strong></h4>
+                <p>Role: <strong>@inviteRole</strong></p>
+                <div class="alert alert-info">This account already has a password. Please <a href="@loginUrl">sign in</a> with the invited email to accept the invitation.</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">You are authenticated as a different user. Please sign out and open the invitation link from the invited email, or contact support.</div>
+    }
+
+    @if (showSuccess)
+    {
+        <div class="alert alert-success mt-3">Invitation accepted. Redirecting to projects...</div>
+    }
+    @if (showFailure)
+    {
+        <div class="alert alert-danger mt-3">Failed to accept invitation. @failureMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private bool loading = true;
+    private bool isValid = false;
+    private bool isAuthenticated = false;
+    private bool matchesEmail = false;
+    private bool requirePasswordSetup = false;
+    private string inviteEmail = string.Empty;
+    private string inviteRole = string.Empty;
+    private string inviteProjectName = string.Empty;
+    private string error = string.Empty;
+    private bool submitting = false;
+
+    private bool showSuccess = false;
+    private bool showFailure = false;
+    private string failureMessage = string.Empty;
+
+    private string loginUrl => $"/authentication/login?returnUrl={Uri.EscapeDataString(Nav.Uri)}";
+
+    private FormModel form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+
+        try
+        {
+            var resp = await Http.GetAsync($"api/invitations/validate/{Token}");
+            if (!resp.IsSuccessStatusCode)
+            {
+                isValid = false;
+                loading = false;
+                return;
+            }
+
+            var info = await resp.Content.ReadFromJsonAsync<InviteInfo>();
+            if (info == null)
+            {
+                isValid = false;
+                loading = false;
+                return;
+            }
+
+            inviteEmail = info.email;
+            inviteRole = info.role;
+            inviteProjectName = info.projectName; // now display name
+            requirePasswordSetup = info.requirePasswordSetup;
+
+            isValid = true;
+
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            isAuthenticated = user.Identity?.IsAuthenticated == true;
+
+            if (isAuthenticated)
+            {
+                var userEmailClaim = user.Claims.FirstOrDefault(c => c.Type == "email")?.Value
+                                     ?? user.Identity?.Name;
+                matchesEmail = string.Equals(userEmailClaim, inviteEmail, StringComparison.OrdinalIgnoreCase);
+
+                if (matchesEmail)
+                {
+                    // call server accept endpoint - authenticated path
+                    var acceptResp = await Http.PostAsync($"api/invitations/accept/{Token}", null);
+                    if (acceptResp.IsSuccessStatusCode)
+                    {
+                        showSuccess = true;
+                        await Task.Delay(800);
+                        Nav.NavigateTo("/projects", true);
+                        return;
+                    }
+                    else
+                    {
+                        showFailure = true;
+                        failureMessage = "Failed to accept invitation.";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            isValid = false;
+            error = "An error occurred while validating the invitation.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OnSubmitAsync()
+    {
+        error = string.Empty;
+        showFailure = false;
+        showSuccess = false;
+        submitting = true;
+
+        if (form.Password != form.ConfirmPassword)
+        {
+            error = "Passwords do not match";
+            submitting = false;
+            return;
+        }
+
+        try
+        {
+            var payload = new
+            {
+                Name = string.IsNullOrWhiteSpace(form.Name) ? null : form.Name,
+                Password = form.Password
+            };
+
+            var resp = await Http.PostAsJsonAsync($"api/invitations/accept/{Token}/complete", payload);
+            if (resp.IsSuccessStatusCode)
+            {
+                showSuccess = true;
+                await Task.Delay(800);
+                Nav.NavigateTo("/projects", true);
+                return;
+            }
+
+            var body = await resp.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
+            if (body != null && body.TryGetValue("message", out var msg))
+            {
+                error = msg?.ToString() ?? "Failed to complete invitation";
+            }
+            else
+            {
+                error = "Failed to complete invitation";
+            }
+
+            showFailure = true;
+            failureMessage = error;
+        }
+        catch
+        {
+            showFailure = true;
+            failureMessage = "An error occurred while completing the invitation.";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private class InviteInfo
+    {
+        public Guid projectId { get; set; }
+        public string projectName { get; set; } = string.Empty;
+        public string email { get; set; } = string.Empty;
+        public string role { get; set; } = string.Empty;
+        public Guid invitedBy { get; set; }
+        public bool requirePasswordSetup { get; set; }
+    }
+
+    private class FormModel
+    {
+        public string? Name { get; set; }
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

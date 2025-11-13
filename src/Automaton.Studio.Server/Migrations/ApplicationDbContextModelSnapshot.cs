@@ -418,6 +418,51 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.InvitationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("InvitedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsConsumed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("InvitationTokens");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Log", b =>
                 {
                     b.Property<int>("Id")
@@ -869,7 +914,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 12, 10, 4, 54, 535, DateTimeKind.Local).AddTicks(4931));
+                        .HasDefaultValue(new DateTime(2025, 11, 13, 12, 12, 26, 957, DateTimeKind.Local).AddTicks(5354));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

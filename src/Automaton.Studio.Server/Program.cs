@@ -225,6 +225,7 @@ services.AddScoped<AiProviderFactory>();
 services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
 services.AddScoped<ProjectResourceService>();
+services.AddScoped<InvitationTokenService>();
 
 // Project authorization handlers
 services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectMemberHandler>();

@@ -72,6 +72,9 @@
             <Checkbox @bind-Value="@addMemberModel.CreateAccountIfNotExists">
                 Create account if email doesn't exist
             </Checkbox>
+            <div class="form-text text-muted" style="margin-top:8px;font-size:0.9em;">
+                An invitation email will be sent to the address above. If the account doesn't exist it will be created and the recipient will be prompted to set a password; otherwise they will receive an invitation to join the project.
+            </div>
         </FormItem>
     </Form>
 </Modal>
