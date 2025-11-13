@@ -1,7 +1,7 @@
 @using Automaton.Studio.Models
 
 <div class="customsteps-tab">
-    @if (ViewModel.IsResourceManager)
+    @if (ViewModel.CanManageResources)
     {
         <div style="margin-bottom: 16px;">
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
@@ -26,7 +26,7 @@
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
             <ActionColumn Title="Actions">
-                @if (ViewModel.IsResourceManager)
+                @if (ViewModel.CanManageResources)
                 {
                     <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveStep(context.StepId))">
                         <Icon Type="delete" /> Remove
@@ -40,7 +40,7 @@
             <Empty>
                 <DescriptionTemplate>No custom steps in this project yet</DescriptionTemplate>
                 <ChildContent>
-                    @if (ViewModel.IsResourceManager)
+                    @if (ViewModel.CanManageResources)
                     {
                         <Button Type="@ButtonType.Primary" OnClick="@ShowAddStepModal">
                             Add First Custom Step
@@ -74,6 +74,9 @@
     private bool stepsLoaded = false;
     private bool addStepModalVisible = false;
     private string selectedStepId = string.Empty;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
 
     private async Task LoadSteps()
     {
@@ -115,9 +118,6 @@
             await ViewModel.RemoveCustomStepAsync(ViewModel.Project.Id, stepId);
         }
     }
-
-    [Inject]
-    private ModalService Modal { get; set; } = default!;
 
     private class AddStepModel
     {

@@ -1,7 +1,7 @@
 @using Automaton.Studio.Models
 
 <div class="flows-tab">
-    @if (ViewModel.IsResourceManager)
+    @if (ViewModel.CanManageResources)
     {
         <div style="margin-bottom: 16px;">
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddFlowModal">
@@ -26,7 +26,7 @@
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
             <ActionColumn Title="Actions">
-                @if (ViewModel.IsResourceManager)
+                @if (ViewModel.CanManageResources)
                 {
                     <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveFlow(context.FlowId))">
                         <Icon Type="delete" /> Remove
@@ -40,7 +40,7 @@
             <Empty>
                 <DescriptionTemplate>No flows in this project yet</DescriptionTemplate>
                 <ChildContent>
-                    @if (ViewModel.IsResourceManager)
+                    @if (ViewModel.CanManageResources)
                     {
                         <Button Type="@ButtonType.Primary" OnClick="@ShowAddFlowModal">
                             Add First Flow
@@ -74,6 +74,9 @@
     private bool flowsLoaded = false;
     private bool addFlowModalVisible = false;
     private string selectedFlowId = string.Empty;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
 
     private async Task LoadFlows()
     {
@@ -115,9 +118,6 @@
             await ViewModel.RemoveFlowAsync(ViewModel.Project.Id, flowId);
         }
     }
-
-    [Inject]
-    private ModalService Modal { get; set; } = default!;
 
     private class AddFlowModel
     {

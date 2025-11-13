@@ -1,8 +1,9 @@
 @using Automaton.Studio.Enums
 @using Automaton.Studio.Models
+@using Automaton.Studio.Services
 
 <div class="members-tab">
-    @if (ViewModel.IsProjectAdmin)
+    @if (IsProjectAdmin)
     {
         <div style="margin-bottom: 16px;">
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddMemberModal">
@@ -22,7 +23,7 @@
         </Column>
         <Column Title="Joined" TData="DateTime" @bind-Field="@context.JoinedAt" Format="yyyy-MM-dd" Sortable />
         <ActionColumn Title="Actions">
-            @if (ViewModel.IsProjectAdmin && !context.IsOwner)
+            @if (IsProjectAdmin && !context.IsOwner)
             {
                 <Dropdown>
                     <Overlay>
@@ -31,8 +32,8 @@
                                 <Icon Type="edit" /> Change Role
                             </MenuItem>
                             <MenuDivider />
-                            <MenuItem Danger OnClick="@(() => ShowRemoveMemberConfirm(context))">
-                                <Icon Type="delete" /> Remove
+                            <MenuItem>
+                                <span style="color: #ff4d4f;" OnClick="@(() => ShowRemoveMemberConfirm(context))"><Icon Type="delete" /> Remove</span>
                             </MenuItem>
                         </Menu>
                     </Overlay>
@@ -87,14 +88,16 @@
     @if (selectedMember != null)
     {
         <p>Update role for <strong>@selectedMember.Email</strong></p>
-        <FormItem Label="New Role">
-            <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@newRole" Style="width: 100%;">
-                <SelectOption Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
-                <SelectOption Value="ProjectRole.Developer" Label="Developer" />
-                <SelectOption Value="ProjectRole.AppUser" Label="App User" />
-                <SelectOption Value="ProjectRole.Viewer" Label="Viewer" />
-            </Select>
-        </FormItem>
+        <Form Model="@selectedMember">
+            <FormItem Label="New Role">
+                <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@newRole" Style="width: 100%;">
+                    <SelectOption Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
+                    <SelectOption Value="ProjectRole.Developer" Label="Developer" />
+                    <SelectOption Value="ProjectRole.AppUser" Label="App User" />
+                    <SelectOption Value="ProjectRole.Viewer" Label="Viewer" />
+                </Select>
+            </FormItem>
+        </Form>
     }
 </Modal>
 
@@ -107,6 +110,14 @@
     private AddProjectMemberRequest addMemberModel = new();
     private ProjectMemberDto? selectedMember;
     private ProjectRole newRole;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
+
+    [Inject]
+    private ProjectContextService ProjectContextService { get; set; } = default!;
+
+    private bool IsProjectAdmin => ProjectContextService?.CurrentProject?.CurrentUserRole == ProjectRole.ProjectAdmin || ViewModel.IsProjectAdmin;
 
     private void ShowAddMemberModal()
     {
@@ -172,7 +183,4 @@
             _ => "default"
         };
     }
-
-    [Inject]
-    private ModalService Modal { get; set; } = default!;
 }

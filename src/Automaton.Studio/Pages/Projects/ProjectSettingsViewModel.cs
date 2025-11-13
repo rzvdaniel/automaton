@@ -13,17 +13,20 @@ public class ProjectSettingsViewModel
     private readonly ProjectMembersClientService _membersService;
     private readonly ProjectResourcesClientService _resourcesService;
     private readonly IMessageService _messageService;
+    private readonly ProjectContextService _projectContextService;
 
     public ProjectSettingsViewModel(
         ProjectsClientService projectsService,
         ProjectMembersClientService membersService,
         ProjectResourcesClientService resourcesService,
-        IMessageService messageService)
+        IMessageService messageService,
+        ProjectContextService projectContextService)
     {
         _projectsService = projectsService;
         _membersService = membersService;
         _resourcesService = resourcesService;
         _messageService = messageService;
+        _projectContextService = projectContextService;
     }
 
     public bool IsLoading { get; private set; }
@@ -37,6 +40,11 @@ public class ProjectSettingsViewModel
 
     public bool IsProjectAdmin => Membership?.Role == ProjectRole.ProjectAdmin;
     public bool IsResourceManager => Membership?.Role == ProjectRole.ProjectAdmin || Membership?.Role == ProjectRole.Developer;
+
+    // Expose project context information for UI
+    public ProjectRole? CurrentRole => _projectContextService?.CurrentProject?.CurrentUserRole ?? Membership?.Role;
+
+    public bool CanManageResources => CurrentRole == ProjectRole.ProjectAdmin || CurrentRole == ProjectRole.Developer || IsResourceManager;
 
     public async Task InitializeAsync(Guid projectId)
     {

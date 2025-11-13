@@ -4,15 +4,22 @@
     <Card Title="Project Settings" Style="margin-bottom: 24px;">
         <Form Model="@settingsModel" Layout="@FormLayout.Vertical">
             <FormItem Label="Display Name">
-                <Input @bind-Value="@settingsModel.DisplayName" />
+                <Input @bind-Value="@settingsModel.DisplayName" Disabled="@(!ViewModel.CanManageResources)" />
             </FormItem>
             <FormItem Label="Description">
-                <TextArea @bind-Value="@settingsModel.Description" Rows="4" />
+                <TextArea @bind-Value="@settingsModel.Description" Rows="4" Disabled="@(!ViewModel.CanManageResources)" />
             </FormItem>
             <FormItem>
-                <Button Type="@ButtonType.Primary" OnClick="@HandleUpdateSettings">
-                    Save Changes
-                </Button>
+                @if (ViewModel.CanManageResources)
+                {
+                    <Button Type="@ButtonType.Primary" OnClick="@HandleUpdateSettings">
+                        Save Changes
+                    </Button>
+                }
+                else
+                {
+                    <div style="color: rgba(0,0,0,0.45);">You don't have permission to update project settings.</div>
+                }
             </FormItem>
         </Form>
     </Card>
@@ -65,10 +72,10 @@
 
     private async Task HandleUpdateSettings()
     {
-        if (ViewModel.Project != null)
+        if (ViewModel.Project != null && ViewModel.CanManageResources)
         {
             await ViewModel.UpdateProjectAsync(ViewModel.Project.Id, settingsModel);
-            
+
             // Reload settings model
             settingsModel = new UpdateProjectRequest
             {

@@ -1,7 +1,7 @@
 @using Automaton.Studio.Models
 
 <div class="runners-tab">
-    @if (ViewModel.IsResourceManager)
+    @if (ViewModel.CanManageResources)
     {
         <div style="margin-bottom: 16px;">
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
@@ -26,7 +26,7 @@
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
             <ActionColumn Title="Actions">
-                @if (ViewModel.IsResourceManager)
+                @if (ViewModel.CanManageResources)
                 {
                     <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveRunner(context.RunnerId))">
                         <Icon Type="delete" /> Remove
@@ -40,7 +40,7 @@
             <Empty>
                 <DescriptionTemplate>No runners in this project yet</DescriptionTemplate>
                 <ChildContent>
-                    @if (ViewModel.IsResourceManager)
+                    @if (ViewModel.CanManageResources)
                     {
                         <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
                             Add First Runner
@@ -74,6 +74,9 @@
     private bool runnersLoaded = false;
     private bool addRunnerModalVisible = false;
     private string selectedRunnerId = string.Empty;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
 
     private async Task LoadRunners()
     {
@@ -115,9 +118,6 @@
             await ViewModel.RemoveRunnerAsync(ViewModel.Project.Id, runnerId);
         }
     }
-
-    [Inject]
-    private ModalService Modal { get; set; } = default!;
 
     private class AddRunnerModel
     {

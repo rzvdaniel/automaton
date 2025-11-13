@@ -1,7 +1,8 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Enums
 
 <div class="apps-tab">
-    @if (ViewModel.IsResourceManager)
+    @if (ViewModel.CanManageResources)
     {
         <div style="margin-bottom: 16px;">
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
@@ -26,7 +27,7 @@
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
             <ActionColumn Title="Actions">
-                @if (ViewModel.IsResourceManager)
+                @if (ViewModel.CanManageResources)
                 {
                     <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveApp(context.AppId))">
                         <Icon Type="delete" /> Remove
@@ -40,7 +41,7 @@
             <Empty>
                 <DescriptionTemplate>No apps in this project yet</DescriptionTemplate>
                 <ChildContent>
-                    @if (ViewModel.IsResourceManager)
+                    @if (ViewModel.CanManageResources)
                     {
                         <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
                             Add First App
@@ -74,6 +75,9 @@
     private bool appsLoaded = false;
     private bool addAppModalVisible = false;
     private string selectedAppId = string.Empty;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
 
     private async Task LoadApps()
     {
@@ -115,9 +119,6 @@
             await ViewModel.RemoveAppAsync(ViewModel.Project.Id, appId);
         }
     }
-
-    [Inject]
-    private ModalService Modal { get; set; } = default!;
 
     private class AddAppModel
     {

@@ -95,24 +95,22 @@
     protected override async Task OnInitializedAsync()
     {
         await ProjectContext.LoadProjectsAsync();
-        ProjectContext.OnCurrentProjectChanged += OnProjectChanged;
     }
-    
-    private void OnProjectChanged(ProjectListItem? project)
-    {
-        StateHasChanged();
-    }
-    
+
     private async Task SwitchProject(Guid projectId)
     {
         await ProjectContext.SetCurrentProjectAsync(projectId);
+        // force navigation to dashboard so pages reload based on new context
+        Navigation.NavigateTo("/", false);
     }
-    
+
     private async Task SwitchToPersonal()
     {
         await ProjectContext.SetCurrentProjectAsync(null);
+        // force navigation to dashboard so pages reload based on personal mode
+        Navigation.NavigateTo("/", false);
     }
-    
+
     private string GetRoleColor(ProjectRole? role)
     {
         return role switch
@@ -123,10 +121,5 @@
             ProjectRole.Viewer => "default",
             _ => "default"
         };
-    }
-    
-    public void Dispose()
-    {
-        ProjectContext.OnCurrentProjectChanged -= OnProjectChanged;
     }
 }
