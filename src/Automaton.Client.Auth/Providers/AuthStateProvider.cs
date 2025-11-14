@@ -80,6 +80,9 @@ public class AuthStateProvider : AuthenticationStateProvider
         var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(JsonWebTokenParser.ParseClaimsFromJwt(token), ClaimJwtAuthType));
         var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
 
+        // Set the Authorization header with the new token
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(Bearer, token);
+        
         NotifyAuthenticationStateChanged(authState);
     }
 
