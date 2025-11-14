@@ -4,7 +4,7 @@ using Automaton.Core.Enums;
 using Automaton.Studio.Enums;
 using Microsoft.AspNetCore.Components;
 
-namespace Automaton.Studio.Pages
+namespace Automaton.Studio.Pages.Dashboard
 {
     public partial class DashboardPage : ComponentBase
     {
