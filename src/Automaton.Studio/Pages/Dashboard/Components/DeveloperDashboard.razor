@@ -70,75 +70,72 @@
     </div>
 
     <!-- Project Statistics -->
-    @if (dashboardStats != null)
-    {
-        <div class="section">
-            <Title Level="3" Style="margin-bottom: 24px;">
-                @if (ProjectContext.IsInProjectContext())
-                {
-                    @("Project Statistics")
-                }
-                else
-                {
-                    @("Your Statistics")
-                }
-            </Title>
-            <Row Gutter="(16, 16)">
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <div class="stat-content">
-                            <div class="stat-icon">
-                                <Icon Type="profile" Style="font-size: 24px; color: #1890ff;" />
-                            </div>
-                            <div class="stat-details">
-                                <div class="stat-value">@dashboardStats.TotalFlows</div>
-                                <div class="stat-label">Total Flows</div>
-                            </div>
+    <div class="section" style="@(dashboardStats == null ? "display:none;" : "")">
+        <Title Level="3" Style="margin-bottom: 24px;">
+            @if (ProjectContext.IsInProjectContext())
+            {
+                @("Project Statistics")
+            }
+            else
+            {
+                @("Your Statistics")
+            }
+        </Title>
+        <Row Gutter="(16, 16)">
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="profile" Style="font-size: 24px; color: #1890ff;" />
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <div class="stat-content">
-                            <div class="stat-icon">
-                                <Icon Type="play-square" Style="font-size: 24px; color: #52c41a;" />
-                            </div>
-                            <div class="stat-details">
-                                <div class="stat-value">@dashboardStats.OnlineRunners/@dashboardStats.TotalRunners</div>
-                                <div class="stat-label">Online Runners</div>
-                            </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@(dashboardStats?.TotalFlows ?? 0)</div>
+                            <div class="stat-label">Total Flows</div>
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <div class="stat-content">
-                            <div class="stat-icon">
-                                <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
-                            </div>
-                            <div class="stat-details">
-                                <div class="stat-value">@dashboardStats.SuccessRate%</div>
-                                <div class="stat-label">Success Rate</div>
-                            </div>
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="play-square" Style="font-size: 24px; color: #52c41a;" />
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <div class="stat-content">
-                            <div class="stat-icon">
-                                <Icon Type="bar-chart" Style="font-size: 24px; color: #fa8c16;" />
-                            </div>
-                            <div class="stat-details">
-                                <div class="stat-value">@dashboardStats.RecentExecutions</div>
-                                <div class="stat-label">Recent Executions</div>
-                            </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@(dashboardStats?.OnlineRunners ?? 0)/@(dashboardStats?.TotalRunners ?? 0)</div>
+                            <div class="stat-label">Online Runners</div>
                         </div>
-                    </Card>
-                </Col>
-            </Row>
-        </div>
-    }
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@(dashboardStats?.SuccessRate ?? 0)%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="bar-chart" Style="font-size: 24px; color: #fa8c16;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@(dashboardStats?.RecentExecutions ?? 0)</div>
+                            <div class="stat-label">Recent Executions</div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+        </Row>
+    </div>
 
     <!-- Recent Activity Links -->
     <div class="section">
@@ -191,45 +188,42 @@
         </Row>
     </div>
 
-    @if (ProjectContext.IsInProjectContext() && projectRole == Automaton.Studio.Enums.ProjectRole.ProjectAdmin)
-    {
+    <div class="section" style="@(ProjectContext.IsInProjectContext() && projectRole == Automaton.Studio.Enums.ProjectRole.ProjectAdmin ? "" : "display:none;")">
         <!-- Project Admin Tools -->
-        <div class="section">
-            <Title Level="3" Style="margin-bottom: 24px;">Project Administration</Title>
-            <Row Gutter="(16, 16)">
-                <Col Xs="24" Sm="12">
-                    <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
-                        <div style="display: flex; align-items: center; gap: 16px;">
-                            <div class="tool-icon">
-                                <Icon Type="team" Style="font-size: 24px; color: #1890ff;" />
-                            </div>
-                            <div>
-                                <Title Level="5" Style="margin-bottom: 4px;">Manage Members</Title>
-                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
-                                    Add or remove project members
-                                </Paragraph>
-                            </div>
+        <Title Level="3" Style="margin-bottom: 24px;">Project Administration</Title>
+        <Row Gutter="(16, 16)">
+            <Col Xs="24" Sm="12">
+                <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div class="tool-icon">
+                            <Icon Type="team" Style="font-size: 24px; color: #1890ff;" />
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12">
-                    <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
-                        <div style="display: flex; align-items: center; gap: 16px;">
-                            <div class="tool-icon">
-                                <Icon Type="setting" Style="font-size: 24px; color: #722ed1;" />
-                            </div>
-                            <div>
-                                <Title Level="5" Style="margin-bottom: 4px;">Project Settings</Title>
-                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
-                                    Configure project details
-                                </Paragraph>
-                            </div>
+                        <div>
+                            <Title Level="5" Style="margin-bottom: 4px;">Manage Members</Title>
+                            <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                Add or remove project members
+                            </Paragraph>
                         </div>
-                    </Card>
-                </Col>
-            </Row>
-        </div>
-    }
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12">
+                <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div class="tool-icon">
+                            <Icon Type="setting" Style="font-size: 24px; color: #722ed1;" />
+                        </div>
+                        <div>
+                            <Title Level="5" Style="margin-bottom: 4px;">Project Settings</Title>
+                            <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                Configure project details
+                            </Paragraph>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+        </Row>
+    </div>
 </div>
 
 @code {
