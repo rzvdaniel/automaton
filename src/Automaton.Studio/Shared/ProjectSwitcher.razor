@@ -9,7 +9,7 @@
     {
         <div class="current-project-indicator">
             <Icon Type="team" />
-            <Dropdown>
+            <Dropdown Trigger="new[] { Trigger.Click }">
                 <Overlay>
                     <Menu>
                         <MenuItem Icon="user" OnClick="@(() => SwitchToPersonal())">
@@ -48,7 +48,7 @@
     {
         <div class="no-project-indicator">
             <Icon Type="user" />
-            <Dropdown>
+            <Dropdown Trigger="new[] { Trigger.Click }">
                 <Overlay>
                     <Menu>
                         <MenuItem Icon="user"  Disabled>
