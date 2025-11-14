@@ -25,15 +25,15 @@
         <ActionColumn Title="Actions">
             @if (IsProjectAdmin && !context.IsOwner)
             {
-                <Dropdown>
+                <Dropdown Trigger="new[] { Trigger.Click }">
                     <Overlay>
                         <Menu>
-                            <MenuItem OnClick="@(() => ShowUpdateRoleModal(context))">
-                                <Icon Type="edit" /> Change Role
+                            <MenuItem Icon="edit" OnClick="@(() => ShowUpdateRoleModal(context))">
+                                <span style="margin-left: 12px;">Change Role</span>
                             </MenuItem>
                             <MenuDivider />
-                            <MenuItem>
-                                <span style="color: #ff4d4f;" OnClick="@(() => ShowRemoveMemberConfirm(context))"><Icon Type="delete" /> Remove</span>
+                            <MenuItem Icon="delete" OnClick="@(() => ShowRemoveMemberConfirm(context))">
+                                <span style="margin-left: 12px;">Remove</span>
                             </MenuItem>
                         </Menu>
                     </Overlay>

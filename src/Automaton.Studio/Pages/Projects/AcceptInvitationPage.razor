@@ -2,9 +2,11 @@
 @page "/projects/invite/{Token}"
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Forms
+@using Automaton.Studio.Services
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IClaimUtilityService ClaimUtilityService
 
 <Layout>
     <Content>
@@ -200,9 +202,8 @@
 
             if (isAuthenticated)
             {
-                var userEmailClaim = user.Claims.FirstOrDefault(c => c.Type == "email")?.Value
-                                     ?? user.Identity?.Name;
-                matchesEmail = string.Equals(userEmailClaim, inviteEmail, StringComparison.OrdinalIgnoreCase);
+                var userEmail = this.ClaimUtilityService.GetUserEmail(user);
+                matchesEmail = this.ClaimUtilityService.EmailsMatch(userEmail, inviteEmail);
 
                 if (matchesEmail)
                 {

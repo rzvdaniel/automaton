@@ -75,7 +75,8 @@ public static class ServiceCollectionExtensions
         // Services
         services.AddScoped<Services.ConfigurationService>();
         services.AddScoped<DesktopSettingsService>();
-        
+        services.AddScoped<IClaimUtilityService, ClaimUtilityService>();
+
         // Register initializer as singleton and as hosted service
         services.AddSingleton<DesktopScriptEngineSettingsInitializer>();
         services.AddHostedService(sp => sp.GetRequiredService<DesktopScriptEngineSettingsInitializer>());

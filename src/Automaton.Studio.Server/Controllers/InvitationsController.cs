@@ -32,6 +32,7 @@ public class InvitationsController : ControllerBase
     }
 
     [HttpGet("validate/{token}")]
+    [AllowAnonymous]
     public async Task<IActionResult> Validate(string token)
     {
         var invite = await invitationService.ValidateInvitationToken(token);
@@ -48,8 +49,8 @@ public class InvitationsController : ControllerBase
     }
 
     // Accept for authenticated users
-    [HttpPost("accept/{token}")]
     [Authorize]
+    [HttpPost("accept/{token}")]
     public async Task<IActionResult> Accept(string token)
     {
         var invite = await invitationService.ValidateInvitationToken(token);
@@ -106,8 +107,8 @@ public class InvitationsController : ControllerBase
     }
 
     // Combined accept + setup for unauthenticated users
-    [HttpPost("accept/{token}/complete")]
     [AllowAnonymous]
+    [HttpPost("accept/{token}/complete")]
     public async Task<IActionResult> Complete(string token, [FromBody] AcceptInvitationRequest request)
     {
         if (string.IsNullOrWhiteSpace(request?.Password))
