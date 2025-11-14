@@ -359,50 +359,112 @@
 </div>
 
 @code {
-    [Parameter] public DashboardStats? dashboardStats { get; set; }
-    [Parameter] public IEnumerable<FlowInfo>? recentFlows { get; set; }
-    [Parameter] public IEnumerable<RecentActivity>? recentActivity { get; set; }
-    [Parameter] public IEnumerable<FlowExecution>? recentExecutions { get; set; }
-    [Parameter] public EventCallback OnRefreshActivity { get; set; }
-    [Parameter] public EventCallback OnRefreshExecutions { get; set; }
-    [Parameter] public EventCallback OnLoadMoreActivity { get; set; }
-    [Parameter] public EventCallback OnLoadMoreExecutions { get; set; }
-
+    private DashboardStats? dashboardStats;
+    private IEnumerable<FlowInfo>? recentFlows;
+    private IEnumerable<RecentActivity>? recentActivity;
+    private IEnumerable<FlowExecution>? recentExecutions;
     private bool isLoadingActivity = false;
     private bool isLoadingExecutions = false;
     private int activityCount = 10;
     private int executionCount = 15;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load activity data after the initial render to improve perceived performance
+            await LoadRecentActivity();
+            await LoadRecentExecutions();
+        }
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Load stats
+            dashboardStats = await DashboardService.GetDashboardStatsAsync();
+
+            // Load more recent flows for the dedicated tab
+            recentFlows = await DashboardService.GetAllRecentFlowsAsync();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+    }
+
+    private async Task LoadRecentActivity()
+    {
+        isLoadingActivity = true;
+        StateHasChanged();
+
+        try
+        {
+            recentActivity = await DashboardService.GetRecentActivityAsync(activityCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recent activity: {ex.Message}");
+            recentActivity = new List<RecentActivity>();
+        }
+        finally
+        {
+            isLoadingActivity = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadRecentExecutions()
+    {
+        isLoadingExecutions = true;
+        StateHasChanged();
+
+        try
+        {
+            recentExecutions = await DashboardService.GetRecentExecutionsAsync(executionCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recent executions: {ex.Message}");
+            recentExecutions = new List<FlowExecution>();
+        }
+        finally
+        {
+            isLoadingExecutions = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task RefreshActivity()
     {
-        if (OnRefreshActivity.HasDelegate)
-        {
-            await OnRefreshActivity.InvokeAsync();
-        }
+        activityCount = 10; // Reset to initial count
+        await LoadRecentActivity();
     }
 
     private async Task RefreshExecutions()
     {
-        if (OnRefreshExecutions.HasDelegate)
-        {
-            await OnRefreshExecutions.InvokeAsync();
-        }
+        executionCount = 15; // Reset to initial count
+        await LoadRecentExecutions();
     }
 
     private async Task LoadMoreActivity()
     {
-        if (OnLoadMoreActivity.HasDelegate)
-        {
-            await OnLoadMoreActivity.InvokeAsync();
-        }
+        activityCount += 10;
+        await LoadRecentActivity();
     }
 
     private async Task LoadMoreExecutions()
     {
-        if (OnLoadMoreExecutions.HasDelegate)
-        {
-            await OnLoadMoreExecutions.InvokeAsync();
-        }
+        executionCount += 15;
+        await LoadRecentExecutions();
     }
 
     private string GetActivityTagColor(ActivityType activityType)
