@@ -101,16 +101,4 @@
         // force navigation to dashboard so pages reload based on personal mode
         Navigation.NavigateTo("/", false);
     }
-
-    private string GetRoleColor(ProjectRole? role)
-    {
-        return role switch
-        {
-            ProjectRole.ProjectAdmin => "red",
-            ProjectRole.Developer => "blue",
-            ProjectRole.AppUser => "green",
-            ProjectRole.Viewer => "default",
-            _ => "default"
-        };
-    }
 }
