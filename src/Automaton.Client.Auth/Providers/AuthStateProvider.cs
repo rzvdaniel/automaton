@@ -44,6 +44,8 @@ public class AuthStateProvider : AuthenticationStateProvider
 
             if (string.IsNullOrWhiteSpace(authToken))
             {
+                // Clear the Authorization header when there's no valid token
+                httpClient.DefaultRequestHeaders.Authorization = null;
                 return anonymousState;
             }
 
@@ -66,7 +68,9 @@ public class AuthStateProvider : AuthenticationStateProvider
             // be performed during the OnAfterRenderAsync lifecycle method."
 
             // No matter what other exceptions may be triggered, always return anonymous.
-
+            
+            // Clear the Authorization header on error
+            httpClient.DefaultRequestHeaders.Authorization = null;
             return anonymousState;
         }
     }
@@ -81,6 +85,9 @@ public class AuthStateProvider : AuthenticationStateProvider
 
     public void NotifyUserLogout()
     {
+        // Clear the Authorization header from the HttpClient to prevent stale tokens
+        httpClient.DefaultRequestHeaders.Authorization = null;
+        
         var authState = Task.FromResult(anonymousState);
 
         NotifyAuthenticationStateChanged(authState);
@@ -103,6 +110,8 @@ public class AuthStateProvider : AuthenticationStateProvider
         }
         catch
         {
+            // Clear the Authorization header if we can't get a valid token
+            httpClient.DefaultRequestHeaders.Authorization = null;
             return string.Empty;        
         }     
     }
