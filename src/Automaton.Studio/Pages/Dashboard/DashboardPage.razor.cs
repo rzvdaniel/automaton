@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Dashboard
 {
-    public partial class DashboardPage : ComponentBase
+    public partial class DashboardPage : ComponentBase, IDisposable
     {
         private bool shouldShowOnboarding;
         private ProjectRole? currentUserRole;
@@ -28,11 +28,28 @@ namespace Automaton.Studio.Pages.Dashboard
                 shouldShowOnboarding = false;
             }
 
+            // Subscribe to project context changes
+            ProjectContextService.OnCurrentProjectChanged += HandleProjectContextChanged;
+
             // Detect user role in current project
             await DetectUserRoleAsync();
 
             // Load dashboard context for role-based data
             await DashboardContextService.LoadDashboardDataAsync();
+        }
+
+        private async void HandleProjectContextChanged(ProjectListItem? project)
+        {
+            Console.WriteLine($"Project context changed: {project?.DisplayName ?? "Personal Workspace"}");
+            
+            // Re-detect user role
+            await DetectUserRoleAsync();
+            
+            // Reload dashboard context for new role
+            await DashboardContextService.LoadDashboardDataAsync();
+            
+            // Trigger UI update
+            StateHasChanged();
         }
 
         private async Task DetectUserRoleAsync()
@@ -60,6 +77,12 @@ namespace Automaton.Studio.Pages.Dashboard
                 currentUserRole = null;
                 isInProjectContext = false;
             }
+        }
+
+        public void Dispose()
+        {
+            // Unsubscribe from event to prevent memory leaks
+            ProjectContextService.OnCurrentProjectChanged -= HandleProjectContextChanged;
         }
 
         private void NavigateToCreateApp()
