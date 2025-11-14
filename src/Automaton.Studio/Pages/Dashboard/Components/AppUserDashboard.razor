@@ -20,67 +20,17 @@
         </div>
     </div>
 
-    @if (DashboardContext.IsLoading)
-    {
-        <div class="loading-container">
-            <Spin Size="SpinSize.Large" />
-        </div>
-    }
-    else if (!DashboardContext.ProjectApps.Any())
-    {
-        <div class="empty-state">
-            <div class="empty-content">
-                <div class="empty-icon">
-                    <Icon Type="appstore" Style="font-size: 72px; color: #d9d9d9;" />
-                </div>
-                <Title Level="3" Style="color: #8c8c8c;">No Applications Available</Title>
-                <Paragraph Style="color: #8c8c8c; margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
-                    There are no applications in this project yet. Contact your project administrator to add applications.
-                </Paragraph>
-            </div>
-        </div>
-    }
-    else
-    {
-        <!-- Search and Filter Bar -->
-        @* <div class="filter-bar">
-            <Input Placeholder="Search applications..."
-                   Prefix="@searchIcon"
-                   @bind-Value="searchText"
-                   @bind-Value:event="oninput"
-                   Size="@InputSize.Large"
-                   Style="max-width: 500px;" />
-        </div> *@
-
-        <!-- Apps Grid -->
-        <div class="apps-grid">
-            @foreach (var app in FilteredApps)
-            {
-                <div class="app-card" @onclick="@(() => OpenApp(app))">
-                    <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
-                    <div class="app-card-content">
-                        <div class="app-icon">
-                            <Icon Type="appstore" Style="font-size: 32px; color: #1890ff;" />
-                        </div>
-                        <h3 class="app-name">@app.AppName</h3>
-                        <Button Type="@ButtonType.Primary"
-                                Size="@ButtonSize.Large"
-                                Block
-                                Icon="arrow-right"
-                                Class="launch-button">
-                            Open App
-                        </Button>
-                    </div>
-                </div>
-            }
-        </div>
-    }
+    <!-- Use reusable AppGridDisplay component -->
+    <AppGridDisplay Apps="@fullAppDetails"
+                    IsLoading="@(DashboardContext.IsLoading || isLoadingAppDetails)"
+                    EmptyTitle="No Applications Available"
+                    EmptyMessage="There are no applications in this project yet. Contact your project administrator to add applications."
+                    OnAppClick="@(async (app) => await OpenApp(app))" />
 </div>
 
 @code {
-    private string searchText = string.Empty;
-    private List<AppModel>? fullAppDetails;
-    private RenderFragment searchIcon = @<Icon Type="search" />;
+    private List<AppListItem>? fullAppDetails;
+    private bool isLoadingAppDetails = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,16 +40,34 @@
 
     private async Task LoadAppDetails()
     {
+        isLoadingAppDetails = true;
         try
         {
             // Load full app details for each project app
-            fullAppDetails = new List<AppModel>();
+            fullAppDetails = new List<AppListItem>();
             foreach (var projectApp in DashboardContext.ProjectApps)
             {
                 try
                 {
                     var appDetail = await AppsService.Load(projectApp.AppId);
-                    fullAppDetails.Add(appDetail);
+                    
+                    // Convert AppModel to AppListItem
+                    fullAppDetails.Add(new AppListItem
+                    {
+                        Id = appDetail.Id,
+                        Name = appDetail.Name,
+                        DisplayName = appDetail.DisplayName,
+                        Description = appDetail.Description,
+                        IsPublished = appDetail.IsPublished,
+                        PublicUrl = appDetail.PublicUrl,
+                        PublishedAt = appDetail.PublishedAt,
+                        Version = appDetail.Version,
+                        RequiresAuthentication = appDetail.RequiresAuthentication,
+                        Created = appDetail.Created,
+                        Updated = appDetail.Updated,
+                        ExecutionRunnerId = appDetail.ExecutionRunnerId,
+                        Appearance = appDetail.Appearance
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -111,64 +79,24 @@
         {
             Console.WriteLine($"Error loading app details: {ex.Message}");
         }
-    }
-
-    private IEnumerable<ProjectAppDto> FilteredApps
-    {
-        get
+        finally
         {
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                return DashboardContext.ProjectApps;
-            }
-
-            return DashboardContext.ProjectApps.Where(app =>
-                app.AppName.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+            isLoadingAppDetails = false;
         }
     }
 
-    private async Task OpenApp(ProjectAppDto app)
+    private async Task OpenApp(AppListItem app)
     {
-        // Try to find the app in full details to get the public URL
-        var appDetail = fullAppDetails?.FirstOrDefault(a => a.Id == app.AppId);
-
-        if (appDetail != null && appDetail.IsPublished && !string.IsNullOrEmpty(appDetail.PublicUrl))
+        if (app.IsPublished && !string.IsNullOrEmpty(app.PublicUrl))
         {
             // Navigate to published app
-            Navigation.NavigateTo($"/web/{appDetail.PublicUrl}", forceLoad: false);
+            Navigation.NavigateTo($"/web/{app.PublicUrl}", forceLoad: false);
         }
         else
         {
-            // Navigate to app designer (fallback)
-            Navigation.NavigateTo($"/appdesigner/{app.AppId}");
+            // Navigate to app designer (fallback for unpublished apps)
+            Navigation.NavigateTo($"/appdesigner/{app.Id}");
         }
-    }
-
-    private string GetCardBackgroundImage(ProjectAppDto app)
-    {
-        var appDetail = fullAppDetails?.FirstOrDefault(a => a.Id == app.AppId);
-
-        if (appDetail != null && !string.IsNullOrEmpty(appDetail.Appearance?.BackgroundImageUrl))
-        {
-            return $"background-image: url('{appDetail.Appearance.BackgroundImageUrl}'); opacity: {appDetail.Appearance.BackgroundImageOpacity};";
-        }
-
-        // Default gradient background
-        var hash = Math.Abs(app.AppId.GetHashCode());
-        var colors = new[]
-        {
-            "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-            "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-            "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-            "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-            "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-            "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
-            "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)"
-        };
-
-        var gradient = colors[hash % colors.Length];
-        return $"background: {gradient}; opacity: 0.15;";
     }
 
     public void Dispose()
@@ -213,114 +141,6 @@
         flex: 1;
     }
 
-    .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 400px;
-    }
-
-    .empty-state {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 400px;
-        background: white;
-        border-radius: 12px;
-        padding: 48px;
-    }
-
-    .empty-content {
-        text-align: center;
-        max-width: 600px;
-    }
-
-    .empty-icon {
-        margin-bottom: 24px;
-    }
-
-    .filter-bar {
-        margin-bottom: 32px;
-        display: flex;
-        justify-content: center;
-    }
-
-    .apps-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 24px;
-        padding-bottom: 40px;
-    }
-
-    .app-card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
-        overflow: hidden;
-        cursor: pointer;
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-    }
-
-    .app-card:hover {
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-        transform: translateY(-8px);
-    }
-
-    .app-card-background {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-size: cover;
-        background-position: center;
-        z-index: 0;
-        pointer-events: none;
-    }
-
-    .app-card-content {
-        position: relative;
-        z-index: 1;
-        padding: 32px 24px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        height: 100%;
-        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 1) 60%);
-    }
-
-    .app-icon {
-        width: 80px;
-        height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
-        border-radius: 20px;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
-    }
-
-    .app-name {
-        font-size: 22px;
-        font-weight: 700;
-        color: #262626;
-        margin: 0 0 auto 0;
-        line-height: 1.4;
-    }
-
-    .launch-button {
-        margin-top: 24px;
-        font-weight: 600;
-        height: 48px;
-        font-size: 16px;
-    }
-
     /* Responsive */
     @@media (max-width: 768px) {
         .dashboard-header {
@@ -330,21 +150,6 @@
         .header-content {
             flex-direction: column;
             text-align: center;
-        }
-
-        .apps-grid {
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 16px;
-        }
-
-        .app-card {
-            min-height: 280px;
-        }
-    }
-
-    @@media (max-width: 480px) {
-        .apps-grid {
-            grid-template-columns: 1fr;
         }
     }
 </style>

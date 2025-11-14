@@ -1,0 +1,846 @@
+@using Automaton.Studio.Services
+@using Automaton.Studio.Models
+@using Automaton.Core.Enums
+@using Automaton.Studio.Enums
+
+@inject NavigationManager NavigationManager
+@inject OnboardingService OnboardingService
+@inject DashboardService DashboardService
+
+<!-- Default dashboard for personal workspace -->
+<div class="home-container">
+    <!-- Header Section -->
+    <div class="home-header">
+        <div class="home-header-content">
+            <div class="home-header-icon">
+                <Icon Type="thunderbolt" Style="font-size: 48px; color: white;" />
+            </div>
+            <div class="home-header-text">
+                <Title Level="1" Style="margin-bottom: 8px;">Automaton Dashboard</Title>
+                <Paragraph Class="home-subtitle">
+                    Build, manage, and execute automated workflows with ease. Get started by exploring the sections below.
+                </Paragraph>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Section -->
+    @if (dashboardStats != null)
+    {
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="profile" Style="font-size: 24px; color: #1890ff;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.TotalFlows</div>
+                            <div class="stat-label">Total Flows</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="play-square" Style="font-size: 24px; color: #52c41a;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.OnlineRunners/@dashboardStats.TotalRunners</div>
+                            <div class="stat-label">Online Runners</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="check-circle" Style="font-size: 24px; color: #722ed1;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.SuccessRate%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="bar-chart" Style="font-size: 24px; color: #fa8c16;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.RecentExecutions</div>
+                            <div class="stat-label">Recent Executions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Main Content Tabs -->
+    <Tabs DefaultActiveKey="recent-flows" Class="home-tabs">
+        <TabPane Key="recent-flows" Tab="Recent Flows">
+            <div class="flows-content">
+                <Title Level="3">Your Recent Flows</Title>
+                @if (recentFlows != null && recentFlows.Any())
+                {
+                    <div class="section">
+                        <Paragraph>
+                            Quick access to your recently edited workflows. Click any flow to continue editing.
+                        </Paragraph>
+                        
+                        <div class="flows-grid">
+                            @foreach (var flow in recentFlows)
+                            {
+                                <div class="flow-grid-card" @onclick="@(() => NavigationManager.NavigateTo($"/flow/designer/{flow.Id}/{flow.Name}"))">
+                                    <Card Hoverable="true" Class="flow-card">
+                                        <div class="flow-card-content">
+                                            <div class="flow-header">
+                                                <div class="flow-icon">
+                                                    <Icon Type="profile" Style="font-size: 20px; color: #1890ff;" />
+                                                </div>
+                                                <div class="flow-info">
+                                                    <Text Strong Class="flow-name">@flow.Name</Text>
+                                                    <Text Type="@TextElementType.Secondary" Class="flow-date">
+                                                        Updated @flow.Updated.ToString("MMM dd, yyyy")
+                                                    </Text>
+                                                </div>
+                                                <div class="flow-actions">
+                                                    <Icon Type="edit" Style="color: #1890ff;" />
+                                                </div>
+                                            </div>
+                                            <div class="flow-stats">
+                                                <div class="flow-stat">
+                                                    <Icon Type="clock-circle" Style="font-size: 12px; color: #8c8c8c;" />
+                                                    <span>@flow.Created.ToString("MMM dd")</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="flows-actions">
+                            <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => NavigationManager.NavigateTo("/flows"))" Size="@ButtonSize.Large">
+                                Create New Flow
+                            </Button>
+                            <Button Type="@ButtonType.Default" OnClick="@(() => NavigationManager.NavigateTo("/flows"))" Size="@ButtonSize.Large">
+                                View All Flows
+                            </Button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="flows-empty">
+                        <div class="empty-content">
+                            <div class="empty-icon">
+                                <Icon Type="profile" Style="font-size: 64px; color: #d9d9d9;" />
+                            </div>
+                            <Title Level="3" Style="color: #8c8c8c;">No Recent Flows</Title>
+                            <Paragraph Style="color: #8c8c8c; margin-bottom: 24px;">
+                                You haven't created any workflows yet. Get started by creating your first flow!
+                            </Paragraph>
+                            <Button Type="@ButtonType.Primary" Icon="plus" Size="@ButtonSize.Large" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                Create Your First Flow
+                            </Button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </TabPane>
+
+        <TabPane Key="activity" Tab="Recent Activity">
+            <div class="activity-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <Title Level="3" style="margin-bottom: 0;">Recent Activity</Title>
+                    <Button Type="@ButtonType.Link" OnClick="@RefreshActivity" Icon="reload" Size="@ButtonSize.Small">
+                        Refresh
+                    </Button>
+                </div>
+                
+                @if (isLoadingActivity)
+                {
+                    <div style="text-align: center; padding: 40px;">
+                        <Spin Size="SpinSize.Large" />
+                    </div>
+                }
+                else if (recentActivity != null && recentActivity.Any())
+                {
+                    <div class="activity-list">
+                        @foreach (var activity in recentActivity)
+                        {
+                            <Card Size="CardSize.Small" Class="activity-item" Bordered="true">
+                                <div class="activity-content-item">
+                                    <div class="activity-icon">
+                                        <Icon Type="@activity.Icon" Style="@($"color: {activity.Color};")" />
+                                    </div>
+                                    <div class="activity-details">
+                                        <div class="activity-title">
+                                            <Text Strong>@activity.EntityName</Text>
+                                            <Tag Color="@GetActivityTagColor(activity.ActivityType)">@activity.ActivityTypeText</Tag>
+                                        </div>
+                                        <div class="activity-description">
+                                            <Text Type="@TextElementType.Secondary">@activity.Description</Text>
+                                        </div>
+                                        <div class="activity-meta">
+                                            <span class="activity-meta-text">
+                                                <Icon Type="clock-circle" Style="font-size: 12px;" />
+                                                @activity.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(activity.UserName))
+                                            {
+                                                <span class="activity-meta-text">
+                                                    <Icon Type="user" Style="font-size: 12px;" />
+                                                    @activity.UserName
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="activity-actions">
+                                        @if (activity.EntityId.HasValue)
+                                        {
+                                            @if (activity.ActivityType == ActivityType.FlowCreated || 
+                                                 activity.ActivityType == ActivityType.FlowUpdated ||
+                                                 activity.ActivityType == ActivityType.FlowExecuted)
+                                            {
+                                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" 
+                                                        OnClick="@(() => NavigationManager.NavigateTo($"/flow/designer/{activity.EntityId}/{activity.EntityName}"))">
+                                                    <Icon Type="edit" />
+                                                </Button>
+                                            }
+                                            else if (activity.ActivityType == ActivityType.CustomStepCreated || 
+                                                     activity.ActivityType == ActivityType.CustomStepUpdated)
+                                            {
+                                                <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" 
+                                                        OnClick="@(() => NavigationManager.NavigateTo($"/customstep/designer/{activity.EntityId}"))">
+                                                    <Icon Type="edit" />
+                                                </Button>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </Card>
+                        }
+                    </div>
+                    
+                    @if (recentActivity.Count() >= 10)
+                    {
+                        <div style="text-align: center; margin-top: 16px;">
+                            <Button Type="@ButtonType.Link" OnClick="@LoadMoreActivity">
+                                Load More
+                            </Button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="activity-placeholder">
+                        <div style="text-align: center;">
+                            <Icon Type="inbox" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                            <Title Level="4" Style="color: #999;">No Recent Activity</Title>
+                            <Paragraph Style="color: #999; margin-bottom: 24px;">
+                                Activity will appear here when you create, update, or execute flows and custom steps.
+                            </Paragraph>
+                            <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                Create Your First Flow
+                            </Button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </TabPane>
+
+        <TabPane Key="recent-executions" Tab="Recent Executions">
+            <div class="executions-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <Title Level="3" style="margin-bottom: 0;">Recent Flow Executions</Title>
+                    <Button Type="@ButtonType.Link" OnClick="@RefreshExecutions" Icon="reload" Size="@ButtonSize.Small">
+                        Refresh
+                    </Button>
+                </div>
+                
+                @if (isLoadingExecutions)
+                {
+                    <div style="text-align: center; padding: 40px;">
+                        <Spin Size="SpinSize.Large" />
+                    </div>
+                }
+                else if (recentExecutions != null && recentExecutions.Any())
+                {
+                    <div class="executions-list">
+                        @foreach (var execution in recentExecutions)
+                        {
+                            <Card Size="CardSize.Small" Class="execution-item" Bordered="true">
+                                <div class="execution-content-item">
+                                    <div class="execution-icon">
+                                        @if (execution.Status == WorkflowStatus.Success)
+                                        {
+                                            <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        }
+                                        else if (execution.Status == WorkflowStatus.Error)
+                                        {
+                                            <Icon Type="close-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#ff4d4f" />
+                                        }
+                                        else if (execution.Status == WorkflowStatus.Working)
+                                        {
+                                            <Icon Type="sync" Spin="true" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        }
+                                        else
+                                        {
+                                            <Icon Type="clock-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#d9d9d9" />
+                                        }
+                                    </div>
+                                    <div class="execution-details">
+                                        <div class="execution-title">
+                                            <Text Strong>@execution.Application</Text>
+                                            <Tag Color="@GetExecutionStatusColor(execution.Status)">@execution.Status</Tag>
+                                        </div>
+                                        <div class="execution-description">
+                                            <Text Type="@TextElementType.Secondary">Flow ID: @execution.FlowId.ToString().Substring(0, 8)...</Text>
+                                        </div>
+                                        <div class="execution-meta">
+                                            <span class="execution-meta-text">
+                                                <Icon Type="clock-circle" Style="font-size: 12px;" />
+                                                Started: @execution.Started.ToString("MMM dd, yyyy HH:mm")
+                                            </span>
+                                            @if (execution.Finished != default)
+                                            {
+                                                <span class="execution-meta-text">
+                                                    <Icon Type="check" Style="font-size: 12px;" />
+                                                    Finished: @execution.Finished.ToString("HH:mm")
+                                                </span>
+                                                <span class="execution-meta-text">
+                                                    <Icon Type="hourglass" Style="font-size: 12px;" />
+                                                    Duration: @((execution.Finished - execution.Started).TotalSeconds.ToString("F1"))s
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="execution-actions">
+                                        <Button Type="@ButtonType.Link" Size="@ButtonSize.Small" 
+                                                OnClick="@(() => NavigationManager.NavigateTo($"/flow/activity/{execution.FlowId}/flow"))">
+                                            <Icon Type="eye" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        }
+                    </div>
+                    
+                    @if (recentExecutions.Count() >= executionCount)
+                    {
+                        <div style="text-align: center; margin-top: 16px;">
+                            <Button Type="@ButtonType.Link" OnClick="@LoadMoreExecutions">
+                                Load More
+                            </Button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="executions-placeholder">
+                        <div style="text-align: center;">
+                            <Icon Type="bar-chart" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                            <Title Level="4" Style="color: #999;">No Recent Executions</Title>
+                            <Paragraph Style="color: #999; margin-bottom: 24px;">
+                                Executions will appear here when you run workflows.
+                            </Paragraph>
+                            <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/flows"))">
+                                View Your Flows
+                            </Button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </TabPane>
+    </Tabs>
+</div>
+
+@code {
+    [Parameter] public DashboardStats? dashboardStats { get; set; }
+    [Parameter] public IEnumerable<FlowInfo>? recentFlows { get; set; }
+    [Parameter] public IEnumerable<RecentActivity>? recentActivity { get; set; }
+    [Parameter] public IEnumerable<FlowExecution>? recentExecutions { get; set; }
+    [Parameter] public EventCallback OnRefreshActivity { get; set; }
+    [Parameter] public EventCallback OnRefreshExecutions { get; set; }
+    [Parameter] public EventCallback OnLoadMoreActivity { get; set; }
+    [Parameter] public EventCallback OnLoadMoreExecutions { get; set; }
+
+    private bool isLoadingActivity = false;
+    private bool isLoadingExecutions = false;
+    private int activityCount = 10;
+    private int executionCount = 15;
+
+    private async Task RefreshActivity()
+    {
+        if (OnRefreshActivity.HasDelegate)
+        {
+            await OnRefreshActivity.InvokeAsync();
+        }
+    }
+
+    private async Task RefreshExecutions()
+    {
+        if (OnRefreshExecutions.HasDelegate)
+        {
+            await OnRefreshExecutions.InvokeAsync();
+        }
+    }
+
+    private async Task LoadMoreActivity()
+    {
+        if (OnLoadMoreActivity.HasDelegate)
+        {
+            await OnLoadMoreActivity.InvokeAsync();
+        }
+    }
+
+    private async Task LoadMoreExecutions()
+    {
+        if (OnLoadMoreExecutions.HasDelegate)
+        {
+            await OnLoadMoreExecutions.InvokeAsync();
+        }
+    }
+
+    private string GetActivityTagColor(ActivityType activityType)
+    {
+        return activityType switch
+        {
+            ActivityType.FlowCreated or ActivityType.CustomStepCreated or ActivityType.RunnerAdded or ActivityType.ScheduleCreated => "green",
+            ActivityType.FlowUpdated or ActivityType.CustomStepUpdated or ActivityType.RunnerUpdated or ActivityType.ScheduleUpdated => "blue",
+            ActivityType.FlowDeleted or ActivityType.CustomStepDeleted or ActivityType.RunnerDeleted or ActivityType.ScheduleDeleted => "red",
+            ActivityType.FlowExecuted => "purple",
+            _ => "default"
+        };
+    }
+
+    private string GetExecutionStatusColor(WorkflowStatus status)
+    {
+        return status switch
+        {
+            WorkflowStatus.Success => "green",
+            WorkflowStatus.Error => "red",
+            WorkflowStatus.Working => "blue",
+            _ => "default"
+        };
+    }
+}
+
+<style>
+    /* Inherited styles from DashboardPage - keeping them here for component independence */
+    .home-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px 40px 24px;
+    }
+
+    .home-header {
+        margin-bottom: 24px;
+        padding: 24px 0;
+    }
+
+    .home-header-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .home-header-icon {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background-color: #1890ff;
+        border-radius: 16px;
+    }
+
+    .home-header-text {
+        flex: 1;
+    }
+
+    .home-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    /* Stats Section */
+    .stats-section {
+        margin-bottom: 32px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .stat-content {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .stat-icon {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .stat-details {
+        flex: 1;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #262626;
+        line-height: 1.2;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #8c8c8c;
+        margin-top: 4px;
+    }
+
+    .home-tabs .ant-tabs-content-holder {
+        padding-top: 24px;
+    }
+
+    .section {
+        margin-bottom: 48px;
+    }
+
+    .section:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Recent Flows Tab Styles */
+    .flows-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        min-height: 400px;
+    }
+
+    .flows-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+    }
+
+    .flow-grid-card {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+
+    .flow-grid-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .flow-card {
+        height: 100%;
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+    }
+
+    .flow-card:hover {
+        border-color: #1890ff;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+    }
+
+    .flow-card-content {
+        padding: 8px;
+    }
+
+    .flow-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .flow-icon {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #e6f7ff;
+        border-radius: 6px;
+    }
+
+    .flow-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .flow-name {
+        display: block;
+        font-size: 16px;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .flow-date {
+        font-size: 12px;
+        color: #8c8c8c;
+    }
+
+    .flow-actions {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .flow-card:hover .flow-actions {
+        opacity: 1;
+    }
+
+    .flow-stats {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-top: 8px;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .flow-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: #8c8c8c;
+    }
+
+    .flows-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        padding-top: 24px;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 24px;
+    }
+
+    .flows-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .empty-content {
+        text-align: center;
+        max-width: 400px;
+    }
+
+    .empty-icon {
+        margin-bottom: 24px;
+    }
+
+    /* Activity Section */
+    .activity-content {
+        min-height: 400px;
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    }
+
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .activity-item {
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .activity-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .activity-content-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 4px 0;
+    }
+
+    .activity-icon {
+        flex-shrink: 0;
+        font-size: 18px;
+        margin-top: 2px;
+    }
+
+    .activity-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .activity-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+    }
+
+    .activity-description {
+        margin-bottom: 8px;
+    }
+
+    .activity-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .activity-meta-text {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #8c8c8c;
+        font-size: 12px;
+    }
+
+    .activity-actions {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .activity-item:hover .activity-actions {
+        opacity: 1;
+    }
+
+    .activity-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+    }
+
+    /* Executions Tab Styles */
+    .executions-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        min-height: 400px;
+    }
+
+    .executions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .execution-item {
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .execution-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .execution-content-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 4px 0;
+    }
+
+    .execution-icon {
+        flex-shrink: 0;
+        font-size: 18px;
+        margin-top: 2px;
+    }
+
+    .execution-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .execution-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+    }
+
+    .execution-description {
+        margin-bottom: 8px;
+    }
+
+    .execution-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .execution-meta-text {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #8c8c8c;
+        font-size: 12px;
+    }
+
+    .execution-actions {
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .execution-item:hover .execution-actions {
+        opacity: 1;
+    }
+
+    .executions-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+    }
+</style>
