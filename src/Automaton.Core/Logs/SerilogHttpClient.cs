@@ -15,11 +15,6 @@ namespace Automaton.Core.Logs
             this.httpClient = httpClient;
         }
 
-        ~SerilogHttpClient()
-        {
-            Dispose(false);
-        }
-
         public void Configure(IConfiguration configuration)
         {
             // Does nothing for now
@@ -27,16 +22,7 @@ namespace Automaton.Core.Logs
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                httpClient.Dispose();
-            }
+            // Do not dispose HttpClient - it's managed by HttpClientFactory via DI
         }
 
         public async Task<HttpResponseMessage> PostAsync(string requestUri, Stream stream, CancellationToken cancellationToken)
@@ -45,7 +31,7 @@ namespace Automaton.Core.Logs
             var logEventsText = reader.ReadToEnd();
             var logEvents = JsonConvert.DeserializeObject<IEnumerable<SerilogHttpLogEvent>>(logEventsText);
 
-            var response = await httpClient.PostAsJsonAsync(requestUri, logEvents);
+            var response = await httpClient.PostAsJsonAsync(requestUri, logEvents, cancellationToken);
 
             return response;
         }

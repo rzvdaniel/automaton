@@ -161,8 +161,30 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Handlers.LogUpdateNotificationHandler>();
 
         // Other
-        services.AddSingleton(sp => new HttpClient { BaseAddress = new Uri(configService.BaseUrl) });
-        services.AddSingleton(sp => new SerilogHttpClient(new HttpClient { BaseAddress = new Uri(configService.BaseUrl) }));
+        // Register a scoped HttpClient for all services
+        // All services (FlowSettingsService, ProjectsClientService, etc.) that accept
+        // HttpClient in their constructor will receive this instance with BaseAddress set
+        services.AddScoped(sp =>
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(configService.BaseUrl)
+            };
+            return client;
+        });
+
+        // Special registration for AuthenticationService
+        services.AddHttpClient<Pages.Authentication.Services.AuthenticationService>(client =>
+        {
+            client.BaseAddress = new Uri(configService.BaseUrl);
+        });
+
+        // Scoped HttpClient for logging (SerilogHttpClient)
+        services.AddHttpClient<SerilogHttpClient>(client =>
+        {
+            client.BaseAddress = new Uri(configService.BaseUrl);
+        });
+
         services.AddSingleton<KeyboardService>();
 
         services.AddScoped(typeof(DragDropService));

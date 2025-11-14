@@ -42,7 +42,6 @@
 <AntContainer />
 
 @code {
-    [Inject] public HttpClient HttpClient { get; set; }
     [Inject] public SerilogHttpClient SerilogHttpClient { get; set; }
     [Inject] public ConfigurationService ConfigurationService { get; set; }
     [Inject] public DesktopScriptEngineSettingsInitializer SettingsInitializer { get; set; }
@@ -62,8 +61,8 @@
 
 
     /// <summary>
-    /// Configure Serilog here because we need the injected SerilogHttpClient
-    /// and I did not know how to generate it in ServiceCollectionExtension.AddStudio()
+    /// Configure Serilog using the injected SerilogHttpClient from DI.
+    /// This ensures the HttpClient is properly managed by HttpClientFactory.
     /// </summary>
     /// <returns></returns>
     private async Task ConfigureSerilog()
@@ -74,7 +73,7 @@
                 .Enrich.With(new ApplicationEnricher(ConfigurationService))
                 .WriteTo.Http(
                     requestUri: $"{ConfigurationService.BaseUrl}/{ConfigurationService.LogsUrl}",
-                    httpClient: new SerilogHttpClient(HttpClient),
+                    httpClient: SerilogHttpClient,
                     queueLimitBytes: null)
                 .CreateLogger());
     }
