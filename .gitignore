@@ -40,6 +40,11 @@ wwwroot/app-thumbnails/**
 !wwwroot/app-thumbnails/
 !wwwroot/app-thumbnails/README.md
 
+# Ignore any nested project `wwwroot/app-thumbnails` folders as well
+**/wwwroot/app-thumbnails/**
+!**/wwwroot/app-thumbnails/
+!**/wwwroot/app-thumbnails/README.md
+
 #npm
 node_modules/
 
