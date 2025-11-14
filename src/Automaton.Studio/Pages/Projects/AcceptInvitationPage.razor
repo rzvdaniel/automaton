@@ -6,81 +6,142 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 
-<div class="invite-page">
-    <h3>Project invitation</h3>
+<Layout>
+    <Content>
+        <div class="auth-container">
+            <!-- Form Panel -->
+            <div class="form-panel">
+                <div class="form-content">
+                    @if (loading)
+                    {
+                        <div class="loading-container">
+                            <p>Validating invitation...</p>
+                        </div>
+                    }
+                    else if (!isValid)
+                    {
+                        <div class="form-header">
+                            <Title Level="1" Class="form-title">Invalid Invitation</Title>
+                        </div>
+                        <div class="alert alert-danger">This invitation is invalid or expired.</div>
+                    }
+                    else if (isAuthenticated && matchesEmail)
+                    {
+                        <div class="form-header">
+                            <Title Level="1" Class="form-title">Accepting Invitation</Title>
+                        </div>
+                        <div class="alert alert-info">Your account matches the invitation. Accepting now...</div>
+                    }
+                    else if (!isAuthenticated && requirePasswordSetup)
+                    {
+                        <Form Loading="submitting"
+                              Model="@form"
+                              Layout="@FormLayout.Vertical"
+                              OnValidSubmit="OnSubmitAsync"
+                              Class="auth-form">
+                            <ChildContent>
+                                <div class="form-header">
+                                    <Title Level="1" Class="form-title">Accept Invitation</Title>
+                                    <p class="form-subtitle">You are invited to join <strong>@inviteProjectName</strong> as <strong>@inviteRole</strong></p>
+                                </div>
 
-    @if (loading)
-    {
-        <div class="loading">Validating invitation...</div>
-    }
-    else if (!isValid)
-    {
-        <div class="alert alert-danger">This invitation is invalid or expired.</div>
-    }
-    else if (isAuthenticated && matchesEmail)
-    {
-        <div class="alert alert-info">Your account matches the invitation. Accepting now...</div>
-    }
-    else if (!isAuthenticated && requirePasswordSetup)
-    {
-        <div class="card">
-            <div class="card-body">
-                <h4>You are invited to join <strong>@inviteProjectName</strong></h4>
-                <p>Role: <strong>@inviteRole</strong></p>
+                                <FormItem Label="Name">
+                                    <Input @bind-Value="@form.Name" Size="@InputSize.Large" />
+                                </FormItem>
 
-                <EditForm Model="form" OnValidSubmit="OnSubmitAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
+                                <FormItem Label="Password">
+                                    <InputPassword @bind-Value="@form.Password" Size="@InputSize.Large" />
+                                </FormItem>
 
-                    <div class="mb-2">
-                        <label>Name</label>
-                        <InputText class="form-control" @bind-Value="form.Name" />
+                                <FormItem Label="Confirm Password">
+                                    <InputPassword @bind-Value="@form.ConfirmPassword" Size="@InputSize.Large" />
+                                </FormItem>
+
+                                <FormItem>
+                                    <Button Type="ButtonType.Primary" HtmlType="submit" Size="@ButtonSize.Large" Block Disabled="submitting">
+                                        @((submitting) ? "Processing..." : "Accept Invitation & Set Password")
+                                    </Button>
+                                </FormItem>
+
+                                @if (!string.IsNullOrEmpty(error))
+                                {
+                                    <div class="alert alert-danger">@error</div>
+                                }
+                            </ChildContent>
+                        </Form>
+                    }
+                    else if (!isAuthenticated && !requirePasswordSetup)
+                    {
+                        <div class="form-header">
+                            <Title Level="1" Class="form-title">Sign In Required</Title>
+                        </div>
+                        <div class="form-content-text">
+                            <p>You are invited to join <strong>@inviteProjectName</strong> as <strong>@inviteRole</strong></p>
+                            <p class="mt-3">This email already has an account. Please <a href="@loginUrl">sign in</a> to accept the invitation.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-header">
+                            <Title Level="1" Class="form-title">Wrong Account</Title>
+                        </div>
+                        <div class="alert alert-warning">You are authenticated as a different user. Please sign out and open the invitation link from the invited email, or contact support.</div>
+                    }
+
+                    @if (showSuccess)
+                    {
+                        <div class="alert alert-success mt-3">Invitation accepted. Redirecting to projects...</div>
+                    }
+                    @if (showFailure)
+                    {
+                        <div class="alert alert-danger mt-3">Failed to accept invitation. @failureMessage</div>
+                    }
+                </div>
+            </div>
+
+            <!-- Information Panel -->
+            <div class="info-panel">
+                <div class="info-content">
+                    <div class="brand-section">
+                        <h1 class="brand-title">You're Invited</h1>
+                        <p class="brand-subtitle">Join the team and start collaborating on automation workflows</p>
                     </div>
-
-                    <div class="mb-2">
-                        <label>Password</label>
-                        <InputText class="form-control" @bind-Value="form.Password" type="password" />
+                    
+                    <div class="hero-visual">
+                        <div class="invitation-mockup">
+                            <div class="invitation-header">
+                                <div class="invitation-icon">??</div>
+                                <p class="invitation-title">Project Invitation</p>
+                            </div>
+                            <div class="invitation-content">
+                                <div class="invitation-item">
+                                    <span class="invitation-label">Project:</span>
+                                    <span class="invitation-value">@inviteProjectName</span>
+                                </div>
+                                <div class="invitation-item">
+                                    <span class="invitation-label">Role:</span>
+                                    <span class="invitation-value">@inviteRole</span>
+                                </div>
+                                <div class="invitation-item">
+                                    <span class="invitation-label">Email:</span>
+                                    <span class="invitation-value">@inviteEmail</span>
+                                </div>
+                                <div class="invitation-perks">
+                                    <p class="perk-title">What you get access to:</p>
+                                    <ul class="perk-list">
+                                        <li>Collaborative automation workflows</li>
+                                        <li>Team project management</li>
+                                        <li>Real-time execution monitoring</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="mb-2">
-                        <label>Confirm Password</label>
-                        <InputText class="form-control" @bind-Value="form.ConfirmPassword" type="password" />
-                    </div>
-
-                    <button class="btn btn-primary" type="submit" disabled="@submitting">@((submitting) ? "Processing..." : "Accept invitation & set password")</button>
-                </EditForm>
-
-                @if (!string.IsNullOrEmpty(error))
-                {
-                    <div class="alert alert-danger mt-2">@error</div>
-                }
+                </div>
             </div>
         </div>
-    }
-    else if (!isAuthenticated && !requirePasswordSetup)
-    {
-        <div class="card">
-            <div class="card-body">
-                <h4>You are invited to join <strong>@inviteProjectName</strong></h4>
-                <p>Role: <strong>@inviteRole</strong></p>
-                <div class="alert alert-info">This account already has a password. Please <a href="@loginUrl">sign in</a> with the invited email to accept the invitation.</div>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="alert alert-warning">You are authenticated as a different user. Please sign out and open the invitation link from the invited email, or contact support.</div>
-    }
-
-    @if (showSuccess)
-    {
-        <div class="alert alert-success mt-3">Invitation accepted. Redirecting to projects...</div>
-    }
-    @if (showFailure)
-    {
-        <div class="alert alert-danger mt-3">Failed to accept invitation. @failureMessage</div>
-    }
-</div>
+    </Content>
+</Layout>
 
 @code {
     [Parameter] public string Token { get; set; } = string.Empty;
