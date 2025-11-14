@@ -77,28 +77,28 @@ public class ProjectContextService
         
         try
         {
-            // Find project in loaded list first
-            var project = _userProjects?.FirstOrDefault(p => p.Id == projectId);
-            
-            // If not found in cache, try to load from API
-            if (project == null)
+            // Always load fresh project details from API to ensure CurrentUserRole is set
+            // This is important because the role information needs to be current
+            var projectDto = await _projectsService.GetProjectAsync(projectId.Value);
+            var project = new ProjectListItem
             {
-                var projectDto = await _projectsService.GetProjectAsync(projectId.Value);
-                project = new ProjectListItem
-                {
-                    Id = projectDto.Id,
-                    Name = projectDto.Name,
-                    DisplayName = projectDto.DisplayName,
-                    Description = projectDto.Description,
-                    OwnerName = projectDto.OwnerName,
-                    CurrentUserRole = projectDto.CurrentUserRole,
-                    MemberCount = projectDto.MemberCount,
-                    CreatedAt = projectDto.CreatedAt
-                };
-            }
+                Id = projectDto.Id,
+                Name = projectDto.Name,
+                DisplayName = projectDto.DisplayName,
+                Description = projectDto.Description,
+                OwnerId = projectDto.OwnerId,
+                OwnerName = projectDto.OwnerName,
+                CurrentUserRole = projectDto.CurrentUserRole,
+                MemberCount = projectDto.MemberCount,
+                AppCount = projectDto.AppCount,
+                FlowCount = projectDto.FlowCount,
+                CreatedAt = projectDto.CreatedAt,
+                IsOwner = projectDto.IsOwner
+            };
             
             CurrentProject = project;
-            _logger.Information("Switched to project {ProjectId} ({ProjectName})", projectId, project.DisplayName);
+            _logger.Information("Switched to project {ProjectId} ({ProjectName}) with role {Role}", 
+                projectId, project.DisplayName, project.CurrentUserRole);
         }
         catch (Exception ex)
         {
