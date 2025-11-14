@@ -8,23 +8,21 @@
     @if (ProjectContext.CurrentProject != null)
     {
         <div class="current-project-indicator">
-            <Icon Type="team" Theme="@IconThemeType.Outline" />
+            <Icon Type="team" />
             <Dropdown>
                 <Overlay>
                     <Menu>
-                        <MenuItem OnClick="@(() => SwitchToPersonal())">
-                            <Icon Type="user" Theme="@IconThemeType.Outline" />
-                            <span style="margin-left: 8px;">Personal Workspace</span>
+                        <MenuItem Icon="user" OnClick="@(() => SwitchToPersonal())">
+                            <span style="margin-left: 12px;">Personal Workspace</span>
                         </MenuItem>
                         <MenuDivider />
                         @foreach (var project in ProjectContext.GetProjects())
                         {
-                            <MenuItem OnClick="@(() => SwitchProject(project.Id))" Disabled="@(project.Id == ProjectContext.CurrentProject?.Id)">
-                                <Icon Type="team" Theme="@(project.Id == ProjectContext.CurrentProject?.Id ? IconThemeType.Fill : IconThemeType.Outline)" />
-                                <span style="margin-left: 8px;">@project.DisplayName</span>
+                            <MenuItem Icon="team" OnClick="@(() => SwitchProject(project.Id))" Disabled="@(project.Id == ProjectContext.CurrentProject?.Id)">
+                                <span style="margin-left: 12px;">@project.DisplayName</span>
                                 @if (project.Id == ProjectContext.CurrentProject?.Id)
                                 {
-                                    <Icon Type="check" Theme="@IconThemeType.Outline" style="margin-left: auto; color: #52c41a;" />
+                                    <Icon Type="check" style="margin-left: auto; color: #52c41a;" />
                                 }
                             </MenuItem>
                         }
@@ -32,19 +30,15 @@
                         {
                             <MenuDivider />
                         }
-                        <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
-                            <Icon Type="setting" Theme="@IconThemeType.Outline" />
-                            <span style="margin-left: 8px;">Manage Projects</span>
+                        <MenuItem Icon="setting" OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                            <span style="margin-left: 12px;">Manage Projects</span>
                         </MenuItem>
                     </Menu>
                 </Overlay>
                 <ChildContent>
                     <a class="ant-dropdown-link" @onclick:preventDefault>
                         <span class="project-name">@ProjectContext.CurrentProject.DisplayName</span>
-                        <Tag Color="@GetRoleColor(ProjectContext.CurrentProject.CurrentUserRole)" style="margin-left: 8px;">
-                            @ProjectContext.CurrentProject.CurrentUserRole
-                        </Tag>
-                        <Icon Type="down" />
+                        <Icon Type="caret-down" />
                     </a>
                 </ChildContent>
             </Dropdown>
@@ -53,37 +47,34 @@
     else
     {
         <div class="no-project-indicator">
-            <Icon Type="user" Theme="@IconThemeType.Outline" />
+            <Icon Type="user" />
             <Dropdown>
                 <Overlay>
                     <Menu>
-                        <MenuItem Disabled>
-                            <Icon Type="user" Theme="@IconThemeType.Fill" />
-                            <span style="margin-left: 8px;">Personal Workspace</span>
-                            <Icon Type="check" Theme="@IconThemeType.Outline" style="margin-left: auto; color: #52c41a;" />
+                        <MenuItem Icon="user"  Disabled>
+                            <span style="margin-left: 12px;">Personal Workspace</span>
+                            <Icon Type="check" style="margin-left: auto; color: #52c41a;" />
                         </MenuItem>
                         @if (ProjectContext.GetProjects().Any())
                         {
                             <MenuDivider />
                             @foreach (var project in ProjectContext.GetProjects())
                             {
-                                <MenuItem OnClick="@(() => SwitchProject(project.Id))">
-                                    <Icon Type="team" Theme="@IconThemeType.Outline" />
-                                    <span style="margin-left: 8px;">@project.DisplayName</span>
+                                <MenuItem Icon="team" OnClick="@(() => SwitchProject(project.Id))">
+                                    <span style="margin-left: 12px;">@project.DisplayName</span>
                                 </MenuItem>
                             }
                         }
                         <MenuDivider />
-                        <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
-                            <Icon Type="plus-circle" Theme="@IconThemeType.Outline" />
-                            <span style="margin-left: 8px;">Create or Join Project</span>
+                        <MenuItem Icon="plus-circle"  OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                            <span style="margin-left: 12px;">Create or Join Project</span>
                         </MenuItem>
                     </Menu>
                 </Overlay>
                 <ChildContent>
                     <a class="ant-dropdown-link" @onclick:preventDefault>
                         <span class="workspace-name">Personal</span>
-                        <Icon Type="down" />
+                        <Icon Type="caret-down" />
                     </a>
                 </ChildContent>
             </Dropdown>
