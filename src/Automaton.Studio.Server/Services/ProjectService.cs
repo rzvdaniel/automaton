@@ -247,21 +247,7 @@ public class ProjectService
         return true;
     }
 
-    /// <summary>
-    /// Check if user has a specific role or higher in a project
-    /// </summary>
-    public async Task<bool> HasRoleAsync(Guid projectId, Guid userId, ProjectRole minimumRole, CancellationToken cancellationToken = default)
-    {
-        return await authorizationService.HasRoleInProjectAsync(projectId, userId, minimumRole, cancellationToken);
-    }
 
-    /// <summary>
-    /// Get user's membership in a project
-    /// </summary>
-    public async Task<ProjectMember?> GetUserProjectMembershipAsync(Guid projectId, CancellationToken cancellationToken = default)
-    {
-        return await authorizationService.GetUserProjectMembershipAsync(projectId, UserId, cancellationToken);
-    }
 
     /// <summary>
     /// Get user's role in a project
