@@ -40,26 +40,7 @@
     </Header>
 
     <Content Class="content-padding home-content content-background">
-        @if (isInProjectContext && currentUserRole.HasValue)
-        {
-            @if (currentUserRole == ProjectRole.AppUser)
-            {
-                <AppUserDashboard />
-            }
-            else if (currentUserRole == ProjectRole.Viewer)
-            {
-                <ViewerDashboard />
-            }
-            else if (currentUserRole == ProjectRole.Developer || currentUserRole == ProjectRole.ProjectAdmin)
-            {
-                <DeveloperDashboard />
-            }
-        }
-        else
-        {
-            <!-- Default dashboard for personal workspace -->
-            <PersonalDashboard />
-        }
+        <DynamicComponent Type="@GetDashboardComponentType()" />
     </Content>
 </Layout>
 
