@@ -2,6 +2,7 @@
 using Automaton.Studio.Services;
 using Automaton.Core.Enums;
 using Automaton.Studio.Enums;
+using Automaton.Studio.Pages.Dashboard.Components;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Dashboard
@@ -35,7 +36,7 @@ namespace Automaton.Studio.Pages.Dashboard
             await DetectUserRoleAsync();
 
             // Load dashboard context for role-based data
-            await DashboardContextService.LoadDashboardDataAsync();
+            await DashboardContextService.LoadDashboardDataAsync();         
         }
 
         private async void HandleProjectContextChanged(ProjectListItem? project)
@@ -47,7 +48,7 @@ namespace Automaton.Studio.Pages.Dashboard
             
             // Reload dashboard context for new role
             await DashboardContextService.LoadDashboardDataAsync();
-            
+                        
             // Trigger UI update
             StateHasChanged();
         }
@@ -79,6 +80,36 @@ namespace Automaton.Studio.Pages.Dashboard
             }
         }
 
+        /// <summary>
+        /// Maps user role and project context to the appropriate dashboard component type.
+        /// Always returns a valid Type (defaults to PersonalDashboard if unable to determine).
+        /// </summary>
+        /// <returns>The dashboard component type to display.</returns>
+        protected Type GetDashboardComponentType()
+        {
+            // If not in project context, show personal workspace dashboard
+            if (!isInProjectContext)
+            {
+                return typeof(PersonalDashboard);
+            }
+
+            // If role is not available, default to personal dashboard
+            if (!currentUserRole.HasValue)
+            {
+                return typeof(PersonalDashboard);
+            }
+
+            // Map role to dashboard component type
+            return currentUserRole.Value switch
+            {
+                ProjectRole.AppUser => typeof(AppUserDashboard),
+                ProjectRole.Viewer => typeof(ViewerDashboard),
+                ProjectRole.Developer => typeof(DeveloperDashboard),
+                ProjectRole.ProjectAdmin => typeof(DeveloperDashboard),
+                _ => typeof(PersonalDashboard) // Fallback for unknown roles
+            };
+        }
+
         public void Dispose()
         {
             // Unsubscribe from event to prevent memory leaks
@@ -100,13 +131,6 @@ namespace Automaton.Studio.Pages.Dashboard
             NavigationManager.NavigateTo("/customsteps");
         }
 
-        // Removed the skip functionality since we're using a simplified approach
-        // Users can simply not visit the onboarding page if they don't want to complete setup
-        private void SkipOnboardingForNow()
-        {
-            // Update the local state to hide the onboarding alert for this session only
-            shouldShowOnboarding = false;
-            StateHasChanged();
-        }
+
     }
 }
