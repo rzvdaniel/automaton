@@ -6,12 +6,24 @@ namespace Automaton.Studio.Pages.Apps;
 public class AppsViewModel
 {
     private readonly AppsService appsService;
+    private readonly ResourceAuthorizationService authorizationService;
 
     public ICollection<AppListItem> Apps { get; set; } = new List<AppListItem>();
 
-    public AppsViewModel(AppsService appsService)
+    /// <summary>
+    /// Check if user can create apps in the current context.
+    /// </summary>
+    public bool CanCreateApp => authorizationService.CanCreateApp();
+
+    /// <summary>
+    /// Check if user can manage resources (update/delete) in the current context.
+    /// </summary>
+    public bool CanManageApps => authorizationService.CanManageResources();
+
+    public AppsViewModel(AppsService appsService, ResourceAuthorizationService authorizationService)
     {
         this.appsService = appsService;
+        this.authorizationService = authorizationService;
     }
 
     public async Task GetApps()

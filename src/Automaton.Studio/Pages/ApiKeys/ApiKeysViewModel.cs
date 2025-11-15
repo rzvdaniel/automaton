@@ -11,6 +11,7 @@ public class ApiKeysViewModel
     private readonly IApiKeysService apiKeysService;
     private readonly MessageService messageService;
     private readonly IJSRuntime jsRuntime;
+    private readonly ResourceAuthorizationService authorizationService;
 
     public bool Loading { get; set; } = true;
     public List<ApiKeyResponse>? ApiKeys { get; set; }
@@ -23,14 +24,26 @@ public class ApiKeysViewModel
     public string NewApiKey { get; set; } = "";
     public ApiKeyScope NewApiKeyScope { get; set; } = ApiKeyScope.FullAccess;
 
+    /// <summary>
+    /// Check if user can create API keys (always true, API keys are personal).
+    /// </summary>
+    public bool CanCreateApiKey => authorizationService.CanCreateApiKey();
+
+    /// <summary>
+    /// Check if user can manage API keys (always true for personal keys).
+    /// </summary>
+    public bool CanManageApiKeys => true; // API keys are always personal
+
     public ApiKeysViewModel(
         IApiKeysService apiKeysService,
         MessageService messageService,
-        IJSRuntime jsRuntime)
+        IJSRuntime jsRuntime,
+        ResourceAuthorizationService authorizationService)
     {
         this.apiKeysService = apiKeysService;
         this.messageService = messageService;
         this.jsRuntime = jsRuntime;
+        this.authorizationService = authorizationService;
     }
 
     public async Task LoadApiKeys()

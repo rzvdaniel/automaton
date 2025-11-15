@@ -32,13 +32,16 @@
                             </Button>
                         </Tooltip>
                     </SpaceItem>
-                    <SpaceItem>
-                        <Tooltip Title="Create new app">
-                            <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ShowNewAppDialog())">
-                                Create App
-                            </Button>
-                        </Tooltip>
-                    </SpaceItem>
+                    @if (AppsViewModel.CanCreateApp)
+                    {
+                        <SpaceItem>
+                            <Tooltip Title="Create new app">
+                                <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ShowNewAppDialog())">
+                                    Create App
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                    }
                 </Space>
             </Col>
         </Row>
@@ -57,7 +60,7 @@
                           FeatureSectionTitle="Powerful web apps anyone can create in seconds!"
                           FeatureSectionSubtitle="Create apps that connect to your existing Flows"
                           HelpSectionTitle="Learn more about Apps"
-                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Create App", Icon = "plus", OnClick = () => ShowNewAppDialog() })"
+                          PrimaryAction="@(AppsViewModel.CanCreateApp ? new EnhancedEmpty.EmptyActionModel { Text = "Create App", Icon = "plus", OnClick = () => ShowNewAppDialog() } : null)"
                           SecondaryActions="@GetAppSecondaryActions()"
                           FeatureCards="@GetAppFeatureCards()"
                           HelpLinks="@GetAppHelpLinks()">

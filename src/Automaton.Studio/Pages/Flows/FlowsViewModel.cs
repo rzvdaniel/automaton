@@ -10,18 +10,36 @@ public class FlowsViewModel
 {
     private readonly FlowsService flowsService;
     private readonly FlowService flowService;
+    private readonly ResourceAuthorizationService authorizationService;
 
     public ICollection<FlowModel> Flows { get; set;  } = new List<FlowModel>();
+
+    /// <summary>
+    /// Check if user can create flows in the current context.
+    /// </summary>
+    public bool CanCreateFlow => authorizationService.CanCreateFlow();
+
+    /// <summary>
+    /// Check if user can manage resources (update/delete) in the current context.
+    /// </summary>
+    public bool CanManageFlows => authorizationService.CanManageResources();
+
+    /// <summary>
+    /// Check if user can execute flows in the current context.
+    /// </summary>
+    public bool CanExecuteFlows => authorizationService.CanExecuteResources();
 
     public FlowsViewModel
     (
         FlowsService flowsService,
         RunnerService runnerService,
-        FlowService flowService
+        FlowService flowService,
+        ResourceAuthorizationService authorizationService
     )
     {
         this.flowsService = flowsService;
         this.flowService = flowService;
+        this.authorizationService = authorizationService;
     }
 
     public async Task GetFlows()

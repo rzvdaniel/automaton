@@ -8,14 +8,29 @@ public class CustomStepsViewModel
 {
     private readonly CustomStepsService customStepsService;
     private readonly StepFactory stepFactory;
+    private readonly ResourceAuthorizationService authorizationService;
 
-    public CustomStepsViewModel(CustomStepsService customStepsService, StepFactory stepFactory)
+    public CustomStepsViewModel(
+        CustomStepsService customStepsService, 
+        StepFactory stepFactory,
+        ResourceAuthorizationService authorizationService)
     {
         this.customStepsService = customStepsService;
         this.stepFactory = stepFactory;
+        this.authorizationService = authorizationService;
     }
 
     public ICollection<CustomStepListItem> CustomSteps { get; set; } = new List<CustomStepListItem>();
+
+    /// <summary>
+    /// Check if user can create custom steps in the current context.
+    /// </summary>
+    public bool CanCreateCustomStep => authorizationService.CanCreateCustomStep();
+
+    /// <summary>
+    /// Check if user can manage resources (update/delete) in the current context.
+    /// </summary>
+    public bool CanManageCustomSteps => authorizationService.CanManageResources();
 
     public async Task GetCustomSteps()
     {

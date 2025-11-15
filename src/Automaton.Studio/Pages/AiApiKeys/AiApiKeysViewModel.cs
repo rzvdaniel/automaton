@@ -8,6 +8,7 @@ public class AiApiKeysViewModel
 {
     private readonly AiApiKeyService aiApiKeyService;
     private readonly MessageService messageService;
+    private readonly ResourceAuthorizationService authorizationService;
 
     public bool Loading { get; set; } = false;
     public bool CreateModalVisible { get; set; } = false;
@@ -16,10 +17,24 @@ public class AiApiKeysViewModel
     public IEnumerable<AiApiKeyModel> AiApiKeys { get; set; } = new List<AiApiKeyModel>();
     public CreateAiApiKeyRequest CreateRequest { get; set; } = new();
 
-    public AiApiKeysViewModel(AiApiKeyService aiApiKeyService, MessageService messageService)
+    /// <summary>
+    /// Check if user can create AI API keys (always true, AI API keys are personal).
+    /// </summary>
+    public bool CanCreateAiApiKey => authorizationService.CanCreateAiApiKey();
+
+    /// <summary>
+    /// Check if user can manage AI API keys (always true for personal keys).
+    /// </summary>
+    public bool CanManageAiApiKeys => true; // AI API keys are always personal
+
+    public AiApiKeysViewModel(
+        AiApiKeyService aiApiKeyService, 
+        MessageService messageService,
+        ResourceAuthorizationService authorizationService)
     {
         this.aiApiKeyService = aiApiKeyService;
         this.messageService = messageService;
+        this.authorizationService = authorizationService;
     }
 
     public async Task LoadAiApiKeys()
