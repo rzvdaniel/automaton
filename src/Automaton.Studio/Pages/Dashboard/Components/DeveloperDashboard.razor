@@ -34,36 +34,42 @@
         <Title Level="3" Style="margin-bottom: 24px;">Quick Actions</Title>
         <Row Gutter="(16, 16)">
             <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/apps"))">
-                    <div class="action-icon" style="background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);">
-                        <Icon Type="appstore" Style="font-size: 32px; color: white;" />
+                <Card Hoverable Class="action-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/apps"))" class="clickable-card-content">
+                        <div class="action-icon" style="background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);">
+                            <Icon Type="appstore" Style="font-size: 32px; color: white;" />
+                        </div>
+                        <Title Level="4">Create App</Title>
+                        <Paragraph Type="@TextElementType.Secondary">
+                            Build a new web application
+                        </Paragraph>
                     </div>
-                    <Title Level="4">Create App</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        Build a new web application
-                    </Paragraph>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/flows"))">
-                    <div class="action-icon" style="background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);">
-                        <Icon Type="profile" Style="font-size: 32px; color: white;" />
+                <Card Hoverable Class="action-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/flows"))" class="clickable-card-content">
+                        <div class="action-icon" style="background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);">
+                            <Icon Type="profile" Style="font-size: 32px; color: white;" />
+                        </div>
+                        <Title Level="4">Create Flow</Title>
+                        <Paragraph Type="@TextElementType.Secondary">
+                            Design an automation workflow
+                        </Paragraph>
                     </div>
-                    <Title Level="4">Create Flow</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        Design an automation workflow
-                    </Paragraph>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card" @onclick="@(() => Navigation.NavigateTo("/customsteps"))">
-                    <div class="action-icon" style="background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);">
-                        <Icon Type="experiment" Style="font-size: 32px; color: white;" />
+                <Card Hoverable Class="action-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/customsteps"))" class="clickable-card-content">
+                        <div class="action-icon" style="background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);">
+                            <Icon Type="experiment" Style="font-size: 32px; color: white;" />
+                        </div>
+                        <Title Level="4">Create Custom Step</Title>
+                        <Paragraph Type="@TextElementType.Secondary">
+                            Build reusable automation steps
+                        </Paragraph>
                     </div>
-                    <Title Level="4">Create Custom Step</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        Build reusable automation steps
-                    </Paragraph>
                 </Card>
             </Col>
         </Row>
@@ -142,47 +148,55 @@
         <Title Level="3" Style="margin-bottom: 24px;">Development Tools</Title>
         <Row Gutter="(16, 16)">
             <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/apps"))">
-                    <div class="tool-icon">
-                        <Icon Type="appstore" Style="font-size: 24px; color: #1890ff;" />
+                <Card Hoverable Class="tool-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/apps"))" class="clickable-card-content">
+                        <div class="tool-icon">
+                            <Icon Type="appstore" Style="font-size: 24px; color: #1890ff;" />
+                        </div>
+                        <Title Level="5">Apps</Title>
+                        <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                            Manage web applications
+                        </Paragraph>
                     </div>
-                    <Title Level="5">Apps</Title>
-                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                        Manage web applications
-                    </Paragraph>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/flows"))">
-                    <div class="tool-icon">
-                        <Icon Type="profile" Style="font-size: 24px; color: #52c41a;" />
+                <Card Hoverable Class="tool-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/flows"))" class="clickable-card-content">
+                        <div class="tool-icon">
+                            <Icon Type="profile" Style="font-size: 24px; color: #52c41a;" />
+                        </div>
+                        <Title Level="5">Flows</Title>
+                        <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                            Manage automation flows
+                        </Paragraph>
                     </div>
-                    <Title Level="5">Flows</Title>
-                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                        Manage automation flows
-                    </Paragraph>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/runners"))">
-                    <div class="tool-icon">
-                        <Icon Type="play-square" Style="font-size: 24px; color: #722ed1;" />
+                <Card Hoverable Class="tool-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/runners"))" class="clickable-card-content">
+                        <div class="tool-icon">
+                            <Icon Type="play-square" Style="font-size: 24px; color: #722ed1;" />
+                        </div>
+                        <Title Level="5">Runners</Title>
+                        <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                            Manage execution runners
+                        </Paragraph>
                     </div>
-                    <Title Level="5">Runners</Title>
-                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                        Manage execution runners
-                    </Paragraph>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="tool-card" @onclick="@(() => Navigation.NavigateTo("/customsteps"))">
-                    <div class="tool-icon">
-                        <Icon Type="experiment" Style="font-size: 24px; color: #fa8c16;" />
+                <Card Hoverable Class="tool-card">
+                    <div @onclick="@(() => Navigation.NavigateTo("/customsteps"))" class="clickable-card-content">
+                        <div class="tool-icon">
+                            <Icon Type="experiment" Style="font-size: 24px; color: #fa8c16;" />
+                        </div>
+                        <Title Level="5">Custom Steps</Title>
+                        <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
+                            Manage custom steps
+                        </Paragraph>
                     </div>
-                    <Title Level="5">Custom Steps</Title>
-                    <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px;">
-                        Manage custom steps
-                    </Paragraph>
                 </Card>
             </Col>
         </Row>
@@ -193,31 +207,35 @@
         <Title Level="3" Style="margin-bottom: 24px;">Project Administration</Title>
         <Row Gutter="(16, 16)">
             <Col Xs="24" Sm="12">
-                <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <div class="tool-icon">
-                            <Icon Type="team" Style="font-size: 24px; color: #1890ff;" />
-                        </div>
-                        <div>
-                            <Title Level="5" Style="margin-bottom: 4px;">Manage Members</Title>
-                            <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
-                                Add or remove project members
-                            </Paragraph>
+                <Card Hoverable>
+                    <div @onclick="@(() => Navigation.NavigateTo($"/projects"))" class="clickable-card-content">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div class="tool-icon">
+                                <Icon Type="team" Style="font-size: 24px; color: #1890ff;" />
+                            </div>
+                            <div>
+                                <Title Level="5" Style="margin-bottom: 4px;">Manage Members</Title>
+                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                    Add or remove project members
+                                </Paragraph>
+                            </div>
                         </div>
                     </div>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12">
-                <Card Hoverable @onclick="@(() => Navigation.NavigateTo($"/projects"))">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <div class="tool-icon">
-                            <Icon Type="setting" Style="font-size: 24px; color: #722ed1;" />
-                        </div>
-                        <div>
-                            <Title Level="5" Style="margin-bottom: 4px;">Project Settings</Title>
-                            <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
-                                Configure project details
-                            </Paragraph>
+                <Card Hoverable>
+                    <div @onclick="@(() => Navigation.NavigateTo($"/projects"))" class="clickable-card-content">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div class="tool-icon">
+                                <Icon Type="setting" Style="font-size: 24px; color: #722ed1;" />
+                            </div>
+                            <div>
+                                <Title Level="5" Style="margin-bottom: 4px;">Project Settings</Title>
+                                <Paragraph Type="@TextElementType.Secondary" Style="font-size: 12px; margin-bottom: 0;">
+                                    Configure project details
+                                </Paragraph>
+                            </div>
                         </div>
                     </div>
                 </Card>
@@ -377,6 +395,16 @@
         justify-content: center;
         background: #f0f2f5;
         margin: 0 auto 12px;
+    }
+
+    .clickable-card-content {
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: inherit;
+        justify-content: inherit;
     }
 
     /* Responsive */
