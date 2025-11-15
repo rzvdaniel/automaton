@@ -18,14 +18,9 @@ public class AiApiKeysViewModel
     public CreateAiApiKeyRequest CreateRequest { get; set; } = new();
 
     /// <summary>
-    /// Check if user can create AI API keys (always true, AI API keys are personal).
-    /// </summary>
-    public bool CanCreateAiApiKey => authorizationService.CanCreateAiApiKey();
-
-    /// <summary>
     /// Check if user can manage AI API keys (always true for personal keys).
     /// </summary>
-    public bool CanManageAiApiKeys => true; // AI API keys are always personal
+    public bool CanManageAiApiKeys => authorizationService.CanManageResources();
 
     public AiApiKeysViewModel(
         AiApiKeyService aiApiKeyService, 

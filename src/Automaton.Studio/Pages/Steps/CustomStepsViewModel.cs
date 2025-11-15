@@ -23,11 +23,6 @@ public class CustomStepsViewModel
     public ICollection<CustomStepListItem> CustomSteps { get; set; } = new List<CustomStepListItem>();
 
     /// <summary>
-    /// Check if user can create custom steps in the current context.
-    /// </summary>
-    public bool CanCreateCustomStep => authorizationService.CanCreateCustomStep();
-
-    /// <summary>
     /// Check if user can manage resources (update/delete) in the current context.
     /// </summary>
     public bool CanManageCustomSteps => authorizationService.CanManageResources();

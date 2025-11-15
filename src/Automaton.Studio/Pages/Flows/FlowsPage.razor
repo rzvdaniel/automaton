@@ -24,7 +24,7 @@
 
             <Col Class="right-actions">
                 <Space Class="right-header-items">
-                    @if (FlowsViewModel.CanCreateFlow)
+                    @if (FlowsViewModel.CanManageFlows)
                     {
                         <SpaceItem>
                             <Tooltip Title="New flow">
@@ -52,7 +52,7 @@
                           FeatureSectionTitle="Automated workflows anyone can setup in seconds!"
                           FeatureSectionSubtitle="Create powerful automation flows with our intuitive drag-and-drop interface"
                           HelpSectionTitle="Learn more about Workflows"
-                          PrimaryAction="@(FlowsViewModel.CanCreateFlow ? new EnhancedEmpty.EmptyActionModel { Text = "Create Flow", Icon = "plus", OnClick = () => NewFlowDialog() } : null)"
+                           PrimaryAction="@(FlowsViewModel.CanManageFlows ? new EnhancedEmpty.EmptyActionModel { Text = "Create Flow", Icon = "plus", OnClick = () => NewFlowDialog() } : null)"
                           SecondaryActions="@GetFlowSecondaryActions()"
                           FeatureCards="@GetFlowFeatureCards()"
                           HelpLinks="@GetFlowHelpLinks()">

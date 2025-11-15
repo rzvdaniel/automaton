@@ -15,11 +15,6 @@ public class FlowsViewModel
     public ICollection<FlowModel> Flows { get; set;  } = new List<FlowModel>();
 
     /// <summary>
-    /// Check if user can create flows in the current context.
-    /// </summary>
-    public bool CanCreateFlow => authorizationService.CanCreateFlow();
-
-    /// <summary>
     /// Check if user can manage resources (update/delete) in the current context.
     /// </summary>
     public bool CanManageFlows => authorizationService.CanManageResources();

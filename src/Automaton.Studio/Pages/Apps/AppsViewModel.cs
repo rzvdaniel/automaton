@@ -11,11 +11,6 @@ public class AppsViewModel
     public ICollection<AppListItem> Apps { get; set; } = new List<AppListItem>();
 
     /// <summary>
-    /// Check if user can create apps in the current context.
-    /// </summary>
-    public bool CanCreateApp => authorizationService.CanCreateApp();
-
-    /// <summary>
     /// Check if user can manage resources (update/delete) in the current context.
     /// </summary>
     public bool CanManageApps => authorizationService.CanManageResources();

@@ -25,14 +25,9 @@ public class ApiKeysViewModel
     public ApiKeyScope NewApiKeyScope { get; set; } = ApiKeyScope.FullAccess;
 
     /// <summary>
-    /// Check if user can create API keys (always true, API keys are personal).
-    /// </summary>
-    public bool CanCreateApiKey => authorizationService.CanCreateApiKey();
-
-    /// <summary>
     /// Check if user can manage API keys (always true for personal keys).
     /// </summary>
-    public bool CanManageApiKeys => true; // API keys are always personal
+    public bool CanManageApiKeys => authorizationService.CanManageResources();
 
     public ApiKeysViewModel(
         IApiKeysService apiKeysService,

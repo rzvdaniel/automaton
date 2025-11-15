@@ -23,7 +23,7 @@
 
             <Col Class="right-actions">
                 <Space Class="right-header-items">
-                    @if (CustomStepsViewModel.CanCreateCustomStep)
+                    @if (CustomStepsViewModel.CanManageCustomSteps)
                     {
                         <SpaceItem>
                             <Tooltip Title="New custom step">
@@ -52,7 +52,7 @@
                           FeatureSectionTitle="Powerful automation steps anyone can create in seconds!"
                           FeatureSectionSubtitle="Create custom steps using Python, PowerShell, or Batch scripts"
                           HelpSectionTitle="Learn more about Custom Steps"
-                          PrimaryAction="@(CustomStepsViewModel.CanCreateCustomStep ? new EnhancedEmpty.EmptyActionModel { Text = "Create Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() } : null)"
+                          PrimaryAction="@(CustomStepsViewModel.CanManageCustomSteps ? new EnhancedEmpty.EmptyActionModel { Text = "Create Step", Icon = "plus", OnClick = () => ShowNewCustomStepDialog() } : null)"
                           SecondaryActions="@GetCustomStepSecondaryActions()"
                           FeatureCards="@GetCustomStepFeatureCards()"
                           HelpLinks="@GetCustomStepHelpLinks()">

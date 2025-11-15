@@ -13,11 +13,6 @@ public class RunnersViewModel
     public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
 
     /// <summary>
-    /// Check if user can create runners in the current context.
-    /// </summary>
-    public bool CanCreateRunner => authorizationService.CanCreateRunner();
-
-    /// <summary>
     /// Check if user can manage resources (update/delete) in the current context.
     /// </summary>
     public bool CanManageRunners => authorizationService.CanManageResources();
