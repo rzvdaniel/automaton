@@ -13,13 +13,20 @@ public class AiApiKeyService
     private readonly ILogger<AiApiKeyService> logger;
     private readonly ConfigurationService configuration;
     private readonly AiProviderFactory aiProviderFactory;
+    private readonly ResourceAuthorizationService authorizationService;
 
-    public AiApiKeyService(ApplicationDbContext dbContext, ILogger<AiApiKeyService> logger, ConfigurationService configuration, AiProviderFactory aiProviderFactory)
+    public AiApiKeyService(
+        ApplicationDbContext dbContext, 
+        ILogger<AiApiKeyService> logger, 
+        ConfigurationService configuration, 
+        AiProviderFactory aiProviderFactory,
+        ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.configuration = configuration;
         this.aiProviderFactory = aiProviderFactory;
+        this.authorizationService = authorizationService;
     }
 
     public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null)
@@ -48,16 +55,23 @@ public class AiApiKeyService
 
     public async Task<IEnumerable<AiApiKey>> GetUserAiApiKeysAsync(Guid userId)
     {
-        return await dbContext.AiApiKeys
-            .Where(ak => ak.UserId == userId && ak.IsActive)
+        // Use authorization service query to get accessible AI API keys
+        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }
 
     public async Task<AiApiKey?> GetAiApiKeyAsync(Guid id, Guid userId)
     {
-        return await dbContext.AiApiKeys
-            .FirstOrDefaultAsync(ak => ak.Id == id && ak.UserId == userId && ak.IsActive);
+        // Check if user can access this AI API key
+        if (!await authorizationService.CanAccessAiApiKeyAsync(id, userId))
+        {
+            logger.LogWarning("User {UserId} attempted to access AI API key {AiApiKeyId} without permission", userId, id);
+            return null;
+        }
+
+        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
+            .FirstOrDefaultAsync(ak => ak.Id == id);
     }
 
     public async Task<string?> GetDecryptedApiKeyAsync(Guid id, Guid userId)
@@ -82,6 +96,13 @@ public class AiApiKeyService
 
     public async Task<bool> UpdateAiApiKeyAsync(Guid id, Guid userId, string? name = null, string? description = null, bool? isActive = null)
     {
+        // Check if user can update this AI API key
+        if (!await authorizationService.CanUpdateAiApiKeyAsync(id, userId))
+        {
+            logger.LogWarning("User {UserId} attempted to update AI API key {AiApiKeyId} without permission", userId, id);
+            return false;
+        }
+
         var aiApiKey = await GetAiApiKeyAsync(id, userId);
         if (aiApiKey == null) return false;
 
@@ -97,6 +118,13 @@ public class AiApiKeyService
 
     public async Task<bool> DeleteAiApiKeyAsync(Guid id, Guid userId)
     {
+        // Check if user can delete this AI API key
+        if (!await authorizationService.CanDeleteAiApiKeyAsync(id, userId))
+        {
+            logger.LogWarning("User {UserId} attempted to delete AI API key {AiApiKeyId} without permission", userId, id);
+            return false;
+        }
+
         var aiApiKey = await GetAiApiKeyAsync(id, userId);
         if (aiApiKey == null) return false;
 
@@ -109,8 +137,9 @@ public class AiApiKeyService
 
     public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, AiProvider provider)
     {
-        return await dbContext.AiApiKeys
-            .Where(ak => ak.UserId == userId && ak.Provider == provider && ak.IsActive)
+        // Use authorization service query to get accessible AI API keys
+        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
+            .Where(ak => ak.Provider == provider)
             .OrderByDescending(ak => ak.LastUsedAt ?? ak.CreatedAt)
             .ToListAsync();
     }

@@ -11,11 +11,16 @@ public class ApiKeyService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<ApiKeyService> logger;
+    private readonly ResourceAuthorizationService authorizationService;
 
-    public ApiKeyService(ApplicationDbContext dbContext, ILogger<ApiKeyService> logger)
+    public ApiKeyService(
+        ApplicationDbContext dbContext, 
+        ILogger<ApiKeyService> logger,
+        ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
+        this.authorizationService = authorizationService;
     }
 
     public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(Guid userId, string name, string? description = null, DateTime? expiresAt = null, ApiKeyScope scope = ApiKeyScope.Runner)
@@ -93,14 +98,21 @@ public class ApiKeyService
 
     public async Task<IEnumerable<ApiKey>> GetUserApiKeysAsync(Guid userId)
     {
-        return await dbContext.ApiKeys
-            .Where(ak => ak.UserId == userId)
+        // Use authorization service query to get accessible API keys
+        return await authorizationService.GetAccessibleApiKeysQuery(userId)
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }
 
     public async Task<bool> RevokeApiKeyAsync(Guid apiKeyId, Guid userId)
     {
+        // Check if user can delete (revoke) this API key
+        if (!await authorizationService.CanDeleteApiKeyAsync(apiKeyId, userId))
+        {
+            logger.LogWarning("User {UserId} attempted to revoke API key {ApiKeyId} without permission", userId, apiKeyId);
+            return false;
+        }
+
         var apiKey = await dbContext.ApiKeys
             .FirstOrDefaultAsync(ak => ak.Id == apiKeyId && ak.UserId == userId);
 
@@ -119,10 +131,10 @@ public class ApiKeyService
     /// </summary>
     public async Task<ApiKey?> GetUserWebAppApiKeyAsync(Guid userId)
     {
-        return await dbContext.ApiKeys
+        // Use authorization service query to get accessible API keys
+        return await authorizationService.GetAccessibleApiKeysQuery(userId)
             .Include(ak => ak.User)
-            .Where(ak => ak.UserId == userId
-                && ak.Scope == ApiKeyScope.WebApp
+            .Where(ak => ak.Scope == ApiKeyScope.WebApp
                 && ak.IsActive
                 && (!ak.ExpiresAt.HasValue || ak.ExpiresAt.Value > DateTime.UtcNow))
             .OrderByDescending(ak => ak.CreatedAt)

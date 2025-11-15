@@ -735,4 +735,152 @@ public class ResourceAuthorizationService
     }
 
     #endregion
+
+    #region API Keys Authorization
+
+    /// <summary>
+    /// Check if user can access an API key
+    /// User can access only if they are the owner
+    /// </summary>
+    public async Task<bool> CanAccessApiKeyAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanAccessApiKeyAsync(apiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can access an API key
+    /// </summary>
+    public async Task<bool> CanAccessApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var apiKey = await dbContext.ApiKeys
+            .FirstOrDefaultAsync(ak => ak.Id == apiKeyId && ak.UserId == userId, cancellationToken);
+
+        return apiKey != null;
+    }
+
+    /// <summary>
+    /// Check if user can update an API key
+    /// User can update only if they are the owner
+    /// </summary>
+    public async Task<bool> CanUpdateApiKeyAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanUpdateApiKeyAsync(apiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can update an API key
+    /// </summary>
+    public async Task<bool> CanUpdateApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Same as access - only owner can update
+        return await CanAccessApiKeyAsync(apiKeyId, userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if user can delete an API key
+    /// User can delete only if they are the owner
+    /// </summary>
+    public async Task<bool> CanDeleteApiKeyAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanDeleteApiKeyAsync(apiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can delete an API key
+    /// </summary>
+    public async Task<bool> CanDeleteApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Same as access - only owner can delete
+        return await CanAccessApiKeyAsync(apiKeyId, userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Get IQueryable for API keys that the user can access
+    /// </summary>
+    public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery()
+    {
+        return GetAccessibleApiKeysQuery(UserId);
+    }
+
+    public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery(Guid userId)
+    {
+        // API keys are only accessible to their owner (no project sharing)
+        return dbContext.ApiKeys.Where(ak => ak.UserId == userId);
+    }
+
+    #endregion
+
+    #region AI API Keys Authorization
+
+    /// <summary>
+    /// Check if user can access an AI API key
+    /// User can access only if they are the owner
+    /// </summary>
+    public async Task<bool> CanAccessAiApiKeyAsync(Guid aiApiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanAccessAiApiKeyAsync(aiApiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can access an AI API key
+    /// </summary>
+    public async Task<bool> CanAccessAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var aiApiKey = await dbContext.AiApiKeys
+            .FirstOrDefaultAsync(ak => ak.Id == aiApiKeyId && ak.UserId == userId && ak.IsActive, cancellationToken);
+
+        return aiApiKey != null;
+    }
+
+    /// <summary>
+    /// Check if user can update an AI API key
+    /// User can update only if they are the owner
+    /// </summary>
+    public async Task<bool> CanUpdateAiApiKeyAsync(Guid aiApiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanUpdateAiApiKeyAsync(aiApiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can update an AI API key
+    /// </summary>
+    public async Task<bool> CanUpdateAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Same as access - only owner can update
+        return await CanAccessAiApiKeyAsync(aiApiKeyId, userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if user can delete an AI API key
+    /// User can delete only if they are the owner
+    /// </summary>
+    public async Task<bool> CanDeleteAiApiKeyAsync(Guid aiApiKeyId, CancellationToken cancellationToken = default)
+    {
+        return await CanDeleteAiApiKeyAsync(aiApiKeyId, UserId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Check if a specific user can delete an AI API key
+    /// </summary>
+    public async Task<bool> CanDeleteAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Same as access - only owner can delete
+        return await CanAccessAiApiKeyAsync(aiApiKeyId, userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Get IQueryable for AI API keys that the user can access
+    /// </summary>
+    public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery()
+    {
+        return GetAccessibleAiApiKeysQuery(UserId);
+    }
+
+    public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery(Guid userId)
+    {
+        // AI API keys are only accessible to their owner (no project sharing)
+        return dbContext.AiApiKeys.Where(ak => ak.UserId == userId && ak.IsActive);
+    }
+
+    #endregion
 }
