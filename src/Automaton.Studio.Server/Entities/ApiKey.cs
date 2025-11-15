@@ -21,9 +21,6 @@ public class ApiKey
     public string KeyPrefix { get; set; } = string.Empty; // For display purposes (e.g., "ak_runner_1234...")
 
     [Required]
-    public Guid UserId { get; set; }
-
-    [Required]
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastUsedAt { get; set; }
@@ -38,6 +35,7 @@ public class ApiKey
     [MaxLength(500)]
     public string? Description { get; set; }
 
-    // Navigation properties
-    public virtual ApplicationUser User { get; set; } = null!;
+    // Navigation properties for many-to-many relationship with users and projects
+    public virtual ICollection<ApiKeyUser> ApiKeyUsers { get; set; } = new List<ApiKeyUser>();
+    public virtual ICollection<ProjectApiKey> ProjectApiKeys { get; set; } = new List<ProjectApiKey>();
 }

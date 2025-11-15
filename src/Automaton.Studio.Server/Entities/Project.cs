@@ -55,4 +55,6 @@ public class Project
     public virtual ICollection<ProjectFlow> ProjectFlows { get; set; } = new List<ProjectFlow>();
     public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();
     public virtual ICollection<ProjectCustomStep> ProjectCustomSteps { get; set; } = new List<ProjectCustomStep>();
+    public virtual ICollection<ProjectApiKey> ProjectApiKeys { get; set; } = new List<ProjectApiKey>();
+    public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
 }

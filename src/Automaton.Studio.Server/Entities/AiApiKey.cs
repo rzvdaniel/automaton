@@ -23,9 +23,6 @@ public class AiApiKey
     public string EncryptedApiKey { get; set; } = string.Empty; // Encrypted storage
 
     [Required]
-    public Guid UserId { get; set; }
-
-    [Required]
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastUsedAt { get; set; }
@@ -35,7 +32,9 @@ public class AiApiKey
     [MaxLength(500)]
     public string? Description { get; set; }
 
-    public virtual ApplicationUser User { get; set; } = null!;
+    // Navigation properties for many-to-many relationship with users and projects
+    public virtual ICollection<AiApiKeyUser> AiApiKeyUsers { get; set; } = new List<AiApiKeyUser>();
+    public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
 }
 
 public enum AiProvider

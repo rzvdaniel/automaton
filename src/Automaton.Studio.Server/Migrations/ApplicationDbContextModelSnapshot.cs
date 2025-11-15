@@ -56,20 +56,26 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("Provider")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("LastUsedAt");
 
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "IsActive");
-
-                    b.HasIndex("UserId", "Provider");
-
                     b.ToTable("AiApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKeyUser", b =>
+                {
+                    b.Property<Guid>("AiApiKeyId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("AiApiKeyId", "UserId");
+
+                    b.HasIndex(new[] { "AiApiKeyId" }, "IX_AiApiKeyUser_AiApiKeyId");
+
+                    b.ToTable("AiApiKeyUsers");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
@@ -116,9 +122,6 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(3);
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("HashedKey")
@@ -126,11 +129,22 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("LastUsedAt");
 
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "IsActive");
-
                     b.ToTable("ApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
+                {
+                    b.Property<Guid>("ApiKeyId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ApiKeyId", "UserId");
+
+                    b.HasIndex(new[] { "ApiKeyId" }, "IX_ApiKeyUser_ApiKeyId");
+
+                    b.ToTable("ApiKeyUsers");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
@@ -547,6 +561,56 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectAiApiKey", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AiApiKeyId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "AiApiKeyId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("AiApiKeyId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectAiApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApiKey", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("ApiKeyId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AddedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("ProjectId", "ApiKeyId");
+
+                    b.HasIndex("AddedBy");
+
+                    b.HasIndex("ApiKeyId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectApiKeys");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -914,7 +978,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 13, 12, 12, 26, 957, DateTimeKind.Local).AddTicks(5354));
+                        .HasDefaultValue(new DateTime(2025, 11, 16, 0, 3, 22, 927, DateTimeKind.Local).AddTicks(908));
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");
@@ -1022,26 +1086,22 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKeyUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                    b.HasOne("Automaton.Studio.Server.Entities.AiApiKey", null)
+                        .WithMany("AiApiKeyUsers")
+                        .HasForeignKey("AiApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", null)
+                        .WithMany("ApiKeyUsers")
+                        .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
@@ -1110,6 +1170,58 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectAiApiKey", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.AiApiKey", "AiApiKey")
+                        .WithMany("ProjectAiApiKeys")
+                        .HasForeignKey("AiApiKeyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectAiApiKeys")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("AiApiKey");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApiKey", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", "ApiKey")
+                        .WithMany("ProjectApiKeys")
+                        .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                        .WithMany("ProjectApiKeys")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("ApiKey");
+
+                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
@@ -1316,6 +1428,20 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+                {
+                    b.Navigation("AiApiKeyUsers");
+
+                    b.Navigation("ProjectAiApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+                {
+                    b.Navigation("ApiKeyUsers");
+
+                    b.Navigation("ProjectApiKeys");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
                 {
                     b.Navigation("UserRoles");
@@ -1348,6 +1474,10 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
                 {
                     b.Navigation("Members");
+
+                    b.Navigation("ProjectAiApiKeys");
+
+                    b.Navigation("ProjectApiKeys");
 
                     b.Navigation("ProjectApps");
 

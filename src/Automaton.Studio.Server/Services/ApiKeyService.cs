@@ -23,7 +23,7 @@ public class ApiKeyService
         this.authorizationService = authorizationService;
     }
 
-    public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(Guid userId, string name, string? description = null, DateTime? expiresAt = null, ApiKeyScope scope = ApiKeyScope.Runner)
+    public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(Guid userId, string name, string? description = null, DateTime? expiresAt = null, ApiKeyScope scope = ApiKeyScope.Runner, Guid? projectId = null)
     {
         // Generate a cryptographically secure API key
         var keyBytes = new byte[32];
@@ -52,7 +52,6 @@ public class ApiKeyService
             Name = name,
             HashedKey = hashedKey,
             KeyPrefix = $"{prefix}{rawKey[..8]}...",
-            UserId = userId,
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = expiresAt,
             Description = description,
@@ -61,6 +60,28 @@ public class ApiKeyService
         };
 
         dbContext.ApiKeys.Add(entity);
+        
+        // Create personal ownership link
+        var apiKeyUser = new ApiKeyUser
+        {
+            ApiKeyId = entity.Id,
+            UserId = userId
+        };
+        dbContext.ApiKeyUsers.Add(apiKeyUser);
+        
+        // If project is specified, add to project
+        if (projectId.HasValue)
+        {
+            var projectApiKey = new ProjectApiKey
+            {
+                ProjectId = projectId.Value,
+                ApiKeyId = entity.Id,
+                AddedAt = DateTime.UtcNow,
+                AddedBy = userId
+            };
+            dbContext.ProjectApiKeys.Add(projectApiKey);
+        }
+        
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("API key created for user {UserId} with scope {Scope}", userId, scope);
@@ -76,7 +97,6 @@ public class ApiKeyService
         var hashedKey = HashApiKey(apiKey);
 
         var entity = await dbContext.ApiKeys
-            .Include(ak => ak.User)
             .FirstOrDefaultAsync(ak => ak.HashedKey == hashedKey && ak.IsActive);
 
         if (entity == null)
@@ -113,8 +133,8 @@ public class ApiKeyService
             return false;
         }
 
-        var apiKey = await dbContext.ApiKeys
-            .FirstOrDefaultAsync(ak => ak.Id == apiKeyId && ak.UserId == userId);
+        var apiKey = await authorizationService.GetAccessibleApiKeysQuery(userId)
+            .FirstOrDefaultAsync(ak => ak.Id == apiKeyId);
 
         if (apiKey == null)
             return false;
@@ -133,7 +153,6 @@ public class ApiKeyService
     {
         // Use authorization service query to get accessible API keys
         return await authorizationService.GetAccessibleApiKeysQuery(userId)
-            .Include(ak => ak.User)
             .Where(ak => ak.Scope == ApiKeyScope.WebApp
                 && ak.IsActive
                 && (!ak.ExpiresAt.HasValue || ak.ExpiresAt.Value > DateTime.UtcNow))

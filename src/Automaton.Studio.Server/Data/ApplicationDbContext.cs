@@ -31,7 +31,9 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<Log> Logs { get; set; }
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
+        public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
+        public virtual DbSet<AiApiKeyUser> AiApiKeyUsers { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
@@ -43,6 +45,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ProjectFlow> ProjectFlows { get; set; }
         public virtual DbSet<ProjectRunner> ProjectRunners { get; set; }
         public virtual DbSet<ProjectCustomStep> ProjectCustomSteps { get; set; }
+        public virtual DbSet<ProjectApiKey> ProjectApiKeys { get; set; }
+        public virtual DbSet<ProjectAiApiKey> ProjectAiApiKeys { get; set; }
         public virtual DbSet<InvitationToken> InvitationTokens { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
@@ -183,7 +187,6 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.HashedKey).IsRequired().HasMaxLength(500);
                 entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 
                 // Configure Scope property with sentinel value to avoid EF Core warning
@@ -194,15 +197,16 @@ namespace Automaton.Studio.Server.Data
                 
                 entity.Property(e => e.Description).HasMaxLength(500);
 
-                entity.HasOne(e => e.User)
-                    .WithMany()
-                    .HasForeignKey(e => e.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
                 entity.HasIndex(e => e.HashedKey).IsUnique();
-                entity.HasIndex(e => e.UserId);
-                entity.HasIndex(e => new { e.UserId, e.IsActive });
                 entity.HasIndex(e => e.LastUsedAt);
+            });
+            
+            modelBuilder.Entity<ApiKeyUser>(entity =>
+            {
+                entity.HasKey(e => new { e.ApiKeyId, e.UserId });
+                entity.HasIndex(e => e.ApiKeyId, "IX_ApiKeyUser_ApiKeyId");
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.ApiKeyId).IsRequired();
             });
 
             modelBuilder.Entity<AiApiKey>(entity =>
@@ -212,19 +216,18 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Provider).IsRequired();
                 entity.Property(e => e.EncryptedApiKey).IsRequired().HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Description).HasMaxLength(500);
 
-                entity.HasOne(e => e.User)
-                    .WithMany()
-                    .HasForeignKey(e => e.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasIndex(e => e.UserId);
-                entity.HasIndex(e => new { e.UserId, e.IsActive });
                 entity.HasIndex(e => e.LastUsedAt);
-                entity.HasIndex(e => new { e.UserId, e.Provider });
+            });
+            
+            modelBuilder.Entity<AiApiKeyUser>(entity =>
+            {
+                entity.HasKey(e => new { e.AiApiKeyId, e.UserId });
+                entity.HasIndex(e => e.AiApiKeyId, "IX_AiApiKeyUser_AiApiKeyId");
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.AiApiKeyId).IsRequired();
             });
 
             modelBuilder.Entity<FlowExecutionLog>(entity =>
@@ -397,6 +400,54 @@ namespace Automaton.Studio.Server.Data
                     .HasForeignKey(e => e.CustomStepId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectApiKey>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.ApiKeyId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.ApiKeyId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectApiKeys)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.ApiKey)
+                    .WithMany(a => a.ProjectApiKeys)
+                    .HasForeignKey(e => e.ApiKeyId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AddedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AddedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+            
+            modelBuilder.Entity<ProjectAiApiKey>(entity =>
+            {
+                entity.HasKey(e => new { e.ProjectId, e.AiApiKeyId });
+                entity.Property(e => e.AddedAt).IsRequired();
+                
+                entity.HasIndex(e => e.ProjectId);
+                entity.HasIndex(e => e.AiApiKeyId);
+                
+                entity.HasOne(e => e.Project)
+                    .WithMany(p => p.ProjectAiApiKeys)
+                    .HasForeignKey(e => e.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.AiApiKey)
+                    .WithMany(a => a.ProjectAiApiKeys)
+                    .HasForeignKey(e => e.AiApiKeyId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
                 entity.HasOne(e => e.AddedByUser)
                     .WithMany()
                     .HasForeignKey(e => e.AddedBy)
