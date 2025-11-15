@@ -24,11 +24,13 @@ public class ApiKeysViewModelTests
         mockApiKeysService = Substitute.For<IApiKeysService>();
         mockMessageService = Substitute.For<MessageService>();
         mockJsRuntime = Substitute.For<IJSRuntime>();
+        var mockAuthorizationService = Substitute.For<ResourceAuthorizationService>();
 
         viewModel = new ApiKeysViewModel(
             mockApiKeysService,
             mockMessageService,
-            mockJsRuntime);
+            mockJsRuntime,
+            mockAuthorizationService);
     }
 
     [Test]

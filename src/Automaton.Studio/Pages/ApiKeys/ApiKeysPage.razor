@@ -26,13 +26,16 @@
 
             <Col Class="right-actions">
                 <Space Class="right-header-items">
-                    <SpaceItem>
-                        <Tooltip Title="New API Key">
-                            <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ViewModel.ShowCreateModal())">
-                                Create API Key
-                            </Button>
-                        </Tooltip>
-                    </SpaceItem>
+                    @if (ViewModel.CanCreateApiKey)
+                    {
+                        <SpaceItem>
+                            <Tooltip Title="New API Key">
+                                <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ViewModel.ShowCreateModal())">
+                                    Create API Key
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                    }
                 </Space>
             </Col>
         </Row>
