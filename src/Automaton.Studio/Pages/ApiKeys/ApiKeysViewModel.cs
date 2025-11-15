@@ -25,14 +25,18 @@ public class ApiKeysViewModel
     public ApiKeyScope NewApiKeyScope { get; set; } = ApiKeyScope.FullAccess;
 
     /// <summary>
-    /// Check if user can create API keys (always true, API keys are personal).
+    /// Check if user can create API keys.
+    /// In Personal Mode: always true
+    /// In Project Mode: only ProjectAdmin and Developer
     /// </summary>
     public bool CanCreateApiKey => authorizationService.CanCreateApiKey();
 
     /// <summary>
-    /// Check if user can manage API keys (always true for personal keys).
+    /// Check if user can manage API keys.
+    /// In Personal Mode: always true for owned keys
+    /// In Project Mode: only ProjectAdmin and Developer
     /// </summary>
-    public bool CanManageApiKeys => true; // API keys are always personal
+    public bool CanManageApiKeys => authorizationService.CanManageResources();
 
     public ApiKeysViewModel(
         IApiKeysService apiKeysService,

@@ -29,7 +29,7 @@ public class AiApiKeyService
         this.authorizationService = authorizationService;
     }
 
-    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null)
+    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null, Guid? projectId = null)
     {
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
@@ -40,13 +40,34 @@ public class AiApiKeyService
             Name = name,
             Provider = provider,
             EncryptedApiKey = encryptedApiKey,
-            UserId = userId,
             CreatedAt = DateTime.UtcNow,
             Description = description,
             IsActive = true
         };
 
         dbContext.AiApiKeys.Add(entity);
+        
+        // Create personal ownership link
+        var aiApiKeyUser = new AiApiKeyUser
+        {
+            AiApiKeyId = entity.Id,
+            UserId = userId
+        };
+        dbContext.AiApiKeyUsers.Add(aiApiKeyUser);
+        
+        // If project is specified, add to project
+        if (projectId.HasValue)
+        {
+            var projectAiApiKey = new ProjectAiApiKey
+            {
+                ProjectId = projectId.Value,
+                AiApiKeyId = entity.Id,
+                AddedAt = DateTime.UtcNow,
+                AddedBy = userId
+            };
+            dbContext.ProjectAiApiKeys.Add(projectAiApiKey);
+        }
+        
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation("AI API key created for user {UserId} with provider {Provider}", userId, provider);

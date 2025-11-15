@@ -173,22 +173,40 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if user can create an API key.
-    /// API keys are personal and not project-scoped, so always allowed.
+    /// In Personal Mode: always true
+    /// In Project Mode: only ProjectAdmin and Developer
     /// </summary>
     public bool CanCreateApiKey()
     {
-        // API keys are always personal, regardless of project context
-        return true;
+        if (IsInPersonalMode())
+        {
+            _logger.Debug("CanCreateApiKey: Personal mode - allowing creation");
+            return true;
+        }
+
+        var canCreate = HasRoleOrHigher(ProjectRole.Developer);
+        _logger.Debug("CanCreateApiKey: Project mode - Role: {Role}, CanCreate: {CanCreate}", 
+            GetCurrentProjectRole(), canCreate);
+        return canCreate;
     }
 
     /// <summary>
     /// Check if user can create an AI API key.
-    /// AI API keys are personal and not project-scoped, so always allowed.
+    /// In Personal Mode: always true
+    /// In Project Mode: only ProjectAdmin and Developer
     /// </summary>
     public bool CanCreateAiApiKey()
     {
-        // AI API keys are always personal, regardless of project context
-        return true;
+        if (IsInPersonalMode())
+        {
+            _logger.Debug("CanCreateAiApiKey: Personal mode - allowing creation");
+            return true;
+        }
+
+        var canCreate = HasRoleOrHigher(ProjectRole.Developer);
+        _logger.Debug("CanCreateAiApiKey: Project mode - Role: {Role}, CanCreate: {CanCreate}", 
+            GetCurrentProjectRole(), canCreate);
+        return canCreate;
     }
 
     /// <summary>

@@ -1,5 +1,7 @@
+using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -17,14 +19,17 @@ public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationSchemeOptions>
 {
     private readonly ApiKeyService apiKeyService;
+    private readonly ApplicationDbContext dbContext;
 
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        ApiKeyService apiKeyService) : base(options, logger, encoder)
+        ApiKeyService apiKeyService,
+        ApplicationDbContext dbContext) : base(options, logger, encoder)
     {
         this.apiKeyService = apiKeyService;
+        this.dbContext = dbContext;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -67,21 +72,40 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("Invalid API key");
         }
 
+        // Get the user associated with this API key
+        var userId = await dbContext.ApiKeyUsers
+            .Where(aku => aku.ApiKeyId == apiKeyEntity.Id)
+            .Select(aku => aku.UserId)
+            .FirstOrDefaultAsync();
+        
+        if (userId == Guid.Empty)
+        {
+            Logger.LogWarning("API key {ApiKeyId} has no associated user", apiKeyEntity.Id);
+            return AuthenticateResult.Fail("Invalid API key - no user association");
+        }
+        
+        var user = await dbContext.Users.FindAsync(userId);
+        if (user == null)
+        {
+            Logger.LogWarning("User {UserId} not found for API key {ApiKeyId}", userId, apiKeyEntity.Id);
+            return AuthenticateResult.Fail("Invalid API key - user not found");
+        }
+
         Logger.LogInformation("API key authentication successful for user {UserId} with scope {Scope} on request {Method} {Path}", 
-            apiKeyEntity.UserId, apiKeyEntity.Scope, Request.Method, Request.Path);
+            userId, apiKeyEntity.Scope, Request.Method, Request.Path);
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, apiKeyEntity.UserId.ToString()),
-            new(ClaimTypes.Name, apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email),
-            new(ClaimTypes.Email, apiKeyEntity.User.Email),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(ClaimTypes.Name, user.UserName ?? user.Email),
+            new(ClaimTypes.Email, user.Email),
             new("api_key_scope", apiKeyEntity.Scope.ToString()),
             new("api_key_id", apiKeyEntity.Id.ToString()),
-            new("uid", apiKeyEntity.UserId.ToString())
+            new("uid", userId.ToString())
         };
 
         Logger.LogDebug("Created claims for API key authentication: NameIdentifier={UserId}, Name={UserName}, Email={Email}", 
-            apiKeyEntity.UserId, apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email, apiKeyEntity.User.Email);
+            userId, user.UserName ?? user.Email, user.Email);
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);

@@ -1,8 +1,10 @@
 using Automaton.Core.Enums;
+using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -12,11 +14,16 @@ public class ApiKeysController : BaseController
 {
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
+    private readonly ApplicationDbContext dbContext;
 
-    public ApiKeysController(ApiKeyService apiKeyService, UserContextService userContextService)
+    public ApiKeysController(
+        ApiKeyService apiKeyService, 
+        UserContextService userContextService,
+        ApplicationDbContext dbContext)
     {
         this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
+        this.dbContext = dbContext;
     }
 
     [HttpPost]
@@ -103,11 +110,28 @@ public class ApiKeysController : BaseController
             return Forbid("API key does not have sufficient permissions for runner operations. Required: Runner, Execute, or FullAccess scope.");
         }
 
+        // Get the user associated with this API key
+        var userId = await dbContext.ApiKeyUsers
+            .Where(aku => aku.ApiKeyId == apiKeyEntity.Id)
+            .Select(aku => aku.UserId)
+            .FirstOrDefaultAsync();
+        
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized(new { message = "API key has no associated user" });
+        }
+        
+        var user = await dbContext.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized(new { message = "User not found for API key" });
+        }
+
         return Ok(new ValidateApiKeyResponse
         {
             IsValid = true,
-            UserId = apiKeyEntity.UserId,
-            UserName = apiKeyEntity.User.UserName ?? apiKeyEntity.User.Email,
+            UserId = userId,
+            UserName = user.UserName ?? user.Email,
             Scope = apiKeyEntity.Scope,
             KeyPrefix = apiKeyEntity.KeyPrefix
         });

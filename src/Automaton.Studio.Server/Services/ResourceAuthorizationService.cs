@@ -749,13 +749,29 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can access an API key
+    /// User can access if:
+    /// 1. They own it (through ApiKeyUser)
+    /// 2. They are a member of a project that has access to it (through ProjectApiKey) with appropriate role
     /// </summary>
     public async Task<bool> CanAccessApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var apiKey = await dbContext.ApiKeys
-            .FirstOrDefaultAsync(ak => ak.Id == apiKeyId && ak.UserId == userId, cancellationToken);
-
-        return apiKey != null;
+        // Check personal ownership
+        var isOwner = await dbContext.ApiKeyUsers
+            .AnyAsync(aku => aku.ApiKeyId == apiKeyId && aku.UserId == userId, cancellationToken);
+        
+        if (isOwner)
+            return true;
+        
+        // Check project membership with appropriate role
+        var hasProjectAccess = await dbContext.ProjectApiKeys
+            .Where(pak => pak.ApiKeyId == apiKeyId)
+            .Join(dbContext.ProjectMembers, 
+                pak => pak.ProjectId, 
+                pm => pm.ProjectId, 
+                (pak, pm) => new { pak, pm })
+            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive, cancellationToken);
+        
+        return hasProjectAccess;
     }
 
     /// <summary>
@@ -769,11 +785,13 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can update an API key
+    /// Only the owner can update
     /// </summary>
     public async Task<bool> CanUpdateApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        // Same as access - only owner can update
-        return await CanAccessApiKeyAsync(apiKeyId, userId, cancellationToken);
+        // Only owner can update
+        return await dbContext.ApiKeyUsers
+            .AnyAsync(aku => aku.ApiKeyId == apiKeyId && aku.UserId == userId, cancellationToken);
     }
 
     /// <summary>
@@ -787,15 +805,18 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can delete an API key
+    /// Only the owner can delete
     /// </summary>
     public async Task<bool> CanDeleteApiKeyAsync(Guid apiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        // Same as access - only owner can delete
-        return await CanAccessApiKeyAsync(apiKeyId, userId, cancellationToken);
+        // Only owner can delete
+        return await dbContext.ApiKeyUsers
+            .AnyAsync(aku => aku.ApiKeyId == apiKeyId && aku.UserId == userId, cancellationToken);
     }
 
     /// <summary>
     /// Get IQueryable for API keys that the user can access
+    /// Includes both personally owned keys and keys from projects the user is a member of
     /// </summary>
     public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery()
     {
@@ -804,8 +825,23 @@ public class ResourceAuthorizationService
 
     public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery(Guid userId)
     {
-        // API keys are only accessible to their owner (no project sharing)
-        return dbContext.ApiKeys.Where(ak => ak.UserId == userId);
+        // Get API keys the user owns
+        var ownedKeys = dbContext.ApiKeyUsers
+            .Where(aku => aku.UserId == userId)
+            .Select(aku => aku.ApiKeyId);
+        
+        // Get API keys from projects the user is a member of
+        var projectKeys = dbContext.ProjectMembers
+            .Where(pm => pm.UserId == userId && pm.IsActive)
+            .Join(dbContext.ProjectApiKeys, 
+                pm => pm.ProjectId, 
+                pak => pak.ProjectId, 
+                (pm, pak) => pak.ApiKeyId);
+        
+        // Combine both sets
+        var accessibleKeyIds = ownedKeys.Union(projectKeys);
+        
+        return dbContext.ApiKeys.Where(ak => accessibleKeyIds.Contains(ak.Id));
     }
 
     #endregion
@@ -823,13 +859,29 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can access an AI API key
+    /// User can access if:
+    /// 1. They own it (through AiApiKeyUser)
+    /// 2. They are a member of a project that has access to it (through ProjectAiApiKey) with appropriate role
     /// </summary>
     public async Task<bool> CanAccessAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var aiApiKey = await dbContext.AiApiKeys
-            .FirstOrDefaultAsync(ak => ak.Id == aiApiKeyId && ak.UserId == userId && ak.IsActive, cancellationToken);
-
-        return aiApiKey != null;
+        // Check personal ownership
+        var isOwner = await dbContext.AiApiKeyUsers
+            .AnyAsync(aaku => aaku.AiApiKeyId == aiApiKeyId && aaku.UserId == userId, cancellationToken);
+        
+        if (isOwner)
+            return true;
+        
+        // Check project membership with appropriate role
+        var hasProjectAccess = await dbContext.ProjectAiApiKeys
+            .Where(paak => paak.AiApiKeyId == aiApiKeyId)
+            .Join(dbContext.ProjectMembers, 
+                paak => paak.ProjectId, 
+                pm => pm.ProjectId, 
+                (paak, pm) => new { paak, pm })
+            .AnyAsync(x => x.pm.UserId == userId && x.pm.IsActive, cancellationToken);
+        
+        return hasProjectAccess;
     }
 
     /// <summary>
@@ -843,11 +895,13 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can update an AI API key
+    /// Only the owner can update
     /// </summary>
     public async Task<bool> CanUpdateAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        // Same as access - only owner can update
-        return await CanAccessAiApiKeyAsync(aiApiKeyId, userId, cancellationToken);
+        // Only owner can update
+        return await dbContext.AiApiKeyUsers
+            .AnyAsync(aaku => aaku.AiApiKeyId == aiApiKeyId && aaku.UserId == userId, cancellationToken);
     }
 
     /// <summary>
@@ -861,15 +915,18 @@ public class ResourceAuthorizationService
 
     /// <summary>
     /// Check if a specific user can delete an AI API key
+    /// Only the owner can delete
     /// </summary>
     public async Task<bool> CanDeleteAiApiKeyAsync(Guid aiApiKeyId, Guid userId, CancellationToken cancellationToken = default)
     {
-        // Same as access - only owner can delete
-        return await CanAccessAiApiKeyAsync(aiApiKeyId, userId, cancellationToken);
+        // Only owner can delete
+        return await dbContext.AiApiKeyUsers
+            .AnyAsync(aaku => aaku.AiApiKeyId == aiApiKeyId && aaku.UserId == userId, cancellationToken);
     }
 
     /// <summary>
     /// Get IQueryable for AI API keys that the user can access
+    /// Includes both personally owned keys and keys from projects the user is a member of
     /// </summary>
     public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery()
     {
@@ -878,8 +935,23 @@ public class ResourceAuthorizationService
 
     public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery(Guid userId)
     {
-        // AI API keys are only accessible to their owner (no project sharing)
-        return dbContext.AiApiKeys.Where(ak => ak.UserId == userId && ak.IsActive);
+        // Get AI API keys the user owns
+        var ownedKeys = dbContext.AiApiKeyUsers
+            .Where(aaku => aaku.UserId == userId)
+            .Select(aaku => aaku.AiApiKeyId);
+        
+        // Get AI API keys from projects the user is a member of
+        var projectKeys = dbContext.ProjectMembers
+            .Where(pm => pm.UserId == userId && pm.IsActive)
+            .Join(dbContext.ProjectAiApiKeys, 
+                pm => pm.ProjectId, 
+                paak => paak.ProjectId, 
+                (pm, paak) => paak.AiApiKeyId);
+        
+        // Combine both sets
+        var accessibleKeyIds = ownedKeys.Union(projectKeys);
+        
+        return dbContext.AiApiKeys.Where(ak => accessibleKeyIds.Contains(ak.Id) && ak.IsActive);
     }
 
     #endregion
