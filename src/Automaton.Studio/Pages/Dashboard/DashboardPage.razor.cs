@@ -130,7 +130,5 @@ namespace Automaton.Studio.Pages.Dashboard
         {
             NavigationManager.NavigateTo("/customsteps");
         }
-
-
     }
 }
