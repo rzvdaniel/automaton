@@ -8,7 +8,7 @@ public partial class ProjectPage : ComponentBase
     public string ProjectId { get; set; } = string.Empty;
 
     [Inject]
-    public ProjectSettingsViewModel ViewModel { get; set; } = default!;
+    public ProjectViewModel ViewModel { get; set; } = default!;
 
     [Inject]
     public NavigationManager NavigationManager { get; set; } = default!;

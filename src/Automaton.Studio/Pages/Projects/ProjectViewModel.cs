@@ -7,7 +7,7 @@ using Serilog;
 
 namespace Automaton.Studio.Pages.Projects;
 
-public class ProjectSettingsViewModel
+public class ProjectViewModel
 {
     private readonly ProjectsClientService _projectsService;
     private readonly ProjectMembersClientService _membersService;
@@ -15,7 +15,7 @@ public class ProjectSettingsViewModel
     private readonly IMessageService _messageService;
     private readonly ProjectContextService _projectContextService;
 
-    public ProjectSettingsViewModel(
+    public ProjectViewModel(
         ProjectsClientService projectsService,
         ProjectMembersClientService membersService,
         ProjectResourcesClientService resourcesService,
