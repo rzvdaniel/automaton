@@ -96,6 +96,12 @@ else
 
 	[Inject] private Automaton.Studio.Services.RunnerService RunnerService { get; set; }
 
+	/// <summary>
+	/// Optional external data source for runners. If provided, the component will use this instead of loading from service.
+	/// </summary>
+	[Parameter]
+	public IEnumerable<RunnerModel>? Runners { get; set; }
+
 	[Parameter] 
 	public bool Multiple { get; set; } = false;
 
@@ -143,6 +149,13 @@ else
 
 	public async Task LoadRunnersAsync()
 	{
+		// If external data source provided, use it instead of loading from service
+		if (Runners != null)
+		{
+			AvailableRunners = Runners;
+			return;
+		}
+
 		try
 		{
 			isLoading = true;
