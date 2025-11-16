@@ -37,6 +37,8 @@ public class ProjectViewModel
     public List<ProjectFlowDto> Flows { get; private set; } = new();
     public List<ProjectRunnerDto> Runners { get; private set; } = new();
     public List<ProjectCustomStepDto> CustomSteps { get; private set; } = new();
+    public List<ProjectApiKeyDto> ApiKeys { get; private set; } = new();
+    public List<ProjectAiApiKeyDto> AiApiKeys { get; private set; } = new();
 
     public bool IsProjectAdmin => Membership?.Role == ProjectRole.ProjectAdmin;
     public bool IsResourceManager => Membership?.Role == ProjectRole.ProjectAdmin || Membership?.Role == ProjectRole.Developer;
@@ -308,6 +310,94 @@ public class ProjectViewModel
         {
             Log.Error(ex, "Error removing custom step {StepId} from project {ProjectId}", stepId, projectId);
             _messageService.Error($"Error removing custom step: {ex.Message}");
+        }
+    }
+
+    public async Task LoadApiKeysAsync(Guid projectId)
+    {
+        try
+        {
+            var apiKeys = await _resourcesService.ListApiKeysAsync(projectId);
+            ApiKeys = apiKeys?.ToList() ?? new List<ProjectApiKeyDto>();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error loading API keys for project {ProjectId}", projectId);
+            _messageService.Error($"Error loading API keys: {ex.Message}");
+        }
+    }
+
+    public async Task AddApiKeyAsync(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            await _resourcesService.AddApiKeyAsync(projectId, apiKeyId);
+            _messageService.Success("API key added to project successfully");
+            await LoadApiKeysAsync(projectId);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error adding API key {ApiKeyId} to project {ProjectId}", apiKeyId, projectId);
+            _messageService.Error($"Error adding API key: {ex.Message}");
+        }
+    }
+
+    public async Task RemoveApiKeyAsync(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            await _resourcesService.RemoveApiKeyAsync(projectId, apiKeyId);
+            _messageService.Success("API key removed from project successfully");
+            await LoadApiKeysAsync(projectId);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error removing API key {ApiKeyId} from project {ProjectId}", apiKeyId, projectId);
+            _messageService.Error($"Error removing API key: {ex.Message}");
+        }
+    }
+
+    public async Task LoadAiApiKeysAsync(Guid projectId)
+    {
+        try
+        {
+            var aiApiKeys = await _resourcesService.ListAiApiKeysAsync(projectId);
+            AiApiKeys = aiApiKeys?.ToList() ?? new List<ProjectAiApiKeyDto>();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error loading AI API keys for project {ProjectId}", projectId);
+            _messageService.Error($"Error loading AI API keys: {ex.Message}");
+        }
+    }
+
+    public async Task AddAiApiKeyAsync(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            await _resourcesService.AddAiApiKeyAsync(projectId, aiApiKeyId);
+            _messageService.Success("AI API key added to project successfully");
+            await LoadAiApiKeysAsync(projectId);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error adding AI API key {AiApiKeyId} to project {ProjectId}", aiApiKeyId, projectId);
+            _messageService.Error($"Error adding AI API key: {ex.Message}");
+        }
+    }
+
+    public async Task RemoveAiApiKeyAsync(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            await _resourcesService.RemoveAiApiKeyAsync(projectId, aiApiKeyId);
+            _messageService.Success("AI API key removed from project successfully");
+            await LoadAiApiKeysAsync(projectId);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error removing AI API key {AiApiKeyId} from project {ProjectId}", aiApiKeyId, projectId);
+            _messageService.Error($"Error removing AI API key: {ex.Message}");
         }
     }
 

@@ -104,6 +104,16 @@
                         <CustomStepsTab ViewModel="@ViewModel" />
                     </TabPane>
 
+                    <TabPane Key="apikeys" Tab="API Keys">
+                        <Icon Type="key" />
+                        <ApiKeysTab ViewModel="@ViewModel" />
+                    </TabPane>
+
+                    <TabPane Key="aiapikeys" Tab="AI API Keys">
+                        <Icon Type="robot" />
+                        <AiApiKeysTab ViewModel="@ViewModel" />
+                    </TabPane>
+
                     @if (ViewModel.IsProjectAdmin)
                     {
                         <TabPane Key="settings" Tab="Settings">

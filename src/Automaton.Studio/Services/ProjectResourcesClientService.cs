@@ -214,4 +214,102 @@ public class ProjectResourcesClientService
             throw;
         }
     }
+
+    // API Keys
+    public async Task<ICollection<ProjectApiKeyDto>> ListApiKeysAsync(Guid projectId)
+    {
+        try
+        {
+            var result = await httpClient.GetAsync($"{configService.ProjectsUrl}/{projectId}/apikeys");
+            result.EnsureSuccessStatusCode();
+            var apiKeys = await result.Content.ReadAsAsync<ICollection<ProjectApiKeyDto>>();
+            return apiKeys;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when loading API keys for project {ProjectId}.", projectId);
+            throw;
+        }
+    }
+
+    public async Task<ProjectApiKeyDto> AddApiKeyAsync(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            var result = await httpClient.PostAsync($"{configService.ProjectsUrl}/{projectId}/apikeys/{apiKeyId}", null);
+            result.EnsureSuccessStatusCode();
+            var projectApiKey = await result.Content.ReadAsAsync<ProjectApiKeyDto>();
+            logger.Information("Added API key {ApiKeyId} to project {ProjectId}.", apiKeyId, projectId);
+            return projectApiKey;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when adding API key {ApiKeyId} to project {ProjectId}.", apiKeyId, projectId);
+            throw;
+        }
+    }
+
+    public async Task RemoveApiKeyAsync(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            var result = await httpClient.DeleteAsync($"{configService.ProjectsUrl}/{projectId}/apikeys/{apiKeyId}");
+            result.EnsureSuccessStatusCode();
+            logger.Information("Removed API key {ApiKeyId} from project {ProjectId}.", apiKeyId, projectId);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when removing API key {ApiKeyId} from project {ProjectId}.", apiKeyId, projectId);
+            throw;
+        }
+    }
+
+    // AI API Keys
+    public async Task<ICollection<ProjectAiApiKeyDto>> ListAiApiKeysAsync(Guid projectId)
+    {
+        try
+        {
+            var result = await httpClient.GetAsync($"{configService.ProjectsUrl}/{projectId}/aiapikeys");
+            result.EnsureSuccessStatusCode();
+            var aiApiKeys = await result.Content.ReadAsAsync<ICollection<ProjectAiApiKeyDto>>();
+            return aiApiKeys;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when loading AI API keys for project {ProjectId}.", projectId);
+            throw;
+        }
+    }
+
+    public async Task<ProjectAiApiKeyDto> AddAiApiKeyAsync(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            var result = await httpClient.PostAsync($"{configService.ProjectsUrl}/{projectId}/aiapikeys/{aiApiKeyId}", null);
+            result.EnsureSuccessStatusCode();
+            var projectAiApiKey = await result.Content.ReadAsAsync<ProjectAiApiKeyDto>();
+            logger.Information("Added AI API key {AiApiKeyId} to project {ProjectId}.", aiApiKeyId, projectId);
+            return projectAiApiKey;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when adding AI API key {AiApiKeyId} to project {ProjectId}.", aiApiKeyId, projectId);
+            throw;
+        }
+    }
+
+    public async Task RemoveAiApiKeyAsync(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            var result = await httpClient.DeleteAsync($"{configService.ProjectsUrl}/{projectId}/aiapikeys/{aiApiKeyId}");
+            result.EnsureSuccessStatusCode();
+            logger.Information("Removed AI API key {AiApiKeyId} from project {ProjectId}.", aiApiKeyId, projectId);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when removing AI API key {AiApiKeyId} from project {ProjectId}.", aiApiKeyId, projectId);
+            throw;
+        }
+    }
 }
