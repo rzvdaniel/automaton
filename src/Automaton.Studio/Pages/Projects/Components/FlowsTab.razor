@@ -1,4 +1,5 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Components
 
 <div class="flows-tab">
     @if (ViewModel.CanManageResources)
@@ -58,13 +59,12 @@
        OnOk="@HandleAddFlow"
        OnCancel="@(() => addFlowModalVisible = false)">
     <Form TModel="AddFlowModel" Layout="@FormLayout.Vertical">
-        <FormItem Label="Flow ID">
-            <Input @bind-Value="@selectedFlowId" Placeholder="Enter Flow GUID" />
+        <FormItem Label="Select Flow">
+            <FlowsSelector @bind-SelectedValue="@selectedFlowId" 
+                           Style="width: 100%"
+                           Placeholder="Select a flow to add" />
         </FormItem>
     </Form>
-    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-        Note: In a production version, this would be a dropdown of available flows.
-    </Text>
 </Modal>
 
 @code {
@@ -73,7 +73,7 @@
 
     private bool flowsLoaded = false;
     private bool addFlowModalVisible = false;
-    private string selectedFlowId = string.Empty;
+    private Guid? selectedFlowId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
@@ -89,15 +89,15 @@
 
     private void ShowAddFlowModal()
     {
-        selectedFlowId = string.Empty;
+        selectedFlowId = null;
         addFlowModalVisible = true;
     }
 
     private async Task HandleAddFlow()
     {
-        if (ViewModel.Project != null && Guid.TryParse(selectedFlowId, out var flowId))
+        if (ViewModel.Project != null && selectedFlowId.HasValue)
         {
-            await ViewModel.AddFlowAsync(ViewModel.Project.Id, flowId);
+            await ViewModel.AddFlowAsync(ViewModel.Project.Id, selectedFlowId.Value);
             addFlowModalVisible = false;
         }
     }
@@ -121,6 +121,6 @@
 
     private class AddFlowModel
     {
-        public string FlowId { get; set; } = string.Empty;
+        public Guid? FlowId { get; set; }
     }
 }

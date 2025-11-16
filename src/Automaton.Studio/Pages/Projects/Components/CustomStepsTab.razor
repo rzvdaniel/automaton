@@ -1,4 +1,5 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Components
 
 <div class="customsteps-tab">
     @if (ViewModel.CanManageResources)
@@ -58,13 +59,12 @@
        OnOk="@HandleAddStep"
        OnCancel="@(() => addStepModalVisible = false)">
     <Form TModel="AddStepModel" Layout="@FormLayout.Vertical">
-        <FormItem Label="Custom Step ID">
-            <Input @bind-Value="@selectedStepId" Placeholder="Enter Custom Step GUID" />
+        <FormItem Label="Select Custom Step">
+            <CustomStepsSelector @bind-SelectedValue="@selectedStepId" 
+                                 Style="width: 100%"
+                                 Placeholder="Select a custom step to add" />
         </FormItem>
     </Form>
-    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-        Note: In a production version, this would be a dropdown of available custom steps.
-    </Text>
 </Modal>
 
 @code {
@@ -73,7 +73,7 @@
 
     private bool stepsLoaded = false;
     private bool addStepModalVisible = false;
-    private string selectedStepId = string.Empty;
+    private Guid? selectedStepId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
@@ -89,15 +89,15 @@
 
     private void ShowAddStepModal()
     {
-        selectedStepId = string.Empty;
+        selectedStepId = null;
         addStepModalVisible = true;
     }
 
     private async Task HandleAddStep()
     {
-        if (ViewModel.Project != null && Guid.TryParse(selectedStepId, out var stepId))
+        if (ViewModel.Project != null && selectedStepId.HasValue)
         {
-            await ViewModel.AddCustomStepAsync(ViewModel.Project.Id, stepId);
+            await ViewModel.AddCustomStepAsync(ViewModel.Project.Id, selectedStepId.Value);
             addStepModalVisible = false;
         }
     }
@@ -121,6 +121,6 @@
 
     private class AddStepModel
     {
-        public string StepId { get; set; } = string.Empty;
+        public Guid? StepId { get; set; }
     }
 }

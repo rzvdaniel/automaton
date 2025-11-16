@@ -8,13 +8,13 @@ namespace Automaton.Studio.Services;
 /// </summary>
 public class ProjectContextService
 {
-    private readonly ProjectsClientService _projectsService;
+    private readonly ProjectsService _projectsService;
     private readonly ILogger _logger = Log.ForContext<ProjectContextService>();
     
     private ProjectListItem? _currentProject;
     private List<ProjectListItem>? _userProjects;
     
-    public ProjectContextService(ProjectsClientService projectsService)
+    public ProjectContextService(ProjectsService projectsService)
     {
         _projectsService = projectsService;
     }

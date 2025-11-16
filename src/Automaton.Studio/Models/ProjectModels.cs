@@ -127,3 +127,23 @@ public class ProjectCustomStepDto
     public string AddedBy { get; set; } = string.Empty;
     public string? AddedByUserName { get; set; }
 }
+
+public class ProjectApiKeyDto
+{
+    public Guid ProjectId { get; set; }
+    public Guid ApiKeyId { get; set; }
+    public string ApiKeyName { get; set; } = string.Empty;
+    public DateTime AddedAt { get; set; }
+    public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
+}
+
+public class ProjectAiApiKeyDto
+{
+    public Guid ProjectId { get; set; }
+    public Guid AiApiKeyId { get; set; }
+    public string AiApiKeyName { get; set; } = string.Empty;
+    public DateTime AddedAt { get; set; }
+    public string AddedBy { get; set; } = string.Empty;
+    public string? AddedByUserName { get; set; }
+}

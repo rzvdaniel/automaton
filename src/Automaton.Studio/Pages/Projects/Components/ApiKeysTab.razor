@@ -1,0 +1,126 @@
+@using Automaton.Studio.Models
+@using Automaton.Studio.Components
+
+<div class="apikeys-tab">
+    @if (ViewModel.CanManageResources)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddApiKeyModal">
+                <Icon Type="plus" />
+                Add API Key to Project
+            </Button>
+        </div>
+    }
+
+    @if (!apiKeysLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadApiKeys">
+                <Icon Type="reload" /> Load API Keys
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectApiKeyDto" DataSource="@ViewModel.ApiKeys">
+            <Column Title="API Key Name" TData="string" @bind-Field="@context.ApiKeyName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.CanManageResources)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveApiKey(context.ApiKeyId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.ApiKeys.Count == 0)
+        {
+            <Empty>
+                <DescriptionTemplate>No API keys in this project yet</DescriptionTemplate>
+                <ChildContent>
+                    @if (ViewModel.CanManageResources)
+                    {
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowAddApiKeyModal">
+                            Add First API Key
+                        </Button>
+                    }
+                </ChildContent>
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add API Key Modal -->
+<Modal Title="Add API Key to Project"
+       @bind-Visible="@addApiKeyModalVisible"
+       OnOk="@HandleAddApiKey"
+       OnCancel="@(() => addApiKeyModalVisible = false)">
+    <Form TModel="AddApiKeyModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="Select API Key">
+            <ApiKeysSelector @bind-SelectedValue="@selectedApiKeyId" 
+                             Style="width: 100%"
+                             Placeholder="Select an API key to add" />
+        </FormItem>
+    </Form>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectViewModel ViewModel { get; set; } = default!;
+
+    private bool apiKeysLoaded = false;
+    private bool addApiKeyModalVisible = false;
+    private Guid? selectedApiKeyId = null;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
+
+    private async Task LoadApiKeys()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadApiKeysAsync(ViewModel.Project.Id);
+            apiKeysLoaded = true;
+        }
+    }
+
+    private void ShowAddApiKeyModal()
+    {
+        selectedApiKeyId = null;
+        addApiKeyModalVisible = true;
+    }
+
+    private async Task HandleAddApiKey()
+    {
+        if (ViewModel.Project != null && selectedApiKeyId.HasValue)
+        {
+            await ViewModel.AddApiKeyAsync(ViewModel.Project.Id, selectedApiKeyId.Value);
+            addApiKeyModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveApiKey(Guid apiKeyId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove API Key",
+            Content = "Are you sure you want to remove this API key from the project?",
+            OkText = "Remove",
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true }
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveApiKeyAsync(ViewModel.Project.Id, apiKeyId);
+        }
+    }
+
+    private class AddApiKeyModel
+    {
+        public Guid? ApiKeyId { get; set; }
+    }
+}

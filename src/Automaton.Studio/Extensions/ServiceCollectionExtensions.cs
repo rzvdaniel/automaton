@@ -112,9 +112,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAiMessageFormattingService, AiMessageFormattingService>();
 
         // Project services
-        services.AddScoped<ProjectsClientService>();
-        services.AddScoped<ProjectMembersClientService>();
-        services.AddScoped<ProjectResourcesClientService>();
+        services.AddScoped<ProjectsService>();
+        services.AddScoped<ProjectMembersService>();
+        services.AddScoped<ProjectResourcesService>();
         services.AddScoped<ProjectContextService>();
         services.AddScoped<DashboardContextService>();
         services.AddScoped<ResourceAuthorizationService>();

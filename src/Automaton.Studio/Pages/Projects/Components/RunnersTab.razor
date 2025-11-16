@@ -1,4 +1,5 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Components
 
 <div class="runners-tab">
     @if (ViewModel.CanManageResources)
@@ -58,13 +59,12 @@
        OnOk="@HandleAddRunner"
        OnCancel="@(() => addRunnerModalVisible = false)">
     <Form TModel="AddRunnerModel" Layout="@FormLayout.Vertical">
-        <FormItem Label="Runner ID">
-            <Input @bind-Value="@selectedRunnerId" Placeholder="Enter Runner GUID" />
+        <FormItem Label="Select Runner">
+            <RunnerSelector @bind-SelectedValue="@selectedRunnerId" 
+                            Style="width: 100%"
+                            Placeholder="Select a runner to add" />
         </FormItem>
     </Form>
-    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-        Note: In a production version, this would be a dropdown of available runners.
-    </Text>
 </Modal>
 
 @code {
@@ -73,7 +73,7 @@
 
     private bool runnersLoaded = false;
     private bool addRunnerModalVisible = false;
-    private string selectedRunnerId = string.Empty;
+    private Guid? selectedRunnerId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
@@ -89,15 +89,15 @@
 
     private void ShowAddRunnerModal()
     {
-        selectedRunnerId = string.Empty;
+        selectedRunnerId = null;
         addRunnerModalVisible = true;
     }
 
     private async Task HandleAddRunner()
     {
-        if (ViewModel.Project != null && Guid.TryParse(selectedRunnerId, out var runnerId))
+        if (ViewModel.Project != null && selectedRunnerId.HasValue)
         {
-            await ViewModel.AddRunnerAsync(ViewModel.Project.Id, runnerId);
+            await ViewModel.AddRunnerAsync(ViewModel.Project.Id, selectedRunnerId.Value);
             addRunnerModalVisible = false;
         }
     }
@@ -121,6 +121,6 @@
 
     private class AddRunnerModel
     {
-        public string RunnerId { get; set; } = string.Empty;
+        public Guid? RunnerId { get; set; }
     }
 }

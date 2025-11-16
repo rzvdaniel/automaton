@@ -1,4 +1,5 @@
 @using Automaton.Studio.Models
+@using Automaton.Studio.Components
 @using Automaton.Studio.Enums
 
 <div class="apps-tab">
@@ -59,13 +60,12 @@
        OnOk="@HandleAddApp"
        OnCancel="@(() => addAppModalVisible = false)">
     <Form TModel="AddAppModel" Layout="@FormLayout.Vertical">
-        <FormItem Label="App ID">
-            <Input @bind-Value="@selectedAppId" Placeholder="Enter App GUID" />
+        <FormItem Label="Select App">
+            <AppsSelector @bind-SelectedValue="@selectedAppId" 
+                          Style="width: 100%"
+                          Placeholder="Select an app to add" />
         </FormItem>
     </Form>
-    <Text Type="@TextElementType.Secondary" Style="font-size: 12px;">
-        Note: In a production version, this would be a dropdown of available apps.
-    </Text>
 </Modal>
 
 @code {
@@ -74,7 +74,7 @@
 
     private bool appsLoaded = false;
     private bool addAppModalVisible = false;
-    private string selectedAppId = string.Empty;
+    private Guid? selectedAppId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
@@ -90,15 +90,15 @@
 
     private void ShowAddAppModal()
     {
-        selectedAppId = string.Empty;
+        selectedAppId = null;
         addAppModalVisible = true;
     }
 
     private async Task HandleAddApp()
     {
-        if (ViewModel.Project != null && Guid.TryParse(selectedAppId, out var appId))
+        if (ViewModel.Project != null && selectedAppId.HasValue)
         {
-            await ViewModel.AddAppAsync(ViewModel.Project.Id, appId);
+            await ViewModel.AddAppAsync(ViewModel.Project.Id, selectedAppId.Value);
             addAppModalVisible = false;
         }
     }
@@ -122,6 +122,6 @@
 
     private class AddAppModel
     {
-        public string AppId { get; set; } = string.Empty;
+        public Guid? AppId { get; set; }
     }
 }

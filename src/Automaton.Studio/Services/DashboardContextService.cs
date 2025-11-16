@@ -10,7 +10,7 @@ namespace Automaton.Studio.Services;
 public class DashboardContextService
 {
     private readonly ProjectContextService _projectContext;
-    private readonly ProjectResourcesClientService _projectResources;
+    private readonly ProjectResourcesService _projectResources;
     private readonly ILogger _logger;
 
     public bool IsAppUser { get; private set; }
@@ -23,7 +23,7 @@ public class DashboardContextService
 
     public DashboardContextService(
         ProjectContextService projectContext,
-        ProjectResourcesClientService projectResources)
+        ProjectResourcesService projectResources)
     {
         _projectContext = projectContext;
         _projectResources = projectResources;

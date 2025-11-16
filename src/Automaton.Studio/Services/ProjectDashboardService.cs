@@ -10,14 +10,14 @@ namespace Automaton.Studio.Services;
 public class ProjectDashboardService
 {
     private readonly ProjectContextService _projectContext;
-    private readonly ProjectResourcesClientService _projectResources;
-    private readonly ProjectsClientService _projectsClient;
+    private readonly ProjectResourcesService _projectResources;
+    private readonly ProjectsService _projectsClient;
     private readonly ILogger _logger;
 
     public ProjectDashboardService(
         ProjectContextService projectContext,
-        ProjectResourcesClientService projectResources,
-        ProjectsClientService projectsClient)
+        ProjectResourcesService projectResources,
+        ProjectsService projectsClient)
     {
         _projectContext = projectContext;
         _projectResources = projectResources;

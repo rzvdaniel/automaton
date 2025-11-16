@@ -1,0 +1,126 @@
+@using Automaton.Studio.Models
+@using Automaton.Studio.Components
+
+<div class="aiapikeys-tab">
+    @if (ViewModel.CanManageResources)
+    {
+        <div style="margin-bottom: 16px;">
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddAiApiKeyModal">
+                <Icon Type="plus" />
+                Add AI API Key to Project
+            </Button>
+        </div>
+    }
+
+    @if (!aiApiKeysLoaded)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Button Type="@ButtonType.Link" OnClick="@LoadAiApiKeys">
+                <Icon Type="reload" /> Load AI API Keys
+            </Button>
+        </div>
+    }
+    else
+    {
+        <Table TItem="ProjectAiApiKeyDto" DataSource="@ViewModel.AiApiKeys">
+            <Column Title="AI API Key Name" TData="string" @bind-Field="@context.AiApiKeyName" />
+            <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
+            <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
+            <ActionColumn Title="Actions">
+                @if (ViewModel.CanManageResources)
+                {
+                    <Button Size="@ButtonSize.Small" Danger OnClick="@(() => HandleRemoveAiApiKey(context.AiApiKeyId))">
+                        <Icon Type="delete" /> Remove
+                    </Button>
+                }
+            </ActionColumn>
+        </Table>
+
+        @if (ViewModel.AiApiKeys.Count == 0)
+        {
+            <Empty>
+                <DescriptionTemplate>No AI API keys in this project yet</DescriptionTemplate>
+                <ChildContent>
+                    @if (ViewModel.CanManageResources)
+                    {
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowAddAiApiKeyModal">
+                            Add First AI API Key
+                        </Button>
+                    }
+                </ChildContent>
+            </Empty>
+        }
+    }
+</div>
+
+<!-- Add AI API Key Modal -->
+<Modal Title="Add AI API Key to Project"
+       @bind-Visible="@addAiApiKeyModalVisible"
+       OnOk="@HandleAddAiApiKey"
+       OnCancel="@(() => addAiApiKeyModalVisible = false)">
+    <Form TModel="AddAiApiKeyModel" Layout="@FormLayout.Vertical">
+        <FormItem Label="Select AI API Key">
+            <AiApiKeysSelector @bind-SelectedValue="@selectedAiApiKeyId" 
+                               Style="width: 100%"
+                               Placeholder="Select an AI API key to add" />
+        </FormItem>
+    </Form>
+</Modal>
+
+@code {
+    [Parameter]
+    public ProjectViewModel ViewModel { get; set; } = default!;
+
+    private bool aiApiKeysLoaded = false;
+    private bool addAiApiKeyModalVisible = false;
+    private Guid? selectedAiApiKeyId = null;
+
+    [Inject]
+    private ModalService Modal { get; set; } = default!;
+
+    private async Task LoadAiApiKeys()
+    {
+        if (ViewModel.Project != null)
+        {
+            await ViewModel.LoadAiApiKeysAsync(ViewModel.Project.Id);
+            aiApiKeysLoaded = true;
+        }
+    }
+
+    private void ShowAddAiApiKeyModal()
+    {
+        selectedAiApiKeyId = null;
+        addAiApiKeyModalVisible = true;
+    }
+
+    private async Task HandleAddAiApiKey()
+    {
+        if (ViewModel.Project != null && selectedAiApiKeyId.HasValue)
+        {
+            await ViewModel.AddAiApiKeyAsync(ViewModel.Project.Id, selectedAiApiKeyId.Value);
+            addAiApiKeyModalVisible = false;
+        }
+    }
+
+    private async Task HandleRemoveAiApiKey(Guid aiApiKeyId)
+    {
+        var confirmed = await Modal.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Remove AI API Key",
+            Content = "Are you sure you want to remove this AI API key from the project?",
+            OkText = "Remove",
+            OkType = ButtonType.Primary,
+            OkButtonProps = new ButtonProps { Danger = true }
+        });
+
+        if (confirmed && ViewModel.Project != null)
+        {
+            await ViewModel.RemoveAiApiKeyAsync(ViewModel.Project.Id, aiApiKeyId);
+        }
+    }
+
+    private class AddAiApiKeyModel
+    {
+        public Guid? AiApiKeyId { get; set; }
+    }
+}
