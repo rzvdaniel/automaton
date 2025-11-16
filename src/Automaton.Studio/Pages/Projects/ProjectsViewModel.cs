@@ -6,11 +6,11 @@ namespace Automaton.Studio.Pages.Projects;
 
 public class ProjectsViewModel
 {
-    private readonly ProjectsClientService _projectsService;
+    private readonly ProjectsService _projectsService;
 
     public List<ProjectListItem>? Projects { get; private set; }
 
-    public ProjectsViewModel(ProjectsClientService projectsService)
+    public ProjectsViewModel(ProjectsService projectsService)
     {
         _projectsService = projectsService;
     }

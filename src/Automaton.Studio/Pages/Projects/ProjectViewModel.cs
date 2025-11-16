@@ -9,16 +9,16 @@ namespace Automaton.Studio.Pages.Projects;
 
 public class ProjectViewModel
 {
-    private readonly ProjectsClientService _projectsService;
-    private readonly ProjectMembersClientService _membersService;
-    private readonly ProjectResourcesClientService _resourcesService;
+    private readonly ProjectsService _projectsService;
+    private readonly ProjectMembersService _membersService;
+    private readonly ProjectResourcesService _resourcesService;
     private readonly IMessageService _messageService;
     private readonly ProjectContextService _projectContextService;
 
     public ProjectViewModel(
-        ProjectsClientService projectsService,
-        ProjectMembersClientService membersService,
-        ProjectResourcesClientService resourcesService,
+        ProjectsService projectsService,
+        ProjectMembersService membersService,
+        ProjectResourcesService resourcesService,
         IMessageService messageService,
         ProjectContextService projectContextService)
     {

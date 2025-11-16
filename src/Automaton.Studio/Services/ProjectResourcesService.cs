@@ -3,18 +3,18 @@ using Serilog;
 
 namespace Automaton.Studio.Services;
 
-public class ProjectResourcesClientService
+public class ProjectResourcesService
 {
     private readonly HttpClient httpClient;
     private readonly ConfigurationService configService;
     private readonly ILogger logger;
 
-    public ProjectResourcesClientService(
+    public ProjectResourcesService(
         ConfigurationService configService,
         HttpClient httpClient
     )
     {
-        logger = Log.ForContext<ProjectResourcesClientService>();
+        logger = Log.ForContext<ProjectResourcesService>();
         this.configService = configService;
         this.httpClient = httpClient;
     }
