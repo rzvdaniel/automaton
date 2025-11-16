@@ -1,12 +1,8 @@
-using Automaton.Studio.Enums;
-using Automaton.Studio.Models;
-using Automaton.Studio.Services;
-using AntDesign;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Projects;
 
-public partial class ProjectSettingsPage : ComponentBase
+public partial class ProjectPage : ComponentBase
 {
     [Parameter]
     public string ProjectId { get; set; } = string.Empty;
