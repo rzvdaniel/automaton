@@ -534,6 +534,246 @@ public class ProjectResourceService
 
     #endregion
 
+    #region API Keys
+
+    /// <summary>
+    /// Add an API key to a project. Only ProjectAdmin and Developer can add API keys.
+    /// </summary>
+    public async Task<ProjectApiKeyDto?> AddApiKeyToProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to add API key to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, apiKeyId, UserId, cancellationToken);
+            return null;
+        }
+
+        var apiKey = await dbContext.ApiKeys
+            .FirstOrDefaultAsync(a => a.Id == apiKeyId && a.ApiKeyUsers.Any(u => u.UserId == UserId), cancellationToken);
+
+        if (apiKey == null)
+        {
+            throw new InvalidOperationException("API key not found or access denied");
+        }
+
+        var existingLink = await dbContext.ProjectApiKeys
+            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.ApiKeyId == apiKeyId, cancellationToken);
+
+        if (existingLink != null)
+        {
+            throw new InvalidOperationException("API key is already linked to this project");
+        }
+
+        var projectApiKey = new ProjectApiKey
+        {
+            ProjectId = projectId,
+            ApiKeyId = apiKeyId,
+            AddedAt = DateTime.UtcNow,
+            AddedBy = UserId
+        };
+
+        dbContext.ProjectApiKeys.Add(projectApiKey);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Added API key {ApiKeyId} to project {ProjectId} by user {UserId}", apiKeyId, projectId, UserId);
+
+        await auditService.LogResourceLinkedAsync(projectId, apiKeyId, "ApiKey", cancellationToken);
+
+        return new ProjectApiKeyDto
+        {
+            ProjectId = projectId,
+            ApiKeyId = apiKeyId,
+            ApiKeyName = apiKey.Name,
+            AddedAt = projectApiKey.AddedAt,
+            AddedBy = UserId,
+            AddedByName = userContextService.GetUserName()
+        };
+    }
+
+    /// <summary>
+    /// Remove an API key from a project
+    /// </summary>
+    public async Task<bool> RemoveApiKeyFromProjectAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to remove API key from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, apiKeyId, UserId, cancellationToken);
+            return false;
+        }
+
+        var projectApiKey = await dbContext.ProjectApiKeys
+            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.ApiKeyId == apiKeyId, cancellationToken);
+
+        if (projectApiKey == null)
+        {
+            return false;
+        }
+
+        dbContext.ProjectApiKeys.Remove(projectApiKey);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Removed API key {ApiKeyId} from project {ProjectId} by user {UserId}", apiKeyId, projectId, UserId);
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, apiKeyId, "ApiKeyRemoved", cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// List all API keys in a project
+    /// </summary>
+    public async Task<IEnumerable<ProjectApiKeyDto>> ListProjectApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        var hasAccess = await dbContext.ProjectMembers
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
+
+        if (!hasAccess)
+        {
+            logger.Warning("User {UserId} attempted to list API keys in project {ProjectId} without access", UserId, projectId);
+            return Enumerable.Empty<ProjectApiKeyDto>();
+        }
+
+        var apiKeys = await dbContext.ProjectApiKeys
+            .Where(pa => pa.ProjectId == projectId)
+            .Include(pa => pa.ApiKey)
+            .Include(pa => pa.AddedByUser)
+            .Select(pa => new ProjectApiKeyDto
+            {
+                ProjectId = pa.ProjectId,
+                ApiKeyId = pa.ApiKeyId,
+                ApiKeyName = pa.ApiKey.Name,
+                AddedAt = pa.AddedAt,
+                AddedBy = pa.AddedBy,
+                AddedByName = pa.AddedByUser != null ? pa.AddedByUser.UserName ?? string.Empty : string.Empty
+            })
+            .OrderByDescending(pa => pa.AddedAt)
+            .ToListAsync(cancellationToken);
+
+        return apiKeys;
+    }
+
+    #endregion
+
+    #region AI API Keys
+
+    /// <summary>
+    /// Add an AI API key to a project. Only ProjectAdmin and Developer can add AI API keys.
+    /// </summary>
+    public async Task<ProjectAiApiKeyDto?> AddAiApiKeyToProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default)
+    {
+        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to add AI API key to project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, aiApiKeyId, UserId, cancellationToken);
+            return null;
+        }
+
+        var aiApiKey = await dbContext.AiApiKeys
+            .FirstOrDefaultAsync(a => a.Id == aiApiKeyId && a.AiApiKeyUsers.Any(u => u.UserId == UserId), cancellationToken);
+
+        if (aiApiKey == null)
+        {
+            throw new InvalidOperationException("AI API key not found or access denied");
+        }
+
+        var existingLink = await dbContext.ProjectAiApiKeys
+            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.AiApiKeyId == aiApiKeyId, cancellationToken);
+
+        if (existingLink != null)
+        {
+            throw new InvalidOperationException("AI API key is already linked to this project");
+        }
+
+        var projectAiApiKey = new ProjectAiApiKey
+        {
+            ProjectId = projectId,
+            AiApiKeyId = aiApiKeyId,
+            AddedAt = DateTime.UtcNow,
+            AddedBy = UserId
+        };
+
+        dbContext.ProjectAiApiKeys.Add(projectAiApiKey);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Added AI API key {AiApiKeyId} to project {ProjectId} by user {UserId}", aiApiKeyId, projectId, UserId);
+
+        await auditService.LogResourceLinkedAsync(projectId, aiApiKeyId, "AiApiKey", cancellationToken);
+
+        return new ProjectAiApiKeyDto
+        {
+            ProjectId = projectId,
+            AiApiKeyId = aiApiKeyId,
+            AiApiKeyName = aiApiKey.Name,
+            AddedAt = projectAiApiKey.AddedAt,
+            AddedBy = UserId,
+            AddedByName = userContextService.GetUserName()
+        };
+    }
+
+    /// <summary>
+    /// Remove an AI API key from a project
+    /// </summary>
+    public async Task<bool> RemoveAiApiKeyFromProjectAsync(Guid projectId, Guid aiApiKeyId, CancellationToken cancellationToken = default)
+    {
+        if (!await CanManageResourcesAsync(projectId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to remove AI API key from project {ProjectId} without permission", UserId, projectId);
+            await auditService.LogAccessDeniedAsync(projectId, aiApiKeyId, UserId, cancellationToken);
+            return false;
+        }
+
+        var projectAiApiKey = await dbContext.ProjectAiApiKeys
+            .FirstOrDefaultAsync(pa => pa.ProjectId == projectId && pa.AiApiKeyId == aiApiKeyId, cancellationToken);
+
+        if (projectAiApiKey == null)
+        {
+            return false;
+        }
+
+        dbContext.ProjectAiApiKeys.Remove(projectAiApiKey);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Removed AI API key {AiApiKeyId} from project {ProjectId} by user {UserId}", aiApiKeyId, projectId, UserId);
+        // Audit
+        await auditService.LogResourceLinkedAsync(projectId, aiApiKeyId, "AiApiKeyRemoved", cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// List all AI API keys in a project
+    /// </summary>
+    public async Task<IEnumerable<ProjectAiApiKeyDto>> ListProjectAiApiKeysAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        var hasAccess = await dbContext.ProjectMembers
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.IsActive, cancellationToken);
+
+        if (!hasAccess)
+        {
+            logger.Warning("User {UserId} attempted to list AI API keys in project {ProjectId} without access", UserId, projectId);
+            return Enumerable.Empty<ProjectAiApiKeyDto>();
+        }
+
+        var aiApiKeys = await dbContext.ProjectAiApiKeys
+            .Where(pa => pa.ProjectId == projectId)
+            .Include(pa => pa.AiApiKey)
+            .Include(pa => pa.AddedByUser)
+            .Select(pa => new ProjectAiApiKeyDto
+            {
+                ProjectId = pa.ProjectId,
+                AiApiKeyId = pa.AiApiKeyId,
+                AiApiKeyName = pa.AiApiKey.Name,
+                AddedAt = pa.AddedAt,
+                AddedBy = pa.AddedBy,
+                AddedByName = pa.AddedByUser != null ? pa.AddedByUser.UserName ?? string.Empty : string.Empty
+            })
+            .OrderByDescending(pa => pa.AddedAt)
+            .ToListAsync(cancellationToken);
+
+        return aiApiKeys;
+    }
+
+    #endregion
+
     #region Helper Methods
 
     /// <summary>

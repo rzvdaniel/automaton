@@ -413,4 +413,198 @@ public class ProjectResourcesController : BaseController
     }
 
     #endregion
+
+    #region API Keys
+
+    /// <summary>
+    /// List all API keys linked to the project.
+    /// Any project member can view project API keys.
+    /// </summary>
+    [HttpGet("apikeys")]
+    [Authorize(Policy = "ProjectMember")]
+    public async Task<ActionResult<IEnumerable<ProjectApiKeyDto>>> ListProjectApiKeys(Guid projectId)
+    {
+        try
+        {
+            var apiKeys = await resourceService.ListProjectApiKeysAsync(projectId);
+            return Ok(apiKeys);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error listing API keys for project {ProjectId}", projectId);
+            return StatusCode(500, new { message = "Error retrieving API keys" });
+        }
+    }
+
+    /// <summary>
+    /// Link an API key to the project.
+    /// Only ProjectAdmin and Developer can link API keys.
+    /// </summary>
+    [HttpPost("apikeys/{apiKeyId}")]
+    [Authorize(Policy = "ProjectResourceManager")]
+    public async Task<ActionResult<ProjectApiKeyDto>> AddApiKeyToProject(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            var projectApiKey = await resourceService.AddApiKeyToProjectAsync(projectId, apiKeyId);
+            
+            logger.LogInformation(
+                "API key linked to project: ProjectId={ProjectId}, ApiKeyId={ApiKeyId}, AddedBy={AddedBy}",
+                projectId, apiKeyId, GetUserId());
+
+            return Ok(projectApiKey);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error linking API key {ApiKeyId} to project {ProjectId}", 
+                apiKeyId, projectId);
+            return StatusCode(500, new { message = "Error linking API key" });
+        }
+    }
+
+    /// <summary>
+    /// Unlink an API key from the project.
+    /// Only ProjectAdmin and Developer can unlink API keys.
+    /// </summary>
+    [HttpDelete("apikeys/{apiKeyId}")]
+    [Authorize(Policy = "ProjectResourceManager")]
+    public async Task<ActionResult> RemoveApiKeyFromProject(Guid projectId, Guid apiKeyId)
+    {
+        try
+        {
+            var success = await resourceService.RemoveApiKeyFromProjectAsync(projectId, apiKeyId);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "API key not found in project" });
+            }
+
+            logger.LogInformation(
+                "API key unlinked from project: ProjectId={ProjectId}, ApiKeyId={ApiKeyId}, RemovedBy={RemovedBy}",
+                projectId, apiKeyId, GetUserId());
+
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error unlinking API key {ApiKeyId} from project {ProjectId}", 
+                apiKeyId, projectId);
+            return StatusCode(500, new { message = "Error unlinking API key" });
+        }
+    }
+
+    #endregion
+
+    #region AI API Keys
+
+    /// <summary>
+    /// List all AI API keys linked to the project.
+    /// Any project member can view project AI API keys.
+    /// </summary>
+    [HttpGet("aiapikeys")]
+    [Authorize(Policy = "ProjectMember")]
+    public async Task<ActionResult<IEnumerable<ProjectAiApiKeyDto>>> ListProjectAiApiKeys(Guid projectId)
+    {
+        try
+        {
+            var aiApiKeys = await resourceService.ListProjectAiApiKeysAsync(projectId);
+            return Ok(aiApiKeys);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error listing AI API keys for project {ProjectId}", projectId);
+            return StatusCode(500, new { message = "Error retrieving AI API keys" });
+        }
+    }
+
+    /// <summary>
+    /// Link an AI API key to the project.
+    /// Only ProjectAdmin and Developer can link AI API keys.
+    /// </summary>
+    [HttpPost("aiapikeys/{aiApiKeyId}")]
+    [Authorize(Policy = "ProjectResourceManager")]
+    public async Task<ActionResult<ProjectAiApiKeyDto>> AddAiApiKeyToProject(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            var projectAiApiKey = await resourceService.AddAiApiKeyToProjectAsync(projectId, aiApiKeyId);
+            
+            logger.LogInformation(
+                "AI API key linked to project: ProjectId={ProjectId}, AiApiKeyId={AiApiKeyId}, AddedBy={AddedBy}",
+                projectId, aiApiKeyId, GetUserId());
+
+            return Ok(projectAiApiKey);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error linking AI API key {AiApiKeyId} to project {ProjectId}", 
+                aiApiKeyId, projectId);
+            return StatusCode(500, new { message = "Error linking AI API key" });
+        }
+    }
+
+    /// <summary>
+    /// Unlink an AI API key from the project.
+    /// Only ProjectAdmin and Developer can unlink AI API keys.
+    /// </summary>
+    [HttpDelete("aiapikeys/{aiApiKeyId}")]
+    [Authorize(Policy = "ProjectResourceManager")]
+    public async Task<ActionResult> RemoveAiApiKeyFromProject(Guid projectId, Guid aiApiKeyId)
+    {
+        try
+        {
+            var success = await resourceService.RemoveAiApiKeyFromProjectAsync(projectId, aiApiKeyId);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "AI API key not found in project" });
+            }
+
+            logger.LogInformation(
+                "AI API key unlinked from project: ProjectId={ProjectId}, AiApiKeyId={AiApiKeyId}, RemovedBy={RemovedBy}",
+                projectId, aiApiKeyId, GetUserId());
+
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error unlinking AI API key {AiApiKeyId} from project {ProjectId}", 
+                aiApiKeyId, projectId);
+            return StatusCode(500, new { message = "Error unlinking AI API key" });
+        }
+    }
+
+    #endregion
 }

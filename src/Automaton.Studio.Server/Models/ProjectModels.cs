@@ -150,3 +150,29 @@ public class ProjectCustomStepDto
     public Guid? AddedBy { get; set; }
     public string AddedByName { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Response model for project API key
+/// </summary>
+public class ProjectApiKeyDto
+{
+    public Guid ProjectId { get; set; }
+    public Guid ApiKeyId { get; set; }
+    public string ApiKeyName { get; set; } = string.Empty;
+    public DateTime AddedAt { get; set; }
+    public Guid? AddedBy { get; set; }
+    public string AddedByName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response model for project AI API key
+/// </summary>
+public class ProjectAiApiKeyDto
+{
+    public Guid ProjectId { get; set; }
+    public Guid AiApiKeyId { get; set; }
+    public string AiApiKeyName { get; set; } = string.Empty;
+    public DateTime AddedAt { get; set; }
+    public Guid? AddedBy { get; set; }
+    public string AddedByName { get; set; } = string.Empty;
+}
