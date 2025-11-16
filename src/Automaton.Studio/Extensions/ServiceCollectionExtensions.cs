@@ -35,6 +35,7 @@ using Automaton.Studio.Pages.Steps.Designer;
 using Automaton.Studio.Pages.Account.Models;
 using Automaton.Studio.Pages.Authentication.Config;
 using Automaton.Studio.Pages.Install.Config;
+using Automaton.Studio.Pages.Dashboard;
 
 namespace Automaton.Studio.Extensions;
 
@@ -141,6 +142,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowLogsViewModel>();
         services.AddScoped<FlowScheduleViewModel>();
         services.AddScoped<FlowSettingsViewModel>();
+        services.AddScoped<DashboardViewModel>();
 
         // Studio steps
         services.AddTransient<EmitLogStep>();

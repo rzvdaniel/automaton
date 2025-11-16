@@ -24,16 +24,19 @@
             </Col>
             <Col Class="right-actions">
                 <Space>
-                    <SpaceItem>
-                        <Dropdown Trigger="@(new Trigger[] { Trigger.Click })" OnClick='e => { Console.WriteLine("Dropdown button clicked."); }'>
-                            <Overlay>
-                                @_createMenuOverlay
-                            </Overlay>
-                            <Unbound>
-                                <Button RefBack=@context Type="@ButtonType.Primary">Create <Icon Type="@IconType.Outline.Down" /></Button>
-                            </Unbound>
-                        </Dropdown>
-                    </SpaceItem>
+                    @if (DashboardViewModel.CanCreateResource)
+                    {
+                        <SpaceItem>
+                            <Dropdown Trigger="@(new Trigger[] { Trigger.Click })" OnClick='e => { Console.WriteLine("Dropdown button clicked."); }'>
+                                <Overlay>
+                                    @_createMenuOverlay
+                                </Overlay>
+                                <Unbound>
+                                    <Button RefBack=@context Type="@ButtonType.Primary">Create <Icon Type="@IconType.Outline.Down" /></Button>
+                                </Unbound>
+                            </Dropdown>
+                        </SpaceItem>
+                    }
                 </Space>
             </Col>
         </Row>

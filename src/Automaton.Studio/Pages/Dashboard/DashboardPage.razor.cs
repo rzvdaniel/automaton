@@ -1,8 +1,7 @@
-﻿using Automaton.Studio.Models;
-using Automaton.Studio.Services;
-using Automaton.Core.Enums;
-using Automaton.Studio.Enums;
+﻿using Automaton.Studio.Enums;
+using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Dashboard.Components;
+using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Dashboard
@@ -13,10 +12,11 @@ namespace Automaton.Studio.Pages.Dashboard
         private ProjectRole? currentUserRole;
         private bool isInProjectContext;
 
-        [Inject] NavigationManager NavigationManager { get; set; }
-        [Inject] OnboardingService OnboardingService { get; set; }
-        [Inject] ProjectContextService ProjectContextService { get; set; }
-        [Inject] DashboardContextService DashboardContextService { get; set; }
+        [Inject] private NavigationManager NavigationManager { get; set; }
+        [Inject] private OnboardingService OnboardingService { get; set; }
+        [Inject] private ProjectContextService ProjectContextService { get; set; }
+        [Inject] private DashboardContextService DashboardContextService { get; set; }
+        [Inject] private DashboardViewModel DashboardViewModel { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
