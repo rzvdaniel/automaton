@@ -11,6 +11,7 @@ using Automaton.Studio.Pages.Steps.Designer.Components;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Processors;
 using Automaton.Mcp.Enums;
+using Automaton.Studio.Services.Mcp;
 
 namespace Automaton.Studio.Pages.Steps.Designer.Components;
 
@@ -64,6 +65,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
     [Inject] private ITextSimilarityService TextSimilarityService { get; set; } = default!;
     [Inject] private IAiMessageFormattingService AiMessageFormattingService { get; set; } = default!;
+    [Inject] private ISystemPromptBuilder SystemPromptBuilder { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -515,7 +517,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 ["language"] = CurrentLanguage,
                 ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
                 ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
-                ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
+                ["contextId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
                 ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty))
             }
         };
@@ -667,25 +669,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     private string BuildSystemPrompt()
     {
-        return $"""
-            You are an expert automation developer. Generate {CurrentLanguage} code for a custom step in an automation workflow.
-
-            IMPORTANT WORKFLOW INSTRUCTIONS:
-            When tools are available, follow this process:
-            1. ALWAYS start by using get_current_code to retrieve the current code from the step editor
-            2. Analyze the user's request and the current code
-            3. Generate or modify the code as needed
-            4. Use execute_code to test the code and check if it works correctly
-            5. If the execution shows errors or issues, modify the code and test again
-            6. Only stop when the code executes successfully or when you're confident it meets the requirements
-            7. When finished, provide the final working code as your response
-
-            Requirements:
-            - Generate clean, robust code with proper error handling
-            - Use the specified language: {CurrentLanguage}
-            - The code should be suitable for automation workflows
-            - Follow best practices for the chosen language
-            """;
+        return SystemPromptBuilder.BuildStepSystemPrompt(CurrentLanguage);
     }
 
     private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)

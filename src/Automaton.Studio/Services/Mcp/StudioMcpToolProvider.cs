@@ -191,17 +191,17 @@ public class StudioMcpToolProvider : IMcpToolProvider
         return Task.FromResult<IEnumerable<McpTool>>(tools);
     }
 
-    public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? currentStepId = null)
+    public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? contextId = null)
     {
         try
         {
             return toolName switch
             {
-                "get_current_code" => await GetCurrentCodeAsync(arguments, currentStepId),
-                "execute_code" => await ExecuteCodeAsync(arguments, currentStepId),
-                "get_step_variables" => await GetStepVariablesAsync(arguments, currentStepId),
-                "suggest_variables" => await SuggestVariablesAsync(arguments, currentStepId),
-                "save_code" => await SaveCodeAsync(arguments, currentStepId),
+                "get_current_code" => await GetCurrentCodeAsync(arguments, contextId),
+                "execute_code" => await ExecuteCodeAsync(arguments, contextId),
+                "get_step_variables" => await GetStepVariablesAsync(arguments, contextId),
+                "suggest_variables" => await SuggestVariablesAsync(arguments, contextId),
+                "save_code" => await SaveCodeAsync(arguments, contextId),
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }
@@ -216,11 +216,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? currentStepId)
+    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? contextId)
     {
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
             ? stepIdProp.GetString() 
-            : currentStepId ?? _stepContextService.GetCurrentStepId();
+            : contextId ?? _stepContextService.GetCurrentStepId();
         
         if (string.IsNullOrEmpty(stepId))
         {
@@ -275,13 +275,13 @@ public class StudioMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> ExecuteCodeAsync(JsonElement arguments, string? currentStepId)
+    private async Task<McpToolResult> ExecuteCodeAsync(JsonElement arguments, string? contextId)
     {
         var code = arguments.GetProperty("code").GetString();
         var language = arguments.GetProperty("language").GetString();
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
             ? stepIdProp.GetString() 
-            : currentStepId;
+            : contextId;
         
         if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(language))
         {
@@ -407,11 +407,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> GetStepVariablesAsync(JsonElement arguments, string? currentStepId)
+    private async Task<McpToolResult> GetStepVariablesAsync(JsonElement arguments, string? contextId)
     {
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
             ? stepIdProp.GetString() 
-            : currentStepId ?? _stepContextService.GetCurrentStepId();
+            : contextId ?? _stepContextService.GetCurrentStepId();
         
         if (string.IsNullOrEmpty(stepId))
         {
@@ -474,11 +474,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> SaveCodeAsync(JsonElement arguments, string? currentStepId)
+    private async Task<McpToolResult> SaveCodeAsync(JsonElement arguments, string? contextId)
     {
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp)
             ? stepIdProp.GetString()
-            : currentStepId ?? _stepContextService.GetCurrentStepId();
+            : contextId ?? _stepContextService.GetCurrentStepId();
         var rawCode = arguments.GetProperty("code").GetString();
         var language = arguments.GetProperty("language").GetString();
 
@@ -544,11 +544,11 @@ public class StudioMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> SuggestVariablesAsync(JsonElement arguments, string? currentStepId)
+    private async Task<McpToolResult> SuggestVariablesAsync(JsonElement arguments, string? contextId)
     {
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
             ? stepIdProp.GetString() 
-            : currentStepId ?? _stepContextService.GetCurrentStepId();
+            : contextId ?? _stepContextService.GetCurrentStepId();
         
         if (string.IsNullOrEmpty(stepId))
         {

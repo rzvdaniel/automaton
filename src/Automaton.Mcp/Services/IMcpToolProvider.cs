@@ -9,5 +9,5 @@ namespace Automaton.Mcp.Services;
 public interface IMcpToolProvider
 {
     Task<IEnumerable<McpTool>> GetToolsAsync();
-    Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? currentStepId = null);
+    Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? contextId = null);
 }
