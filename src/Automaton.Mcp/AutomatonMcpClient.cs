@@ -504,7 +504,8 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             // Extract context ID from request - could be stepId, appId, or any other context identifier
             var contextId = request.Context?.GetValueOrDefault("contextId")?.ToString();
             
-            var result = await _toolProvider.ExecuteToolAsync(toolCall.FunctionName, arguments.RootElement, contextId);
+            // Pass the full context dictionary to the tool provider so it can access context-specific functions
+            var result = await _toolProvider.ExecuteToolAsync(toolCall.FunctionName, arguments.RootElement, contextId, request.Context);
             
             if (result.Success)
             {

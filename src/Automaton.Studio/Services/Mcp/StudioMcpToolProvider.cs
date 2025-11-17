@@ -191,13 +191,13 @@ public class StudioMcpToolProvider : IMcpToolProvider
         return Task.FromResult<IEnumerable<McpTool>>(tools);
     }
 
-    public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? contextId = null)
+    public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? contextId = null, Dictionary<string, object>? context = null)
     {
         try
         {
             return toolName switch
             {
-                "get_current_code" => await GetCurrentCodeAsync(arguments, contextId),
+                "get_current_code" => await GetCurrentCodeAsync(arguments, contextId, context),
                 "execute_code" => await ExecuteCodeAsync(arguments, contextId),
                 "get_step_variables" => await GetStepVariablesAsync(arguments, contextId),
                 "suggest_variables" => await SuggestVariablesAsync(arguments, contextId),
@@ -216,7 +216,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? contextId)
+    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? contextId, Dictionary<string, object>? context)
     {
         var stepId = arguments.TryGetProperty("stepId", out var stepIdProp) 
             ? stepIdProp.GetString() 
@@ -229,23 +229,45 @@ public class StudioMcpToolProvider : IMcpToolProvider
 
         try
         {
-            // Get the actual current code from the Step Designer
-            var currentCode = await _stepContextService.GetCurrentCodeAsync();
-            var language = _stepContextService.GetLanguage();
+            // Check if context has a getCurrentCode function (for WebApps or other contexts)
+            string currentCode;
+            string language;
+            
+            if (context != null && context.TryGetValue("getCurrentCode", out var getCurrentCodeObj))
+            {
+                // Use the context-provided getCurrentCode function
+                if (getCurrentCodeObj is Func<Task<string>> getCurrentCodeFunc)
+                {
+                    currentCode = await getCurrentCodeFunc();
+                    language = context.TryGetValue("language", out var langObj) ? langObj?.ToString() ?? "html" : "html";
+                }
+                else
+                {
+                    // Fallback to Step context service
+                    currentCode = await _stepContextService.GetCurrentCodeAsync();
+                    language = _stepContextService.GetLanguage();
+                }
+            }
+            else
+            {
+                // Fallback to Step context service
+                currentCode = await _stepContextService.GetCurrentCodeAsync();
+                language = _stepContextService.GetLanguage();
+            }
             
             if (string.IsNullOrEmpty(currentCode))
             {
                 return new McpToolResult 
                 { 
                     Success = true, 
-                    Content = $"# No code found for step {stepId}\n# TODO: Add your implementation here\nprint('Hello World')" 
+                    Content = $"# No code found for {stepId}\n# TODO: Add your implementation here" 
                 };
             }
 
             // Return the actual code with metadata
             var result = new
             {
-                stepId = stepId,
+                contextId = stepId,
                 language = language ?? "python",
                 code = currentCode,
                 codeAnalysis = new
@@ -255,7 +277,7 @@ public class StudioMcpToolProvider : IMcpToolProvider
                     hasLogging = currentCode.Contains("INFO:") || currentCode.Contains("WARN:") || currentCode.Contains("ERROR:"),
                     isEmptyOrTemplate = string.IsNullOrWhiteSpace(currentCode) || currentCode.Trim().StartsWith("#") && currentCode.Trim().Split('\n').Length <= 3
                 },
-                message = "Current code retrieved from Step Designer"
+                message = "Current code retrieved successfully"
             };
 
             return new McpToolResult 
