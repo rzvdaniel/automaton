@@ -65,7 +65,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
     [Inject] private ITextSimilarityService TextSimilarityService { get; set; } = default!;
     [Inject] private IAiMessageFormattingService AiMessageFormattingService { get; set; } = default!;
-    [Inject] private ISystemPromptBuilder SystemPromptBuilder { get; set; } = default!;
+    [Inject] private IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -669,7 +669,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     private string BuildSystemPrompt()
     {
-        return SystemPromptBuilder.BuildStepSystemPrompt(CurrentLanguage);
+        return StepSystemPromptBuilder.BuildSystemPrompt(CurrentLanguage);
     }
 
     private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)

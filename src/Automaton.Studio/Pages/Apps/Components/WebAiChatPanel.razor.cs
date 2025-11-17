@@ -22,7 +22,7 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<WebAiChatPanel> logger { get; set; } = default!;
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
-    [Inject] private ISystemPromptBuilder SystemPromptBuilder { get; set; } = default!;
+    [Inject] private IWebAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; } = default!;
 
     protected ElementReference messagesContainer;
 
@@ -226,7 +226,7 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
         var request = new ConversationRequest
         {
             InitialMessage = userPrompt,
-            SystemPrompt = SystemPromptBuilder.BuildWebAppSystemPrompt(),
+            SystemPrompt = WebAppSystemPromptBuilder.BuildSystemPrompt(),
             Provider = provider.Provider,
             ApiKey = apiKey,
             Model = model,
