@@ -93,12 +93,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ErrorService>();
         services.AddScoped<FlowExecutionsService>();
         services.AddScoped<CustomStepsService>();
-        services.AddScoped<Services.AppsService>();
+        services.AddScoped<AppsService>();
         services.AddScoped<IframeProxyService>();
         services.AddScoped<IframeMessageHandler>();
         services.AddScoped<StudioFlowExecuteService>();
-        services.AddScoped<StudioFlowConvertService>(); // Keep concrete for backwards compatibility
-        services.AddScoped<IFlowConvertService<StudioFlow>, StudioFlowConvertService>(); // Add interface registration
+        services.AddScoped<StudioFlowConvertService>();
+        services.AddScoped<IFlowConvertService<StudioFlow>, StudioFlowConvertService>();
         services.AddScoped<FlowLogsService>();
         services.AddScoped<FlowScheduleService>();
         services.AddScoped<CustomStepExecuteService>();
@@ -110,6 +110,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICodeExtractionService, CodeExtractionService>();
         services.AddScoped<ITextSimilarityService, TextSimilarityService>();
         services.AddScoped<IAiMessageFormattingService, AiMessageFormattingService>();
+        services.AddScoped<ApiKeysService>();
+        services.AddScoped<AiApiKeyService>();
 
         // Project services
         services.AddScoped<ProjectsService>();
