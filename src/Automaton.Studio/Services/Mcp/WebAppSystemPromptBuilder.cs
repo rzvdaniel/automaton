@@ -105,6 +105,7 @@ public class WebAppSystemPromptBuilder : IWebAppSystemPromptBuilder
 
             ## AVAILABLE TOOLS:
             - **get_current_code**: 📖 Retrieve existing HTML/CSS/JavaScript from the web app (USE THIS FIRST for improvements!)
+            - **save_code**: 💾 Save code to app (Can be called MULTIPLE TIMES - save early, test, fix, save again!)
 
             ## REMEMBER:
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
