@@ -11,28 +11,24 @@ using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 using Automaton.Mcp.Enums;
 using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Components.AiChat.Models;
+using Automaton.Studio.Components.AiChat.Contexts;
 
 namespace Automaton.Studio.Components.AiChat;
 
-public partial class StepAiChatPanel : ComponentBase, IDisposable
+public partial class AiChatPanel : ComponentBase, IDisposable
 {
+    [Parameter] public IAiChatContext Context { get; set; } = default!;
     [Parameter] public EventCallback<string> OnSend { get; set; }
     [Parameter] public EventCallback<string> OnCodeGenerated { get; set; }
-    [Parameter] public string CurrentLanguage { get; set; } = "Python";
-    [Parameter] public List<VariableInfo>? InputVariables { get; set; }
-    [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
-    [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
-    [Parameter] public string? CurrentStepId { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-    [Inject] private ILogger<StepAiChatPanel> logger { get; set; } = default!;
+    [Inject] private ILogger<AiChatPanel> logger { get; set; } = default!;
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
     [Inject] private ITextSimilarityService TextSimilarityService { get; set; } = default!;
     [Inject] private IAiMessageFormattingService AiMessageFormattingService { get; set; } = default!;
-    [Inject] private IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; } = default!;
 
     private const string Agent = "Agent";
     private const string Ask = "Ask";
@@ -51,16 +47,16 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
 
     private List<AiProviderInfo>? availableProviders;
 
-    private List<ChatMessage> messages = new()
-    {
-        new ChatMessage("System", "AI code panel ready with MCP integration. AI can now see and test your code in real-time.", DateTime.Now) 
-        { 
-            Type = MessageType.System 
-        }
-    };
+    private List<ChatMessage> messages = new();
 
     protected override async Task OnInitializedAsync()
     {
+        // Initialize with context-specific system message
+        messages.Add(new ChatMessage("System", Context.InitialSystemMessage, DateTime.Now) 
+        { 
+            Type = MessageType.System 
+        });
+
         McpClient.ConversationUpdated += OnConversationUpdated;
         await LoadProvidersAsync();
     }
@@ -154,25 +150,28 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                         var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                         if (toolCallForResult != null)
                         {
-                            // Process tool result using the new architecture
-                            var processedResult = _toolResultProcessorFactory.ProcessToolResult(
-                                toolCallForResult.Name, toolResult, CurrentLanguage);
-
-                            // Add as NEW message to show result details
-                            var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
+                            // Process tool result using the new architecture (only if context supports it)
+                            if (Context.ProcessToolResults)
                             {
-                                Type = MessageType.ToolExecution,
-                                ToolCallId = toolResult.ToolCallId,
-                                ToolName = toolCallForResult.Name,
-                                ToolStatus = toolResult.IsSuccess ? "success" : "error",
-                                ToolResult = toolResult.Result,
-                                ToolError = toolResult.ErrorMessage,
-                                ToolResultViewModel = processedResult,
-                                IsSuccess = toolResult.IsSuccess
-                            };
-                            
-                            messages.Add(resultMessage);
-                            logger.LogInformation("Added tool result message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
+                                var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                                    toolCallForResult.Name, toolResult, Context.Language);
+
+                                // Add as NEW message to show result details
+                                var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
+                                {
+                                    Type = MessageType.ToolExecution,
+                                    ToolCallId = toolResult.ToolCallId,
+                                    ToolName = toolCallForResult.Name,
+                                    ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                                    ToolResult = toolResult.Result,
+                                    ToolError = toolResult.ErrorMessage,
+                                    ToolResultViewModel = processedResult,
+                                    IsSuccess = toolResult.IsSuccess
+                                };
+                                
+                                messages.Add(resultMessage);
+                                logger.LogInformation("Added tool result message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
+                            }
                         }
                     }
                 }
@@ -474,18 +473,14 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         var request = new ConversationRequest
         {
             InitialMessage = userPrompt,
-            SystemPrompt = BuildSystemPrompt(),
+            SystemPrompt = Context.BuildSystemPrompt(),
             Provider = provider.Provider,
             ApiKey = apiKey,
             Model = model,
             ConversationHistory = BuildMcpConversationHistory(),
-            Context = new Dictionary<string, object>
+            Context = new Dictionary<string, object>(Context.GetAdditionalContext())
             {
-                ["language"] = CurrentLanguage,
-                ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
-                ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
-                ["contextId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
-                ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty))
+                ["contextId"] = Context.GetContextId()
             }
         };
         
@@ -558,7 +553,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             pendingCodes: pendingCodes,
             codeHistory: codeHistory,
             onCodeGenerated: OnCodeGenerated,
-            currentLanguage: CurrentLanguage,
+            currentLanguage: Context.Language,
             logger: logger,
             codeExtractionService: CodeExtractionService);
     }
@@ -634,11 +629,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private string BuildSystemPrompt()
-    {
-        return StepSystemPromptBuilder.BuildSystemPrompt(CurrentLanguage);
-    }
-
     private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)
     {
         if (!string.IsNullOrEmpty(selectedApiKeyId) && provider.StoredKeys?.Any() == true)
@@ -688,7 +678,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             };
 
             string content = message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode)
-                ? $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
+                ? $"{message.Content}\n\n```{Context.Language?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
                 : message.Content;
 
             conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));

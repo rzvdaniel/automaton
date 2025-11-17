@@ -8,11 +8,12 @@
 @using Automaton.Mcp.Client
 @using Automaton.Studio.Components.AiChat.ToolResults
 @using Automaton.Studio.Components.AiChat.ToolResults.Processors
+@using Automaton.Studio.Components.AiChat.Contexts
 
 @implements IDisposable
 
 <div class="ai-chat-panel">
-	<PanelHeader Title="AI Code Generation (MCP)"
+	<PanelHeader Title="@Context.Title"
 				 ShowClearButton="true"
 				 OnClearClick="ClearConversationHistory"
 				 ClearDisabled="@isGeneratingCode"
@@ -31,7 +32,7 @@
 				
 				<ChatMessageComponent 
 					Message="@msg" 
-					Language="@CurrentLanguage"
+					Language="@Context.Language"
 					IsLast="@isLast"
 					IsGeneratingCode="@isGeneratingCode"
 					OnApplyCode="@(async (codeId) => await ApplyCodeFromButton(codeId))" />
@@ -42,7 +43,7 @@
 	<div class="ai-chat-input">
 		<div class="input-area">
 			<TextArea @bind-Value="promptText"
-					  Placeholder="Describe what you want the AI to do... (MCP tools will be used automatically)"
+					  Placeholder="@Context.InputPlaceholder"
 					  Disabled="@isGeneratingCode"
 					  ShowCount="false"
 					  AutoSize="false"
@@ -54,17 +55,20 @@
 
 		<div class="input-controls">
 			<div class="left-controls">
-				<Select @bind-Value="selectedAgent"
-						TItemValue="string"
-						TItem="string"
-						Size="@InputSize.Small"
-						Style="width: 80px;"
-						Disabled="@isGeneratingCode">
-					<SelectOptions>
-						<SelectOption Value="@Ask" Label="Ask" />
-						<SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
-					</SelectOptions>
-				</Select>
+				@if (Context.ShowAgentSelector)
+				{
+					<Select @bind-Value="selectedAgent"
+							TItemValue="string"
+							TItem="string"
+							Size="@InputSize.Small"
+							Style="width: 80px;"
+							Disabled="@isGeneratingCode">
+						<SelectOptions>
+							<SelectOption Value="@Ask" Label="Ask" />
+							<SelectOption TItemValue="string" TItem="string" Value="@Agent" Label="Agent" />
+						</SelectOptions>
+					</Select>
+				}
 
 				<Select @bind-Value="selectedProviderModel"
 						TItemValue="string"
