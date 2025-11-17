@@ -4,9 +4,8 @@ using Automaton.Studio.Pages.Steps.Designer.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using Automaton.Mcp.Client;
-using Automaton.Mcp.Client.Models;
 using Microsoft.Extensions.Logging;
+using Automaton.Mcp.Enums;
 
 namespace Automaton.Studio.Pages.Apps.Components;
 
@@ -77,7 +76,7 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
             return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
-        if (Enum.TryParse<Automaton.Studio.Models.AiProvider>(providerName, out var provider))
+        if (Enum.TryParse<AiProvider>(providerName, out var provider))
         {
             return availableProviders?.FirstOrDefault(p => p.Provider == provider);
         }

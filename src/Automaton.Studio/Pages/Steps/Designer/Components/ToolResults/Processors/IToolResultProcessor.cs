@@ -1,5 +1,4 @@
-using Automaton.Mcp.Client.Models;
-using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults;
+using Automaton.Mcp.Models;
 
 namespace Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Processors;
 

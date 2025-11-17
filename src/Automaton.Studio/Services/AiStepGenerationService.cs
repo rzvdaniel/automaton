@@ -1,9 +1,8 @@
 using Automaton.Studio.Models;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Client;
-using Automaton.Mcp.Client.Models;
-using Automaton.Studio.Services;
+using Automaton.Mcp.Models;
+using Automaton.Mcp.Enums;
 
 namespace Automaton.Studio.Services;
 
@@ -57,11 +56,11 @@ public class AiStepGenerationService
             {
                 InitialMessage = request.Description,
                 SystemPrompt = systemPrompt,
-                Provider = MapToMcpProvider(request.Provider),
+                Provider = request.Provider,
                 ApiKey = apiKey,
                 Model = request.Model,
                 ConversationHistory = request.ConversationHistory?.Select(cm => 
-                    new Automaton.Mcp.Client.Models.ConversationMessage(cm.Role, cm.Content)).ToList(),
+                    new Automaton.Mcp.Models.ConversationMessage(cm.Role, cm.Content)).ToList(),
                 Context = new Dictionary<string, object>
                 {
                     ["userId"] = userId,
@@ -124,7 +123,7 @@ public class AiStepGenerationService
         return await GenerateStepCodeAsync(request, userId);
     }
 
-    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, Automaton.Studio.Models.AiProvider provider)
+    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, AiProvider provider)
     {
         try
         {
@@ -304,17 +303,5 @@ public class AiStepGenerationService
             """;
 
         return prompt;
-    }
-
-    private static Automaton.Mcp.Client.Models.AiProvider MapToMcpProvider(Models.AiProvider provider)
-    {
-        return provider switch
-        {
-            Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
-            Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
-            Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
-            Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
-            _ => Automaton.Mcp.Client.Models.AiProvider.OpenAI
-        };
     }
 }

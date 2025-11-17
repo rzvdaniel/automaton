@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Automaton.Mcp.Client;
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 using Microsoft.Extensions.Logging;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Utilities;
 using Automaton.Studio.Pages.Steps.Designer.Components;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Processors;
+using Automaton.Mcp.Enums;
 
 namespace Automaton.Studio.Pages.Steps.Designer.Components;
 
@@ -326,7 +327,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
-        if (Enum.TryParse<Automaton.Studio.Models.AiProvider>(providerName, out var provider))
+        if (Enum.TryParse<AiProvider>(providerName, out var provider))
         {
             return availableProviders?.FirstOrDefault(p => p.Provider == provider);
         }
@@ -505,7 +506,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         {
             InitialMessage = userPrompt,
             SystemPrompt = BuildSystemPrompt(),
-            Provider = MapToMcpProvider(provider.Provider),
+            Provider = provider.Provider,
             ApiKey = apiKey,
             Model = model,
             ConversationHistory = BuildMcpConversationHistory(),
@@ -687,18 +688,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
             """;
     }
 
-    private static Automaton.Mcp.Client.Models.AiProvider MapToMcpProvider(Automaton.Studio.Models.AiProvider provider)
-    {
-        return provider switch
-        {
-            Automaton.Studio.Models.AiProvider.OpenAI => Automaton.Mcp.Client.Models.AiProvider.OpenAI,
-            Automaton.Studio.Models.AiProvider.Anthropic => Automaton.Mcp.Client.Models.AiProvider.Anthropic,
-            Automaton.Studio.Models.AiProvider.Google => Automaton.Mcp.Client.Models.AiProvider.Google,
-            Automaton.Studio.Models.AiProvider.Custom => Automaton.Mcp.Client.Models.AiProvider.Custom,
-            _ => Automaton.Mcp.Client.Models.AiProvider.OpenAI
-        };
-    }
-
     private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)
     {
         if (!string.IsNullOrEmpty(selectedApiKeyId) && provider.StoredKeys?.Any() == true)
@@ -731,9 +720,9 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
         return string.Empty;
     }
 
-    private List<Automaton.Mcp.Client.Models.ConversationMessage> BuildMcpConversationHistory()
+    private List<Automaton.Mcp.Models.ConversationMessage> BuildMcpConversationHistory()
     {
-        var conversationHistory = new List<Automaton.Mcp.Client.Models.ConversationMessage>();
+        var conversationHistory = new List<Automaton.Mcp.Models.ConversationMessage>();
         
         foreach (var message in messages.Where(m => 
             m.Type != MessageType.System && 
@@ -751,7 +740,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 ? $"{message.Content}\n\n```{CurrentLanguage?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
                 : message.Content;
 
-            conversationHistory.Add(new Automaton.Mcp.Client.Models.ConversationMessage(role, content));
+            conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));
         }
 
         return conversationHistory;

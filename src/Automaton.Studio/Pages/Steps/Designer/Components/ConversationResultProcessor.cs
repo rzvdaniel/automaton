@@ -1,4 +1,4 @@
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 using Automaton.Studio.Pages.Steps.Designer.Components.Factories;
 using Automaton.Studio.Pages.Steps.Designer.Components.Services;
 using Automaton.Studio.Services;

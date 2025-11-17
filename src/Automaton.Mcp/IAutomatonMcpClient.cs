@@ -1,4 +1,4 @@
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 
 namespace Automaton.Mcp.Client;
 

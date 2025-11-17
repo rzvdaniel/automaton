@@ -1,3 +1,5 @@
+using Automaton.Mcp.Enums;
+
 namespace Automaton.Studio.Models;
 
 public class AiApiKeyModel
@@ -56,12 +58,4 @@ public class CodeGenerationResponse
     public bool IsSuccess { get; set; }
     public string GeneratedCode { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;
-}
-
-public enum AiProvider
-{
-    OpenAI = 1,
-    Anthropic = 2,
-    Google = 3,
-    Custom = 99
 }

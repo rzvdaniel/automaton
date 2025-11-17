@@ -1,5 +1,4 @@
-using Automaton.Mcp.Client.Models;
-using Microsoft.Extensions.Logging;
+using Automaton.Mcp.Models;
 
 namespace Automaton.Studio.Services;
 

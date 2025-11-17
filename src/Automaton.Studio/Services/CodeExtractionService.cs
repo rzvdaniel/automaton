@@ -1,4 +1,4 @@
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;

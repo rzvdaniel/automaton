@@ -2,9 +2,10 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Automaton.Mcp.Client.Models;
-using Automaton.Mcp.Client.Services;
+using Automaton.Mcp.Models;
+using Automaton.Mcp.Services;
 using OpenAI.Chat;
+using Automaton.Mcp.Enums;
 
 namespace Automaton.Mcp.Client;
 

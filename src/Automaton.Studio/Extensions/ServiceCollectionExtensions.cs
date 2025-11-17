@@ -25,7 +25,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
 using Automaton.Mcp.Client.Extensions;
-using Automaton.Mcp.Client.Services;
+using Automaton.Mcp.Services;
 using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Config;
 using Automaton.Studio.Pages.Flows.FlowDesigner;

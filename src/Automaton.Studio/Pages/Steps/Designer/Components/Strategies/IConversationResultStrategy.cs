@@ -1,4 +1,4 @@
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 
 namespace Automaton.Studio.Pages.Steps.Designer.Components.Strategies;
 

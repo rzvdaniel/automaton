@@ -1,4 +1,4 @@
-using Automaton.Mcp.Client.Models;
+using Automaton.Mcp.Models;
 using System.Text.Json;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults;
 using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Utilities;

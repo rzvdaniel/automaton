@@ -1,6 +1,7 @@
 using Automaton.Studio.Models;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Automaton.Mcp.Enums;
 
 namespace Automaton.Studio.Services;
 
