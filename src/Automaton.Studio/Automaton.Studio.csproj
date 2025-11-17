@@ -30,7 +30,7 @@
     <ProjectReference Include="..\Automaton.Client.Auth\Automaton.Client.Auth.csproj" />
     <ProjectReference Include="..\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj" />
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
-    <ProjectReference Include="..\Automaton.Mcp.Client\Automaton.Mcp.Client.csproj" />
+    <ProjectReference Include="..\Automaton.Mcp.Client\Automaton.Mcp.csproj" />
     <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -29,7 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Studio.Tests", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner.Console.Tests", "src\UnitTests\Automaton.Runner.Console.Tests\Automaton.Runner.Console.Tests.csproj", "{2D1D059C-C960-66BE-5615-A6D11CCFFF99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Mcp.Client", "src\Automaton.Mcp.Client\Automaton.Mcp.Client.csproj", "{07445103-1648-CB98-FD15-9D5164B2D634}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Mcp", "src\Automaton.Mcp.Client\Automaton.Mcp.csproj", "{07445103-1648-CB98-FD15-9D5164B2D634}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

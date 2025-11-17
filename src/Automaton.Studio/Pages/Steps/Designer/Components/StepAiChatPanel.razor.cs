@@ -53,7 +53,6 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
     [Parameter] public List<VariableInfo>? InputVariables { get; set; }
     [Parameter] public List<VariableInfo>? OutputVariables { get; set; }
     [Parameter] public Func<Task<string>>? GetCurrentCode { get; set; }
-    [Parameter] public Func<string, Task<ExecutionResult>>? ExecuteCode { get; set; }
     [Parameter] public string? CurrentStepId { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
@@ -516,12 +515,7 @@ public partial class StepAiChatPanel : ComponentBase, IDisposable
                 ["inputVariables"] = InputVariables ?? new List<VariableInfo>(),
                 ["outputVariables"] = OutputVariables ?? new List<VariableInfo>(),
                 ["currentStepId"] = CurrentStepId ?? Guid.NewGuid().ToString(),
-                ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty)),
-                ["executeCode"] = ExecuteCode ?? ((code) => Task.FromResult(new ExecutionResult 
-                { 
-                    IsSuccess = false, 
-                    ErrorMessage = "Execution not available" 
-                }))
+                ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty))
             }
         };
         
