@@ -35,6 +35,7 @@ partial class StepPage : ComponentBase, IDisposable
     [Inject] private ICurrentStepContextService CurrentStepContextService { get; set; }
     [Inject] private RunnerService RunnerService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
+    [Inject] private Automaton.Studio.Services.Mcp.IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; }
 
     [Parameter] public string StepId { get; set; }
 
@@ -335,6 +336,19 @@ partial class StepPage : ComponentBase, IDisposable
             // Fallback to view model code if Monaco editor fails
             return StepDesignerViewModel.CustomStep.Definition.Code ?? string.Empty;
         }
+    }
+
+    // Create AI Chat context for Step code generation
+    private Automaton.Studio.Components.AiChat.Contexts.StepAiChatContext CreateAiChatContext()
+    {
+        return new Automaton.Studio.Components.AiChat.Contexts.StepAiChatContext(
+            StepSystemPromptBuilder,
+            StepDesignerViewModel.CustomStep.Definition.Language,
+            StepId,
+            GetInputVariablesForAI(),
+            GetOutputVariablesForAI(),
+            GetCurrentCodeForAI
+        );
     }
 
     private async void OnCodeChangedByMcpTools(object? sender, CodeChangedEventArgs e)

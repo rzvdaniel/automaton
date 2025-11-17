@@ -249,12 +249,8 @@
                                     <Tabs Size="TabSize.Small" Class="right-panel">
                                         <TabPane Tab="AI Chat" Key="ai">
                                             <div class="tab-content-scrollable">
-                                                <StepAiChatPanel OnCodeGenerated="OnCodeGenerated"
-                                                             CurrentLanguage="@StepDesignerViewModel.CustomStep.Definition.Language"
-                                                             InputVariables="@GetInputVariablesForAI()"
-                                                             OutputVariables="@GetOutputVariablesForAI()"
-                                                             GetCurrentCode="@GetCurrentCodeForAI"
-                                                             CurrentStepId="@StepId" />
+                                                <AiChatPanel Context="@CreateAiChatContext()"
+                                                             OnCodeGenerated="OnCodeGenerated" />
                                             </div>
                                         </TabPane>
                                         <TabPane Tab="Test Variables" Key="variables">
@@ -736,7 +732,7 @@
         overflow-x: hidden;
     }
 
-    /* Ensure StepAiChatPanel takes full height */
+    /* Ensure AiChatPanel takes full height */
     .tab-content-scrollable .ai-chat-panel {
         height: 100%;
         min-height: 0;

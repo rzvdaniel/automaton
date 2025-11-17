@@ -116,9 +116,8 @@
 									<Tabs Size="TabSize.Small" Class="right-panel">
 										<TabPane Tab="AI Chat" Key="ai">
 											<div class="tab-content-scrollable">
-												<WebAiChatPanel OnCodeGenerated="OnCodeGenerated"
-																GetCurrentCode="@GetCurrentCodeForAI"
-																CurrentWebAppId="@AppId" />
+												<AiChatPanel Context="@CreateAiChatContext()"
+															 OnCodeGenerated="OnCodeGenerated" />
 											</div>
 										</TabPane>
 									</Tabs>

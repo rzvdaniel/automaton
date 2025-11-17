@@ -45,6 +45,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
+    [Inject] private Automaton.Studio.Services.Mcp.IWebAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -469,6 +470,16 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             // Fallback to view model code if Monaco editor fails
             return currentApp.Definition?.HtmlContent ?? string.Empty;
         }
+    }
+
+    // Create AI Chat context for WebApp code generation
+    private Automaton.Studio.Components.AiChat.Contexts.WebAppAiChatContext CreateAiChatContext()
+    {
+        return new Automaton.Studio.Components.AiChat.Contexts.WebAppAiChatContext(
+            WebAppSystemPromptBuilder,
+            AppId,
+            GetCurrentCodeForAI
+        );
     }
 
     private string GetDefaultHtmlContent()
