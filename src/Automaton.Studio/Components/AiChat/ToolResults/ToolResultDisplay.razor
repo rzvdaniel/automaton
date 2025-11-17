@@ -1,0 +1,84 @@
+@using Automaton.Studio.Components.AiChat.ToolResults
+@using Automaton.Studio.Components.AiChat.ToolResults.Processors
+@using System.Net
+
+<div class="tool-result-display">
+    <ToolResultHeader StatusIcon="@GetToolStatusIcon(Status)"
+                      StatusText="@GetToolStatusText(Status)"
+                      Status="@Status"
+                      Title="@Result.Description"
+                      Timestamp="@Timestamp"
+                      ShowTimestamp="@ShowTimestamp" />
+
+    @* Each result type component handles its own error display *@
+    @switch (Result.ResultType)
+    {
+        case ToolResultType.Code:
+            <CodeResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Execution:
+            <ExecutionResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Variables:
+            <VariablesResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.SaveCode:
+            <SaveCodeResultDisplay Result="Result" />
+            break;
+            
+        case ToolResultType.Generic:
+        default:
+            @* Generic results still need error display here *@
+            @if (!string.IsNullOrEmpty(Result.ErrorMessage))
+            {
+                <div class="tool-result-error">
+                    <strong>Error:</strong> @Result.ErrorMessage
+                </div>
+            }
+            else
+            {
+                <GenericResultDisplay Result="Result" />
+            }
+            break;
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] 
+    public ToolResultViewModel Result { get; set; } = default!;
+    
+    [Parameter] 
+    public string Status { get; set; } = "unknown";
+    
+    [Parameter] 
+    public DateTime? Timestamp { get; set; }
+    
+    [Parameter] 
+    public bool ShowTimestamp { get; set; } = true;
+    
+    // Proper Unicode emoji status icons
+    private string GetToolStatusIcon(string? status)
+    {
+        return status switch
+        {
+            "executing" => "?",  // Hourglass emoji
+            "success" => "?",    // Check mark emoji
+            "error" => "?",      // Cross mark emoji
+            _ => "??"             // Wrench emoji
+        };
+    }
+
+    private string GetToolStatusText(string? status)
+    {
+        return status switch
+        {
+            "executing" => "Executing",
+            "success" => "Success",
+            "error" => "Failed",
+            _ => "Unknown"
+        };
+    }
+}

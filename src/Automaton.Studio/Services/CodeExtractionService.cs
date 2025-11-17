@@ -1,5 +1,5 @@
 using Automaton.Mcp.Models;
-using Automaton.Studio.Pages.Steps.Designer.Components.ToolResults.Utilities;
+using Automaton.Studio.Components.AiChat.ToolResults.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 

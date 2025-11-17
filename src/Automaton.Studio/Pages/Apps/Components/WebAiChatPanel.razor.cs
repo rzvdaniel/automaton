@@ -1,7 +1,6 @@
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Automaton.Studio.Services.Mcp;
-using Automaton.Studio.Pages.Steps.Designer.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Enums;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
+using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 
 namespace Automaton.Studio.Pages.Apps.Components;
 
