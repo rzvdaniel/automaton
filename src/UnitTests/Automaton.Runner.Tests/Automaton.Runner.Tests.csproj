@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Automaton.Runner.Console\Automaton.Runner.Console.csproj" />
+    <ProjectReference Include="..\..\Automaton.Runner\Automaton.Runner.csproj" />
   </ItemGroup>
 
 </Project>

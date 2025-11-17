@@ -15,7 +15,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Client.Auth", "sr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", "src\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj", "{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{F8CF6650-9B57-4FF4-9049-0307F7A91F0A}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{F8CF6650-9B57-4FF4-9049-0307F7A91F0A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server", "src\Automaton.Studio.Server\Automaton.Studio.Server.csproj", "{2277C348-E1BF-43C3-B8F9-76310B110E65}"
 EndProject
@@ -23,13 +23,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server.Tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Tests", "src\UnitTests\Automaton.Core.Tests\Automaton.Core.Tests.csproj", "{4E4A4ED0-7C86-4198-82E3-41C15239A093}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner.Console", "src\Automaton.Runner.Console\Automaton.Runner.Console.csproj", "{133A369B-FB67-966C-48EA-B3EA224C992A}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Studio.Tests", "src\UnitTests\Automaton.Studio.Tests\Automaton.Studio.Tests.csproj", "{2573AC8E-949D-818F-4460-61997BB65B55}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner.Console.Tests", "src\UnitTests\Automaton.Runner.Console.Tests\Automaton.Runner.Console.Tests.csproj", "{2D1D059C-C960-66BE-5615-A6D11CCFFF99}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Mcp", "src\Automaton.Mcp\Automaton.Mcp.csproj", "{6883598D-3C8F-6E4B-4011-C0047AD479DE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner", "src\Automaton.Runner\Automaton.Runner.csproj", "{920D63D0-A7C5-979D-2818-65FDDB25C464}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner.Tests", "src\UnitTests\Automaton.Runner.Tests\Automaton.Runner.Tests.csproj", "{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -73,22 +73,22 @@ Global
 		{4E4A4ED0-7C86-4198-82E3-41C15239A093}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E4A4ED0-7C86-4198-82E3-41C15239A093}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E4A4ED0-7C86-4198-82E3-41C15239A093}.Release|Any CPU.Build.0 = Release|Any CPU
-		{133A369B-FB67-966C-48EA-B3EA224C992A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{133A369B-FB67-966C-48EA-B3EA224C992A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{133A369B-FB67-966C-48EA-B3EA224C992A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{133A369B-FB67-966C-48EA-B3EA224C992A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2573AC8E-949D-818F-4460-61997BB65B55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2573AC8E-949D-818F-4460-61997BB65B55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2573AC8E-949D-818F-4460-61997BB65B55}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2573AC8E-949D-818F-4460-61997BB65B55}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2D1D059C-C960-66BE-5615-A6D11CCFFF99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2D1D059C-C960-66BE-5615-A6D11CCFFF99}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2D1D059C-C960-66BE-5615-A6D11CCFFF99}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2D1D059C-C960-66BE-5615-A6D11CCFFF99}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -97,7 +97,7 @@ Global
 		{E0EC0CE1-0C13-4E4D-AE96-53DDDCCD29FA} = {F8CF6650-9B57-4FF4-9049-0307F7A91F0A}
 		{4E4A4ED0-7C86-4198-82E3-41C15239A093} = {F8CF6650-9B57-4FF4-9049-0307F7A91F0A}
 		{2573AC8E-949D-818F-4460-61997BB65B55} = {F8CF6650-9B57-4FF4-9049-0307F7A91F0A}
-		{2D1D059C-C960-66BE-5615-A6D11CCFFF99} = {F8CF6650-9B57-4FF4-9049-0307F7A91F0A}
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB} = {F8CF6650-9B57-4FF4-9049-0307F7A91F0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {83E26756-FC19-479A-9074-C74CC45932CF}
