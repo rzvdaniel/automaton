@@ -206,7 +206,7 @@
         function (hook, vm) {
           hook.beforeEach(function (html) {
             if (vm.route.file && vm.route.file !== 'README.md') {
-              var url = 'https://github.com/rzvdaniel/automaton/blob/main/src/Automaton.Studio.Web/wwwroot/docs/' + vm.route.file;
+              var url = 'https://github.com/rzvdaniel/automaton/blob/main/src/Automaton.Studio/wwwroot/docs/' + vm.route.file;
               var editHtml = '[:memo: Edit Document](' + url + ')\n';
               return html + '\n\n----\n\n' + editHtml;
             }

@@ -1,0 +1,91 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11018.127
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0F0676E9-1533-4AD5-A9B1-6BEB52903EC1}"
+	ProjectSection(SolutionItems) = preProject
+		readme.md = readme.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio", "src\Automaton.Studio\Automaton.Studio.csproj", "{32966A02-FF27-452A-AD17-B833CEC405A5}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core", "src\Automaton.Core\Automaton.Core.csproj", "{943DB182-7B55-45A7-B6B9-42113129D76C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Steps", "src\Automaton.Steps\Automaton.Steps.csproj", "{FD3E1F6F-1A79-427A-8205-93DCCD60B01C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", "src\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj", "{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Studio.Auth", "src\Automaton.Studio.Auth\Automaton.Studio.Auth.csproj", "{CF6789AE-95A4-E21E-9D72-2224445FC996}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner", "src\Automaton.Runner\Automaton.Runner.csproj", "{920D63D0-A7C5-979D-2818-65FDDB25C464}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Mcp", "src\Automaton.Mcp\Automaton.Mcp.csproj", "{6883598D-3C8F-6E4B-4011-C0047AD479DE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Runner.Tests", "src\UnitTests\Automaton.Runner.Tests\Automaton.Runner.Tests.csproj", "{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Core.Tests", "src\UnitTests\Automaton.Core.Tests\Automaton.Core.Tests.csproj", "{39AE9B40-6793-3F94-EE84-BEC2B575966A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automaton.Studio.Tests", "src\UnitTests\Automaton.Studio.Tests\Automaton.Studio.Tests.csproj", "{2573AC8E-949D-818F-4460-61997BB65B55}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{F364A479-636C-4073-8907-3DEFE8025037}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{32966A02-FF27-452A-AD17-B833CEC405A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32966A02-FF27-452A-AD17-B833CEC405A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32966A02-FF27-452A-AD17-B833CEC405A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32966A02-FF27-452A-AD17-B833CEC405A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{943DB182-7B55-45A7-B6B9-42113129D76C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{943DB182-7B55-45A7-B6B9-42113129D76C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{943DB182-7B55-45A7-B6B9-42113129D76C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{943DB182-7B55-45A7-B6B9-42113129D76C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD3E1F6F-1A79-427A-8205-93DCCD60B01C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD3E1F6F-1A79-427A-8205-93DCCD60B01C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD3E1F6F-1A79-427A-8205-93DCCD60B01C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD3E1F6F-1A79-427A-8205-93DCCD60B01C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F098591-AAE6-4D0C-BCA3-BD95F0A5DA81}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF6789AE-95A4-E21E-9D72-2224445FC996}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF6789AE-95A4-E21E-9D72-2224445FC996}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF6789AE-95A4-E21E-9D72-2224445FC996}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF6789AE-95A4-E21E-9D72-2224445FC996}.Release|Any CPU.Build.0 = Release|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{920D63D0-A7C5-979D-2818-65FDDB25C464}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6883598D-3C8F-6E4B-4011-C0047AD479DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39AE9B40-6793-3F94-EE84-BEC2B575966A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39AE9B40-6793-3F94-EE84-BEC2B575966A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39AE9B40-6793-3F94-EE84-BEC2B575966A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39AE9B40-6793-3F94-EE84-BEC2B575966A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2573AC8E-949D-818F-4460-61997BB65B55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2573AC8E-949D-818F-4460-61997BB65B55}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2573AC8E-949D-818F-4460-61997BB65B55}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2573AC8E-949D-818F-4460-61997BB65B55}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C2DDE7FE-B45B-513B-0FA5-4253C139E2AB} = {F364A479-636C-4073-8907-3DEFE8025037}
+		{39AE9B40-6793-3F94-EE84-BEC2B575966A} = {F364A479-636C-4073-8907-3DEFE8025037}
+		{2573AC8E-949D-818F-4460-61997BB65B55} = {F364A479-636C-4073-8907-3DEFE8025037}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {83E26756-FC19-479A-9074-C74CC45932CF}
+	EndGlobalSection
+EndGlobal
