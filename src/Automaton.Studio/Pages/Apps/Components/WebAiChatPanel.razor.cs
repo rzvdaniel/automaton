@@ -1,11 +1,14 @@
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
+using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Pages.Steps.Designer.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Enums;
+using Automaton.Mcp.Client;
+using Automaton.Mcp.Models;
 
 namespace Automaton.Studio.Pages.Apps.Components;
 
@@ -18,6 +21,8 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<WebAiChatPanel> logger { get; set; } = default!;
+    [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
+    [Inject] private ISystemPromptBuilder SystemPromptBuilder { get; set; } = default!;
 
     protected ElementReference messagesContainer;
 
@@ -26,6 +31,7 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
     private bool showNoProvidersMessage = false;
     private bool isGeneratingCode = false;
     private Dictionary<string, string> pendingCodes = new();
+    private string? _conversationId;
 
     private List<AiProviderInfo>? availableProviders;
 
@@ -39,7 +45,36 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        McpClient.ConversationUpdated += OnConversationUpdated;
         await LoadProvidersAsync();
+    }
+
+    private void OnConversationUpdated(object? sender, ConversationUpdatedEvent e)
+    {
+        if (e.ConversationId == _conversationId)
+        {
+            InvokeAsync(() =>
+            {
+                // Process AI reasoning messages
+                if (e.Messages?.Any() == true)
+                {
+                    foreach (var message in e.Messages)
+                    {
+                        if (message.Role.ToLowerInvariant() == "assistant" && !string.IsNullOrWhiteSpace(message.Content))
+                        {
+                            var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                            {
+                                Type = MessageType.Text
+                            };
+                            messages.Add(reasoningMsg);
+                        }
+                    }
+                }
+
+                StateHasChanged();
+                ScrollToBottom();
+            });
+        }
     }
 
     private async Task LoadProvidersAsync()
@@ -124,6 +159,25 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
     {
         if (!IsReadyToSendRealtime) return;
 
+        try
+        {
+            await BeginConversation();
+            var conversationContext = await PrepareConversationContext();
+            var result = await ExecuteConversation(conversationContext);
+            await ProcessConversationResult(result, conversationContext.UserPrompt);
+        }
+        catch (Exception ex)
+        {
+            HandleConversationError(ex);
+        }
+        finally
+        {
+            await EndConversation();
+        }
+    }
+
+    private async Task BeginConversation()
+    {
         isGeneratingCode = true;
         pendingCodes.Clear();
 
@@ -137,46 +191,205 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
         };
         messages.Add(generatingMessage);
 
-        var userPrompt = promptText;
         promptText = string.Empty;
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
+    }
 
-        try
+    private async Task<ConversationContext> PrepareConversationContext()
+    {
+        var selectedProvider = GetSelectedProvider();
+        var selectedModel = GetSelectedModel();
+        var selectedApiKeyId = GetSelectedApiKeyId();
+
+        if (selectedProvider == null)
+            throw new InvalidOperationException("No AI provider selected");
+
+        var apiKey = await GetApiKeyFromProvider(selectedProvider, selectedApiKeyId);
+        if (string.IsNullOrEmpty(apiKey))
+            throw new InvalidOperationException("No valid API key found for the specified provider");
+
+        var userPrompt = messages.Last(m => m.Role == "User").Content;
+
+        return new ConversationContext
         {
-            // TODO: Implement actual AI generation
-            // For now, add a placeholder message
-            messages.RemoveAll(m => m.Type == MessageType.Generating);
+            UserPrompt = userPrompt,
+            Provider = selectedProvider,
+            Model = selectedModel,
+            ApiKey = apiKey,
+            ConversationRequest = BuildConversationRequest(userPrompt, selectedProvider, selectedModel, apiKey)
+        };
+    }
 
-            var responseMessage = new ChatMessage("AI", "AI generation will be implemented soon. This will generate complete HTML/CSS/JavaScript web pages.", DateTime.Now)
+    private ConversationRequest BuildConversationRequest(string userPrompt, AiProviderInfo provider, string model, string apiKey)
+    {
+        var request = new ConversationRequest
+        {
+            InitialMessage = userPrompt,
+            SystemPrompt = SystemPromptBuilder.BuildWebAppSystemPrompt(),
+            Provider = provider.Provider,
+            ApiKey = apiKey,
+            Model = model,
+            ConversationHistory = BuildMcpConversationHistory(),
+            Context = new Dictionary<string, object>
             {
-                Type = MessageType.Text
-            };
-            messages.Add(responseMessage);
+                ["language"] = "html",
+                ["contextId"] = CurrentWebAppId ?? Guid.NewGuid().ToString(),
+                ["getCurrentCode"] = GetCurrentCode ?? (() => Task.FromResult(string.Empty))
+            }
+        };
 
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
-        }
-        catch (Exception ex)
+        return request;
+    }
+
+    private async Task<ConversationResult> ExecuteConversation(ConversationContext context)
+    {
+        _conversationId = context.ConversationRequest.ConversationId;
+        var result = await McpClient.StartConversationAsync(context.ConversationRequest);
+        _conversationId = result.ConversationId;
+
+        // Remove generating message
+        RemoveGeneratingMessage();
+
+        return result;
+    }
+
+    private void RemoveGeneratingMessage()
+    {
+        var generatingIndex = messages.FindLastIndex(m => m.Type == MessageType.Generating);
+        if (generatingIndex >= 0)
         {
-            messages.RemoveAll(m => m.Type == MessageType.Generating);
+            messages.RemoveAt(generatingIndex);
+        }
+    }
 
-            var errorMessage = new ChatMessage("AI", "Error generating code:", DateTime.Now)
+    private async Task ProcessConversationResult(ConversationResult result, string userPrompt)
+    {
+        if (result.IsSuccess)
+        {
+            // Add the generated code
+            var codeId = Guid.NewGuid().ToString();
+            pendingCodes[codeId] = result.GeneratedCode ?? "";
+
+            var successMessage = new ChatMessage("AI", "Web page generated successfully!", DateTime.Now)
+            {
+                Type = MessageType.CodeSuccess,
+                CodeId = codeId,
+                GeneratedCode = result.GeneratedCode,
+                IsSuccess = true
+            };
+
+            messages.Add(successMessage);
+
+            // Auto-apply the generated code
+            if (OnCodeGenerated.HasDelegate && !string.IsNullOrEmpty(result.GeneratedCode))
+            {
+                await OnCodeGenerated.InvokeAsync(result.GeneratedCode);
+            }
+        }
+        else
+        {
+            var errorMessage = new ChatMessage("AI", "Code generation failed:", DateTime.Now)
             {
                 Type = MessageType.CodeError,
-                Content = ex.Message,
+                Content = result.ErrorMessage ?? "Unknown error",
                 IsSuccess = false
             };
 
             messages.Add(errorMessage);
-            logger.LogError(ex, "Error during web code generation");
         }
-        finally
+    }
+
+    private void HandleConversationError(Exception ex)
+    {
+        RemoveGeneratingMessage();
+
+        var errorMessage = new ChatMessage("AI", "Unexpected error:", DateTime.Now)
         {
-            isGeneratingCode = false;
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
+            Type = MessageType.CodeError,
+            Content = ex.Message,
+            IsSuccess = false
+        };
+
+        messages.Add(errorMessage);
+        logger.LogError(ex, "Error during web app conversation execution");
+    }
+
+    private async Task EndConversation()
+    {
+        isGeneratingCode = false;
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
+    }
+
+    private List<Automaton.Mcp.Models.ConversationMessage> BuildMcpConversationHistory()
+    {
+        var conversationHistory = new List<Automaton.Mcp.Models.ConversationMessage>();
+
+        foreach (var message in messages.Where(m =>
+            m.Type != MessageType.System &&
+            m.Type != MessageType.Generating &&
+            m.Type != MessageType.ToolExecution))
+        {
+            string role = message.Role.ToLowerInvariant() switch
+            {
+                "user" => "user",
+                "ai" => "assistant",
+                _ => "user"
+            };
+
+            string content = message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode)
+                ? $"{message.Content}\n\n```html\n{message.GeneratedCode}\n```"
+                : message.Content;
+
+            conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));
         }
+
+        return conversationHistory;
+    }
+
+    private string? GetSelectedApiKeyId()
+    {
+        var selectedProvider = GetSelectedProvider();
+        if (selectedProvider == null) return null;
+
+        if (selectedProvider.StoredKeys?.Any() == true)
+        {
+            var mostRecentKey = selectedProvider.StoredKeys
+                .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
+                .First();
+            return mostRecentKey.Id.ToString();
+        }
+
+        return null;
+    }
+
+    private async Task<string> GetApiKeyFromProvider(AiProviderInfo provider, string? selectedApiKeyId)
+    {
+        if (!string.IsNullOrEmpty(selectedApiKeyId) && provider.StoredKeys?.Any() == true)
+        {
+            var selectedKey = provider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == selectedApiKeyId);
+            if (selectedKey != null)
+            {
+                var decryptedKey = await AiApiKeyService.GetDecryptedApiKeyAsync(selectedKey.Id);
+                if (!string.IsNullOrEmpty(decryptedKey))
+                {
+                    return decryptedKey;
+                }
+            }
+        }
+
+        if (provider.HasEnvironmentKey)
+        {
+            var envKeys = await AiApiKeyService.GetEnvironmentApiKeysAsync();
+            if (envKeys.TryGetValue(provider.Provider, out var envKey) && !string.IsNullOrEmpty(envKey))
+            {
+                return envKey;
+            }
+        }
+
+        logger.LogWarning("No valid API key found for provider {Provider}", provider.Provider);
+        return string.Empty;
     }
 
     private async Task ScrollToBottom()
@@ -194,6 +407,12 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
     private async Task ClearConversationHistory()
     {
         if (isGeneratingCode) return;
+
+        if (!string.IsNullOrEmpty(_conversationId))
+        {
+            await McpClient.EndConversationAsync(_conversationId);
+            _conversationId = null;
+        }
 
         messages.RemoveAll(m => m.Type != MessageType.System);
         pendingCodes.Clear();
@@ -225,6 +444,21 @@ public partial class WebAiChatPanel : ComponentBase, IDisposable
 
     public void Dispose()
     {
-        // Cleanup if needed
+        McpClient.ConversationUpdated -= OnConversationUpdated;
+
+        if (!string.IsNullOrEmpty(_conversationId))
+        {
+            _ = Task.Run(() => McpClient.EndConversationAsync(_conversationId));
+        }
+    }
+
+    // Helper class for better structure
+    private record ConversationContext
+    {
+        public string UserPrompt { get; init; } = string.Empty;
+        public AiProviderInfo Provider { get; init; } = default!;
+        public string Model { get; init; } = string.Empty;
+        public string ApiKey { get; init; } = string.Empty;
+        public ConversationRequest ConversationRequest { get; init; } = default!;
     }
 }
