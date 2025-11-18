@@ -54,10 +54,11 @@
 
 <!-- Add Member Modal -->
 <Modal Title="Add Member"
-       @bind-Visible="@addMemberModalVisible"
+       Visible="@addMemberModalVisible"
        OnOk="@HandleAddMember"
-       OnCancel="@(() => addMemberModalVisible = false)"
-       ConfirmLoading="@isAddingMember">
+       OnCancel="@HandleCancelAddMember"
+       ConfirmLoading="@isAddingMember"
+       MaskClosable="false">
     <Form Model="@addMemberModel">
         <FormItem Label="Email">
             <Input @bind-Value="@addMemberModel.Email" Placeholder="user@example.com" Disabled="@isAddingMember" />
@@ -143,6 +144,14 @@
             isAddingMember = false;
             addMemberModalVisible = false;
             StateHasChanged();
+        }
+    }
+
+    private void HandleCancelAddMember()
+    {
+        if (!isAddingMember)
+        {
+            addMemberModalVisible = false;
         }
     }
 
