@@ -14,6 +14,7 @@ public class StepViewModel : IDisposable
     private readonly CustomStepExecuteService customStepExecuteService;
     private readonly ConfigurationService configurationService;
     private readonly RunnerService runnerService;
+    private readonly ProjectContextService projectContextService;
 
     public IEnumerable<Guid> SelectedRunners { get; set; } = new List<Guid>();
     public bool HasSelectedRunners => SelectedRunners.Any();
@@ -48,13 +49,14 @@ public class StepViewModel : IDisposable
         return "run";
     }
 
-    public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory, ConfigurationService configurationService, RunnerService runnerService)
+    public StepViewModel(CustomStepsService customStepsService, CustomStepExecuteService customStepExecuteService, StepFactory stepFactory, ConfigurationService configurationService, RunnerService runnerService, ProjectContextService projectContextService)
     {
         this.stepFactory = stepFactory;
         this.customStepsService = customStepsService;
         this.customStepExecuteService = customStepExecuteService;
         this.configurationService = configurationService;
         this.runnerService = runnerService;
+        this.projectContextService = projectContextService;
         customStepExecuteService.ScriptTextWritten += OnNewScriptText;
     }
 
@@ -95,7 +97,8 @@ public class StepViewModel : IDisposable
         foreach (var result in results)
         {
             // Get runner name
-            var runners = await runnerService.List();
+            var projectId = projectContextService.GetCurrentProjectId();
+            var runners = await runnerService.List(projectId);
             var runner = runners.FirstOrDefault(r => r.Id == result.RunnerId);
             var runnerName = runner?.Name ?? result.RunnerId.ToString();
 

@@ -7,6 +7,7 @@ public class FlowScheduleViewModel
 {
     private readonly FlowScheduleService flowScheduleService;
     private readonly RunnerService runnerService;
+    private readonly ProjectContextService projectContextService;
     public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
 
     public Guid FlowId { get; set; }
@@ -15,11 +16,13 @@ public class FlowScheduleViewModel
     public FlowScheduleViewModel
     (
         FlowScheduleService flowScheduleService,
-        RunnerService runnerService
+        RunnerService runnerService,
+        ProjectContextService projectContextService
     )
     {
         this.flowScheduleService = flowScheduleService;
         this.runnerService = runnerService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task GetFlowSchedules(int startIndex, int pageSize)
@@ -29,7 +32,8 @@ public class FlowScheduleViewModel
 
     public async Task GetRunners()
     {
-        Runners = await runnerService.List();
+        var projectId = projectContextService.GetCurrentProjectId();
+        Runners = await runnerService.List(projectId);
     }
 
     public void NewSchedule()

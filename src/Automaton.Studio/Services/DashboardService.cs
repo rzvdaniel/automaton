@@ -11,6 +11,7 @@ public class DashboardService
     private readonly FlowsService flowsService;
     private readonly RunnerService runnerService;
     private readonly RecentActivityService recentActivityService;
+    private readonly ProjectContextService projectContextService;
     private readonly ILogger logger;
 
     public DashboardService(
@@ -19,7 +20,8 @@ public class DashboardService
         FlowExecutionsService flowExecutionsService,
         FlowsService flowsService,
         RunnerService runnerService,
-        RecentActivityService recentActivityService)
+        RecentActivityService recentActivityService,
+        ProjectContextService projectContextService)
     {
         this.httpClient = httpClient;
         this.configService = configService;
@@ -27,6 +29,7 @@ public class DashboardService
         this.flowsService = flowsService;
         this.runnerService = runnerService;
         this.recentActivityService = recentActivityService;
+        this.projectContextService = projectContextService;
         this.logger = Log.ForContext<DashboardService>();
     }
 
@@ -74,7 +77,8 @@ public class DashboardService
     {
         try
         {
-            var flows = await flowsService.List();
+            var projectId = projectContextService.GetCurrentProjectId();
+            var flows = await flowsService.List(projectId);
             return flows.OrderByDescending(f => f.Updated).Take(count);
         }
         catch (Exception ex)
@@ -88,7 +92,8 @@ public class DashboardService
     {
         try
         {
-            var flows = await flowsService.List();
+            var projectId = projectContextService.GetCurrentProjectId();
+            var flows = await flowsService.List(projectId);
             return flows.OrderByDescending(f => f.Updated).Take(count);
         }
         catch (Exception ex)
