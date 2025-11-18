@@ -52,7 +52,7 @@ else
 			TItemValue="Guid ?"
 			ValueProperty="r => r.Id"
 			LabelProperty="r => r.Name"
-			DisabledPredicate="r => r.Status == RunnerStatus.Offline"
+			DisabledPredicate="@IsSelectionDisabled"
 			@bind-Value="SelectedValue"
 			AllowClear="@AllowClear"
 			Style="@Style">
@@ -104,6 +104,9 @@ else
 
 	[Parameter] 
 	public bool Multiple { get; set; } = false;
+
+	[Parameter]
+	public bool AllowDisabledSelection { get; set; } = false;
 
 	[Parameter]
 	public Guid? SelectedValue
@@ -183,6 +186,8 @@ else
 	};
 
 	private string GetRunnerStatusClass(RunnerStatus status) => $"runner-status-icon runner-status-{status.ToString().ToLower()}";
+
+	private bool IsSelectionDisabled(RunnerModel r) => !AllowDisabledSelection && r.Status == RunnerStatus.Offline;
 }
 
 <style>

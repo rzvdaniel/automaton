@@ -63,7 +63,8 @@
        OnCancel="@(() => addRunnerModalVisible = false)">
     <Form TModel="AddRunnerModel" Layout="@FormLayout.Vertical">
         <FormItem Label="Select Runner">
-            <RunnerSelector @bind-SelectedValue="@selectedRunnerId" 
+            <RunnerSelector @bind-SelectedValue="@selectedRunnerId"
+                            AllowDisabledSelection="true"
                             Style="width: 100%"
                             Placeholder="Select a runner to add" />
         </FormItem>
