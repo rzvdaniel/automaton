@@ -16,11 +16,17 @@ public class ApiKeysService : IApiKeysService
     }
 
     /// <summary>
-    /// Get all API keys for the current user
+    /// Get all API keys for the current user filtered by project context
     /// </summary>
-    public async Task<List<ApiKeyResponse>> GetApiKeysAsync()
+    public async Task<List<ApiKeyResponse>> GetApiKeysAsync(Guid? projectId = null)
     {
-        var response = await httpClient.GetAsync($"{configService.ApiKeysUrl}");
+        var url = configService.ApiKeysUrl;
+        if (projectId.HasValue)
+        {
+            url += $"?projectId={projectId.Value}";
+        }
+
+        var response = await httpClient.GetAsync(url);
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync();

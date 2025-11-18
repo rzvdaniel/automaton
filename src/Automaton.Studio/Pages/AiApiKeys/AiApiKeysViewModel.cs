@@ -9,6 +9,7 @@ public class AiApiKeysViewModel
     private readonly AiApiKeyService aiApiKeyService;
     private readonly MessageService messageService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public bool Loading { get; set; } = false;
     public bool CreateModalVisible { get; set; } = false;
@@ -25,11 +26,13 @@ public class AiApiKeysViewModel
     public AiApiKeysViewModel(
         AiApiKeyService aiApiKeyService, 
         MessageService messageService,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService)
     {
         this.aiApiKeyService = aiApiKeyService;
         this.messageService = messageService;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task LoadAiApiKeys()
@@ -37,7 +40,8 @@ public class AiApiKeysViewModel
         Loading = true;
         try
         {
-            AiApiKeys = await aiApiKeyService.GetAiApiKeysAsync();
+            var projectId = projectContextService.GetCurrentProjectId();
+            AiApiKeys = await aiApiKeyService.GetAiApiKeysAsync(projectId);
         }
         catch (Exception ex)
         {

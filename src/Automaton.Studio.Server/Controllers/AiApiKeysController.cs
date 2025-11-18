@@ -23,10 +23,10 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AiApiKeyResponse>>> GetAiApiKeys()
+    public async Task<ActionResult<IEnumerable<AiApiKeyResponse>>> GetAiApiKeys([FromQuery] Guid? projectId = null)
     {
         var userId = GetUserId();
-        var apiKeys = await aiApiKeyService.GetUserAiApiKeysAsync(userId);
+        var apiKeys = await aiApiKeyService.GetUserAiApiKeysAsync(userId, projectId);
         
         var response = apiKeys.Select(ak => new AiApiKeyResponse
         {

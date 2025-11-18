@@ -62,7 +62,7 @@ public class ExecuteFlowStep : StudioStep
 
     public void OnFocus()
     {
-        var flowsInfo = Task.Run(this.flowsService.List).Result;
+        var flowsInfo = Task.Run(() => this.flowsService.List(null)).Result;
         Flows = flowsInfo
             .Select(flow => new ExecuteFlowModel
             {

@@ -16,9 +16,9 @@ public class FlowsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<FlowInfo> Get()
+    public IEnumerable<FlowInfo> Get([FromQuery] Guid? projectId = null)
     {
-        return flowsService.List();
+        return flowsService.List(projectId);
     }
 
     [HttpGet("{id}")]

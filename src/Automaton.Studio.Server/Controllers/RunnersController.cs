@@ -17,9 +17,9 @@ public class RunnersController : BaseController
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RunnerDetails>>> Get(CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<RunnerDetails>>> Get([FromQuery] Guid? projectId, CancellationToken cancellationToken)
     {
-        return Ok(await runnersService.List(cancellationToken));
+        return Ok(await runnersService.List(projectId, cancellationToken));
     }
 
     [HttpGet("find")]

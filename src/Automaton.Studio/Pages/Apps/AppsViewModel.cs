@@ -7,6 +7,7 @@ public class AppsViewModel
 {
     private readonly AppsService appsService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public ICollection<AppListItem> Apps { get; set; } = new List<AppListItem>();
 
@@ -15,15 +16,20 @@ public class AppsViewModel
     /// </summary>
     public bool CanManageApps => authorizationService.CanManageResources();
 
-    public AppsViewModel(AppsService appsService, ResourceAuthorizationService authorizationService)
+    public AppsViewModel(
+        AppsService appsService, 
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService)
     {
         this.appsService = appsService;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task GetApps()
     {
-        Apps = await appsService.List();
+        var projectId = projectContextService.GetCurrentProjectId();
+        Apps = await appsService.List(projectId);
     }
 
     public async Task CreateApp(NewApp app)

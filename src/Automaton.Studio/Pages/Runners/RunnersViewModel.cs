@@ -9,6 +9,7 @@ public class RunnersViewModel
 {
     private readonly RunnerService runnerService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public ICollection<RunnerModel> Runners { get; set; } = new List<RunnerModel>();
 
@@ -21,16 +22,19 @@ public class RunnersViewModel
     (
         RunnerService runnerService,
         FlowService flowService,
-        ResourceAuthorizationService authorizationService
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService
     )
     {
         this.runnerService = runnerService;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task GetRunners()
     {
-        var runners = await runnerService.List();
+        var projectId = projectContextService.GetCurrentProjectId();
+        var runners = await runnerService.List(projectId);
         Runners = runners
             .Select(runner => new RunnerModel
             {

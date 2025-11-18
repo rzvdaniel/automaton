@@ -37,10 +37,10 @@ public class FlowsService
         this.logger = Log.ForContext<FlowsService>();
     }
 
-    public IEnumerable<FlowInfo> List()
+    public IEnumerable<FlowInfo> List(Guid? projectId = null)
     {
-        // Use authorization service to get accessible flows (personal + project-based)
-        var accessibleFlows = authorizationService.GetAccessibleFlowsQuery();
+        // Use authorization service to get flows filtered by project context
+        var accessibleFlows = authorizationService.GetFlowsQueryByContext(projectId);
 
         var flows =
             from m in accessibleFlows

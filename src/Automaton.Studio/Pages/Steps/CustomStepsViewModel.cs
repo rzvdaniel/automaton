@@ -9,15 +9,18 @@ public class CustomStepsViewModel
     private readonly CustomStepsService customStepsService;
     private readonly StepFactory stepFactory;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public CustomStepsViewModel(
         CustomStepsService customStepsService, 
         StepFactory stepFactory,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService)
     {
         this.customStepsService = customStepsService;
         this.stepFactory = stepFactory;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public ICollection<CustomStepListItem> CustomSteps { get; set; } = new List<CustomStepListItem>();
@@ -29,7 +32,8 @@ public class CustomStepsViewModel
 
     public async Task GetCustomSteps()
     {
-        var flowsInfo = await customStepsService.List();
+        var projectId = projectContextService.GetCurrentProjectId();
+        var flowsInfo = await customStepsService.List(projectId);
         CustomSteps = flowsInfo.Select(MapToCustomStepListItem).ToList();
     }
 

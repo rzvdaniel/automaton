@@ -23,13 +23,19 @@ public class RunnerService
         this.httpClient = httpClient;
     }
 
-    public async Task<ICollection<RunnerModel>> List()
+    public async Task<ICollection<RunnerModel>> List(Guid? projectId = null)
     {
         ICollection<RunnerModel> runners = new List<RunnerModel>();
 
         try
         {
-            var result = await httpClient.GetAsync(configService.RunnersUrl);
+            var url = configService.RunnersUrl;
+            if (projectId.HasValue)
+            {
+                url += $"?projectId={projectId.Value}";
+            }
+
+            var result = await httpClient.GetAsync(url);
 
             result.EnsureSuccessStatusCode();
 

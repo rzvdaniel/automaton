@@ -51,10 +51,10 @@ public class ApiKeysController : BaseController
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetApiKeys()
+    public async Task<IActionResult> GetApiKeys([FromQuery] Guid? projectId = null)
     {
         var userId = userContextService.GetUserId();
-        var apiKeys = await apiKeyService.GetUserApiKeysAsync(userId);
+        var apiKeys = await apiKeyService.GetUserApiKeysAsync(userId, projectId);
 
         var response = apiKeys.Select(ak => new ApiKeyResponse
         {

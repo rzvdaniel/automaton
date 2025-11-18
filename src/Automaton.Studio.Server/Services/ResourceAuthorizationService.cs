@@ -639,6 +639,163 @@ public class ResourceAuthorizationService
         return personalRunners.Union(projectRunners);
     }
 
+    /// <summary>
+    /// Get IQueryable for apps filtered by project context.
+    /// If projectId is null, returns only personal apps. Otherwise, returns only apps in that project.
+    /// </summary>
+    public IQueryable<Entities.WebApp> GetAppsQueryByContext(Guid? projectId)
+    {
+        return GetAppsQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.WebApp> GetAppsQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal apps
+            return dbContext.WebApps
+                .Where(a => a.WebAppUsers.Any(u => u.UserId == userId));
+        }
+        else
+        {
+            // Project mode - return only apps in that project (if user has access)
+            return dbContext.WebApps
+                .Where(a => a.ProjectApps.Any(pa => pa.ProjectId == projectId && 
+                                                     pa.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+        }
+    }
+
+    /// <summary>
+    /// Get IQueryable for flows filtered by project context.
+    /// If projectId is null, returns only personal flows. Otherwise, returns only flows in that project.
+    /// </summary>
+    public IQueryable<Entities.Flow> GetFlowsQueryByContext(Guid? projectId)
+    {
+        return GetFlowsQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.Flow> GetFlowsQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal flows
+            return dbContext.Flows
+                .Where(f => f.FlowUsers.Any(u => u.UserId == userId));
+        }
+        else
+        {
+            // Project mode - return only flows in that project (if user has access)
+            return dbContext.Flows
+                .Where(f => f.ProjectFlows.Any(pf => pf.ProjectId == projectId && 
+                                                      pf.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+        }
+    }
+
+    /// <summary>
+    /// Get IQueryable for custom steps filtered by project context.
+    /// If projectId is null, returns only personal steps. Otherwise, returns only steps in that project.
+    /// </summary>
+    public IQueryable<Entities.CustomStep> GetCustomStepsQueryByContext(Guid? projectId)
+    {
+        return GetCustomStepsQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.CustomStep> GetCustomStepsQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal steps
+            return dbContext.CustomSteps
+                .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId));
+        }
+        else
+        {
+            // Project mode - return only steps in that project (if user has access)
+            return dbContext.CustomSteps
+                .Where(cs => cs.ProjectCustomSteps.Any(pcs => pcs.ProjectId == projectId && 
+                                                               pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+        }
+    }
+
+    /// <summary>
+    /// Get IQueryable for runners filtered by project context.
+    /// If projectId is null, returns only personal runners. Otherwise, returns only runners in that project.
+    /// </summary>
+    public IQueryable<Entities.Runner> GetRunnersQueryByContext(Guid? projectId)
+    {
+        return GetRunnersQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.Runner> GetRunnersQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal runners
+            return dbContext.Runners
+                .Where(r => r.RunnerUsers.Any(u => u.UserId == userId));
+        }
+        else
+        {
+            // Project mode - return only runners in that project (if user has access)
+            return dbContext.Runners
+                .Where(r => r.ProjectRunners.Any(pr => pr.ProjectId == projectId && 
+                                                        pr.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+        }
+    }
+
+    /// <summary>
+    /// Get IQueryable for API keys filtered by project context.
+    /// If projectId is null, returns only personal API keys. Otherwise, returns only API keys in that project.
+    /// </summary>
+    public IQueryable<Entities.ApiKey> GetApiKeysQueryByContext(Guid? projectId)
+    {
+        return GetApiKeysQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.ApiKey> GetApiKeysQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal API keys
+            return dbContext.ApiKeys
+                .Where(ak => ak.ApiKeyUsers.Any(u => u.UserId == userId));
+        }
+        else
+        {
+            // Project mode - return only API keys in that project (if user has access)
+            return dbContext.ApiKeys
+                .Where(ak => ak.ProjectApiKeys.Any(pak => pak.ProjectId == projectId && 
+                                                           pak.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+        }
+    }
+
+    /// <summary>
+    /// Get IQueryable for AI API keys filtered by project context.
+    /// If projectId is null, returns only personal AI API keys. Otherwise, returns only AI API keys in that project.
+    /// </summary>
+    public IQueryable<Entities.AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId)
+    {
+        return GetAiApiKeysQueryByContext(projectId, UserId);
+    }
+
+    public IQueryable<Entities.AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId, Guid userId)
+    {
+        if (projectId == null)
+        {
+            // Personal mode - return only personal AI API keys
+            return dbContext.AiApiKeys
+                .Where(ak => ak.AiApiKeyUsers.Any(u => u.UserId == userId) && ak.IsActive);
+        }
+        else
+        {
+            // Project mode - return only AI API keys in that project (if user has access)
+            return dbContext.AiApiKeys
+                .Where(ak => ak.ProjectAiApiKeys.Any(pak => pak.ProjectId == projectId && 
+                                                             pak.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)) && 
+                             ak.IsActive);
+        }
+    }
+
     #endregion
 
     #region Projects Authorization

@@ -10,6 +10,7 @@ public class FlowsViewModel
     private readonly FlowsService flowsService;
     private readonly FlowService flowService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public ICollection<FlowModel> Flows { get; set;  } = new List<FlowModel>();
 
@@ -28,17 +29,20 @@ public class FlowsViewModel
         FlowsService flowsService,
         RunnerService runnerService,
         FlowService flowService,
-        ResourceAuthorizationService authorizationService
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService
     )
     {
         this.flowsService = flowsService;
         this.flowService = flowService;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task GetFlows()
     {
-        var flowsInfo = await flowsService.List();
+        var projectId = projectContextService.GetCurrentProjectId();
+        var flowsInfo = await flowsService.List(projectId);
         Flows = flowsInfo
             .Select(flow => new FlowModel
             {

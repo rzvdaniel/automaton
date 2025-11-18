@@ -16,11 +16,17 @@ public class AiApiKeyService
         this.logger = logger;
     }
 
-    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysAsync()
+    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysAsync(Guid? projectId = null)
     {
         try
         {
-            var response = await httpClient.GetAsync("api/aiApiKeys");
+            var url = "api/aiApiKeys";
+            if (projectId.HasValue)
+            {
+                url += $"?projectId={projectId.Value}";
+            }
+
+            var response = await httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();

@@ -37,10 +37,10 @@ public class CustomStepsService
         this.logger = Log.ForContext<CustomStepsService>();
     }
 
-    public IEnumerable<CustomStep> List()
+    public IEnumerable<CustomStep> List(Guid? projectId = null)
     {
-        // Use authorization service to get accessible custom steps (personal + project-based)
-        var entities = authorizationService.GetAccessibleCustomStepsQuery();
+        // Use authorization service to get custom steps filtered by project context
+        var entities = authorizationService.GetCustomStepsQueryByContext(projectId);
         var steps = entities.Select(MapToModel);
 
         return steps;

@@ -12,6 +12,7 @@ public class ApiKeysViewModel
     private readonly MessageService messageService;
     private readonly IJSRuntime jsRuntime;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ProjectContextService projectContextService;
 
     public bool Loading { get; set; } = true;
     public List<ApiKeyResponse>? ApiKeys { get; set; }
@@ -33,12 +34,14 @@ public class ApiKeysViewModel
         IApiKeysService apiKeysService,
         MessageService messageService,
         IJSRuntime jsRuntime,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        ProjectContextService projectContextService)
     {
         this.apiKeysService = apiKeysService;
         this.messageService = messageService;
         this.jsRuntime = jsRuntime;
         this.authorizationService = authorizationService;
+        this.projectContextService = projectContextService;
     }
 
     public async Task LoadApiKeys()
@@ -46,7 +49,8 @@ public class ApiKeysViewModel
         Loading = true;
         try
         {
-            ApiKeys = await apiKeysService.GetApiKeysAsync();
+            var projectId = projectContextService.GetCurrentProjectId();
+            ApiKeys = await apiKeysService.GetApiKeysAsync(projectId);
         }
         catch (Exception ex)
         {

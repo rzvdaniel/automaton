@@ -183,7 +183,7 @@ public class StepFactory
 
     private void LoadCustomSteps()
     {
-        var customStepsList = Task.Run(customStepsService.List).Result;
+        var customStepsList = Task.Run(() => customStepsService.List(null)).Result;
 
         foreach (var customStep in customStepsList)
         {

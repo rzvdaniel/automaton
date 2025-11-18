@@ -74,10 +74,10 @@ public class AiApiKeyService
         return entity;
     }
 
-    public async Task<IEnumerable<AiApiKey>> GetUserAiApiKeysAsync(Guid userId)
+    public async Task<IEnumerable<AiApiKey>> GetUserAiApiKeysAsync(Guid userId, Guid? projectId = null)
     {
-        // Use authorization service query to get accessible AI API keys
-        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
+        // Use authorization service query to get AI API keys filtered by project context
+        return await authorizationService.GetAiApiKeysQueryByContext(projectId, userId)
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }

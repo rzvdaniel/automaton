@@ -13,9 +13,9 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<Models.CustomStep> Get()
+    public IEnumerable<Models.CustomStep> Get([FromQuery] Guid? projectId = null)
     {
-        return customStepsService.List();
+        return customStepsService.List(projectId);
     }
 
     [HttpGet("{id}")]

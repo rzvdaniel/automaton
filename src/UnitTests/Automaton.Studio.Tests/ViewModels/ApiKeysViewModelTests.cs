@@ -25,12 +25,14 @@ public class ApiKeysViewModelTests
         mockMessageService = Substitute.For<MessageService>();
         mockJsRuntime = Substitute.For<IJSRuntime>();
         var mockAuthorizationService = Substitute.For<ResourceAuthorizationService>();
+        var mockProjectContextService = Substitute.For<ProjectContextService>();
 
         viewModel = new ApiKeysViewModel(
             mockApiKeysService,
             mockMessageService,
             mockJsRuntime,
-            mockAuthorizationService);
+            mockAuthorizationService,
+            mockProjectContextService);
     }
 
     [Test]
@@ -41,7 +43,7 @@ public class ApiKeysViewModelTests
         {
             new() { Id = Guid.NewGuid(), Name = "Test Key", KeyPrefix = "ak_test", Scope = ApiKeyScope.Runner, CreatedAt = DateTime.Now, IsActive = true }
         };
-        mockApiKeysService.GetApiKeysAsync().Returns(apiKeys);
+        mockApiKeysService.GetApiKeysAsync(Arg.Any<Guid?>()).Returns(apiKeys);
 
         // Act
         await viewModel.LoadApiKeys();
@@ -55,7 +57,7 @@ public class ApiKeysViewModelTests
     public async Task LoadApiKeys_Exception_ShouldShowErrorAndClearLoading()
     {
         // Arrange
-        mockApiKeysService.GetApiKeysAsync().ThrowsAsync(new Exception("API Error"));
+        mockApiKeysService.GetApiKeysAsync(Arg.Any<Guid?>()).ThrowsAsync(new Exception("API Error"));
 
         // Act
         await viewModel.LoadApiKeys();
@@ -106,7 +108,7 @@ public class ApiKeysViewModelTests
             CreatedAt = DateTime.Now 
         };
         mockApiKeysService.CreateApiKeyAsync(Arg.Any<CreateApiKeyRequest>()).Returns(createResponse);
-        mockApiKeysService.GetApiKeysAsync().Returns(new List<ApiKeyResponse>());
+        mockApiKeysService.GetApiKeysAsync(Arg.Any<Guid?>()).Returns(new List<ApiKeyResponse>());
 
         // Act
         await viewModel.CreateApiKey();
@@ -116,7 +118,7 @@ public class ApiKeysViewModelTests
         Assert.That(viewModel.CreateModalVisible, Is.False);
         Assert.That(viewModel.SuccessModalVisible, Is.True);
         Assert.That(viewModel.CreateLoading, Is.False);
-        await mockApiKeysService.Received(1).GetApiKeysAsync(); // Refresh call
+        await mockApiKeysService.Received(1).GetApiKeysAsync(Arg.Any<Guid?>()); // Refresh call
     }
 
     [Test]
@@ -125,14 +127,14 @@ public class ApiKeysViewModelTests
         // Arrange
         var apiKeyId = Guid.NewGuid();
         mockApiKeysService.RevokeApiKeyAsync(apiKeyId).Returns(true);
-        mockApiKeysService.GetApiKeysAsync().Returns(new List<ApiKeyResponse>());
+        mockApiKeysService.GetApiKeysAsync(Arg.Any<Guid?>()).Returns(new List<ApiKeyResponse>());
 
         // Act
         await viewModel.RevokeApiKey(apiKeyId);
 
         // Assert
         await mockMessageService.Received(1).SuccessAsync("API key revoked successfully");
-        await mockApiKeysService.Received(1).GetApiKeysAsync(); // Refresh call
+        await mockApiKeysService.Received(1).GetApiKeysAsync(Arg.Any<Guid?>()); // Refresh call
     }
 
     [Test]

@@ -32,10 +32,10 @@ public class AppsService
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
-    public IEnumerable<Models.AppModel> List()
+    public IEnumerable<Models.AppModel> List(Guid? projectId = null)
     {
-        // Use authorization service to get accessible apps (personal + project-based)
-        var entities = authorizationService.GetAccessibleAppsQuery();
+        // Use authorization service to get apps filtered by project context
+        var entities = authorizationService.GetAppsQueryByContext(projectId);
         var apps = entities.Select(MapToModel);
 
         return apps;

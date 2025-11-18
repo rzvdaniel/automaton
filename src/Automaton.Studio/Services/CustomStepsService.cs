@@ -20,11 +20,17 @@ public class CustomStepsService
         this.httpClient = httpClient;
     }
 
-    public async Task<ICollection<CustomStep>> List()
+    public async Task<ICollection<CustomStep>> List(Guid? projectId = null)
     {
         try
         {
-            var result = await httpClient.GetAsync(configService.CustomStepsUrl);
+            var url = configService.CustomStepsUrl;
+            if (projectId.HasValue)
+            {
+                url += $"?projectId={projectId.Value}";
+            }
+
+            var result = await httpClient.GetAsync(url);
 
             result.EnsureSuccessStatusCode();
 

@@ -24,9 +24,9 @@ public class AppsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<Models.AppModel> Get()
+    public IEnumerable<Models.AppModel> Get([FromQuery] Guid? projectId = null)
     {
-        return appsService.List();
+        return appsService.List(projectId);
     }
 
     [HttpGet("{id}")]

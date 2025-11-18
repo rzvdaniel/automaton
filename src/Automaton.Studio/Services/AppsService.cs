@@ -20,11 +20,17 @@ public class AppsService
         this.httpClient = httpClient;
     }
 
-    public async Task<ICollection<AppListItem>> List()
+    public async Task<ICollection<AppListItem>> List(Guid? projectId = null)
     {
         try
         {
-            var result = await httpClient.GetAsync(configService.AppsUrl);
+            var url = configService.AppsUrl;
+            if (projectId.HasValue)
+            {
+                url += $"?projectId={projectId.Value}";
+            }
+
+            var result = await httpClient.GetAsync(url);
 
             result.EnsureSuccessStatusCode();
 

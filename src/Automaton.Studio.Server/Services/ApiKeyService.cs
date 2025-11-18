@@ -116,10 +116,10 @@ public class ApiKeyService
         return entity;
     }
 
-    public async Task<IEnumerable<ApiKey>> GetUserApiKeysAsync(Guid userId)
+    public async Task<IEnumerable<ApiKey>> GetUserApiKeysAsync(Guid userId, Guid? projectId = null)
     {
-        // Use authorization service query to get accessible API keys
-        return await authorizationService.GetAccessibleApiKeysQuery(userId)
+        // Use authorization service query to get API keys filtered by project context
+        return await authorizationService.GetApiKeysQueryByContext(projectId, userId)
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }

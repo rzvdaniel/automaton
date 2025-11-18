@@ -5,9 +5,9 @@ namespace Automaton.Studio.Services;
 public interface IApiKeysService
 {
     /// <summary>
-    /// Get all API keys for the current user
+    /// Get all API keys for the current user filtered by project context
     /// </summary>
-    Task<List<ApiKeyResponse>> GetApiKeysAsync();
+    Task<List<ApiKeyResponse>> GetApiKeysAsync(Guid? projectId = null);
 
     /// <summary>
     /// Create a new API key
