@@ -11,7 +11,7 @@ namespace Automaton.Studio.Pages.Apps;
 partial class AppsPage : ComponentBase
 {
     public bool loading;
-    private bool _isGridView = true;
+    private bool _isGridView;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private AppsViewModel AppsViewModel { get; set; } = default!;
@@ -22,6 +22,11 @@ partial class AppsPage : ComponentBase
     protected override async Task OnInitializedAsync()
     {
         loading = true;
+
+        // Set default view mode based on user permissions
+        // If user can manage apps (Personal mode or Project mode with manage rights), default to List view
+        // Otherwise, default to Grid view
+        _isGridView = !AppsViewModel.CanManageApps;
 
         try
         {
