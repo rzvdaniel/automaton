@@ -151,9 +151,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _membersService.AddMemberAsync(projectId, request);
+            var newMember = await _membersService.AddMemberAsync(projectId, request);
             _messageService.Success("Member added successfully");
-            await LoadMembersAsync(projectId);
+            
+            // Add to local collection immediately
+            Members.Add(newMember);
         }
         catch (Exception ex)
         {
@@ -169,7 +171,13 @@ public class ProjectViewModel
             var request = new UpdateProjectMemberRequest { Role = newRole };
             await _membersService.UpdateMemberRoleAsync(projectId, userId, request);
             _messageService.Success("Member role updated successfully");
-            await LoadMembersAsync(projectId);
+            
+            // Update local collection immediately
+            var member = Members.FirstOrDefault(m => m.UserId == userId);
+            if (member != null)
+            {
+                member.Role = newRole;
+            }
         }
         catch (Exception ex)
         {
@@ -184,7 +192,13 @@ public class ProjectViewModel
         {
             await _membersService.RemoveMemberAsync(projectId, userId);
             _messageService.Success("Member removed successfully");
-            await LoadMembersAsync(projectId);
+            
+            // Remove from local collection immediately
+            var member = Members.FirstOrDefault(m => m.UserId == userId);
+            if (member != null)
+            {
+                Members.Remove(member);
+            }
         }
         catch (Exception ex)
         {

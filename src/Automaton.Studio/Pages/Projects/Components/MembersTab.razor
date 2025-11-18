@@ -56,13 +56,14 @@
 <Modal Title="Add Member"
        @bind-Visible="@addMemberModalVisible"
        OnOk="@HandleAddMember"
-       OnCancel="@(() => addMemberModalVisible = false)">
+       OnCancel="@(() => addMemberModalVisible = false)"
+       ConfirmLoading="@isAddingMember">
     <Form Model="@addMemberModel">
         <FormItem Label="Email">
-            <Input @bind-Value="@addMemberModel.Email" Placeholder="user@example.com" />
+            <Input @bind-Value="@addMemberModel.Email" Placeholder="user@example.com" Disabled="@isAddingMember" />
         </FormItem>
         <FormItem Label="Role">
-            <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@addMemberModel.Role" Style="width: 100%;">
+            <Select TItemValue="ProjectRole" TItem="string" @bind-Value="@addMemberModel.Role" Style="width: 100%;" Disabled="@isAddingMember">
                 <SelectOption Value="ProjectRole.ProjectAdmin" Label="Project Admin" />
                 <SelectOption Value="ProjectRole.Developer" Label="Developer" />
                 <SelectOption Value="ProjectRole.AppUser" Label="App User" />
@@ -70,7 +71,7 @@
             </Select>
         </FormItem>
         <FormItem>
-            <Checkbox @bind-Value="@addMemberModel.CreateAccountIfNotExists">
+            <Checkbox @bind-Value="@addMemberModel.CreateAccountIfNotExists" Disabled="@isAddingMember">
                 Create account if email doesn't exist
             </Checkbox>
             <div class="form-text text-muted" style="margin-top:8px;font-size:0.9em;">
@@ -107,6 +108,7 @@
 
     private bool addMemberModalVisible = false;
     private bool updateRoleModalVisible = false;
+    private bool isAddingMember = false;
     private AddProjectMemberRequest addMemberModel = new();
     private ProjectMemberDto? selectedMember;
     private ProjectRole newRole;
@@ -133,8 +135,14 @@
     {
         if (ViewModel.Project != null && !string.IsNullOrWhiteSpace(addMemberModel.Email))
         {
+            isAddingMember = true;
+            StateHasChanged();
+            
             await ViewModel.AddMemberAsync(ViewModel.Project.Id, addMemberModel);
+            
+            isAddingMember = false;
             addMemberModalVisible = false;
+            StateHasChanged();
         }
     }
 
@@ -151,6 +159,7 @@
         {
             await ViewModel.UpdateMemberRoleAsync(ViewModel.Project.Id, selectedMember.UserId, newRole);
             updateRoleModalVisible = false;
+            StateHasChanged();
         }
     }
 
@@ -169,6 +178,7 @@
         if (confirmed && ViewModel.Project != null)
         {
             await ViewModel.RemoveMemberAsync(ViewModel.Project.Id, member.UserId);
+            StateHasChanged();
         }
     }
 
