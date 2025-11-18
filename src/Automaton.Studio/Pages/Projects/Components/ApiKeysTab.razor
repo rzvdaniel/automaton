@@ -2,27 +2,30 @@
 @using Automaton.Studio.Components
 
 <div class="apikeys-tab">
-    @if (ViewModel.CanManageResources)
-    {
-        <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+        @if (ViewModel.CanManageResources)
+        {
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddApiKeyModal">
                 <Icon Type="plus" />
                 Add API Key to Project
             </Button>
-        </div>
-    }
+        }
+        <Button OnClick="@LoadApiKeys" Loading="@isLoading">
+            <Icon Type="reload" />
+            Refresh
+        </Button>
+    </div>
 
-    @if (!apiKeysLoaded)
+    @if (isLoading && !apiKeysLoaded)
     {
         <div style="text-align: center; padding: 40px 0;">
-            <Button Type="@ButtonType.Link" OnClick="@LoadApiKeys">
-                <Icon Type="reload" /> Load API Keys
-            </Button>
+            <Spin Size="@SpinSize.Large" />
+            <div style="margin-top: 16px;">Loading API keys...</div>
         </div>
     }
     else
     {
-        <Table TItem="ProjectApiKeyDto" DataSource="@ViewModel.ApiKeys">
+        <Table TItem="ProjectApiKeyDto" DataSource="@ViewModel.ApiKeys" Loading="@isLoading">
             <Column Title="API Key Name" TData="string" @bind-Field="@context.ApiKeyName" />
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
@@ -72,18 +75,28 @@
     public ProjectViewModel ViewModel { get; set; } = default!;
 
     private bool apiKeysLoaded = false;
+    private bool isLoading = false;
     private bool addApiKeyModalVisible = false;
     private Guid? selectedApiKeyId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApiKeys();
+    }
+
     private async Task LoadApiKeys()
     {
-        if (ViewModel.Project != null)
+        if (ViewModel.Project != null && !isLoading)
         {
+            isLoading = true;
+            StateHasChanged();
             await ViewModel.LoadApiKeysAsync(ViewModel.Project.Id);
             apiKeysLoaded = true;
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
@@ -99,6 +112,7 @@
         {
             await ViewModel.AddApiKeyAsync(ViewModel.Project.Id, selectedApiKeyId.Value);
             addApiKeyModalVisible = false;
+            StateHasChanged();
         }
     }
 
@@ -116,6 +130,7 @@
         if (confirmed && ViewModel.Project != null)
         {
             await ViewModel.RemoveApiKeyAsync(ViewModel.Project.Id, apiKeyId);
+            StateHasChanged();
         }
     }
 

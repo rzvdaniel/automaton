@@ -2,27 +2,30 @@
 @using Automaton.Studio.Components
 
 <div class="runners-tab">
-    @if (ViewModel.CanManageResources)
-    {
-        <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+        @if (ViewModel.CanManageResources)
+        {
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddRunnerModal">
                 <Icon Type="plus" />
                 Add Runner to Project
             </Button>
-        </div>
-    }
+        }
+        <Button OnClick="@LoadRunners" Loading="@isLoading">
+            <Icon Type="reload" />
+            Refresh
+        </Button>
+    </div>
 
-    @if (!runnersLoaded)
+    @if (isLoading && !runnersLoaded)
     {
         <div style="text-align: center; padding: 40px 0;">
-            <Button Type="@ButtonType.Link" OnClick="@LoadRunners">
-                <Icon Type="reload" /> Load Runners
-            </Button>
+            <Spin Size="@SpinSize.Large" />
+            <div style="margin-top: 16px;">Loading runners...</div>
         </div>
     }
     else
     {
-        <Table TItem="ProjectRunnerDto" DataSource="@ViewModel.Runners">
+        <Table TItem="ProjectRunnerDto" DataSource="@ViewModel.Runners" Loading="@isLoading">
             <Column Title="Runner Name" TData="string" @bind-Field="@context.RunnerName" />
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
@@ -72,18 +75,28 @@
     public ProjectViewModel ViewModel { get; set; } = default!;
 
     private bool runnersLoaded = false;
+    private bool isLoading = false;
     private bool addRunnerModalVisible = false;
     private Guid? selectedRunnerId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRunners();
+    }
+
     private async Task LoadRunners()
     {
-        if (ViewModel.Project != null)
+        if (ViewModel.Project != null && !isLoading)
         {
+            isLoading = true;
+            StateHasChanged();
             await ViewModel.LoadRunnersAsync(ViewModel.Project.Id);
             runnersLoaded = true;
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
@@ -99,6 +112,7 @@
         {
             await ViewModel.AddRunnerAsync(ViewModel.Project.Id, selectedRunnerId.Value);
             addRunnerModalVisible = false;
+            StateHasChanged();
         }
     }
 
@@ -116,6 +130,7 @@
         if (confirmed && ViewModel.Project != null)
         {
             await ViewModel.RemoveRunnerAsync(ViewModel.Project.Id, runnerId);
+            StateHasChanged();
         }
     }
 

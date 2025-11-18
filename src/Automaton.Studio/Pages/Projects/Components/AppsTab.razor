@@ -3,27 +3,30 @@
 @using Automaton.Studio.Enums
 
 <div class="apps-tab">
-    @if (ViewModel.CanManageResources)
-    {
-        <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+        @if (ViewModel.CanManageResources)
+        {
             <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
                 <Icon Type="plus" />
                 Add App to Project
             </Button>
-        </div>
-    }
+        }
+        <Button OnClick="@LoadApps" Loading="@isLoading">
+            <Icon Type="reload" />
+            Refresh
+        </Button>
+    </div>
 
-    @if (!appsLoaded)
+    @if (isLoading && !appsLoaded)
     {
         <div style="text-align: center; padding: 40px 0;">
-            <Button Type="@ButtonType.Link" OnClick="@LoadApps">
-                <Icon Type="reload" /> Load Apps
-            </Button>
+            <Spin Size="@SpinSize.Large" />
+            <div style="margin-top: 16px;">Loading apps...</div>
         </div>
     }
     else
     {
-        <Table TItem="ProjectAppDto" DataSource="@ViewModel.Apps">
+        <Table TItem="ProjectAppDto" DataSource="@ViewModel.Apps" Loading="@isLoading">
             <Column Title="App Name" TData="string" @bind-Field="@context.AppName" />
             <Column Title="Added" TData="DateTime" @bind-Field="@context.AddedAt" Format="yyyy-MM-dd HH:mm" Sortable />
             <Column Title="Added By" TData="string" @bind-Field="@context.AddedByUserName" />
@@ -73,18 +76,28 @@
     public ProjectViewModel ViewModel { get; set; } = default!;
 
     private bool appsLoaded = false;
+    private bool isLoading = false;
     private bool addAppModalVisible = false;
     private Guid? selectedAppId = null;
 
     [Inject]
     private ModalService Modal { get; set; } = default!;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApps();
+    }
+
     private async Task LoadApps()
     {
-        if (ViewModel.Project != null)
+        if (ViewModel.Project != null && !isLoading)
         {
+            isLoading = true;
+            StateHasChanged();
             await ViewModel.LoadAppsAsync(ViewModel.Project.Id);
             appsLoaded = true;
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
@@ -100,6 +113,7 @@
         {
             await ViewModel.AddAppAsync(ViewModel.Project.Id, selectedAppId.Value);
             addAppModalVisible = false;
+            StateHasChanged();
         }
     }
 
@@ -117,6 +131,7 @@
         if (confirmed && ViewModel.Project != null)
         {
             await ViewModel.RemoveAppAsync(ViewModel.Project.Id, appId);
+            StateHasChanged();
         }
     }
 

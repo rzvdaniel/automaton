@@ -197,9 +197,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddAppAsync(projectId, appId);
+            var newApp = await _resourcesService.AddAppAsync(projectId, appId);
             _messageService.Success("App added to project successfully");
-            await LoadAppsAsync(projectId);
+            
+            // Add to local collection immediately
+            Apps.Add(newApp);
         }
         catch (Exception ex)
         {
@@ -214,7 +216,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveAppAsync(projectId, appId);
             _messageService.Success("App removed from project successfully");
-            await LoadAppsAsync(projectId);
+            
+            // Remove from local collection immediately
+            var app = Apps.FirstOrDefault(a => a.AppId == appId);
+            if (app != null)
+            {
+                Apps.Remove(app);
+            }
         }
         catch (Exception ex)
         {
@@ -227,9 +235,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddFlowAsync(projectId, flowId);
+            var newFlow = await _resourcesService.AddFlowAsync(projectId, flowId);
             _messageService.Success("Flow added to project successfully");
-            await LoadFlowsAsync(projectId);
+            
+            // Add to local collection immediately
+            Flows.Add(newFlow);
         }
         catch (Exception ex)
         {
@@ -244,7 +254,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveFlowAsync(projectId, flowId);
             _messageService.Success("Flow removed from project successfully");
-            await LoadFlowsAsync(projectId);
+            
+            // Remove from local collection immediately
+            var flow = Flows.FirstOrDefault(f => f.FlowId == flowId);
+            if (flow != null)
+            {
+                Flows.Remove(flow);
+            }
         }
         catch (Exception ex)
         {
@@ -257,9 +273,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddRunnerAsync(projectId, runnerId);
+            var newRunner = await _resourcesService.AddRunnerAsync(projectId, runnerId);
             _messageService.Success("Runner added to project successfully");
-            await LoadRunnersAsync(projectId);
+            
+            // Add to local collection immediately
+            Runners.Add(newRunner);
         }
         catch (Exception ex)
         {
@@ -274,7 +292,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveRunnerAsync(projectId, runnerId);
             _messageService.Success("Runner removed from project successfully");
-            await LoadRunnersAsync(projectId);
+            
+            // Remove from local collection immediately
+            var runner = Runners.FirstOrDefault(r => r.RunnerId == runnerId);
+            if (runner != null)
+            {
+                Runners.Remove(runner);
+            }
         }
         catch (Exception ex)
         {
@@ -287,9 +311,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddCustomStepAsync(projectId, stepId);
+            var newStep = await _resourcesService.AddCustomStepAsync(projectId, stepId);
             _messageService.Success("Custom step added to project successfully");
-            await LoadCustomStepsAsync(projectId);
+            
+            // Add to local collection immediately
+            CustomSteps.Add(newStep);
         }
         catch (Exception ex)
         {
@@ -304,7 +330,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveCustomStepAsync(projectId, stepId);
             _messageService.Success("Custom step removed from project successfully");
-            await LoadCustomStepsAsync(projectId);
+            
+            // Remove from local collection immediately
+            var step = CustomSteps.FirstOrDefault(s => s.StepId == stepId);
+            if (step != null)
+            {
+                CustomSteps.Remove(step);
+            }
         }
         catch (Exception ex)
         {
@@ -331,9 +363,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddApiKeyAsync(projectId, apiKeyId);
+            var newApiKey = await _resourcesService.AddApiKeyAsync(projectId, apiKeyId);
             _messageService.Success("API key added to project successfully");
-            await LoadApiKeysAsync(projectId);
+            
+            // Add to local collection immediately
+            ApiKeys.Add(newApiKey);
         }
         catch (Exception ex)
         {
@@ -348,7 +382,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveApiKeyAsync(projectId, apiKeyId);
             _messageService.Success("API key removed from project successfully");
-            await LoadApiKeysAsync(projectId);
+            
+            // Remove from local collection immediately
+            var apiKey = ApiKeys.FirstOrDefault(a => a.ApiKeyId == apiKeyId);
+            if (apiKey != null)
+            {
+                ApiKeys.Remove(apiKey);
+            }
         }
         catch (Exception ex)
         {
@@ -375,9 +415,11 @@ public class ProjectViewModel
     {
         try
         {
-            await _resourcesService.AddAiApiKeyAsync(projectId, aiApiKeyId);
+            var newAiApiKey = await _resourcesService.AddAiApiKeyAsync(projectId, aiApiKeyId);
             _messageService.Success("AI API key added to project successfully");
-            await LoadAiApiKeysAsync(projectId);
+            
+            // Add to local collection immediately
+            AiApiKeys.Add(newAiApiKey);
         }
         catch (Exception ex)
         {
@@ -392,7 +434,13 @@ public class ProjectViewModel
         {
             await _resourcesService.RemoveAiApiKeyAsync(projectId, aiApiKeyId);
             _messageService.Success("AI API key removed from project successfully");
-            await LoadAiApiKeysAsync(projectId);
+            
+            // Remove from local collection immediately
+            var aiApiKey = AiApiKeys.FirstOrDefault(a => a.AiApiKeyId == aiApiKeyId);
+            if (aiApiKey != null)
+            {
+                AiApiKeys.Remove(aiApiKey);
+            }
         }
         catch (Exception ex)
         {
