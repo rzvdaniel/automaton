@@ -3,83 +3,36 @@
 @inject DashboardContextService DashboardContext
 @inject NavigationManager Navigation
 @inject AppsService AppsService
+@inject ProjectContextService ProjectContext
+@inject IJSRuntime JSRuntime
 
 <div class="app-user-dashboard">
     <!-- Welcome Header -->
-    <div class="dashboard-header">
-        <div class="header-content">
-            <div class="header-icon">
-                <Icon Type="appstore" Style="font-size: 48px; color: white;" />
+    <div class="home-header">
+        <div class="home-header-content">
+            <div class="home-header-icon">
+                <Icon Type="thunderbolt" Style="font-size: 48px; color: white;" />
             </div>
-            <div class="header-text">
-                <Title Level="1" Style="margin-bottom: 8px; color: white;">My Dashboard</Title>
-                <Paragraph Style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 0;">
-                    Quick access to your applications and project statistics
+            <div class="home-header-text">
+                <Title Level="1" Style="margin-bottom: 8px;">
+                    @if (ProjectContext.IsInProjectContext())
+                    {
+                        @($"{ProjectContext.CurrentProject?.DisplayName} Dashboard")
+                    }
+                    else
+                    {
+                        @("Personal Dashboard")
+                    }
+                </Title>
+                <Paragraph Class="home-subtitle">
+                    Access applications
                 </Paragraph>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Stats Section -->
-    <div class="stats-section">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="appstore" Style="font-size: 24px; color: #1890ff;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@totalApps</div>
-                        <div class="stat-label">Total Apps</div>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@publishedApps</div>
-                        <div class="stat-label">Published Apps</div>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="clock-circle" Style="font-size: 24px; color: #722ed1;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@recentlyUsedCount</div>
-                        <div class="stat-label">Recently Used</div>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card" style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/apps"))">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="eye" Style="font-size: 24px; color: #fa8c16;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">
-                            <Icon Type="arrow-right" Style="font-size: 20px;" />
-                        </div>
-                        <div class="stat-label">View All Apps</div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
     <!-- Latest Apps Section -->
     <div class="section">
-        <div class="section-header">
-            <Title Level="3" Style="margin-bottom: 0;">Latest Apps</Title>
-            <Button Type="@ButtonType.Link" OnClick="@(() => Navigation.NavigateTo("/apps"))" Icon="arrow-right">
-                View All
-            </Button>
-        </div>
         
         <AppGridDisplay Apps="@latestApps"
                         IsLoading="@(DashboardContext.IsLoading || isLoadingAppDetails)"
@@ -168,7 +121,7 @@
         if (app.IsPublished && !string.IsNullOrEmpty(app.PublicUrl))
         {
             // Navigate to published app
-            Navigation.NavigateTo($"/web/{app.PublicUrl}", forceLoad: false);
+            await JSRuntime.InvokeVoidAsync("open", $"/web/{app.PublicUrl}", "_blank");
         }
         else
         {
@@ -185,7 +138,7 @@
 
 <style>
     .app-user-dashboard {
-        max-width: 1400px;
+        max-width: 1200px;
         margin: 0 auto;
         padding: 0;
     }

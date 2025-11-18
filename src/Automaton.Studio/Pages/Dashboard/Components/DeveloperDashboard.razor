@@ -15,7 +15,7 @@
                 <Title Level="1" Style="margin-bottom: 8px; color: white;">
                     @if (ProjectContext.IsInProjectContext())
                     {
-                        @($"Project: {ProjectContext.CurrentProject?.DisplayName}")
+                        @($"{ProjectContext.CurrentProject?.DisplayName} Dashboard")
                     }
                     else
                     {
@@ -27,52 +27,6 @@
                 </Paragraph>
             </div>
         </div>
-    </div>
-
-    <!-- Quick Actions Section -->
-    <div class="section">
-        <Title Level="3" Style="margin-bottom: 24px;">Quick Actions</Title>
-        <Row Gutter="(16, 16)">
-            <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card">
-                    <div @onclick="@(() => Navigation.NavigateTo("/apps"))" class="clickable-card-content">
-                        <div class="action-icon" style="background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);">
-                            <Icon Type="appstore" Style="font-size: 32px; color: white;" />
-                        </div>
-                        <Title Level="4">Create App</Title>
-                        <Paragraph Type="@TextElementType.Secondary">
-                            Build a new web application
-                        </Paragraph>
-                    </div>
-                </Card>
-            </Col>
-            <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card">
-                    <div @onclick="@(() => Navigation.NavigateTo("/flows"))" class="clickable-card-content">
-                        <div class="action-icon" style="background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);">
-                            <Icon Type="profile" Style="font-size: 32px; color: white;" />
-                        </div>
-                        <Title Level="4">Create Flow</Title>
-                        <Paragraph Type="@TextElementType.Secondary">
-                            Design an automation workflow
-                        </Paragraph>
-                    </div>
-                </Card>
-            </Col>
-            <Col Xs="24" Sm="12" Md="8">
-                <Card Hoverable Class="action-card">
-                    <div @onclick="@(() => Navigation.NavigateTo("/customsteps"))" class="clickable-card-content">
-                        <div class="action-icon" style="background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);">
-                            <Icon Type="experiment" Style="font-size: 32px; color: white;" />
-                        </div>
-                        <Title Level="4">Create Custom Step</Title>
-                        <Paragraph Type="@TextElementType.Secondary">
-                            Build reusable automation steps
-                        </Paragraph>
-                    </div>
-                </Card>
-            </Col>
-        </Row>
     </div>
 
     <!-- Project Statistics -->
@@ -247,6 +201,9 @@
 @code {
     private DashboardStats? dashboardStats;
     private Automaton.Studio.Enums.ProjectRole? projectRole;
+
+    [Inject]
+    private ProjectContextService ProjectContextService { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

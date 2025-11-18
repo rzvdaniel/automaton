@@ -18,24 +18,10 @@
         <MenuItem Key="1" Icon="team" RouterLink="/projects">
             <b>Projects</b>
         </MenuItem>
-    }
-
-    @if (showDevTools)
-    {
+    
         <MenuItem Key="2" Icon="appstore" RouterLink="/apps">
             <b>Apps</b>
         </MenuItem>
-    }
-    else if (currentUserRole == ProjectRole.AppUser)
-    {
-        <!-- AppUsers can see Apps in read-only mode -->
-        <MenuItem Key="2" Icon="appstore" RouterLink="/apps">
-            <b>Apps</b>
-        </MenuItem>
-    }
-
-    @if (showDevTools)
-    {
         <MenuItem Key="3" Icon="profile" RouterLink="/flows">
             <b>Flows</b>
         </MenuItem>
@@ -57,17 +43,16 @@
         <MenuItem Key="9" Icon="download" RouterLink="/downloads">
             <b>Downloads</b>
         </MenuItem>
-    }
-
-    <MenuItem Key="10" Icon="book" RouterLink="/docs">
-        <b>Docs</b>
-    </MenuItem>
-
-    @if (shouldShowOnboarding)
-    {
-        <MenuItem Key="11" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
-            <b>Get Started</b>
+        <MenuItem Key="10" Icon="book" RouterLink="/docs">
+            <b>Docs</b>
         </MenuItem>
+
+        @if (shouldShowOnboarding)
+        {
+            <MenuItem Key="11" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
+                <b>Get Started</b>
+            </MenuItem>
+        }
     }
 
     <MenuItem Key="12" Icon="user" RouterLink="/account/">
