@@ -1,5 +1,4 @@
 using Automaton.Studio.Models;
-using Serilog;
 
 namespace Automaton.Studio.Services;
 

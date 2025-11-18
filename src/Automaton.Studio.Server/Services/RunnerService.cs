@@ -35,19 +35,15 @@ public class RunnerService
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
+    public async Task<IEnumerable<RunnerDetails>> List(CancellationToken cancellationToken)
+    {
+        return await List(null, cancellationToken);
+    }
+
     public async Task<IEnumerable<RunnerDetails>> List(Guid? projectId, CancellationToken cancellationToken)
     {
         // Use authorization service to get runners filtered by project context
         var runners = authorizationService.GetRunnersQueryByContext(projectId);
-
-        return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
-    }
-
-    public async Task<IEnumerable<RunnerDetails>> List(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
-    {
-        // Use authorization service to get accessible runners (personal + project-based)
-        var runners = authorizationService.GetAccessibleRunnersQuery()
-            .Where(x => runnerIds.Contains(x.Id));
 
         return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
     }

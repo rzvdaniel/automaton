@@ -685,9 +685,14 @@ public class ResourceAuthorizationService
         else
         {
             // Project mode - return only flows in that project (if user has access)
-            return dbContext.Flows
-                .Where(f => f.ProjectFlows.Any(pf => pf.ProjectId == projectId && 
-                                                      pf.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+            var projectFlowIds = dbContext.ProjectFlows
+                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Select(pcs => pcs.FlowId);
+
+            var projectFlows = dbContext.Flows
+                .Where(cs => projectFlowIds.Contains(cs.Id));
+
+            return projectFlows;
         }
     }
 
@@ -711,9 +716,14 @@ public class ResourceAuthorizationService
         else
         {
             // Project mode - return only steps in that project (if user has access)
-            return dbContext.CustomSteps
-                .Where(cs => cs.ProjectCustomSteps.Any(pcs => pcs.ProjectId == projectId && 
-                                                               pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+            var projectStepsIds = dbContext.ProjectCustomSteps
+                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Select(pcs => pcs.CustomStepId);
+
+            var projectSteps = dbContext.CustomSteps
+                .Where(cs => projectStepsIds.Contains(cs.Id));
+
+            return projectSteps;
         }
     }
 
@@ -737,9 +747,14 @@ public class ResourceAuthorizationService
         else
         {
             // Project mode - return only runners in that project (if user has access)
-            return dbContext.Runners
-                .Where(r => r.ProjectRunners.Any(pr => pr.ProjectId == projectId && 
-                                                        pr.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive)));
+            var projectRunnerIds = dbContext.ProjectRunners
+                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Select(pcs => pcs.RunnerId);
+
+            var projectRunners = dbContext.Runners
+                .Where(cs => projectRunnerIds.Contains(cs.Id));
+
+            return projectRunners;
         }
     }
 

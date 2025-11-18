@@ -22,12 +22,6 @@ public class RunnersController : BaseController
         return Ok(await runnersService.List(projectId, cancellationToken));
     }
 
-    [HttpGet("find")]
-    public async Task<ActionResult<IEnumerable<RunnerDetails>>> Get(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
-    {
-        return Ok(await runnersService.List(runnerIds, cancellationToken));
-    }
-
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
     public ActionResult Post(RunnerDetails runner, CancellationToken cancellationToken)
