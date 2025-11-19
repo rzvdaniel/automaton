@@ -79,7 +79,8 @@ stages:
             inputs:
               command: 'test'
               projects: 'src/UnitTests/Automaton.Core.Tests/Automaton.Core.Tests.csproj'
-              arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --collect:"XPlat Code Coverage"'
+              arguments: '--configuration $(buildConfiguration) --logger trx --collect:"XPlat Code Coverage"'
+              publishTestResults: true
             continueOnError: true
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
