@@ -83,13 +83,10 @@ stages:
             continueOnError: true
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
-          - task: FileTransform@1
-            displayName: Transform appsettings
-            inputs:
-              # Run transforms against the workspace so project-level appsettings.json files are found
-              folderPath: '$(System.DefaultWorkingDirectory)'
-              fileType: 'json'
-              targetFiles: '**/appsettings.json'
+          # Note: FileTransform is skipped for runner builds because:
+          # - Runner publishes as self-contained single files with embedded config
+          # - appsettings.json is baked into the executable with -p:PublishSingleFile=true
+          # - Variable substitution at build time is not applicable for this workflow
 
           # Create temporary directories for builds
           - script: |
