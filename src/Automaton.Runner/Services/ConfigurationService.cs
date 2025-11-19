@@ -50,9 +50,9 @@ public class ConfigurationService
             }
             Log.Debug("No cached server URL found");
                         
-            // Stored file (user preference from interactive setup)
-            Log.Debug("Attempting to load server URL from file storage");
+            Log.Debug("Attempting to load server URL from environment variable or file storage");
             var storedServerUrl = storageService.LoadServerUrlAsync().Result;
+
             if (!string.IsNullOrEmpty(storedServerUrl))
             {
                 Log.Debug("Using stored file server URL: {StoredUrl}", storedServerUrl);

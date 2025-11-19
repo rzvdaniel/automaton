@@ -723,7 +723,7 @@ Wants=network.target
 Type=simple
 User=YOUR_USERNAME
 WorkingDirectory=/home/YOUR_USERNAME
-Environment=""AppConfig__BaseUrl=https://studio.automaton.monster""
+Environment=""AUTOMATON_API_URL=https://studio.automaton.monster""
 Environment=""AUTOMATON_API_KEY=ak_your_api_key_here""
 ExecStart=/usr/local/bin/automaton-runner
 Restart=always
@@ -754,7 +754,7 @@ WantedBy=multi-user.target";
     <string>/var/log/automaton-runner-error.log</string>
     <key>EnvironmentVariables</key>
     <dict>
-        <key>AppConfig__BaseUrl</key>
+        <key>AUTOMATON_API_URL</key>
         <string>https://studio.automaton.monster</string>
         <key>AUTOMATON_API_KEY</key>
         <string>ak_your_api_key_here</string>

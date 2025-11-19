@@ -143,12 +143,35 @@ public class RunnerHostService
             // DEBUG: Log all environment variables that might affect configuration
             logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
             logger.Debug("AUTOMATON_API_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_API_URL"));
-            logger.Debug("AUTOMATON_API_KEY: {EnvVar}",
-                string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
+            logger.Debug("AUTOMATON_API_KEY: {EnvVar}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
             logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
             logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
+            logger.Debug("DOTNET_VERSION: {EnvVar}", Environment.Version);
             logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
             logger.Debug("=== END ENVIRONMENT VARIABLES ===");
+
+            WriteLine("=== ENVIRONMENT VARIABLES DEBUG ===");
+            WriteLine("AUTOMATON_API_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_API_URL"));
+            WriteLine("AUTOMATON_API_KEY: {0}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
+            WriteLine("ASPNETCORE_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+            WriteLine("DOTNET_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
+            WriteLine("DOTNET_VERSION: {0}", Environment.Version);
+            WriteLine("Current Directory: {0}", Environment.CurrentDirectory);
+            WriteLine("=== END ENVIRONMENT VARIABLES ===");
+            WriteLine();
+
+            // Check Server Url
+            var serverUrl = await storageService.LoadServerUrlAsync();
+            if (string.IsNullOrEmpty(serverUrl))
+            {
+                // Server not configured and will load the default from appsettings.json
+                // Ask user to confirm or change
+                var configuredServer = await PromptForServerConfigurationAsync();
+            }
+            else
+            {
+                WriteLine($"✅ Server registered: {serverUrl}");
+            }
 
             // Check Authentication
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
