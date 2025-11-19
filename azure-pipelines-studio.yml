@@ -76,7 +76,7 @@ jobs:
     displayName: Transform appsettings
     condition: eq(${{ parameters.isRelease }}, false)
     inputs:
-      folderPath: '$(build.artifactStagingDirectory)'
+      folderPath: '$(build.artifactStagingDirectory)/Automaton.Studio'
       fileType: 'json'
       targetFiles: '**/appsettings.json'
 
