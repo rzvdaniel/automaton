@@ -86,7 +86,8 @@ stages:
           - task: FileTransform@1
             displayName: Transform appsettings
             inputs:
-              folderPath: '$(Build.artifactStagingDirectory)'
+              # Run transforms against the workspace so project-level appsettings.json files are found
+              folderPath: '$(System.DefaultWorkingDirectory)'
               fileType: 'json'
               targetFiles: '**/appsettings.json'
 
