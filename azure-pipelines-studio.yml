@@ -68,7 +68,7 @@ jobs:
       command: 'publish'
       publishWebProjects: false
       projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio/Automaton.Studio.csproj'
-      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
+      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Studio" --no-restore'
       zipAfterPublish: false
     displayName: 'Publish Automaton Studio'
 
