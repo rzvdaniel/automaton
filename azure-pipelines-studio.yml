@@ -11,7 +11,7 @@ parameters:
 
 jobs:
 
-- job: AutomatonClient
+- job: AutomatonStudio
   
   pool:
     vmImage: 'ubuntu-latest'
