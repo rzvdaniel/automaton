@@ -68,7 +68,7 @@ jobs:
       command: 'publish'
       publishWebProjects: false
       projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio/Automaton.Studio.csproj'
-      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Studio" --no-restore'
+      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
       zipAfterPublish: false
     displayName: 'Publish Automaton Studio'
 
@@ -76,13 +76,13 @@ jobs:
     displayName: Transform appsettings
     condition: eq(${{ parameters.isRelease }}, false)
     inputs:
-      folderPath: '$(build.artifactStagingDirectory)/Automaton.Studio'
+      folderPath: '$(build.artifactStagingDirectory)'
       fileType: 'json'
       targetFiles: '**/appsettings.json'
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Studio artifact
     inputs:
-      targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio'
+      targetPath: '$(build.artifactStagingDirectory)'
       artifact: 'Automaton.Studio'
       publishLocation: 'pipeline'
