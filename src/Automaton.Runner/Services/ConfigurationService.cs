@@ -32,14 +32,14 @@ public class ConfigurationService
         {
             // Configuration Priority Order (12-Factor App Pattern):
             // 1. Cached value - Highest priority for current session changes
-            // 2. Environment variable - Perfect for services and Docker (AppConfig__BaseUrl)
-            // 3. User's stored preference - User's explicit choice from interactive setup
+            // 2. User's stored preference - User's explicit choice from interactive setup
+            // 3. Environment variable - Perfect for services and Docker (AUTOMATON_API_URL)
             // 4. Exception if none available
             //
             // Rationale: Environment variables are industry standard for service configuration.
             // They work reliably with Docker, Kubernetes, CI/CD, and Windows services.
             // File fallback provides convenience for interactive/standalone usage.
-            
+
             // DEBUG: Log configuration resolution process
             Log.Debug("BaseUrl resolution started");
             
@@ -61,7 +61,7 @@ public class ConfigurationService
             }
             Log.Debug("No stored file server URL found");
 
-            // Fall back to check environment variable first (works for services!)
+            // Fall back to check environment variable (works for services!)
             if (!string.IsNullOrEmpty(appConfig.BaseUrl))
             {
                 Log.Debug("Using environment variable server URL: {EnvUrl}", appConfig.BaseUrl);
@@ -70,10 +70,9 @@ public class ConfigurationService
             }
             Log.Debug("No environment variable server URL found (AppConfig.BaseUrl is empty)");
 
-
             Log.Warning("Server URL is not configured from any source (cached, environment, or file)");
             throw new InvalidOperationException(
-                "Server URL is not configured. Please set AppConfig__BaseUrl environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
+                "Server URL is not configured. Please set AUTOMATON_API_URL environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
         }
     }
 

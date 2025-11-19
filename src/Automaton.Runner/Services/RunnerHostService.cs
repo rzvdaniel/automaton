@@ -49,8 +49,8 @@ public class RunnerHostService
             // Validate configuration from environment variables only
             if (!configService.IsServerConfigured())
             {
-                logger.Error("Service mode requires AppConfig__BaseUrl environment variable");
-                throw new InvalidOperationException("Server URL not configured. Set AppConfig__BaseUrl environment variable.");
+                logger.Error("Service mode requires AUTOMATON_API_URL environment variable");
+                throw new InvalidOperationException("Server URL not configured. Set AUTOMATON_API_URL environment variable.");
             }
 
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
@@ -142,7 +142,7 @@ public class RunnerHostService
 
             // DEBUG: Log all environment variables that might affect configuration
             logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
-            logger.Debug("AppConfig__BaseUrl: {EnvVar}", Environment.GetEnvironmentVariable("AppConfig__BaseUrl"));
+            logger.Debug("AUTOMATON_API_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_API_URL"));
             logger.Debug("AUTOMATON_API_KEY: {EnvVar}",
                 string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
             logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
@@ -552,11 +552,8 @@ public class RunnerHostService
         WriteLine($"?? Server: {configService.BaseUrl}");
         WriteLine($"?? Connection Status: {(hubService.IsConnected() ? "Connected" : "Attempting to connect...")}");
         WriteLine();
-        WriteLine("?? Controls:");
-        WriteLine("   • Press 'q' to quit");
-        WriteLine("   • Press 's' for detailed status");
-        WriteLine("   • Press 'r' to retry connection");
-        WriteLine();
+
+        DisplayControlKeys();
 
         // Handle console input
         _ = Task.Run(async () =>
@@ -567,15 +564,16 @@ public class RunnerHostService
                 switch (key.KeyChar.ToString().ToLower())
                 {
                     case "q":
-                        WriteLine("?? Shutting down runner...");
-                        cancellationTokenSource.Cancel();
+                        ShutDown(cancellationTokenSource);
                         break;
                     case "s":
                         await ShowStatusAsync();
+                        DisplayControlKeys();
                         break;
                     case "r":
                         WriteLine("?? Attempting to reconnect...");
                         await AttemptReconnection();
+                        DisplayControlKeys();
                         break;
                 }
 
@@ -595,6 +593,15 @@ public class RunnerHostService
 
         await hubService.DisconnectAsync();
         WriteLine("?? Runner stopped");
+    }
+
+    private void DisplayControlKeys()
+    {
+        WriteLine("?? Controls:");
+        WriteLine("   • Press 'q' to quit");
+        WriteLine("   • Press 's' for detailed status");
+        WriteLine("   • Press 'r' to retry connection");
+        WriteLine();
     }
 
     private async Task AttemptReconnection()
@@ -890,6 +897,12 @@ public class RunnerHostService
         WriteLine();
     }
 
+    public void ShutDown(CancellationTokenSource cancellationTokenSource)
+    {
+        WriteLine("?? Shutting down runner...");
+        cancellationTokenSource.Cancel();
+    }
+
     /// <summary>
     /// Cleanup stored API key and runner configuration
     /// </summary>
@@ -952,6 +965,9 @@ public class RunnerHostService
 
             logger.Information("Runner cleanup completed. Runner config cleared: {RunnerConfigCleared}, Server config cleared: {ServerConfigCleared}",
                 runnerConfigCleared, serverConfigCleared);
+#if DEBUG
+
+#endif
             return true;
         }
         catch (Exception ex)
@@ -1007,14 +1023,21 @@ public class RunnerHostService
         Write("Enter your API key (starts with 'ak_'): ");
         var newApiKey = ReadLine();
 
-        if (!string.IsNullOrWhiteSpace(newApiKey))
+        if (string.IsNullOrWhiteSpace(newApiKey))
         {
-            await apiKeyAuthService.SetApiKeyAsync(newApiKey);
-            WriteLine("✅ New API key configured!");
-            return newApiKey;
+            return null;
         }
 
-        return null;
+        var result = await apiKeyAuthService.SetApiKeyAsync(newApiKey);
+
+        if (!result)
+        {
+            return null;
+        }
+
+        WriteLine("✅ New API key configured!");
+
+        return newApiKey;
     }
 
     /// <summary>

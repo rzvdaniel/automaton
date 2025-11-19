@@ -8,6 +8,7 @@ using System.CommandLine;
 using Automaton.Core.Scripting;
 using Automaton.Core.Services;
 using Microsoft.Extensions.Http;
+using static System.Console;
 
 namespace Automaton.Runner.Console;
 
@@ -55,6 +56,9 @@ public class Program
                 using var scope = host.Services.CreateScope();
                 var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
                 await runnerService.StartInteractiveAsync();
+#if DEBUG
+                PressAnyKeyToExit();
+#endif
             }, verboseOption);
 
             // All subcommands will inherit the verbose option from the root
@@ -100,6 +104,9 @@ public class Program
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.AuthenticateInteractiveAsync(apiKey, server);
+#if DEBUG
+            PressAnyKeyToExit();
+#endif
         }, apiKeyOption, serverOption, verboseOption);
 
         return command;
@@ -134,6 +141,9 @@ public class Program
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.RegisterInteractiveAsync(name, force);
+#if DEBUG
+            PressAnyKeyToExit();
+#endif
         }, nameOption, forceOption, verboseOption);
 
         return command;
@@ -154,6 +164,9 @@ public class Program
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.ShowStatusAsync();
+#if DEBUG
+            PressAnyKeyToExit();
+#endif
         }, verboseOption);
 
         return command;
@@ -180,6 +193,9 @@ public class Program
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.ConfigureServerAsync(url);
+#if DEBUG
+            PressAnyKeyToExit();
+#endif
         }, urlOption, verboseOption);
 
         return command;
@@ -212,6 +228,9 @@ public class Program
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.CleanupAsync();
+#if DEBUG
+            PressAnyKeyToExit();
+#endif
         }, verboseOption);
 
         return command;
@@ -240,7 +259,6 @@ public class Program
             .UseSerilog()
             .ConfigureServices((context, services) =>
             {
-                // CRITICAL: Bind AppConfig from configuration (enables environment variables like AppConfig__BaseUrl)
                 services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
 
                 // Register configuration services
@@ -338,4 +356,10 @@ public class Program
                         persistenceService);
                 });
             });
+
+    private static void PressAnyKeyToExit()
+    {
+        Write("Press any key to exit");
+        ReadKey();
+    }
 }
