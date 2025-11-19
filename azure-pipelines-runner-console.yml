@@ -83,6 +83,13 @@ stages:
             continueOnError: true
             condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
+          - task: FileTransform@1
+            displayName: Transform appsettings
+            inputs:
+              folderPath: '$(Build.artifactStagingDirectory)'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
+
           # Create temporary directories for builds
           - script: |
               mkdir -p "$(Agent.TempDirectory)/builds/win-x64"
