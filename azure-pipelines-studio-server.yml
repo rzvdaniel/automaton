@@ -24,9 +24,9 @@ jobs:
 
   steps:
   - task: UseDotNet@2 
-    displayName: ".NET 8.x"
+    displayName: ".NET 9.x"
     inputs:
-      version: '8.x'
+      version: '9.x'
       packageType: sdk
 
   - task: DotNetCoreCLI@2
