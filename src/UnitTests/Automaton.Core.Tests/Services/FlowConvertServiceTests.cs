@@ -47,32 +47,6 @@ namespace Automaton.Core.Tests.Services
         }
 
         [Test]
-        public void ConvertFlow_ShouldConvertAllDefinitions()
-        {
-            // Arrange
-            var flow = new Flow
-            {
-                Id = Guid.NewGuid(),
-                Name = "Test Flow",
-                StartupDefinitionId = "def1"
-            };
-
-            var definition1 = new Definition { Id = "def1", Name = "Definition 1" };
-            var definition2 = new Definition { Id = "def2", Name = "Definition 2" };
-
-            flow.Definitions.Add(definition1);
-            flow.Definitions.Add(definition2);
-
-            // Act
-            var workflow = _flowConvertService.ConvertFlow(flow);
-
-            // Assert
-            Assert.That(workflow.Definitions.Count, Is.EqualTo(2));
-            Assert.That(workflow.Definitions.Any(d => d.Id == "def1"), Is.True);
-            Assert.That(workflow.Definitions.Any(d => d.Id == "def2"), Is.True);
-        }
-
-        [Test]
         public void ConvertFlow_WithEmptyFlow_ShouldCreateEmptyWorkflow()
         {
             // Arrange

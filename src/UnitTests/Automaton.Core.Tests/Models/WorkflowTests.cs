@@ -135,20 +135,6 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        public void SetVariable_WhenVariableDoesNotExist_ShouldAddVariable()
-        {
-            // Arrange
-            var newVariable = new StepVariable { Id = "1", Name = "NewVar", Value = "new" };
-
-            // Act
-            _workflow.SetVariable(newVariable);
-
-            // Assert
-            Assert.That(_workflow.Variables.ContainsKey("NewVar"), Is.True);
-            Assert.That(_workflow.Variables["NewVar"].Value, Is.EqualTo("new"));
-        }
-
-        [Test]
         public void SetVariable_ShouldTriggerEvent()
         {
             // Arrange

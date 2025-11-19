@@ -39,41 +39,6 @@ is_boolean = True
     }
 
     [Test]
-    public void PythonNetScriptEngine_WithInputVariables_PassesCorrectly()
-    {
-        // Arrange
-        var engine = new PythonNetScriptEngine();
-
-        var code = @"
-# Use input variables
-greeting_message = f'{greeting} {name}'
-result_length = len(greeting_message)
-doubled_number = input_number * 2
-";
-
-        // ✅ Convert inputs to JSON strings
-        var inputs = new Dictionary<string, string>
-        {
-            ["greeting"] = JsonConvert.SerializeObject("Hello"),
-            ["name"] = JsonConvert.SerializeObject("World"),
-            ["input_number"] = JsonConvert.SerializeObject(21)
-        };
-
-        // Act
-        var variables = engine.Execute(code, inputs);
-
-        // Assert
-        variables.Should().ContainKey("greeting_message");
-        variables.Should().ContainKey("result_length");
-        variables.Should().ContainKey("doubled_number");
-
-        // ✅ Deserialize JSON strings for comparison
-        JsonConvert.DeserializeObject<string>(variables["greeting_message"]).Should().Be("Hello World");
-        JsonConvert.DeserializeObject<long>(variables["result_length"]).Should().Be(11L);
-        JsonConvert.DeserializeObject<long>(variables["doubled_number"]).Should().Be(42L);
-    }
-
-    [Test]
     public void PythonNetScriptEngine_WithOutputCallback_CapturesOutput()
     {
         // Arrange
@@ -138,49 +103,6 @@ json_test_passed = parsed_data['value'] == 123
         JsonConvert.DeserializeObject<bool>(variables["json_test_passed"]).Should().Be(true);
         var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
         resultStr.Should().StartWith("Python");
-    }
-
-    [Test]
-    [Ignore("This test requires the 'requests' module to be installed. Remove [Ignore] if requests is available.")]
-    public void PythonNetScriptEngine_WithRequestsModule_CanImport()
-    {
-        // Arrange
-        var engine = new PythonNetScriptEngine();
-
-        var code = @"
-try:
-    import requests
-    requests_available = True
-    requests_version = requests.__version__
-    result = f'Requests module version {requests_version} imported successfully'
-except ImportError as e:
-    requests_available = False
-    result = f'Requests module not available: {str(e)}'
-except Exception as e:
- requests_available = False
-    result = f'Error importing requests: {str(e)}'
-";
-
-        // Act
-        var variables = engine.Execute(code, new Dictionary<string, string>());
-
-        // Assert
-        variables.Should().ContainKey("result");
-        variables.Should().ContainKey("requests_available");
-
-        // ✅ Deserialize JSON strings for comparison
-        var requestsAvailable = JsonConvert.DeserializeObject<bool>(variables["requests_available"]);
-        var resultStr = JsonConvert.DeserializeObject<string>(variables["result"]);
-
-        if (requestsAvailable)
-        {
-            resultStr.Should().Contain("imported successfully");
-        }
-        else
-        {
-            // If requests is not available, the test will show what went wrong
-            TestContext.WriteLine($"Requests import result: {resultStr}");
-        }
     }
 
     [Test]

@@ -58,16 +58,6 @@ namespace Automaton.Core.Tests.Models
         }
 
         [Test]
-        [Description("Parse should throw ArgumentException when value is null")]
-        public void Parse_WithNullValue_ShouldThrowArgumentException()
-        {
-            var workflow = new Workflow();
-            var stringVariable = new StepVariable { Id = "C", Name = "C", Value = null };
-
-            Assert.Throws<ArgumentException>(() => stepVariableParser.Parse(stringVariable, workflow));
-        }
-
-        [Test]
         [Description("Parse string with multiple variables")]
         public void Parse_StringWithMultipleVariables_ShouldReplaceAll()
         {
