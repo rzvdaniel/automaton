@@ -241,8 +241,13 @@ public class FlowsService
             throw new InvalidOperationException($"Flow {id} not found");
         }
 
-        // Only update the name, don't touch the flow body
+        // Deserialize the flow body, update the name, and serialize it back
+        var flow = DeserializeFlow(entity.Body);
+        flow.Name = settings.Name;
+
+        // Update both the entity name and the serialized body
         entity.Name = settings.Name;
+        entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
 
         dbContext.SaveChanges();
