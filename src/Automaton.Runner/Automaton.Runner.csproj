@@ -9,6 +9,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <UserSecretsId>94fcdced-d08b-48ea-a56e-fbfc17fdd073</UserSecretsId>
   </PropertyGroup>
 	<ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.10" />
