@@ -120,40 +120,41 @@
                         <div class="top-flows-list">
                             @foreach (var flow in dashboardStats.TopFlows)
                             {
-                                <Card Size="CardSize.Small" Class="flow-item" Bordered="true" Hoverable="true" 
-                                      @onclick="@(() => Navigation.NavigateTo($"/flow/designer/{flow.FlowId}/{flow.FlowName}"))">
-                                    <div class="flow-item-header">
-                                        <div class="flow-item-icon">
-                                            <Icon Type="profile" Style="font-size: 20px; color: #1890ff;" />
-                                        </div>
-                                        <div class="flow-item-details">
-                                            <div class="flow-item-name">@flow.FlowName</div>
-                                            <div class="flow-item-meta">
-                                                <span class="flow-item-executions">
-                                                    <Icon Type="play-circle" Style="font-size: 12px;" />
-                                                    @flow.ExecutionCount executions
-                                                </span>
-                                                <span class="flow-item-success">
-                                                    @if (flow.SuccessRate >= 90)
-                                                    {
-                                                        <Icon Type="check-circle" Style="font-size: 12px; color: #52c41a;" />
-                                                        <span style="color: #52c41a;">@flow.SuccessRate.ToString("F1")%</span>
-                                                    }
-                                                    else if (flow.SuccessRate >= 70)
-                                                    {
-                                                        <Icon Type="warning" Style="font-size: 12px; color: #fa8c16;" />
-                                                        <span style="color: #fa8c16;">@flow.SuccessRate.ToString("F1")%</span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <Icon Type="close-circle" Style="font-size: 12px; color: #ff4d4f;" />
-                                                        <span style="color: #ff4d4f;">@flow.SuccessRate.ToString("F1")%</span>
-                                                    }
-                                                </span>
+                                <Card Size="CardSize.Small" Class="flow-item" Bordered="true" Hoverable="true">
+                                    <div class="flow-item-content" @onclick="@(() => Navigation.NavigateTo($"/flow/designer/{flow.FlowId}/{flow.FlowName}"))" style="cursor: pointer;">
+                                        <div class="flow-item-header">
+                                            <div class="flow-item-icon">
+                                                <Icon Type="profile" Style="font-size: 20px; color: #1890ff;" />
                                             </div>
-                                        </div>
-                                        <div class="flow-item-last-run">
-                                            Last run: @GetRelativeTime(flow.LastExecuted)
+                                            <div class="flow-item-details">
+                                                <div class="flow-item-name">@flow.FlowName</div>
+                                                <div class="flow-item-meta">
+                                                    <span class="flow-item-executions">
+                                                        <Icon Type="play-circle" Style="font-size: 12px;" />
+                                                        @flow.ExecutionCount executions
+                                                    </span>
+                                                    <span class="flow-item-success">
+                                                        @if (flow.SuccessRate >= 90)
+                                                        {
+                                                            <Icon Type="check-circle" Style="font-size: 12px; color: #52c41a;" />
+                                                            <span style="color: #52c41a;">@flow.SuccessRate.ToString("F1")%</span>
+                                                        }
+                                                        else if (flow.SuccessRate >= 70)
+                                                        {
+                                                            <Icon Type="warning" Style="font-size: 12px; color: #fa8c16;" />
+                                                            <span style="color: #fa8c16;">@flow.SuccessRate.ToString("F1")%</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <Icon Type="close-circle" Style="font-size: 12px; color: #ff4d4f;" />
+                                                            <span style="color: #ff4d4f;">@flow.SuccessRate.ToString("F1")%</span>
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="flow-item-last-run">
+                                                Last run: @GetRelativeTime(flow.LastExecuted)
+                                            </div>
                                         </div>
                                     </div>
                                 </Card>
@@ -212,7 +213,7 @@
                                             <Tag Color="@GetActivityTagColor(activity.ActivityType)">@activity.ActivityTypeText</Tag>
                                         </div>
                                         <div class="activity-description">
-                                            <Text Type="@TextElementType.Secondary">@activity.Description</Text>
+                                            <Text Type="TextElementType.Secondary">@activity.Description</Text>
                                         </div>
                                         <div class="activity-meta">
                                             <span class="activity-meta-text">
@@ -325,7 +326,7 @@
                                             <Tag Color="@GetExecutionStatusColor(execution.Status)">@execution.Status</Tag>
                                         </div>
                                         <div class="execution-description">
-                                            <Text Type="@TextElementType.Secondary">Flow ID: @execution.FlowId.ToString().Substring(0, 8)...</Text>
+                                            <Text Type="TextElementType.Secondary">Flow ID: @execution.FlowId.ToString().Substring(0, 8)...</Text>
                                         </div>
                                         <div class="execution-meta">
                                             <span class="execution-meta-text">
