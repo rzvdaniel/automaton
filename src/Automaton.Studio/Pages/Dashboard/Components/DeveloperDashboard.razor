@@ -23,7 +23,14 @@
                     }
                 </Title>
                 <Paragraph Style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 0;">
-                    Build, manage, and deploy your automation workflows
+                    @if (dashboardStats != null)
+                    {
+                        <span>@dashboardStats.ExecutionsToday executions today • @dashboardStats.ExecutionsThisWeek this week • @dashboardStats.ActiveSchedules active schedules</span>
+                    }
+                    else
+                    {
+                        <span>Build, manage, and deploy your automation workflows</span>
+                    }
                 </Paragraph>
             </div>
         </div>
@@ -34,16 +41,16 @@
         <Title Level="3" Style="margin-bottom: 24px;">
             @if (ProjectContext.IsInProjectContext())
             {
-                @("Project Statistics")
+                @("Project Overview")
             }
             else
             {
-                @("Your Statistics")
+                @("Your Overview")
             }
         </Title>
         <Row Gutter="(16, 16)">
             <Col Xs="24" Sm="12" Md="6">
-                <Card Class="stat-card">
+                <Card Class="stat-card clickable-stat" @onclick="@(() => Navigation.NavigateTo("/flows"))">
                     <div class="stat-content">
                         <div class="stat-icon">
                             <Icon Type="profile" Style="font-size: 24px; color: #1890ff;" />
@@ -51,12 +58,32 @@
                         <div class="stat-details">
                             <div class="stat-value">@(dashboardStats?.TotalFlows ?? 0)</div>
                             <div class="stat-label">Total Flows</div>
+                            <div class="stat-trend">
+                                <Icon Type="arrow-up" Style="font-size: 12px; color: #52c41a;" />
+                                <span style="color: #52c41a; font-size: 12px;">Active</span>
+                            </div>
                         </div>
                     </div>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="6">
-                <Card Class="stat-card">
+                <Card Class="stat-card clickable-stat" @onclick="@(() => Navigation.NavigateTo("/apps"))">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="appstore" Style="font-size: 24px; color: #722ed1;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@(dashboardStats?.TotalApps ?? 0)</div>
+                            <div class="stat-label">Web Apps</div>
+                            <div class="stat-trend">
+                                <span style="color: #8c8c8c; font-size: 12px;">Published apps</span>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card clickable-stat" @onclick="@(() => Navigation.NavigateTo("/runners"))">
                     <div class="stat-content">
                         <div class="stat-icon">
                             <Icon Type="play-square" Style="font-size: 24px; color: #52c41a;" />
@@ -64,6 +91,31 @@
                         <div class="stat-details">
                             <div class="stat-value">@(dashboardStats?.OnlineRunners ?? 0)/@(dashboardStats?.TotalRunners ?? 0)</div>
                             <div class="stat-label">Online Runners</div>
+                            <div class="stat-trend">
+                                @if (dashboardStats?.TotalRunners > 0)
+                                {
+                                    var healthPercent = (double)(dashboardStats?.OnlineRunners ?? 0) / (dashboardStats?.TotalRunners ?? 1) * 100;
+                                    if (healthPercent >= 80)
+                                    {
+                                        <Icon Type="check-circle" Style="font-size: 12px; color: #52c41a;" />
+                                        <span style="color: #52c41a; font-size: 12px;">Healthy</span>
+                                    }
+                                    else if (healthPercent >= 50)
+                                    {
+                                        <Icon Type="warning" Style="font-size: 12px; color: #fa8c16;" />
+                                        <span style="color: #fa8c16; font-size: 12px;">Warning</span>
+                                    }
+                                    else
+                                    {
+                                        <Icon Type="close-circle" Style="font-size: 12px; color: #ff4d4f;" />
+                                        <span style="color: #ff4d4f; font-size: 12px;">Critical</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span style="color: #8c8c8c; font-size: 12px;">No runners</span>
+                                }
+                            </div>
                         </div>
                     </div>
                 </Card>
@@ -77,19 +129,65 @@
                         <div class="stat-details">
                             <div class="stat-value">@(dashboardStats?.SuccessRate ?? 0)%</div>
                             <div class="stat-label">Success Rate</div>
+                            <div class="stat-trend">
+                                <span style="color: #8c8c8c; font-size: 12px;">Last 7 days</span>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+        </Row>
+        
+        <!-- Additional Metrics Row -->
+        <Row Gutter="(16, 16)" Style="margin-top: 16px;">
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card-small">
+                    <div class="stat-content-small">
+                        <div class="stat-icon-small">
+                            <Icon Type="calendar" Style="font-size: 18px; color: #1890ff;" />
+                        </div>
+                        <div class="stat-details-small">
+                            <div class="stat-value-small">@(dashboardStats?.ExecutionsToday ?? 0)</div>
+                            <div class="stat-label-small">Today</div>
                         </div>
                     </div>
                 </Card>
             </Col>
             <Col Xs="24" Sm="12" Md="6">
-                <Card Class="stat-card">
-                    <div class="stat-content">
-                        <div class="stat-icon">
-                            <Icon Type="bar-chart" Style="font-size: 24px; color: #fa8c16;" />
+                <Card Class="stat-card-small">
+                    <div class="stat-content-small">
+                        <div class="stat-icon-small">
+                            <Icon Type="bar-chart" Style="font-size: 18px; color: #52c41a;" />
                         </div>
-                        <div class="stat-details">
-                            <div class="stat-value">@(dashboardStats?.RecentExecutions ?? 0)</div>
-                            <div class="stat-label">Recent Executions</div>
+                        <div class="stat-details-small">
+                            <div class="stat-value-small">@(dashboardStats?.ExecutionsThisWeek ?? 0)</div>
+                            <div class="stat-label-small">This Week</div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card-small clickable-stat" @onclick="@(() => Navigation.NavigateTo("/customsteps"))">
+                    <div class="stat-content-small">
+                        <div class="stat-icon-small">
+                            <Icon Type="experiment" Style="font-size: 18px; color: #fa8c16;" />
+                        </div>
+                        <div class="stat-details-small">
+                            <div class="stat-value-small">@(dashboardStats?.TotalCustomSteps ?? 0)</div>
+                            <div class="stat-label-small">Custom Steps</div>
+                        </div>
+                    </div>
+                </Card>
+            </Col>
+            <Col Xs="24" Sm="12" Md="6">
+                <Card Class="stat-card-small">
+                    <div class="stat-content-small">
+                        <div class="stat-icon-small">
+                            <Icon Type="schedule" Style="font-size: 18px; color: #722ed1;" />
+                        </div>
+                        <div class="stat-details-small">
+                            <div class="stat-value-small">@(dashboardStats?.ActiveSchedules ?? 0)</div>
+                            <div class="stat-label-small">Active Schedules</div>
                         </div>
                     </div>
                 </Card>
@@ -156,6 +254,108 @@
         </Row>
     </div>
 
+    <!-- Execution Trends -->
+    @if (dashboardStats?.ExecutionTrends != null && dashboardStats.ExecutionTrends.Any())
+    {
+        <div class="section">
+            <Title Level="3" Style="margin-bottom: 24px;">Execution Trends (Last 7 Days)</Title>
+            <Card Class="trend-card">
+                <div class="trend-chart">
+                    @foreach (var trend in dashboardStats.ExecutionTrends.OrderBy(t => t.Date))
+                    {
+                        var maxHeight = dashboardStats.ExecutionTrends.Max(t => t.TotalCount);
+                        var successHeight = maxHeight > 0 ? (double)trend.SuccessCount / maxHeight * 100 : 0;
+                        var failureHeight = maxHeight > 0 ? (double)trend.FailureCount / maxHeight * 100 : 0;
+                        
+                        <div class="trend-bar-container">
+                            <div class="trend-bar-wrapper">
+                                @if (trend.FailureCount > 0)
+                                {
+                                    <div class="trend-bar trend-bar-failure" 
+                                         style="height: @(failureHeight)%;"
+                                         title="@trend.FailureCount failures"></div>
+                                }
+                                @if (trend.SuccessCount > 0)
+                                {
+                                    <div class="trend-bar trend-bar-success" 
+                                         style="height: @(successHeight)%;"
+                                         title="@trend.SuccessCount successes"></div>
+                                }
+                                @if (trend.TotalCount == 0)
+                                {
+                                    <div class="trend-bar trend-bar-empty"></div>
+                                }
+                            </div>
+                            <div class="trend-label">@trend.Date.ToString("ddd")</div>
+                            <div class="trend-count">@trend.TotalCount</div>
+                        </div>
+                    }
+                </div>
+                <div class="trend-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #52c41a;"></div>
+                        <span>Success</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff4d4f;"></div>
+                        <span>Failure</span>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    }
+
+    <!-- Top Flows -->
+    @if (dashboardStats?.TopFlows != null && dashboardStats.TopFlows.Any())
+    {
+        <div class="section">
+            <Title Level="3" Style="margin-bottom: 24px;">Most Active Flows</Title>
+            <Card Class="top-flows-card">
+                <div class="top-flows-list">
+                    @foreach (var flow in dashboardStats.TopFlows)
+                    {
+                        <div class="flow-item" @onclick="@(() => Navigation.NavigateTo($"/flows"))">
+                            <div class="flow-item-header">
+                                <div class="flow-item-icon">
+                                    <Icon Type="profile" Style="font-size: 20px; color: #1890ff;" />
+                                </div>
+                                <div class="flow-item-details">
+                                    <div class="flow-item-name">@flow.FlowName</div>
+                                    <div class="flow-item-meta">
+                                        <span class="flow-item-executions">
+                                            <Icon Type="play-circle" Style="font-size: 12px;" />
+                                            @flow.ExecutionCount executions
+                                        </span>
+                                        <span class="flow-item-success">
+                                            @if (flow.SuccessRate >= 90)
+                                            {
+                                                <Icon Type="check-circle" Style="font-size: 12px; color: #52c41a;" />
+                                                <span style="color: #52c41a;">@flow.SuccessRate.ToString("F1")%</span>
+                                            }
+                                            else if (flow.SuccessRate >= 70)
+                                            {
+                                                <Icon Type="warning" Style="font-size: 12px; color: #fa8c16;" />
+                                                <span style="color: #fa8c16;">@flow.SuccessRate.ToString("F1")%</span>
+                                            }
+                                            else
+                                            {
+                                                <Icon Type="close-circle" Style="font-size: 12px; color: #ff4d4f;" />
+                                                <span style="color: #ff4d4f;">@flow.SuccessRate.ToString("F1")%</span>
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flow-item-last-run">
+                                Last run: @GetRelativeTime(flow.LastExecuted)
+                            </div>
+                        </div>
+                    }
+                </div>
+            </Card>
+        </div>
+    }
+
     <div class="section" style="@(ProjectContext.IsInProjectContext() && projectRole == Automaton.Studio.Enums.ProjectRole.ProjectAdmin ? "" : "display:none;")">
         <!-- Project Admin Tools -->
         <Title Level="3" Style="margin-bottom: 24px;">Project Administration</Title>
@@ -216,6 +416,24 @@
             projectRole = ProjectContext.CurrentProject?.CurrentUserRole;
         }
     }
+    
+    private string GetRelativeTime(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+        
+        if (timeSpan.TotalMinutes < 1)
+            return "just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes} minute{((int)timeSpan.TotalMinutes == 1 ? "" : "s")} ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours} hour{((int)timeSpan.TotalHours == 1 ? "" : "s")} ago";
+        if (timeSpan.TotalDays < 7)
+            return $"{(int)timeSpan.TotalDays} day{((int)timeSpan.TotalDays == 1 ? "" : "s")} ago";
+        if (timeSpan.TotalDays < 30)
+            return $"{(int)(timeSpan.TotalDays / 7)} week{((int)(timeSpan.TotalDays / 7) == 1 ? "" : "s")} ago";
+        
+        return dateTime.ToString("MMM d, yyyy");
+    }
 }
 
 <style>
@@ -226,11 +444,11 @@
     }
 
     .dashboard-header {
-        background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+        background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
         border-radius: 12px;
         padding: 48px 40px;
         margin-bottom: 32px;
-        box-shadow: 0 4px 12px rgba(82, 196, 26, 0.2);
+        box-shadow: 0 4px 20px rgba(24, 144, 255, 0.25);
     }
 
     .header-content {
@@ -248,6 +466,7 @@
         height: 80px;
         background-color: rgba(255, 255, 255, 0.2);
         border-radius: 16px;
+        backdrop-filter: blur(10px);
     }
 
     .header-text {
@@ -258,40 +477,25 @@
         margin-bottom: 48px;
     }
 
-    .action-card {
-        text-align: center;
-        padding: 32px 24px;
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        height: 100%;
-    }
-
-    .action-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-    }
-
-    .action-icon {
-        width: 80px;
-        height: 80px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
     .stat-card {
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         transition: all 0.3s ease;
         padding: 0;
+        border: 1px solid #f0f0f0;
     }
 
     .stat-card:hover {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    .clickable-stat {
+        cursor: pointer;
+    }
+
+    .clickable-stat:hover {
+        border-color: #1890ff;
     }
 
     .stat-content {
@@ -303,13 +507,13 @@
 
     .stat-icon {
         flex-shrink: 0;
-        width: 48px;
-        height: 48px;
+        width: 56px;
+        height: 56px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #f8f9fa;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+        border-radius: 12px;
     }
 
     .stat-details {
@@ -317,16 +521,73 @@
     }
 
     .stat-value {
-        font-size: 24px;
-        font-weight: 600;
+        font-size: 28px;
+        font-weight: 700;
         color: #262626;
         line-height: 1.2;
+        margin-bottom: 4px;
     }
 
     .stat-label {
         font-size: 14px;
         color: #8c8c8c;
+        margin-bottom: 4px;
+    }
+
+    .stat-trend {
+        display: flex;
+        align-items: center;
+        gap: 4px;
         margin-top: 4px;
+    }
+
+    /* Small stat cards */
+    .stat-card-small {
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+        padding: 0;
+        border: 1px solid #f0f0f0;
+    }
+
+    .stat-card-small:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .stat-content-small {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .stat-icon-small {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .stat-details-small {
+        flex: 1;
+    }
+
+    .stat-value-small {
+        font-size: 20px;
+        font-weight: 600;
+        color: #262626;
+        line-height: 1.2;
+    }
+
+    .stat-label-small {
+        font-size: 12px;
+        color: #8c8c8c;
+        margin-top: 2px;
     }
 
     .tool-card {
@@ -336,22 +597,24 @@
         text-align: center;
         transition: all 0.3s ease;
         height: 100%;
+        border: 1px solid #f0f0f0;
     }
 
     .tool-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: #1890ff;
     }
 
     .tool-icon {
-        width: 48px;
-        height: 48px;
+        width: 56px;
+        height: 56px;
         border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #f0f2f5;
-        margin: 0 auto 12px;
+        background: linear-gradient(135deg, #f0f2f5 0%, #e8e9eb 100%);
+        margin: 0 auto 16px;
     }
 
     .clickable-card-content {
@@ -362,6 +625,174 @@
         flex-direction: column;
         align-items: inherit;
         justify-content: inherit;
+    }
+
+    /* Trend Chart Styles */
+    .trend-card {
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #f0f0f0;
+    }
+
+    .trend-chart {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        height: 200px;
+        gap: 8px;
+        padding: 20px 0;
+        border-bottom: 2px solid #f0f0f0;
+    }
+
+    .trend-bar-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .trend-bar-wrapper {
+        width: 100%;
+        height: 150px;
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .trend-bar {
+        width: 100%;
+        max-width: 48px;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.3s ease;
+        min-height: 4px;
+    }
+
+    .trend-bar-success {
+        background: linear-gradient(180deg, #52c41a 0%, #73d13d 100%);
+    }
+
+    .trend-bar-failure {
+        background: linear-gradient(180deg, #ff4d4f 0%, #ff7875 100%);
+    }
+
+    .trend-bar-empty {
+        background: #f0f0f0;
+        height: 4px !important;
+    }
+
+    .trend-bar-container:hover .trend-bar {
+        opacity: 0.8;
+    }
+
+    .trend-label {
+        font-size: 12px;
+        color: #8c8c8c;
+        font-weight: 500;
+    }
+
+    .trend-count {
+        font-size: 11px;
+        color: #bfbfbf;
+    }
+
+    .trend-legend {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 20px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #595959;
+    }
+
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+    }
+
+    /* Top Flows Styles */
+    .top-flows-card {
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #f0f0f0;
+    }
+
+    .top-flows-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .flow-item {
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .flow-item:hover {
+        background-color: #fafafa;
+        border-color: #1890ff;
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+    }
+
+    .flow-item-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .flow-item-icon {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #e6f7ff;
+        border-radius: 8px;
+    }
+
+    .flow-item-details {
+        flex: 1;
+    }
+
+    .flow-item-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: #262626;
+        margin-bottom: 4px;
+    }
+
+    .flow-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 13px;
+        color: #8c8c8c;
+    }
+
+    .flow-item-executions,
+    .flow-item-success {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .flow-item-last-run {
+        font-size: 12px;
+        color: #bfbfbf;
+        padding-left: 52px;
     }
 
     /* Responsive */
@@ -377,6 +808,28 @@
 
         .section {
             margin-bottom: 32px;
+        }
+
+        .trend-chart {
+            height: 150px;
+            gap: 4px;
+        }
+
+        .trend-bar-wrapper {
+            height: 120px;
+        }
+
+        .trend-bar {
+            max-width: 32px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+        }
+
+        .flow-item-last-run {
+            padding-left: 0;
+            margin-top: 4px;
         }
     }
 </style>

@@ -58,13 +58,89 @@ namespace Automaton.Studio.Server.Services
                 
                 var successRate = totalExecutions > 0 ? (double)successfulExecutions / totalExecutions * 100 : 0;
 
+                // Get additional metrics
+                var totalApps = await dbContext.WebApps
+                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
+                    .CountAsync(cancellationToken);
+                
+                var totalCustomSteps = await dbContext.CustomSteps
+                    .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId))
+                    .CountAsync(cancellationToken);
+                
+                var activeSchedules = await dbContext.Schedules
+                    .Where(fs => fs.ScheduleUsers.Any(u => u.UserId == userId))
+                    .CountAsync(cancellationToken);
+                
+                // Time-based execution counts
+                var today = DateTime.UtcNow.Date;
+                var thisWeekStart = today.AddDays(-(int)today.DayOfWeek);
+                var thisMonthStart = new DateTime(today.Year, today.Month, 1);
+                
+                var executionsToday = await dbContext.FlowExecutions
+                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
+                               e.Started >= today)
+                    .CountAsync(cancellationToken);
+                
+                var executionsThisWeek = await dbContext.FlowExecutions
+                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
+                               e.Started >= thisWeekStart)
+                    .CountAsync(cancellationToken);
+                
+                var executionsThisMonth = await dbContext.FlowExecutions
+                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
+                               e.Started >= thisMonthStart)
+                    .CountAsync(cancellationToken);
+                
+                // Get daily execution trends for the last 7 days
+                var trendCutoff = DateTime.UtcNow.AddDays(-7).Date;
+                var executionTrends = await dbContext.FlowExecutions
+                    .Where(e => e.FlowExecutionUsers.Any(u => u.UserId == userId) &&
+                               e.Started >= trendCutoff)
+                    .GroupBy(e => e.Started.Date)
+                    .Select(g => new Models.DailyExecutionTrend
+                    {
+                        Date = g.Key,
+                        SuccessCount = g.Count(e => e.Status == WorkflowStatus.Success.ToString()),
+                        FailureCount = g.Count(e => e.Status == WorkflowStatus.Error.ToString()),
+                        TotalCount = g.Count()
+                    })
+                    .OrderBy(t => t.Date)
+                    .ToListAsync(cancellationToken);
+                
+                // Get top flows by execution count - join with Flows table to get names
+                var topFlows = await (from fe in dbContext.FlowExecutions
+                                     join f in dbContext.Flows on fe.FlowId equals f.Id
+                                     where fe.FlowExecutionUsers.Any(u => u.UserId == userId) &&
+                                           fe.Started >= cutoffDate
+                                     group fe by new { fe.FlowId, f.Name } into g
+                                     orderby g.Count() descending
+                                     select new Models.FlowHealthMetric
+                                     {
+                                         FlowId = g.Key.FlowId,
+                                         FlowName = g.Key.Name,
+                                         ExecutionCount = g.Count(),
+                                         SuccessRate = g.Count() > 0 ? 
+                                             (double)g.Count(e => e.Status == WorkflowStatus.Success.ToString()) / g.Count() * 100 : 0,
+                                         LastExecuted = g.Max(e => e.Started)
+                                     })
+                                     .Take(5)
+                                     .ToListAsync(cancellationToken);
+
                 return new Models.DashboardStats
                 {
                     TotalFlows = totalFlows,
                     TotalRunners = totalRunners,
                     OnlineRunners = onlineRunners,
                     SuccessRate = Math.Round(successRate, 1),
-                    RecentExecutions = totalExecutions
+                    RecentExecutions = totalExecutions,
+                    TotalApps = totalApps,
+                    TotalCustomSteps = totalCustomSteps,
+                    ActiveSchedules = activeSchedules,
+                    ExecutionsToday = executionsToday,
+                    ExecutionsThisWeek = executionsThisWeek,
+                    ExecutionsThisMonth = executionsThisMonth,
+                    ExecutionTrends = executionTrends,
+                    TopFlows = topFlows
                 };
             }
             catch (Exception ex)
