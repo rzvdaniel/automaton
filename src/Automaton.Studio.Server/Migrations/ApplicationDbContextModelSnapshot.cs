@@ -583,7 +583,7 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("ProjectAiApiKeys");
+                    b.ToTable("ProjectAiApiKeys", (string)null);
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApiKey", b =>
@@ -608,7 +608,7 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("ProjectApiKeys");
+                    b.ToTable("ProjectApiKeys", (string)null);
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
@@ -978,7 +978,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValue(new DateTime(2025, 11, 16, 0, 3, 22, 927, DateTimeKind.Local).AddTicks(908));
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
                     b.Property<DateTime>("Expires")
                         .HasColumnType("datetime(6)");

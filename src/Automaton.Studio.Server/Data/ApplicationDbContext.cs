@@ -157,7 +157,10 @@ namespace Automaton.Studio.Server.Data
                 entity.HasKey(e => new { e.Id });
                 entity.Property(s => s.Token).IsRequired();
                 entity.Property(s => s.RevokedAt).IsRequired(false);
-                entity.Property(s => s.CreatedAt).IsRequired().HasDefaultValue(DateTime.Now);
+                entity.Property(s => s.CreatedAt)
+                    .IsRequired()
+                    .ValueGeneratedOnAdd()
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
                 entity.Property(s => s.Expires).IsRequired();
             });
 
@@ -410,48 +413,62 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => new { e.ProjectId, e.ApiKeyId });
                 entity.Property(e => e.AddedAt).IsRequired();
-                
-                entity.HasIndex(e => e.ProjectId);
+                entity.Property(e => e.AddedBy).IsRequired(false);
+
+                entity.HasIndex(e => e.AddedBy);
                 entity.HasIndex(e => e.ApiKeyId);
-                
+                entity.HasIndex(e => e.ProjectId);
+
+                // Explicit relationships to avoid duplicate/shadow foreign keys
                 entity.HasOne(e => e.Project)
                     .WithMany(p => p.ProjectApiKeys)
                     .HasForeignKey(e => e.ProjectId)
-                    .OnDelete(DeleteBehavior.Cascade);
-                    
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
                 entity.HasOne(e => e.ApiKey)
                     .WithMany(a => a.ProjectApiKeys)
                     .HasForeignKey(e => e.ApiKeyId)
-                    .OnDelete(DeleteBehavior.Cascade);
-                    
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
                 entity.HasOne(e => e.AddedByUser)
                     .WithMany()
                     .HasForeignKey(e => e.AddedBy)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                entity.ToTable("ProjectApiKeys");
             });
             
             modelBuilder.Entity<ProjectAiApiKey>(entity =>
             {
                 entity.HasKey(e => new { e.ProjectId, e.AiApiKeyId });
                 entity.Property(e => e.AddedAt).IsRequired();
-                
-                entity.HasIndex(e => e.ProjectId);
+                entity.Property(e => e.AddedBy).IsRequired(false);
+
+                entity.HasIndex(e => e.AddedBy);
                 entity.HasIndex(e => e.AiApiKeyId);
-                
+                entity.HasIndex(e => e.ProjectId);
+
+                // Explicit relationships to avoid duplicate/shadow foreign keys
                 entity.HasOne(e => e.Project)
                     .WithMany(p => p.ProjectAiApiKeys)
                     .HasForeignKey(e => e.ProjectId)
-                    .OnDelete(DeleteBehavior.Cascade);
-                    
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
                 entity.HasOne(e => e.AiApiKey)
                     .WithMany(a => a.ProjectAiApiKeys)
                     .HasForeignKey(e => e.AiApiKeyId)
-                    .OnDelete(DeleteBehavior.Cascade);
-                    
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+
                 entity.HasOne(e => e.AddedByUser)
                     .WithMany()
                     .HasForeignKey(e => e.AddedBy)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                entity.ToTable("ProjectAiApiKeys");
             });
 
             // Invitation tokens
