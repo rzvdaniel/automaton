@@ -21,6 +21,18 @@ namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings
 
         protected override async Task OnInitializedAsync()
         {
+            await LoadFlowSettings();
+            await base.OnInitializedAsync();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            await LoadFlowSettings();
+            await base.OnParametersSetAsync();
+        }
+
+        private async Task LoadFlowSettings()
+        {
             loading = true;
 
             try
@@ -41,8 +53,6 @@ namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings
             {
                 loading = false;
             }
-
-            await base.OnInitializedAsync();
         }
 
         private async Task HandleUpdateSettings()

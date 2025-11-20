@@ -74,7 +74,9 @@ namespace Automaton.Studio.Pages.Flows
                 {
                     await FlowsViewModel.RenameFlow(id, renameFlowModel.Name);
                     StateHasChanged();
-                    await MessageService.SuccessAsync($"Flow renamed to '{renameFlowModel.Name}'");
+                    
+                    // Fire and forget the message to not block modal closing
+                    _ = MessageService.SuccessAsync($"Flow renamed to '{renameFlowModel.Name}'");
                 }
                 catch
                 {
