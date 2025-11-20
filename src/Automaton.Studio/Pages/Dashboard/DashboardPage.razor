@@ -32,7 +32,7 @@
                                     @_createMenuOverlay
                                 </Overlay>
                                 <Unbound>
-                                    <Button RefBack=@context Type="@ButtonType.Primary">Create <Icon Type="@IconType.Outline.Down" /></Button>
+                                    <Button RefBack=@context Type="@ButtonType.Primary">Manage <Icon Type="@IconType.Outline.Down" /></Button>
                                 </Unbound>
                             </Dropdown>
                         </SpaceItem>
@@ -52,14 +52,37 @@
     private RenderFragment _createMenuOverlay =>
         @<Menu>
             <MenuItem OnClick="@(() => NavigateToCreateApp())">
-            <Icon Type="appstore" /> Apps
+                <Icon Type="appstore" /> Create App
             </MenuItem>
             <MenuItem OnClick="@(() => NavigateToCreateFlow())">
-                <Icon Type="profile" /> Flows
+                <Icon Type="profile" /> Create Flow
             </MenuItem>
             <MenuItem OnClick="@(() => NavigateToCreateStep())">
-                <Icon Type="experiment" /> Steps
+                <Icon Type="experiment" /> Create Step
             </MenuItem>
+            <MenuDivider />
+            <MenuItem OnClick="@(() => Navigation.NavigateTo("/apps"))">
+                <Icon Type="appstore" /> Manage Apps
+            </MenuItem>
+            <MenuItem OnClick="@(() => Navigation.NavigateTo("/flows"))">
+                <Icon Type="profile" /> Manage Flows
+            </MenuItem>
+            <MenuItem OnClick="@(() => Navigation.NavigateTo("/runners"))">
+                <Icon Type="play-square" /> Manage Runners
+            </MenuItem>
+            <MenuItem OnClick="@(() => Navigation.NavigateTo("/customsteps"))">
+                <Icon Type="experiment" /> Manage Custom Steps
+            </MenuItem>
+            @if (ProjectContextService != null && ProjectContextService.IsInProjectContext() && ProjectContextService.CurrentProject?.CurrentUserRole == Automaton.Studio.Enums.ProjectRole.ProjectAdmin)
+            {
+                <MenuDivider />
+                <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                    <Icon Type="team" /> Manage Members
+                </MenuItem>
+                <MenuItem OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                    <Icon Type="setting" /> Project Settings
+                </MenuItem>
+            }
         </Menu>;
 }
 
