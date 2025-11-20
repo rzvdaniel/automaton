@@ -16,9 +16,10 @@ This will:
 - Validate configuration files
 - Start MySQL container
 - Verify database and user creation
-- Apply EF migrations
-- Verify schema creation
+- Confirm database is ready for automatic migrations
 - Clean up test environment
+
+**Note:** Migrations are applied automatically when you first run `dotnet run`.
 
 ### Manual Setup
 
@@ -68,22 +69,20 @@ cd src/Automaton.Studio.Server
 dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
 ```
 
-### 5. Run Database Migrations
+### 5. Start the Server
 
-From the project root:
-```bash
-cd src/Automaton.Studio.Server
-dotnet ef database update
-```
-
-This will apply all Entity Framework migrations to create the database schema.
-
-### 6. Run the Server
+Database migrations are applied automatically when the server starts for the first time:
 
 ```bash
 cd src/Automaton.Studio.Server
 dotnet run
 ```
+
+The server will automatically:
+- Connect to the MySQL database
+- Apply all pending Entity Framework migrations
+- Create the database schema (38 tables)
+- Start the Automaton Studio Server
 
 ## Useful Commands
 

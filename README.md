@@ -47,12 +47,7 @@ For new developers joining the team, we provide a Docker-based MySQL setup for e
    dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
    ```
 
-4. **Run migrations**
-   ```bash
-   dotnet ef database update
-   ```
-
-5. **Start the server**
+4. **Start the server** (migrations apply automatically on first run)
    ```bash
    dotnet run
    ```

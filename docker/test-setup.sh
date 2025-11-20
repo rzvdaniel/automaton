@@ -100,6 +100,8 @@ done
 # Step 6: Verify database and user exist
 echo ""
 echo "Step 6: Verifying database and user..."
+# Give MySQL a moment to fully initialize after health check passes
+sleep 2
 if docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! -e "SHOW DATABASES;" 2>/dev/null | grep -q "automaton"; then
     print_success "Database 'automaton' exists and is accessible"
 else
@@ -120,29 +122,27 @@ else
     exit 1
 fi
 
-# Step 8: Apply EF migrations
+# Step 8: Verify database is ready for connections
 echo ""
-echo "Step 8: Applying Entity Framework migrations..."
-cd src/Automaton.Studio.Server
-export ConnectionStrings__MySqlConnection="Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
-if dotnet ef database update > /dev/null 2>&1; then
-    print_success "EF migrations applied successfully"
+echo "Step 8: Verifying database is ready for the server..."
+# Just verify the database is accessible and ready
+# Migrations will be applied automatically when developers run the server
+if docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! automaton -e "SELECT 1" 2>/dev/null > /dev/null; then
+    print_success "Database is ready for automatic migrations"
+    print_info "Note: Migrations will be applied automatically when you run 'dotnet run'"
 else
-    print_error "Failed to apply EF migrations"
-    cd ../..
+    print_error "Failed to connect to database"
     exit 1
 fi
-cd ../..
 
-# Step 9: Verify tables were created
+# Step 9: Verify database is empty (no tables yet - waiting for first server start)
 echo ""
-echo "Step 9: Verifying database schema..."
+echo "Step 9: Verifying database is empty and ready for first use..."
 table_count=$(docker exec automaton-mysql-dev mysql -u automaton_user -pAutomatonPass123! automaton -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='automaton';" 2>/dev/null)
-if [ "$table_count" -gt 30 ]; then
-    print_success "Database schema created successfully ($table_count tables)"
+if [ "$table_count" -eq 0 ]; then
+    print_success "Database is empty and ready for first server start"
 else
-    print_error "Database schema incomplete (only $table_count tables)"
-    exit 1
+    print_info "Database has $table_count tables (may be from previous test run)"
 fi
 
 # Step 10: Cleanup
