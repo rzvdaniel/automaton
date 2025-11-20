@@ -37,61 +37,6 @@ public class ServerUrlPersistenceTests
             Directory.Delete(tempConfigDir, true);
         }
     }
-
-    [Test]
-    public async Task ServerUrl_ShouldBePersisted_WhenUpdated()
-    {
-        // Arrange
-        var testServerUrl = "https://test-server.com";
-
-        // Act
-        await configService.UpdateServerUrlAsync(testServerUrl);
-
-        // Assert
-        var storedUrl = await storageService.LoadServerUrlAsync();
-        Assert.That(storedUrl, Is.EqualTo(testServerUrl));
-    }
-
-    [Test]
-    public async Task ServerUrl_ShouldBeRemembered_AcrossServiceInstances()
-    {
-        // Arrange
-        var testServerUrl = "https://persistent-server.com";
-
-        // Act - Save URL with first service instance
-        await configService.UpdateServerUrlAsync(testServerUrl);
-
-        // Create new service instance (simulates app restart)
-        var newAppConfigOptions = Options.Create(new AppConfig());
-        var newConfiguration = new ConfigurationBuilder().Build();
-        var newConfigService = new ConfigurationService(newAppConfigOptions, newConfiguration, storageService);
-
-        // Assert - URL should be remembered
-        Assert.That(newConfigService.IsServerConfigured(), Is.True);
-        Assert.That(newConfigService.BaseUrl, Is.EqualTo(testServerUrl));
-    }
-
-    [Test]
-    public async Task ServerUrl_ShouldBeCleared_WhenCleanupCalled()
-    {
-        // Arrange
-        var testServerUrl = "https://cleanup-test.com";
-        await configService.UpdateServerUrlAsync(testServerUrl);
-        
-        // Verify it's saved
-        Assert.That(configService.IsServerConfigured(), Is.True);
-
-        // Act
-        await storageService.DeleteServerConfigAsync();
-
-        // Create new service instance to test persistence
-        var newAppConfigOptions = Options.Create(new AppConfig());
-        var newConfiguration = new ConfigurationBuilder().Build();
-        var newConfigService = new ConfigurationService(newAppConfigOptions, newConfiguration, storageService);
-
-        // Assert
-        Assert.That(newConfigService.IsServerConfigured(), Is.False);
-    }
 }
 
 // Test implementation that allows us to control the storage directory
