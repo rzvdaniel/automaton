@@ -226,6 +226,36 @@ public class FlowsService
         return settings;
     }
 
+    public async Task UpdateSettings(Guid id, FlowSettings settings)
+    {
+        // Check if user can update this flow
+        if (!await authorizationService.CanUpdateFlowAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update flow {id}");
+        }
+
+        var entity = dbContext.Flows.SingleOrDefault(x => x.Id == id);
+
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"Flow {id} not found");
+        }
+
+        // Deserialize the flow body, update the name, and serialize it back
+        var flow = DeserializeFlow(entity.Body);
+        flow.Name = settings.Name;
+
+        // Update both the entity name and the serialized body
+        entity.Name = settings.Name;
+        entity.Body = JsonSerializer.Serialize(flow);
+        entity.Updated = DateTime.UtcNow;
+
+        dbContext.SaveChanges();
+
+        // Log activity
+        await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, settings.Name, id);
+    }
+
     private static Flow DeserializeFlow(string jsonFlow)
     {
         var flow = JsonSerializer.Deserialize<Flow>(jsonFlow);

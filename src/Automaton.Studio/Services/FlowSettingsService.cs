@@ -38,4 +38,20 @@ public class FlowSettingsService
             throw;
         }
     }
+
+    public async Task UpdateSettings(Guid flowId, FlowSettings settings)
+    {
+        try
+        {
+            var result = await httpClient.PutAsJsonAsync($"{configService.FlowsUrl}/settings/{flowId}", settings);
+
+            result.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to update flow settings");
+
+            throw;
+        }
+    }
 }

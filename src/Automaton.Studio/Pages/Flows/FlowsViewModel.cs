@@ -81,6 +81,17 @@ public class FlowsViewModel
         Flows.Remove(flow);
     }
 
+    public async Task RenameFlow(Guid id, string newName)
+    {
+        await flowService.Rename(id, newName);
+
+        var flow = Flows.SingleOrDefault(x => x.Id == id);
+        if (flow != null)
+        {
+            flow.Name = newName;
+        }
+    }
+
     public async Task<string> RunFlow(Guid id, IEnumerable<Guid> runnerIds)
     {
         var flowModel = GetFlowModel(id);

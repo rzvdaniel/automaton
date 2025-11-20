@@ -89,4 +89,12 @@ public class FlowsController : BaseController
 
         return Ok(flow);
     }
+
+    [HttpPut("settings/{id}")]
+    public async Task<IActionResult> UpdateSettings(Guid id, FlowSettings settings)
+    {
+        await flowsService.UpdateSettings(id, settings);
+
+        return NoContent();
+    }
 }

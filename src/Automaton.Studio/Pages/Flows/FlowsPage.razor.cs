@@ -1,6 +1,7 @@
 ﻿using AntDesign;
 using Automaton.Core.Enums;
 using Automaton.Studio.Pages.Flows.Components.NewFlow;
+using Automaton.Studio.Pages.Flows.Components.RenameFlow;
 using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 
@@ -52,6 +53,36 @@ namespace Automaton.Studio.Pages.Flows
             await FlowsViewModel.DeleteFlow(id);
 
             StateHasChanged();
+        }
+
+        private async Task RenameFlow(Guid id, string currentName)
+        {
+            var renameFlowModel = new RenameFlowModel
+            {
+                Id = id,
+                Name = currentName
+            };
+
+            var modalRef = await ModalService.CreateModalAsync<RenameFlowDialog, RenameFlowModel>
+            (
+                new ModalOptions { Title = "Rename Flow" }, renameFlowModel
+            );
+
+            modalRef.OnOk = async () =>
+            {
+                try
+                {
+                    await FlowsViewModel.RenameFlow(id, renameFlowModel.Name);
+                    StateHasChanged();
+                    
+                    // Fire and forget the message to not block modal closing
+                    _ = MessageService.SuccessAsync($"Flow renamed to '{renameFlowModel.Name}'");
+                }
+                catch
+                {
+                    await MessageService.ErrorAsync($"Flow '{currentName}' could not be renamed");
+                }
+            };
         }
 
         private async Task NewFlowDialog()

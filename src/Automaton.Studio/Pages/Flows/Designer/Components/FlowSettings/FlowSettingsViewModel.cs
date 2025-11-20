@@ -29,4 +29,20 @@ public class FlowSettingsViewModel
         Created = result.Created;
         Updated = result.Updated;
     }
+
+    public async Task UpdateFlowSettings(string name)
+    {
+        var settings = new Models.FlowSettings
+        {
+            Id = Id,
+            Name = name,
+            Created = Created,
+            Updated = Updated
+        };
+
+        await flowDashboardService.UpdateSettings(Id, settings);
+
+        // Update local state
+        Name = name;
+    }
 }
