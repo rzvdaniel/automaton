@@ -1,0 +1,57 @@
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.0
+    container_name: automaton-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
+      MYSQL_USER: ${MYSQL_USER:-automaton_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AutomatonPass123!}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # Persist MySQL data
+      - mysql-data:/var/lib/mysql
+      # Optional: Add custom MySQL configuration
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      # Optional: Add initialization scripts
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - automaton-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Automaton Studio Server (optional - uncomment to run server in Docker)
+  # automaton-server:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.server
+  #   container_name: automaton-server-dev
+  #   restart: unless-stopped
+  #   ports:
+  #     - "7091:7091"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ASPNETCORE_URLS=https://+:7091
+  #     - ConnectionStrings__MySqlConnection=Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   networks:
+  #     - automaton-network
+  #   volumes:
+  #     - ./logs:/app/Logs
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  automaton-network:
+    driver: bridge
