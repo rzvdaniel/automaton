@@ -19,7 +19,7 @@ public class FlowExecutionsController : BaseController
     }
 
     [HttpGet("flow/{flowId}/{startIndex}/{pageSize}")]
-    public async Task<ActionResult<IEnumerable<FlowExecution>>> GetForFlow(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
+    public async Task<ActionResult<FlowExecutionResult>> GetForFlow(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
     {
         var result = await flowExecutionService.GetAsync(flowId, startIndex, pageSize, cancellationToken);
 

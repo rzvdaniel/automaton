@@ -8,7 +8,7 @@ namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowActivity;
 
 public partial class FlowActivity : ComponentBase
 {
-    public const int PageStart = 1;
+    public const int PageStart = 0;
     public const int PageSize = 100;
 
     [Parameter] public string FlowId { get; set; }

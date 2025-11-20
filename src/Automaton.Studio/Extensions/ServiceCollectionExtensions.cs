@@ -147,7 +147,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CustomStepsViewModel>();
         services.AddScoped<MainLayoutViewModel>();
         services.AddScoped<FlowActivityViewModel>();
-        services.AddScoped<FlowLogsViewModel>();
         services.AddScoped<FlowScheduleViewModel>();
         services.AddScoped<FlowSettingsViewModel>();
         services.AddScoped<DashboardViewModel>();
