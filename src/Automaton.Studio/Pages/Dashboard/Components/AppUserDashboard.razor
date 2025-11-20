@@ -31,66 +31,14 @@
         </div>
     </div>
 
-    <!-- Quick Stats Section -->
-    <div class="stats-section">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="appstore" Style="font-size: 24px; color: #722ed1;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@totalApps</div>
-                        <div class="stat-label">Total Apps</div>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@publishedApps</div>
-                        <div class="stat-label">Published Apps</div>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-content">
-                    <div class="stat-icon">
-                        <Icon Type="clock-circle" Style="font-size: 24px; color: #1890ff;" />
-                    </div>
-                    <div class="stat-details">
-                        <div class="stat-value">@recentlyUsedCount</div>
-                        <div class="stat-label">Recently Updated</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- App User Information Card -->
+    <!-- Compact App User Information -->
     @if (ProjectContext.IsInProjectContext())
     {
-        <div class="info-section">
-            <Card Class="info-card" Bordered="true">
-                <div class="info-content">
-                    <div class="info-icon">
-                        <Icon Type="info-circle" Style="font-size: 20px; color: #1890ff;" />
-                    </div>
-                    <div class="info-text">
-                        <Text Strong>App User Access</Text>
-                        <Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 0; margin-top: 4px;">
-                            You have access to @totalApps application(s) in this project. Click on any app below to launch it. 
-                            @if (!string.IsNullOrEmpty(ProjectContext.CurrentProject?.OwnerName))
-                            {
-                                <span>Contact <Text Strong>@ProjectContext.CurrentProject.OwnerName</Text> if you need access to additional apps.</span>
-                            }
-                        </Paragraph>
-                    </div>
-                </div>
-            </Card>
+        <div class="info-section-compact">
+            <Alert Type="@AlertType.Info" 
+                   Message="@($"You have access to {totalApps} application(s). " + (!string.IsNullOrEmpty(ProjectContext.CurrentProject?.OwnerName) ? $"Contact {ProjectContext.CurrentProject.OwnerName} for additional access." : ""))"
+                   ShowIcon="true"
+                   Closable="false" />
         </div>
     }
 
@@ -98,9 +46,22 @@
     <div class="section">
         <div class="section-header">
             <Title Level="3" Style="margin-bottom: 0;">Available Applications</Title>
+            <Select TItemValue="string" 
+                    TItem="string"
+                    @bind-Value="@sortBy" 
+                    Style="width: 200px;" 
+                    Placeholder="Sort by"
+                    OnSelectedItemChanged="@OnSortChanged">
+                <SelectOptions>
+                    <SelectOption TItemValue="string" TItem="string" Value="@("updated")" Label="Recently Updated" />
+                    <SelectOption TItemValue="string" TItem="string" Value="@("created")" Label="Recently Created" />
+                    <SelectOption TItemValue="string" TItem="string" Value="@("name")" Label="Name (A-Z)" />
+                    <SelectOption TItemValue="string" TItem="string" Value="@("published")" Label="Published First" />
+                </SelectOptions>
+            </Select>
         </div>
         
-        <AppGridDisplay Apps="@latestApps"
+        <AppGridDisplay Apps="@displayedApps"
                         IsLoading="@(DashboardContext.IsLoading || isLoadingAppDetails)"
                         EmptyTitle="No Applications Available"
                         EmptyMessage="There are no applications in this project yet. Contact your project administrator to add applications."
@@ -110,12 +71,10 @@
 
 @code {
     private List<AppListItem>? fullAppDetails;
-    private List<AppListItem>? latestApps;
+    private List<AppListItem>? displayedApps;
     private bool isLoadingAppDetails = false;
     private int totalApps = 0;
-    private int publishedApps = 0;
-    private int recentlyUsedCount = 0;
-    private const int MAX_LATEST_APPS = 6;
+    private string sortBy = "updated";
 
     protected override async Task OnInitializedAsync()
     {
@@ -160,17 +119,8 @@
                 }
             }
 
-            // Calculate statistics
             totalApps = fullAppDetails.Count;
-            publishedApps = fullAppDetails.Count(a => a.IsPublished);
-            
-            // Get latest apps (most recently updated)
-            latestApps = fullAppDetails
-                .OrderByDescending(a => a.Updated)
-                .Take(MAX_LATEST_APPS)
-                .ToList();
-            
-            recentlyUsedCount = latestApps.Count;
+            SortApps();
         }
         catch (Exception ex)
         {
@@ -180,6 +130,31 @@
         {
             isLoadingAppDetails = false;
         }
+    }
+
+    private void SortApps()
+    {
+        if (fullAppDetails == null || !fullAppDetails.Any())
+        {
+            displayedApps = new List<AppListItem>();
+            return;
+        }
+
+        displayedApps = sortBy switch
+        {
+            "updated" => fullAppDetails.OrderByDescending(a => a.Updated).ToList(),
+            "created" => fullAppDetails.OrderByDescending(a => a.Created).ToList(),
+            "name" => fullAppDetails.OrderBy(a => a.DisplayName ?? a.Name).ToList(),
+            "published" => fullAppDetails.OrderByDescending(a => a.IsPublished).ThenByDescending(a => a.Updated).ToList(),
+            _ => fullAppDetails.OrderByDescending(a => a.Updated).ToList()
+        };
+    }
+
+    private async Task OnSortChanged()
+    {
+        SortApps();
+        StateHasChanged();
+        await Task.CompletedTask;
     }
 
     private async Task OpenApp(AppListItem app)
@@ -241,94 +216,9 @@
         margin-bottom: 0;
     }
 
-    /* Stats Section */
-    .stats-section {
-        margin-bottom: 32px;
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
-    }
-
-    .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
-        border: 1px solid #f0f0f0;
-        transition: all 0.3s ease;
-    }
-
-    .stat-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        transform: translateY(-2px);
-    }
-
-    .stat-content {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .stat-icon {
-        flex-shrink: 0;
-        width: 48px;
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-    }
-
-    .stat-details {
-        flex: 1;
-    }
-
-    .stat-value {
-        font-size: 24px;
-        font-weight: 600;
-        color: #262626;
-        line-height: 1.2;
-    }
-
-    .stat-label {
-        font-size: 14px;
-        color: #8c8c8c;
-        margin-top: 4px;
-    }
-
-    /* Info Section */
-    .info-section {
-        margin-bottom: 32px;
-    }
-
-    .info-card {
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
-    }
-
-    .info-content {
-        display: flex;
-        align-items: flex-start;
-        gap: 16px;
-    }
-
-    .info-icon {
-        flex-shrink: 0;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: #e6f7ff;
-        border-radius: 8px;
-    }
-
-    .info-text {
-        flex: 1;
+    /* Compact Info Section */
+    .info-section-compact {
+        margin-bottom: 24px;
     }
 
     /* Section */
@@ -337,6 +227,9 @@
     }
 
     .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 24px;
     }
 
@@ -351,14 +244,10 @@
             text-align: center;
         }
 
-        .stats-grid {
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        }
-    }
-
-    @@media (max-width: 480px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
         }
     }
 </style>
