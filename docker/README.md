@@ -4,6 +4,24 @@ This directory contains Docker configurations for setting up a MySQL database fo
 
 ## Quick Start
 
+### Automated Test
+
+To verify the complete setup works correctly, run the integration test:
+```bash
+bash docker/test-setup.sh
+```
+
+This will:
+- Check prerequisites (Docker, Docker Compose, .NET SDK)
+- Validate configuration files
+- Start MySQL container
+- Verify database and user creation
+- Apply EF migrations
+- Verify schema creation
+- Clean up test environment
+
+### Manual Setup
+
 ### 1. Prerequisites
 - Docker and Docker Compose installed
 - .NET 8.0 SDK (for running the server locally)
