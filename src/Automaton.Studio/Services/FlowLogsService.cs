@@ -19,27 +19,6 @@ public class FlowLogsService
         this.httpClient = httpClient;
     }
 
-
-    public async Task<FlowLogsResult> GetLogsResult(Guid flowId, int startIndex, int pageSize)
-    {
-        try
-        {
-            var result = await httpClient.GetAsync($"{configService.FlowLogsUrl}/flow/{flowId}/{startIndex}/{pageSize}");
-
-            result.EnsureSuccessStatusCode();
-
-            var logsResult = await result.Content.ReadAsAsync<FlowLogsResult>();
-
-            return logsResult;
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Failed to load flow logs list");
-
-            throw;
-        }
-    }
-
     public async Task<IEnumerable<LogModel>> GetLogs(Guid flowId, Guid flowExecutionId)
     {
         try
