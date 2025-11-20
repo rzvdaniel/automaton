@@ -2,7 +2,7 @@
 using Automaton.Studio.Resources;
 using FluentValidation;
 
-namespace Automaton.Studio.Pages.Flows.Designer;
+namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSchedule;
 
 public class FlowScheduleModelValidator : AbstractValidator<FlowScheduleModel>
 {

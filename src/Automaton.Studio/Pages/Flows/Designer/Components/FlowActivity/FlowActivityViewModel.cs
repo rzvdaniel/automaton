@@ -1,7 +1,7 @@
 ﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 
-namespace Automaton.Studio.Pages.Flows.Designer;
+namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowActivity;
 
 public class FlowActivityViewModel
 {

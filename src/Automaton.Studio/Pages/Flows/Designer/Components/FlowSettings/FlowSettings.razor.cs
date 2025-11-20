@@ -1,7 +1,7 @@
 ﻿using AntDesign;
 using Microsoft.AspNetCore.Components;
 
-namespace Automaton.Studio.Pages.Flows.Designer
+namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings
 {
     public partial class FlowSettings : ComponentBase
     {

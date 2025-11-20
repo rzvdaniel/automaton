@@ -7,7 +7,7 @@ using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
-namespace Automaton.Studio.Pages.Flows.Designer;
+namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSchedule;
 
 public partial class FlowSchedule : ComponentBase
 {

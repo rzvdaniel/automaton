@@ -36,6 +36,10 @@ using Automaton.Studio.Pages.Account.Models;
 using Automaton.Studio.Pages.Authentication.Config;
 using Automaton.Studio.Pages.Install.Config;
 using Automaton.Studio.Pages.Dashboard;
+using Automaton.Studio.Pages.Flows.Components;
+using Automaton.Studio.Pages.Flows.Designer.Components.FlowSchedule;
+using Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings;
+using Automaton.Studio.Pages.Flows.Designer.Components.FlowActivity;
 
 namespace Automaton.Studio.Extensions;
 
