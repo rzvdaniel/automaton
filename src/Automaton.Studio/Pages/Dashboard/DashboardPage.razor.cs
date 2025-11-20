@@ -13,6 +13,7 @@ namespace Automaton.Studio.Pages.Dashboard
         private bool isInProjectContext;
 
         [Inject] private NavigationManager NavigationManager { get; set; }
+        [Inject] private NavigationManager Navigation { get; set; }
         [Inject] private OnboardingService OnboardingService { get; set; }
         [Inject] private ProjectContextService ProjectContextService { get; set; }
         [Inject] private DashboardContextService DashboardContextService { get; set; }
