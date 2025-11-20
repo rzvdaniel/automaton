@@ -74,6 +74,18 @@ public class FlowService
 
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task Rename(Guid flowId, string newName)
+    {
+        var settings = new FlowSettings
+        {
+            Id = flowId,
+            Name = newName
+        };
+
+        var response = await httpClient.PutAsJsonAsync($"{configService.FlowsUrl}/settings/{flowId}", settings);
+        response.EnsureSuccessStatusCode();
+    }
    
     public async Task<IEnumerable<RunnerFlowResult>> Run(Guid flowId, IEnumerable<Guid> runnerIds)
     {

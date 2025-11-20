@@ -12,12 +12,24 @@
     
     <div class="flow-tab-main">
         <div class="settings-section">
-            <Title Level="4">Flow Information</Title>
-            <Descriptions Bordered Column="1" Style="margin-top: 16px;">
-                <DescriptionsItem Title="Name">@ViewModel.Name</DescriptionsItem>
-                <DescriptionsItem Title="Created">@ViewModel.Created</DescriptionsItem>
-                <DescriptionsItem Title="Updated">@ViewModel.Updated</DescriptionsItem>            
-            </Descriptions>
+            <Card Title="Flow Information" Style="margin-bottom: 24px;">
+                <Form Model="@settingsModel" Layout="@FormLayout.Vertical">
+                    <FormItem Label="Name">
+                        <Input @bind-Value="@settingsModel.Name" />
+                    </FormItem>
+                    <FormItem Label="Created">
+                        <Input Value="@ViewModel.Created.ToString()" Disabled="true" />
+                    </FormItem>
+                    <FormItem Label="Updated">
+                        <Input Value="@ViewModel.Updated.ToString()" Disabled="true" />
+                    </FormItem>
+                    <FormItem>
+                        <Button Type="@ButtonType.Primary" OnClick="@HandleUpdateSettings" Loading="@isSaving">
+                            Save Changes
+                        </Button>
+                    </FormItem>
+                </Form>
+            </Card>
         </div>
         
         <div class="settings-section">
@@ -61,12 +73,6 @@
 
     .settings-section:last-child {
         margin-bottom: 0;
-    }
-
-    /* Style the descriptions component */
-    .settings-section .ant-descriptions {
-        background: #fbf9f7;
-        border-radius: 6px;
     }
 </style>
 

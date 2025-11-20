@@ -98,6 +98,9 @@
                             <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
                                 <Overlay>
                                     <Menu>
+                                        <MenuItem Icon="edit" OnClick="()=> RenameFlow(context.Id, context.Name)">
+                                            Rename
+                                        </MenuItem>
                                         <Popconfirm Title="Sure to delete?"
                                                     OnConfirm="()=> DeleteFlow(context.Id)"
                                                     OkText="Yes"
