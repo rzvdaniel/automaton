@@ -1,0 +1,64 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+azure-pipelines*.yml
+
+# Documentation
+*.md
+docs/
+screenshots/
+
+# Development files
+.vs/
+.vscode/
+.directory
+
+# Build output
+**/bin/
+**/obj/
+**/out/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+
+# NuGet
+packages/
+*.nupkg
+
+# User-specific files
+*.user
+*.suo
+*.cache
+
+# Test results
+[Tt]est[Rr]esult*/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+App_Data/
+
+# Logs
+Logs/
+*.log
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+Thumbs.db

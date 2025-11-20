@@ -20,6 +20,45 @@ Automaton is currently in early development, approaching its first alpha release
 
 💾 Persistent Storage – Built-in support for MySQL-backed state and flow management
 
+## 🚀 Getting Started
+
+### Development Environment Setup
+
+For new developers joining the team, we provide a Docker-based MySQL setup for easy onboarding:
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/rzvdaniel/automaton.git
+   cd automaton
+   ```
+
+2. **Set up the database**
+   ```bash
+   # Copy environment variables
+   cp .env.example .env
+   
+   # Start MySQL container
+   docker compose -f docker-compose.dev.yml up -d mysql
+   ```
+
+3. **Configure connection string**
+   ```bash
+   cd src/Automaton.Studio.Server
+   dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+   ```
+
+4. **Run migrations**
+   ```bash
+   dotnet ef database update
+   ```
+
+5. **Start the server**
+   ```bash
+   dotnet run
+   ```
+
+For detailed instructions, see the [Docker Setup Guide](docker/README.md).
+
 ## 📸 Screenshots
 
 ![Screenshot 01](/screenshots/Screenshot-2024-01-22-231011.png?raw=true "Studio Flow")

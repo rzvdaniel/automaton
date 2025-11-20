@@ -59,3 +59,8 @@ App_Data/
 
 # Created by developers using GNU/Linux
 .directory
+
+# Environment files
+.env
+.env.local
+.env.*.local
