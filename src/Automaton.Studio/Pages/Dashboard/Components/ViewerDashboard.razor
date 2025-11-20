@@ -1,266 +1,588 @@
 @using Automaton.Studio.Services
 @using Automaton.Studio.Models
+@using Automaton.Core.Enums
 @inject ProjectContextService ProjectContext
 @inject DashboardService DashboardService
 @inject NavigationManager Navigation
 
 <div class="viewer-dashboard">
-    <!-- Welcome Header -->
-    <div class="dashboard-header">
-        <div class="header-content">
-            <div class="header-icon">
+    <!-- Header Section -->
+    <div class="home-header">
+        <div class="home-header-content">
+            <div class="home-header-icon">
                 <Icon Type="eye" Style="font-size: 48px; color: white;" />
             </div>
-            <div class="header-text">
-                <Title Level="1" Style="margin-bottom: 8px; color: white;">
+            <div class="home-header-text">
+                <Title Level="1" Style="margin-bottom: 8px;">
                     @if (ProjectContext.IsInProjectContext())
                     {
-                        @($"Project: {ProjectContext.CurrentProject?.DisplayName}")
+                        @($"{ProjectContext.CurrentProject?.DisplayName} Overview")
                     }
                     else
                     {
                         @("Project Overview")
                     }
                 </Title>
-                <Paragraph Style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin-bottom: 0;">
+                <Paragraph Class="home-subtitle">
                     Read-only view of project resources and activity
                 </Paragraph>
             </div>
         </div>
     </div>
 
-    <!-- Project Statistics -->
+    <!-- Quick Stats Section -->
     @if (dashboardStats != null)
     {
-        @* <div class="section">
-            <Title Level="3" Style="margin-bottom: 24px;">Project Statistics</Title>
-            <Row Gutter="(16, 16)">
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <Statistic Title="Total Flows"
-                                  Value="@dashboardStats.TotalFlows"
-                                  Prefix="@flowIcon"
-                                  ValueStyle="@("color: #1890ff")" />
-                        <div class="stat-description">
-                            Automation workflows in project
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="profile" Style="font-size: 24px; color: #1890ff;" />
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <Statistic Title="Online Runners"
-                                  Value="@($"{dashboardStats.OnlineRunners}/{dashboardStats.TotalRunners}")"
-                                  Prefix="@runnerIcon"
-                                  ValueStyle="@("color: #52c41a")" />
-                        <div class="stat-description">
-                            Active execution runners
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.TotalFlows</div>
+                            <div class="stat-label">Total Flows</div>
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <Statistic Title="Success Rate"
-                                  Value="@dashboardStats.SuccessRate"
-                                  Suffix="%"
-                                  Prefix="@successIcon"
-                                  ValueStyle="@("color: #52c41a")" />
-                        <div class="stat-description">
-                            Successful executions
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="appstore" Style="font-size: 24px; color: #722ed1;" />
                         </div>
-                    </Card>
-                </Col>
-                <Col Xs="24" Sm="12" Md="6">
-                    <Card Class="stat-card">
-                        <Statistic Title="Recent Executions"
-                                  Value="@dashboardStats.RecentExecutions"
-                                  Prefix="@executionIcon"
-                                  ValueStyle="@("color: #722ed1")" />
-                        <div class="stat-description">
-                            Executions in last 7 days
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.TotalApps</div>
+                            <div class="stat-label">Web Apps</div>
                         </div>
-                    </Card>
-                </Col>
-            </Row>
-        </div> *@
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="play-square" Style="font-size: 24px; color: #52c41a;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.OnlineRunners/@dashboardStats.TotalRunners</div>
+                            <div class="stat-label">Online Runners</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.SuccessRate%</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="experiment" Style="font-size: 24px; color: #fa8c16;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.TotalCustomSteps</div>
+                            <div class="stat-label">Custom Steps</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-content">
+                        <div class="stat-icon">
+                            <Icon Type="schedule" Style="font-size: 24px; color: #1890ff;" />
+                        </div>
+                        <div class="stat-details">
+                            <div class="stat-value">@dashboardStats.ActiveSchedules</div>
+                            <div class="stat-label">Active Schedules</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     }
 
-    <!-- Information Cards -->
-    <div class="section">
-        <Title Level="3" Style="margin-bottom: 24px;">Project Information</Title>
-        <Row Gutter="(16, 16)">
-            <Col Xs="24" Md="12">
-                <Card Class="info-card">
-                    <div class="info-header">
-                        <Icon Type="info-circle" Style="font-size: 24px; color: #1890ff;" />
-                        <Title Level="4" Style="margin: 0;">About Viewer Access</Title>
-                    </div>
-                    <Paragraph>
-                        As a Viewer, you have read-only access to this project. You can:
-                    </Paragraph>
-                    <ul class="permission-list">
-                        <li><Icon Type="check" Style="color: #52c41a;" /> View project statistics and metrics</li>
-                        <li><Icon Type="check" Style="color: #52c41a;" /> Monitor execution logs and history</li>
-                        <li><Icon Type="check" Style="color: #52c41a;" /> Access project documentation</li>
-                        <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot create or modify resources</li>
-                        <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot execute flows or workflows</li>
-                    </ul>
-                </Card>
-            </Col>
-            <Col Xs="24" Md="12">
-                <Card Class="info-card">
-                    <div class="info-header">
-                        <Icon Type="team" Style="font-size: 24px; color: #722ed1;" />
-                        <Title Level="4" Style="margin: 0;">Need More Access?</Title>
-                    </div>
-                    <Paragraph>
-                        If you need to create or modify resources, please contact your project administrator to upgrade your role.
-                    </Paragraph>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        <strong>Project Owner:</strong> @(ProjectContext.CurrentProject?.OwnerName ?? "Unknown")
-                    </Paragraph>
-                    <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 16px;">
-                        Available roles:
-                    </Paragraph>
-                    <div class="role-badges">
-                        <Tag Color="@TagColor.Blue">Viewer (Current)</Tag>
-                        <Tag>AppUser</Tag>
-                        <Tag>Developer</Tag>
-                        <Tag>ProjectAdmin</Tag>
-                    </div>
-                </Card>
-            </Col>
-        </Row>
-    </div>
+    <!-- Main Content Tabs -->
+    <Tabs DefaultActiveKey="about" Class="home-tabs">
+        <TabPane Key="about" Tab="About Viewer Access">
+            <div class="about-content">
+                <Title Level="3" Style="margin-bottom: 24px;">Viewer Role Information</Title>
+                
+                <Row Gutter="(16, 16)">
+                    <Col Xs="24" Md="12">
+                        <Card Class="info-card">
+                            <div class="info-header">
+                                <Icon Type="info-circle" Style="font-size: 24px; color: #1890ff;" />
+                                <Title Level="4" Style="margin: 0;">What You Can Do</Title>
+                            </div>
+                            <Paragraph>
+                                As a Viewer, you have read-only access to this project:
+                            </Paragraph>
+                            <ul class="permission-list">
+                                <li><Icon Type="check" Style="color: #52c41a;" /> View project statistics and metrics</li>
+                                <li><Icon Type="check" Style="color: #52c41a;" /> Monitor execution logs and history</li>
+                                <li><Icon Type="check" Style="color: #52c41a;" /> Access project documentation</li>
+                                <li><Icon Type="check" Style="color: #52c41a;" /> View workflow definitions</li>
+                                <li><Icon Type="check" Style="color: #52c41a;" /> Review runner configurations</li>
+                            </ul>
+                        </Card>
+                    </Col>
+                    <Col Xs="24" Md="12">
+                        <Card Class="info-card">
+                            <div class="info-header">
+                                <Icon Type="stop" Style="font-size: 24px; color: #ff4d4f;" />
+                                <Title Level="4" Style="margin: 0;">Restrictions</Title>
+                            </div>
+                            <Paragraph>
+                                The following actions are not available:
+                            </Paragraph>
+                            <ul class="permission-list">
+                                <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot create or modify flows</li>
+                                <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot execute workflows</li>
+                                <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot create or edit custom steps</li>
+                                <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot manage runners</li>
+                                <li><Icon Type="close" Style="color: #ff4d4f;" /> Cannot change project settings</li>
+                            </ul>
+                        </Card>
+                    </Col>
+                </Row>
+            </div>
+        </TabPane>
 
-    <!-- Quick Links -->
-    <div class="section">
-        <Title Level="3" Style="margin-bottom: 24px;">Available Resources</Title>
-        <Row Gutter="(16, 16)">
-            <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="resource-card">
-                    <div class="resource-icon">
-                        <Icon Type="bar-chart" Style="font-size: 32px; color: #1890ff;" />
-                    </div>
-                    <Title Level="5">Analytics</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        View project metrics and reports
-                    </Paragraph>
-                    <Button Type="@ButtonType.Text" Disabled>
-                        Coming Soon
+        <TabPane Key="activity" Tab="Recent Activity">
+            <div class="activity-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <Title Level="3" style="margin-bottom: 0;">Recent Project Activity</Title>
+                    <Button Type="@ButtonType.Link" OnClick="@RefreshActivity" Icon="reload" Size="@ButtonSize.Small">
+                        Refresh
                     </Button>
-                </Card>
-            </Col>
-            <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="resource-card">
-                    <div class="resource-icon">
-                        <Icon Type="file-text" Style="font-size: 32px; color: #52c41a;" />
+                </div>
+                
+                @if (isLoadingActivity)
+                {
+                    <div style="text-align: center; padding: 40px;">
+                        <Spin Size="SpinSize.Large" />
                     </div>
-                    <Title Level="5">Logs</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        View execution logs and history
-                    </Paragraph>
-                    <Button Type="@ButtonType.Text" Disabled>
-                        Coming Soon
-                    </Button>
-                </Card>
-            </Col>
-            <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="resource-card">
-                    <div class="resource-icon">
-                        <Icon Type="book" Style="font-size: 32px; color: #722ed1;" />
+                }
+                else if (recentActivity != null && recentActivity.Any())
+                {
+                    <div class="activity-list">
+                        @foreach (var activity in recentActivity)
+                        {
+                            <Card Size="CardSize.Small" Class="activity-item" Bordered="true">
+                                <div class="activity-content-item">
+                                    <div class="activity-icon">
+                                        <Icon Type="@activity.Icon" Style="@($"color: {activity.Color};")" />
+                                    </div>
+                                    <div class="activity-details">
+                                        <div class="activity-title">
+                                            <Text Strong>@activity.EntityName</Text>
+                                            <Tag Color="@GetActivityTagColor(activity.ActivityType)">@activity.ActivityTypeText</Tag>
+                                        </div>
+                                        <div class="activity-description">
+                                            <Text Type="TextElementType.Secondary">@activity.Description</Text>
+                                        </div>
+                                        <div class="activity-meta">
+                                            <span class="activity-meta-text">
+                                                <Icon Type="clock-circle" Style="font-size: 12px;" />
+                                                @activity.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(activity.UserName))
+                                            {
+                                                <span class="activity-meta-text">
+                                                    <Icon Type="user" Style="font-size: 12px;" />
+                                                    @activity.UserName
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        }
                     </div>
-                    <Title Level="5">Documentation</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        Access project documentation
-                    </Paragraph>
-                    <Button Type="@ButtonType.Text" Disabled>
-                        Coming Soon
-                    </Button>
-                </Card>
-            </Col>
-            <Col Xs="24" Sm="12" Md="6">
-                <Card Hoverable Class="resource-card">
-                    <div class="resource-icon">
-                        <Icon Type="calendar" Style="font-size: 32px; color: #fa8c16;" />
+                    
+                    @if (recentActivity.Count() >= activityCount)
+                    {
+                        <div style="text-align: center; margin-top: 16px;">
+                            <Button Type="@ButtonType.Link" OnClick="@LoadMoreActivity">
+                                Load More
+                            </Button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="activity-placeholder">
+                        <div style="text-align: center;">
+                            <Icon Type="inbox" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                            <Title Level="4" Style="color: #999;">No Recent Activity</Title>
+                            <Paragraph Style="color: #999;">
+                                Activity will appear here when team members create, update, or execute resources.
+                            </Paragraph>
+                        </div>
                     </div>
-                    <Title Level="5">Schedules</Title>
-                    <Paragraph Type="@TextElementType.Secondary">
-                        View scheduled workflows
-                    </Paragraph>
-                    <Button Type="@ButtonType.Text" Disabled>
-                        Coming Soon
+                }
+            </div>
+        </TabPane>
+
+        <TabPane Key="recent-executions" Tab="Recent Executions">
+            <div class="executions-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <Title Level="3" style="margin-bottom: 0;">Recent Flow Executions</Title>
+                    <Button Type="@ButtonType.Link" OnClick="@RefreshExecutions" Icon="reload" Size="@ButtonSize.Small">
+                        Refresh
                     </Button>
+                </div>
+                
+                @if (isLoadingExecutions)
+                {
+                    <div style="text-align: center; padding: 40px;">
+                        <Spin Size="SpinSize.Large" />
+                    </div>
+                }
+                else if (recentExecutions != null && recentExecutions.Any())
+                {
+                    <div class="executions-list">
+                        @foreach (var execution in recentExecutions)
+                        {
+                            <Card Size="CardSize.Small" Class="execution-item" Bordered="true">
+                                <div class="execution-content-item">
+                                    <div class="execution-icon">
+                                        @if (execution.Status == WorkflowStatus.Success)
+                                        {
+                                            <Icon Type="check-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#52c41a" />
+                                        }
+                                        else if (execution.Status == WorkflowStatus.Error)
+                                        {
+                                            <Icon Type="close-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#ff4d4f" />
+                                        }
+                                        else if (execution.Status == WorkflowStatus.Working)
+                                        {
+                                            <Icon Type="sync" Spin="true" Theme="IconThemeType.TwoTone" TwoToneColor="#1890ff" />
+                                        }
+                                        else
+                                        {
+                                            <Icon Type="clock-circle" Theme="IconThemeType.TwoTone" TwoToneColor="#d9d9d9" />
+                                        }
+                                    </div>
+                                    <div class="execution-details">
+                                        <div class="execution-title">
+                                            <Text Strong>@execution.Application</Text>
+                                            <Tag Color="@GetExecutionStatusColor(execution.Status)">@execution.Status</Tag>
+                                        </div>
+                                        <div class="execution-description">
+                                            <Text Type="TextElementType.Secondary">Flow ID: @execution.FlowId.ToString().Substring(0, 8)...</Text>
+                                        </div>
+                                        <div class="execution-meta">
+                                            <span class="execution-meta-text">
+                                                <Icon Type="clock-circle" Style="font-size: 12px;" />
+                                                Started: @execution.Started.ToString("MMM dd, yyyy HH:mm")
+                                            </span>
+                                            @if (execution.Finished != default)
+                                            {
+                                                <span class="execution-meta-text">
+                                                    <Icon Type="check" Style="font-size: 12px;" />
+                                                    Finished: @execution.Finished.ToString("HH:mm")
+                                                </span>
+                                                <span class="execution-meta-text">
+                                                    <Icon Type="hourglass" Style="font-size: 12px;" />
+                                                    Duration: @((execution.Finished - execution.Started).TotalSeconds.ToString("F1"))s
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        }
+                    </div>
+                    
+                    @if (recentExecutions.Count() >= executionCount)
+                    {
+                        <div style="text-align: center; margin-top: 16px;">
+                            <Button Type="@ButtonType.Link" OnClick="@LoadMoreExecutions">
+                                Load More
+                            </Button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="executions-placeholder">
+                        <div style="text-align: center;">
+                            <Icon Type="bar-chart" Style="font-size: 48px; color: #d9d9d9; margin-bottom: 16px;" />
+                            <Title Level="4" Style="color: #999;">No Recent Executions</Title>
+                            <Paragraph Style="color: #999;">
+                                Executions will appear here when workflows are run.
+                            </Paragraph>
+                        </div>
+                    </div>
+                }
+            </div>
+        </TabPane>
+
+        <TabPane Key="contact" Tab="Need More Access?">
+            <div class="contact-content">
+                <Title Level="3" Style="margin-bottom: 24px;">Request Additional Permissions</Title>
+                
+                <Card Class="upgrade-card">
+                    <div class="upgrade-content">
+                        <div class="upgrade-icon">
+                            <Icon Type="team" Style="font-size: 48px; color: #722ed1;" />
+                        </div>
+                        <Title Level="4">Contact Project Administrator</Title>
+                        <Paragraph>
+                            If you need to create, modify, or execute resources in this project, please contact your project administrator to upgrade your role.
+                        </Paragraph>
+                        <Paragraph Type="@TextElementType.Secondary">
+                            <strong>Project Owner:</strong> @(ProjectContext.CurrentProject?.OwnerName ?? "Unknown")
+                        </Paragraph>
+                        <Paragraph Type="@TextElementType.Secondary" Style="margin-top: 24px;">
+                            Available roles in this project:
+                        </Paragraph>
+                        <div class="role-badges">
+                            <Tag Color="@TagColor.Blue">Viewer (Current)</Tag>
+                            <Tag>AppUser</Tag>
+                            <Tag>Developer</Tag>
+                            <Tag>ProjectAdmin</Tag>
+                        </div>
+                    </div>
                 </Card>
-            </Col>
-        </Row>
-    </div>
+            </div>
+        </TabPane>
+    </Tabs>
 </div>
 
 @code {
     private DashboardStats? dashboardStats;
+    private IEnumerable<RecentActivity>? recentActivity;
+    private IEnumerable<FlowExecution>? recentExecutions;
+    private bool isLoadingActivity = false;
+    private bool isLoadingExecutions = false;
+    private int activityCount = 10;
+    private int executionCount = 15;
 
     protected override async Task OnInitializedAsync()
     {
         // Load dashboard stats
         dashboardStats = await DashboardService.GetDashboardStatsAsync();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load activity data after the initial render to improve perceived performance
+            await LoadRecentActivity();
+            await LoadRecentExecutions();
+        }
+    }
+
+    private async Task LoadRecentActivity()
+    {
+        isLoadingActivity = true;
+        StateHasChanged();
+
+        try
+        {
+            recentActivity = await DashboardService.GetRecentActivityAsync(activityCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recent activity: {ex.Message}");
+            recentActivity = new List<RecentActivity>();
+        }
+        finally
+        {
+            isLoadingActivity = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadRecentExecutions()
+    {
+        isLoadingExecutions = true;
+        StateHasChanged();
+
+        try
+        {
+            recentExecutions = await DashboardService.GetRecentExecutionsAsync(executionCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading recent executions: {ex.Message}");
+            recentExecutions = new List<FlowExecution>();
+        }
+        finally
+        {
+            isLoadingExecutions = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshActivity()
+    {
+        activityCount = 10; // Reset to initial count
+        await LoadRecentActivity();
+    }
+
+    private async Task RefreshExecutions()
+    {
+        executionCount = 15; // Reset to initial count
+        await LoadRecentExecutions();
+    }
+
+    private async Task LoadMoreActivity()
+    {
+        activityCount += 10;
+        await LoadRecentActivity();
+    }
+
+    private async Task LoadMoreExecutions()
+    {
+        executionCount += 15;
+        await LoadRecentExecutions();
+    }
+
+    private string GetActivityTagColor(ActivityType activityType)
+    {
+        return activityType switch
+        {
+            ActivityType.FlowCreated or ActivityType.CustomStepCreated or ActivityType.RunnerAdded or ActivityType.ScheduleCreated => "green",
+            ActivityType.FlowUpdated or ActivityType.CustomStepUpdated or ActivityType.RunnerUpdated or ActivityType.ScheduleUpdated => "blue",
+            ActivityType.FlowDeleted or ActivityType.CustomStepDeleted or ActivityType.RunnerDeleted or ActivityType.ScheduleDeleted => "red",
+            ActivityType.FlowExecuted => "purple",
+            _ => "default"
+        };
+    }
+
+    private string GetExecutionStatusColor(WorkflowStatus status)
+    {
+        return status switch
+        {
+            WorkflowStatus.Success => "green",
+            WorkflowStatus.Error => "red",
+            WorkflowStatus.Working => "blue",
+            _ => "default"
+        };
+    }
 }
 
 <style>
     .viewer-dashboard {
-        max-width: 1400px;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 0;
+        padding: 0 24px 40px 24px;
     }
 
-    .dashboard-header {
-        background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
-        border-radius: 12px;
-        padding: 48px 40px;
-        margin-bottom: 32px;
-        box-shadow: 0 4px 12px rgba(114, 46, 209, 0.2);
+    .home-header {
+        margin-bottom: 24px;
+        padding: 24px 0;
     }
 
-    .header-content {
+    .home-header-content {
         display: flex;
         align-items: center;
         gap: 24px;
     }
 
-    .header-icon {
+    .home-header-icon {
         flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         width: 80px;
         height: 80px;
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: #1890ff;
         border-radius: 16px;
     }
 
-    .header-text {
+    .home-header-text {
         flex: 1;
     }
 
-    .section {
-        margin-bottom: 48px;
+    .home-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
+    }
+
+    /* Stats Section */
+    .stats-section {
+        margin-bottom: 32px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
     }
 
     .stat-card {
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        border: 1px solid #f0f0f0;
         transition: all 0.3s ease;
-        padding: 24px;
     }
 
     .stat-card:hover {
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
     }
 
-    .stat-description {
-        font-size: 12px;
+    .stat-content {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .stat-icon {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .stat-details {
+        flex: 1;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #262626;
+        line-height: 1.2;
+    }
+
+    .stat-label {
+        font-size: 14px;
         color: #8c8c8c;
-        margin-top: 8px;
+        margin-top: 4px;
+    }
+
+    .home-tabs .ant-tabs-content-holder {
+        padding-top: 24px;
+    }
+
+    .section {
+        margin-bottom: 32px;
+    }
+
+    /* Content Sections */
+    .about-content, .activity-content, .executions-content, .contact-content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+        min-height: 400px;
     }
 
     .info-card {
@@ -295,43 +617,106 @@
         flex-wrap: wrap;
     }
 
-    .resource-card {
-        text-align: center;
-        padding: 24px;
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        height: 100%;
+    /* Activity & Executions Lists */
+    .activity-list, .executions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 600px;
+        overflow-y: auto;
     }
 
-    .resource-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    .activity-item, .execution-item {
+        border-radius: 6px;
+        transition: all 0.2s ease;
     }
 
-    .resource-icon {
-        width: 80px;
-        height: 80px;
-        border-radius: 16px;
+    .activity-item:hover, .execution-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .activity-content-item, .execution-content-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 4px 0;
+    }
+
+    .activity-icon, .execution-icon {
+        flex-shrink: 0;
+        font-size: 18px;
+        margin-top: 2px;
+    }
+
+    .activity-details, .execution-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .activity-title, .execution-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+    }
+
+    .activity-description, .execution-description {
+        margin-bottom: 8px;
+    }
+
+    .activity-meta, .execution-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .activity-meta-text, .execution-meta-text {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #8c8c8c;
+        font-size: 12px;
+    }
+
+    .activity-placeholder, .executions-placeholder {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #f0f2f5;
-        margin: 0 auto 16px;
+        height: 300px;
+    }
+
+    /* Upgrade Card */
+    .upgrade-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .upgrade-content {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .upgrade-icon {
+        margin-bottom: 24px;
     }
 
     /* Responsive */
     @@media (max-width: 768px) {
-        .dashboard-header {
-            padding: 32px 24px;
+        .home-header {
+            padding: 16px 0;
         }
 
-        .header-content {
+        .home-header-content {
             flex-direction: column;
             text-align: center;
         }
 
-        .section {
-            margin-bottom: 32px;
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         }
     }
 </style>

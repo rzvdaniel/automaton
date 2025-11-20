@@ -11,28 +11,94 @@
     <div class="home-header">
         <div class="home-header-content">
             <div class="home-header-icon">
-                <Icon Type="thunderbolt" Style="font-size: 48px; color: white;" />
+                <Icon Type="appstore" Style="font-size: 48px; color: white;" />
             </div>
             <div class="home-header-text">
                 <Title Level="1" Style="margin-bottom: 8px;">
                     @if (ProjectContext.IsInProjectContext())
                     {
-                        @($"{ProjectContext.CurrentProject?.DisplayName} Dashboard")
+                        @($"{ProjectContext.CurrentProject?.DisplayName} Apps")
                     }
                     else
                     {
-                        @("Personal Dashboard")
+                        @("Applications")
                     }
                 </Title>
                 <Paragraph Class="home-subtitle">
-                    Access applications
+                    Access and launch your applications
                 </Paragraph>
             </div>
         </div>
     </div>
 
+    <!-- Quick Stats Section -->
+    <div class="stats-section">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-icon">
+                        <Icon Type="appstore" Style="font-size: 24px; color: #722ed1;" />
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">@totalApps</div>
+                        <div class="stat-label">Total Apps</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-icon">
+                        <Icon Type="check-circle" Style="font-size: 24px; color: #52c41a;" />
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">@publishedApps</div>
+                        <div class="stat-label">Published Apps</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-content">
+                    <div class="stat-icon">
+                        <Icon Type="clock-circle" Style="font-size: 24px; color: #1890ff;" />
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-value">@recentlyUsedCount</div>
+                        <div class="stat-label">Recently Updated</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App User Information Card -->
+    @if (ProjectContext.IsInProjectContext())
+    {
+        <div class="info-section">
+            <Card Class="info-card" Bordered="true">
+                <div class="info-content">
+                    <div class="info-icon">
+                        <Icon Type="info-circle" Style="font-size: 20px; color: #1890ff;" />
+                    </div>
+                    <div class="info-text">
+                        <Text Strong>App User Access</Text>
+                        <Paragraph Type="@TextElementType.Secondary" Style="margin-bottom: 0; margin-top: 4px;">
+                            You have access to @totalApps application(s) in this project. Click on any app below to launch it. 
+                            @if (!string.IsNullOrEmpty(ProjectContext.CurrentProject?.OwnerName))
+                            {
+                                <span>Contact <Text Strong>@ProjectContext.CurrentProject.OwnerName</Text> if you need access to additional apps.</span>
+                            }
+                        </Paragraph>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    }
+
     <!-- Latest Apps Section -->
     <div class="section">
+        <div class="section-header">
+            <Title Level="3" Style="margin-bottom: 0;">Available Applications</Title>
+        </div>
         
         <AppGridDisplay Apps="@latestApps"
                         IsLoading="@(DashboardContext.IsLoading || isLoadingAppDetails)"
@@ -140,53 +206,56 @@
     .app-user-dashboard {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 0;
+        padding: 0 24px 40px 24px;
     }
 
-    .dashboard-header {
-        background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-        border-radius: 12px;
-        padding: 48px 40px;
-        margin-bottom: 32px;
-        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+    .home-header {
+        margin-bottom: 24px;
+        padding: 24px 0;
     }
 
-    .header-content {
+    .home-header-content {
         display: flex;
         align-items: center;
         gap: 24px;
     }
 
-    .header-icon {
+    .home-header-icon {
         flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         width: 80px;
         height: 80px;
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: #722ed1;
         border-radius: 16px;
     }
 
-    .header-text {
+    .home-header-text {
         flex: 1;
+    }
+
+    .home-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0;
     }
 
     /* Stats Section */
     .stats-section {
-        margin-bottom: 40px;
+        margin-bottom: 32px;
     }
 
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 16px;
     }
 
     .stat-card {
         background: white;
         border-radius: 8px;
-        padding: 24px;
+        padding: 20px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
         border: 1px solid #f0f0f0;
         transition: all 0.3s ease;
@@ -231,31 +300,59 @@
         margin-top: 4px;
     }
 
+    /* Info Section */
+    .info-section {
+        margin-bottom: 32px;
+    }
+
+    .info-card {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    }
+
+    .info-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .info-icon {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #e6f7ff;
+        border-radius: 8px;
+    }
+
+    .info-text {
+        flex: 1;
+    }
+
     /* Section */
     .section {
         margin-bottom: 40px;
     }
 
     .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
         margin-bottom: 24px;
     }
 
     /* Responsive */
     @@media (max-width: 768px) {
-        .dashboard-header {
-            padding: 32px 24px;
+        .home-header {
+            padding: 16px 0;
         }
 
-        .header-content {
+        .home-header-content {
             flex-direction: column;
             text-align: center;
         }
 
         .stats-grid {
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         }
     }
 
