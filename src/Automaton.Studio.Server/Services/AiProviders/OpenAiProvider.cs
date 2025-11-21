@@ -15,6 +15,8 @@ public class OpenAiProvider : IAiProvider
 
     private static readonly List<string> DefaultSupportedModels = new()
     {
+        "o1-preview",                // Advanced reasoning model
+        "o1-mini",                   // Faster reasoning model
         "gpt-4o",                    // Latest, most capable model
         "gpt-4o-mini",               // Fast and cost-effective  
         "gpt-4-turbo",               // Previous generation turbo

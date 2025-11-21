@@ -15,11 +15,11 @@ public class GoogleProvider : IAiProvider
 
     private static readonly List<string> DefaultSupportedModels = new()
     {
-        "gemini-1.5-pro",                // Latest pro model - most capable
-        "gemini-1.5-flash",              // Fast and efficient
-        "gemini-1.5-pro-exp-0827",      // Experimental pro version
-        "gemini-pro",                    // Legacy model
-        "gemini-pro-vision"              // Vision-capable legacy model
+        "gemini-1.5-pro-002",            // Latest pro model with improvements
+        "gemini-1.5-flash-002",          // Latest flash model, fast and efficient
+        "gemini-1.5-pro",                // Stable pro identifier
+        "gemini-1.5-flash",              // Stable flash identifier
+        "gemini-1.0-pro"                 // Previous generation
     };
 
     private const string DefaultModelName = "gemini-1.5-pro";

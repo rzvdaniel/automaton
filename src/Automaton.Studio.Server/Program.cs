@@ -232,6 +232,10 @@ services.AddScoped<AnthropicProvider>();
 services.AddScoped<GoogleProvider>();
 services.AddScoped<AiProviderFactory>();
 
+// AI Provider Seeding
+services.AddScoped<AiProviderSeeder>();
+services.AddHostedService<Automaton.Studio.Server.Hosting.AiProviderSeederHostedService>();
+
 // Project/Organization services
 services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
