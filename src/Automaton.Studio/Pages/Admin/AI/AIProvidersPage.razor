@@ -1,0 +1,279 @@
+@page "/admin/ai-providers"
+@using Automaton.Studio.Models
+@using Automaton.Mcp.Enums
+@attribute [Authorize(Roles = "SysAdmin,Admin")]
+
+<PageTitle>AI Providers Management - Automaton Studio</PageTitle>
+
+<Layout>
+    <Header Class="header">
+        <Row>
+            <Col Flex=@("none")>
+                <Space Size="SpaceSize.Large">
+                    <SpaceItem Class="header-item">
+                        <Breadcrumb>
+                            <BreadcrumbItem Href="/">
+                                <Icon Type="home" Width="16" Height="16" />
+                                <span>Home</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="setting" Width="16" Height="16" />
+                                <span>Admin</span>
+                            </BreadcrumbItem>
+                            <BreadcrumbItem>
+                                <Icon Type="robot" Width="16" Height="16" />
+                                <span>AI Providers</span>
+                            </BreadcrumbItem>
+                        </Breadcrumb>
+                    </SpaceItem>
+                </Space>
+            </Col>
+
+            <Col Class="right-actions">
+                <Space Class="right-header-items">
+                    <SpaceItem>
+                        <Tooltip Title="Add New AI Provider">
+                            <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@ShowCreateProviderModal">
+                                Add Provider
+                            </Button>
+                        </Tooltip>
+                    </SpaceItem>
+                </Space>
+            </Col>
+        </Row>
+    </Header>
+
+    <Content Class="content-padding content-background">
+        @if (ViewModel.Loading)
+        {
+            <div class="loading-container">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+            @if (ViewModel.Providers?.Any() == true)
+            {
+                @foreach (var provider in ViewModel.Providers.OrderBy(p => p.DisplayOrder))
+                {
+                    <Card Title="@provider.ProviderName" 
+                          Style="margin-bottom: 16px;">
+                        <Extra>
+                            <Space Size="@SpaceSize.Small">
+                                <SpaceItem>
+                                    <Button Size="@ButtonSize.Small" Icon="edit" OnClick="@(() => ShowEditProviderModal(provider))">
+                                        Edit
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Popconfirm Title="Are you sure you want to delete this provider?"
+                                               OnConfirm="@(() => DeleteProvider(provider.Id))"
+                                               OkText="Yes"
+                                               CancelText="No">
+                                        <Button Size="@ButtonSize.Small" Danger Icon="delete">
+                                            Delete
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            </Space>
+                        </Extra>
+                        <Body>
+                            <Descriptions Bordered Size="@DescriptionsSize.Small">
+                                <DescriptionsItem Title="Status">
+                                    @if (provider.Enabled)
+                                    {
+                                        <Badge Status="success" Text="Enabled" />
+                                    }
+                                    else
+                                    {
+                                        <Badge Status="default" Text="Disabled" />
+                                    }
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Provider Type">
+                                    <Tag Color="blue">@provider.Provider.ToString()</Tag>
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Default Model">
+                                    <code>@provider.DefaultModel</code>
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Description" Span="3">
+                                    @(string.IsNullOrEmpty(provider.Description) ? "No description" : provider.Description)
+                                </DescriptionsItem>
+                            </Descriptions>
+
+                            <Divider>Supported Models</Divider>
+
+                            <Space Direction="DirectionVHType.Horizontal" Wrap>
+                                <SpaceItem>
+                                    <Button Size="@ButtonSize.Small" Icon="plus" OnClick="@(() => ShowCreateModelModal(provider.Id))">
+                                        Add Model
+                                    </Button>
+                                </SpaceItem>
+                            </Space>
+
+                            @if (provider.Models?.Any() == true)
+                            {
+                                <Table TItem="AiModelConfigModel" 
+                                       DataSource="@provider.Models.OrderBy(m => m.DisplayOrder)" 
+                                       Size="@TableSize.Small"
+                                       Style="margin-top: 16px;">
+                                    <Column TData="string" Title="Model Name" @bind-Field="@context.ModelName">
+                                        <code>@context.ModelName</code>
+                                    </Column>
+                                    
+                                    <Column TData="string" Title="Display Name" @bind-Field="@context.DisplayName">
+                                        @context.DisplayName
+                                    </Column>
+                                    
+                                    <Column TData="string" Title="Description" @bind-Field="@context.Description">
+                                        @(string.IsNullOrEmpty(context.Description) ? "-" : context.Description)
+                                    </Column>
+                                    
+                                    <Column TData="bool" Title="Status" DataIndex="@nameof(context.Enabled)">
+                                        @if (context.Enabled)
+                                        {
+                                            <Badge Status="success" Text="Enabled" />
+                                        }
+                                        else
+                                        {
+                                            <Badge Status="default" Text="Disabled" />
+                                        }
+                                    </Column>
+                                    
+                                    <ActionColumn Title="Actions">
+                                        <Space Size="@SpaceSize.Small">
+                                            <SpaceItem>
+                                                <Button Size="@ButtonSize.Small" Icon="edit" OnClick="@(() => ShowEditModelModal(provider.Id, context))">
+                                                    Edit
+                                                </Button>
+                                            </SpaceItem>
+                                            <SpaceItem>
+                                                <Popconfirm Title="Are you sure you want to delete this model?"
+                                                           OnConfirm="@(() => DeleteModel(provider.Id, context.Id))"
+                                                           OkText="Yes"
+                                                           CancelText="No">
+                                                    <Button Size="@ButtonSize.Small" Danger Icon="delete">
+                                                        Delete
+                                                    </Button>
+                                                </Popconfirm>
+                                            </SpaceItem>
+                                        </Space>
+                                    </ActionColumn>
+                                </Table>
+                            }
+                            else
+                            {
+                                <div style="margin-top: 16px;">
+                                    <Empty>
+                                        <Description>No models configured</Description>
+                                    </Empty>
+                                </div>
+                            }
+                        </Body>
+                    </Card>
+                }
+            }
+            else
+            {
+                <div>
+                    <Empty>
+                        <Description>No AI providers configured</Description>
+                    </Empty>
+                </div>
+            }
+        }
+    </Content>
+</Layout>
+
+@* Provider Create/Edit Modal *@
+<Modal Title="@(ViewModel.EditingProvider == null ? "Add AI Provider" : "Edit AI Provider")"
+       Visible="@ViewModel.ProviderModalVisible"
+       OnOk="@SaveProvider"
+       OnCancel="@(() => ViewModel.ProviderModalVisible = false)"
+       ConfirmLoading="@ViewModel.ProviderSaving">
+    <Form Model="@ViewModel.ProviderRequest" Layout="@FormLayout.Vertical">
+        <FormItem Label="Provider Name">
+            <Input @bind-Value="@ViewModel.ProviderRequest.ProviderName" Placeholder="e.g., OpenAI" />
+        </FormItem>
+
+        <FormItem Label="Provider Type">
+            <Select @bind-Value="@ViewModel.ProviderRequest.Provider" 
+                    TItemValue="AiProvider" 
+                    TItem="AiProvider"
+                    Disabled="@(ViewModel.EditingProvider != null)">
+                <SelectOptions>
+                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.OpenAI" Label="OpenAI" />
+                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Anthropic" Label="Anthropic" />
+                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Google" Label="Google" />
+                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Custom" Label="Custom" />
+                </SelectOptions>
+            </Select>
+        </FormItem>
+
+        <FormItem Label="Default Model">
+            <Input @bind-Value="@ViewModel.ProviderRequest.DefaultModel" Placeholder="e.g., gpt-4o" />
+        </FormItem>
+
+        <FormItem Label="Description">
+            <TextArea @bind-Value="@ViewModel.ProviderRequest.Description" 
+                     Placeholder="Optional description" 
+                     Rows="3" />
+        </FormItem>
+
+        <FormItem Label="Display Order">
+            <AntDesign.InputNumber @bind-Value="@ViewModel.ProviderRequest.DisplayOrder" Min="0" />
+        </FormItem>
+
+        <FormItem>
+            <Checkbox @bind-Value="@ViewModel.ProviderRequest.Enabled">Enabled</Checkbox>
+        </FormItem>
+    </Form>
+</Modal>
+
+@* Model Create/Edit Modal *@
+<Modal Title="@(ViewModel.EditingModel == null ? "Add AI Model" : "Edit AI Model")"
+       Visible="@ViewModel.ModelModalVisible"
+       OnOk="@SaveModel"
+       OnCancel="@(() => ViewModel.ModelModalVisible = false)"
+       ConfirmLoading="@ViewModel.ModelSaving">
+    <Form Model="@ViewModel.ModelRequest" Layout="@FormLayout.Vertical">
+        <FormItem Label="Model Name">
+            <Input @bind-Value="@ViewModel.ModelRequest.ModelName" 
+                   Placeholder="e.g., gpt-4o"
+                   Disabled="@(ViewModel.EditingModel != null)" />
+            <small class="text-secondary">The actual model identifier sent to the API</small>
+        </FormItem>
+
+        <FormItem Label="Display Name">
+            <Input @bind-Value="@ViewModel.ModelRequest.DisplayName" Placeholder="e.g., GPT-4 Omni" />
+            <small class="text-secondary">Friendly name shown in the UI</small>
+        </FormItem>
+
+        <FormItem Label="Description">
+            <TextArea @bind-Value="@ViewModel.ModelRequest.Description" 
+                     Placeholder="Optional description of the model's capabilities" 
+                     Rows="3" />
+        </FormItem>
+
+        <FormItem Label="Display Order">
+            <AntDesign.InputNumber @bind-Value="@ViewModel.ModelRequest.DisplayOrder" Min="0" />
+        </FormItem>
+
+        <FormItem>
+            <Checkbox @bind-Value="@ViewModel.ModelRequest.Enabled">Enabled</Checkbox>
+        </FormItem>
+    </Form>
+</Modal>
+
+<style>
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+
+    .text-secondary {
+        color: rgba(0, 0, 0, 0.45);
+        font-size: 12px;
+    }
+</style>
