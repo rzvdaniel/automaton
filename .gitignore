@@ -64,3 +64,6 @@ App_Data/
 .env
 .env.local
 .env.*.local
+
+# AppSettings files
+appsettings*.json
