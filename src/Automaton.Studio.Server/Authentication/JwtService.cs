@@ -43,8 +43,11 @@ namespace Common.Authentication
             };
             if (roles != null && roles.Any())
             {
-                var rolesConcatString = string.Join(",", roles);
-                jwtClaims.Add(new Claim(ClaimTypes.Role, rolesConcatString));
+                // Add a separate role claim for each role so authorization works correctly
+                foreach (var role in roles)
+                {
+                    jwtClaims.Add(new Claim(ClaimTypes.Role, role));
+                }
             }
 
             var customClaims = claims?.Select(claim => new Claim(claim.Key, claim.Value)).ToArray()
