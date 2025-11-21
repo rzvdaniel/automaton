@@ -1,4 +1,5 @@
 ﻿using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using System.Text;
 using System.Text.Json;
 
@@ -23,7 +24,6 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
             var response = await client.PostAsync(configurationService.EmailConfig.EmailApiUrl, content, cancellationToken);
 
             return response.IsSuccessStatusCode;        
-
         }
         catch (Exception ex)
         {

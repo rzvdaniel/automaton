@@ -2,6 +2,7 @@
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;

@@ -26,6 +26,7 @@ using System.Transactions;
 using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.AiCodeGeneration;
+using Automaton.Studio.Server.Services.Interfaces;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
