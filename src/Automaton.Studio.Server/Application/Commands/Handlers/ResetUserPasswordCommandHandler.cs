@@ -1,4 +1,5 @@
 ﻿using Automaton.Studio.Server.Core.Commands;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using MediatR;
 using Microsoft.AspNetCore.WebUtilities;
@@ -10,11 +11,11 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
     {
         private UsersService UserManagerService { get; set; }
         private ConfigurationService ConfigurationService { get; set; }
-        private EmailService EmailService { get; set; }
+        private IEmailService EmailService { get; set; }
         private ILogger<ResetUserPasswordCommandHandler> Logger { get; set; }
 
         public ResetUserPasswordCommandHandler(UsersService userManager, ConfigurationService configurationService, 
-            EmailService emailService, ILogger<ResetUserPasswordCommandHandler> logger)
+            IEmailService emailService, ILogger<ResetUserPasswordCommandHandler> logger)
         {
             UserManagerService = userManager;
             ConfigurationService = configurationService;

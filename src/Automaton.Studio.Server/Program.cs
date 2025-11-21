@@ -26,17 +26,13 @@ using System.Transactions;
 using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.AiCodeGeneration;
-using Automaton.Studio.Server.Services;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
 
-var configurationBuilder = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    .AddUserSecrets<Program>(optional: true, reloadOnChange: true)
-    .Build();
-
-var configurationService = new ConfigurationService(configurationBuilder);
+// Use the WebApplicationBuilder's built configuration so environment-specific files
+// (e.g. appsettings.Development.json) and user secrets are included automatically.
+var configurationService = new ConfigurationService(applicationBuilder.Configuration);
 
 var services = applicationBuilder.Services;
 
@@ -206,7 +202,20 @@ services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
-services.AddScoped<EmailService>();
+
+// Register email service implementation based on environment and configuration.
+var useNoOpEmail = applicationBuilder.Environment.IsDevelopment() && !configurationService.EmailConfig.SendEmailsInDevelopment;
+if (useNoOpEmail)
+{
+    services.AddScoped<NoOpEmailService>();
+    services.AddScoped<IEmailService>(sp => sp.GetRequiredService<NoOpEmailService>());
+}
+else
+{
+    services.AddScoped<EmailService>();
+    services.AddScoped<IEmailService>(sp => sp.GetRequiredService<EmailService>());
+}
+
 services.AddScoped<InstallService>();
 services.AddScoped<SettingsService>();
 services.AddTransient<UsersService>();

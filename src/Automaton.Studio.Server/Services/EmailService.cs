@@ -1,14 +1,14 @@
-﻿using System.Text;
+﻿using Automaton.Studio.Server.Models;
+using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Automaton.Studio.Server.Services;
 
-public class EmailService(ConfigurationService configurationService)
+public class EmailService(ConfigurationService configurationService, ILogger<EmailService> logger) : IEmailService
 {
     private const string ApiKeyHeader = "X-Api-Key";
     private const string ApplicationJson = "application/json";
-    private readonly Serilog.ILogger logger = Serilog.Log.ForContext<FlowsService>();
+    private readonly Serilog.ILogger logger = Serilog.Log.ForContext<EmailService>();
 
     public async Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
     {
@@ -22,7 +22,7 @@ public class EmailService(ConfigurationService configurationService)
 
             var response = await client.PostAsync(configurationService.EmailConfig.EmailApiUrl, content, cancellationToken);
 
-            return response.IsSuccessStatusCode;
+            return response.IsSuccessStatusCode;        
 
         }
         catch (Exception ex)
@@ -31,20 +31,4 @@ public class EmailService(ConfigurationService configurationService)
             throw;
         }
     }
-}
-
-public class EmailData
-{
-    public required string Template { get; set; }
-    public Dictionary<string, string> Variables { get; set; } = [];
-    public required EmailAccount From { get; set; }
-    public required IEnumerable<EmailAccount> To { get; set; } = [];
-}
-
-public class EmailAccount
-{
-    [JsonInclude]
-    public required string Email { get; set; }
-    [JsonInclude]
-    public string? Name { get; set; }
 }

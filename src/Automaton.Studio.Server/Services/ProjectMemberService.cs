@@ -18,7 +18,7 @@ public class ProjectMemberService
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
     private readonly UserManager<ApplicationUser> userManager;
-    private readonly EmailService emailService;
+    private readonly IEmailService emailService;
     private readonly Serilog.ILogger logger;
     private readonly InvitationTokenService invitationService;
     private readonly ConfigurationService configurationService;
@@ -29,7 +29,7 @@ public class ProjectMemberService
         ApplicationDbContext dbContext,
         UserContextService userContextService,
         UserManager<ApplicationUser> userManager,
-        EmailService emailService,
+        IEmailService emailService,
         InvitationTokenService invitationService,
         ConfigurationService configurationService)
     {

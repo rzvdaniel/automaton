@@ -1,6 +1,7 @@
 ﻿using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Common.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -14,12 +15,12 @@ public class AccountController : BaseController
     private readonly ConfigurationService configurationService;
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
-    private readonly EmailService emailService;
+    private readonly IEmailService emailService;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext, 
         UsersService userManagerService,
-        EmailService emailService)
+        IEmailService emailService)
     {
         this.configurationService = configurationService;
         this.dataContext = dataContext;

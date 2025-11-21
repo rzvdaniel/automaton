@@ -1,5 +1,6 @@
 ﻿using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
@@ -12,11 +13,11 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
     {
         private ConfigurationService ConfigurationService { get; set; }
         private UserManager<ApplicationUser> UserManager { get; set; }
-        private EmailService EmailService { get; set; }
+        private IEmailService EmailService { get; set; }
 
         public ForgotUserPasswordHandler(
             ConfigurationService configurationService,
-            EmailService emailService,
+            IEmailService emailService,
             UserManager<ApplicationUser> userManager)
         {
             ConfigurationService = configurationService;
