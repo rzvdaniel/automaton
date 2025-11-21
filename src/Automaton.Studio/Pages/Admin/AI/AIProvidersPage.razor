@@ -82,15 +82,15 @@
                                 <DescriptionsItem Title="Status">
                                     @if (provider.Enabled)
                                     {
-                                        <Badge Status="success" Text="Enabled" />
+                                        <Badge Status="@BadgeStatus.Success" Text="Enabled" />
                                     }
                                     else
                                     {
-                                        <Badge Status="default" Text="Disabled" />
+                                        <Badge Status="@BadgeStatus.Default" Text="Disabled" />
                                     }
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Provider Type">
-                                    <Tag Color="blue">@provider.Provider.ToString()</Tag>
+                                    <Tag Color="@("blue")">@provider.Provider.ToString()</Tag>
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Default Model">
                                     <code>@provider.DefaultModel</code>
@@ -102,7 +102,7 @@
 
                             <Divider>Supported Models</Divider>
 
-                            <Space Direction="DirectionVHType.Horizontal" Wrap>
+                            <Space Direction="SpaceDirection.Horizontal" Wrap>
                                 <SpaceItem>
                                     <Button Size="@ButtonSize.Small" Icon="plus" OnClick="@(() => ShowCreateModelModal(provider.Id))">
                                         Add Model
@@ -131,7 +131,7 @@
                                     <Column TData="bool" Title="Status" DataIndex="@nameof(context.Enabled)">
                                         @if (context.Enabled)
                                         {
-                                            <Badge Status="success" Text="Enabled" />
+                                            <Badge Status="@BadgeStatus.Success" Text="Enabled" />
                                         }
                                         else
                                         {
