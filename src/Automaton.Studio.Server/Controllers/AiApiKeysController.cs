@@ -1,4 +1,4 @@
-using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -145,7 +145,7 @@ public class AiApiKeysController : ControllerBase
     /// Get environment API keys for desktop scenarios
     /// </summary>
     [HttpGet("environment")]
-    public ActionResult<Dictionary<AiProvider, string?>> GetEnvironmentApiKeys()
+    public ActionResult<Dictionary<AiProviderType, string?>> GetEnvironmentApiKeys()
     {
         var environmentKeys = aiApiKeyService.GetEnvironmentApiKeys();
         
@@ -172,7 +172,7 @@ public class AiApiKeysController : ControllerBase
 public class CreateAiApiKeyRequest
 {
     public string Name { get; set; } = string.Empty;
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string? Description { get; set; }
 }
@@ -187,7 +187,7 @@ public class AiApiKeyResponse
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }

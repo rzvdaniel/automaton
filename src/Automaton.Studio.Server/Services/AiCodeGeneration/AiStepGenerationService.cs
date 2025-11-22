@@ -1,4 +1,4 @@
-using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Automaton.Studio.Server.Services.AiProviders;
 
 namespace Automaton.Studio.Server.Services.AiCodeGeneration;
@@ -47,7 +47,7 @@ public class AiStepGenerationService
         }
     }
 
-    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, AiProvider provider)
+    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, AiProviderType provider)
     {
         // If a specific key is selected, use that
         if (aiApiKeyId.HasValue)
@@ -189,7 +189,7 @@ public class StepGenerationRequest
 {
     public string Description { get; set; } = string.Empty;
     public string Language { get; set; } = "Python";
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public Guid? SelectedAiApiKeyId { get; set; }
     public string? Model { get; set; }
     public List<VariableInfo>? InputVariables { get; set; }

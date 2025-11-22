@@ -1,5 +1,5 @@
 using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -11,27 +11,16 @@ public class AnthropicProvider : IAiProvider
     private readonly ILogger<AnthropicProvider> logger;
     private readonly AiProvidersConfig aiProvidersConfig;
 
-    public AiProvider ProviderType => AiProvider.Anthropic;
+    public AiProviderType ProviderType => AiProviderType.Anthropic;
 
-    private static readonly List<string> DefaultSupportedModels = new()
-    {
-        "claude-3-5-sonnet-20241022",    // Latest Sonnet - best balance
-        "claude-3-5-haiku-20241022",     // Latest Haiku - fastest
-        "claude-3-opus-20240229",        // Most capable but expensive
-        "claude-3-sonnet-20240229",      // Previous Sonnet
-        "claude-3-haiku-20240307"        // Previous Haiku
-    };
-
-    private const string DefaultModelName = "claude-3-5-sonnet-20241022";
-
-    public string DefaultModel => aiProvidersConfig.GetProviderConfig(ProviderType)?.DefaultModel ?? DefaultModelName;
+    public string DefaultModel => aiProvidersConfig.GetProviderConfig(ProviderType)?.DefaultModel;
     
     public IReadOnlyList<string> SupportedModels
     {
         get
         {
             var configModels = aiProvidersConfig.GetProviderConfig(ProviderType)?.SupportedModels;
-            return configModels?.Count > 0 ? configModels : DefaultSupportedModels;
+            return configModels;
         }
     }
 

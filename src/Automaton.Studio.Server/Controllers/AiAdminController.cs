@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -335,7 +336,7 @@ public class AiAdminController : BaseController
 public class CreateAiProviderRequest
 {
     public string ProviderName { get; set; } = string.Empty;
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public string? Description { get; set; }
     public string DefaultModel { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;

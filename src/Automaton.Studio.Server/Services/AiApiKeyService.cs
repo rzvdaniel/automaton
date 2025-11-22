@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Automaton.Studio.Server.Services.AiProviders;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -29,7 +30,7 @@ public class AiApiKeyService
         this.authorizationService = authorizationService;
     }
 
-    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProvider provider, string apiKey, string? description = null, Guid? projectId = null)
+    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProviderType provider, string apiKey, string? description = null, Guid? projectId = null)
     {
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
@@ -156,7 +157,7 @@ public class AiApiKeyService
         return true;
     }
 
-    public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, AiProvider provider)
+    public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, AiProviderType provider)
     {
         // Use authorization service query to get accessible AI API keys
         return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
@@ -168,15 +169,15 @@ public class AiApiKeyService
     /// <summary>
     /// For Desktop environments - read from environment variables
     /// </summary>
-    public Dictionary<AiProvider, string?> GetEnvironmentApiKeys()
+    public Dictionary<AiProviderType, string?> GetEnvironmentApiKeys()
     {
-        var environmentKeys = new Dictionary<AiProvider, string?>();
+        var environmentKeys = new Dictionary<AiProviderType, string?>();
 
         // Check common environment variable names for each provider
-        environmentKeys[AiProvider.OpenAI] = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        environmentKeys[AiProvider.Anthropic] = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") 
+        environmentKeys[AiProviderType.OpenAI] = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        environmentKeys[AiProviderType.Anthropic] = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") 
             ?? Environment.GetEnvironmentVariable("CLAUDE_API_KEY");
-        environmentKeys[AiProvider.Google] = Environment.GetEnvironmentVariable("GOOGLE_AI_API_KEY") 
+        environmentKeys[AiProviderType.Google] = Environment.GetEnvironmentVariable("GOOGLE_AI_API_KEY") 
             ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
         return environmentKeys;
@@ -194,9 +195,9 @@ public class AiApiKeyService
         var groupedKeys = storedKeys.GroupBy(k => k.Provider);
 
         // Get environment keys (for desktop)
-        var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<AiProvider, string?>();
+        var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<AiProviderType, string?>();
 
-        foreach (AiProvider provider in Enum.GetValues<AiProvider>())
+        foreach (AiProviderType provider in Enum.GetValues<AiProviderType>())
         {
             var storedKeysForProvider = groupedKeys.FirstOrDefault(g => g.Key == provider)?.ToList() ?? new List<AiApiKey>();
             var hasEnvironmentKey = envKeys.TryGetValue(provider, out var envKey) && !string.IsNullOrEmpty(envKey);
@@ -213,7 +214,7 @@ public class AiApiKeyService
             });
         }
 
-        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey || p.Provider != AiProvider.Custom)
+        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey || p.Provider != AiProviderType.Custom)
                       .OrderByDescending(p => p.HasStoredKeys || p.HasEnvironmentKey);
     }
 
@@ -268,20 +269,20 @@ public class AiApiKeyService
         return sha256.ComputeHash(Encoding.UTF8.GetBytes(keyString));
     }
 
-    private static string GetProviderDisplayName(AiProvider provider) => provider switch
+    private static string GetProviderDisplayName(AiProviderType provider) => provider switch
     {
-        AiProvider.OpenAI => "OpenAI",
-        AiProvider.Anthropic => "Anthropic", 
-        AiProvider.Google => "Google",
-        AiProvider.Custom => "Custom Provider",
+        AiProviderType.OpenAI => "OpenAI",
+        AiProviderType.Anthropic => "Anthropic", 
+        AiProviderType.Google => "Google",
+        AiProviderType.Custom => "Custom Provider",
         _ => provider.ToString()
     };
 
-    private List<string> GetSupportedModels(AiProvider provider)
+    private List<string> GetSupportedModels(AiProviderType provider)
     {
         try
         {
-            if (provider == AiProvider.Custom)
+            if (provider == AiProviderType.Custom)
             {
                 return new List<string> { "custom-model" };
             }
@@ -322,7 +323,7 @@ public class AiApiKeyService
 
 public class AiProviderInfo
 {
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public string ProviderName { get; set; } = string.Empty;
     public bool HasStoredKeys { get; set; }
     public int StoredKeyCount { get; set; }

@@ -1,3 +1,4 @@
+using Automaton.Studio.Server.Entities.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automaton.Studio.Server.Entities;
@@ -16,7 +17,7 @@ public class AiProviderConfig
     public string ProviderName { get; set; } = string.Empty; // e.g., "OpenAI", "Anthropic", "Google"
 
     [Required]
-    public AiProvider Provider { get; set; } // Enum value
+    public AiProviderType Provider { get; set; } // Enum value
 
     [MaxLength(500)]
     public string? Description { get; set; }

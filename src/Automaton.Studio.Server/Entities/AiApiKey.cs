@@ -1,3 +1,4 @@
+using Automaton.Studio.Server.Entities.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automaton.Studio.Server.Entities;
@@ -16,7 +17,7 @@ public class AiApiKey
     public string Name { get; set; } = string.Empty; // User-friendly name like "My OpenAI Key"
 
     [Required]
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
 
     [Required]
     [MaxLength(1000)]
@@ -35,12 +36,4 @@ public class AiApiKey
     // Navigation properties for many-to-many relationship with users and projects
     public virtual ICollection<AiApiKeyUser> AiApiKeyUsers { get; set; } = new List<AiApiKeyUser>();
     public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
-}
-
-public enum AiProvider
-{
-    OpenAI = 1,
-    Anthropic = 2,
-    Google = 3,
-    Custom = 99
 }

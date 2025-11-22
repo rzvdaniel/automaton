@@ -1,5 +1,5 @@
 using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Entities.Enums;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
@@ -11,27 +11,16 @@ public class OpenAiProvider : IAiProvider
     private readonly ILogger<OpenAiProvider> logger;
     private readonly AiProvidersConfig aiProvidersConfig;
 
-    public AiProvider ProviderType => AiProvider.OpenAI;
+    public AiProviderType ProviderType => AiProviderType.OpenAI;
 
-    private static readonly List<string> DefaultSupportedModels = new()
-    {
-        "gpt-4o",                    // Latest, most capable model
-        "gpt-4o-mini",               // Fast and cost-effective  
-        "gpt-4-turbo",               // Previous generation turbo
-        "gpt-4",                     // Standard GPT-4
-        "gpt-3.5-turbo"             // Legacy but cost-effective
-    };
-
-    private const string DefaultModelName = "gpt-4o";
-
-    public string DefaultModel => aiProvidersConfig.GetProviderConfig(ProviderType)?.DefaultModel ?? DefaultModelName;
+    public string DefaultModel => aiProvidersConfig.GetProviderConfig(ProviderType)?.DefaultModel;
     
     public IReadOnlyList<string> SupportedModels
     {
         get
         {
             var configModels = aiProvidersConfig.GetProviderConfig(ProviderType)?.SupportedModels;
-            return configModels?.Count > 0 ? configModels : DefaultSupportedModels;
+            return configModels;
         }
     }
 
