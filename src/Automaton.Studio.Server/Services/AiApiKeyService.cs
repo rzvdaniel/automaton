@@ -287,36 +287,12 @@ public class AiApiKeyService
                 return new List<string> { "custom-model" };
             }
             
-            // Try to get models from database first
-            var providerConfig = dbContext.AiProviders
-                .Include(p => p.Models.Where(m => m.Enabled))
-                .FirstOrDefault(p => p.Provider == provider && p.Enabled);
-            
-            if (providerConfig != null && providerConfig.Models.Any())
-            {
-                return providerConfig.Models
-                    .OrderBy(m => m.DisplayOrder)
-                    .ThenBy(m => m.DisplayName)
-                    .Select(m => m.ModelName)
-                    .ToList();
-            }
-            
-            // Fallback to config-based models if DB is not configured yet
             return aiProviderFactory.GetSupportedModels(provider).ToList();
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to get supported models for provider {Provider}, falling back to config", provider);
-            
-            // Final fallback to config
-            try
-            {
-                return aiProviderFactory.GetSupportedModels(provider).ToList();
-            }
-            catch
-            {
-                return new List<string>();
-            }
+            return new List<string>();
         }
     }
 }

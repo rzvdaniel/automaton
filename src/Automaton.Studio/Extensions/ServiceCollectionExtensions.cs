@@ -150,7 +150,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowScheduleViewModel>();
         services.AddScoped<FlowSettingsViewModel>();
         services.AddScoped<DashboardViewModel>();
-        services.AddScoped<Pages.Admin.AI.AIProvidersViewModel>();
 
         // Studio steps
         services.AddTransient<EmitLogStep>();

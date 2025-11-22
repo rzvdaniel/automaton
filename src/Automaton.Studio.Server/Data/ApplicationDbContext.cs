@@ -37,8 +37,6 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
-        public virtual DbSet<AiProvider> AiProviders { get; set; }
-        public virtual DbSet<AiModel> AiModels { get; set; }
         
         // Project/Organization entities
         public virtual DbSet<Project> Projects { get; set; }
@@ -487,49 +485,6 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.Token).IsUnique();
                 entity.HasIndex(e => e.ProjectId);
                 entity.HasIndex(e => e.Email);
-            });
-
-            // AI Provider Configuration
-            modelBuilder.Entity<AiProvider>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.ProviderName).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.Provider).IsRequired();
-                entity.Property(e => e.DefaultModel).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Enabled).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.CreatedBy).IsRequired();
-
-                entity.HasIndex(e => e.Provider).IsUnique();
-                entity.HasIndex(e => e.Enabled);
-                entity.HasIndex(e => e.DisplayOrder);
-
-                entity.ToTable("AiProviders");
-            });
-
-            // AI Model Configuration
-            modelBuilder.Entity<AiModel>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.ProviderId).IsRequired();
-                entity.Property(e => e.ModelName).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Enabled).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.CreatedBy).IsRequired();
-
-                entity.HasOne(e => e.Provider)
-                    .WithMany(p => p.Models)
-                    .HasForeignKey(e => e.ProviderId)
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired();
-
-                entity.HasIndex(e => e.ProviderId);
-                entity.HasIndex(e => new { e.ProviderId, e.ModelName }).IsUnique();
-                entity.HasIndex(e => e.Enabled);
-                entity.HasIndex(e => e.DisplayOrder);
-
-                entity.ToTable("AiModels");
             });
         }
 

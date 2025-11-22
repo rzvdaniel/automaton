@@ -47,14 +47,6 @@
             <b>Docs</b>
         </MenuItem>
 
-        <AuthorizeView Roles="SysAdmin,Admin">
-            <Authorized>
-                <MenuItem Key="14" Icon="control" RouterLink="/admin/ai-providers">
-                    <b>Admin</b>
-                </MenuItem>
-            </Authorized>
-        </AuthorizeView>
-
         @if (shouldShowOnboarding)
         {
             <MenuItem Key="11" Icon="question-circle" RouterLink="/onboarding" Class="get-started-item">
