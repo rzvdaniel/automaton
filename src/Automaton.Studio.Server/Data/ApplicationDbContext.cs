@@ -37,8 +37,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
-        public virtual DbSet<AiProvider> AiProviderConfigs { get; set; }
-        public virtual DbSet<AiModel> AiModelConfigs { get; set; }
+        public virtual DbSet<AiProvider> AiProviders { get; set; }
+        public virtual DbSet<AiModel> AiModels { get; set; }
         
         // Project/Organization entities
         public virtual DbSet<Project> Projects { get; set; }
@@ -504,7 +504,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.Enabled);
                 entity.HasIndex(e => e.DisplayOrder);
 
-                entity.ToTable("AiProviderConfigs");
+                entity.ToTable("AiProviders");
             });
 
             // AI Model Configuration
@@ -529,7 +529,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.Enabled);
                 entity.HasIndex(e => e.DisplayOrder);
 
-                entity.ToTable("AiModelConfigs");
+                entity.ToTable("AiModels");
             });
         }
 

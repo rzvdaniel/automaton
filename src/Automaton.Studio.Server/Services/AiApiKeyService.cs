@@ -288,7 +288,7 @@ public class AiApiKeyService
             }
             
             // Try to get models from database first
-            var providerConfig = dbContext.AiProviderConfigs
+            var providerConfig = dbContext.AiProviders
                 .Include(p => p.Models.Where(m => m.Enabled))
                 .FirstOrDefault(p => p.Provider == provider && p.Enabled);
             

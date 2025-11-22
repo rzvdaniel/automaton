@@ -33,7 +33,7 @@ public class AiAdminController : BaseController
     {
         try
         {
-            var providers = await _dbContext.AiProviderConfigs
+            var providers = await _dbContext.AiProviders
                 .Include(p => p.Models.Where(m => m.Enabled))
                 .OrderBy(p => p.DisplayOrder)
                 .ThenBy(p => p.ProviderName)
@@ -56,7 +56,7 @@ public class AiAdminController : BaseController
     {
         try
         {
-            var provider = await _dbContext.AiProviderConfigs
+            var provider = await _dbContext.AiProviders
                 .Include(p => p.Models)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -83,7 +83,7 @@ public class AiAdminController : BaseController
             var userId = GetUserId();
 
             // Check if provider already exists
-            var existingProvider = await _dbContext.AiProviderConfigs
+            var existingProvider = await _dbContext.AiProviders
                 .FirstOrDefaultAsync(p => p.Provider == request.Provider);
 
             if (existingProvider != null)
@@ -102,7 +102,7 @@ public class AiAdminController : BaseController
                 CreatedBy = userId
             };
 
-            _dbContext.AiProviderConfigs.Add(provider);
+            _dbContext.AiProviders.Add(provider);
             await _dbContext.SaveChangesAsync();
 
             _logger.LogInformation("AI provider configuration created: {ProviderName} by user {UserId}", 
@@ -126,7 +126,7 @@ public class AiAdminController : BaseController
         try
         {
             var userId = GetUserId();
-            var provider = await _dbContext.AiProviderConfigs.FindAsync(id);
+            var provider = await _dbContext.AiProviders.FindAsync(id);
 
             if (provider == null)
                 return NotFound(new { error = "Provider configuration not found" });
@@ -162,14 +162,14 @@ public class AiAdminController : BaseController
         try
         {
             var userId = GetUserId();
-            var provider = await _dbContext.AiProviderConfigs
+            var provider = await _dbContext.AiProviders
                 .Include(p => p.Models)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (provider == null)
                 return NotFound(new { error = "Provider configuration not found" });
 
-            _dbContext.AiProviderConfigs.Remove(provider);
+            _dbContext.AiProviders.Remove(provider);
             await _dbContext.SaveChangesAsync();
 
             _logger.LogInformation("AI provider configuration deleted: {ProviderName} by user {UserId}", 
@@ -195,12 +195,12 @@ public class AiAdminController : BaseController
             var userId = GetUserId();
 
             // Check if provider exists
-            var provider = await _dbContext.AiProviderConfigs.FindAsync(providerId);
+            var provider = await _dbContext.AiProviders.FindAsync(providerId);
             if (provider == null)
                 return NotFound(new { error = "Provider configuration not found" });
 
             // Check if model already exists for this provider
-            var existingModel = await _dbContext.AiModelConfigs
+            var existingModel = await _dbContext.AiModels
                 .FirstOrDefaultAsync(m => m.ProviderId == providerId && m.ModelName == request.ModelName);
 
             if (existingModel != null)
@@ -219,7 +219,7 @@ public class AiAdminController : BaseController
                 CreatedBy = userId
             };
 
-            _dbContext.AiModelConfigs.Add(model);
+            _dbContext.AiModels.Add(model);
             await _dbContext.SaveChangesAsync();
 
             _logger.LogInformation("AI model configuration created: {ModelName} for provider {ProviderId} by user {UserId}", 
@@ -242,7 +242,7 @@ public class AiAdminController : BaseController
     {
         try
         {
-            var model = await _dbContext.AiModelConfigs
+            var model = await _dbContext.AiModels
                 .Include(m => m.Provider)
                 .FirstOrDefaultAsync(m => m.Id == modelId && m.ProviderId == providerId);
 
@@ -267,7 +267,7 @@ public class AiAdminController : BaseController
         try
         {
             var userId = GetUserId();
-            var model = await _dbContext.AiModelConfigs
+            var model = await _dbContext.AiModels
                 .FirstOrDefaultAsync(m => m.Id == modelId && m.ProviderId == providerId);
 
             if (model == null)
@@ -304,13 +304,13 @@ public class AiAdminController : BaseController
         try
         {
             var userId = GetUserId();
-            var model = await _dbContext.AiModelConfigs
+            var model = await _dbContext.AiModels
                 .FirstOrDefaultAsync(m => m.Id == modelId && m.ProviderId == providerId);
 
             if (model == null)
                 return NotFound(new { error = "Model configuration not found" });
 
-            _dbContext.AiModelConfigs.Remove(model);
+            _dbContext.AiModels.Remove(model);
             await _dbContext.SaveChangesAsync();
 
             _logger.LogInformation("AI model configuration deleted: {ModelName} by user {UserId}", 
