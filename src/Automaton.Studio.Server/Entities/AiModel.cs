@@ -6,7 +6,7 @@ namespace Automaton.Studio.Server.Entities;
 /// Entity for storing AI model configuration for each provider (managed by system administrators)
 /// This replaces the SupportedModels arrays in appsettings.json
 /// </summary>
-public class AiModelConfig
+public class AiModel
 {
     [Key]
     public Guid Id { get; set; }
@@ -41,5 +41,5 @@ public class AiModelConfig
     public Guid? UpdatedBy { get; set; } // User ID who last updated this config
 
     // Navigation property
-    public virtual AiProviderConfig Provider { get; set; } = default!;
+    public virtual AiProvider Provider { get; set; } = default!;
 }

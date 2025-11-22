@@ -37,8 +37,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
-        public virtual DbSet<AiProviderConfig> AiProviderConfigs { get; set; }
-        public virtual DbSet<AiModelConfig> AiModelConfigs { get; set; }
+        public virtual DbSet<AiProvider> AiProviderConfigs { get; set; }
+        public virtual DbSet<AiModel> AiModelConfigs { get; set; }
         
         // Project/Organization entities
         public virtual DbSet<Project> Projects { get; set; }
@@ -490,7 +490,7 @@ namespace Automaton.Studio.Server.Data
             });
 
             // AI Provider Configuration
-            modelBuilder.Entity<AiProviderConfig>(entity =>
+            modelBuilder.Entity<AiProvider>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ProviderName).IsRequired().HasMaxLength(50);
@@ -508,7 +508,7 @@ namespace Automaton.Studio.Server.Data
             });
 
             // AI Model Configuration
-            modelBuilder.Entity<AiModelConfig>(entity =>
+            modelBuilder.Entity<AiModel>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ProviderId).IsRequired();

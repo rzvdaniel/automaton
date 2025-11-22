@@ -89,7 +89,7 @@ public class AiAdminController : BaseController
             if (existingProvider != null)
                 return Conflict(new { error = "Provider configuration already exists" });
 
-            var provider = new AiProviderConfig
+            var provider = new AiProvider
             {
                 Id = Guid.NewGuid(),
                 ProviderName = request.ProviderName,
@@ -206,7 +206,7 @@ public class AiAdminController : BaseController
             if (existingModel != null)
                 return Conflict(new { error = "Model configuration already exists for this provider" });
 
-            var model = new AiModelConfig
+            var model = new AiModel
             {
                 Id = Guid.NewGuid(),
                 ProviderId = providerId,
