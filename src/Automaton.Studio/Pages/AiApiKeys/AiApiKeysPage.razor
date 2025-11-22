@@ -143,13 +143,13 @@
             <Form Model="@ViewModel.CreateRequest" Layout="@FormLayout.Vertical">
                 <FormItem Label="Provider" Required>
                     <Select @bind-Value="ViewModel.CreateRequest.Provider" 
-                            TItemValue="AiProvider" 
-                            TItem="AiProvider"
+                            TItemValue="AiProviderType" 
+                            TItem="AiProviderType"
                             OnSelectedItemChanged="OnProviderChanged">
                         <SelectOptions>
-                            <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.OpenAI" Label="OpenAI (GPT-4, ChatGPT)" />
-                            <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.Anthropic" Label="Anthropic (Claude)" />
-                            <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="AiProvider.Google" Label="Google (Gemini)" />
+                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.OpenAI" Label="OpenAI (GPT-4, ChatGPT)" />
+                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.Anthropic" Label="Anthropic (Claude)" />
+                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.Google" Label="Google (Gemini)" />
                         </SelectOptions>
                     </Select>
                 </FormItem>
@@ -236,42 +236,42 @@
 @code {
     private List<string> AvailableModels => ViewModel.CreateRequest.Provider switch
     {
-        AiProvider.OpenAI => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" },
-        AiProvider.Anthropic => new List<string> { "claude-3-sonnet", "claude-3-haiku", "claude-3-opus" },
-        AiProvider.Google => new List<string> { "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro" },
+        AiProviderType.OpenAI => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" },
+        AiProviderType.Anthropic => new List<string> { "claude-3-sonnet", "claude-3-haiku", "claude-3-opus" },
+        AiProviderType.Google => new List<string> { "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro" },
         _ => new List<string>()
     };
 
-    private void OnProviderChanged(AiProvider provider)
+    private void OnProviderChanged(AiProviderType provider)
     {
         ViewModel.CreateRequest.Model = null; // Reset model selection
         StateHasChanged();
     }
 
-    private string GetProviderIcon(AiProvider provider) => provider switch
+    private string GetProviderIcon(AiProviderType provider) => provider switch
     {
-        AiProvider.OpenAI => "openai",
-        AiProvider.Anthropic => "anthropic", 
-        AiProvider.Google => "google",
+        AiProviderType.OpenAI => "openai",
+        AiProviderType.Anthropic => "anthropic", 
+        AiProviderType.Google => "google",
         _ => "robot"
     };
 
-    private string GetProviderClass(AiProvider provider) => $"provider-{provider.ToString().ToLower()}";
+    private string GetProviderClass(AiProviderType provider) => $"provider-{provider.ToString().ToLower()}";
 
-    private string GetProviderDisplayName(AiProvider provider) => provider switch
+    private string GetProviderDisplayName(AiProviderType provider) => provider switch
     {
-        AiProvider.OpenAI => "OpenAI",
-        AiProvider.Anthropic => "Anthropic",
-        AiProvider.Google => "Google",
-        AiProvider.Custom => "Custom",
+        AiProviderType.OpenAI => "OpenAI",
+        AiProviderType.Anthropic => "Anthropic",
+        AiProviderType.Google => "Google",
+        AiProviderType.Custom => "Custom",
         _ => provider.ToString()
     };
 
-    private string GetApiKeyHelpText(AiProvider provider) => provider switch
+    private string GetApiKeyHelpText(AiProviderType provider) => provider switch
     {
-        AiProvider.OpenAI => "Get your API key from: https://platform.openai.com/api-keys",
-        AiProvider.Anthropic => "Get your API key from: https://console.anthropic.com/",
-        AiProvider.Google => "Get your API key from: https://aistudio.google.com/app/apikey",
+        AiProviderType.OpenAI => "Get your API key from: https://platform.openai.com/api-keys",
+        AiProviderType.Anthropic => "Get your API key from: https://console.anthropic.com/",
+        AiProviderType.Google => "Get your API key from: https://aistudio.google.com/app/apikey",
         _ => "Enter the API key from your AI provider"
     };
 }

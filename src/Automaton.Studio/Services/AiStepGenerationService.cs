@@ -123,7 +123,7 @@ public class AiStepGenerationService
         return await GenerateStepCodeAsync(request, userId);
     }
 
-    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, AiProvider provider)
+    private async Task<string?> GetApiKeyForProviderAsync(Guid userId, Guid? aiApiKeyId, AiProviderType provider)
     {
         try
         {

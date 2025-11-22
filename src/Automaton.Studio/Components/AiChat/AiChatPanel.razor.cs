@@ -295,7 +295,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
-        if (Enum.TryParse<AiProvider>(providerName, out var provider))
+        if (Enum.TryParse<AiProviderType>(providerName, out var provider))
         {
             return availableProviders?.FirstOrDefault(p => p.Provider == provider);
         }

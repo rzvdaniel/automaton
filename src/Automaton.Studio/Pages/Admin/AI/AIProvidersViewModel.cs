@@ -231,7 +231,7 @@ public class AIProvidersViewModel
 public class ProviderRequest
 {
     public string ProviderName { get; set; } = string.Empty;
-    public AiProvider Provider { get; set; }
+    public AiProviderType Provider { get; set; }
     public string? Description { get; set; }
     public string DefaultModel { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;

@@ -112,11 +112,11 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             
             switch (request.Provider)
             {
-                case AiProvider.OpenAI:
+                case AiProviderType.OpenAI:
                     responseText = await CallOpenAiAsync(request, cancellationToken);
                     break;
                     
-                case AiProvider.Anthropic:
+                case AiProviderType.Anthropic:
                     responseText = await FallbackAiCallAsync(request, cancellationToken);
                     break;
                     

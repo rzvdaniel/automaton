@@ -137,35 +137,35 @@ public class AiApiKeyService
     /// <summary>
     /// Get environment API keys (for desktop scenarios)
     /// </summary>
-    public async Task<Dictionary<AiProvider, string?>> GetEnvironmentApiKeysAsync()
+    public async Task<Dictionary<AiProviderType, string?>> GetEnvironmentApiKeysAsync()
     {
         try
         {
             var response = await httpClient.GetAsync("api/aiApiKeys/environment");
             if (!response.IsSuccessStatusCode)
             {
-                return new Dictionary<AiProvider, string?>();
+                return new Dictionary<AiProviderType, string?>();
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<Dictionary<AiProvider, string?>>(json, new JsonSerializerOptions
+            var result = JsonSerializer.Deserialize<Dictionary<AiProviderType, string?>>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
-            return result ?? new Dictionary<AiProvider, string?>();
+            return result ?? new Dictionary<AiProviderType, string?>();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting environment API keys");
-            return new Dictionary<AiProvider, string?>();
+            return new Dictionary<AiProviderType, string?>();
         }
     }
 
     /// <summary>
     /// Get API keys by provider for MCP integration
     /// </summary>
-    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysByProviderAsync(AiProvider provider)
+    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysByProviderAsync(AiProviderType provider)
     {
         try
         {

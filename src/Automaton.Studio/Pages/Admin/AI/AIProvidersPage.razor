@@ -197,14 +197,14 @@
 
         <FormItem Label="Provider Type">
             <Select @bind-Value="@ViewModel.ProviderRequest.Provider" 
-                    TItemValue="AiProvider" 
-                    TItem="AiProvider"
+                    TItemValue="AiProviderType" 
+                    TItem="AiProviderType"
                     Disabled="@(ViewModel.EditingProvider != null)">
                 <SelectOptions>
-                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.OpenAI" Label="OpenAI" />
-                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Anthropic" Label="Anthropic" />
-                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Google" Label="Google" />
-                    <SelectOption TItemValue="AiProvider" TItem="AiProvider" Value="@AiProvider.Custom" Label="Custom" />
+                    <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="@AiProviderType.OpenAI" Label="OpenAI" />
+                    <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="@AiProviderType.Anthropic" Label="Anthropic" />
+                    <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="@AiProviderType.Google" Label="Google" />
+                    <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="@AiProviderType.Custom" Label="Custom" />
                 </SelectOptions>
             </Select>
         </FormItem>

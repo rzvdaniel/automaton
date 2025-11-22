@@ -177,21 +177,21 @@ else
 		}
 	}
 
-	private string GetProviderIcon(AiProvider provider) => provider switch
+	private string GetProviderIcon(AiProviderType provider) => provider switch
 	{
-		AiProvider.OpenAI => "robot",
-		AiProvider.Anthropic => "thunderbolt",
-		AiProvider.Google => "google",
-		AiProvider.Custom => "api",
+		AiProviderType.OpenAI => "robot",
+		AiProviderType.Anthropic => "thunderbolt",
+		AiProviderType.Google => "google",
+		AiProviderType.Custom => "api",
 		_ => "api",
 	};
 
-	private string GetProviderColor(AiProvider provider) => provider switch
+	private string GetProviderColor(AiProviderType provider) => provider switch
 	{
-		AiProvider.OpenAI => "green",
-		AiProvider.Anthropic => "orange",
-		AiProvider.Google => "blue",
-		AiProvider.Custom => "purple",
+		AiProviderType.OpenAI => "green",
+		AiProviderType.Anthropic => "orange",
+		AiProviderType.Google => "blue",
+		AiProviderType.Custom => "purple",
 		_ => "default",
 	};
 }

@@ -3,7 +3,7 @@
 /// <summary>
 /// AI provider enumeration
 /// </summary>
-public enum AiProvider
+public enum AiProviderType
 {
     OpenAI = 1,
     Anthropic = 2,

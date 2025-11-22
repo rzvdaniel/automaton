@@ -11,7 +11,7 @@ namespace Automaton.Mcp.Models
         public string ConversationId { get; set; } = Guid.NewGuid().ToString();
         public string InitialMessage { get; set; } = string.Empty;
         public string SystemPrompt { get; set; } = string.Empty;
-        public AiProvider Provider { get; set; }
+        public AiProviderType Provider { get; set; }
         public string ApiKey { get; set; } = string.Empty;
         public string? Model { get; set; }
         public List<ConversationMessage>? ConversationHistory { get; set; }
