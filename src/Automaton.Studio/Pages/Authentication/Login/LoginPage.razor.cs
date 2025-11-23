@@ -36,7 +36,7 @@ partial class LoginPage : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.LoginFailed);
+            _ = MessageService.ErrorAsync(Resources.Errors.LoginFailed);
         }
         finally
         {

@@ -166,23 +166,6 @@
                     </div>
                 </FormItem>
                 
-                @if (AvailableModels?.Any() == true)
-                {
-                    <FormItem Label="Model (Optional)">
-                        <Select @bind-Value="ViewModel.CreateRequest.Model" 
-                                TItemValue="string" 
-                                TItem="string"
-                                Placeholder="Select model (leave empty for default)">
-                            <SelectOptions>
-                                @foreach (var model in AvailableModels)
-                                {
-                                    <SelectOption TItemValue="string" TItem="string" Value="@model" Label="@model" />
-                                }
-                            </SelectOptions>
-                        </Select>
-                    </FormItem>
-                }
-                
                 <FormItem Label="Description (Optional)">
                     <TextArea @bind-Value="ViewModel.CreateRequest.Description" 
                              Placeholder="Optional description for this API key"
@@ -234,17 +217,8 @@
 </style>
 
 @code {
-    private List<string> AvailableModels => ViewModel.CreateRequest.Provider switch
-    {
-        AiProviderType.OpenAI => new List<string> { "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo" },
-        AiProviderType.Anthropic => new List<string> { "claude-3-sonnet", "claude-3-haiku", "claude-3-opus" },
-        AiProviderType.Google => new List<string> { "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro" },
-        _ => new List<string>()
-    };
-
     private void OnProviderChanged(AiProviderType provider)
     {
-        ViewModel.CreateRequest.Model = null; // Reset model selection
         StateHasChanged();
     }
 

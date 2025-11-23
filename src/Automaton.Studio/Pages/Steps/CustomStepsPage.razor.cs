@@ -26,7 +26,7 @@ namespace Automaton.Studio.Pages.Steps
             }
             catch
             {
-                await MessageService.ErrorAsync(Resources.Errors.CustomStepsListNotLoaded);
+                _ = MessageService.ErrorAsync(Resources.Errors.CustomStepsListNotLoaded);
             }
             finally
             {
@@ -66,7 +66,7 @@ namespace Automaton.Studio.Pages.Steps
                 }
                 catch
                 {
-                    await MessageService.ErrorAsync($"Custom step {model.Name} could not be created");
+                    _ = MessageService.ErrorAsync($"Custom step {model.Name} could not be created");
                 }
             };
         }

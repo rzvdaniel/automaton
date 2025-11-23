@@ -33,7 +33,7 @@ partial class ForgotPassword : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.ForgotPasswordFailed);
+            _ = MessageService.ErrorAsync(Resources.Errors.ForgotPasswordFailed);
         }
         finally
         {

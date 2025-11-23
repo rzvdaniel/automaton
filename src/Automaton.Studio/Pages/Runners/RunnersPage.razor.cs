@@ -24,7 +24,7 @@ partial class RunnersPage : ComponentBase
         }
         catch
         {
-            await MessageService.ErrorAsync(Resources.Errors.FlowsListNotLoaded);
+            _ = MessageService.ErrorAsync(Resources.Errors.FlowsListNotLoaded);
         }
         finally
         {
@@ -97,11 +97,11 @@ partial class RunnersPage : ComponentBase
         try
         {
             await RunnersViewModel.DeleteRunner(id);
-            await MessageService.SuccessAsync("Runner deleted successfully");
+            _ = MessageService.SuccessAsync("Runner deleted successfully");
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to delete runner");
+            _ = MessageService.ErrorAsync("Failed to delete runner");
         }
     }
 }

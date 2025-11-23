@@ -47,7 +47,7 @@ namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings
             }
             catch
             {
-                await MessageService.ErrorAsync(Resources.Errors.FlowsActivityNotLoaded);
+                _ = MessageService.ErrorAsync(Resources.Errors.FlowsActivityNotLoaded);
             }
             finally
             {
@@ -62,11 +62,11 @@ namespace Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings
             try
             {
                 await ViewModel.UpdateFlowSettings(settingsModel.Name);
-                await MessageService.SuccessAsync("Flow settings updated successfully");
+                _ = MessageService.SuccessAsync("Flow settings updated successfully");
             }
             catch
             {
-                await MessageService.ErrorAsync("Failed to update flow settings");
+                _ = MessageService.ErrorAsync("Failed to update flow settings");
             }
             finally
             {

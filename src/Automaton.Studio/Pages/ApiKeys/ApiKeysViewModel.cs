@@ -54,7 +54,7 @@ public class ApiKeysViewModel
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Failed to load API keys: {ex.Message}");
+            _ = messageService.ErrorAsync($"Failed to load API keys: {ex.Message}");
         }
         finally
         {
@@ -72,7 +72,7 @@ public class ApiKeysViewModel
     {
         if (string.IsNullOrWhiteSpace(CreateRequest.Name))
         {
-            await messageService.WarningAsync("Please enter a name for the API key");
+            _ = messageService.WarningAsync("Please enter a name for the API key");
             return;
         }
 
@@ -89,7 +89,7 @@ public class ApiKeysViewModel
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Error creating API key: {ex.Message}");
+            _ = messageService.ErrorAsync($"Error creating API key: {ex.Message}");
         }
         finally
         {
@@ -104,17 +104,17 @@ public class ApiKeysViewModel
             var success = await apiKeysService.RevokeApiKeyAsync(apiKeyId);
             if (success)
             {
-                await messageService.SuccessAsync("API key revoked successfully");
+                _ = messageService.SuccessAsync("API key revoked successfully");
                 await LoadApiKeys(); // Refresh the list
             }
             else
             {
-                await messageService.ErrorAsync("Failed to revoke API key");
+                _ = messageService.ErrorAsync("Failed to revoke API key");
             }
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Error revoking API key: {ex.Message}");
+            _ = messageService.ErrorAsync($"Error revoking API key: {ex.Message}");
         }
     }
 
@@ -123,11 +123,11 @@ public class ApiKeysViewModel
         try
         {
             await jsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", NewApiKey);
-            await messageService.SuccessAsync("API key copied to clipboard");
+            _ = messageService.SuccessAsync("API key copied to clipboard");
         }
         catch
         {
-            await messageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
+            _ = messageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
         }
     }
 

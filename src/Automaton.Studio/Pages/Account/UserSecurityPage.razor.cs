@@ -24,11 +24,11 @@ public partial class UserSecurityPage : ComponentBase
 
             await UserSecurityViewModel.UpdateUserPassword();
 
-            await MessageService.InfoAsync("User password updated");
+            _ = MessageService.InfoAsync("User password updated");
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync("User password update failed");
+            _ = MessageService.ErrorAsync("User password update failed");
         }
         finally
         {

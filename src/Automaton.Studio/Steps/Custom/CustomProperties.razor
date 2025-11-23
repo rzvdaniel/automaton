@@ -396,19 +396,19 @@
             {
                 // Force a fresh check after successful update
                 await ForceCheckForUpdates();
-                await MessageService.SuccessAsync($"Step updated to version {latestVersion}!");
+                _ = MessageService.SuccessAsync($"Step updated to version {latestVersion}!");
                 
                 // Refresh the form to show updated data
                 await InvokeAsync(StateHasChanged);
             }
             else
             {
-                await MessageService.ErrorAsync("Failed to update step. Please try again.");
+                _ = MessageService.ErrorAsync("Failed to update step. Please try again.");
             }
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Error updating step: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Error updating step: {ex.Message}");
         }
         finally
         {

@@ -34,7 +34,7 @@ partial class AppsPage : ComponentBase
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to load apps list");
+            _ = MessageService.ErrorAsync("Failed to load apps list");
         }
         finally
         {
@@ -75,7 +75,7 @@ partial class AppsPage : ComponentBase
         var app = AppsViewModel.Apps?.FirstOrDefault(a => a.Id == id);
         if (app == null)
         {
-            await MessageService.ErrorAsync("App not found");
+            _ = MessageService.ErrorAsync("App not found");
             return;
         }
 
@@ -103,7 +103,7 @@ partial class AppsPage : ComponentBase
         {
             if (string.IsNullOrWhiteSpace(model.PublicUrl))
             {
-                await MessageService.WarningAsync("Please enter a URL slug");
+                _ = MessageService.WarningAsync("Please enter a URL slug");
                 return;
             }
 
@@ -112,12 +112,12 @@ partial class AppsPage : ComponentBase
                 await AppsViewModel.PublishApp(id, model.PublicUrl, model.RequiresAuthentication, model.ExecutionRunnerId);
 
                 var accessType = model.RequiresAuthentication ? "Protected" : "Public";
-                await MessageService.SuccessAsync($"App published! ({accessType}) Access it at /web/{model.PublicUrl}");
+                _ = MessageService.SuccessAsync($"App published! ({accessType}) Access it at /web/{model.PublicUrl}");
                 StateHasChanged();
             }
             catch (Exception ex)
             {
-                await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
+                _ = MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
             }
         };
     }
@@ -137,12 +137,12 @@ partial class AppsPage : ComponentBase
             try
             {
                 await AppsViewModel.UnpublishApp(id);
-                await MessageService.SuccessAsync("App unpublished successfully");
+                _ = MessageService.SuccessAsync("App unpublished successfully");
                 StateHasChanged();
             }
             catch
             {
-                await MessageService.ErrorAsync("Failed to unpublish app");
+                _ = MessageService.ErrorAsync("Failed to unpublish app");
             }
         }
     }
@@ -164,7 +164,7 @@ partial class AppsPage : ComponentBase
             }
             catch
             {
-                await MessageService.ErrorAsync($"App {model.Name} could not be created");
+                _ = MessageService.ErrorAsync($"App {model.Name} could not be created");
             }
         };
     }
@@ -178,7 +178,7 @@ partial class AppsPage : ComponentBase
         }
         else
         {
-            await MessageService.InfoAsync("This app has not been published yet. Please publish it first to execute.");
+            _ = MessageService.InfoAsync("This app has not been published yet. Please publish it first to execute.");
         }
     }
 

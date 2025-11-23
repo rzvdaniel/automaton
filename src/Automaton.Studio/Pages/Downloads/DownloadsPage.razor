@@ -787,11 +787,11 @@ WantedBy=multi-user.target";
 		try
 		{
 			await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
-			await MessageService.SuccessAsync($"{description} copied to clipboard");
+			_ =  MessageService.SuccessAsync($"{description} copied to clipboard");
 		}
 		catch
 		{
-			await MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
+			_ = MessageService.WarningAsync("Could not copy to clipboard. Please copy manually.");
 		}
 	}
 

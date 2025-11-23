@@ -31,7 +31,6 @@ public class CreateAiApiKeyRequest
     public AiProviderType Provider { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? Model { get; set; }
 }
 
 public class CodeGenerationRequest

@@ -62,7 +62,7 @@ partial class ResetPassword : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.ResetPasswordFailed);
+            _ = MessageService.ErrorAsync(Resources.Errors.ResetPasswordFailed);
         }
         finally
         {

@@ -41,7 +41,7 @@ public partial class FlowSchedule : ComponentBase
         }
         catch
         {
-            await MessageService.ErrorAsync("Schedules not loaded");
+            _ = MessageService.ErrorAsync("Schedules not loaded");
         }
         finally
         {
@@ -60,17 +60,17 @@ public partial class FlowSchedule : ComponentBase
             if (schedule.IsNew)
             {
                 await FlowScheduleViewModel.AddSchedule(schedule);
-                await MessageService.InfoAsync("Schedule created");
+                _ = MessageService.InfoAsync("Schedule created");
             }
             else
             {
                 await FlowScheduleViewModel.UpdateSchedule(schedule);
-                await MessageService.InfoAsync("Schedule updated");
+                _ = MessageService.InfoAsync("Schedule updated");
             }
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync("Schedule update failed");
+            _ = MessageService.ErrorAsync("Schedule update failed");
         }
         finally
         {
@@ -86,13 +86,13 @@ public partial class FlowSchedule : ComponentBase
 
             await FlowScheduleViewModel.DeleteSchedule(id);
 
-            await MessageService.InfoAsync("Schedule deleted");
+            _ = MessageService.InfoAsync("Schedule deleted");
 
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync("Schedule delete failed");
+            _ = MessageService.ErrorAsync("Schedule delete failed");
         }
         finally
         {

@@ -38,7 +38,7 @@ public partial class FlowActivity : ComponentBase
         }
         catch
         {
-            await MessageService.ErrorAsync(Resources.Errors.FlowsActivityNotLoaded);
+            _ = MessageService.ErrorAsync(Resources.Errors.FlowsActivityNotLoaded);
         }
         finally
         {

@@ -32,7 +32,7 @@ partial class ProjectsPage : ComponentBase
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to load projects list");
+            _ = MessageService.ErrorAsync("Failed to load projects list");
         }
         finally
         {
@@ -53,7 +53,7 @@ partial class ProjectsPage : ComponentBase
         if (string.IsNullOrWhiteSpace(createProjectModel.Name) || 
             string.IsNullOrWhiteSpace(createProjectModel.DisplayName))
         {
-            await MessageService.WarningAsync("Please fill in required fields");
+            _ = MessageService.WarningAsync("Please fill in required fields");
             return;
         }
 
@@ -61,13 +61,13 @@ partial class ProjectsPage : ComponentBase
         try
         {
             await ProjectsViewModel.CreateProject(createProjectModel);
-            await MessageService.SuccessAsync("Project created successfully");
+            _ = MessageService.SuccessAsync("Project created successfully");
             createProjectVisible = false;
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to create project: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Failed to create project: {ex.Message}");
         }
         finally
         {
@@ -86,7 +86,7 @@ partial class ProjectsPage : ComponentBase
         var project = ProjectsViewModel.Projects?.FirstOrDefault(p => p.Id == projectId);
         if (project == null)
         {
-            await MessageService.ErrorAsync("Project not found");
+            _ = MessageService.ErrorAsync("Project not found");
             return;
         }
 
@@ -103,7 +103,7 @@ partial class ProjectsPage : ComponentBase
     {
         if (string.IsNullOrWhiteSpace(editProjectModel.DisplayName))
         {
-            await MessageService.WarningAsync("Display name is required");
+            _ = MessageService.WarningAsync("Display name is required");
             return;
         }
 
@@ -111,13 +111,13 @@ partial class ProjectsPage : ComponentBase
         try
         {
             await ProjectsViewModel.UpdateProject(editingProjectId, editProjectModel);
-            await MessageService.SuccessAsync("Project updated successfully");
+            _ = MessageService.SuccessAsync("Project updated successfully");
             editProjectVisible = false;
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to update project: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Failed to update project: {ex.Message}");
         }
         finally
         {
@@ -141,12 +141,12 @@ partial class ProjectsPage : ComponentBase
             try
             {
                 await ProjectsViewModel.DeleteProject(projectId);
-                await MessageService.SuccessAsync("Project deleted successfully");
+                _ = MessageService.SuccessAsync("Project deleted successfully");
                 StateHasChanged();
             }
             catch (Exception ex)
             {
-                await MessageService.ErrorAsync($"Failed to delete project: {ex.Message}");
+                _ = MessageService.ErrorAsync($"Failed to delete project: {ex.Message}");
             }
         }
     }

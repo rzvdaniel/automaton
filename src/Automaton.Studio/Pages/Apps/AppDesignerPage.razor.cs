@@ -68,7 +68,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to load app");
+            _ = MessageService.ErrorAsync("Failed to load app");
             NavigationManager.NavigateTo("/apps");
         }
         finally
@@ -179,31 +179,16 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
 
             // Persist the current app including ExecutionRunnerId (if changed)
             await AppsService.Update(currentApp);
-            await MessageService.SuccessAsync("App saved successfully");
+            _ = MessageService.SuccessAsync("App saved successfully");
         }
         catch
         {
-            await MessageService.ErrorAsync("Failed to save app");
+            _ = MessageService.ErrorAsync("Failed to save app");
         }
         finally
         {
             saving = false;
         }
-    }
-
-    private string GetRunnerStatusIcon(Automaton.Core.Enums.RunnerStatus status)
-    {
-        return status switch
-        {
-            Automaton.Core.Enums.RunnerStatus.Online => "check-circle",
-            Automaton.Core.Enums.RunnerStatus.Offline => "close-circle",
-            _ => "question-circle",
-        };
-    }
-
-    private string GetRunnerStatusClass(Automaton.Core.Enums.RunnerStatus status)
-    {
-        return $"runner-status-icon runner-status-{status.ToString().ToLower()}";
     }
 
     // Publishing Methods - Phase 2 Implementation
@@ -256,7 +241,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             {
                 if (string.IsNullOrWhiteSpace(model.PublicUrl))
                 {
-                    await MessageService.WarningAsync("Please enter a URL slug");
+                    _ = MessageService.WarningAsync("Please enter a URL slug");
                     return;
                 }
 
@@ -272,18 +257,18 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                     currentApp.RequiresAuthentication = model.RequiresAuthentication;
                     currentApp.ExecutionRunnerId = model.ExecutionRunnerId;
 
-                    await MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
+                    _ = MessageService.SuccessAsync($"App published! Access it at /web/{model.PublicUrl}");
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
                 {
-                    await MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
+                    _ = MessageService.ErrorAsync($"Failed to publish app: {ex.Message}");
                 }
             };
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Error showing publish dialog: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Error showing publish dialog: {ex.Message}");
         }
         finally
         {
@@ -316,12 +301,12 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             currentApp.IsPublished = false;
             currentApp.PublishedAt = null;
 
-            await MessageService.SuccessAsync("App unpublished successfully");
+            _ = MessageService.SuccessAsync("App unpublished successfully");
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to unpublish app: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Failed to unpublish app: {ex.Message}");
         }
         finally
         {
@@ -393,7 +378,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             
             if (!currentApp.IsPublished)
             {
-                await MessageService.WarningAsync("Publish your app first to enable live preview");
+                _ = MessageService.WarningAsync("Publish your app first to enable live preview");
                 return;
             }
             
@@ -409,11 +394,11 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             // Force re-render
             await InvokeAsync(StateHasChanged);
 
-            await MessageService.SuccessAsync("Preview refreshed", 1);
+            _ = MessageService.SuccessAsync("Preview refreshed", 1);
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to refresh preview: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Failed to refresh preview: {ex.Message}");
         }
     }
 
@@ -429,7 +414,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
         else
         {
-            await MessageService.WarningAsync("This app has not been published yet.");
+            _ = MessageService.WarningAsync("This app has not been published yet.");
         }
     }
 
@@ -444,11 +429,11 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
             currentApp.Definition.HtmlContent = generatedCode;
 
             // Show success message
-            await MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
+            _ = MessageService.SuccessAsync("Code generated successfully! You can now review and modify it.");
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Failed to update code editor: {ex.Message}");
         }
     }
 
@@ -567,30 +552,30 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                     {
                         // Store the relative path from server, but display it with full server URL
                         currentApp.Appearance.BackgroundImageUrl = $"{ConfigurationService.BaseUrl}{response.ImageUrl}";
-                        await MessageService.SuccessAsync("Image uploaded successfully");
+                        _ = MessageService.SuccessAsync("Image uploaded successfully");
                         await InvokeAsync(StateHasChanged);
                     }
                     else
                     {
-                        await MessageService.ErrorAsync("Invalid response from server: missing image URL");
+                        _ = MessageService.ErrorAsync("Invalid response from server: missing image URL");
                     }
                 }
                 catch (Exception parseEx)
                 {
                     Logger.LogError(parseEx, "[AppDesigner] Failed to parse upload response");
-                    await MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
+                    _ = MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
                 }
             }
             else if (fileInfo.File.State == UploadState.Fail)
             {
                 // Upload failed - show error message once
-                await MessageService.ErrorAsync("Image upload failed. Please check the file size and format (max 2MB, PNG/JPG only)");
+                _ = MessageService.ErrorAsync("Image upload failed. Please check the file size and format (max 2MB, PNG/JPG only)");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[AppDesigner] Error uploading image");
-            await MessageService.ErrorAsync($"Error uploading image: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Error uploading image: {ex.Message}");
         }
     }
 
@@ -607,7 +592,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         if (confirmed)
         {
             currentApp.Appearance.BackgroundImageUrl = null;
-            await MessageService.SuccessAsync("Image removed");
+            _ = MessageService.SuccessAsync("Image removed");
             await InvokeAsync(StateHasChanged);
         }
     }

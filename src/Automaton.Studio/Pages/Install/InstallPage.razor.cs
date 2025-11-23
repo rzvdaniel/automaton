@@ -42,7 +42,7 @@ partial class InstallPage : ComponentBase
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync(Resources.Errors.InstallationFailed);
+            _ = MessageService.ErrorAsync(Resources.Errors.InstallationFailed);
         }
         finally
         {

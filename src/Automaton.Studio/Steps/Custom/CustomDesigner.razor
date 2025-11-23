@@ -233,17 +233,17 @@
             {
                 // Force a fresh check after successful update
                 await ForceCheckForUpdates();
-                await MessageService.SuccessAsync($"Step updated to {LatestVersionText}!");
+                _ = MessageService.SuccessAsync($"Step updated to {LatestVersionText}!");
                 await OnStepUpdated.InvokeAsync(true);
             }
             else
             {
-                await MessageService.ErrorAsync("Failed to update step. Please try again.");
+                _ = MessageService.ErrorAsync("Failed to update step. Please try again.");
             }
         }
         catch (Exception ex)
         {
-            await MessageService.ErrorAsync($"Error updating step: {ex.Message}");
+            _ = MessageService.ErrorAsync($"Error updating step: {ex.Message}");
         }
         finally
         {

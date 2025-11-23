@@ -45,7 +45,7 @@ public class AiApiKeysViewModel
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Failed to load AI API keys: {ex.Message}");
+            _ = messageService.ErrorAsync($"Failed to load AI API keys: {ex.Message}");
         }
         finally
         {
@@ -67,13 +67,13 @@ public class AiApiKeysViewModel
             // Validate required fields
             if (string.IsNullOrWhiteSpace(CreateRequest?.Name))
             {
-                await messageService.ErrorAsync("Name is required");
+                _ = messageService.ErrorAsync("Name is required");
                 return;
             }
             
             if (string.IsNullOrWhiteSpace(CreateRequest?.ApiKey))
             {
-                await messageService.ErrorAsync("API Key is required");
+                _ = messageService.ErrorAsync("API Key is required");
                 return;
             }
 
@@ -86,16 +86,17 @@ public class AiApiKeysViewModel
                 AiApiKeys = keysList;
                 
                 CreateModalVisible = false;
-                await messageService.SuccessAsync("AI API key added successfully!");
+                
+                _ = messageService.SuccessAsync("AI API key added successfully!");
             }
             else
             {
-                await messageService.ErrorAsync("Failed to create AI API key - returned null");
+                _ = messageService.ErrorAsync("Failed to create AI API key - returned null");
             }
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Failed to create AI API key: {ex.Message}");
+            _ = messageService.ErrorAsync($"Failed to create AI API key: {ex.Message}");
         }
         finally
         {
@@ -113,17 +114,17 @@ public class AiApiKeysViewModel
                 var keysList = AiApiKeys.ToList();
                 keysList.RemoveAll(k => k.Id == id);
                 AiApiKeys = keysList;
-                
-                await messageService.SuccessAsync("AI API key deleted successfully!");
+
+                _ = messageService.SuccessAsync("AI API key deleted successfully!");
             }
             else
             {
-                await messageService.ErrorAsync("Failed to delete AI API key");
+                _ = messageService.ErrorAsync("Failed to delete AI API key");
             }
         }
         catch (Exception ex)
         {
-            await messageService.ErrorAsync($"Failed to delete AI API key: {ex.Message}");
+            _ = messageService.ErrorAsync($"Failed to delete AI API key: {ex.Message}");
         }
     }
 }
