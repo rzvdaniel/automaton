@@ -293,7 +293,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         try
         {
             // Use the official OpenAI .NET SDK pattern with tools
-            var client = new ChatClient(model: request.Model ?? "gpt-4o", apiKey: request.ApiKey);
+            var client = new ChatClient(model: request.Model ?? "gpt-4.1", apiKey: request.ApiKey);
             
             // Build conversation messages
             var messages = new List<ChatMessage>();
@@ -324,13 +324,9 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             
             // Create MCP tools for AI to use from integrated Studio services
             var tools = await CreateMcpToolsAsync();
-            
+
             // Create chat completion options with tools
-            var options = new ChatCompletionOptions
-            {
-                MaxOutputTokenCount = 2000,
-                Temperature = 0.7f
-            };
+            var options = new ChatCompletionOptions();
             
             // Add tools to options
             foreach (var tool in tools)
