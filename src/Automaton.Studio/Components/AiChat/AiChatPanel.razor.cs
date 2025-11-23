@@ -75,6 +75,18 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     {
                         if (message.Role.ToLowerInvariant() == "assistant" && !string.IsNullOrWhiteSpace(message.Content))
                         {
+                            // Check if this message already exists in the conversation to avoid duplicates
+                            var isDuplicate = messages.Any(m => 
+                                m.Role == "AI" && 
+                                m.Type == MessageType.Text &&
+                                TextSimilarityService.AreSimilar(m.Content, message.Content, similarityThreshold: 0.95));
+                            
+                            if (isDuplicate)
+                            {
+                                logger.LogInformation("Skipping duplicate AI message: {Length} chars", message.Content.Length);
+                                continue;
+                            }
+                            
                             // Check if this is a reasoning message (not a final code response)
                             var isReasoningMessage = IsReasoningMessage(message.Content);
                             

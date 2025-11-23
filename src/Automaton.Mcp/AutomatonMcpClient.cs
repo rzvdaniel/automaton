@@ -130,14 +130,10 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             conversationHistory.Add(new ConversationMessage("user", request.InitialMessage));
             conversationHistory.Add(new ConversationMessage("assistant", responseText));
             
-            // Emit event for real-time UI updates
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                Messages = conversationHistory,
-                ToolCalls = allToolCalls,
-                ToolResults = allToolResults
-            });
+            // NOTE: Do NOT emit ConversationUpdated event here - messages are already emitted
+            // in real-time during the conversation inside CallOpenAiAsync (for OpenAI) or
+            // will be processed by the UI from the returned ConversationResult.
+            // Emitting here would cause duplicate messages in the UI.
             
             return new ConversationResult
             {
@@ -450,10 +446,38 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                         break;
                         
                     case ChatFinishReason.Length:
-                        throw new InvalidOperationException("Incomplete model output due to token limit");
+                        var lengthErrorMsg = "Incomplete model output due to token limit";
+                        
+                        // Emit error as conversation update so UI can display it
+                        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                        {
+                            ConversationId = request.ConversationId,
+                            Messages = new List<ConversationMessage> 
+                            { 
+                                new ConversationMessage("assistant", $"Error: {lengthErrorMsg}") 
+                            },
+                            ToolCalls = new List<ToolCall>(),
+                            ToolResults = new List<ToolResult>()
+                        });
+                        
+                        throw new InvalidOperationException(lengthErrorMsg);
                         
                     default:
-                        throw new InvalidOperationException($"Unexpected finish reason: {completion.Value.FinishReason}");
+                        var unexpectedErrorMsg = $"Unexpected finish reason: {completion.Value.FinishReason}";
+                        
+                        // Emit error as conversation update so UI can display it
+                        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                        {
+                            ConversationId = request.ConversationId,
+                            Messages = new List<ConversationMessage> 
+                            { 
+                                new ConversationMessage("assistant", $"Error: {unexpectedErrorMsg}") 
+                            },
+                            ToolCalls = new List<ToolCall>(),
+                            ToolResults = new List<ToolResult>()
+                        });
+                        
+                        throw new InvalidOperationException(unexpectedErrorMsg);
                 }
                 
             } while (requiresAction);
@@ -463,6 +487,19 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling OpenAI API with MCP tools");
+            
+            // Emit error as conversation update so UI can display it
+            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+            {
+                ConversationId = request.ConversationId,
+                Messages = new List<ConversationMessage> 
+                { 
+                    new ConversationMessage("assistant", $"Error: {ex.Message}") 
+                },
+                ToolCalls = new List<ToolCall>(),
+                ToolResults = new List<ToolResult>()
+            });
+            
             throw;
         }
     }
