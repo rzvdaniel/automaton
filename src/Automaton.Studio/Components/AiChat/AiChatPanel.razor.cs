@@ -129,60 +129,81 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     }
                 }
 
-                // Add tool results as NEW messages (don't replace executing messages)
+                // Add tool results - UPDATE existing executing messages or add new if needed
                 foreach (var toolResult in e.ToolResults)
                 {
-                    // Check if we already added this result
+                    // Check if we already have a completed result message for this tool call
                     var existingResultMessage = messages.FirstOrDefault(m => 
                         m.Type == MessageType.ToolExecution && 
                         m.ToolCallId == toolResult.ToolCallId &&
-                        m.ToolStatus != "executing");
+                        (m.ToolStatus == "success" || m.ToolStatus == "error"));
 
-                    if (existingResultMessage == null)
+                    if (existingResultMessage != null)
                     {
-                        // First, update the previous "executing" message to show it's complete
-                        var executingMessage = messages.FirstOrDefault(m =>
-                            m.Type == MessageType.ToolExecution &&
-                            m.ToolCallId == toolResult.ToolCallId &&
-                            m.ToolStatus == "executing");
+                        // Already have a result message, skip
+                        continue;
+                    }
 
-                        if (executingMessage != null)
+                    // Find the executing message to update
+                    var executingMessage = messages.FirstOrDefault(m =>
+                        m.Type == MessageType.ToolExecution &&
+                        m.ToolCallId == toolResult.ToolCallId &&
+                        (m.ToolStatus == "executing" || m.ToolStatus == "completed"));
+
+                    var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
+                    
+                    if (executingMessage != null && Context.ProcessToolResults)
+                    {
+                        // Update the existing executing message with result details
+                        var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                            toolCallForResult?.Name ?? executingMessage.ToolName ?? "unknown", 
+                            toolResult, 
+                            Context.Language);
+
+                        var index = messages.IndexOf(executingMessage);
+                        messages[index] = executingMessage with 
+                        { 
+                            Content = FormatToolResultFromViewModel(processedResult),
+                            ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                            ToolResult = toolResult.Result,
+                            ToolError = toolResult.ErrorMessage,
+                            ToolResultViewModel = processedResult,
+                            IsSuccess = toolResult.IsSuccess
+                        };
+                        logger.LogInformation("Updated tool message with result: {ToolName} - {Status}", 
+                            executingMessage.ToolName, toolResult.IsSuccess ? "Success" : "Failed");
+                    }
+                    else if (executingMessage != null)
+                    {
+                        // Just update status if not processing results
+                        var index = messages.IndexOf(executingMessage);
+                        messages[index] = executingMessage with 
+                        { 
+                            ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                            IsSuccess = toolResult.IsSuccess
+                        };
+                    }
+                    else if (toolCallForResult != null && Context.ProcessToolResults)
+                    {
+                        // No executing message found, add a new result message
+                        var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                            toolCallForResult.Name, toolResult, Context.Language);
+
+                        var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
                         {
-                            // Update the executing message to show completion status
-                            var index = messages.IndexOf(executingMessage);
-                            messages[index] = executingMessage with 
-                            { 
-                                ToolStatus = "completed",
-                                IsSuccess = toolResult.IsSuccess
-                            };
-                        }
-
-                        var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
-                        if (toolCallForResult != null)
-                        {
-                            // Process tool result using the new architecture (only if context supports it)
-                            if (Context.ProcessToolResults)
-                            {
-                                var processedResult = _toolResultProcessorFactory.ProcessToolResult(
-                                    toolCallForResult.Name, toolResult, Context.Language);
-
-                                // Add as NEW message to show result details
-                                var resultMessage = new ChatMessage("AI", FormatToolResultFromViewModel(processedResult), DateTime.Now)
-                                {
-                                    Type = MessageType.ToolExecution,
-                                    ToolCallId = toolResult.ToolCallId,
-                                    ToolName = toolCallForResult.Name,
-                                    ToolStatus = toolResult.IsSuccess ? "success" : "error",
-                                    ToolResult = toolResult.Result,
-                                    ToolError = toolResult.ErrorMessage,
-                                    ToolResultViewModel = processedResult,
-                                    IsSuccess = toolResult.IsSuccess
-                                };
-                                
-                                messages.Add(resultMessage);
-                                logger.LogInformation("Added tool result message: {ToolName} - {Status}", toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
-                            }
-                        }
+                            Type = MessageType.ToolExecution,
+                            ToolCallId = toolResult.ToolCallId,
+                            ToolName = toolCallForResult.Name,
+                            ToolStatus = toolResult.IsSuccess ? "success" : "error",
+                            ToolResult = toolResult.Result,
+                            ToolError = toolResult.ErrorMessage,
+                            ToolResultViewModel = processedResult,
+                            IsSuccess = toolResult.IsSuccess
+                        };
+                        
+                        messages.Add(resultMessage);
+                        logger.LogInformation("Added tool result message: {ToolName} - {Status}", 
+                            toolCallForResult.Name, toolResult.IsSuccess ? "Success" : "Failed");
                     }
                 }
 
@@ -193,31 +214,35 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     }
     
     /// <summary>
-    /// Determine if a message is AI reasoning/thinking (vs final code output)
+    /// Determine if a message should be displayed as AI response in the chat panel.
+    /// This includes reasoning messages, explanations, summaries, and final answers.
     /// </summary>
     private bool IsReasoningMessage(string content)
     {
-        // Skip if it's very short (likely not reasoning)
+        // Skip if it's very short (likely not meaningful)
         if (content.Length < 10)
             return false;
             
-        // Skip if it contains only code (no explanation)
-        if (content.StartsWith("```") && content.Count(c => c == '`') >= 6)
-            return false;
-            
-        // Include if it contains reasoning keywords
-        var reasoningKeywords = new[]
+        // Skip if it contains ONLY code blocks (no explanation text)
+        // But allow messages that have code blocks WITH explanatory text
+        var trimmedContent = content.Trim();
+        if (trimmedContent.StartsWith("```") && trimmedContent.EndsWith("```"))
         {
-            "I see", "I notice", "I'll", "Let me", "I need to",
-            "The error", "The issue", "The problem", "This is because",
-            "I'm going to", "I will", "First", "Next", "Now",
-            "Let's", "We need", "Looking at", "Based on",
-            "I can see", "It appears", "It looks like", "It seems",
-            "I should", "I must", "I have to", "To fix", "To solve"
-        };
+            // Count how many code blocks there are
+            var codeBlockCount = content.Split("```").Length - 1;
+            // If it's just one code block with no surrounding text, skip it
+            if (codeBlockCount == 2)
+            {
+                var beforeCode = content.Substring(0, content.IndexOf("```")).Trim();
+                var afterCode = content.Substring(content.LastIndexOf("```") + 3).Trim();
+                if (string.IsNullOrEmpty(beforeCode) && string.IsNullOrEmpty(afterCode))
+                    return false;
+            }
+        }
         
-        return reasoningKeywords.Any(keyword => 
-            content.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        // Include any AI message that appears to be text (not just code)
+        // This ensures final explanations and summaries are shown
+        return true;
     }
 
     private string FormatToolCall(ToolCall toolCall)
