@@ -92,7 +92,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UserAccountService>();
         services.AddScoped<IApiKeysService, ApiKeysService>();
         services.AddScoped<AiApiKeyService>();
-        services.AddScoped<AiStepGenerationService>();
         services.AddScoped<FlowService>();
         services.AddScoped<FlowsService>();
         services.AddScoped<RunnerService>();

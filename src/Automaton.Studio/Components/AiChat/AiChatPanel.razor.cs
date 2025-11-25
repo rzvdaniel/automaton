@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Automaton.Studio.Components.AiChat.ToolResults;
 using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 using Automaton.Mcp.Enums;
-using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Components.AiChat.Models;
 using Automaton.Studio.Components.AiChat.Contexts;
 
@@ -22,7 +21,6 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     [Parameter] public EventCallback<string> OnCodeGenerated { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
-    [Inject] private AiStepGenerationService AiStepGenerationService { get; set; } = default!;
     [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<AiChatPanel> logger { get; set; } = default!;
