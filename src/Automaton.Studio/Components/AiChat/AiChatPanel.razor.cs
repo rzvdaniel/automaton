@@ -148,7 +148,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     var executingMessage = messages.FirstOrDefault(m =>
                         m.Type == MessageType.ToolExecution &&
                         m.ToolCallId == toolResult.ToolCallId &&
-                        (m.ToolStatus == "executing" || m.ToolStatus == "completed"));
+                        m.ToolStatus == "executing");
 
                     var toolCallForResult = e.ToolCalls.FirstOrDefault(tc => tc.Id == toolResult.ToolCallId);
                     
@@ -228,15 +228,30 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         var trimmedContent = content.Trim();
         if (trimmedContent.StartsWith("```") && trimmedContent.EndsWith("```"))
         {
-            // Count how many code blocks there are
-            var codeBlockCount = content.Split("```").Length - 1;
-            // If it's just one code block with no surrounding text, skip it
-            if (codeBlockCount == 2)
+            // Count backticks efficiently
+            var backtickCount = 0;
+            foreach (var c in content)
             {
-                var beforeCode = content.Substring(0, content.IndexOf("```")).Trim();
-                var afterCode = content.Substring(content.LastIndexOf("```") + 3).Trim();
-                if (string.IsNullOrEmpty(beforeCode) && string.IsNullOrEmpty(afterCode))
-                    return false;
+                if (c == '`') backtickCount++;
+            }
+            
+            // If it's just one code block (6 backticks for opening and closing ```)
+            if (backtickCount == 6)
+            {
+                var firstCodeBlockIndex = content.IndexOf("```");
+                var lastCodeBlockIndex = content.LastIndexOf("```");
+                
+                // Check if there's any meaningful text before or after the code block
+                if (firstCodeBlockIndex >= 0 && lastCodeBlockIndex > firstCodeBlockIndex)
+                {
+                    var hasTextBefore = content.AsSpan(0, firstCodeBlockIndex).Trim().Length > 0;
+                    var afterCodeStart = lastCodeBlockIndex + 3;
+                    var hasTextAfter = afterCodeStart < content.Length && 
+                                       content.AsSpan(afterCodeStart).Trim().Length > 0;
+                    
+                    if (!hasTextBefore && !hasTextAfter)
+                        return false;
+                }
             }
         }
         
