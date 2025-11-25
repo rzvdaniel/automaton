@@ -107,6 +107,16 @@ public class WebAppSystemPromptBuilder : IWebAppSystemPromptBuilder
             - **get_current_code**: 📖 Retrieve existing HTML/CSS/JavaScript from the web app (USE THIS FIRST for improvements!)
             - **save_code**: 💾 Save code to app (Can be called MULTIPLE TIMES - save early, test, fix, save again!)
 
+            ## FINAL EXPLANATION GUIDELINES:
+            ⚡ **KEEP EXPLANATIONS CONCISE** ⚡
+            - The full code is ALREADY SAVED via save_code - DO NOT repeat it in your explanation
+            - Your final message should be a brief summary of what was created/modified
+            - Only include SHORT code snippets (1-5 lines) when needed to highlight key features or changes
+            - Focus on explaining WHAT was accomplished and key features, not showing the full implementation
+            - Example good explanation: "Created a responsive landing page with: hero section, navigation menu, contact form with validation, and smooth scroll effects."
+            - Example bad explanation: (pasting the entire 200+ line HTML file)
+            - If showing code snippets, use them sparingly to illustrate specific JavaScript functionality or CSS techniques
+
             ## REMEMBER:
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
             ⚡ Generate COMPLETE, WORKING code - not pseudocode, outlines, or error messages
@@ -115,7 +125,7 @@ public class WebAppSystemPromptBuilder : IWebAppSystemPromptBuilder
             ⚡ Follow MODERN web development best practices
             ⚡ Add COMMENTS to explain complex parts
             ⚡ Make it VISUALLY APPEALING with good design principles
-            ⚡ Your final response should be the CODE itself, not explanations about missing code or errors
+            ⚡ Your final explanation should be BRIEF - the code is already saved, don't repeat it!
             """.Trim();
     }
 }

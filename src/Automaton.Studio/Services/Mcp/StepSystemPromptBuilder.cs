@@ -136,12 +136,22 @@ public class StepSystemPromptBuilder : IStepSystemPromptBuilder
 
         prompt += """
 
+            ## FINAL EXPLANATION GUIDELINES:
+            ⚡ **KEEP EXPLANATIONS CONCISE** ⚡
+            - The full code is ALREADY SAVED via save_code - DO NOT repeat it in your explanation
+            - Your final message should be a brief summary of what was done
+            - Only include SHORT code snippets (1-5 lines) when needed to highlight key changes or important parts
+            - Focus on explaining WHAT was accomplished and WHY, not showing the full implementation
+            - Example good explanation: "Created a function to fetch NY Times headlines. Key features: error handling with try/except, JSON parsing of API response, returns list of headline strings."
+            - Example bad explanation: (pasting the entire 50+ line function)
+            - If showing code snippets, use them sparingly to illustrate specific points
+
             ## REMEMBER: 
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
             ⚡ If step has NO variables but code needs them → CALL suggest_variables before generating code!
             ⚡ Save code EARLY and OFTEN - use save_code to show progress, then test and refine!
             ⚡ If execute_code returns Success: false → ANALYZE ERROR, FIX CODE, SAVE AGAIN, and retry!
-            ⚡ Your final response should be WORKING CODE, not execution results or explanations!
+            ⚡ Your final explanation should be BRIEF - the code is already saved, don't repeat it!
             ⚡ The save-test-fix cycle can repeat multiple times - that's normal and expected!
             Always test your code with execute_code and fix any errors by saving improved versions.
             """;
