@@ -18,13 +18,40 @@
             <Icon Type="check-circle" Style="margin-left: auto; color: #22c55e; font-size: 16px;" />
         </div>
     }
-    else
+    else if (ResultViewModel != null)
     {
-        <!-- Result state: Show detailed result -->
+        <!-- Result state with detailed result data: Show full result display -->
         <ToolResultDisplay Result="@ResultViewModel" 
                           Status="@Status"
                           Timestamp="@Timestamp"
                           ShowTimestamp="true" />
+    }
+    else
+    {
+        <!-- Result state without result data: Show simple status message -->
+        <div class="tool-header-simple">
+            <span class="tool-description">@Description</span>
+            <span class="tool-status @(Status == "success" ? "status-success" : "status-error")">
+                @if (Status == "success")
+                {
+                    <Icon Type="check-circle" Style="color: #22c55e; font-size: 14px; margin-right: 4px;" />
+                    <span>Success</span>
+                }
+                else if (Status == "error")
+                {
+                    <Icon Type="close-circle" Style="color: #dc3545; font-size: 14px; margin-right: 4px;" />
+                    <span>Failed</span>
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <span class="error-message">: @ErrorMessage</span>
+                    }
+                }
+                else
+                {
+                    <span>@Status</span>
+                }
+            </span>
+        </div>
     }
 </div>
 
@@ -88,6 +115,32 @@
 
     .tool-description {
         flex: 1;
+    }
+
+    .tool-header-simple {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #24292f;
+    }
+
+    .tool-status {
+        display: flex;
+        align-items: center;
+        margin-left: auto;
+    }
+
+    .status-success {
+        color: #22c55e;
+    }
+
+    .status-error {
+        color: #dc3545;
+    }
+
+    .error-message {
+        color: #dc3545;
     }
 
     .tool-error {
