@@ -73,15 +73,28 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     {
                         if (message.Role.ToLowerInvariant() == "assistant" && !string.IsNullOrWhiteSpace(message.Content))
                         {
-                            // Check if this message already exists in the conversation to avoid duplicates
-                            var isDuplicate = messages.Any(m => 
+                            // Check if this EXACT message already exists in the conversation
+                            var normalizedNewContent = message.Content.Trim();
+                            var isExactDuplicate = messages.Any(m => 
+                                m.Role == "AI" && 
+                                m.Type == MessageType.Text &&
+                                m.Content.Trim().Equals(normalizedNewContent, StringComparison.Ordinal));
+                            
+                            if (isExactDuplicate)
+                            {
+                                logger.LogInformation("Skipping exact duplicate AI message: {Length} chars", message.Content.Length);
+                                continue;
+                            }
+                            
+                            // Check for similar messages (near-duplicates)
+                            var isSimilarDuplicate = messages.Any(m => 
                                 m.Role == "AI" && 
                                 m.Type == MessageType.Text &&
                                 TextSimilarityService.AreSimilar(m.Content, message.Content, similarityThreshold: 0.95));
                             
-                            if (isDuplicate)
+                            if (isSimilarDuplicate)
                             {
-                                logger.LogInformation("Skipping duplicate AI message: {Length} chars", message.Content.Length);
+                                logger.LogInformation("Skipping similar duplicate AI message: {Length} chars", message.Content.Length);
                                 continue;
                             }
                             
