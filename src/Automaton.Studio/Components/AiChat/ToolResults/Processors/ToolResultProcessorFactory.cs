@@ -25,11 +25,45 @@ public class ToolResultProcessorFactory
 
     public ToolResultViewModel ProcessToolResult(string toolName, ToolResult toolResult, string currentLanguage)
     {
-        var processor = _processors.TryGetValue(toolName, out var specificProcessor) 
-            ? specificProcessor 
-            : _genericProcessor;
-
-        return processor.ProcessResult(toolResult, currentLanguage);
+        if (_processors.TryGetValue(toolName, out var specificProcessor))
+        {
+            return specificProcessor.ProcessResult(toolResult, currentLanguage);
+        }
+        
+        // For generic processor, pass the actual tool name for better display
+        return ProcessGenericResult(toolName, toolResult);
+    }
+    
+    private ToolResultViewModel ProcessGenericResult(string toolName, ToolResult toolResult)
+    {
+        // Format tool name for display (e.g., "suggest_variables" -> "Suggest variables")
+        var displayName = FormatToolNameForDisplay(toolName);
+        
+        return new ToolResultViewModel
+        {
+            Icon = "tool",
+            Description = displayName,
+            StatusIcon = toolResult.IsSuccess ? "check-circle" : "close-circle",
+            Status = toolResult.IsSuccess ? "Success" : "Failed",
+            IsSuccess = toolResult.IsSuccess,
+            ResultType = ToolResultType.Generic,
+            Summary = toolResult.IsSuccess ? "Tool executed successfully" : null,
+            ErrorMessage = toolResult.IsSuccess ? null : toolResult.ErrorMessage
+        };
+    }
+    
+    private string FormatToolNameForDisplay(string toolName)
+    {
+        if (string.IsNullOrEmpty(toolName))
+            return "Executing tool";
+            
+        // Convert snake_case to readable format (e.g., "suggest_variables" -> "Suggest variables")
+        var words = toolName.Split('_');
+        if (words.Length > 0)
+        {
+            words[0] = char.ToUpper(words[0][0]) + words[0].Substring(1);
+        }
+        return string.Join(" ", words);
     }
 
     public IEnumerable<string> GetSupportedTools()

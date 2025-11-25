@@ -568,21 +568,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         if (result.IsSuccess)
         {
-            // Remove the last AI reasoning message to avoid duplication
-            // since it will be shown in the CodeSuccessDisplay component with better formatting
-            if (!string.IsNullOrEmpty(result.GeneratedCode))
-            {
-                var lastReasoningMessage = messages.LastOrDefault(m => m.Type == MessageType.Text && m.Role == "AI");
-                if (lastReasoningMessage != null)
-                {
-                    // Check if the reasoning message contains similar content to the final result
-                    if (TextSimilarityService.AreSimilar(lastReasoningMessage.Content, result.GeneratedCode, similarityThreshold: 0.6))
-                    {
-                        messages.Remove(lastReasoningMessage);
-                        logger.LogInformation("Removed duplicate AI reasoning message before code result display");
-                    }
-                }
-            }
+            // Note: We no longer remove AI reasoning messages here.
+            // The final explanation from the AI should be displayed in the chat panel
+            // alongside the generated code. Only duplicate messages (detected earlier via
+            // similarity check in OnConversationUpdated) are skipped.
             
             var processor = CreateResultProcessor();
             await processor.ProcessSuccessResult(result, userPrompt, selectedAgent);
