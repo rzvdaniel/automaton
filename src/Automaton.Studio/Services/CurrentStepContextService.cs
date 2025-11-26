@@ -157,9 +157,20 @@ public class CurrentStepContextService : ICurrentStepContextService
         }
         else
         {
+            // Log diagnostic information to help identify the timing issue
             _logger.LogWarning("SetCodeAsync called but _currentStep is null or has no Definition. " +
-                "Code length: {CodeLength}. Ensure SetCurrentStep() is called before AI conversation starts.",
+                "Code length: {CodeLength}. This typically happens when SetCurrentStep() wasn't called before the AI conversation started, " +
+                "or if the Blazor circuit was reset. Check that StepPage.OnInitializedAsync() completes before AI chat interaction.",
                 code?.Length ?? 0);
+            
+            // Even though _currentStep is null, still fire the CodeChanged event with the code
+            // This allows any subscribers to still receive the code update
+            // The subscriber (StepPage) can use the code directly even without a step ID
+            CodeChanged?.Invoke(this, new CodeChangedEventArgs
+            {
+                StepId = null,  // Unknown step ID - subscriber should use code directly
+                NewCode = code
+            });
         }
     }
 
