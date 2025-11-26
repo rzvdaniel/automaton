@@ -155,6 +155,12 @@ public class CurrentStepContextService : ICurrentStepContextService
                 NewCode = code
             });
         }
+        else
+        {
+            _logger.LogWarning("SetCodeAsync called but _currentStep is null or has no Definition. " +
+                "Code length: {CodeLength}. Ensure SetCurrentStep() is called before AI conversation starts.",
+                code?.Length ?? 0);
+        }
     }
 
     public async Task<int> CreateInputVariablesAsync(List<(string Name, string Description)> variables)

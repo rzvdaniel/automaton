@@ -5,15 +5,19 @@ namespace Automaton.Studio.Components.AiChat.Services;
 /// </summary>
 public static class CodeDetectionService
 {
-    private static readonly string[] CodeIndicators = 
+    // Strong code indicators - unambiguous programming constructs
+    private static readonly string[] StrongCodeIndicators = 
     {
         "def ", "class ", "import ", "from ", // Python
-        "function ", "const ", "let ", "var ", // JavaScript
+        "function ", "const ", "let ", "var ", // JavaScript  
         "public ", "private ", "void ", "int ", "string ", // C#
-        "if ", "for ", "while ", "try ", "catch ", // General programming constructs
-        "{", "}", "[", "]", "(", ")", "=", ";", // Code symbols
+        "async ", "await ", "return ", // General async/return
+        "=>", "->", // Arrow functions
+        "namespace ", "using ", // C# namespaces
+        "export ", "require(", // JavaScript modules
     };
-
+    
+    // Phrases that indicate conversational/explanatory text (NOT code)
     private static readonly string[] ExplanatoryPhrases = 
     {
         "the persistent failure",
@@ -22,7 +26,23 @@ public static class CodeDetectionService
         "as a workaround",
         "you can try",
         "if you have further details",
-        "those could help"
+        "those could help",
+        "has been successfully",
+        "has been removed",
+        "has been updated",
+        "has been modified",
+        "has been added",
+        "feel free to",
+        "let me know",
+        "if you need",
+        "you can now",
+        "the code has been",
+        "i've updated",
+        "i have updated",
+        "successfully updated",
+        "successfully removed",
+        "successfully added",
+        "successfully modified",
     };
 
     /// <summary>
@@ -35,31 +55,25 @@ public static class CodeDetectionService
         if (string.IsNullOrWhiteSpace(response))
             return false;
 
-        // Check for code block markers (most reliable indicator)
+        // MOST RELIABLE: Code block markers (```) indicate actual code
         if (response.Contains("```"))
             return true;
 
-        // Check for specific programming language keywords
-        if (response.Contains("def ") || response.Contains("import "))
-            return true;
-
-        // Check for actual code structure (not just explanatory text)
-        var hasCodeStructure = CodeIndicators.Any(indicator => 
-            response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
-
-        // Check if it's mostly explanatory text
+        // Check for explanatory text phrases first - these indicate NOT code
         var hasExplanatoryText = ExplanatoryPhrases.Any(phrase => 
             response.Contains(phrase, StringComparison.OrdinalIgnoreCase));
-
-        // If it has explanatory text and no clear code structure, it's probably not code
-        if (hasExplanatoryText && !hasCodeStructure)
+        
+        // If it has explanatory phrases, it's likely a text explanation, not code
+        if (hasExplanatoryText)
             return false;
 
-        // Check if it has multiple programming keywords (indicates code)
-        var keywordCount = CodeIndicators.Count(indicator => 
+        // Count strong code indicators (unambiguous programming constructs)
+        var strongIndicatorCount = StrongCodeIndicators.Count(indicator => 
             response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
 
-        return keywordCount >= 3; // Require at least 3 programming keywords
+        // Require at least 2 strong programming keywords to consider it code
+        // This avoids false positives from casual English text
+        return strongIndicatorCount >= 2;
     }
 
     /// <summary>
@@ -76,21 +90,17 @@ public static class CodeDetectionService
 
         // Code block markers are very strong indicators
         if (response.Contains("```"))
-            score += 0.4;
+            score += 0.5;
 
-        // Python-specific indicators
-        if (response.Contains("def ") || response.Contains("import "))
-            score += 0.3;
-
-        // Count programming keywords
-        var keywordCount = CodeIndicators.Count(indicator => 
+        // Count strong programming keywords
+        var keywordCount = StrongCodeIndicators.Count(indicator => 
             response.Contains(indicator, StringComparison.OrdinalIgnoreCase));
-        score += Math.Min(keywordCount * 0.05, 0.3); // Max 0.3 from keywords
+        score += Math.Min(keywordCount * 0.1, 0.4); // Max 0.4 from keywords
 
-        // Penalize explanatory text
+        // Penalize explanatory text - stronger penalty
         var explanatoryCount = ExplanatoryPhrases.Count(phrase => 
             response.Contains(phrase, StringComparison.OrdinalIgnoreCase));
-        score -= Math.Min(explanatoryCount * 0.1, 0.2); // Max -0.2 penalty
+        score -= Math.Min(explanatoryCount * 0.15, 0.5); // Max -0.5 penalty
 
         // Ensure score is within bounds
         return Math.Max(0.0, Math.Min(1.0, score));
