@@ -79,14 +79,10 @@ public class AskModeResultStrategy : IConversationResultStrategy
 
     private void ProcessTextResult(ConversationResult result)
     {
-        var responseMessage = new ChatMessage("AI", result.GeneratedCode ?? "No response received.", DateTime.Now)
-        {
-            Type = MessageType.Text,
-            IsSuccess = true
-        };
-
-        _messages.Add(responseMessage);
-        _logger.LogInformation("Text response generated in Ask mode: {ContentLength} characters", 
-            responseMessage.Content.Length);
+        // Text messages are already added via OnConversationUpdated handler in AiChatPanel
+        // which handles real-time streaming of AI responses. We don't add them here to avoid duplicates.
+        // This method is kept for potential future use cases where text-only responses need special handling.
+        _logger.LogInformation("Text response received in Ask mode (already displayed via real-time updates): {ContentLength} characters", 
+            result.GeneratedCode?.Length ?? 0);
     }
 }
