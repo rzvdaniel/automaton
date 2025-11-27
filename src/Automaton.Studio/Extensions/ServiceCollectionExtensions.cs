@@ -73,11 +73,19 @@ public static class ServiceCollectionExtensions
 
         // Register MCP services
         services.AddAutomatonMcpClient();
-        services.AddScoped<IMcpToolProvider, StudioMcpToolProvider>();
+        
+        // Register individual tool providers
+        services.AddScoped<StudioMcpToolProvider>();
+        services.AddScoped<WebAppMcpToolProvider>();
+        
+        // Register composite provider as the main IMcpToolProvider
+        services.AddScoped<IMcpToolProvider, CompositeMcpToolProvider>();
+        
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
         services.AddScoped<IWebAppSystemPromptBuilder, WebAppSystemPromptBuilder>();
         services.AddScoped<ICustomStepExecuteService, CustomStepExecuteService>();
         services.AddScoped<ICurrentStepContextService, CurrentStepContextService>();
+        services.AddScoped<ICurrentWebAppContextService, CurrentWebAppContextService>();
 
         // Services
         services.AddScoped<Services.ConfigurationService>();

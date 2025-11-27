@@ -25,13 +25,13 @@ public class WebAppAiChatContext : IAiChatContext
 
     public string InputPlaceholder => "Describe the web page you want to create (HTML/CSS/JavaScript)...";
 
-    public string InitialSystemMessage => "AI web code generation ready. I can help you create HTML, CSS, and JavaScript pages.";
+    public string InitialSystemMessage => "AI web code generation ready with MCP integration. AI can now see and edit your HTML code in real-time.";
 
     public string Language => "html";
 
-    public bool ShowAgentSelector => false;
+    public bool ShowAgentSelector => true;  // Enable Agent/Ask selector for WebApps
 
-    public bool ProcessToolResults => false; // WebApps don't use Step-specific MCP tools
+    public bool ProcessToolResults => true; // Enable MCP tools for WebApps
 
     public string BuildSystemPrompt()
     {

@@ -46,12 +46,16 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IWebAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
+    [Inject] private ICurrentWebAppContextService CurrentWebAppContextService { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         loading = true;
+
+        // Subscribe to code changes from MCP tools
+        CurrentWebAppContextService.CodeChanged += OnCodeChangedByMcpTools;
 
         try
         {
@@ -64,6 +68,11 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             if (Guid.TryParse(AppId, out var appGuid))
             {
                 currentApp = await AppsService.Load(appGuid);
+                
+                // Register current web app with the context service
+                CurrentWebAppContextService.SetCurrentWebApp(
+                    currentApp,
+                    GetCurrentCodeForAI);
             }
         }
         catch
@@ -616,10 +625,40 @@ partial class AppPage : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Unsubscribe from code changes
+        CurrentWebAppContextService.CodeChanged -= OnCodeChangedByMcpTools;
+        
         // Dispose preview handler
         if (PreviewMessageHandler != null)
         {
             await PreviewMessageHandler.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Handle code changes from MCP tools (AI-generated code updates)
+    /// </summary>
+    private async void OnCodeChangedByMcpTools(object? sender, WebAppCodeChangedEventArgs e)
+    {
+        try
+        {
+            // Update Monaco editor with the new code saved by MCP tools
+            if (codeEditor != null && !string.IsNullOrEmpty(e.NewCode))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await codeEditor.SetValue(e.NewCode);
+                    currentApp.Definition.HtmlContent = e.NewCode;
+                    StateHasChanged();
+                });
+                
+                Logger.LogInformation("Code updated in Monaco editor from MCP tools: {Length} chars", e.NewCode.Length);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating editor from MCP tools");
+            _ = MessageService.ErrorAsync($"Error updating editor: {ex.Message}");
         }
     }
 }
