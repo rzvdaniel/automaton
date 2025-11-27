@@ -1,7 +1,17 @@
 ﻿namespace Automaton.Studio.Components.AiChat.ToolResults.Processors;
 
-public record ChatMessage(string Role, string Content, DateTime Time)
+public record ChatMessage
 {
+    public ChatMessage(string role, string content, DateTime time)
+    {
+        Role = role;
+        Content = content;
+        Time = time;
+    }
+
+    public string Role { get; init; }
+    public string Content { get; init; }
+    public DateTime Time { get; init; }
     public bool IsGenerating { get; init; } = false;
     public string? CodeId { get; init; }
     public bool IsSuccess { get; init; } = true;

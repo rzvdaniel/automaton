@@ -166,8 +166,8 @@
         }
         else
         {
-            // Navigate to app designer (fallback for unpublished apps)
-            Navigation.NavigateTo($"/appdesigner/{app.Id}");
+            // Navigate to app (fallback for unpublished apps)
+            Navigation.NavigateTo($"/app/{app.Id}");
         }
     }
 

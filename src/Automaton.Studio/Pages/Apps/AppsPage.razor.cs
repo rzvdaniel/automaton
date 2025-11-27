@@ -51,7 +51,7 @@ partial class AppsPage : ComponentBase
 
     private void EditApp(Guid id)
     {
-        NavigationManager.NavigateTo($"appdesigner/{id}");
+        NavigationManager.NavigateTo($"app/{id}");
     }
 
     private async Task ViewApp(string publicUrl)

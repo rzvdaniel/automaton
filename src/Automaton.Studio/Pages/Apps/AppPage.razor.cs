@@ -13,7 +13,7 @@ using Automaton.Studio.Pages.Authentication.Config;
 
 namespace Automaton.Studio.Pages.Apps;
 
-partial class AppDesignerPage : ComponentBase, IAsyncDisposable
+partial class AppPage : ComponentBase, IAsyncDisposable
 {
     private StandaloneCodeEditor codeEditor;
     private bool loading = false;
@@ -41,7 +41,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
     [Inject] private ModalService ModalService { get; set; }
     [Inject] private RunnerService RunnerService { get; set; }
     [Inject] private IWebHostEnvironment WebHostEnvironment { get; set; }
-    [Inject] private ILogger<AppDesignerPage> Logger { get; set; }
+    [Inject] private ILogger<AppPage> Logger { get; set; }
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
@@ -83,11 +83,11 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             var scriptPath = Path.Combine(WebHostEnvironment.WebRootPath, "automatonApi.js");
             automatonApiScript = await File.ReadAllTextAsync(scriptPath);
-            Logger.LogInformation("[AppDesigner] Loaded automatonApi.js ({Length} bytes)", automatonApiScript.Length);
+            Logger.LogInformation("Loaded automatonApi.js ({Length} bytes)", automatonApiScript.Length);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[AppDesigner] Failed to load automatonApi.js");
+            Logger.LogError(ex, "Failed to load automatonApi.js");
             automatonApiScript = null;
         }
     }
@@ -103,17 +103,17 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                 {
                     { "Authorization", $"Bearer {accessToken}" }
                 };
-                Logger.LogInformation("[AppDesigner] Upload headers initialized with JWT token");
+                Logger.LogInformation("Upload headers initialized with JWT token");
             }
             else
             {
-                Logger.LogWarning("[AppDesigner] No access token found in authentication storage");
+                Logger.LogWarning("No access token found in authentication storage");
                 uploadHeaders = new Dictionary<string, string>();
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[AppDesigner] Failed to initialize upload headers");
+            Logger.LogError(ex, "Failed to initialize upload headers");
             uploadHeaders = new Dictionary<string, string>();
         }
     }
@@ -137,11 +137,11 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         {
             await PreviewMessageHandler.InitializeAsync();
             previewHandlerInitialized = true;
-            Logger.LogInformation("[AppDesigner] Preview handler initialized");
+            Logger.LogInformation("Preview handler initialized");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[AppDesigner] Failed to initialize preview handler");
+            Logger.LogError(ex, "Failed to initialize preview handler");
         }
     }
 
@@ -360,7 +360,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[AppDesigner] Error generating preview HTML");
+            Logger.LogError(ex, "Error generating preview HTML");
             return GetDefaultHtmlContent();
         }
     }
@@ -562,7 +562,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
                 }
                 catch (Exception parseEx)
                 {
-                    Logger.LogError(parseEx, "[AppDesigner] Failed to parse upload response");
+                    Logger.LogError(parseEx, "Failed to parse upload response");
                     _ = MessageService.ErrorAsync($"Failed to process upload response: {parseEx.Message}");
                 }
             }
@@ -574,7 +574,7 @@ partial class AppDesignerPage : ComponentBase, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[AppDesigner] Error uploading image");
+            Logger.LogError(ex, "Error uploading image");
             _ = MessageService.ErrorAsync($"Error uploading image: {ex.Message}");
         }
     }
