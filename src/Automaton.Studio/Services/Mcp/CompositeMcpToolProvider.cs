@@ -2,11 +2,13 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
+using Automaton.Studio.Components.AiChat.Contexts;
 
 namespace Automaton.Studio.Services.Mcp;
 
 /// <summary>
 /// Composite MCP tool provider that delegates to the appropriate provider based on context.
+/// The context explicitly specifies which tool provider to use via the "toolProviderType" key.
 /// This enables clear separation of concerns between Step and WebApp MCP tools.
 /// </summary>
 public class CompositeMcpToolProvider : IMcpToolProvider
@@ -38,45 +40,42 @@ public class CompositeMcpToolProvider : IMcpToolProvider
 
     public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, string? contextId = null, Dictionary<string, object>? context = null)
     {
-        // Determine which provider to use based on context
-        var isWebAppContext = IsWebAppContext(context);
+        // Determine which provider to use based on explicit toolProviderType in context
+        var providerType = GetToolProviderType(context);
 
-        _logger.LogDebug("Executing tool {ToolName} with {ContextType} context", 
-            toolName, isWebAppContext ? "WebApp" : "Step");
+        _logger.LogDebug("Executing tool {ToolName} with {ContextType} provider", 
+            toolName, providerType);
 
-        if (isWebAppContext)
+        if (providerType == McpToolProviderType.WebApp)
         {
             return await _webAppToolProvider.ExecuteToolAsync(toolName, arguments, contextId, context);
         }
         else
         {
+            // Default to Step provider
             return await _stepToolProvider.ExecuteToolAsync(toolName, arguments, contextId, context);
         }
     }
 
     /// <summary>
-    /// Determine if the context is for a WebApp based on the language or other indicators
+    /// Get the tool provider type from context. 
+    /// The context explicitly specifies which provider to use via the "toolProviderType" key.
     /// </summary>
-    private bool IsWebAppContext(Dictionary<string, object>? context)
+    private McpToolProviderType GetToolProviderType(Dictionary<string, object>? context)
     {
-        if (context == null) return false;
+        if (context == null) return McpToolProviderType.Step;
 
-        // Check for HTML language indicator
-        if (context.TryGetValue("language", out var langObj))
+        // Check for explicit toolProviderType marker (set by IAiChatContext.GetAdditionalContext)
+        if (context.TryGetValue("toolProviderType", out var typeObj))
         {
-            var language = langObj?.ToString()?.ToLowerInvariant();
-            if (language == "html" || language == "css" || language == "javascript")
+            var typeString = typeObj?.ToString();
+            if (Enum.TryParse<McpToolProviderType>(typeString, out var providerType))
             {
-                return true;
+                return providerType;
             }
         }
 
-        // Check for WebApp-specific context markers
-        if (context.ContainsKey("isWebApp") && context["isWebApp"] is bool isWebApp && isWebApp)
-        {
-            return true;
-        }
-
-        return false;
+        // Default to Step provider
+        return McpToolProviderType.Step;
     }
 }
