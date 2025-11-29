@@ -2,6 +2,7 @@
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
+using Automaton.Studio.Services.Mcp;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -36,6 +37,7 @@ partial class StepPage : ComponentBase, IDisposable
     [Inject] private RunnerService RunnerService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; }
+    [Inject] private Automaton.Studio.Services.Mcp.IStudioMcpClient StudioMcpClient { get; set; }
 
     [Parameter] public string StepId { get; set; }
 

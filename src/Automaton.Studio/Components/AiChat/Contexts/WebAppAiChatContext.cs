@@ -33,8 +33,6 @@ public class WebAppAiChatContext : IAiChatContext
 
     public bool ProcessToolResults => true; // Enable MCP tools for WebApps
 
-    public McpToolProviderType ToolProviderType => McpToolProviderType.WebApp;
-
     public string BuildSystemPrompt()
     {
         return _promptBuilder.BuildSystemPrompt();
@@ -50,8 +48,7 @@ public class WebAppAiChatContext : IAiChatContext
         return new Dictionary<string, object>
         {
             ["language"] = "html",
-            ["getCurrentCode"] = _getCurrentCode ?? (() => Task.FromResult(string.Empty)),
-            ["toolProviderType"] = McpToolProviderType.WebApp.ToString()
+            ["getCurrentCode"] = _getCurrentCode ?? (() => Task.FromResult(string.Empty))
         };
     }
 }

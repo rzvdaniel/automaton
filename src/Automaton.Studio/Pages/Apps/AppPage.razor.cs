@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using Automaton.Studio.Pages.Authentication.Config;
+using Automaton.Studio.Services.Mcp;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -47,6 +48,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IWebAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
     [Inject] private ICurrentWebAppContextService CurrentWebAppContextService { get; set; }
+    [Inject] private Automaton.Studio.Services.Mcp.IWebAppMcpClient WebAppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
 

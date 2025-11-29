@@ -11,17 +11,18 @@ using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 using Automaton.Mcp.Enums;
 using Automaton.Studio.Components.AiChat.Models;
 using Automaton.Studio.Components.AiChat.Contexts;
+using Automaton.Studio.Services.Mcp;
 
 namespace Automaton.Studio.Components.AiChat;
 
 public partial class AiChatPanel : ComponentBase, IDisposable
 {
     [Parameter] public IAiChatContext Context { get; set; } = default!;
+    [Parameter] public IMcpClient McpClient { get; set; } = default!;
     [Parameter] public EventCallback<string> OnSend { get; set; }
     [Parameter] public EventCallback<string> OnCodeGenerated { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
-    [Inject] private IAutomatonMcpClient McpClient { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<AiChatPanel> logger { get; set; } = default!;
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
@@ -55,7 +56,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             Type = MessageType.System 
         });
 
+        // Subscribe to MCP client events
         McpClient.ConversationUpdated += OnConversationUpdated;
+        
         await LoadProvidersAsync();
     }
 

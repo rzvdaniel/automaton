@@ -1,7 +1,7 @@
 using Automaton.Studio.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Services;
+namespace Automaton.Studio.Services.Mcp;
 
 /// <summary>
 /// Shared service for maintaining current web app context across components.

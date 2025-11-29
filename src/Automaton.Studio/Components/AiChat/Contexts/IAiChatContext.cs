@@ -1,22 +1,6 @@
 namespace Automaton.Studio.Components.AiChat.Contexts;
 
 /// <summary>
-/// Type of MCP tool provider to use for AI chat
-/// </summary>
-public enum McpToolProviderType
-{
-    /// <summary>
-    /// Step-specific tools (Python, PowerShell, JavaScript code editing and execution)
-    /// </summary>
-    Step,
-    
-    /// <summary>
-    /// WebApp-specific tools (HTML/CSS/JavaScript editing)
-    /// </summary>
-    WebApp
-}
-
-/// <summary>
 /// Defines the context for AI chat interactions, allowing different scenarios (Steps, WebApps, Flows) to customize behavior
 /// </summary>
 public interface IAiChatContext
@@ -50,11 +34,6 @@ public interface IAiChatContext
     /// Whether tool results should be processed (Step-specific MCP tools like execute_code)
     /// </summary>
     bool ProcessToolResults { get; }
-
-    /// <summary>
-    /// The type of MCP tool provider to use for this context
-    /// </summary>
-    McpToolProviderType ToolProviderType { get; }
 
     /// <summary>
     /// Build the system prompt for AI conversations

@@ -71,15 +71,13 @@ public static class ServiceCollectionExtensions
         services.AddCourier(Assembly.GetExecutingAssembly());
         services.AddScoped<IAuthenticationStorage, WebAuthenticationStorage>();
 
-        // Register MCP services
-        services.AddAutomatonMcpClient();
-        
-        // Register individual tool providers
+        // Register MCP services - Tool providers and explicit context clients
         services.AddScoped<StudioMcpToolProvider>();
         services.AddScoped<WebAppMcpToolProvider>();
         
-        // Register composite provider as the main IMcpToolProvider
-        services.AddScoped<IMcpToolProvider, CompositeMcpToolProvider>();
+        // Register context-specific MCP clients
+        services.AddScoped<IStudioMcpClient, StudioMcpClient>();
+        services.AddScoped<IWebAppMcpClient, WebAppMcpClient>();
         
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
         services.AddScoped<IWebAppSystemPromptBuilder, WebAppSystemPromptBuilder>();

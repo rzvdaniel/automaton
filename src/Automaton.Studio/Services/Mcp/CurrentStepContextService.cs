@@ -2,7 +2,7 @@ using Automaton.Studio.Domain;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Services;
+namespace Automaton.Studio.Services.Mcp;
 
 /// <summary>
 /// Shared service for maintaining current step context across components
@@ -181,7 +181,7 @@ public class CurrentStepContextService : ICurrentStepContextService
         var created = 0;
         foreach (var (name, description) in variables)
         {
-            var variable = new Automaton.Core.Models.StepVariable
+            var variable = new StepVariable
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = name,
@@ -207,7 +207,7 @@ public class CurrentStepContextService : ICurrentStepContextService
         var created = 0;
         foreach (var (name, description) in variables)
         {
-            var variable = new Automaton.Core.Models.StepVariable
+            var variable = new StepVariable
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = name,

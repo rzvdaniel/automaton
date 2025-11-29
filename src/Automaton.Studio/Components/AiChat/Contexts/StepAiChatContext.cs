@@ -43,8 +43,6 @@ public class StepAiChatContext : IAiChatContext
 
     public bool ProcessToolResults => true;
 
-    public McpToolProviderType ToolProviderType => McpToolProviderType.Step;
-
     public string BuildSystemPrompt()
     {
         return _promptBuilder.BuildSystemPrompt(_currentLanguage);
@@ -62,8 +60,7 @@ public class StepAiChatContext : IAiChatContext
             ["language"] = _currentLanguage,
             ["inputVariables"] = _inputVariables ?? new List<VariableInfo>(),
             ["outputVariables"] = _outputVariables ?? new List<VariableInfo>(),
-            ["getCurrentCode"] = _getCurrentCode ?? (() => Task.FromResult(string.Empty)),
-            ["toolProviderType"] = McpToolProviderType.Step.ToString()
+            ["getCurrentCode"] = _getCurrentCode ?? (() => Task.FromResult(string.Empty))
         };
     }
 }
