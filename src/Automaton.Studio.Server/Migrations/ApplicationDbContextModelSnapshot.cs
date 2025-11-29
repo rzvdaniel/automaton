@@ -78,114 +78,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiApiKeyUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ModelName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<Guid>("ProviderId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DisplayOrder");
-
-                    b.HasIndex("Enabled");
-
-                    b.HasIndex("ProviderId");
-
-                    b.HasIndex("ProviderId", "ModelName")
-                        .IsUnique();
-
-                    b.ToTable("AiModels", (string)null);
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("DefaultModel")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("Provider")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ProviderName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DisplayOrder");
-
-                    b.HasIndex("Enabled");
-
-                    b.HasIndex("Provider")
-                        .IsUnique();
-
-                    b.ToTable("AiProviders", (string)null);
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1203,17 +1095,6 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
-                {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "Provider")
-                        .WithMany("Models")
-                        .HasForeignKey("ProviderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Provider");
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApiKey", null)
@@ -1552,11 +1433,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AiApiKeyUsers");
 
                     b.Navigation("ProjectAiApiKeys");
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
-                {
-                    b.Navigation("Models");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
