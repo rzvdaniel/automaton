@@ -6,20 +6,20 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Implementation of the current app context service
 /// </summary>
-public class AppContextService : IAppContextService
+public class AppEditorBridge : IAppEditorBridge
 {
     private AppModel? _currentApp;
     private Func<Task<string>>? _getCurrentCodeCallback;
-    private readonly ILogger<AppContextService> _logger;
+    private readonly ILogger<AppEditorBridge> _logger;
 
     public event EventHandler<AppCodeChangedEventArgs>? CodeChanged;
 
-    public AppContextService(ILogger<AppContextService> logger)
+    public AppEditorBridge(ILogger<AppEditorBridge> logger)
     {
         _logger = logger;
     }
 
-    public event EventHandler<AppContextChangedEventArgs>? WebAppContextChanged;
+    public event EventHandler<AppEditorBridgeChangedEventArgs>? WebAppContextChanged;
 
     public void SetCurrentApp(AppModel app, Func<Task<string>>? getCurrentCodeCallback = null)
     {
@@ -28,7 +28,7 @@ public class AppContextService : IAppContextService
         
         _logger.LogDebug("Current web app context set: {AppId}", app.Id);
         
-        WebAppContextChanged?.Invoke(this, new AppContextChangedEventArgs
+        WebAppContextChanged?.Invoke(this, new AppEditorBridgeChangedEventArgs
         {
             AppId = app.Id.ToString()
         });
@@ -101,7 +101,7 @@ public class AppContextService : IAppContextService
 /// <summary>
 /// Event arguments for app context changes
 /// </summary>
-public class AppContextChangedEventArgs : EventArgs
+public class AppEditorBridgeChangedEventArgs : EventArgs
 {
     public string? AppId { get; set; }
 }

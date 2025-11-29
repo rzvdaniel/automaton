@@ -33,7 +33,7 @@ partial class StepPage : ComponentBase, IDisposable
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private AiCodeCleanupService CodeCleanupService { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
-    [Inject] private IStepContextService CurrentStepContextService { get; set; }
+    [Inject] private IStepEditorBridge CurrentStepContextService { get; set; }
     [Inject] private RunnerService RunnerService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; }

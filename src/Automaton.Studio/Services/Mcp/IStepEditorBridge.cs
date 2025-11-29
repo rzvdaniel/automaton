@@ -6,7 +6,7 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Shared service for maintaining step context across components
 /// </summary>
-public interface IStepContextService
+public interface IStepEditorBridge
 {
     /// <summary>
     /// Set the current step being edited
@@ -56,7 +56,7 @@ public interface IStepContextService
     /// <summary>
     /// Event fired when step context changes
     /// </summary>
-    event EventHandler<StepContextChangedEventArgs>? StepContextChanged;
+    event EventHandler<StepEditorBridgeChangedEventArgs>? StepContextChanged;
 
     /// <summary>
     /// Event fired when code is updated (e.g., by MCP tools)

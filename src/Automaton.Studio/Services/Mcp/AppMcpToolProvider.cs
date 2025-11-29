@@ -12,13 +12,13 @@ namespace Automaton.Studio.Services.Mcp;
 public class AppMcpToolProvider : IMcpToolProvider
 {
     private readonly ILogger<AppMcpToolProvider> _logger;
-    private readonly IAppContextService _webAppContextService;
+    private readonly IAppEditorBridge _webAppContextService;
     private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, WebAppContext> _appContexts = new();
 
     public AppMcpToolProvider(
         ILogger<AppMcpToolProvider> logger,
-        IAppContextService webAppContextService,
+        IAppEditorBridge webAppContextService,
         AiCodeCleanupService codeCleanupService)
     {
         _logger = logger;

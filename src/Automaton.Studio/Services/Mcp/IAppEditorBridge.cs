@@ -6,7 +6,7 @@ namespace Automaton.Studio.Services.Mcp;
 /// Shared service for maintaining current web app context across components.
 /// Similar to StepContextService but for Apps.
 /// </summary>
-public interface IAppContextService
+public interface IAppEditorBridge
 {
     /// <summary>
     /// Set the current app being edited
@@ -31,7 +31,7 @@ public interface IAppContextService
     /// <summary>
     /// Event fired when web app context changes
     /// </summary>
-    event EventHandler<AppContextChangedEventArgs>? WebAppContextChanged;
+    event EventHandler<AppEditorBridgeChangedEventArgs>? WebAppContextChanged;
 
     /// <summary>
     /// Event fired when code is updated (e.g., by MCP tools)

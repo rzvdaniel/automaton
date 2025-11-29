@@ -7,20 +7,20 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Implementation of the current step context service
 /// </summary>
-public class StepContextService : IStepContextService
+public class StepEditorBridge : IStepEditorBridge
 {
     private CustomStep? _currentStep;
     private Func<Task<string>>? _getCurrentCodeCallback;
-    private readonly ILogger<StepContextService> _logger;
+    private readonly ILogger<StepEditorBridge> _logger;
 
     public event EventHandler<CodeChangedEventArgs>? CodeChanged;
 
-    public StepContextService(ILogger<StepContextService> logger)
+    public StepEditorBridge(ILogger<StepEditorBridge> logger)
     {
         _logger = logger;
     }
 
-    public event EventHandler<StepContextChangedEventArgs>? StepContextChanged;
+    public event EventHandler<StepEditorBridgeChangedEventArgs>? StepContextChanged;
 
     public void SetCurrentStep(CustomStep customStep, Func<Task<string>>? getCurrentCodeCallback = null)
     {
@@ -29,7 +29,7 @@ public class StepContextService : IStepContextService
         
         _logger.LogDebug("Current step context set: {StepId}", customStep.Id);
         
-        StepContextChanged?.Invoke(this, new StepContextChangedEventArgs
+        StepContextChanged?.Invoke(this, new StepEditorBridgeChangedEventArgs
         {
             StepId = customStep.Id.ToString(),
             Language = customStep.Definition?.Language
@@ -169,7 +169,7 @@ public class StepContextService : IStepContextService
 /// <summary>
 /// Event arguments for step context changes
 /// </summary>
-public class StepContextChangedEventArgs : EventArgs
+public class StepEditorBridgeChangedEventArgs : EventArgs
 {
     public string? StepId { get; set; }
     public string? Language { get; set; }
