@@ -1,6 +1,9 @@
 ﻿using AntDesign;
 using Automaton.Core.Enums;
 using Blazored.FluentValidation;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Rendering;
 
 namespace Automaton.Studio.Pages.Flows.Designer.Components.NewVariable;
 
@@ -9,6 +12,28 @@ public partial class VariableDialog : FeedbackComponent<VariableModel>
     private VariableModel model;
     private FluentValidationValidator validator;
     private IEnumerable<VariableType> VariableTypes { get; } = Enum.GetValues<VariableType>();
+    private InputPassword _inputPassword;
+    private bool passwordVisible = false;
+
+    // Attributes for password visibility toggle icon
+    private Dictionary<string, object> passwordIconAttributes = new()
+    {
+        ["Class"] = "custom-password-icon",
+        ["Type"] = IconType.Outline.EyeInvisible,
+        ["Theme"] = IconThemeType.Outline
+    };
+
+    private Dictionary<string, object> hideAttributes = new()
+    {
+        ["Type"] = IconType.Outline.EyeInvisible,
+        ["Style"] = ""
+    };
+
+    private Dictionary<string, object> showAttributes = new()
+    {
+        ["Type"] = IconType.Outline.Eye,
+        ["Style"] = "color: #1890ff"
+    };
 
     protected override void OnInitialized()
     {
@@ -33,7 +58,11 @@ public partial class VariableDialog : FeedbackComponent<VariableModel>
     // ✅ Helper methods for value input
     private string GetValuePlaceholder(VariableModel variable)
     {
-        return "Enter value (API key, text, etc.)...";
+        if (variable.IsSensitive)
+        {
+            return "Enter sensitive value (password, API key, token, etc.)...";
+        }
+        return "Enter value (text, number, JSON, etc.)...";
     }
 
     private bool IsLongValue(object value)
@@ -44,5 +73,30 @@ public partial class VariableDialog : FeedbackComponent<VariableModel>
             return str.Length > 100;
         }
         return false;
+    }
+
+    // ✅ Simple password icon render - adapted for code-behind
+    private RenderFragment PasswordIconRender(Func<Task> clickActionAsync, Dictionary<string, object> iconAttributes)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<Icon>(0);
+            builder.AddMultipleAttributes(1, iconAttributes);
+            builder.AddAttribute(2, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, clickActionAsync));
+            builder.CloseComponent();
+        };
+    }
+
+    private async Task TogglePasswordVisibility()
+    {
+        passwordVisible = !passwordVisible;
+        passwordIconAttributes = passwordVisible ? showAttributes : hideAttributes;
+        
+        if (_inputPassword != null)
+        {
+            await _inputPassword.Focus();
+        }
+        
+        StateHasChanged();
     }
 }

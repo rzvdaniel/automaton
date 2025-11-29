@@ -16,9 +16,40 @@
 			<Input @bind-Value="@context.Name" Placeholder=@Placeholders.EnterVariableName />
 		</FormItem>
 
-		<!-- ✅ Value field with TextArea for long values like API keys -->
+		<!-- ✅ NEW: Sensitive checkbox -->
+		<FormItem Label="Sensitive">
+			<Checkbox @bind-Checked="@context.IsSensitive">
+				<span style="font-size: 13px; color: #595959;">
+					This variable contains sensitive data (password, API key, token, etc.)
+				</span>
+			</Checkbox>
+			@if (context.IsSensitive)
+			{
+				<div class="sensitive-info">
+					<Icon Type="lock" Theme="IconThemeType.Fill" Style="color: #faad14; font-size: 12px; margin-right: 4px;" />
+					<span>Value will be encrypted and stored securely</span>
+				</div>
+			}
+		</FormItem>
+
+		<!-- ✅ Value field with password input type for sensitive variables -->
 		<FormItem Label="Value">
-			@if (IsLongValue(context.Value))
+			@if (context.IsSensitive)
+			{
+				<!-- Password input for sensitive variables -->
+				<InputPassword @ref="_inputPassword"
+							   Value="@context.Value?.ToString()"
+							   OnChange="(x) => { context.Value = x; }"
+							   Placeholder="@GetValuePlaceholder(context)"
+							   IconRender="@PasswordIconRender(() => TogglePasswordVisibility(), passwordIconAttributes)"
+							   ShowPassword="@passwordVisible"
+							   Style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 13px;" />
+				<div class="value-hint sensitive-hint">
+					<Icon Type="eye-invisible" Style="font-size: 12px; margin-right: 4px;" />
+					<span>Value is hidden by default. Click the eye icon to reveal.</span>
+				</div>
+			}
+			else if (IsLongValue(context.Value))
 			{
 				<!-- Multi-line input for long values -->
 				<div class="value-editor-section">
@@ -70,10 +101,36 @@
 		background-color: #f6f8fa;
 		border-radius: 4px;
 		border: 1px solid #e1e4e8;
+		margin-top: 8px;
+	}
+
+	.sensitive-hint {
+		background-color: #fffbe6;
+		border-color: #ffe58f;
+		color: #ad8b00;
+	}
+
+	.sensitive-info {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		color: #ad8b00;
+		padding: 6px 10px;
+		background-color: #fffbe6;
+		border-radius: 4px;
+		border: 1px solid #ffe58f;
+		margin-top: 8px;
+	}
+
+	.custom-password-icon {
+		color: rgba(0,0,0,.45);
+		cursor: pointer;
+		transition: all .3s;
 	}
 
 	/* Style for monospace inputs */
-	.ant-input, .ant-input-textarea textarea {
+	.ant-input, .ant-input-textarea textarea, .ant-input-password input {
 		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 		font-size: 13px;
 	}

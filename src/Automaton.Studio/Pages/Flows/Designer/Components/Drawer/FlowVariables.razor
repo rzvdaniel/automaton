@@ -114,7 +114,15 @@
                                     <div class="variable-card editable-variable-card">
                                         <div class="variable-header">
                                             <div class="variable-info">
-                                                <div class="variable-name">@variable.Name</div>
+                                                <div class="variable-name">
+                                                    @variable.Name
+                                                    @if (variable.IsSensitive)
+                                                    {
+                                                        <Tooltip Title="Sensitive variable - encrypted storage">
+                                                            <Icon Type="lock" Theme="IconThemeType.Fill" Style="color: #faad14; font-size: 12px; margin-left: 6px;" />
+                                                        </Tooltip>
+                                                    }
+                                                </div>
                                             </div>
                                             <div class="variable-actions">
                                                 <Tooltip Title="Edit variable (name, type, description)">
@@ -133,9 +141,22 @@
                                             </div>
                                         </div>
 
-                                        <!-- ✅ NEW: Inline Value Editor for String type -->
+                                        <!-- ✅ Variable Value Editor -->
                                         <div class="variable-value-editor">
-                                            @if (IsLongValue(variable.Value))
+                                            @if (variable.IsSensitive)
+                                            {
+                                                <!-- Password input for sensitive variables -->
+                                                <InputPassword Value="@variable.Value?.ToString()" 
+                                                               Placeholder="@GetPlaceholder(variable)"
+                                                               OnChange="@((string value) => OnInputVariableValueChanged(variable, value))"
+                                                               VisibilityToggle="true"
+                                                               Class="value-password-input" />
+                                                <div class="editor-hint sensitive-hint">
+                                                    <Icon Type="eye-invisible" Style="font-size: 12px; margin-right: 4px;" />
+                                                    <span>Value is hidden by default. Click the eye icon to reveal.</span>
+                                                </div>
+                                            }
+                                            else if (IsLongValue(variable.Value))
                                             {
                                                 <!-- Multi-line input for long values -->
                                                 <div class="value-editor-container">
@@ -506,6 +527,26 @@ border-color: #1890ff !important;
         background: #ffffff !important;
     }
 
+    .value-password-input {
+        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace !important;
+        font-size: 13px !important;
+        border-radius: 6px !important;
+        border: 1.5px solid #d9d9d9 !important;
+        background: #ffffff !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .value-password-input:hover {
+        border-color: #40a9ff !important;
+        background: #fafbfc !important;
+    }
+
+    .value-password-input:focus, .value-password-input:focus-within {
+        border-color: #1890ff !important;
+        box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1) !important;
+        background: #ffffff !important;
+    }
+
     .value-indicator {
         position: absolute;
      right: 12px;
@@ -544,6 +585,12 @@ top: 12px;
         display: flex;
  align-items: center;
   gap: 4px;
+    }
+
+    .sensitive-hint {
+        background-color: #fffbe6;
+        border-color: #ffe58f;
+        color: #ad8b00;
     }
 
   /* Variable Description with Icon */

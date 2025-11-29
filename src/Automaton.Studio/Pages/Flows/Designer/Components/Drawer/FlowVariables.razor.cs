@@ -29,7 +29,8 @@ public partial class FlowVariables : ComponentBase
                 Id = x.Key,
                 Name = x.Value.Name,
                 Value = x.Value.Value,
-                Description = x.Value.Description
+                Description = x.Value.Description,
+                IsSensitive = x.Value.IsSensitive  // ✅ Include IsSensitive flag
             }).OrderBy(x => x.Name);
         }
     }
@@ -43,7 +44,8 @@ public partial class FlowVariables : ComponentBase
                 Id = x.Key,
                 Name = x.Value.Name,
                 Value = x.Value.Value,
-                Description = x.Value.Description
+                Description = x.Value.Description,
+                IsSensitive = x.Value.IsSensitive  // ✅ Include IsSensitive flag
             }).OrderBy(x => x.Name);
         }
     }
@@ -57,7 +59,8 @@ public partial class FlowVariables : ComponentBase
                 Id = x.Key,
                 Name = x.Value.Name,
                 Value = x.Value.Value,
-                Description = x.Value.Description
+                Description = x.Value.Description,
+                IsSensitive = x.Value.IsSensitive  // ✅ Include IsSensitive flag
             }).OrderBy(x => x.Name);
         }
     }
@@ -117,7 +120,8 @@ public partial class FlowVariables : ComponentBase
                 Id = Guid.NewGuid().ToString(),
                 Name = newVariable.Name, 
                 Value = newVariable.Value?.ToString(),
-                Description = newVariable.Description
+                Description = newVariable.Description,
+                IsSensitive = newVariable.IsSensitive  // ✅ NEW: Set IsSensitive flag
             });
 
             StateHasChanged();
@@ -135,7 +139,8 @@ public partial class FlowVariables : ComponentBase
             ExistingNames = existingInputVariables,
             Name = variable.Name,
             Value = variable.Value,
-            Description = variable.Description
+            Description = variable.Description,
+            IsSensitive = variable.IsSensitive  // ✅ NEW: Load IsSensitive flag
         };
 
         var editVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
@@ -150,7 +155,8 @@ public partial class FlowVariables : ComponentBase
                 Id = variable.Id,
                 Name = updatedVariable.Name, 
                 Value = updatedVariable.Value?.ToString(),
-                Description = updatedVariable.Description
+                Description = updatedVariable.Description,
+                IsSensitive = updatedVariable.IsSensitive  // ✅ NEW: Update IsSensitive flag
             });
 
             StateHasChanged();
@@ -195,7 +201,8 @@ public partial class FlowVariables : ComponentBase
                 Id = Guid.NewGuid().ToString(),
                 Name = newVariable.Name, 
                 Value = newVariable.Value?.ToString(),
-                Description = newVariable.Description
+                Description = newVariable.Description,
+                IsSensitive = newVariable.IsSensitive  // ✅ NEW: Set IsSensitive flag
             });
 
             StateHasChanged();
@@ -213,7 +220,8 @@ public partial class FlowVariables : ComponentBase
             ExistingNames = existingOutputVariables,
             Name = variable.Name,
             Value = variable.Value,
-            Description = variable.Description
+            Description = variable.Description,
+            IsSensitive = variable.IsSensitive  // ✅ NEW: Load IsSensitive flag
         };
 
         var editVariableDialog = await ModalService.CreateModalAsync<VariableDialog, VariableModel>
@@ -228,7 +236,8 @@ public partial class FlowVariables : ComponentBase
                 Id = variable.Id,
                 Name = updatedVariable.Name, 
                 Value = updatedVariable.Value?.ToString(),
-                Description = updatedVariable.Description
+                Description = updatedVariable.Description,
+                IsSensitive = updatedVariable.IsSensitive  // ✅ NEW: Update IsSensitive flag
             });
 
             StateHasChanged();

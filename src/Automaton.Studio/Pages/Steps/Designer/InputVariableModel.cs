@@ -8,4 +8,9 @@ public class InputVariableModel
     public VariableType Type { get; set; }
     public string Description { get; set; }
     public IEnumerable<VariableType> Types { get; } = Enum.GetValues<VariableType>();
+    
+    /// <summary>
+    /// Indicates if this variable contains sensitive data (passwords, API keys, etc.)
+    /// </summary>
+    public bool IsSensitive { get; set; } = false;
 }
