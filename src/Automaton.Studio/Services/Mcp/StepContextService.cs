@@ -5,78 +5,17 @@ using Microsoft.Extensions.Logging;
 namespace Automaton.Studio.Services.Mcp;
 
 /// <summary>
-/// Shared service for maintaining current step context across components
-/// </summary>
-public interface ICurrentStepContextService
-{
-    /// <summary>
-    /// Set the current step being edited
-    /// </summary>
-    void SetCurrentStep(CustomStep customStep, Func<Task<string>>? getCurrentCodeCallback = null);
-    
-    /// <summary>
-    /// Get the current step's ID
-    /// </summary>
-    string? GetCurrentStepId();
-    
-    /// <summary>
-    /// Get the current step's code
-    /// </summary>
-    Task<string> GetCurrentCodeAsync();
-    
-    /// <summary>
-    /// Get the current step's input variables
-    /// </summary>
-    IEnumerable<StepVariable>? GetInputVariables();
-    
-    /// <summary>
-    /// Get the current step's output variables
-    /// </summary>
-    IEnumerable<StepVariable>? GetOutputVariables();
-    
-    /// <summary>
-    /// Get the current step's language
-    /// </summary>
-    string? GetLanguage();
-    
-    /// <summary>
-    /// Update the step's code
-    /// </summary>
-    Task SetCodeAsync(string code);
-    
-    /// <summary>
-    /// Create input variables for the current step
-    /// </summary>
-    Task<int> CreateInputVariablesAsync(List<(string Name, string Description)> variables);
-    
-    /// <summary>
-    /// Create output variables for the current step
-    /// </summary>
-    Task<int> CreateOutputVariablesAsync(List<(string Name, string Description)> variables);
-    
-    /// <summary>
-    /// Event fired when step context changes
-    /// </summary>
-    event EventHandler<StepContextChangedEventArgs>? StepContextChanged;
-
-    /// <summary>
-    /// Event fired when code is updated (e.g., by MCP tools)
-    /// </summary>
-    event EventHandler<CodeChangedEventArgs>? CodeChanged;
-}
-
-/// <summary>
 /// Implementation of the current step context service
 /// </summary>
-public class CurrentStepContextService : ICurrentStepContextService
+public class StepContextService : IStepContextService
 {
     private CustomStep? _currentStep;
     private Func<Task<string>>? _getCurrentCodeCallback;
-    private readonly ILogger<CurrentStepContextService> _logger;
+    private readonly ILogger<StepContextService> _logger;
 
     public event EventHandler<CodeChangedEventArgs>? CodeChanged;
 
-    public CurrentStepContextService(ILogger<CurrentStepContextService> logger)
+    public StepContextService(ILogger<StepContextService> logger)
     {
         _logger = logger;
     }

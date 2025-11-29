@@ -82,8 +82,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
         services.AddScoped<IWebAppSystemPromptBuilder, WebAppSystemPromptBuilder>();
         services.AddScoped<ICustomStepExecuteService, CustomStepExecuteService>();
-        services.AddScoped<ICurrentStepContextService, CurrentStepContextService>();
-        services.AddScoped<ICurrentWebAppContextService, CurrentWebAppContextService>();
+        services.AddScoped<IStepContextService, StepContextService>();
+        services.AddScoped<IWebAppContextService, WebAppContextService>();
 
         // Services
         services.AddScoped<Services.ConfigurationService>();

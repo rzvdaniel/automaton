@@ -13,14 +13,14 @@ public class StudioMcpToolProvider : IMcpToolProvider
 {
     private readonly ILogger<StudioMcpToolProvider> _logger;
     private readonly ICustomStepExecuteService _executeService;
-    private readonly ICurrentStepContextService _stepContextService;
+    private readonly IStepContextService _stepContextService;
     private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, StepContext> _stepContexts = new();
 
     public StudioMcpToolProvider(
         ILogger<StudioMcpToolProvider> logger,
         ICustomStepExecuteService executeService,
-        ICurrentStepContextService stepContextService,
+        IStepContextService stepContextService,
         AiCodeCleanupService codeCleanupService)
     {
         _logger = logger;

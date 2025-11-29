@@ -47,7 +47,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IWebAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
-    [Inject] private ICurrentWebAppContextService CurrentWebAppContextService { get; set; }
+    [Inject] private IWebAppContextService CurrentWebAppContextService { get; set; }
     [Inject] private Automaton.Studio.Services.Mcp.IWebAppMcpClient WebAppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
