@@ -37,6 +37,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
+        public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
+        public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
         
         // Project/Organization entities
         public virtual DbSet<Project> Projects { get; set; }
@@ -259,6 +261,33 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Description).HasMaxLength(500);
                 
                 entity.HasIndex(e => e.Key).IsUnique();
+            });
+            
+            // Sensitive Variables Configuration
+            modelBuilder.Entity<SensitiveVariable>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.EncryptedValue).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.ResourceType).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.ResourceId).IsRequired();
+                entity.Property(e => e.VariableScope).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+
+                entity.HasIndex(e => new { e.ResourceType, e.ResourceId });
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.LastUsedAt);
+            });
+            
+            modelBuilder.Entity<SensitiveVariableUser>(entity =>
+            {
+                entity.HasKey(e => new { e.SensitiveVariableId, e.UserId });
+                entity.HasIndex(e => e.SensitiveVariableId, "IX_SensitiveVariableUser_SensitiveVariableId");
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.SensitiveVariableId).IsRequired();
             });
             
             // Project/Organization entity configurations

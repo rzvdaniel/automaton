@@ -2,6 +2,7 @@
 using Automaton.Core.Models;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
@@ -15,6 +16,7 @@ public class FlowsService
     private readonly ScheduleService scheduleService;
     private readonly RecentActivityService recentActivityService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly SensitiveVariableService sensitiveVariableService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
 
@@ -25,7 +27,8 @@ public class FlowsService
         ScheduleService scheduleService,
         RecentActivityService recentActivityService,
         UserContextService userContextService,
-        ResourceAuthorizationService authorizationService
+        ResourceAuthorizationService authorizationService,
+        SensitiveVariableService sensitiveVariableService
     )
     {
         this.dbContext = dbContext;
@@ -33,6 +36,7 @@ public class FlowsService
         this.scheduleService = scheduleService;
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
+        this.sensitiveVariableService = sensitiveVariableService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<FlowsService>();
     }
@@ -72,6 +76,10 @@ public class FlowsService
 
         var flow = DeserializeFlow(entity.Body);
 
+        // ✅ Decrypt sensitive variables for both UI and Runner execution
+        // Security is handled by: authorization checks, password input masking, and encryption at rest
+        DecryptSensitiveVariablesAsync(flow).Wait();
+
         return flow;
     }
 
@@ -80,6 +88,9 @@ public class FlowsService
         flow.Id = Guid.NewGuid();
         flow.Created = DateTime.UtcNow;
         flow.Updated = DateTime.UtcNow;
+
+        // ✅ Process sensitive variables BEFORE serialization
+        await ProcessSensitiveVariablesAsync(flow);
 
         var flowEntity = new Entities.Flow
         {
@@ -123,6 +134,9 @@ public class FlowsService
             throw new InvalidOperationException($"Flow {id} not found");
         }
 
+        // ✅ Process sensitive variables BEFORE serialization
+        await ProcessSensitiveVariablesAsync(flow);
+
         entity.Name = flow.Name;
         entity.Body = JsonSerializer.Serialize(flow);
         entity.Updated = DateTime.UtcNow;
@@ -158,6 +172,9 @@ public class FlowsService
         }
 
         var flowName = flow.Name;
+
+        // ✅ Delete associated sensitive variables
+        await DeleteSensitiveVariablesAsync(id);
 
         dbContext.Flows.Remove(flow);
         dbContext.SaveChanges();
@@ -203,6 +220,8 @@ public class FlowsService
             throw new InvalidOperationException($"Flow {flowId} not found");
         }
         
+        // Note: Flow decryption happens when Runner loads flow via API
+        // The Get(Guid id) method returns flow with decrypted values
         var result = await runnerService.ExecuteFlow(flowId, runnerIds, cancellationToken);
 
         // Log activity
@@ -255,6 +274,151 @@ public class FlowsService
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowUpdated, settings.Name, id);
     }
+
+    #region Sensitive Variables Handling
+
+    /// <summary>
+    /// Process sensitive variables: encrypt and replace with references
+    /// Called during Create/Update operations
+    /// </summary>
+    private async Task ProcessSensitiveVariablesAsync(Flow flow)
+    {
+        // Process Variables dictionary
+        await ProcessVariableDictionaryAsync(flow.Variables, flow.Id, SensitiveVariableScope.Input);
+
+        // Process InputVariables dictionary
+        await ProcessVariableDictionaryAsync(flow.InputVariables, flow.Id, SensitiveVariableScope.Input);
+
+        // Process OutputVariables dictionary
+        await ProcessVariableDictionaryAsync(flow.OutputVariables, flow.Id, SensitiveVariableScope.Output);
+    }
+
+    private async Task ProcessVariableDictionaryAsync(
+        IDictionary<string, StepVariable> variables,
+        Guid flowId,
+        string scope)
+    {
+        foreach (var kvp in variables.ToList())
+        {
+            var variable = kvp.Value;
+
+            if (variable.IsSensitive && !string.IsNullOrEmpty(variable.Value))
+            {
+                // Check if value is already a reference
+                if (!IsSensitiveReference(variable.Value))
+                {
+                    try
+                    {
+                        // Encrypt and store in SensitiveVariables table
+                        var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
+                            userId,
+                            variable.Name,
+                            variable.Value,
+                            SensitiveVariableResourceType.Flow,
+                            flowId,
+                            scope,
+                            variable.Description);
+
+                        // Replace value with reference in the flow
+                        variable.Value = $"${{sensitive:{sensitiveVar.Id}}}";
+
+                        logger.Information("Encrypted sensitive variable '{Name}' for flow {FlowId}", variable.Name, flowId);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error(ex, "Failed to encrypt sensitive variable '{Name}' for flow {FlowId}", variable.Name, flowId);
+                        throw;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Decrypt sensitive variables before execution or display
+    /// Called during Get operation
+    /// </summary>
+    private async Task DecryptSensitiveVariablesAsync(Flow flow)
+    {
+        await DecryptVariableDictionaryAsync(flow.Variables);
+        await DecryptVariableDictionaryAsync(flow.InputVariables);
+        await DecryptVariableDictionaryAsync(flow.OutputVariables);
+    }
+
+    private async Task DecryptVariableDictionaryAsync(IDictionary<string, StepVariable> variables)
+    {
+        foreach (var kvp in variables.ToList())
+        {
+            var variable = kvp.Value;
+
+            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            {
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                if (decryptedValue != null)
+                {
+                    variable.Value = decryptedValue;
+                    logger.Information("Decrypted sensitive variable '{Name}' for execution", variable.Name);
+                }
+                else
+                {
+                    logger.Warning("Failed to decrypt sensitive variable '{Name}', using empty value", variable.Name);
+                    variable.Value = string.Empty;
+                }
+            }
+        }
+    }
+
+    private bool IsSensitiveReference(string? value)
+    {
+        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+    }
+
+    private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
+    {
+        try
+        {
+            // Extract GUID from "${sensitive:guid}"
+            var guidPart = reference.Substring(12, reference.Length - 13);
+            if (Guid.TryParse(guidPart, out var sensitiveVarId))
+            {
+                return await sensitiveVariableService.GetDecryptedValueAsync(sensitiveVarId, userId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to decrypt sensitive reference {Reference}", reference);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Delete all sensitive variables associated with a flow
+    /// Called during Remove operation
+    /// </summary>
+    private async Task DeleteSensitiveVariablesAsync(Guid flowId)
+    {
+        try
+        {
+            var sensitiveVars = await sensitiveVariableService.GetSensitiveVariablesForResourceAsync(
+                SensitiveVariableResourceType.Flow,
+                flowId,
+                userId);
+
+            foreach (var sensitiveVar in sensitiveVars)
+            {
+                await sensitiveVariableService.DeleteSensitiveVariableAsync(sensitiveVar.Id, userId);
+            }
+
+            logger.Information("Deleted {Count} sensitive variables for flow {FlowId}", sensitiveVars.Count, flowId);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to delete sensitive variables for flow {FlowId}", flowId);
+            // Don't throw - allow flow deletion to proceed
+        }
+    }
+
+    #endregion
 
     private static Flow DeserializeFlow(string jsonFlow)
     {

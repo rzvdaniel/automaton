@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,7 @@ public class CustomStepsService
     private readonly RecentActivityService recentActivityService;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly SensitiveVariableService sensitiveVariableService;
     private readonly Guid userId;
     private readonly Serilog.ILogger logger;
     private const string DefaultIcon = "user";
@@ -26,13 +28,15 @@ public class CustomStepsService
         UserContextService userContextService,
         RecentActivityService recentActivityService,
         IHubContext<AutomatonHub> automatonHub,
-        ResourceAuthorizationService authorizationService
+        ResourceAuthorizationService authorizationService,
+        SensitiveVariableService sensitiveVariableService
     )
     {
         this.dataContext = dataContext;
         this.recentActivityService = recentActivityService;
         this.automatonHub = automatonHub;
         this.authorizationService = authorizationService;
+        this.sensitiveVariableService = sensitiveVariableService;
         this.userId = userContextService.GetUserId();
         this.logger = Log.ForContext<CustomStepsService>();
     }
@@ -52,6 +56,9 @@ public class CustomStepsService
         var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefault(x => x.Id == id);
         var step = MapToModel(stepEntity);
+
+        // ✅ Load and mask sensitive variables for UI display
+        LoadSensitiveVariablesForDisplay(step).Wait();
  
         return step;
     }
@@ -105,6 +112,9 @@ public class CustomStepsService
             throw new InvalidOperationException($"Custom step {id} not found");
         }
 
+        // ✅ Process sensitive variables in Definition before saving
+        await ProcessSensitiveVariablesAsync(step.Definition, id);
+
         entity.Name = step.Name;
         entity.DisplayName = step.DisplayName;
         entity.Description = step.Description;
@@ -147,6 +157,9 @@ public class CustomStepsService
 
         var stepName = customStep.Name;
 
+        // ✅ Delete associated sensitive variables
+        await DeleteSensitiveVariablesAsync(id);
+
         dataContext.CustomSteps.Remove(customStep);
         dataContext.SaveChanges();
 
@@ -168,8 +181,8 @@ public class CustomStepsService
     {
         var results = new List<RunnerCustomStepResult>();
         
-        // Get the custom step
-        var customStep = Get(customStepId);
+        // Get the custom step with decrypted values
+        var customStep = await GetForExecutionAsync(customStepId);
         
         if (customStep == null)
         {
@@ -270,6 +283,27 @@ public class CustomStepsService
         return results;
     }
 
+    /// <summary>
+    /// Get custom step with decrypted sensitive variables for execution
+    /// </summary>
+    private async Task<CustomStep?> GetForExecutionAsync(Guid id)
+    {
+        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefault(x => x.Id == id);
+        
+        if (stepEntity == null)
+        {
+            return null;
+        }
+
+        var step = MapToModel(stepEntity);
+
+        // ✅ Decrypt sensitive variables for execution
+        await DecryptSensitiveVariablesAsync(step.Definition);
+
+        return step;
+    }
+
     private Entities.Runner GetRunner(Guid id, Guid userId)
     {
         var runner = dataContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
@@ -282,6 +316,177 @@ public class CustomStepsService
 
         return runner;
     }
+
+    #region Sensitive Variables Handling
+
+    /// <summary>
+    /// Process sensitive variables: encrypt and replace with references
+    /// Called during Update operations
+    /// </summary>
+    private async Task ProcessSensitiveVariablesAsync(CustomStepDefinition definition, Guid customStepId)
+    {
+        // Process CodeInputVariables
+        await ProcessVariableListAsync(definition.CodeInputVariables, customStepId, SensitiveVariableScope.Input);
+
+        // Process CodeOutputVariables
+        await ProcessVariableListAsync(definition.CodeOutputVariables, customStepId, SensitiveVariableScope.Output);
+    }
+
+    private async Task ProcessVariableListAsync(
+        IList<Automaton.Core.Models.StepVariable> variables,
+        Guid customStepId,
+        string scope)
+    {
+        if (variables == null) return;
+
+        foreach (var variable in variables)
+        {
+            if (variable.IsSensitive && !string.IsNullOrEmpty(variable.Value))
+            {
+                // Check if value is already a reference
+                if (!IsSensitiveReference(variable.Value))
+                {
+                    try
+                    {
+                        // Encrypt and store in SensitiveVariables table
+                        var sensitiveVar = await sensitiveVariableService.CreateOrUpdateSensitiveVariableAsync(
+                            userId,
+                            variable.Name,
+                            variable.Value,
+                            SensitiveVariableResourceType.CustomStep,
+                            customStepId,
+                            scope,
+                            variable.Description);
+
+                        // Replace value with reference
+                        variable.Value = $"${{sensitive:{sensitiveVar.Id}}}";
+
+                        logger.Information("Encrypted sensitive variable '{Name}' for custom step {CustomStepId}", 
+                            variable.Name, customStepId);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error(ex, "Failed to encrypt sensitive variable '{Name}' for custom step {CustomStepId}", 
+                            variable.Name, customStepId);
+                        throw;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Load sensitive variables and replace references with masked values for UI display
+    /// </summary>
+    private async Task LoadSensitiveVariablesForDisplay(CustomStep step)
+    {
+        if (step?.Definition == null) return;
+
+        await MaskVariableListAsync(step.Definition.CodeInputVariables);
+        await MaskVariableListAsync(step.Definition.CodeOutputVariables);
+    }
+
+    private async Task MaskVariableListAsync(IList<Automaton.Core.Models.StepVariable> variables)
+    {
+        if (variables == null) return;
+
+        foreach (var variable in variables)
+        {
+            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            {
+                // Replace reference with masked value for UI display
+                variable.Value = "••••••••";
+            }
+        }
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Decrypt sensitive variables before execution
+    /// </summary>
+    private async Task DecryptSensitiveVariablesAsync(CustomStepDefinition definition)
+    {
+        if (definition == null) return;
+
+        await DecryptVariableListAsync(definition.CodeInputVariables);
+        await DecryptVariableListAsync(definition.CodeOutputVariables);
+    }
+
+    private async Task DecryptVariableListAsync(IList<Automaton.Core.Models.StepVariable> variables)
+    {
+        if (variables == null) return;
+
+        foreach (var variable in variables)
+        {
+            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
+            {
+                var decryptedValue = await GetDecryptedSensitiveValueAsync(variable.Value);
+                if (decryptedValue != null)
+                {
+                    variable.Value = decryptedValue;
+                    logger.Information("Decrypted sensitive variable '{Name}' for execution", variable.Name);
+                }
+                else
+                {
+                    logger.Warning("Failed to decrypt sensitive variable '{Name}', using empty value", variable.Name);
+                    variable.Value = string.Empty;
+                }
+            }
+        }
+    }
+
+    private bool IsSensitiveReference(string? value)
+    {
+        return value?.StartsWith("${sensitive:") == true && value.EndsWith("}");
+    }
+
+    private async Task<string?> GetDecryptedSensitiveValueAsync(string reference)
+    {
+        try
+        {
+            // Extract GUID from "${sensitive:guid}"
+            var guidPart = reference.Substring(12, reference.Length - 13);
+            if (Guid.TryParse(guidPart, out var sensitiveVarId))
+            {
+                return await sensitiveVariableService.GetDecryptedValueAsync(sensitiveVarId, userId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to decrypt sensitive reference {Reference}", reference);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Delete all sensitive variables associated with a custom step
+    /// </summary>
+    private async Task DeleteSensitiveVariablesAsync(Guid customStepId)
+    {
+        try
+        {
+            var sensitiveVars = await sensitiveVariableService.GetSensitiveVariablesForResourceAsync(
+                SensitiveVariableResourceType.CustomStep,
+                customStepId,
+                userId);
+
+            foreach (var sensitiveVar in sensitiveVars)
+            {
+                await sensitiveVariableService.DeleteSensitiveVariableAsync(sensitiveVar.Id, userId);
+            }
+
+            logger.Information("Deleted {Count} sensitive variables for custom step {CustomStepId}", 
+                sensitiveVars.Count, customStepId);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to delete sensitive variables for custom step {CustomStepId}", customStepId);
+            // Don't throw - allow step deletion to proceed
+        }
+    }
+
+    #endregion
 
     private static CustomStep MapToModel(Entities.CustomStep entity)
     {

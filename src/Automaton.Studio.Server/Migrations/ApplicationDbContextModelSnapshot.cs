@@ -862,6 +862,79 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("EncryptedValue")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("VariableScope")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("LastUsedAt");
+
+                    b.HasIndex("ResourceType", "ResourceId");
+
+                    b.ToTable("SensitiveVariables");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariableUser", b =>
+                {
+                    b.Property<Guid>("SensitiveVariableId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("SensitiveVariableId", "UserId");
+
+                    b.HasIndex(new[] { "SensitiveVariableId" }, "IX_SensitiveVariableUser_SensitiveVariableId");
+
+                    b.ToTable("SensitiveVariableUsers");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")
@@ -1383,6 +1456,15 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariableUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.SensitiveVariable", null)
+                        .WithMany("SensitiveVariableUsers")
+                        .HasForeignKey("SensitiveVariableId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.WebApp", null)
@@ -1496,6 +1578,11 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariable", b =>
+                {
+                    b.Navigation("SensitiveVariableUsers");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>

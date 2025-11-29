@@ -239,6 +239,7 @@ services.AddScoped<ProjectResourceService>();
 services.AddScoped<InvitationTokenService>();
 services.AddScoped<ProjectAuditService>();
 services.AddScoped<ResourceAuthorizationService>();
+services.AddScoped<SensitiveVariableService>();
 
 // Project authorization handlers
 services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectMemberHandler>();
