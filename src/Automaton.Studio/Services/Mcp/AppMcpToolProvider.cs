@@ -99,7 +99,7 @@ public class AppMcpToolProvider : IMcpToolProvider
     {
         var appId = arguments.TryGetProperty("appId", out var appIdProp) 
             ? appIdProp.GetString() 
-            : contextId ?? _webAppContextService.GetCurrentWebAppId();
+            : contextId ?? _webAppContextService.GetCurrentAppId();
         
         if (string.IsNullOrEmpty(appId))
         {
@@ -173,7 +173,7 @@ public class AppMcpToolProvider : IMcpToolProvider
     {
         var appId = arguments.TryGetProperty("appId", out var appIdProp)
             ? appIdProp.GetString()
-            : contextId ?? _webAppContextService.GetCurrentWebAppId();
+            : contextId ?? _webAppContextService.GetCurrentAppId();
         var rawCode = arguments.GetProperty("code").GetString();
 
         if (string.IsNullOrEmpty(appId) || string.IsNullOrEmpty(rawCode))

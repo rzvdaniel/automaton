@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace Automaton.Studio.Services.Mcp;
 
 /// <summary>
-/// Implementation of the current web app context service
+/// Implementation of the current app context service
 /// </summary>
 public class AppContextService : IAppContextService
 {
@@ -12,29 +12,29 @@ public class AppContextService : IAppContextService
     private Func<Task<string>>? _getCurrentCodeCallback;
     private readonly ILogger<AppContextService> _logger;
 
-    public event EventHandler<WebAppCodeChangedEventArgs>? CodeChanged;
+    public event EventHandler<AppCodeChangedEventArgs>? CodeChanged;
 
     public AppContextService(ILogger<AppContextService> logger)
     {
         _logger = logger;
     }
 
-    public event EventHandler<WebAppContextChangedEventArgs>? WebAppContextChanged;
+    public event EventHandler<AppContextChangedEventArgs>? WebAppContextChanged;
 
-    public void SetCurrentWebApp(AppModel app, Func<Task<string>>? getCurrentCodeCallback = null)
+    public void SetCurrentApp(AppModel app, Func<Task<string>>? getCurrentCodeCallback = null)
     {
         _currentApp = app;
         _getCurrentCodeCallback = getCurrentCodeCallback;
         
         _logger.LogDebug("Current web app context set: {AppId}", app.Id);
         
-        WebAppContextChanged?.Invoke(this, new WebAppContextChangedEventArgs
+        WebAppContextChanged?.Invoke(this, new AppContextChangedEventArgs
         {
             AppId = app.Id.ToString()
         });
     }
 
-    public string? GetCurrentWebAppId()
+    public string? GetCurrentAppId()
     {
         return _currentApp?.Id.ToString();
     }
@@ -71,7 +71,7 @@ public class AppContextService : IAppContextService
             _logger.LogDebug("Code updated for web app {AppId}", _currentApp.Id);
 
             // Notify subscribers that code has changed (e.g., Monaco editor in UI)
-            CodeChanged?.Invoke(this, new WebAppCodeChangedEventArgs
+            CodeChanged?.Invoke(this, new AppCodeChangedEventArgs
             {
                 AppId = _currentApp.Id.ToString(),
                 NewCode = code
@@ -87,7 +87,7 @@ public class AppContextService : IAppContextService
             
             // Even though _currentApp is null, still fire the CodeChanged event with the code
             // This allows any subscribers to still receive the code update
-            CodeChanged?.Invoke(this, new WebAppCodeChangedEventArgs
+            CodeChanged?.Invoke(this, new AppCodeChangedEventArgs
             {
                 AppId = null,  // Unknown app ID - subscriber should use code directly
                 NewCode = code
@@ -99,17 +99,17 @@ public class AppContextService : IAppContextService
 }
 
 /// <summary>
-/// Event arguments for web app context changes
+/// Event arguments for app context changes
 /// </summary>
-public class WebAppContextChangedEventArgs : EventArgs
+public class AppContextChangedEventArgs : EventArgs
 {
     public string? AppId { get; set; }
 }
 
 /// <summary>
-/// Event arguments for web app code changes
+/// Event arguments for app code changes
 /// </summary>
-public class WebAppCodeChangedEventArgs : EventArgs
+public class AppCodeChangedEventArgs : EventArgs
 {
     public string? AppId { get; set; }
     public string NewCode { get; set; } = string.Empty;

@@ -72,7 +72,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                 currentApp = await AppsService.Load(appGuid);
                 
                 // Register current web app with the context service
-                CurrentWebAppContextService.SetCurrentWebApp(
+                CurrentWebAppContextService.SetCurrentApp(
                     currentApp,
                     GetCurrentCodeForAI);
             }
@@ -640,7 +640,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     /// <summary>
     /// Handle code changes from MCP tools (AI-generated code updates)
     /// </summary>
-    private async void OnCodeChangedByMcpTools(object? sender, WebAppCodeChangedEventArgs e)
+    private async void OnCodeChangedByMcpTools(object? sender, AppCodeChangedEventArgs e)
     {
         try
         {

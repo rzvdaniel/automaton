@@ -9,14 +9,14 @@ namespace Automaton.Studio.Services.Mcp;
 public interface IAppContextService
 {
     /// <summary>
-    /// Set the current web app being edited
+    /// Set the current app being edited
     /// </summary>
-    void SetCurrentWebApp(AppModel app, Func<Task<string>>? getCurrentCodeCallback = null);
+    void SetCurrentApp(AppModel app, Func<Task<string>>? getCurrentCodeCallback = null);
 
     /// <summary>
     /// Get the current web app's ID
     /// </summary>
-    string? GetCurrentWebAppId();
+    string? GetCurrentAppId();
 
     /// <summary>
     /// Get the current web app's HTML code
@@ -31,10 +31,10 @@ public interface IAppContextService
     /// <summary>
     /// Event fired when web app context changes
     /// </summary>
-    event EventHandler<WebAppContextChangedEventArgs>? WebAppContextChanged;
+    event EventHandler<AppContextChangedEventArgs>? WebAppContextChanged;
 
     /// <summary>
     /// Event fired when code is updated (e.g., by MCP tools)
     /// </summary>
-    event EventHandler<WebAppCodeChangedEventArgs>? CodeChanged;
+    event EventHandler<AppCodeChangedEventArgs>? CodeChanged;
 }
