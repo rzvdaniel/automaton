@@ -469,9 +469,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     }
 
     // Create AI Chat context for WebApp code generation
-    private Automaton.Studio.Components.AiChat.Contexts.WebAppAiChatContext CreateAiChatContext()
+    private Automaton.Studio.Components.AiChat.Contexts.AppAiChatContext CreateAiChatContext()
     {
-        return new Automaton.Studio.Components.AiChat.Contexts.WebAppAiChatContext(
+        return new Automaton.Studio.Components.AiChat.Contexts.AppAiChatContext(
             WebAppSystemPromptBuilder,
             AppId,
             GetCurrentCodeForAI

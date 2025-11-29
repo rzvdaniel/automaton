@@ -5,13 +5,13 @@ namespace Automaton.Studio.Components.AiChat.Contexts;
 /// <summary>
 /// AI Chat context for WebApp HTML/CSS/JavaScript generation
 /// </summary>
-public class WebAppAiChatContext : IAiChatContext
+public class AppAiChatContext : IAiChatContext
 {
     private readonly IAppSystemPromptBuilder _promptBuilder;
     private readonly string _currentWebAppId;
     private readonly Func<Task<string>>? _getCurrentCode;
 
-    public WebAppAiChatContext(
+    public AppAiChatContext(
         IAppSystemPromptBuilder promptBuilder,
         string currentWebAppId,
         Func<Task<string>>? getCurrentCode = null)
