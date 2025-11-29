@@ -6,7 +6,7 @@ namespace Automaton.Studio.Services.Mcp;
 /// MCP client implementation for Studio/Step Designer context.
 /// Handles tool discovery and execution for custom step development (Python, PowerShell, Batch).
 /// </summary>
-public class StepMcpClient : BaseMcpClient, IStudioMcpClient
+public class StepMcpClient : McpClient, IStudioMcpClient
 {
     public StepMcpClient(
         ILogger<StepMcpClient> logger,

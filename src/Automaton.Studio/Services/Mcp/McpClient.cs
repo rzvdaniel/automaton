@@ -13,7 +13,7 @@ namespace Automaton.Studio.Services.Mcp;
 /// MCP client implementation with common AI conversation logic.
 /// Provides OpenAI integration and works with any IMcpToolProvider.
 /// </summary>
-public class BaseMcpClient : IMcpClient
+public class McpClient : IMcpClient
 {
     protected readonly Microsoft.Extensions.Logging.ILogger Logger;
     protected readonly IMcpToolProvider ToolProvider;
@@ -21,7 +21,7 @@ public class BaseMcpClient : IMcpClient
 
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
-    public BaseMcpClient(ILogger<BaseMcpClient> logger, IMcpToolProvider toolProvider)
+    public McpClient(ILogger<McpClient> logger, IMcpToolProvider toolProvider)
     {
         Logger = logger;
         ToolProvider = toolProvider;
