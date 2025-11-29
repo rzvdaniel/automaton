@@ -6,15 +6,15 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Implementation of the current web app context service
 /// </summary>
-public class WebAppContextService : IWebAppContextService
+public class AppContextService : IAppContextService
 {
     private AppModel? _currentApp;
     private Func<Task<string>>? _getCurrentCodeCallback;
-    private readonly ILogger<WebAppContextService> _logger;
+    private readonly ILogger<AppContextService> _logger;
 
     public event EventHandler<WebAppCodeChangedEventArgs>? CodeChanged;
 
-    public WebAppContextService(ILogger<WebAppContextService> logger)
+    public AppContextService(ILogger<AppContextService> logger)
     {
         _logger = logger;
     }

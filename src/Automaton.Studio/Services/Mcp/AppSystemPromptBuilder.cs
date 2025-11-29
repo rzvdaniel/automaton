@@ -3,7 +3,7 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Service for building AI system prompts for WebApp code generation
 /// </summary>
-public class WebAppSystemPromptBuilder : IWebAppSystemPromptBuilder
+public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 {
     /// <summary>
     /// Build a system prompt for WebApp code generation

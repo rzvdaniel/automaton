@@ -9,16 +9,16 @@ namespace Automaton.Studio.Services.Mcp;
 /// Implementation of MCP tools for WebApp HTML/CSS/JavaScript editing.
 /// Separate from StudioMcpToolProvider to maintain clear separation of concerns.
 /// </summary>
-public class WebAppMcpToolProvider : IMcpToolProvider
+public class AppMcpToolProvider : IMcpToolProvider
 {
-    private readonly ILogger<WebAppMcpToolProvider> _logger;
-    private readonly IWebAppContextService _webAppContextService;
+    private readonly ILogger<AppMcpToolProvider> _logger;
+    private readonly IAppContextService _webAppContextService;
     private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, WebAppContext> _appContexts = new();
 
-    public WebAppMcpToolProvider(
-        ILogger<WebAppMcpToolProvider> logger,
-        IWebAppContextService webAppContextService,
+    public AppMcpToolProvider(
+        ILogger<AppMcpToolProvider> logger,
+        IAppContextService webAppContextService,
         AiCodeCleanupService codeCleanupService)
     {
         _logger = logger;

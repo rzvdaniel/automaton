@@ -6,11 +6,11 @@ namespace Automaton.Studio.Services.Mcp;
 /// MCP client implementation for WebApp Designer context.
 /// Handles tool discovery and execution for web app development (HTML, CSS, JavaScript).
 /// </summary>
-public class WebAppMcpClient : BaseMcpClient, IWebAppMcpClient
+public class AppMcpClient : BaseMcpClient, IAppMcpClient
 {
-    public WebAppMcpClient(
-        ILogger<WebAppMcpClient> logger,
-        WebAppMcpToolProvider toolProvider)
+    public AppMcpClient(
+        ILogger<AppMcpClient> logger,
+        AppMcpToolProvider toolProvider)
         : base(logger, toolProvider)
     {
     }

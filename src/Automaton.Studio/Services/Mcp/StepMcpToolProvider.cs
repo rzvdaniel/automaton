@@ -9,16 +9,16 @@ namespace Automaton.Studio.Services.Mcp;
 /// <summary>
 /// Implementation of MCP tools using Studio's existing services
 /// </summary>
-public class StudioMcpToolProvider : IMcpToolProvider
+public class StepMcpToolProvider : IMcpToolProvider
 {
-    private readonly ILogger<StudioMcpToolProvider> _logger;
+    private readonly ILogger<StepMcpToolProvider> _logger;
     private readonly ICustomStepExecuteService _executeService;
     private readonly IStepContextService _stepContextService;
     private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, StepContext> _stepContexts = new();
 
-    public StudioMcpToolProvider(
-        ILogger<StudioMcpToolProvider> logger,
+    public StepMcpToolProvider(
+        ILogger<StepMcpToolProvider> logger,
         ICustomStepExecuteService executeService,
         IStepContextService stepContextService,
         AiCodeCleanupService codeCleanupService)

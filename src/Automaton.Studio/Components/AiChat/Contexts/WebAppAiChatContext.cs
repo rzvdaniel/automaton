@@ -7,12 +7,12 @@ namespace Automaton.Studio.Components.AiChat.Contexts;
 /// </summary>
 public class WebAppAiChatContext : IAiChatContext
 {
-    private readonly IWebAppSystemPromptBuilder _promptBuilder;
+    private readonly IAppSystemPromptBuilder _promptBuilder;
     private readonly string _currentWebAppId;
     private readonly Func<Task<string>>? _getCurrentCode;
 
     public WebAppAiChatContext(
-        IWebAppSystemPromptBuilder promptBuilder,
+        IAppSystemPromptBuilder promptBuilder,
         string currentWebAppId,
         Func<Task<string>>? getCurrentCode = null)
     {

@@ -72,18 +72,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthenticationStorage, WebAuthenticationStorage>();
 
         // Register MCP services - Tool providers and explicit context clients
-        services.AddScoped<StudioMcpToolProvider>();
-        services.AddScoped<WebAppMcpToolProvider>();
+        services.AddScoped<StepMcpToolProvider>();
+        services.AddScoped<AppMcpToolProvider>();
         
         // Register context-specific MCP clients
-        services.AddScoped<IStudioMcpClient, StudioMcpClient>();
-        services.AddScoped<IWebAppMcpClient, WebAppMcpClient>();
+        services.AddScoped<IStudioMcpClient, StepMcpClient>();
+        services.AddScoped<IAppMcpClient, AppMcpClient>();
         
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
-        services.AddScoped<IWebAppSystemPromptBuilder, WebAppSystemPromptBuilder>();
+        services.AddScoped<IAppSystemPromptBuilder, AppSystemPromptBuilder>();
         services.AddScoped<ICustomStepExecuteService, CustomStepExecuteService>();
         services.AddScoped<IStepContextService, StepContextService>();
-        services.AddScoped<IWebAppContextService, WebAppContextService>();
+        services.AddScoped<IAppContextService, AppContextService>();
 
         // Services
         services.AddScoped<Services.ConfigurationService>();
