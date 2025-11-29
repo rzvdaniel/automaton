@@ -1,7 +1,7 @@
 ﻿using Automaton.Studio.Domain;
 using Automaton.Core.Models;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.EditorBridges;
 
 /// <summary>
 /// Shared service for maintaining step context across components

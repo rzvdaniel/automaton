@@ -26,7 +26,6 @@ using System.Diagnostics;
 using System.Reflection;
 using Automaton.Mcp.Client.Extensions;
 using Automaton.Mcp.Services;
-using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Config;
 using Automaton.Studio.Pages.Flows.FlowDesigner;
 using Automaton.Studio.Pages.Flows.Designer.Components.StepExplorer;
@@ -40,6 +39,10 @@ using Automaton.Studio.Pages.Flows.Components;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowSchedule;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowActivity;
+using Automaton.Studio.Services.Mcp.Clients;
+using Automaton.Studio.Services.Mcp.ToolProviders;
+using Automaton.Studio.Services.Mcp.EditorBridges;
+using Automaton.Studio.Services.Mcp.SystemPrompts;
 
 namespace Automaton.Studio.Extensions;
 
@@ -76,7 +79,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AppMcpToolProvider>();
         
         // Register context-specific MCP clients
-        services.AddScoped<IStudioMcpClient, StepMcpClient>();
+        services.AddScoped<IStepMcpClient, StepMcpClient>();
         services.AddScoped<IAppMcpClient, AppMcpClient>();
         
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();

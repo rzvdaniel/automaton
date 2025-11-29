@@ -1,6 +1,6 @@
 ﻿using Automaton.Studio.Models;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.EditorBridges;
 
 /// <summary>
 /// Shared service for maintaining current web app context across components.

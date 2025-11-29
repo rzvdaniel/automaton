@@ -3,8 +3,9 @@ using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Studio.Models;
 using Automaton.Mcp.Models;
+using Automaton.Studio.Services.Mcp.EditorBridges;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.ToolProviders;
 
 /// <summary>
 /// Implementation of MCP tools using Studio's existing services

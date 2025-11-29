@@ -1,4 +1,4 @@
-using Automaton.Studio.Services.Mcp;
+using Automaton.Studio.Services.Mcp.SystemPrompts;
 
 namespace Automaton.Studio.Components.AiChat.Contexts;
 

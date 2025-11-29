@@ -2,8 +2,9 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
+using Automaton.Studio.Services.Mcp.EditorBridges;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.ToolProviders;
 
 /// <summary>
 /// Implementation of MCP tools for WebApp HTML/CSS/JavaScript editing.

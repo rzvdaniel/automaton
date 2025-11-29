@@ -7,7 +7,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
 /// MCP client implementation with common AI conversation logic.

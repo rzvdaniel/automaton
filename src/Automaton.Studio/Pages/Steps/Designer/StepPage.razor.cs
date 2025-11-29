@@ -2,7 +2,9 @@
 using Automaton.Studio.Domain;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
-using Automaton.Studio.Services.Mcp;
+using Automaton.Studio.Services.Mcp.Clients;
+using Automaton.Studio.Services.Mcp.EditorBridges;
+using Automaton.Studio.Services.Mcp.SystemPrompts;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -36,8 +38,8 @@ partial class StepPage : ComponentBase, IDisposable
     [Inject] private IStepEditorBridge CurrentStepContextService { get; set; }
     [Inject] private RunnerService RunnerService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
-    [Inject] private Automaton.Studio.Services.Mcp.IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; }
-    [Inject] private Automaton.Studio.Services.Mcp.IStudioMcpClient StudioMcpClient { get; set; }
+    [Inject] private IStepSystemPromptBuilder StepSystemPromptBuilder { get; set; }
+    [Inject] private IStepMcpClient StudioMcpClient { get; set; }
 
     [Parameter] public string StepId { get; set; }
 

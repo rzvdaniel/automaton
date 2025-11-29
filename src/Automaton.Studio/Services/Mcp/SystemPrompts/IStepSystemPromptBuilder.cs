@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.SystemPrompts;
 
 /// <summary>
 /// Interface for building AI system prompts for Step code generation

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
 /// MCP client interface for WebApp Designer context.

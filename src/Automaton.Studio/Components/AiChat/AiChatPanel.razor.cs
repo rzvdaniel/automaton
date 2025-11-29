@@ -11,7 +11,7 @@ using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 using Automaton.Mcp.Enums;
 using Automaton.Studio.Components.AiChat.Models;
 using Automaton.Studio.Components.AiChat.Contexts;
-using Automaton.Studio.Services.Mcp;
+using Automaton.Studio.Services.Mcp.Clients;
 
 namespace Automaton.Studio.Components.AiChat;
 

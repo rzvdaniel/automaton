@@ -1,6 +1,7 @@
+using Automaton.Studio.Services.Mcp.ToolProviders;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
 /// MCP client implementation for WebApp Designer context.

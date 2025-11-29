@@ -2,7 +2,7 @@ using Automaton.Studio.Domain;
 using Automaton.Core.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.EditorBridges;
 
 /// <summary>
 /// Implementation of the current step context service

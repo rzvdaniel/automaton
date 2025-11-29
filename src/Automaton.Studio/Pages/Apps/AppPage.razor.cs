@@ -10,7 +10,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using Automaton.Studio.Pages.Authentication.Config;
-using Automaton.Studio.Services.Mcp;
+using Automaton.Studio.Services.Mcp.Clients;
+using Automaton.Studio.Services.Mcp.EditorBridges;
+using Automaton.Studio.Services.Mcp.SystemPrompts;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -46,9 +48,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
-    [Inject] private Automaton.Studio.Services.Mcp.IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
+    [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
-    [Inject] private Automaton.Studio.Services.Mcp.IAppMcpClient WebAppMcpClient { get; set; }
+    [Inject] private IAppMcpClient WebAppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
 

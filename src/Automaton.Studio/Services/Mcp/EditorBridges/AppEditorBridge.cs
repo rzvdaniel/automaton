@@ -1,7 +1,7 @@
 using Automaton.Studio.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.EditorBridges;
 
 /// <summary>
 /// Implementation of the current app context service

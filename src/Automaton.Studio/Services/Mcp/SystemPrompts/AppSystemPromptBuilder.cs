@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.SystemPrompts;
 
 /// <summary>
 /// Service for building AI system prompts for WebApp code generation

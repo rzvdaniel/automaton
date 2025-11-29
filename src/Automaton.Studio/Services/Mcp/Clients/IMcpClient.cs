@@ -1,6 +1,6 @@
 using Automaton.Mcp.Models;
 
-namespace Automaton.Studio.Services.Mcp;
+namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
 /// Base interface for MCP clients used in the Studio.
