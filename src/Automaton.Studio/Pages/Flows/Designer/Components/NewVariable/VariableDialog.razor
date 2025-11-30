@@ -16,20 +16,30 @@
 			<Input @bind-Value="@context.Name" Placeholder=@Placeholders.EnterVariableName />
 		</FormItem>
 
-		<!-- ✅ NEW: Sensitive checkbox -->
+		<!-- ✅ Sensitive toggle with lock icon -->
 		<FormItem Label="Sensitive">
-			<Checkbox @bind-Checked="@context.IsSensitive">
-				<span style="font-size: 13px; color: #595959;">
-					This variable contains sensitive data (password, API key, token, etc.)
-				</span>
-			</Checkbox>
-			@if (context.IsSensitive)
-			{
-				<div class="sensitive-info">
-					<Icon Type="lock" Theme="IconThemeType.Fill" Style="color: #faad14; font-size: 12px; margin-right: 4px;" />
-					<span>Value will be encrypted and stored securely</span>
+			<div style="display: flex; align-items: center; gap: 12px;">
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<Tooltip Title="@(context.IsSensitive ? "Encrypted storage" : "Plain text storage")">
+						<Icon Type="@(context.IsSensitive ? "lock" : "unlock")" 
+							  Theme="IconThemeType.Fill" 
+							  Style="@(context.IsSensitive ? "color: #faad14; font-size: 16px;" : "color: #d9d9d9; font-size: 16px;")" />
+					</Tooltip>
+					<Switch @bind-Checked="context.IsSensitive"
+							CheckedChildren="On" 
+							UnCheckedChildren="Off" />
 				</div>
-			}
+				<span style="font-size: 13px; color: #595959;">
+					@if (context.IsSensitive)
+					{
+						<span style="color: #ad8b00; font-weight: 500;">🔒 Value will be encrypted and stored securely</span>
+					}
+					else
+					{
+						<span>Contains sensitive data (password, API key, token, etc.)</span>
+					}
+				</span>
+			</div>
 		</FormItem>
 
 		<!-- ✅ Value field with password input type for sensitive variables -->
