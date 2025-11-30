@@ -10,14 +10,16 @@ Primary goals:
 - Offer an integrated Web Apps platform so users can build frontends (HTML/CSS/JS) that call Flows as their backend.
 - Enable users to author, test, and run automation Flows composed of built-in and custom Steps.
 - Provide a secure, scalable execution surface (Runners) for flows with API-driven integration points.
+- Support Projects for organizing related Flows, Apps, and Custom Steps together.
 
 Core capabilities:
 - Web Apps: author, preview, and publish frontend apps inside the Studio and execute flows from those apps via a secure client helper (`window.automatonApi`).
 - Visual Flow Designer with drag-and-drop step placement, variable mapping, triggers, and execution controls.
 - Custom Steps authoring (Python, PowerShell, Batch) with an integrated Step Designer including code editor, test variables, and logs.
+- Projects for grouping and organizing related automation assets (Flows, Apps, Custom Steps) with shared settings and permissions.
 - Cross-platform Runner (`Automaton.Runner.Console`) for executing flows; installers and service scripts are provided for production deployment.
 
-This README is based on the actual implementation found in the repository (`src/Automaton.Studio/**`, `src/Automaton.Runner.Console`, `src/Automaton.Core`, `src/Automaton.Steps`, and `examples/`).
+This README is based on the actual implementation found in the repository (`src/Automaton.Studio/**`, `src/Automaton.Runner`, `src/Automaton.Core`, `src/Automaton.Steps`, and `examples/`).
 
 ### Site Map and Key Features
 
@@ -32,6 +34,8 @@ This section provides a sitemap of the Automaton Studio application and a map of
     -   `/flow/activity/{flowid}/{flowname}`: Flow Activity
     -   `/flow/schedule/{flowid}/{flowname}`: Flow Schedule
     -   `/flow/settings/{flowid}/{flowname}`: Flow Settings
+-   `/projects`: Projects
+    -   `/project/designer/{projectId}`: Project Designer
 -   `/runners`: Runners
 -   `/apps`: Apps
     -   `/appdesigner/{appId}`: App Designer
@@ -49,6 +53,9 @@ This section provides a sitemap of the Automaton Studio application and a map of
 
 #### Key Features
 
+*   **Projects:**
+    *   Organize related Flows, Apps, and Custom Steps into logical groupings. Projects provide a way to manage complex automation solutions with multiple interconnected components.
+    *   **Project Designer:** Configure project settings, manage member assets, set shared variables, and control project-level permissions.
 *   **Apps (Web App Platform):**
     *   Author, preview, publish, and manage small web apps (HTML/CSS/JS) that call Flows as their backend. Includes an App Designer with Monaco editor, preview iframe, PWA options, and AI-assisted code helpers.
 *   **Dashboard:** The main landing page.
@@ -81,27 +88,24 @@ This section provides a sitemap of the Automaton Studio application and a map of
 
 The Automaton project is a .NET solution composed of several key components:
 
- - **`Automaton.Studio`**: Shared UI components, pages, and modules used by the Studio front-end. It contains the primary UI surface and is the umbrella project for Studio functionality. The concrete web implementation is provided in:
+- **`Automaton.Studio`**: Shared UI components, pages, and modules used by the Studio front-end. It contains the primary UI surface and is the umbrella project for Studio functionality. The concrete web implementation is provided in:
     - **`Automaton.Studio.Web`**: The web-based implementation of the Studio (main web UI).
     - **`Automaton.Studio.Server`**: The backend server for the studio, handling business logic and data persistence.
-- **`Automaton.Runner.Console`**: A cross-platform command-line runner.
+- **`Automaton.Runner`**: A cross-platform command-line runner.
 - **`Automaton.Core`**: A shared library containing the core logic for workflows, steps, and data models.
+- **`Automaton.Core.Scripting`**: Scripting helpers and runtime integrations used by custom steps and the Step Designer.
+- **`Automaton.Mcp.Client`**: Client libraries for the MCP (model-context-protocol) integrations and inter-process communication used across Studio and Runner components.
 - **`Automaton.Steps`**: A library of built-in, reusable steps for use in automation flows.
-- **`UnitTests`**: Contains the unit tests for the project.
- - **`Automaton.Core`**: A shared library containing the core logic for workflows, steps, and data models.
- - **`Automaton.Core.Scripting`**: Scripting helpers and runtime integrations used by custom steps and the Step Designer.
- - **`Automaton.Mcp.Client`**: Client libraries for the MCP (model-context-protocol) integrations and inter-process communication used across Studio and Runner components.
- - **`Automaton.Steps`**: A library of built-in, reusable steps for use in automation flows.
- - **UI modules**: lightweight UI/feature modules used by the Studio front-end and account flows:
-     - `Automaton.App.Account`
-     - `Automaton.App.Authentication`
-     - `Automaton.App.Install`
-     - `Automaton.Client.Auth`
- - **`UnitTests`**: Contains the unit tests for the project. Key test projects include:
-     - `Automaton.Core.Tests`
-     - `Automaton.Runner.Console.Tests`
-     - `Automaton.Studio.Server.Tests`
-     - `Automaton.Studio.Tests`
+- **UI modules**: lightweight UI/feature modules used by the Studio front-end and account flows:
+    - `Automaton.App.Account`
+    - `Automaton.App.Authentication`
+    - `Automaton.App.Install`
+    - `Automaton.Client.Auth`
+- **`UnitTests`**: Contains the unit tests for the project. Key test projects include:
+    - `Automaton.Core.Tests`
+    - `Automaton.Runner.Console.Tests`
+    - `Automaton.Studio.Server.Tests`
+    - `Automaton.Studio.Tests`
 
 ## Development Environment Setup
 
@@ -117,13 +121,13 @@ dotnet tool install --global dotnet-ef
 
 ## Building and Running the Project
 
-### Automaton Runner Console
+### Automaton Runner
 
 The console runner is a key component for executing flows.
 
 #### Building from Source
 ```bash
-cd src/Automaton.Runner.Console
+cd src/Automaton.Runner
 dotnet build -c Release
 dotnet publish -c Release --self-contained false
 ```
@@ -298,6 +302,23 @@ Security notes:
 - Limit the scope and lifetime of keys used by apps, and monitor usage via the API Keys page.
 
 
+## Projects
+
+Projects provide a way to organize and group related automation assets (Flows, Apps, Custom Steps) into logical units. This is useful for complex automation solutions where multiple flows and apps work together.
+
+Key ideas and behavior:
+- **Organization:** Projects act as containers for related Flows, Apps, and Custom Steps. Assets can belong to one project at a time, making it easy to manage complex automation solutions.
+- **Pages & Files:** Project UI is implemented under `src/Automaton.Studio/Pages/Projects/`.
+    - `ProjectsPage.razor` — lists projects, create/delete, view project details, quick actions.
+    - `ProjectDesignerPage.razor` — full project designer: manage member assets, configure project settings, shared variables, and permissions.
+- **Shared Configuration:** Projects can define shared variables and settings that are available to all member Flows during execution.
+- **Project-level Permissions:** Access control can be configured at the project level, affecting all member assets.
+
+Notes for maintainers / reviewers:
+- Projects are optional; Flows, Apps, and Custom Steps can exist independently without belonging to a project.
+- When a project is deleted, member assets are not deleted but become unassigned (orphaned from the project).
+- The Project Designer provides drag-and-drop or selection-based assignment of assets to projects.
+
 ## Pages summary (UI pages)
 
 Below are concise notes about the main Studio pages and what they do in the UI.
@@ -306,6 +327,11 @@ Below are concise notes about the main Studio pages and what they do in the UI.
     - Pages: flow list UIs under `Pages/Flows/` and the visual designer under `Pages/FlowDesigner/`.
     - Purpose: Create, design, and manage automation flows (workflows). The Flow Designer is a visual canvas where users add nodes/steps, connect data paths, configure triggers, map variables, and wire custom steps or built-in steps together.
     - Key behaviors: drag-and-drop step placement, property panels for step configuration, test/run controls, save/publish actions, and access to execution logs. Flows can be executed by runners or via RESTful execute endpoints.
+
+- **Projects** (`src/Automaton.Studio/Pages/Projects/`)
+    - Purpose: Organize and manage projects that group related Flows, Apps, and Custom Steps. The Projects page lists all projects with quick actions for creation and management.
+    - **Project Designer:** Configure project membership (which assets belong to the project), shared variables, project-level settings, and access permissions.
+    - Key files: `ProjectsPage.razor`, `ProjectDesignerPage.razor`.
 
 - **Runners** (`src/Automaton.Studio/Pages/Runners/`)
     - Purpose: List and manage connected runners (agents that execute flows). UI supports registration status, last-seen timestamps, runner metadata, and actions like disable/unregister.
