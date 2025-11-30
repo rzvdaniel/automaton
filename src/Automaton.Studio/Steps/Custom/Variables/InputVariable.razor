@@ -35,8 +35,7 @@
 		{
 			<!-- Password input for sensitive variables -->
 			<InputPassword Class="modern-password-input" 
-						   Value="Variable.Value?.ToString()" 
-						   OnChange="(x) => { Variable.Value = x; }" 
+						   @bind-Value="Variable.Value"
 						   Placeholder="@(string.IsNullOrEmpty(Variable.Description) ? $"Enter {Variable.Name}..." : Variable.Description)"
 						   Size="@InputSize.Large"
 						   VisibilityToggle="true" />
@@ -53,9 +52,7 @@
 			<!-- Regular text input -->
 			<Input Class="modern-input" 
 				   Type="InputType.Text" 
-				   TValue="string" 
-				   Value="Variable.Value?.ToString()" 
-				   OnChange="(x) => { Variable.Value = x; }" 
+				   @bind-Value="Variable.Value"
 				   Placeholder="@(string.IsNullOrEmpty(Variable.Description) ? $"Enter {Variable.Name}..." : Variable.Description)"
 				   Size="@InputSize.Large" />
 			@if (!string.IsNullOrEmpty(Variable.Value?.ToString()))
