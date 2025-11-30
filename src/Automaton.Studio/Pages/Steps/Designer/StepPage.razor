@@ -338,9 +338,7 @@
                                         <Column Title="Value" TData="string">
                                             @if (inputVariable.IsSensitive)
                                             {
-                                                <InputPassword TValue="string" 
-                                                               Value="inputVariable.Value?.ToString()" 
-                                                               OnChange="(x) => { inputVariable.Value = x; }"
+                                                <InputPassword @bind-Value="inputVariable.Value"
                                                                VisibilityToggle="true"
                                                                Placeholder="Enter sensitive value..." />
                                             }
@@ -413,9 +411,7 @@
                                         <Column Title="Value" TData="string">
                                             @if (outputVariable.IsSensitive)
                                             {
-                                                <InputPassword TValue="string" 
-                                                               Value="outputVariable.Value?.ToString()" 
-                                                               OnChange="(x) => { outputVariable.Value = x; }"
+                                                <InputPassword @bind-Value="outputVariable.Value"
                                                                VisibilityToggle="true"
                                                                Placeholder="Enter sensitive value..." />
                                             }

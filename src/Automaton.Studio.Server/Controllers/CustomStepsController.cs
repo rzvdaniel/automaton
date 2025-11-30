@@ -19,16 +19,17 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet("{id}")]
-    public ActionResult<Models.CustomStep> Get(Guid id)
+    public async Task<ActionResult<Models.CustomStep>> Get(Guid id)
     {
-        var flow = customStepsService.Get(id);
+        // Use GetForEditingAsync to decrypt sensitive variables for UI display
+        var step = await customStepsService.GetForEditingAsync(id);
 
-        if (flow is null)
+        if (step is null)
         {
             return NotFound();
         }
 
-        return Ok(flow);
+        return Ok(step);
     }
 
     [HttpPost]
@@ -36,7 +37,7 @@ public class CustomStepsController : BaseController
     {
         var customStepId = await customStepsService.Create(customStep);
 
-        var newCustomStep = customStepsService.Get(customStepId);
+        var newCustomStep = await customStepsService.GetForEditingAsync(customStepId);
 
         return CreatedAtAction(nameof(Get), new { id = newCustomStep.Id }, newCustomStep);
     }

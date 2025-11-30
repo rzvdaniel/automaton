@@ -283,6 +283,27 @@ public class CustomStepsService
     }
 
     /// <summary>
+    /// Get custom step with decrypted sensitive variables for UI editing
+    /// </summary>
+    public async Task<CustomStep> GetForEditingAsync(Guid id)
+    {
+        var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
+            .SingleOrDefault(x => x.Id == id);
+
+        if (stepEntity == null)
+        {
+            return null;
+        }
+
+        var step = MapToModel(stepEntity);
+
+        // ✅ Decrypt sensitive variables for UI display/editing
+        await DecryptSensitiveVariablesAsync(step.Definition);
+
+        return step;
+    }
+
+    /// <summary>
     /// Get custom step with decrypted sensitive variables for execution
     /// </summary>
     private async Task<CustomStep?> GetForExecutionAsync(Guid id)
