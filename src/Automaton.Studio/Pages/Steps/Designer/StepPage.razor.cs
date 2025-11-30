@@ -73,21 +73,25 @@ partial class StepPage : ComponentBase, IDisposable
     public void AddInputVariable()
     {
         StepDesignerViewModel.AddInputVariable();
+        StateHasChanged();
     }
 
     public void DeleteInputVariable(string name)
     {
         StepDesignerViewModel.DeleteInputVariable(name);
+        StateHasChanged();
     }
 
     public void AddOutputVariable()
     {
         StepDesignerViewModel.AddOutputVariable();
+        StateHasChanged();
     }
 
     public void DeleteOutputVariable(string name)
     {
         StepDesignerViewModel.DeleteOutputVariable(name);
+        StateHasChanged();
     }
 
     private void ClearLogs()

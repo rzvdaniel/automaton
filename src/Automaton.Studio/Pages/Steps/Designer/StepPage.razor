@@ -270,14 +270,14 @@
                                                                 <b>Input Variables</b>
                                                             </HeaderTemplate>
                                                             <ChildContent>
-                                                              <div class="scrollable-list">
-     @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
-           {
-  <div class="variable">
-       <InputVariable Variable="@inputVariable" />
-         </div>
-  }
-        </div>
+                                                                <div class="scrollable-list">
+                                                                    @foreach (var inputVariable in StepDesignerViewModel.CustomStep.Definition.CodeInputVariables)
+                                                                    {
+                                                                        <div class="variable">
+                                                                            <InputVariable Variable="@inputVariable" />
+                                                                        </div>
+                                                                    }
+                                                                </div>
                                                             </ChildContent>
                                                         </Panel>
                                                     </Collapse>
@@ -285,19 +285,19 @@
                                                         <Panel Key="output">
                                                             <HeaderTemplate>
                                                                <b>Output Variables</b>
-                                                               </HeaderTemplate>
-                                                             <ChildContent>
-                                                                   <div class="scrollable-list">
-                                                                  @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
-                                                             {
-                                                                <div class="variable">
-                                                                     <OutputVariable Variable="@outputVariable" />
-                                                                    </div>
-                                                               }
-                                                            </div>
-                                                        </ChildContent>
-                                                              </Panel>
-                                                           </Collapse>
+                                                            </HeaderTemplate>
+                                                            <ChildContent>
+                                                                <div class="scrollable-list">
+                                                                    @foreach (var outputVariable in StepDesignerViewModel.CustomStep.Definition.CodeOutputVariables)
+                                                                    {
+                                                                        <div class="variable">
+                                                                             <OutputVariable Variable="@outputVariable" />
+                                                                        </div>
+                                                                    }
+                                                                </div>
+                                                            </ChildContent>
+                                                        </Panel>
+                                                    </Collapse>
                                                 </div>
                                             </div>
                                         </TabPane>
@@ -317,15 +317,55 @@
                             </SpaceItem>
                             <SpaceItem>
                                 <Table DataSource="@context.Definition.CodeInputVariables"
-                                       RowExpandable="@((record)=>true)"
                                        ScrollY="calc(100vh - 310px);"
                                        ScrollBarWidth="5"
                                        HidePagination>
                                     <ChildContent Context="inputVariable">
-                                        <Column Title="Name" TData="string">
-                                            <Input Type="InputType.Text" @bind-Value="inputVariable.Name" AutoFocus />
+                                        <Column Title="Name" TData="string" Width="200px">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                @if (inputVariable.IsSensitive)
+                                                {
+                                                    <Tooltip Title="Sensitive variable - encrypted storage">
+                                                        <Icon Type="lock" Theme="IconThemeType.Fill" Style="color: #faad14; font-size: 14px;" />
+                                                    </Tooltip>
+                                                }
+                                                <Input Type="InputType.Text" @bind-Value="inputVariable.Name" AutoFocus />
+                                            </div>
                                         </Column>
-                                        <ActionColumn Title="Action">
+                                        <Column Title="Description" TData="string">
+                                            <Input Type="InputType.Text" @bind-Value="inputVariable.Description" Placeholder="Enter description..." />
+                                        </Column>
+                                        <Column Title="Value" TData="string">
+                                            @if (inputVariable.IsSensitive)
+                                            {
+                                                <InputPassword TValue="string" 
+                                                               Value="inputVariable.Value?.ToString()" 
+                                                               OnChange="(x) => { inputVariable.Value = x; }"
+                                                               VisibilityToggle="true"
+                                                               Placeholder="Enter sensitive value..." />
+                                            }
+                                            else
+                                            {
+                                                <Input Type="InputType.Text" 
+                                                       TValue="string" 
+                                                       Value="inputVariable.Value?.ToString()" 
+                                                       OnChange="(x) => { inputVariable.Value = x; }"
+                                                       Placeholder="Enter value..." />
+                                            }
+                                        </Column>
+                                        <Column Title="Sensitive" TData="bool" Width="120px">
+                                            <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                                                <Tooltip Title="@(inputVariable.IsSensitive ? "Encrypted storage" : "Plain text storage")">
+                                                    <Icon Type="@(inputVariable.IsSensitive ? "lock" : "unlock")" 
+                                                          Theme="IconThemeType.Fill" 
+                                                          Style="@(inputVariable.IsSensitive ? "color: #faad14; font-size: 14px;" : "color: #d9d9d9; font-size: 14px;")" />
+                                                </Tooltip>
+                                                <Switch @bind-Checked="inputVariable.IsSensitive"
+                                                        CheckedChildren="On" 
+                                                        UnCheckedChildren="Off" />
+                                            </div>
+                                        </Column>
+                                        <ActionColumn Title="Action" Width="100px">
                                             <Tooltip Title="Delete variable">
                                                 <Popconfirm Title="Sure to delete?"
                                                             OnConfirm="()=> DeleteInputVariable(inputVariable.Name)"
@@ -336,20 +376,6 @@
                                             </Tooltip>
                                         </ActionColumn>
                                     </ChildContent>
-                                    <ExpandTemplate Context="inputVariable2">
-                                        <GridRow Gutter="(16, 0)" Class="expanded-content">
-                                            <GridCol Xs="6" Md="6">
-                                                <FormItem Label="Description">
-                                                    <Input Type="InputType.Text" @bind-Value="inputVariable2.Data.Description" />
-                                                </FormItem>
-                                            </GridCol>
-                                            <GridCol Xs="6" Md="6">
-                                                <FormItem Label="Value">
-                                                    <Input Type="InputType.Text" TValue="string" Value="inputVariable2.Data.Value?.ToString()" OnChange="(x) => { inputVariable2.Data.Value = x; }" />
-                                                </FormItem>
-                                            </GridCol>
-                                        </GridRow>
-                                    </ExpandTemplate>
                                 </Table>
                             </SpaceItem>
                         </Space>
@@ -366,16 +392,55 @@
                             </SpaceItem>
                             <SpaceItem>
                                 <Table DataSource="context.Definition.CodeOutputVariables"
-                                       RowExpandable="@((record)=>true)"
                                        ScrollY="calc(100vh - 310px);"
                                        ScrollBarWidth="5"
                                        HidePagination>
                                     <ChildContent Context="outputVariable">
-                                        
-                                        <Column Title="Name" TData="string">
-                                            <Input Type="InputType.Text" @bind-Value="outputVariable.Name" />
+                                        <Column Title="Name" TData="string" Width="200px">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                @if (outputVariable.IsSensitive)
+                                                {
+                                                    <Tooltip Title="Sensitive variable - encrypted storage">
+                                                        <Icon Type="lock" Theme="IconThemeType.Fill" Style="color: #faad14; font-size: 14px;" />
+                                                    </Tooltip>
+                                                }
+                                                <Input Type="InputType.Text" @bind-Value="outputVariable.Name" />
+                                            </div>
                                         </Column>
-                                        <ActionColumn Title="Action">
+                                        <Column Title="Description" TData="string">
+                                            <Input Type="InputType.Text" @bind-Value="outputVariable.Description" Placeholder="Enter description..." />
+                                        </Column>
+                                        <Column Title="Value" TData="string">
+                                            @if (outputVariable.IsSensitive)
+                                            {
+                                                <InputPassword TValue="string" 
+                                                               Value="outputVariable.Value?.ToString()" 
+                                                               OnChange="(x) => { outputVariable.Value = x; }"
+                                                               VisibilityToggle="true"
+                                                               Placeholder="Enter sensitive value..." />
+                                            }
+                                            else
+                                            {
+                                                <Input Type="InputType.Text" 
+                                                       TValue="string" 
+                                                       Value="outputVariable.Value?.ToString()" 
+                                                       OnChange="(x) => { outputVariable.Value = x; }"
+                                                       Placeholder="Enter value..." />
+                                            }
+                                        </Column>
+                                        <Column Title="Sensitive" TData="bool" Width="120px">
+                                            <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                                                <Tooltip Title="@(outputVariable.IsSensitive ? "Encrypted storage" : "Plain text storage")">
+                                                    <Icon Type="@(outputVariable.IsSensitive ? "lock" : "unlock")" 
+                                                          Theme="IconThemeType.Fill" 
+                                                          Style="@(outputVariable.IsSensitive ? "color: #faad14; font-size: 14px;" : "color: #d9d9d9; font-size: 14px;")" />
+                                                </Tooltip>
+                                                <Switch @bind-Checked="outputVariable.IsSensitive"
+                                                        CheckedChildren="On" 
+                                                        UnCheckedChildren="Off" />
+                                            </div>
+                                        </Column>
+                                        <ActionColumn Title="Action" Width="100px">
                                             <Tooltip Title="Delete variable">
                                                 <Popconfirm Title="Sure to delete?"
                                                             OnConfirm="()=> DeleteOutputVariable(outputVariable.Name)"
@@ -386,20 +451,6 @@
                                             </Tooltip>
                                         </ActionColumn>
                                     </ChildContent>
-                                    <ExpandTemplate Context="outputVariable2">
-                                        <GridRow Gutter="(16, 0)" Class="expanded-content">
-                                            <GridCol Xs="6" Md="6">
-                                                <FormItem Label="Description">
-                                                    <Input Type="InputType.Text" @bind-Value="outputVariable2.Data.Description" />
-                                                </FormItem>
-                                            </GridCol>
-                                            <GridCol Xs="6" Md="6">
-                                                <FormItem Label="Value">
-                                                    <Input Type="InputType.Text" TValue="string" Value="outputVariable2.Data.Value?.ToString()" OnChange="(x) => { outputVariable2.Data.Value = x; }" />
-                                                </FormItem>
-                                            </GridCol>
-                                        </GridRow>
-                                    </ExpandTemplate>
                                 </Table>
                             </SpaceItem>
                         </Space>
@@ -814,5 +865,29 @@
         display: flex;
         flex-wrap: nowrap;
         gap: 8px;
+    }
+
+    /* ✅ Sensitive variable row styling */
+    .sensitive-expanded-row {
+        background: linear-gradient(to right, #fffef6 0%, #fffbe6 100%) !important;
+        border-left: 3px solid #faad14 !important;
+        padding-left: 12px !important;
+        border-radius: 4px;
+        animation: sensitiveGlow 0.3s ease-in;
+    }
+
+    @@keyframes sensitiveGlow {
+        from {
+            background: linear-gradient(to right, #ffffff 0%, #ffffff 100%);
+            border-left-color: transparent;
+        }
+        to {
+            background: linear-gradient(to right, #fffef6 0%, #fffbe6 100%);
+            border-left-color: #faad14;
+        }
+    }
+
+    .expanded-content {
+        padding: 12px;
     }
 </style>

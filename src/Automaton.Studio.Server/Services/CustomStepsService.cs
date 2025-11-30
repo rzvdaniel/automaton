@@ -57,9 +57,8 @@ public class CustomStepsService
             .SingleOrDefault(x => x.Id == id);
         var step = MapToModel(stepEntity);
 
-        // ✅ Load and mask sensitive variables for UI display
-        LoadSensitiveVariablesForDisplay(step).Wait();
- 
+        // Return step with encrypted references as-is for UI
+        // UI password inputs will handle visual hiding
         return step;
     }
 
@@ -373,33 +372,6 @@ public class CustomStepsService
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// Load sensitive variables and replace references with masked values for UI display
-    /// </summary>
-    private async Task LoadSensitiveVariablesForDisplay(CustomStep step)
-    {
-        if (step?.Definition == null) return;
-
-        await MaskVariableListAsync(step.Definition.CodeInputVariables);
-        await MaskVariableListAsync(step.Definition.CodeOutputVariables);
-    }
-
-    private async Task MaskVariableListAsync(IList<Automaton.Core.Models.StepVariable> variables)
-    {
-        if (variables == null) return;
-
-        foreach (var variable in variables)
-        {
-            if (variable.IsSensitive && IsSensitiveReference(variable.Value))
-            {
-                // Replace reference with masked value for UI display
-                variable.Value = "••••••••";
-            }
-        }
-
-        await Task.CompletedTask;
     }
 
     /// <summary>
