@@ -289,7 +289,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         try
         {
             // Use the official OpenAI .NET SDK pattern with tools
-            var client = new ChatClient(model: request.Model ?? "gpt-4.1", apiKey: request.ApiKey);
+            var client = new ChatClient(model: request.Model, apiKey: request.ApiKey);
             
             // Build conversation messages
             var messages = new List<ChatMessage>();
