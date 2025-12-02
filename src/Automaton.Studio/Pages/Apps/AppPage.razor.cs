@@ -337,24 +337,8 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             // Get current code (or fallback to saved)
             var html = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
 
-            // If not published, show message
-            if (!currentApp.IsPublished)
-            {
-                return @"
-<html>
-<body style='padding: 40px; font-family: Arial; text-align: center; background: #fafafa;'>
-    <div style='max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'>
-        <h2 style='color: #faad14;'>⚠️ Publish Required</h2>
-        <p style='color: #666; line-height: 1.6;'>
-            Save and publish your app to enable live preview with flow execution.
-        </p>
-    </div>
-</body>
-</html>";
-            }
-
-            // Inject automatonApi.js if available
-            if (!string.IsNullOrEmpty(automatonApiScript) && !string.IsNullOrEmpty(currentApp.PublicUrl))
+            // Inject automatonApi.js only if published (requires public URL for flow execution)
+            if (currentApp.IsPublished && !string.IsNullOrEmpty(automatonApiScript) && !string.IsNullOrEmpty(currentApp.PublicUrl))
             {
                 var scriptWithSlug = automatonApiScript.Replace("'{{APP_SLUG}}'", $"'{currentApp.PublicUrl}'");
                 var wrappedScript = $"<script>{scriptWithSlug}</script>";
@@ -389,13 +373,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             var code = await codeEditor.GetValue();
             currentApp.Definition.HtmlContent = code;
             
-            if (!currentApp.IsPublished)
-            {
-                _ = MessageService.WarningAsync("Publish your app first to enable live preview");
-                return;
-            }
-            
-            // Save silently
+            // Save silently (no need to publish for preview)
             await AppsService.Update(currentApp);
 
             // Reinitialize handler if not ready
