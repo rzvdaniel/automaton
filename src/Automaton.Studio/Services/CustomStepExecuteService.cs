@@ -148,6 +148,37 @@ public class CustomStepExecuteService : ICustomStepExecuteService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Execute custom step on specified runners
+    /// </summary>
+    public async Task<RunnerCustomStepResult> ExecuteOnRunner(Guid customStepId, Guid runnerId, CancellationToken cancellationToken = default)
+    {
+        _logger.Information("Executing custom step {CustomStepId} runner", customStepId, runnerId);
+
+        try
+        {
+            var result = await _customStepsService.Execute(customStepId, runnerId, cancellationToken);
+           
+            if (result.Success)
+            {
+                _logger.Information("Custom step {CustomStepId} executed successfully on runner {RunnerId}",
+                    customStepId, result.RunnerId);
+            }
+            else
+            {
+                _logger.Warning("Custom step {CustomStepId} failed on runner {RunnerId}: {Error}",
+                customStepId, result.RunnerId, result.Error);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Error executing custom step {CustomStepId} on runners", customStepId);
+            throw;
+        }
+    }
+
     protected void ExecuteAsync(CustomStep step)
     {
         // ✅ Convert input variables - avoid double-encoding strings

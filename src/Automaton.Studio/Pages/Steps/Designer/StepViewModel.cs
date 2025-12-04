@@ -16,9 +16,9 @@ public class StepViewModel : IDisposable
     private readonly RunnerService runnerService;
     private readonly ProjectContextService projectContextService;
 
-    public IEnumerable<Guid> SelectedRunners { get; set; } = new List<Guid>();
-    public bool HasSelectedRunners => SelectedRunners.Any();
-    public bool CanRunFlow => HasSelectedRunners;
+    public Guid? SelectedRunner { get; set; }
+    public bool HasSelectedRunner => SelectedRunner.HasValue && SelectedRunner.Value != Guid.Empty;
+    public bool CanRunFlow => HasSelectedRunner;
 
     private CustomStepDefinition CustomStepDefinition => CustomStep.Definition;
 
@@ -32,8 +32,8 @@ public class StepViewModel : IDisposable
     /// </summary>
     public string GetRunButtonDisabledMessage()
     {
-        if (!HasSelectedRunners)
-            return "Select one or more runners to execute this step";
+        if (!HasSelectedRunner)
+            return "Select a runner to execute this step";
         
         return string.Empty;
     }
@@ -43,7 +43,7 @@ public class StepViewModel : IDisposable
     /// </summary>
     public string GetRunButtonAction()
     {  
-        if (!HasSelectedRunners)
+        if (!HasSelectedRunner)
             return "select-runners";
         
         return "run";
@@ -73,13 +73,13 @@ public class StepViewModel : IDisposable
     }
 
     /// <summary>
-    /// Execute custom step on specified runners
+    /// Execute custom step on the selected runner
     /// </summary>
-    public async Task<IEnumerable<RunnerCustomStepResult>> ExecuteOnRunners()
+    public async Task<RunnerCustomStepResult> ExecuteOnRunner()
     {
-        if (!SelectedRunners.Any())
+        if (!SelectedRunner.HasValue || SelectedRunner.Value == Guid.Empty)
         {
-            throw new ArgumentException("At least one runner must be specified", nameof(SelectedRunners));
+            throw new ArgumentException("A runner must be selected", nameof(SelectedRunner));
         }
 
         // Add execution header to logs
@@ -87,68 +87,77 @@ public class StepViewModel : IDisposable
         {
             ScriptOutput.AppendLine();
         }
-        ScriptOutput.AppendLine($"=== Execution started on {SelectedRunners.Count()} runner(s) at {DateTime.Now:HH:mm:ss} ===");
+        ScriptOutput.AppendLine($"=== Execution started at {DateTime.Now:HH:mm:ss} ===");
         ScriptOutput.AppendLine();
         ScriptTextWritten?.Invoke(this, EventArgs.Empty);
 
-        var results = await customStepExecuteService.ExecuteOnRunners(CustomStep.Id, SelectedRunners);
+        // Execute on single runner using the multi-runner method with array of one
+        var result = await customStepExecuteService.ExecuteOnRunner(CustomStep.Id, SelectedRunner.Value);
 
-        // Display results for each runner
-        foreach (var result in results)
+        if (result == null)
         {
-            // Get runner name
-            var projectId = projectContextService.GetCurrentProjectId();
-            var runners = await runnerService.List(projectId);
-            var runner = runners.FirstOrDefault(r => r.Id == result.RunnerId);
-            var runnerName = runner?.Name ?? result.RunnerId.ToString();
+            throw new InvalidOperationException("No result returned from runner execution");
+        }
 
-            ScriptOutput.AppendLine($"--- Runner: {runnerName} ---");
+        // Get runner name for logs
+        var projectId = projectContextService.GetCurrentProjectId();
+        var runners = await runnerService.List(projectId);
+        var runner = runners.FirstOrDefault(r => r.Id == result.RunnerId);
+        var runnerName = runner?.Name ?? result.RunnerId.ToString();
+
+        ScriptOutput.AppendLine($"--- Runner: {runnerName} ---");
+        
+        if (result.Success)
+        {
+            ScriptOutput.AppendLine($"✅ Status: SUCCESS");
             
-            if (result.Success)
+            var executionTime = result.Finished - result.Started;
+            ScriptOutput.AppendLine($"⏱️  Execution Time: {executionTime.TotalMilliseconds:F2}ms");
+            ScriptOutput.AppendLine();
+            
+            // Show console output (stdout) - this contains print() statements
+            if (!string.IsNullOrEmpty(result.Output))
             {
-                ScriptOutput.AppendLine($"✅ Status: SUCCESS");
-                
-                var executionTime = result.Finished - result.Started;
-                ScriptOutput.AppendLine($"⏱️  Execution Time: {executionTime.TotalMilliseconds:F2}ms");
-                ScriptOutput.AppendLine();
-                
-                // Show console output (stdout) - this contains print() statements
-                if (!string.IsNullOrEmpty(result.Output))
-                {
-                    ScriptOutput.AppendLine($"📋 Console Output:");
-                    ScriptOutput.AppendLine(result.Output);
-                }
-
-                // Show output variables
-                if (result.OutputVariables != null && result.OutputVariables.Any())
-                {
-                    ScriptOutput.AppendLine($"📊 Output Variables:");
-                    foreach (var variable in result.OutputVariables)
-                    {
-                        ScriptOutput.AppendLine($"  • {variable.Key}: {variable.Value}");
-                    }
-                    ScriptOutput.AppendLine();
-                }
+                ScriptOutput.AppendLine($"📋 Console Output:");
+                ScriptOutput.AppendLine(result.Output);
             }
-            else
+
+            // Show output variables and populate them in the CustomStep
+            if (result.OutputVariables != null && result.OutputVariables.Any())
             {
-                ScriptOutput.AppendLine($"❌ Status: FAILED");
+                ScriptOutput.AppendLine($"📊 Output Variables:");
+                foreach (var variable in result.OutputVariables)
+                {
+                    ScriptOutput.AppendLine($"  • {variable.Key}: {variable.Value}");
+                    
+                    // Populate the output variable in the CustomStep definition
+                    var outputVar = CustomStep.Definition.CodeOutputVariables?.FirstOrDefault(v => v.Name == variable.Key);
+                    if (outputVar != null)
+                    {
+                        outputVar.Value = variable.Value?.ToString();
+                    }
+                }
                 ScriptOutput.AppendLine();
-                
-                if (!string.IsNullOrEmpty(result.Error))
-                {
-                    ScriptOutput.AppendLine($"❗ Error:");
-                    ScriptOutput.AppendLine(result.Error);
-                    ScriptOutput.AppendLine();
-                }
-                
-                // Show console output even on failure (may contain error messages)
-                if (!string.IsNullOrEmpty(result.Output))
-                {
-                    ScriptOutput.AppendLine($"📋 Console Output:");
-                    ScriptOutput.AppendLine(result.Output);
-                    ScriptOutput.AppendLine();
-                }
+            }
+        }
+        else
+        {
+            ScriptOutput.AppendLine($"❌ Status: FAILED");
+            ScriptOutput.AppendLine();
+            
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                ScriptOutput.AppendLine($"❗ Error:");
+                ScriptOutput.AppendLine(result.Error);
+                ScriptOutput.AppendLine();
+            }
+            
+            // Show console output even on failure (may contain error messages)
+            if (!string.IsNullOrEmpty(result.Output))
+            {
+                ScriptOutput.AppendLine($"📋 Console Output:");
+                ScriptOutput.AppendLine(result.Output);
+                ScriptOutput.AppendLine();
             }
         }
 
@@ -156,7 +165,7 @@ public class StepViewModel : IDisposable
         ScriptOutput.AppendLine($"=== Execution completed at {DateTime.Now:HH:mm:ss} ===");
         ScriptTextWritten?.Invoke(this, EventArgs.Empty);
 
-        return results;
+        return result;
     }
 
     public void AddInputVariable()

@@ -81,18 +81,18 @@
 
                                 <!-- Runner Selection -->
                                 <SpaceItem>
-                                    <RunnerSelector Multiple="true" @bind-SelectedValues="StepDesignerViewModel.SelectedRunners" Style="width:200px" />
+                                    <RunnerSelector Multiple="false" @bind-SelectedValue="StepDesignerViewModel.SelectedRunner" Style="width:200px" />
                                 </SpaceItem>
                                 
                                 <!-- Enhanced Help Section -->
                                 @if (!StepDesignerViewModel.CanRunFlow)
                                 {
                                     <SpaceItem>
-                                        @if (!StepDesignerViewModel.HasSelectedRunners)
+                                        @if (!StepDesignerViewModel.HasSelectedRunner)
                                         {
                                             <!-- Runners Available but None Selected -->
                                             <div style="display: flex; align-items: center; gap: 8px;">
-                                                <Tooltip Title="Select runners above to execute this step">
+                                                <Tooltip Title="Select a runner above to execute this step">
                                                     <Icon Type="info-circle" Style="color: #1890ff;" Width="16" Height="16" />
                                                 </Tooltip>
                                             </div>

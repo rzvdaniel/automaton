@@ -49,7 +49,7 @@ else
 			Placeholder="@Placeholder"
 			DataSource="AvailableRunners"
 			TItem="RunnerModel"
-			TItemValue="Guid ?"
+			TItemValue="Guid?"
 			ValueProperty="r => r.Id"
 			LabelProperty="r => r.Name"
 			DisabledPredicate="@IsSelectionDisabled"
@@ -76,7 +76,7 @@ else
 
 	private Guid? _selectedValue;
 
-	// Internal mutable copy used for binding
+	// Internal mutable copy used for binding in multiple mode
 	private List<Guid> _boundValues = new();
 
 	private IEnumerable<Guid> BoundValues
@@ -137,11 +137,14 @@ else
 
 	protected override void OnParametersSet()
 	{
-		// sync incoming values into internal copy
-		var incoming = SelectedValues?.ToList() ?? new List<Guid>();
-		if (!_boundValues.SequenceEqual(incoming))
+		// For multiple mode, sync incoming SelectedValues into internal copy
+		if (Multiple)
 		{
-			_boundValues = incoming;
+			var incoming = SelectedValues?.ToList() ?? new List<Guid>();
+			if (!_boundValues.SequenceEqual(incoming))
+			{
+				_boundValues = incoming;
+			}
 		}
 	}
 

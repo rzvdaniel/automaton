@@ -121,4 +121,14 @@ public class CustomStepsService
             throw;
         }
     }
+
+    /// <summary>
+    /// Execute a custom step on specified runner via server API
+    /// </summary>
+    public async Task<RunnerCustomStepResult> Execute(Guid customStepId, Guid runnerId, CancellationToken cancellationToken = default)
+    {
+        var result =  await Execute(customStepId, [runnerId], cancellationToken);
+
+        return result.FirstOrDefault();
+    }
 }

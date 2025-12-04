@@ -209,7 +209,7 @@ partial class StepPage : ComponentBase, IDisposable
                 _ = MessageService.WarningAsync("Validation warnings detected, but continuing with execution...", 2);
             }
 
-            await ExecuteOnRunners();
+            await ExecuteOnRunner();
 
             runningCode = false;
             _ = MessageService.SuccessAsync(Resources.Information.CustomStepExecutionSuccessful);
@@ -221,12 +221,11 @@ partial class StepPage : ComponentBase, IDisposable
         }
     }
 
-    private async Task ExecuteOnRunners()
+    private async Task ExecuteOnRunner()
     {
         try
         {
-            var results = await StepDesignerViewModel.ExecuteOnRunners();
-            var resultsList = results.ToList();
+            var result = await StepDesignerViewModel.ExecuteOnRunner();
             
             // Small delay to ensure DOM updates before auto-scrolling
             await Task.Delay(100);
@@ -235,39 +234,25 @@ partial class StepPage : ComponentBase, IDisposable
                 await ScrollToBottom();
             }
 
-            var successCount = resultsList.Count(r => r.Success);
-            var failureCount = resultsList.Count(r => !r.Success);
-            var totalCount = resultsList.Count;
+            // Force UI update to reflect populated output variables
+            StateHasChanged();
 
-            if (successCount == totalCount)
+            if (result.Success)
             {
-                // All runners succeeded
-                _ = MessageService.SuccessAsync($"Custom step executed successfully on all {totalCount} runner(s)!", 3);
-            }
-            else if (successCount > 0)
-            {
-                // Some runners succeeded, some failed
-                _ = MessageService.WarningAsync($"Custom step completed on {successCount} of {totalCount} runner(s). {failureCount} runner(s) failed. Check logs for details.", 5);
+                _ = MessageService.SuccessAsync("Custom step executed successfully!", 3);
             }
             else
             {
-                // All runners failed
-                var errorMessages = resultsList
-                    .Where(r => !string.IsNullOrEmpty(r.Error))
-                    .Select(r => r.Error)
-                    .Take(3)
-                    .ToList();
-
-                var errorSummary = errorMessages.Any() 
-                    ? $"Errors: {string.Join("; ", errorMessages)}" 
+                var errorSummary = !string.IsNullOrEmpty(result.Error) 
+                    ? $"Error: {result.Error}" 
                     : "Check logs for error details.";
 
-                _ = MessageService.ErrorAsync($"Custom step execution failed on all {totalCount} runner(s). {errorSummary}", 5);
+                _ = MessageService.ErrorAsync($"Custom step execution failed. {errorSummary}", 5);
             }
         }
         catch (Exception ex)
         {
-            _ = MessageService.ErrorAsync($"Failed to execute custom step on runners: {ex.Message}. Please check runner connectivity and try again.", 5);
+            _ = MessageService.ErrorAsync($"Failed to execute custom step on runner: {ex.Message}. Please check runner connectivity and try again.", 5);
         }
     }
 
