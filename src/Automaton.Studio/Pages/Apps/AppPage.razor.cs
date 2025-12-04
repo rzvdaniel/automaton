@@ -230,11 +230,14 @@ partial class AppPage : ComponentBase, IAsyncDisposable
 
         try
         {
+            // Use DisplayName if available, otherwise fall back to Name
+            var displayName = !string.IsNullOrEmpty(currentApp.DisplayName) ? currentApp.DisplayName : currentApp.Name;
+            
             var model = new PublishAppModel
             {
                 AppId = currentApp.Id,
-                DisplayName = currentApp.DisplayName,
-                PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(currentApp.DisplayName),
+                DisplayName = displayName,
+                PublicUrl = currentApp.PublicUrl ?? AppsService.GenerateSlugPreview(displayName),
                 ExecutionRunnerId = currentApp.ExecutionRunnerId
             };
 
