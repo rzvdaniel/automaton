@@ -256,6 +256,9 @@ The solution supports different levels of backend complexity:
 ### Future Enhancement
 9. [08-phase6-flow-generation.md](./08-phase6-flow-generation.md) - Automatic Flow Generation
 
+### Design Decisions
+10. [09-why-link-steps-to-apps.md](./09-why-link-steps-to-apps.md) - Why Link Steps to Apps?
+
 ---
 
 ## Quick Start for AI Implementation
