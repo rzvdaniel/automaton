@@ -11,35 +11,37 @@
 @using Serilog.Formatting.Json;
 @using Serilog.Sinks.Http.HttpClients;
 
-<Router
-    AppAssembly="@this.GetType().Assembly"
-        AdditionalAssemblies="new[] { typeof(AccountPage).Assembly, typeof(LoginPage).Assembly, typeof(InstallPage).Assembly }"
-        PreferExactMatches="@true">
+<CascadingAuthenticationState>
+    <Router
+        AppAssembly="@this.GetType().Assembly"
+            AdditionalAssemblies="new[] { typeof(AccountPage).Assembly, typeof(LoginPage).Assembly, typeof(InstallPage).Assembly }"
+            PreferExactMatches="@true">
 
-    <Found Context="routeData">
-        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
-            <NotAuthorized>
-                @if (context.User.Identity?.IsAuthenticated != true)
-                {
-                    <RedirectToLogin />
-                }
-                else
-                {
-                    <p role="alert">You are not authorized to access this resource.</p>
-                }
-            </NotAuthorized>
-        </AuthorizeRouteView>
-    </Found>
-    <NotFound>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <CustomNotFound />
-        </LayoutView>
-    </NotFound>
-</Router>
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        <p role="alert">You are not authorized to access this resource.</p>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <CustomNotFound />
+            </LayoutView>
+        </NotFound>
+    </Router>
 
-@*To display the pop-up component dynamically, we need to add the <AntContainer /> component in App.razor*@
-@*https://github.com/ant-design-blazor/ant-design-blazor*@
-<AntContainer />
+    @* To display the pop-up component dynamically, we need to add the AntContainer component in App.razor *@
+    @* https://github.com/ant-design-blazor/ant-design-blazor *@
+    <AntContainer />
+</CascadingAuthenticationState>
 
 @code {
     [Inject] public SerilogHttpClient SerilogHttpClient { get; set; }

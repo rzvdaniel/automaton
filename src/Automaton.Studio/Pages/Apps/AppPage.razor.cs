@@ -733,12 +733,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             await InvokeAsync(StateHasChanged);
         };
     }
-    
-    private void CreateNewStep()
-    {
-        NavigationManager.NavigateTo($"/customsteps/new?appId={currentApp.Id}");
-    }
-    
+        
     private void NavigateToStep(Guid stepId)
     {
         NavigationManager.NavigateTo($"/step/{stepId}");
