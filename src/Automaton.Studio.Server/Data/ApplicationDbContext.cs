@@ -36,6 +36,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<AiApiKeyUser> AiApiKeyUsers { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
+        public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
         public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
         public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
@@ -152,6 +153,30 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.WebAppId, "IX_WebAppUser_WebAppId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.WebAppId).IsRequired();
+            });
+
+            modelBuilder.Entity<Entities.WebAppStep>(entity =>
+            {
+                entity.HasKey(e => new { e.WebAppId, e.CustomStepId });
+                entity.Property(e => e.LinkedAt).IsRequired();
+                
+                entity.HasIndex(e => e.WebAppId);
+                entity.HasIndex(e => e.CustomStepId);
+                
+                entity.HasOne(e => e.WebApp)
+                    .WithMany()
+                    .HasForeignKey(e => e.WebAppId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.CustomStep)
+                    .WithMany()
+                    .HasForeignKey(e => e.CustomStepId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(e => e.LinkedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.LinkedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<RefreshToken>(entity =>

@@ -108,6 +108,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowExecutionsService>();
         services.AddScoped<CustomStepsService>();
         services.AddScoped<AppsService>();
+        services.AddScoped<AppStepsService>();
         services.AddScoped<IframeProxyService>();
         services.AddScoped<IframeMessageHandler>();
         services.AddScoped<StudioFlowExecuteService>();

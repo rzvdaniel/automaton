@@ -7,17 +7,20 @@ namespace Automaton.Studio.Server.Controllers;
 public class AppsController : BaseController
 {
     private readonly AppsService appsService;
+    private readonly AppStepsService appStepsService;
     private readonly UserImpersonationServiceFactory<AppsService> appsServiceFactory;
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
 
     public AppsController(
         AppsService appsService,
+        AppStepsService appStepsService,
         UserImpersonationServiceFactory<AppsService> appsServiceFactory,
         ILogger<AppsController> logger,
         IWebHostEnvironment webHostEnvironment)
     {
         this.appsService = appsService;
+        this.appStepsService = appStepsService;
         this.appsServiceFactory = appsServiceFactory;
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
@@ -320,6 +323,94 @@ public class AppsController : BaseController
         {
             logger.LogError(ex, "[AppsController] Error cleaning up old images in {Directory}", appThumbnailsDir);
             // Don't throw - cleanup failure shouldn't prevent upload
+        }
+    }
+
+    /// <summary>
+    /// Get steps linked to an app
+    /// </summary>
+    [HttpGet("{id}/steps")]
+    public async Task<ActionResult<IEnumerable<Models.LinkedStepInfo>>> GetLinkedSteps(Guid id)
+    {
+        try
+        {
+            var steps = await appStepsService.GetLinkedStepsAsync(id);
+            return Ok(steps);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error getting linked steps for app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to get linked steps" });
+        }
+    }
+
+    /// <summary>
+    /// Get available steps that can be linked
+    /// </summary>
+    [HttpGet("{id}/steps/available")]
+    public async Task<ActionResult<IEnumerable<Models.LinkedStepInfo>>> GetAvailableSteps(Guid id)
+    {
+        try
+        {
+            var steps = await appStepsService.GetAvailableStepsAsync(id);
+            return Ok(steps);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error getting available steps for app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to get available steps" });
+        }
+    }
+
+    /// <summary>
+    /// Link a step to an app
+    /// </summary>
+    [HttpPost("{appId}/steps/{stepId}/link")]
+    public async Task<IActionResult> LinkStep(Guid appId, Guid stepId)
+    {
+        try
+        {
+            await appStepsService.LinkStepAsync(appId, stepId);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error linking step {StepId} to app {AppId}", stepId, appId);
+            return StatusCode(500, new { message = "Failed to link step" });
+        }
+    }
+
+    /// <summary>
+    /// Unlink a step from an app
+    /// </summary>
+    [HttpDelete("{appId}/steps/{stepId}")]
+    public async Task<IActionResult> UnlinkStep(Guid appId, Guid stepId)
+    {
+        try
+        {
+            await appStepsService.UnlinkStepAsync(appId, stepId);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error unlinking step {StepId} from app {AppId}", stepId, appId);
+            return StatusCode(500, new { message = "Failed to unlink step" });
         }
     }
 }
