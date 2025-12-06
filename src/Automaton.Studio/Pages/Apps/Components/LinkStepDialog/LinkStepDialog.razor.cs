@@ -46,9 +46,11 @@ public partial class LinkStepDialog : ComponentBase
                 _ = MessageService.SuccessAsync("Step linked successfully");
                 await ModalRef.CloseAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                _ = MessageService.ErrorAsync("Failed to link step");
+                // Log the error for debugging
+                Console.WriteLine($"Failed to link step: {ex.Message}");
+                _ = MessageService.ErrorAsync($"Failed to link step: {ex.Message}");
             }
         }
         

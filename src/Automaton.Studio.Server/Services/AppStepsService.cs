@@ -56,7 +56,7 @@ public class AppStepsService
 
         foreach (var step in linkedSteps)
         {
-            var stepInfo = await MapToLinkedStepInfo(step);
+            var stepInfo = MapToLinkedStepInfo(step);
             result.Add(stepInfo);
         }
 
@@ -96,7 +96,7 @@ public class AppStepsService
 
         foreach (var step in availableSteps)
         {
-            var stepInfo = await MapToLinkedStepInfo(step);
+            var stepInfo = MapToLinkedStepInfo(step);
             result.Add(stepInfo);
         }
 
@@ -189,22 +189,22 @@ public class AppStepsService
     /// <summary>
     /// Map CustomStep entity to LinkedStepInfo model
     /// </summary>
-    private async Task<LinkedStepInfo> MapToLinkedStepInfo(Entities.CustomStep step)
+    private LinkedStepInfo MapToLinkedStepInfo(Entities.CustomStep step)
     {
         var definition = JsonSerializer.Deserialize<CustomStepDefinition>(step.Definition);
 
-        var inputVariables = definition?.InputVariables?.Select(v => new StepVariableInfo
+        var inputVariables = definition?.CodeInputVariables?.Select(v => new StepVariableInfo
         {
-            Name = v.Name,
+            Name = v.Name ?? string.Empty,
             Description = v.Description,
-            Type = v.Type
+            Type = "String" // StepVariable doesn't have Type property
         }).ToList() ?? new List<StepVariableInfo>();
 
-        var outputVariables = definition?.OutputVariables?.Select(v => new StepVariableInfo
+        var outputVariables = definition?.CodeOutputVariables?.Select(v => new StepVariableInfo
         {
-            Name = v.Name,
+            Name = v.Name ?? string.Empty,
             Description = v.Description,
-            Type = v.Type
+            Type = "String" // StepVariable doesn't have Type property
         }).ToList() ?? new List<StepVariableInfo>();
 
         return new LinkedStepInfo

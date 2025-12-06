@@ -685,10 +685,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             return;
         }
         
-        // Use a simple confirmation dialog approach
-        // For now, just navigate to a page where user can manually link steps
-        // TODO: Implement proper modal dialog when AntDesign modal patterns are clearer
-        _ = MessageService.InfoAsync($"Found {availableSteps.Count} available steps. Navigate to Custom Steps page to create or manage steps.");
+        // Display a simple selection approach for now
+        // Future enhancement: implement full modal dialog with search and filtering
+        _ = MessageService.InfoAsync($"Found {availableSteps.Count} available steps. Use the 'Create Step' button to add a new step, or navigate to Custom Steps page to manage existing steps.");
     }
     
     private void CreateNewStep()
