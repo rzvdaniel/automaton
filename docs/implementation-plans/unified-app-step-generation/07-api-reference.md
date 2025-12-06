@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides the complete API reference for the unified App + Backend Step generation feature.
+This document provides the complete API reference for the unified App + Backend Step generation feature, including both direct step execution and flow execution capabilities.
 
 ---
 
@@ -148,6 +148,118 @@ GET /api/web-apps/{appSlug}/steps
 
 ---
 
+## Flow Execution API (Existing + Enhanced)
+
+### Execute Flow from App
+
+Execute a Flow (multi-step workflow) from a published Web App.
+
+```http
+POST /api/web-apps/{appSlug}/flows/{flowIdentifier}/execute
+```
+
+#### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `appSlug` | string | The app's public URL slug |
+| `flowIdentifier` | string | Flow name or GUID |
+
+#### Request Body
+
+```json
+{
+  "inputs": {
+    "user_name": "John Doe",
+    "user_email": "john@example.com",
+    "api_key": "sk_..."
+  },
+  "runnerNames": ["runner-1"]
+}
+```
+
+#### Response
+
+**Success (200 OK)**
+
+```json
+{
+  "success": true,
+  "flowId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "flowName": "UserRegistrationFlow",
+  "status": "Completed",
+  "runnerCount": 1,
+  "executedAt": "2025-01-15T10:30:00Z",
+  "completedAt": "2025-01-15T10:30:05Z",
+  "outputVariables": {
+    "user_id": "usr_789",
+    "email_id": "msg_456",
+    "log_id": "log_123",
+    "success": true
+  },
+  "logs": [
+    "[10:30:00] Starting flow: UserRegistrationFlow",
+    "[10:30:01] Step 1/3: CreateUserStep - Started",
+    "[10:30:02] Step 1/3: CreateUserStep - Completed (user_id: usr_789)",
+    "[10:30:02] Step 2/3: SendWelcomeEmailStep - Started",
+    "[10:30:04] Step 2/3: SendWelcomeEmailStep - Completed (email_id: msg_456)",
+    "[10:30:04] Step 3/3: CreateAuditLogStep - Started",
+    "[10:30:05] Step 3/3: CreateAuditLogStep - Completed",
+    "[10:30:05] Flow completed successfully"
+  ]
+}
+```
+
+#### Example Usage (JavaScript)
+
+```javascript
+// For complex multi-step operations, use executeFlow
+const result = await automatonApi.executeFlow('UserRegistrationFlow', {
+  inputs: {
+    user_name: 'John Doe',
+    user_email: 'john@example.com',
+    password: 'hashed_password_here'
+  }
+});
+
+if (result.success) {
+  console.log('Registration complete!');
+  console.log('User ID:', result.outputVariables.user_id);
+  console.log('Welcome email sent:', result.outputVariables.email_id);
+} else {
+  console.error('Registration failed:', result.error);
+}
+```
+
+---
+
+### List Flows for App
+
+Get all flows available for a published app.
+
+```http
+GET /api/web-apps/{appSlug}/flows
+```
+
+#### Response
+
+**Success (200 OK)**
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "UserRegistrationFlow",
+    "description": "Complete user registration with email and audit log",
+    "stepCount": 3,
+    "inputVariables": ["user_name", "user_email", "password"],
+    "outputVariables": ["user_id", "email_id", "log_id", "success"]
+  }
+]
+```
+
+---
+
 ## App Steps Management API
 
 ### Get Linked Steps
@@ -247,13 +359,68 @@ DELETE /api/apps/{appId}/steps/{stepId}
 
 ---
 
+## App Flows Management API (Phase 6)
+
+### Get Linked Flows
+
+Get all Flows linked to an app.
+
+```http
+GET /api/apps/{appId}/flows
+```
+
+**Requires Authentication**
+
+#### Response
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "UserRegistrationFlow",
+    "description": "Complete user registration workflow",
+    "stepCount": 3,
+    "steps": ["CreateUserStep", "SendWelcomeEmailStep", "CreateAuditLogStep"],
+    "created": "2025-01-10T08:00:00Z",
+    "updated": "2025-01-14T16:30:00Z",
+    "linkedAt": "2025-01-12T12:00:00Z"
+  }
+]
+```
+
+---
+
+### Link Flow to App
+
+Create a link between an app and a Flow.
+
+```http
+POST /api/apps/{appId}/flows/{flowId}/link
+```
+
+**Requires Authentication**
+
+---
+
+### Unlink Flow from App
+
+Remove the link between an app and a Flow.
+
+```http
+DELETE /api/apps/{appId}/flows/{flowId}
+```
+
+**Requires Authentication**
+
+---
+
 ## automatonApi JavaScript SDK
 
 The SDK is automatically injected into published web apps.
 
 ### executeStep
 
-Execute a Custom Step.
+Execute a Custom Step (for simple single-operation backends).
 
 ```javascript
 automatonApi.executeStep(stepIdentifier, options)
@@ -274,26 +441,21 @@ automatonApi.executeStep(stepIdentifier, options)
 #### Example
 
 ```javascript
-try {
-  const result = await automatonApi.executeStep('ProcessDataStep', {
-    inputs: {
-      data_source: 'https://api.example.com/data',
-      output_format: 'json'
-    },
-    runnerNames: ['production-runner']
-  });
-  
-  console.log('Processed:', result.outputVariables);
-} catch (error) {
-  console.error('Execution failed:', error.message);
-}
+// Simple backend operation - use executeStep
+const result = await automatonApi.executeStep('SendEmailStep', {
+  inputs: {
+    to_email: 'user@example.com',
+    subject: 'Hello',
+    body: 'Message content'
+  }
+});
 ```
 
 ---
 
-### executeFlow (Existing)
+### executeFlow
 
-Execute a Flow (existing functionality).
+Execute a Flow (for complex multi-step backends).
 
 ```javascript
 automatonApi.executeFlow(flowIdentifier, options)
@@ -306,6 +468,40 @@ automatonApi.executeFlow(flowIdentifier, options)
 | `flowIdentifier` | string | Flow name or GUID |
 | `options.inputs` | object | Input variable values |
 | `options.runnerNames` | string[] | Specific runners (optional) |
+
+#### Returns
+
+`Promise<WebAppFlowExecutionResponse>`
+
+#### Example
+
+```javascript
+// Complex multi-step operation - use executeFlow
+const result = await automatonApi.executeFlow('UserRegistrationFlow', {
+  inputs: {
+    user_name: 'John Doe',
+    user_email: 'john@example.com',
+    password: 'hashed_password'
+  }
+});
+
+// Access outputs from multiple steps
+console.log('User ID:', result.outputVariables.user_id);
+console.log('Email ID:', result.outputVariables.email_id);
+```
+
+---
+
+### When to Use executeStep vs executeFlow
+
+| Use Case | Method | Example |
+|----------|--------|---------|
+| Single API call | `executeStep` | Send email, process payment |
+| Single DB operation | `executeStep` | Create record, update status |
+| Independent operations | Multiple `executeStep` | Two unrelated buttons |
+| Dependent operations | `executeFlow` | Create user ? send email |
+| Transactional operations | `executeFlow` | Payment ? inventory ? receipt |
+| Operations with rollback | `executeFlow` | Complex workflows |
 
 ---
 
@@ -340,7 +536,7 @@ const slug = automatonApi.getAppSlug();
 
 ## MCP Tools (AI Context)
 
-These tools are available to the AI when generating unified App + Step code.
+These tools are available to the AI when generating unified App + Step/Flow code.
 
 ### Frontend Tools
 
@@ -349,7 +545,7 @@ These tools are available to the AI when generating unified App + Step code.
 | `get_current_code` | Get existing app HTML/CSS/JS | None |
 | `save_app_code` | Save frontend code | `code`: string |
 
-### Backend Tools
+### Backend Step Tools
 
 | Tool | Description | Arguments |
 |------|-------------|-----------|
@@ -360,6 +556,16 @@ These tools are available to the AI when generating unified App + Step code.
 | `execute_step_code` | Test step execution | `step_name`, `inputs` |
 | `link_step_to_app` | Link step to current app | `step_name` |
 | `get_linked_steps` | List linked steps | None |
+
+### Backend Flow Tools (Phase 6)
+
+| Tool | Description | Arguments |
+|------|-------------|-----------|
+| `create_flow` | Create new Flow | `name`, `description` |
+| `add_step_to_flow` | Add step to flow | `flow_name`, `step_name`, `position`, `mappings` |
+| `configure_flow_variables` | Set flow I/O | `flow_name`, `input_variables`, `output_variables` |
+| `link_flow_to_app` | Link flow to current app | `flow_name` |
+| `get_linked_flows` | List linked flows | None |
 
 ### Tool Response Format
 
@@ -383,10 +589,11 @@ These tools are available to the AI when generating unified App + Step code.
 |------|-------------|-------------|
 | `APP_NOT_FOUND` | 404 | App does not exist or is not published |
 | `STEP_NOT_FOUND` | 404 | Step does not exist |
+| `FLOW_NOT_FOUND` | 404 | Flow does not exist |
 | `AUTH_REQUIRED` | 401 | Authentication required but not provided |
 | `ACCESS_DENIED` | 403 | User does not have permission |
 | `RUNNER_NOT_AVAILABLE` | 500 | No runners available for execution |
-| `EXECUTION_FAILED` | 500 | Step execution failed on runner |
+| `EXECUTION_FAILED` | 500 | Step/Flow execution failed on runner |
 | `INVALID_INPUT` | 400 | Invalid request format or parameters |
 
 ---
@@ -397,6 +604,8 @@ These tools are available to the AI when generating unified App + Step code.
 |---------------|-------|
 | Step Execution (public) | 60 requests/minute per app |
 | Step Execution (authenticated) | 120 requests/minute per user |
+| Flow Execution (public) | 30 requests/minute per app |
+| Flow Execution (authenticated) | 60 requests/minute per user |
 | API Management | 100 requests/minute per user |
 
 Rate limit headers are included in responses:
@@ -408,13 +617,14 @@ Rate limit headers are included in responses:
 
 ## WebSocket Events (SignalR)
 
-Step execution uses SignalR for runner communication.
+Step and Flow execution uses SignalR for runner communication.
 
 ### Hub Methods
 
 | Method | Direction | Description |
 |--------|-----------|-------------|
 | `RunCustomStep` | Server ? Runner | Execute step on runner |
+| `RunFlow` | Server ? Runner | Execute flow on runner |
 
 ### Response Format
 
