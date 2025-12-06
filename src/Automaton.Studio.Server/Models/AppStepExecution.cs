@@ -3,7 +3,7 @@ namespace Automaton.Studio.Server.Models;
 /// <summary>
 /// Request to execute a Custom Step from a Web App
 /// </summary>
-public class WebAppStepExecutionRequest
+public class AppStepExecutionRequest
 {
     /// <summary>
     /// Input variables as key-value pairs
@@ -19,7 +19,7 @@ public class WebAppStepExecutionRequest
 /// <summary>
 /// Response from Custom Step execution
 /// </summary>
-public class WebAppStepExecutionResponse
+public class AppStepExecutionResponse
 {
     public bool Success { get; set; }
     public Guid StepId { get; set; }

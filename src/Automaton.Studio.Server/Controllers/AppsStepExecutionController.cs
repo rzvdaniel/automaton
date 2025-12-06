@@ -37,10 +37,10 @@ public class AppsStepExecutionController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("{appSlug}/steps/{stepIdentifier}/execute")]
     [AllowAnonymous] // Auth is checked internally based on app settings
-    public async Task<ActionResult<WebAppStepExecutionResponse>> ExecuteStep(
+    public async Task<ActionResult<AppStepExecutionResponse>> ExecuteStep(
         string appSlug,
         string stepIdentifier,
-        [FromBody] WebAppStepExecutionRequest request,
+        [FromBody] AppStepExecutionRequest request,
         CancellationToken cancellationToken)
     {
         try

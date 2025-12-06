@@ -31,7 +31,7 @@ public class AppsStepExecutionService
     /// <summary>
     /// Execute a step for a web app
     /// </summary>
-    public async Task<WebAppStepExecutionResponse> ExecuteStepForAppAsync(
+    public async Task<AppStepExecutionResponse> ExecuteStepForAppAsync(
         PublishedAppInfo app,
         string stepIdentifier,
         Dictionary<string, string> inputs,
@@ -82,7 +82,7 @@ public class AppsStepExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Execution completed. Success: {success}");
 
-            return new WebAppStepExecutionResponse
+            return new AppStepExecutionResponse
             {
                 Success = success,
                 StepId = step.Id,
@@ -100,7 +100,7 @@ public class AppsStepExecutionService
         {
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR: {ex.Message}");
             
-            return new WebAppStepExecutionResponse
+            return new AppStepExecutionResponse
             {
                 Success = false,
                 Status = "Failed",

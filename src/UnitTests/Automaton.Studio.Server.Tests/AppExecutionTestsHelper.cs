@@ -2,7 +2,7 @@ using Automaton.Core.Models;
 
 namespace Automaton.Studio.Server.Tests;
 
-public static class WebAppExecutionTestsHelper
+public static class AppExecutionTestsHelper
 {
     public static List<string> ApplyInputVariables(Flow flow, Dictionary<string, string> inputs)
     {

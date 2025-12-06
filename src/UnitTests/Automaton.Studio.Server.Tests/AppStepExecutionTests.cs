@@ -2,13 +2,13 @@ using Automaton.Studio.Server.Models;
 
 namespace Automaton.Studio.Server.Tests;
 
-public class WebAppStepExecutionTests
+public class AppStepExecutionTests
 {
     [Test]
     public void WebAppStepExecutionRequest_DefaultsToEmptyInputs()
     {
         // Arrange & Act
-        var request = new WebAppStepExecutionRequest();
+        var request = new AppStepExecutionRequest();
 
         // Assert
         Assert.That(request.Inputs, Is.Null);
@@ -26,7 +26,7 @@ public class WebAppStepExecutionTests
         };
 
         // Act
-        var request = new WebAppStepExecutionRequest
+        var request = new AppStepExecutionRequest
         {
             Inputs = inputs,
             RunnerNames = new List<string> { "runner1" }
@@ -50,7 +50,7 @@ public class WebAppStepExecutionTests
         };
 
         // Act
-        var response = new WebAppStepExecutionResponse
+        var response = new AppStepExecutionResponse
         {
             Success = true,
             StepId = stepId,
@@ -79,7 +79,7 @@ public class WebAppStepExecutionTests
     public void WebAppStepExecutionResponse_FailureResponse()
     {
         // Arrange & Act
-        var response = new WebAppStepExecutionResponse
+        var response = new AppStepExecutionResponse
         {
             Success = false,
             Status = "Failed",
@@ -124,7 +124,7 @@ public class WebAppStepExecutionTests
     public void WebAppStepExecutionResponse_DefaultStatus()
     {
         // Arrange & Act
-        var response = new WebAppStepExecutionResponse();
+        var response = new AppStepExecutionResponse();
 
         // Assert
         Assert.That(response.Status, Is.EqualTo("Unknown"));
