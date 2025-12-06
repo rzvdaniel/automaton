@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1: Direct Step Execution Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .example-section {
+            background: #f4f4f4;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: white;
+            padding: 15px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            background: #ffe6e6;
+            border-color: #ff0000;
+        }
+        .success {
+            background: #e6ffe6;
+            border-color: #00aa00;
+        }
+        h2 {
+            color: #333;
+        }
+        code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Phase 1: Direct Step Execution API - Example</h1>
+    
+    <p>
+        This example demonstrates the new <code>automatonApi.executeStep()</code> functionality
+        which allows web apps to execute Custom Steps directly without creating Flows.
+    </p>
+
+    <div class="example-section">
+        <h2>Example 1: Execute Step by Name</h2>
+        <p>Execute a custom step using its name (e.g., "SendEmailStep")</p>
+        <button onclick="executeStepByName()">Execute Step by Name</button>
+        <div id="result1" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="example-section">
+        <h2>Example 2: Execute Step by GUID</h2>
+        <p>Execute a custom step using its GUID</p>
+        <button onclick="executeStepByGuid()">Execute Step by GUID</button>
+        <div id="result2" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="example-section">
+        <h2>Example 3: Execute with Input Variables</h2>
+        <p>Execute a step and pass input variables</p>
+        <button onclick="executeStepWithInputs()">Execute Step with Inputs</button>
+        <div id="result3" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="example-section">
+        <h2>Example 4: List Available Steps</h2>
+        <p>Get a list of all steps available for this app</p>
+        <button onclick="listAvailableSteps()">List Available Steps</button>
+        <div id="result4" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        // NOTE: In a real Automaton app, automatonApi would be injected by the platform
+        // This is just for demonstration purposes
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = isError ? 'result error' : 'result success';
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function executeStepByName() {
+            try {
+                const result = await automatonApi.executeStep('SendEmailStep', {
+                    inputs: {
+                        to: 'user@example.com',
+                        subject: 'Test Email',
+                        body: 'This is a test email from Automaton'
+                    }
+                });
+                showResult('result1', result);
+            } catch (error) {
+                showResult('result1', { error: error.message }, true);
+            }
+        }
+
+        async function executeStepByGuid() {
+            try {
+                const stepGuid = '3fa85f64-5717-4562-b3fc-2c963f66afa6'; // Example GUID
+                const result = await automatonApi.executeStep(stepGuid, {
+                    inputs: {
+                        param1: 'value1'
+                    }
+                });
+                showResult('result2', result);
+            } catch (error) {
+                showResult('result2', { error: error.message }, true);
+            }
+        }
+
+        async function executeStepWithInputs() {
+            try {
+                const result = await automatonApi.executeStep('DataProcessingStep', {
+                    inputs: {
+                        dataSource: 'database',
+                        filterBy: 'active',
+                        limit: '100'
+                    },
+                    runnerNames: ['runner-1'] // Optional: specify which runner to use
+                });
+                showResult('result3', result);
+            } catch (error) {
+                showResult('result3', { error: error.message }, true);
+            }
+        }
+
+        async function listAvailableSteps() {
+            try {
+                const appSlug = automatonApi.getAppSlug();
+                const result = await automatonApi.customCall(
+                    `/api/web-apps/${appSlug}/steps`,
+                    'GET'
+                );
+                showResult('result4', result);
+            } catch (error) {
+                showResult('result4', { error: error.message }, true);
+            }
+        }
+
+        // Show API documentation on load
+        console.log(`
+=================================================
+Automaton Step Execution API - Usage Examples
+=================================================
+
+1. Execute a step by name:
+   automatonApi.executeStep('StepName', { 
+     inputs: { key: 'value' } 
+   })
+
+2. Execute a step by GUID:
+   automatonApi.executeStep('guid-here', { 
+     inputs: { key: 'value' } 
+   })
+
+3. Execute with specific runner:
+   automatonApi.executeStep('StepName', { 
+     inputs: { key: 'value' },
+     runnerNames: ['runner-1', 'runner-2']
+   })
+
+4. Response format:
+   {
+     success: true/false,
+     stepId: "guid",
+     stepName: "StepName",
+     status: "Completed",
+     runnerCount: 1,
+     executedAt: "timestamp",
+     completedAt: "timestamp",
+     outputVariables: { ... },
+     logs: [ ... ],
+     error: null
+   }
+        `);
+    </script>
+</body>
+</html>

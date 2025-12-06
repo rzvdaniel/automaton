@@ -106,6 +106,29 @@
   }
 
   /**
+   * Execute a Custom Step by name or GUID
+   * @param {string} stepIdentifier - Step name or GUID
+   * @param {object} options - Execution options
+   * @param {object} options.inputs - Input variables as key-value pairs
+   * @param {string[]} options.runnerNames - Optional array of runner names
+   * @returns {Promise<object>} Step execution result
+   */
+  function executeStep(stepIdentifier, options = {}) {
+    const appSlug = getAppSlug();
+    if (!appSlug) {
+      return Promise.reject(new Error('Could not determine app slug'));
+    }
+    
+    const path = `/api/web-apps/${appSlug}/steps/${encodeURIComponent(stepIdentifier)}/execute`;
+    const body = { 
+      inputs: options.inputs || {}, 
+      runnerNames: options.runnerNames || null 
+    };
+    
+    return apiCall(path, 'POST', body).then(response => response.data || response);
+  }
+
+  /**
    * Make a custom API call (advanced usage)
    * @param {string} path - Full API path (must start with /api/web-apps/)
    * @param {string} method - HTTP method (GET or POST)
@@ -122,6 +145,7 @@
   // Expose public API
   window.automatonApi = { 
     executeFlow: executeFlow, 
+    executeStep: executeStep,
     customCall: customCall, 
     getAppSlug: getAppSlug 
   };
