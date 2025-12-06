@@ -195,6 +195,7 @@ services.AddHangfireServer();
 
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
+services.AddScoped<AppsStepExecutionService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
