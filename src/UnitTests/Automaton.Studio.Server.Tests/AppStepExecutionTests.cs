@@ -44,7 +44,7 @@ public class AppStepExecutionTests
     {
         // Arrange
         var stepId = Guid.NewGuid();
-        var outputVars = new Dictionary<string, object>
+        var outputVars = new Dictionary<string, string>
         {
             { "result", "success" }
         };

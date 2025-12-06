@@ -13,17 +13,17 @@ namespace Automaton.Studio.Server.Services;
 public class AppsStepExecutionService
 {
     private readonly ApplicationDbContext dataContext;
-    private readonly CustomStepsService customStepsService;
+    private readonly UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly Serilog.ILogger logger;
 
     public AppsStepExecutionService(
         ApplicationDbContext dataContext,
-        CustomStepsService customStepsService,
+        UserImpersonationServiceFactory<CustomStepsService> customStepsServiceFactory,
         IHubContext<AutomatonHub> automatonHub)
     {
         this.dataContext = dataContext;
-        this.customStepsService = customStepsService;
+        this.customStepsServiceFactory = customStepsServiceFactory;
         this.automatonHub = automatonHub;
         this.logger = Serilog.Log.ForContext<AppsStepExecutionService>();
     }
@@ -117,14 +117,17 @@ public class AppsStepExecutionService
     /// </summary>
     private async Task<CustomStep?> ResolveStepAsync(string identifier, Guid ownerId)
     {
+        // Create an owner-scoped service using the impersonation factory
+        var ownerScopedService = customStepsServiceFactory.CreateForUser(ownerId);
+
         // Try parsing as GUID first
         if (Guid.TryParse(identifier, out var stepId))
         {
-            return await Task.FromResult(customStepsService.Get(stepId));
+            return await Task.FromResult(ownerScopedService.Get(stepId));
         }
 
         // Otherwise, search by name for steps owned by the app owner
-        var steps = customStepsService.List(null);
+        var steps = ownerScopedService.List(null);
         return steps.FirstOrDefault(s => 
             s.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
     }
@@ -162,12 +165,11 @@ public class AppsStepExecutionService
         // Update input variable values
         if (step.Definition?.CodeInputVariables != null)
         {
-            foreach (var inputVar in step.Definition.CodeInputVariables)
+            foreach (var inputVar in step.Definition.CodeInputVariables
+                 .Where(iv => inputs.ContainsKey(iv.Name)))
             {
-                if (inputs.TryGetValue(inputVar.Name, out var value))
-                {
-                    inputVar.Value = value;
-                }
+                inputVar.Value = inputs[inputVar.Name];
+
             }
         }
 
@@ -251,9 +253,9 @@ public class AppsStepExecutionService
     /// <summary>
     /// Aggregate output variables from multiple runner results
     /// </summary>
-    private Dictionary<string, object> AggregateOutputVariables(List<RunnerCustomStepResult> results)
+    private Dictionary<string, string> AggregateOutputVariables(List<RunnerCustomStepResult> results)
     {
-        var output = new Dictionary<string, object>();
+        var output = new Dictionary<string, string>();
 
         // Use first successful result's output variables
         var successResult = results.FirstOrDefault(r => r.Success && r.OutputVariables != null);

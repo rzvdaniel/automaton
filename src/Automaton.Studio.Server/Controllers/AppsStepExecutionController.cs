@@ -13,7 +13,6 @@ namespace Automaton.Studio.Server.Controllers;
 public class AppsStepExecutionController : ControllerBase
 {
     private readonly AppsService appsService;
-    private readonly CustomStepsService customStepsService;
     private readonly AppsStepExecutionService stepExecutionService;
     private readonly Serilog.ILogger logger;
 
@@ -23,7 +22,6 @@ public class AppsStepExecutionController : ControllerBase
         AppsStepExecutionService stepExecutionService)
     {
         this.appsService = appsService;
-        this.customStepsService = customStepsService;
         this.stepExecutionService = stepExecutionService;
         this.logger = Serilog.Log.ForContext<AppsStepExecutionController>();
     }

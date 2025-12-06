@@ -30,7 +30,7 @@ public class AppStepExecutionResponse
     public DateTime? CompletedAt { get; set; }
     public string? Message { get; set; }
     public string? Error { get; set; }
-    public Dictionary<string, object>? OutputVariables { get; set; }
+    public Dictionary<string, string>? OutputVariables { get; set; }
     public List<string>? Logs { get; set; }
 }
 
