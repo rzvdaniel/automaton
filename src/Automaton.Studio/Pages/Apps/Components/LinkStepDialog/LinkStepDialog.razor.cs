@@ -1,26 +1,22 @@
 using AntDesign;
+using Automaton.Studio.Helpers;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Automaton.Studio.Pages.Apps.Components.LinkStepDialog;
 
-public partial class LinkStepDialog : ComponentBase
+public partial class LinkStepDialog : FeedbackComponent<LinkStepDialogModel>
 {
-    [CascadingParameter] public ModalRef ModalRef { get; set; } = default!;
-    [Parameter] public List<LinkedStepInfo> AvailableSteps { get; set; } = new();
-    [Parameter] public Guid AppId { get; set; }
-    
     [Inject] private AppStepsService AppStepsService { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private MessageService MessageService { get; set; } = default!;
 
     private string searchText = "";
-    private Guid? selectedStepId;
     
     private List<LinkedStepInfo> filteredSteps => string.IsNullOrWhiteSpace(searchText)
-        ? AvailableSteps
-        : AvailableSteps.Where(s => 
+        ? (Options?.AvailableSteps ?? new List<LinkedStepInfo>())
+        : (Options?.AvailableSteps ?? new List<LinkedStepInfo>()).Where(s => 
             s.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
             s.DisplayName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
             (s.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false))
@@ -32,43 +28,30 @@ public partial class LinkStepDialog : ComponentBase
         StateHasChanged();
     }
 
-    private async Task SelectStep(Guid stepId)
+    private void SelectStep(Guid stepId)
     {
-        selectedStepId = selectedStepId == stepId ? null : stepId;
+        if (Options == null) return;
         
-        // If step is selected, link it immediately
-        if (selectedStepId.HasValue)
+        // Toggle selection
+        if (Options.SelectedStepId == stepId)
         {
-            try
-            {
-                await AppStepsService.LinkStepAsync(AppId, selectedStepId.Value);
-                _ = MessageService.SuccessAsync("Step linked successfully");
-                await ModalRef.CloseAsync();
-            }
-            catch (Exception ex)
-            {
-                // Log the error for debugging
-                _ = MessageService.ErrorAsync($"Failed to link step: {ex.Message}");
-            }
+            Options.SelectedStepId = null;
+        }
+        else
+        {
+            Options.SelectedStepId = stepId;
         }
         
         StateHasChanged();
     }
 
-    private async Task CreateNewStep()
+    private void CreateNewStep()
     {
-        await ModalRef.CloseAsync();
-        NavigationManager.NavigateTo($"/customsteps/new?appId={AppId}");
+        if (Options != null)
+        {
+            NavigationManager.NavigateTo($"/customsteps/new?appId={Options.AppId}");
+        }
     }
 
-    private string GetLanguageColor(string language)
-    {
-        return language?.ToLower() switch
-        {
-            "python" => "blue",
-            "batch" => "cyan",
-            "powershell" => "purple",
-            _ => "default"
-        };
-    }
+    private string GetLanguageColor(string language) => StepHelpers.GetLanguageColor(language);
 }

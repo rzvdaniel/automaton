@@ -1,7 +1,9 @@
 using AntDesign;
+using Automaton.Studio.Helpers;
 using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Automaton.Studio.Pages.Apps.Components.PublishAppDialog;
+using Automaton.Studio.Pages.Apps.Components.LinkStepDialog;
 using Automaton.Client.Auth.Interfaces;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
@@ -685,9 +687,51 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             return;
         }
         
-        // Display a simple selection approach for now
-        // Future enhancement: implement full modal dialog with search and filtering
-        _ = MessageService.InfoAsync($"Found {availableSteps.Count} available steps. Use the 'Create Step' button to add a new step, or navigate to Custom Steps page to manage existing steps.");
+        var model = new LinkStepDialogModel
+        {
+            AvailableSteps = availableSteps,
+            AppId = currentApp.Id
+        };
+        
+        var modalRef = await ModalService.CreateModalAsync<LinkStepDialog, LinkStepDialogModel>(
+            new ModalOptions
+            {
+                Title = "Link Step to App",
+                Width = 600,
+                OkText = "Link Step",
+                CancelText = "Cancel"
+            },
+            model
+        );
+        
+        // Handle OK - link the selected step
+        modalRef.OnOk = async () =>
+        {
+            if (!model.SelectedStepId.HasValue)
+            {
+                _ = MessageService.WarningAsync("Please select a step to link");
+                return;
+            }
+
+            try
+            {
+                await AppStepsService.LinkStepAsync(model.AppId, model.SelectedStepId.Value);
+                _ = MessageService.SuccessAsync("Step linked successfully");
+                await LoadLinkedSteps();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                _ = MessageService.ErrorAsync($"Failed to link step: {ex.Message}");
+            }
+        };
+        
+        // Reload steps after dialog closes (in case user navigated to create new step)
+        modalRef.OnClose = async () =>
+        {
+            await LoadLinkedSteps();
+            await InvokeAsync(StateHasChanged);
+        };
     }
     
     private void CreateNewStep()
@@ -739,25 +783,7 @@ console.log('Outputs:', result.outputVariables);";
         }
     }
     
-    private string GetStepIcon(string language)
-    {
-        return language?.ToLower() switch
-        {
-            "python" => "code",
-            "batch" => "code",
-            "powershell" => "code",
-            _ => "api"
-        };
-    }
+    private string GetStepIcon(string language) => StepHelpers.GetStepIcon(language);
     
-    private string GetLanguageColor(string language)
-    {
-        return language?.ToLower() switch
-        {
-            "python" => "blue",
-            "batch" => "cyan",
-            "powershell" => "purple",
-            _ => "default"
-        };
-    }
+    private string GetLanguageColor(string language) => StepHelpers.GetLanguageColor(language);
 }
