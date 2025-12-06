@@ -1,0 +1,109 @@
+@using AntDesign
+@using Automaton.Studio.Models
+@using Automaton.Studio.Services
+
+<div class="link-step-dialog">
+    <div class="search-box">
+        <Search Placeholder="Search steps..."
+                @bind-Value="searchText"
+                OnSearch="OnSearch"
+                Style="margin-bottom: 16px;" />
+    </div>
+
+    @if (loading)
+    {
+        <div style="text-align: center; padding: 40px;">
+            <Spin Tip="Loading available steps..." />
+        </div>
+    }
+    else if (!filteredSteps.Any())
+    {
+        <Empty Description="@("No available steps to link")">
+            <ChildContent>
+                <Button Type="@ButtonType.Primary" 
+                        OnClick="CreateNewStep">
+                    Create New Step
+                </Button>
+            </ChildContent>
+        </Empty>
+    }
+    else
+    {
+        <div class="steps-grid">
+            @foreach (var step in filteredSteps)
+            {
+                <Card Class="@($"step-option {(selectedStepId == step.Id ? "selected" : "")}")"
+                      Size="@CardSize.Small"
+                      Hoverable="true"
+                      OnClick="@(() => SelectStep(step.Id))">
+                    <ChildContent>
+                        <div class="step-option-content">
+                            <Checkbox Checked="@(selectedStepId == step.Id)" 
+                                      OnChange="@(e => SelectStep(step.Id))" />
+                            <div class="step-option-info">
+                                <div class="step-option-name">
+                                    <Text Strong>@step.DisplayName</Text>
+                                </div>
+                                <div class="step-option-meta">
+                                    <Tag Color="@GetLanguageColor(step.Language)" Size="small">
+                                        @step.Language
+                                    </Tag>
+                                </div>
+                                @if (!string.IsNullOrEmpty(step.Description))
+                                {
+                                    <div class="step-option-description">
+                                        <Text Type="TextElementType.Secondary" 
+                                              Style="font-size: 12px;">
+                                            @step.Description
+                                        </Text>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </ChildContent>
+                </Card>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .link-step-dialog {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .steps-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .step-option {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .step-option.selected {
+        border-color: #1890ff;
+        background: #e6f7ff;
+    }
+
+    .step-option-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .step-option-info {
+        flex: 1;
+    }
+
+    .step-option-name {
+        margin-bottom: 4px;
+    }
+
+    .step-option-description {
+        margin-top: 4px;
+    }
+</style>

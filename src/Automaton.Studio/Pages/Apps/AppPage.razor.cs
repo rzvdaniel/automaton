@@ -33,11 +33,16 @@ partial class AppPage : ComponentBase, IAsyncDisposable
 
     private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     
+    // Backend Actions tab support
+    private List<LinkedStepInfo> linkedSteps = new();
+    private bool loadingSteps = false;
+    
     // Preview support
     private bool previewHandlerInitialized = false;
     private string? automatonApiScript;
 
     [Inject] private AppsService AppsService { get; set; }
+    [Inject] private AppStepsService AppStepsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
     [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
@@ -77,6 +82,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                 CurrentWebAppContextService.SetCurrentApp(
                     currentApp,
                     GetCurrentCodeForAI);
+                    
+                // Load linked steps
+                await LoadLinkedSteps();
             }
         }
         catch
@@ -645,5 +653,112 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             Logger.LogError(ex, "Error updating editor from MCP tools");
             _ = MessageService.ErrorAsync($"Error updating editor: {ex.Message}");
         }
+    }
+    
+    // Backend Actions Tab Methods
+    private async Task LoadLinkedSteps()
+    {
+        loadingSteps = true;
+        
+        try
+        {
+            linkedSteps = await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load linked steps");
+            _ = MessageService.ErrorAsync("Failed to load linked steps");
+        }
+        finally
+        {
+            loadingSteps = false;
+        }
+    }
+    
+    private async Task ShowLinkStepDialog()
+    {
+        var availableSteps = await AppStepsService.GetAvailableStepsAsync(currentApp.Id);
+        
+        if (!availableSteps.Any())
+        {
+            _ = MessageService.WarningAsync("No steps available to link. Create a new step first.");
+            return;
+        }
+        
+        // Use a simple confirmation dialog approach
+        // For now, just navigate to a page where user can manually link steps
+        // TODO: Implement proper modal dialog when AntDesign modal patterns are clearer
+        _ = MessageService.InfoAsync($"Found {availableSteps.Count} available steps. Navigate to Custom Steps page to create or manage steps.");
+    }
+    
+    private void CreateNewStep()
+    {
+        NavigationManager.NavigateTo($"/customsteps/new?appId={currentApp.Id}");
+    }
+    
+    private void NavigateToStep(Guid stepId)
+    {
+        NavigationManager.NavigateTo($"/step/{stepId}");
+    }
+    
+    private async Task CopyStepCode(LinkedStepInfo step)
+    {
+        var code = GenerateStepCode(step);
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
+        _ = MessageService.SuccessAsync("Code copied to clipboard!");
+    }
+    
+    private string GenerateStepCode(LinkedStepInfo step)
+    {
+        var inputsExample = step.HasInputVariables
+            ? string.Join(", ", step.InputVariables.Take(3).Select(v => $"'{v.Name}': 'value'"))
+            : "";
+
+        return $@"// Execute {step.DisplayName}
+const result = await automatonApi.executeStep('{step.Name}', {{
+    inputs: {{ {inputsExample} }}
+}});
+
+// Access results
+console.log('Success:', result.success);
+console.log('Outputs:', result.outputVariables);";
+    }
+    
+    private async Task UnlinkStep(Guid stepId)
+    {
+        try
+        {
+            await AppStepsService.UnlinkStepAsync(currentApp.Id, stepId);
+            linkedSteps.RemoveAll(s => s.Id == stepId);
+            _ = MessageService.SuccessAsync("Step unlinked successfully");
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to unlink step");
+            _ = MessageService.ErrorAsync("Failed to unlink step");
+        }
+    }
+    
+    private string GetStepIcon(string language)
+    {
+        return language?.ToLower() switch
+        {
+            "python" => "code",
+            "batch" => "code",
+            "powershell" => "code",
+            _ => "api"
+        };
+    }
+    
+    private string GetLanguageColor(string language)
+    {
+        return language?.ToLower() switch
+        {
+            "python" => "blue",
+            "batch" => "cyan",
+            "powershell" => "purple",
+            _ => "default"
+        };
     }
 }

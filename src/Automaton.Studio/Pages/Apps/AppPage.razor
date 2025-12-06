@@ -167,6 +167,93 @@
 						</div>
 					</TabPane>
 
+
+				<TabPane Tab="Backend Actions" Key="backend">
+					<div class="backend-actions-container">
+						<Card Class="backend-card" Bordered="true">
+							<TitleTemplate>
+								<Space>
+									<SpaceItem><Icon Type="code" Style="color: #1890ff;" /></SpaceItem>
+									<SpaceItem><span>Linked Custom Steps</span></SpaceItem>
+									<SpaceItem><Tag Color="@("blue")">@linkedSteps.Count steps</Tag></SpaceItem>
+								</Space>
+							</TitleTemplate>
+							<Extra>
+								<Space>
+									<SpaceItem><Button Icon="plus" Type="@ButtonType.Primary" OnClick="ShowLinkStepDialog">Link Step</Button></SpaceItem>
+									<SpaceItem><Button Icon="plus-circle" OnClick="CreateNewStep">Create Step</Button></SpaceItem>
+								</Space>
+							</Extra>
+							<ChildContent>
+								@if (loadingSteps)
+								{
+									<Spin Tip="Loading steps..." />
+								}
+								else if (!linkedSteps.Any())
+								{
+									<Empty Description="@("No backend steps linked to this app")">
+										<ChildContent>
+											<Text Type="TextElementType.Secondary">Backend steps let you execute scripts from your app.</Text>
+											<Space Style="margin-top: 16px;">
+												<SpaceItem><Button Type="@ButtonType.Primary" Icon="plus" OnClick="ShowLinkStepDialog">Link Existing Step</Button></SpaceItem>
+												<SpaceItem><Button Icon="plus-circle" OnClick="CreateNewStep">Create New Step</Button></SpaceItem>
+											</Space>
+										</ChildContent>
+									</Empty>
+								}
+								else
+								{
+									<div class="steps-list">
+										@foreach (var step in linkedSteps)
+										{
+											<Card Class="step-card" Size="@CardSize.Small" Bordered="true">
+												<ChildContent>
+													<div class="step-card-content">
+														<div class="step-info">
+															<Space>
+																<SpaceItem><Icon Type="@GetStepIcon(step.Language)" Style="font-size: 24px; color: #1890ff;" /></SpaceItem>
+																<SpaceItem>
+																	<div class="step-details">
+																		<div class="step-name"><Text Strong>@step.DisplayName</Text></div>
+																		<div class="step-meta">
+																			<Tag Color="@GetLanguageColor(step.Language)">@step.Language</Tag>
+																			<Tag>v@step.Version</Tag>
+																			@if (step.HasInputVariables) { <Tag Icon="arrow-right" Color="@("green")">@step.InputCount inputs</Tag> }
+																			@if (step.HasOutputVariables) { <Tag Icon="arrow-left" Color="@("orange")">@step.OutputCount outputs</Tag> }
+																		</div>
+																		@if (!string.IsNullOrEmpty(step.Description)) { <div class="step-description"><Text Type="TextElementType.Secondary">@step.Description</Text></div> }
+																	</div>
+																</SpaceItem>
+															</Space>
+														</div>
+														<div class="step-actions">
+															<Space>
+																<SpaceItem><Tooltip Title="Edit step"><Button Icon="edit" Size="@ButtonSize.Small" OnClick="() => NavigateToStep(step.Id)">Edit</Button></Tooltip></SpaceItem>
+																<SpaceItem><Tooltip Title="Copy code"><Button Icon="copy" Size="@ButtonSize.Small" OnClick="() => CopyStepCode(step)"></Button></Tooltip></SpaceItem>
+																<SpaceItem><Popconfirm Title="Unlink this step?" OnConfirm="() => UnlinkStep(step.Id)" OkText="Unlink" CancelText="Cancel"><Tooltip Title="Unlink"><Button Icon="disconnect" Size="@ButtonSize.Small" Danger></Button></Tooltip></Popconfirm></SpaceItem>
+															</Space>
+														</div>
+													</div>
+												</ChildContent>
+											</Card>
+										}
+									</div>
+								}
+								<Divider />
+								<Alert Type="@AlertType.Info" ShowIcon="true">
+									<MessageTemplate>
+										<div>
+											<Text Strong>How to use in your app:</Text>
+											<pre class="code-example">const result = await automatonApi.executeStep('StepName', {{ inputs: {{ key: 'value' }} }});
+console.log(result.outputVariables);</pre>
+										</div>
+									</MessageTemplate>
+								</Alert>
+							</ChildContent>
+						</Card>
+					</div>
+				</TabPane>
+
 					<TabPane Tab="Settings" Key="2">
 						<div class="settings-container">
 							<Card Class="settings-card" Bordered="true">
@@ -537,5 +624,87 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+
+	/* Backend Actions Tab Styles */
+	.backend-actions-container {
+		padding: 24px;
+		max-width: 1000px;
+		margin: 0 auto;
+	}
+
+	.backend-card {
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+		border-radius: 8px;
+	}
+
+	.steps-list {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.step-card {
+		transition: box-shadow 0.3s ease;
+	}
+
+		.step-card:hover {
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		}
+
+	.step-card-content {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+	}
+
+	.step-info {
+		flex: 1;
+	}
+
+	.step-details {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.step-name {
+		font-size: 16px;
+	}
+
+	.step-meta {
+		margin-top: 4px;
+	}
+
+	.step-description {
+		margin-top: 8px;
+		font-size: 13px;
+	}
+
+	.step-actions {
+		flex-shrink: 0;
+		margin-left: 16px;
+	}
+
+	.code-example {
+		background: #f6f8fa;
+		border-radius: 6px;
+		padding: 12px;
+		font-family: 'Consolas', 'Monaco', monospace;
+		font-size: 13px;
+		overflow-x: auto;
+		margin-top: 8px;
+		white-space: pre-wrap;
+	}
+
+	@@media (max-width: 768px) {
+		.step-card-content {
+			flex-direction: column;
+		}
+
+		.step-actions {
+			margin-left: 0;
+			margin-top: 12px;
+		}
 	}
 </style>
