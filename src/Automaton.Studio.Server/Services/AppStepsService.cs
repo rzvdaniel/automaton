@@ -81,15 +81,12 @@ public class AppStepsService
             return new List<LinkedStepInfo>();
         }
 
-        // Get already linked step IDs
-        var linkedStepIds = await dataContext.WebAppSteps
-            .Where(was => was.WebAppId == appId)
-            .Select(was => was.CustomStepId)
-            .ToListAsync();
-
         // Get all accessible steps that are not linked
         var availableSteps = await authorizationService.GetAccessibleCustomStepsQuery()
-            .Where(s => !linkedStepIds.Contains(s.Id))
+            .Where(s => !dataContext.WebAppSteps
+                .Where(was => was.WebAppId == appId)
+                .Select(was => was.CustomStepId)
+                .Contains(s.Id))
             .ToListAsync();
 
         var result = new List<LinkedStepInfo>();
