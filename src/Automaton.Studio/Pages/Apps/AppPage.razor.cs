@@ -710,7 +710,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     private string GenerateStepCode(LinkedStepInfo step)
     {
         var inputsExample = step.HasInputVariables
-            ? string.Join(", ", step.InputVariables.Take(3).Select(v => $"'{v.Name}': 'value'"))
+            ? string.Join(", ", step.InputVariables.Take(3).Select(v => $"{v.Name}: 'value'"))
             : "";
 
         return $@"// Execute {step.DisplayName}
