@@ -13,5 +13,5 @@ public class WebAppStep
     // Navigation properties
     public virtual WebApp WebApp { get; set; }
     public virtual CustomStep CustomStep { get; set; }
-    public virtual ApplicationUser LinkedByUser { get; set; }
+    public virtual ApplicationUser? LinkedByUser { get; set; }
 }
