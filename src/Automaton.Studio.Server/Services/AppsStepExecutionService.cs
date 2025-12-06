@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -290,17 +291,25 @@ public class AppsStepExecutionService
             return Enumerable.Empty<AppStepInfo>();
         }
 
-        var steps = await dataContext.CustomSteps
+        var stepEntities = await dataContext.CustomSteps
             .Where(s => s.CustomStepUsers.Any(su => su.UserId == ownerId))
-            .Select(s => new AppStepInfo
+            .ToListAsync();
+
+        var steps = stepEntities.Select(s => 
+        {
+            var definition = string.IsNullOrEmpty(s.Definition)
+                ? new CustomStepDefinition()
+                : JsonSerializer.Deserialize<CustomStepDefinition>(s.Definition) ?? new CustomStepDefinition();
+
+            return new AppStepInfo
             {
                 Id = s.Id,
                 Name = s.Name,
                 DisplayName = s.DisplayName,
                 Description = s.Description,
-                Language = s.Definition // Will need to extract language from JSON
-            })
-            .ToListAsync();
+                Language = definition.Language
+            };
+        }).ToList();
 
         return steps;
     }

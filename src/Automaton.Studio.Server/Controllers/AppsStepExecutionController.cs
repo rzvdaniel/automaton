@@ -65,7 +65,7 @@ public class AppsStepExecutionController : ControllerBase
             }
 
             // 2. Check authentication requirement
-            if (app.RequiresAuthentication && !User.Identity?.IsAuthenticated == true)
+            if (app.RequiresAuthentication && User.Identity?.IsAuthenticated != true)
             {
                 logger.Warning("Authentication required for app: {AppSlug}", appSlug);
                 return Unauthorized(new { error = "Authentication required" });
@@ -115,7 +115,7 @@ public class AppsStepExecutionController : ControllerBase
                 return NotFound(new { error = "App not found or not published" });
             }
 
-            if (app.RequiresAuthentication && !User.Identity?.IsAuthenticated == true)
+            if (app.RequiresAuthentication && User.Identity?.IsAuthenticated != true)
             {
                 return Unauthorized(new { error = "Authentication required" });
             }
