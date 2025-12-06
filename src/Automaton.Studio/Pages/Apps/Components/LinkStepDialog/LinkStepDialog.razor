@@ -28,36 +28,36 @@
         <div class="steps-grid">
             @foreach (var step in filteredSteps)
             {
-                <Card Class="@($"step-option {(Options?.SelectedStepId == step.Id ? "selected" : "")}")"
-                      Size="@CardSize.Small"
-                      Hoverable="true"
-                      OnClick="@(() => SelectStep(step.Id))">
-                    <ChildContent>
-                        <div class="step-option-content">
-                            <Checkbox Checked="@(Options?.SelectedStepId == step.Id)" 
-                                      OnChange="@(e => SelectStep(step.Id))" />
-                            <div class="step-option-info">
-                                <div class="step-option-name">
-                                    <Text Strong>@step.DisplayName</Text>
-                                </div>
-                                <div class="step-option-meta">
-                                    <Tag Color="@GetLanguageColor(step.Language)" Size="small">
-                                        @step.Language
-                                    </Tag>
-                                </div>
-                                @if (!string.IsNullOrEmpty(step.Description))
-                                {
-                                    <div class="step-option-description">
-                                        <Text Type="TextElementType.Secondary" 
-                                              Style="font-size: 12px;">
-                                            @step.Description
-                                        </Text>
+                <div class="step-option-wrapper" @onclick="@(() => SelectStep(step.Id))">
+                    <Card Class="@($"step-option {(Options?.SelectedStepId == step.Id ? "selected" : "")}")"
+                          Size="@CardSize.Small"
+                          Hoverable="true">
+                        <ChildContent>
+                            <div class="step-option-content">
+                                <Checkbox Checked="@(Options?.SelectedStepId == step.Id)" />
+                                <div class="step-option-info">
+                                    <div class="step-option-name">
+                                        <Text Strong>@step.DisplayName</Text>
                                     </div>
-                                }
+                                    <div class="step-option-meta">
+                                        <Tag Color="@GetLanguageColor(step.Language)">
+                                            @step.Language
+                                        </Tag>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(step.Description))
+                                    {
+                                        <div class="step-option-description">
+                                            <Text Type="TextElementType.Secondary" 
+                                                  Style="font-size: 12px;">
+                                                @step.Description
+                                            </Text>
+                                        </div>
+                                    }
+                                </div>
                             </div>
-                        </div>
-                    </ChildContent>
-                </Card>
+                        </ChildContent>
+                    </Card>
+                </div>
             }
         </div>
     }
@@ -75,8 +75,11 @@
         gap: 8px;
     }
 
-    .step-option {
+    .step-option-wrapper {
         cursor: pointer;
+    }
+
+    .step-option {
         transition: all 0.2s;
     }
 
