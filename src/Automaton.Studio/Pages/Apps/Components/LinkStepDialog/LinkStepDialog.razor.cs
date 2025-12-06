@@ -48,7 +48,6 @@ public partial class LinkStepDialog : ComponentBase
             catch (Exception ex)
             {
                 // Log the error for debugging
-                Console.WriteLine($"Failed to link step: {ex.Message}");
                 _ = MessageService.ErrorAsync($"Failed to link step: {ex.Message}");
             }
         }
