@@ -16,7 +16,6 @@ public partial class LinkStepDialog : ComponentBase
     [Inject] private MessageService MessageService { get; set; } = default!;
 
     private string searchText = "";
-    private bool loading = false;
     private Guid? selectedStepId;
     
     private List<LinkedStepInfo> filteredSteps => string.IsNullOrWhiteSpace(searchText)
