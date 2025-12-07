@@ -53,6 +53,9 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
 
     public Task<IEnumerable<McpTool>> GetToolsAsync()
     {
+        // Build language enum dynamically from CustomStepLanguage
+        var supportedLanguages = string.Join(", ", CustomStepLanguage.GetSupportedLanguages().Select(l => $"\"{l}\""));
+
         var tools = new List<McpTool>
         {
             // Frontend tools
@@ -94,8 +97,8 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             new McpTool
             {
                 Name = "create_backend_step",
-                Description = "Create a new Custom Step for backend logic",
-                InputSchema = JsonDocument.Parse("""
+                Description = "Create a new Custom Step for backend logic. The step will execute on a Runner.",
+                InputSchema = JsonDocument.Parse($$"""
                 {
                     "type": "object",
                     "properties": {
@@ -105,8 +108,8 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                         },
                         "language": {
                             "type": "string",
-                            "enum": ["Python", "Batch", "PowerShell"],
-                            "description": "Programming language for the step"
+                            "enum": [{{supportedLanguages}}],
+                            "description": "Programming language for the step (Python recommended for most use cases)"
                         },
                         "description": {
                             "type": "string",
@@ -362,7 +365,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     private async Task<McpToolResult> HandleCreateBackendStep(JsonElement arguments)
     {
         var name = GetStringArgument(arguments, "name");
-        var language = GetStringArgument(arguments, "language", "Python");
+        var language = GetStringArgument(arguments, "language", CustomStepLanguage.GetDefaultLanguage());
         var description = GetStringArgument(arguments, "description", "");
 
         if (string.IsNullOrEmpty(name))
@@ -683,7 +686,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     {
         public Guid StepId { get; set; }
         public string Name { get; set; } = "";
-        public string Language { get; set; } = "Python";
+        public string Language { get; set; } = CustomStepLanguage.GetDefaultLanguage();
     }
 
     #endregion
