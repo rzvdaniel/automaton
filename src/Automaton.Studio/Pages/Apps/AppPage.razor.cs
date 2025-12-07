@@ -60,6 +60,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
     [Inject] private IAppMcpClient WebAppMcpClient { get; set; }
+    [Inject] private IUnifiedAppMcpClient UnifiedAppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -94,6 +95,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                 CurrentWebAppContextService.SetCurrentApp(
                     currentApp,
                     GetCurrentCodeForAI);
+                    
+                // Set up unified MCP client with app context
+                UnifiedAppMcpClient.SetCurrentApp(currentApp.Id);
                     
                 await LoadAllSteps();
             }

@@ -77,10 +77,12 @@ public static class ServiceCollectionExtensions
         // Register MCP services - Tool providers and explicit context clients
         services.AddScoped<StepMcpToolProvider>();
         services.AddScoped<AppMcpToolProvider>();
+        services.AddScoped<UnifiedAppMcpToolProvider>();
         
         // Register context-specific MCP clients
         services.AddScoped<IStepMcpClient, StepMcpClient>();
         services.AddScoped<IAppMcpClient, AppMcpClient>();
+        services.AddScoped<IUnifiedAppMcpClient, UnifiedAppMcpClient>();
         
         services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
         services.AddScoped<IAppSystemPromptBuilder, AppSystemPromptBuilder>();
