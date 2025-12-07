@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
@@ -22,8 +23,8 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     private readonly AppStepsService _appStepsService;
     private readonly AiCodeCleanupService _codeCleanupService;
 
-    // Track created steps in this session
-    private readonly Dictionary<string, CustomStepContext> _createdSteps = new();
+    // Track created steps in this session (thread-safe)
+    private readonly ConcurrentDictionary<string, CustomStepContext> _createdSteps = new();
     private Guid? _currentAppId;
 
     public UnifiedAppMcpToolProvider(
