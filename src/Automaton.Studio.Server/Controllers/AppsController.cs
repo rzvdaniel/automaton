@@ -393,6 +393,33 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Link multiple steps to an app
+    /// </summary>
+    [HttpPost("{appId}/steps/link-multiple")]
+    public async Task<IActionResult> LinkMultipleSteps(Guid appId, [FromBody] LinkMultipleStepsRequest request)
+    {
+        try
+        {
+            if (request.StepIds == null || !request.StepIds.Any())
+            {
+                return BadRequest(new { message = "No step IDs provided" });
+            }
+
+            await appStepsService.LinkStepsAsync(appId, request.StepIds);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error linking multiple steps to app {AppId}", appId);
+            return StatusCode(500, new { message = "Failed to link steps" });
+        }
+    }
+
+    /// <summary>
     /// Unlink a step from an app
     /// </summary>
     [HttpDelete("{appId}/steps/{stepId}")]
@@ -420,4 +447,9 @@ public class PublishAppRequest
     public required string PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; } = true;
     public Guid? ExecutionRunnerId { get; set; }
+}
+
+public class LinkMultipleStepsRequest
+{
+    public IEnumerable<Guid> StepIds { get; set; } = new List<Guid>();
 }

@@ -73,8 +73,8 @@
 
 					<SpaceItem>
 						<Button Icon="@(currentApp.IsPublished ? "stop" : "cloud-upload")"
-							OnClick="TogglePublish"
-							Loading="@publishing">
+								OnClick="TogglePublish"
+								Loading="@publishing">
 							@(currentApp.IsPublished ? "Unpublish" : "Publish")
 						</Button>
 					</SpaceItem>
@@ -83,8 +83,8 @@
 					{
 						<SpaceItem>
 							<Button Icon="eye"
-								OnClick="OpenPublishedApp"
-								Type="@ButtonType.Default">
+									OnClick="OpenPublishedApp"
+									Type="@ButtonType.Default">
 								View Published
 							</Button>
 						</SpaceItem>
@@ -163,94 +163,140 @@
 									srcdoc="@GetPreviewHtml()"
 									sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
 									class="preview-iframe">
-								</iframe>
+							</iframe>
 						</div>
 					</TabPane>
 
 
-				<TabPane Tab="Backend Actions" Key="backend">
-					<div class="backend-actions-container">
-						<Card Class="backend-card" Bordered="true">
-							<TitleTemplate>
-								<Space>
-									<SpaceItem><Icon Type="code" Style="color: #1890ff;" /></SpaceItem>
-									<SpaceItem><span>Linked Custom Steps</span></SpaceItem>
-									<SpaceItem><Tag Color="@("blue")">@linkedSteps.Count steps</Tag></SpaceItem>
-								</Space>
-							</TitleTemplate>
-							<Extra>
-								<Space>
-									<SpaceItem><Button Icon="plus" Type="@ButtonType.Primary" OnClick="ShowLinkStepDialog">Link Step</Button></SpaceItem>
-								</Space>
-							</Extra>
-							<ChildContent>
-								@if (loadingSteps)
-								{
-									<Spin Tip="Loading steps..." />
-								}
-								else if (!linkedSteps.Any())
-								{
-									<Empty Description="@("No backend steps linked to this app")">
-										<ChildContent>
-											<Text Type="TextElementType.Secondary">Backend steps let you execute scripts from your app.</Text>
-											<Space Style="margin-top: 16px;">
-												<SpaceItem><Button Type="@ButtonType.Primary" Icon="plus" OnClick="ShowLinkStepDialog">Link Existing Step</Button></SpaceItem>
+					<TabPane Tab="Backend Actions" Key="backend">
+						<div class="backend-actions-container">
+							<Card Class="backend-card" Bordered="true">
+								<TitleTemplate>
+									<Space>
+										<SpaceItem><Icon Type="code" Style="color: #1890ff;" /></SpaceItem>
+										<SpaceItem><span>Custom Steps</span></SpaceItem>
+										<SpaceItem><Tag Color="@("blue")">@LinkedStepsCount linked</Tag></SpaceItem>
+									</Space>
+								</TitleTemplate>
+								<ChildContent>
+									@if (loadingSteps)
+									{
+										<Spin Tip="Loading steps..." />
+									}
+									else if (!allSteps.Any())
+									{
+										<Empty Description="@("No custom steps available")">
+											<ChildContent>
+												<div>
+													<p><Text Type="TextElementType.Secondary">Create custom steps to add backend functionality to your app.</Text></p>
+													<Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
+														Create Step
+													</Button>
+												</div>
+											</ChildContent>
+										</Empty>
+									}
+									else
+									{
+										<div class="steps-toolbar">
+											<Space>
+												<SpaceItem>
+													<Input Placeholder="Search steps..."
+														   @bind-Value="stepSearchText"
+														   @oninput="OnStepSearchInput"
+														   AllowClear="true"
+														   Style="width: 300px;" />
+												</SpaceItem>
+												<SpaceItem>
+													<Text Type="TextElementType.Secondary">
+														@FilteredSteps.Count of @allSteps.Count steps
+													</Text>
+												</SpaceItem>
 											</Space>
-										</ChildContent>
-									</Empty>
-								}
-								else
-								{
-									<div class="steps-list">
-										@foreach (var step in linkedSteps)
-										{
-											<Card Class="step-card" Size="@CardSize.Small" Bordered="true">
-												<ChildContent>
-													<div class="step-card-content">
-														<div class="step-info">
-															<Space>
-																<SpaceItem><Icon Type="@GetStepIcon(step.Language)" Style="font-size: 24px; color: #1890ff;" /></SpaceItem>
-																<SpaceItem>
-																	<div class="step-details">
-																		<div class="step-name"><Text Strong>@step.DisplayName</Text></div>
-																		<div class="step-meta">
-																			<Tag Color="@GetLanguageColor(step.Language)">@step.Language</Tag>
-																			<Tag>v@step.Version</Tag>
-																			@if (step.HasInputVariables) { <Tag Icon="arrow-right" Color="@("green")">@step.InputCount inputs</Tag> }
-																			@if (step.HasOutputVariables) { <Tag Icon="arrow-left" Color="@("orange")">@step.OutputCount outputs</Tag> }
-																		</div>
-																		@if (!string.IsNullOrEmpty(step.Description)) { <div class="step-description"><Text Type="TextElementType.Secondary">@step.Description</Text></div> }
-																	</div>
-																</SpaceItem>
-															</Space>
-														</div>
-														<div class="step-actions">
-															<Space>
-																<SpaceItem><Tooltip Title="Edit step"><Button Icon="edit" Size="@ButtonSize.Small" OnClick="() => NavigateToStep(step.Id)">Edit</Button></Tooltip></SpaceItem>
-																<SpaceItem><Tooltip Title="Copy code"><Button Icon="copy" Size="@ButtonSize.Small" OnClick="() => CopyStepCode(step)"></Button></Tooltip></SpaceItem>
-																<SpaceItem><Popconfirm Title="Unlink this step?" OnConfirm="() => UnlinkStep(step.Id)" OkText="Unlink" CancelText="Cancel"><Tooltip Title="Unlink"><Button Icon="disconnect" Size="@ButtonSize.Small" Danger></Button></Tooltip></Popconfirm></SpaceItem>
-															</Space>
-														</div>
-													</div>
-												</ChildContent>
-											</Card>
-										}
-									</div>
-								}
-								<Divider />
-								<Alert Type="@AlertType.Info" ShowIcon="true">
-									<MessageTemplate>
-										<div>
-											<Text Strong>How to use in your app:</Text>
-											<pre class="code-example">const result = await automatonApi.executeStep('StepName', {{ inputs: {{ key: 'value' }} }});
-console.log(result.outputVariables);</pre>
 										</div>
-									</MessageTemplate>
-								</Alert>
-							</ChildContent>
-						</Card>
-					</div>
-				</TabPane>
+
+										<Table TItem="StepWithLinkStatus" 
+											   DataSource="@FilteredSteps" 
+											   Size="@TableSize.Small"
+											   Class="steps-table"
+											   Context="step">
+											<Column TData="bool" Title="" Width="60">
+												<TitleTemplate>
+													<Checkbox Checked="@AllFilteredStepsLinked" 
+															  Indeterminate="@(FilteredSteps.Any(s => s.IsLinked) && !AllFilteredStepsLinked)"
+															  OnChange="@(e => ToggleAllFilteredSteps())" />
+												</TitleTemplate>
+												<ChildContent>
+													<Checkbox Checked="@step.IsLinked" 
+															  OnChange="@(e => ToggleStepLink(step))" />
+												</ChildContent>
+											</Column>
+											<Column TData="string" Title="Name">
+												<Space>
+													<SpaceItem>
+														<Icon Type="@GetStepIcon(step.Step.Language)" Style="color: #1890ff;" />
+													</SpaceItem>
+													<SpaceItem>
+														<div>
+															<strong>@(string.IsNullOrEmpty(step.Step.DisplayName) ? step.Step.Name : step.Step.DisplayName)</strong>
+															@if (!string.IsNullOrEmpty(step.Step.Description))
+															{
+																<br />
+																<span style="font-size: 12px; color: #8c8c8c;">@step.Step.Description</span>
+															}
+														</div>
+													</SpaceItem>
+												</Space>
+											</Column>
+											<Column TData="string" Title="Language" Width="100">
+												<Tag Color="@GetLanguageColor(step.Step.Language)">@step.Step.Language</Tag>
+											</Column>
+											<Column TData="string" Title="Variables" Width="150">
+												<Space>
+													@if (step.Step.HasInputVariables)
+													{
+														<SpaceItem><Tag Color="@("green")">@step.Step.InputCount in</Tag></SpaceItem>
+													}
+													@if (step.Step.HasOutputVariables)
+													{
+														<SpaceItem><Tag Color="@("orange")">@step.Step.OutputCount out</Tag></SpaceItem>
+													}
+												</Space>
+											</Column>
+											<ActionColumn Title="Actions" Width="150">
+												<Space>
+													<SpaceItem>
+														<Tooltip Title="Edit step">
+															<Button Icon="edit" Size="@ButtonSize.Small" OnClick="@(() => NavigateToStep(step.Step.Id))"></Button>
+														</Tooltip>
+													</SpaceItem>
+													@if (step.IsLinked)
+													{
+														<SpaceItem>
+															<Tooltip Title="Copy code">
+																<Button Icon="copy" Size="@ButtonSize.Small" OnClick="@(() => CopyStepCode(step.Step))"></Button>
+															</Tooltip>
+														</SpaceItem>
+													}
+												</Space>
+											</ActionColumn>
+										</Table>
+									}
+
+									<Divider />
+									<Alert Type="@AlertType.Info" ShowIcon="true">
+										<MessageTemplate>
+											<div>
+												<strong>How to use linked steps in your app:</strong>
+												<pre class="code-example">const result = await automatonApi.executeStep('StepName', { inputs: { key: 'value' } });
+console.log(result.outputVariables);</pre>
+											</div>
+										</MessageTemplate>
+									</Alert>
+								</ChildContent>
+							</Card>
+						</div>
+					</TabPane>
 
 					<TabPane Tab="Settings" Key="2">
 						<div class="settings-container">
@@ -264,46 +310,46 @@ console.log(result.outputVariables);</pre>
 											<span>App Configuration</span>
 										</SpaceItem>
 									</Space>
-							</TitleTemplate>
-							<ChildContent>
-								<Row Gutter="(24, 16)">
-									<Col Xs="24" Md="12">
-									<FormItem Label="Name" Required>
-										<Input @bind-Value="@currentApp.Name"
-											   Placeholder="Enter app name"
-											   Size="@InputSize.Large" />
-									</FormItem>
-									</Col>
-									<Col Xs="24" Md="12">
-									<FormItem Label="Display Name">
-										<Input @bind-Value="@currentApp.DisplayName"
-											   Placeholder="Enter display name"
-											   Size="@InputSize.Large" />
-									</FormItem>
-									</Col>
-								</Row>
+								</TitleTemplate>
+								<ChildContent>
+									<Row Gutter="(24, 16)">
+										<Col Xs="24" Md="12">
+										<FormItem Label="Name" Required>
+											<Input @bind-Value="@currentApp.Name"
+												   Placeholder="Enter app name"
+												   Size="@InputSize.Large" />
+										</FormItem>
+										</Col>
+										<Col Xs="24" Md="12">
+										<FormItem Label="Display Name">
+											<Input @bind-Value="@currentApp.DisplayName"
+												   Placeholder="Enter display name"
+												   Size="@InputSize.Large" />
+										</FormItem>
+										</Col>
+									</Row>
 
-								<Row Gutter="(24, 16)">
-									<Col Span="24">
-									<FormItem Label="Description">
-										<TextArea @bind-Value="@currentApp.Description"
-											  Placeholder="Describe your app..."
-											  Rows="4"
-											  ShowCount
-											  MaxLength="500"
-											  Size="@InputSize.Large" />
-									</FormItem>
-									</Col>
-								</Row>
-								<Row>
-									<Col Span="24">
+									<Row Gutter="(24, 16)">
+										<Col Span="24">
+										<FormItem Label="Description">
+											<TextArea @bind-Value="@currentApp.Description"
+													  Placeholder="Describe your app..."
+													  Rows="4"
+													  ShowCount
+													  MaxLength="500"
+													  Size="@InputSize.Large" />
+										</FormItem>
+										</Col>
+									</Row>
+									<Row>
+										<Col Span="24">
 										<FormItem Label="Runner for Preview/Execution">
 											<RunnerSelector @bind-SelectedValue="currentApp.ExecutionRunnerId" Style="width:100%" />
 											<Text Type="TextElementType.Secondary">Optional: select runner used for preview and any executions initiated from this app.</Text>
 										</FormItem>
-									</Col>
-								</Row>
-							</ChildContent>
+										</Col>
+									</Row>
+								</ChildContent>
 							</Card>
 
 							<Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
@@ -362,61 +408,61 @@ console.log(result.outputVariables);</pre>
 								</TitleTemplate>
 								<ChildContent>
 									<Alert Message="Customize how this app appears on the Apps page" Type="@AlertType.Info" Style="margin-bottom: 16px;" />
-									
+
 									<Row Gutter="(24, 16)">
 										<Col Xs="24" Md="12">
 										<FormItem Label="Title Font Color">
 											<InputGroup Compact>
-												<Input @bind-Value="@currentApp.Appearance.TitleFontColor" 
+												<Input @bind-Value="@currentApp.Appearance.TitleFontColor"
 													   Placeholder="#ffffff"
 													   Style="width: calc(100% - 40px);" />
-												<input type="color" 
-													   @bind="currentApp.Appearance.TitleFontColor" 
+												<input type="color"
+													   @bind="currentApp.Appearance.TitleFontColor"
 													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
 											</InputGroup>
 										</FormItem>
 										</Col>
 									</Row>
-									
+
 									<Row Gutter="(24, 16)">
 										<Col Xs="24" Md="12">
 										<FormItem Label="Background Color">
 											<InputGroup Compact>
-												<Input @bind-Value="@currentApp.Appearance.BackgroundColor" 
+												<Input @bind-Value="@currentApp.Appearance.BackgroundColor"
 													   Placeholder="#ffffff"
 													   Style="width: calc(100% - 40px);" />
-												<input type="color" 
-													   @bind="currentApp.Appearance.BackgroundColor" 
+												<input type="color"
+													   @bind="currentApp.Appearance.BackgroundColor"
 													   style="width: 40px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; border-left: none;" />
 											</InputGroup>
 										</FormItem>
 										</Col>
 									</Row>
-									
+
 									<Row Gutter="(24, 16)">
 										<Col Span="24">
-											<FormItem Label="Upload Image">
-												<div class="image-upload-wrapper">
-													@if (!string.IsNullOrEmpty(currentApp.Appearance.BackgroundImageUrl))
-													{
-														<div class="image-preview" style="@GetPreviewImageStyle()">
-															<img src="@currentApp.Appearance.BackgroundImageUrl" alt="Background preview" />
-														</div>
-													}
-													<Upload Name="file"
-															Accept="image/*"
-															ListType="@UploadListType.Picture"
-															Action="@GetUploadAction()"
-															OnChange="OnBackgroundImageUpload"
-															Headers="@uploadHeaders"
-															ShowUploadList="true">
-														<Button Icon="cloud-upload">Click to Upload Image</Button>
-													</Upload>
-													<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 8px;">
-														Recommended: 500x300px, PNG or JPG (max 2MB)
-													</Text>
-												</div>
-											</FormItem>
+										<FormItem Label="Upload Image">
+											<div class="image-upload-wrapper">
+												@if (!string.IsNullOrEmpty(currentApp.Appearance.BackgroundImageUrl))
+												{
+													<div class="image-preview" style="@GetPreviewImageStyle()">
+														<img src="@currentApp.Appearance.BackgroundImageUrl" alt="Background preview" />
+													</div>
+												}
+												<Upload Name="file"
+														Accept="image/*"
+														ListType="@UploadListType.Picture"
+														Action="@GetUploadAction()"
+														OnChange="OnBackgroundImageUpload"
+														Headers="@uploadHeaders"
+														ShowUploadList="true">
+													<Button Icon="cloud-upload">Click to Upload Image</Button>
+												</Upload>
+												<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 8px;">
+													Recommended: 500x300px, PNG or JPG (max 2MB)
+												</Text>
+											</div>
+										</FormItem>
 										</Col>
 									</Row>
 
@@ -434,9 +480,9 @@ console.log(result.outputVariables);</pre>
 											</FormItem>
 										}
 										</Col>
-											
+
 									</Row>
-									
+
 								</ChildContent>
 							</Card>
 						</div>
@@ -618,17 +664,16 @@ console.log(result.outputVariables);</pre>
 		justify-content: center;
 	}
 
-	.image-preview img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
+		.image-preview img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
 
 	/* Backend Actions Tab Styles */
 	.backend-actions-container {
-		padding: 24px;
-		max-width: 1000px;
-		margin: 0 auto;
+		max-width: 100%;
+		margin: 0;
 	}
 
 	.backend-card {
@@ -636,52 +681,15 @@ console.log(result.outputVariables);</pre>
 		border-radius: 8px;
 	}
 
-	.steps-list {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	.step-card {
-		transition: box-shadow 0.3s ease;
-	}
-
-		.step-card:hover {
-			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		}
-
-	.step-card-content {
+	.steps-toolbar {
+		margin-bottom: 16px;
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
+		align-items: center;
 	}
 
-	.step-info {
-		flex: 1;
-	}
-
-	.step-details {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
-	.step-name {
-		font-size: 16px;
-	}
-
-	.step-meta {
-		margin-top: 4px;
-	}
-
-	.step-description {
-		margin-top: 8px;
-		font-size: 13px;
-	}
-
-	.step-actions {
-		flex-shrink: 0;
-		margin-left: 16px;
+	.steps-table {
+		margin-top: 16px;
 	}
 
 	.code-example {

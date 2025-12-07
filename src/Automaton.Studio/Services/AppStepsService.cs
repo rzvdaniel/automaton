@@ -47,6 +47,17 @@ public class AppStepsService
     }
 
     /// <summary>
+    /// Link multiple steps to an app
+    /// </summary>
+    public async Task LinkStepsAsync(Guid appId, IEnumerable<Guid> stepIds)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/apps/{appId}/steps/link-multiple",
+            new { StepIds = stepIds });
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
     /// Unlink a step from an app
     /// </summary>
     public async Task UnlinkStepAsync(Guid appId, Guid stepId)

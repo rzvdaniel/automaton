@@ -152,6 +152,69 @@ public class AppStepsService
     }
 
     /// <summary>
+    /// Link multiple steps to an app in a single operation
+    /// </summary>
+    public async Task LinkStepsAsync(Guid appId, IEnumerable<Guid> stepIds)
+    {
+        var stepIdList = stepIds.ToList();
+        logger.Information("Linking {Count} steps to app {AppId}", stepIdList.Count, appId);
+
+        // Verify user has access to the app
+        var hasAppAccess = await authorizationService.GetAccessibleAppsQuery()
+            .AnyAsync(a => a.Id == appId);
+
+        if (!hasAppAccess)
+        {
+            logger.Warning("User {UserId} attempted to link steps to unauthorized app {AppId}", UserId, appId);
+            throw new UnauthorizedAccessException("You do not have access to this app");
+        }
+
+        // Get accessible step IDs
+        var accessibleStepIds = await authorizationService.GetAccessibleCustomStepsQuery()
+            .Where(s => stepIdList.Contains(s.Id))
+            .Select(s => s.Id)
+            .ToListAsync();
+
+        // Check for unauthorized steps
+        var unauthorizedSteps = stepIdList.Except(accessibleStepIds).ToList();
+        if (unauthorizedSteps.Any())
+        {
+            logger.Warning("User {UserId} attempted to link unauthorized steps: {StepIds}", UserId, string.Join(", ", unauthorizedSteps));
+            throw new UnauthorizedAccessException($"You do not have access to some of the selected steps");
+        }
+
+        // Get already linked step IDs
+        var alreadyLinkedIds = await dataContext.WebAppSteps
+            .Where(was => was.WebAppId == appId && stepIdList.Contains(was.CustomStepId))
+            .Select(was => was.CustomStepId)
+            .ToListAsync();
+
+        // Filter to only new links
+        var newStepIds = stepIdList.Except(alreadyLinkedIds).ToList();
+
+        if (!newStepIds.Any())
+        {
+            logger.Information("All {Count} steps are already linked to app {AppId}", stepIdList.Count, appId);
+            return;
+        }
+
+        // Create links for new steps
+        var links = newStepIds.Select(stepId => new Entities.WebAppStep
+        {
+            WebAppId = appId,
+            CustomStepId = stepId,
+            LinkedAt = DateTime.UtcNow,
+            LinkedBy = UserId
+        }).ToList();
+
+        dataContext.WebAppSteps.AddRange(links);
+        await dataContext.SaveChangesAsync();
+
+        logger.Information("Successfully linked {NewCount} new steps to app {AppId} ({SkippedCount} already linked)", 
+            newStepIds.Count, appId, alreadyLinkedIds.Count);
+    }
+
+    /// <summary>
     /// Unlink a step from an app
     /// </summary>
     public async Task UnlinkStepAsync(Guid appId, Guid stepId)
