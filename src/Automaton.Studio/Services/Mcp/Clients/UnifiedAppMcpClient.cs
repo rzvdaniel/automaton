@@ -12,6 +12,16 @@ public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
 {
     private readonly UnifiedAppMcpToolProvider _unifiedToolProvider;
 
+    /// <summary>
+    /// Event fired when backend steps are created, updated, or linked to the app.
+    /// Proxies the event from the underlying tool provider.
+    /// </summary>
+    public event EventHandler<BackendStepsChangedEventArgs>? BackendStepsChanged
+    {
+        add => _unifiedToolProvider.BackendStepsChanged += value;
+        remove => _unifiedToolProvider.BackendStepsChanged -= value;
+    }
+
     public UnifiedAppMcpClient(
         ILogger<UnifiedAppMcpClient> logger,
         UnifiedAppMcpToolProvider toolProvider)

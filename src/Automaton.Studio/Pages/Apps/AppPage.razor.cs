@@ -82,6 +82,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         loading = true;
 
         CurrentWebAppContextService.CodeChanged += OnCodeChangedByMcpTools;
+        UnifiedAppMcpClient.BackendStepsChanged += OnBackendStepsChanged;
 
         try
         {
@@ -488,6 +489,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         CurrentWebAppContextService.CodeChanged -= OnCodeChangedByMcpTools;
+        UnifiedAppMcpClient.BackendStepsChanged -= OnBackendStepsChanged;
         if (PreviewMessageHandler != null) await PreviewMessageHandler.DisposeAsync();
     }
 
@@ -508,6 +510,28 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error updating editor from MCP tools");
+        }
+    }
+
+    private async void OnBackendStepsChanged(object? sender, Automaton.Studio.Services.Mcp.ToolProviders.BackendStepsChangedEventArgs e)
+    {
+        try
+        {
+            // Only refresh if the event is for the current app
+            if (e.AppId == currentApp.Id)
+            {
+                Logger.LogInformation("Backend steps changed ({ChangeType}: {StepName}), refreshing list", e.ChangeType, e.StepName);
+                
+                await InvokeAsync(async () =>
+                {
+                    await LoadAllSteps();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error refreshing steps after backend change");
         }
     }
     

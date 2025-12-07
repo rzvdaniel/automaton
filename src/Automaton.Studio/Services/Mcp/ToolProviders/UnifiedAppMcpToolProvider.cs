@@ -11,6 +11,16 @@ using Automaton.Core.Models;
 namespace Automaton.Studio.Services.Mcp.ToolProviders;
 
 /// <summary>
+/// Event args for when backend steps are modified (created, updated, linked)
+/// </summary>
+public class BackendStepsChangedEventArgs : EventArgs
+{
+    public Guid AppId { get; init; }
+    public string StepName { get; init; } = "";
+    public string ChangeType { get; init; } = ""; // "created", "linked", "updated"
+}
+
+/// <summary>
 /// Unified MCP tool provider that supports both frontend (App) and backend (Step) operations.
 /// Enables AI to create complete full-stack apps with backend Custom Steps in a single interaction.
 /// </summary>
@@ -25,6 +35,12 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     // Track created steps in this session (thread-safe)
     private readonly ConcurrentDictionary<string, CustomStepContext> _createdSteps = new();
     private Guid? _currentAppId;
+
+    /// <summary>
+    /// Event fired when backend steps are created, updated, or linked to the app.
+    /// UI components can subscribe to refresh their step lists.
+    /// </summary>
+    public event EventHandler<BackendStepsChangedEventArgs>? BackendStepsChanged;
 
     public UnifiedAppMcpToolProvider(
         ILogger<UnifiedAppMcpToolProvider> logger,
@@ -399,6 +415,17 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             _logger.LogInformation("Created backend step: {StepName} ({Language}, ID: {StepId})", 
                 name, language, createdStep.Id);
 
+            // Notify subscribers that a step was created
+            if (_currentAppId.HasValue)
+            {
+                BackendStepsChanged?.Invoke(this, new BackendStepsChangedEventArgs
+                {
+                    AppId = _currentAppId.Value,
+                    StepName = name,
+                    ChangeType = "created"
+                });
+            }
+
             return new McpToolResult
             {
                 Success = true,
@@ -595,6 +622,14 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             await _appStepsService.LinkStepAsync(_currentAppId.Value, step.Id);
             
             _logger.LogInformation("Linked step '{StepName}' to app '{AppId}'", stepName, _currentAppId.Value);
+            
+            // Notify subscribers that a step was linked
+            BackendStepsChanged?.Invoke(this, new BackendStepsChangedEventArgs
+            {
+                AppId = _currentAppId.Value,
+                StepName = stepName,
+                ChangeType = "linked"
+            });
             
             return new McpToolResult
             {

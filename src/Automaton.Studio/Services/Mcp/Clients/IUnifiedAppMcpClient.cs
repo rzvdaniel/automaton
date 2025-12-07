@@ -1,3 +1,5 @@
+using Automaton.Studio.Services.Mcp.ToolProviders;
+
 namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
@@ -9,4 +11,10 @@ public interface IUnifiedAppMcpClient : IMcpClient
     /// Set the current app context for this MCP client session
     /// </summary>
     void SetCurrentApp(Guid appId);
+
+    /// <summary>
+    /// Event fired when backend steps are created, updated, or linked to the app.
+    /// UI components can subscribe to refresh their step lists.
+    /// </summary>
+    event EventHandler<BackendStepsChangedEventArgs>? BackendStepsChanged;
 }
