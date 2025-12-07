@@ -1027,6 +1027,31 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("WebApps");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("CustomStepId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("LinkedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("LinkedBy")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("WebAppId", "CustomStepId");
+
+                    b.HasIndex("CustomStepId");
+
+                    b.HasIndex("LinkedBy");
+
+                    b.HasIndex("WebAppId");
+
+                    b.ToTable("WebAppSteps");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
                 {
                     b.Property<Guid>("WebAppId")
@@ -1463,6 +1488,32 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("SensitiveVariableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "CustomStep")
+                        .WithMany()
+                        .HasForeignKey("CustomStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "LinkedByUser")
+                        .WithMany()
+                        .HasForeignKey("LinkedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CustomStep");
+
+                    b.Navigation("LinkedByUser");
+
+                    b.Navigation("WebApp");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>

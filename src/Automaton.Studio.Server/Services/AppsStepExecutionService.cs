@@ -55,7 +55,7 @@ public class AppsStepExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Resolved step: {step.Name} (ID: {step.Id})");
 
-            // 2. Check if step is linked to this app (optional security check)
+            // 2. TODO!? Check if step is linked to this app (optional security check)
             // For Phase 1, we allow any step owned by the app owner
             // Phase 2+ can add explicit linking requirement
 

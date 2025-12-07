@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a "Backend Actions" tab to `AppPage.razor` that lists Custom Steps linked to the App, allowing users to view, navigate to, and manage backend steps without leaving the App designer context.
+Add a "Backend Actions" tab to `AppPage.razor` that displays ALL Custom Steps the user has access to in an inline table with checkboxes, allowing users to link/unlink steps directly without dialogs.
 
 **Estimated Effort:** 2-3 days
 
@@ -10,7 +10,7 @@ Add a "Backend Actions" tab to `AppPage.razor` that lists Custom Steps linked to
 
 ## Goal
 
-Provide visibility and management of backend steps directly within the App designer:
+Provide visibility and management of backend steps directly within the App designer using an inline table approach:
 
 ```
 ???????????????????????????????????????????????????????????????????????????
@@ -19,29 +19,39 @@ Provide visibility and management of backend steps directly within the App desig
 ?                                                                         ?
 ?  [ Code ] [ Preview ] [ Backend Actions ] [ Settings ]                  ?
 ?                                                                         ?
-?  ???????????????????????????????????????????????????????????????????   ?
-?  ? Backend Actions                                                  ?   ?
-?  ?                                                                  ?   ?
-?  ? ??????????????????????????????????????????????????????????????? ?   ?
-?  ? ? ?? SendEmailStep                           [Edit] [Unlink]  ? ?   ?
-?  ? ?    Language: Python | Version: 3                            ? ?   ?
-?  ? ?    Sends emails using SendGrid API                          ? ?   ?
-?  ? ??????????????????????????????????????????????????????????????? ?   ?
-?  ?                                                                  ?   ?
-?  ? ??????????????????????????????????????????????????????????????? ?   ?
-?  ? ? ?? ProcessDataStep                         [Edit] [Unlink]  ? ?   ?
-?  ? ?    Language: Python | Version: 2                            ? ?   ?
-?  ? ?    Processes and transforms data                            ? ?   ?
-?  ? ??????????????????????????????????????????????????????????????? ?   ?
-?  ?                                                                  ?   ?
-?  ? [+ Link Existing Step]  [+ Create New Step]                     ?   ?
-?  ?                                                                  ?   ?
-?  ? ?? These steps can be called using automatonApi.executeStep()   ?   ?
-?  ?                                                                  ?   ?
-?  ???????????????????????????????????????????????????????????????????   ?
+?  ?????????????????????????????????????????????????????????????????????  ?
+?  ? Custom Steps                                        [3 linked]    ?  ?
+?  ?                                                                   ?  ?
+?  ? [?? Search steps...]                    5 of 8 steps              ?  ?
+?  ?                                                                   ?  ?
+?  ? ????????????????????????????????????????????????????????????????  ?  ?
+?  ? ? ?  ? Name                    ? Language ? Variables? Actions ?  ?  ?
+?  ? ????????????????????????????????????????????????????????????????  ?  ?
+?  ? ? ?  ? ?? SendEmailStep        ? Python   ? 2 in 1out? ?? ??   ?  ?  ?
+?  ? ?    ?    Sends emails via API ?          ?          ?         ?  ?  ?
+?  ? ????????????????????????????????????????????????????????????????  ?  ?
+?  ? ? ?  ? ?? ProcessDataStep      ? Python   ? 1 in 2out? ?? ??   ?  ?  ?
+?  ? ?    ?    Processes data       ?          ?          ?         ?  ?  ?
+?  ? ????????????????????????????????????????????????????????????????  ?  ?
+?  ? ? ?  ? ?? GeneratePdfStep      ? Python   ? 3 in 1out? ??      ?  ?  ?
+?  ? ?    ?    Creates PDF files    ?          ?          ?         ?  ?  ?
+?  ? ????????????????????????????????????????????????????????????????  ?  ?
+?  ?                                                                   ?  ?
+?  ? ?? How to use linked steps in your app:                           ?  ?
+?  ? const result = await automatonApi.executeStep('StepName', {...}); ?  ?
+?  ?                                                                   ?  ?
+?  ?????????????????????????????????????????????????????????????????????  ?
 ?                                                                         ?
 ???????????????????????????????????????????????????????????????????????????
 ```
+
+### Key Design Decisions
+
+1. **Inline Table vs Dialog** - Shows all steps directly in the tab without requiring a modal
+2. **Checkbox-based Linking** - Click checkbox to instantly link/unlink a step
+3. **Select All** - Header checkbox to link/unlink all filtered steps at once
+4. **Search/Filter** - Filter steps by name, display name, or description
+5. **Full Width** - Uses maximum page width for better visibility on large screens
 
 ---
 
@@ -49,201 +59,93 @@ Provide visibility and management of backend steps directly within the App desig
 
 ### 1. Update `AppPage.razor`
 
-Add new TabPane for Backend Actions:
+Replace the Backend Actions tab with an inline table:
 
 ```razor
-@* Add after Preview TabPane, before Settings *@
-
 <TabPane Tab="Backend Actions" Key="backend">
     <div class="backend-actions-container">
         <Card Class="backend-card" Bordered="true">
             <TitleTemplate>
                 <Space>
-                    <SpaceItem>
-                        <Icon Type="code" Style="color: #1890ff;" />
-                    </SpaceItem>
-                    <SpaceItem>
-                        <span>Linked Custom Steps</span>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Tag Color="blue">@linkedSteps.Count steps</Tag>
-                    </SpaceItem>
+                    <SpaceItem><Icon Type="code" Style="color: #1890ff;" /></SpaceItem>
+                    <SpaceItem><span>Custom Steps</span></SpaceItem>
+                    <SpaceItem><Tag Color="@("blue")">@LinkedStepsCount linked</Tag></SpaceItem>
                 </Space>
             </TitleTemplate>
-            <Extra>
-                <Space>
-                    <SpaceItem>
-                        <Button Icon="plus" 
-                                Type="@ButtonType.Primary" 
-                                OnClick="ShowLinkStepDialog">
-                            Link Step
-                        </Button>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Button Icon="plus-circle" 
-                                OnClick="CreateNewStep">
-                            Create Step
-                        </Button>
-                    </SpaceItem>
-                </Space>
-            </Extra>
             <ChildContent>
                 @if (loadingSteps)
                 {
                     <Spin Tip="Loading steps..." />
                 }
-                else if (!linkedSteps.Any())
+                else if (!allSteps.Any())
                 {
-                    <Empty Description="No backend steps linked to this app">
+                    <Empty Description="@("No custom steps available")">
                         <ChildContent>
-                            <Space Direction="DirectionVHType.Vertical" Style="width: 100%">
-                                <SpaceItem>
-                                    <Text Type="TextElementType.Secondary">
-                                        Backend steps let you execute Python/Batch scripts when users interact with your app.
-                                    </Text>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Space>
-                                        <SpaceItem>
-                                            <Button Type="@ButtonType.Primary" 
-                                                    Icon="plus" 
-                                                    OnClick="ShowLinkStepDialog">
-                                                Link Existing Step
-                                            </Button>
-                                        </SpaceItem>
-                                        <SpaceItem>
-                                            <Button Icon="plus-circle" 
-                                                    OnClick="CreateNewStep">
-                                                Create New Step
-                                            </Button>
-                                        </SpaceItem>
-                                    </Space>
-                                </SpaceItem>
-                            </Space>
+                            <div>
+                                <p>Create custom steps to add backend functionality to your app.</p>
+                                <Button Type="@ButtonType.Primary" Icon="plus" 
+                                        OnClick="@(() => NavigationManager.NavigateTo("/customsteps"))">
+                                    Create Step
+                                </Button>
+                            </div>
                         </ChildContent>
                     </Empty>
                 }
                 else
                 {
-                    <div class="steps-list">
-                        @foreach (var step in linkedSteps)
-                        {
-                            <Card Class="step-card" Size="small" Bordered="true">
-                                <ChildContent>
-                                    <div class="step-card-content">
-                                        <div class="step-info">
-                                            <Space>
-                                                <SpaceItem>
-                                                    <Icon Type="@GetStepIcon(step.Language)" 
-                                                          Style="font-size: 24px; color: #1890ff;" />
-                                                </SpaceItem>
-                                                <SpaceItem>
-                                                    <div class="step-details">
-                                                        <div class="step-name">
-                                                            <Text Strong>@step.DisplayName</Text>
-                                                            @if (!string.IsNullOrEmpty(step.Name) && step.Name != step.DisplayName)
-                                                            {
-                                                                <Text Type="TextElementType.Secondary" 
-                                                                      Style="margin-left: 8px; font-size: 12px;">
-                                                                    (@step.Name)
-                                                                </Text>
-                                                            }
-                                                        </div>
-                                                        <div class="step-meta">
-                                                            <Space Size="@SpaceSize.Small">
-                                                                <SpaceItem>
-                                                                    <Tag Color="@GetLanguageColor(step.Language)">
-                                                                        @step.Language
-                                                                    </Tag>
-                                                                </SpaceItem>
-                                                                <SpaceItem>
-                                                                    <Tag>v@step.Version</Tag>
-                                                                </SpaceItem>
-                                                                @if (step.HasInputVariables)
-                                                                {
-                                                                    <SpaceItem>
-                                                                        <Tooltip Title="Has input variables">
-                                                                            <Tag Icon="arrow-right" Color="green">
-                                                                                @step.InputCount inputs
-                                                                            </Tag>
-                                                                        </Tooltip>
-                                                                    </SpaceItem>
-                                                                }
-                                                                @if (step.HasOutputVariables)
-                                                                {
-                                                                    <SpaceItem>
-                                                                        <Tooltip Title="Has output variables">
-                                                                            <Tag Icon="arrow-left" Color="orange">
-                                                                                @step.OutputCount outputs
-                                                                            </Tag>
-                                                                        </Tooltip>
-                                                                    </SpaceItem>
-                                                                }
-                                                            </Space>
-                                                        </div>
-                                                        @if (!string.IsNullOrEmpty(step.Description))
-                                                        {
-                                                            <div class="step-description">
-                                                                <Text Type="TextElementType.Secondary">
-                                                                    @step.Description
-                                                                </Text>
-                                                            </div>
-                                                        }
-                                                    </div>
-                                                </SpaceItem>
-                                            </Space>
-                                        </div>
-                                        <div class="step-actions">
-                                            <Space>
-                                                <SpaceItem>
-                                                    <Tooltip Title="Edit step code">
-                                                        <Button Icon="edit" 
-                                                                Size="@ButtonSize.Small"
-                                                                OnClick="() => NavigateToStep(step.Id)">
-                                                            Edit
-                                                        </Button>
-                                                    </Tooltip>
-                                                </SpaceItem>
-                                                <SpaceItem>
-                                                    <Tooltip Title="Copy executeStep code">
-                                                        <Button Icon="copy" 
-                                                                Size="@ButtonSize.Small"
-                                                                OnClick="() => CopyStepCode(step)">
-                                                        </Button>
-                                                    </Tooltip>
-                                                </SpaceItem>
-                                                <SpaceItem>
-                                                    <Popconfirm Title="Unlink this step from the app?"
-                                                                OnConfirm="() => UnlinkStep(step.Id)"
-                                                                OkText="Unlink"
-                                                                CancelText="Cancel">
-                                                        <Tooltip Title="Unlink step">
-                                                            <Button Icon="disconnect" 
-                                                                    Size="@ButtonSize.Small"
-                                                                    Danger>
-                                                            </Button>
-                                                        </Tooltip>
-                                                    </Popconfirm>
-                                                </SpaceItem>
-                                            </Space>
-                                        </div>
-                                    </div>
-                                </ChildContent>
-                            </Card>
-                        }
+                    <div class="steps-toolbar">
+                        <Space>
+                            <SpaceItem>
+                                <Input Placeholder="Search steps..."
+                                       @bind-Value="stepSearchText"
+                                       @oninput="OnStepSearchInput"
+                                       AllowClear="true"
+                                       Style="width: 300px;" />
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Text Type="TextElementType.Secondary">
+                                    @FilteredSteps.Count of @allSteps.Count steps
+                                </Text>
+                            </SpaceItem>
+                        </Space>
                     </div>
+
+                    <Table TItem="StepWithLinkStatus" 
+                           DataSource="@FilteredSteps" 
+                           Size="@TableSize.Small"
+                           Context="step">
+                        <Column TData="bool" Title="" Width="60">
+                            <TitleTemplate>
+                                <Checkbox Checked="@AllFilteredStepsLinked" 
+                                          Indeterminate="@(FilteredSteps.Any(s => s.IsLinked) && !AllFilteredStepsLinked)"
+                                          OnChange="@(e => ToggleAllFilteredSteps())" />
+                            </TitleTemplate>
+                            <ChildContent>
+                                <Checkbox Checked="@step.IsLinked" 
+                                          OnChange="@(e => ToggleStepLink(step))" />
+                            </ChildContent>
+                        </Column>
+                        <Column TData="string" Title="Name">
+                            <!-- Step name with icon and description -->
+                        </Column>
+                        <Column TData="string" Title="Language" Width="100">
+                            <Tag Color="@GetLanguageColor(step.Step.Language)">@step.Step.Language</Tag>
+                        </Column>
+                        <Column TData="string" Title="Variables" Width="150">
+                            <!-- Input/Output variable counts -->
+                        </Column>
+                        <ActionColumn Title="Actions" Width="150">
+                            <!-- Edit and Copy buttons -->
+                        </ActionColumn>
+                    </Table>
                 }
-                
+
                 <Divider />
-                
                 <Alert Type="@AlertType.Info" ShowIcon="true">
                     <MessageTemplate>
                         <div>
-                            <Text Strong>How to use these steps in your app:</Text>
-                            <pre class="code-example">
-const result = await automatonApi.executeStep('StepName', {
-    inputs: { key: 'value' }
-});
+                            <strong>How to use linked steps in your app:</strong>
+                            <pre class="code-example">const result = await automatonApi.executeStep('StepName', { inputs: { key: 'value' } });
 console.log(result.outputVariables);</pre>
                         </div>
                     </MessageTemplate>
@@ -258,37 +160,46 @@ console.log(result.outputVariables);</pre>
 
 ### 2. Update `AppPage.razor.cs`
 
-Add code-behind logic:
+Add code-behind logic for the inline table approach:
 
 ```csharp
-// Add to class fields
-private List<LinkedStepInfo> linkedSteps = new();
+// Fields
+private List<StepWithLinkStatus> allSteps = new();
 private bool loadingSteps = false;
+private string stepSearchText = "";
 
-// Add service injection
-[Inject] private AppStepsService AppStepsService { get; set; }
+// Computed properties
+private List<StepWithLinkStatus> FilteredSteps => string.IsNullOrWhiteSpace(stepSearchText)
+    ? allSteps
+    : allSteps.Where(s =>
+        (s.Step.Name?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (s.Step.DisplayName?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (s.Step.Description?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToList();
 
-// Add to OnInitializedAsync
-protected override async Task OnInitializedAsync()
-{
-    // ... existing code ...
-    
-    // Load linked steps
-    await LoadLinkedSteps();
-}
+private int LinkedStepsCount => allSteps.Count(s => s.IsLinked);
 
-private async Task LoadLinkedSteps()
+private bool AllFilteredStepsLinked => FilteredSteps.Any() && FilteredSteps.All(s => s.IsLinked);
+
+// Load all steps with their link status
+private async Task LoadAllSteps()
 {
     loadingSteps = true;
-    
     try
     {
-        linkedSteps = await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
+        var linkedSteps = await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
+        var availableSteps = await AppStepsService.GetAvailableStepsAsync(currentApp.Id);
+        
+        allSteps = linkedSteps
+            .Select(s => new StepWithLinkStatus { Step = s, IsLinked = true })
+            .Concat(availableSteps.Select(s => new StepWithLinkStatus { Step = s, IsLinked = false }))
+            .OrderBy(s => s.Step.DisplayName ?? s.Step.Name)
+            .ToList();
     }
     catch (Exception ex)
     {
-        Logger.LogError(ex, "Failed to load linked steps");
-        _ = MessageService.ErrorAsync("Failed to load linked steps");
+        Logger.LogError(ex, "Failed to load steps");
+        _ = MessageService.ErrorAsync("Failed to load steps");
     }
     finally
     {
@@ -296,98 +207,75 @@ private async Task LoadLinkedSteps()
     }
 }
 
-private async Task ShowLinkStepDialog()
-{
-    var availableSteps = await AppStepsService.GetAvailableStepsAsync(currentApp.Id);
-    
-    var modalRef = await ModalService.CreateModalAsync<LinkStepDialog, List<LinkedStepInfo>>(
-        new ModalOptions
-        {
-            Title = "Link Custom Step",
-            Width = 600,
-            OkText = "Link",
-            CancelText = "Cancel"
-        },
-        availableSteps
-    );
-
-    modalRef.OnOk = async () =>
-    {
-        await LoadLinkedSteps();
-        await InvokeAsync(StateHasChanged);
-    };
-}
-
-private void CreateNewStep()
-{
-    // Navigate to create new step with app context
-    NavigationManager.NavigateTo($"/customsteps/new?appId={currentApp.Id}");
-}
-
-private void NavigateToStep(Guid stepId)
-{
-    NavigationManager.NavigateTo($"/step/{stepId}");
-}
-
-private async Task CopyStepCode(LinkedStepInfo step)
-{
-    var code = GenerateStepCode(step);
-    await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
-    _ = MessageService.SuccessAsync("Code copied to clipboard!");
-}
-
-private string GenerateStepCode(LinkedStepInfo step)
-{
-    var inputsExample = step.HasInputVariables
-        ? string.Join(", ", step.InputVariables.Take(3).Select(v => $"'{v.Name}': 'value'"))
-        : "";
-
-    return $@"// Execute {step.DisplayName}
-const result = await automatonApi.executeStep('{step.Name}', {{
-    inputs: {{ {inputsExample} }}
-}});
-
-// Access results
-console.log('Success:', result.success);
-console.log('Outputs:', result.outputVariables);";
-}
-
-private async Task UnlinkStep(Guid stepId)
+// Toggle individual step link
+private async Task ToggleStepLink(StepWithLinkStatus stepWithStatus)
 {
     try
     {
-        await AppStepsService.UnlinkStepAsync(currentApp.Id, stepId);
-        linkedSteps.RemoveAll(s => s.Id == stepId);
-        _ = MessageService.SuccessAsync("Step unlinked successfully");
+        if (stepWithStatus.IsLinked)
+        {
+            await AppStepsService.UnlinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
+            stepWithStatus.IsLinked = false;
+        }
+        else
+        {
+            await AppStepsService.LinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
+            stepWithStatus.IsLinked = true;
+        }
         await InvokeAsync(StateHasChanged);
     }
     catch (Exception ex)
     {
-        Logger.LogError(ex, "Failed to unlink step");
-        _ = MessageService.ErrorAsync("Failed to unlink step");
+        Logger.LogError(ex, "Failed to toggle step link");
+        _ = MessageService.ErrorAsync($"Failed to update step link: {ex.Message}");
     }
 }
 
-private string GetStepIcon(string language)
+// Toggle all filtered steps
+private async Task ToggleAllFilteredSteps()
 {
-    return language?.ToLower() switch
+    try
     {
-        "python" => "code",
-        "batch" => "code",
-        "powershell" => "code",
-        _ => "api"
-    };
+        var filtered = FilteredSteps;
+        if (!filtered.Any()) return;
+
+        var shouldLink = !AllFilteredStepsLinked;
+
+        foreach (var stepWithStatus in filtered)
+        {
+            if (stepWithStatus.IsLinked != shouldLink)
+            {
+                if (shouldLink)
+                    await AppStepsService.LinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
+                else
+                    await AppStepsService.UnlinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
+                stepWithStatus.IsLinked = shouldLink;
+            }
+        }
+
+        var action = shouldLink ? "linked" : "unlinked";
+        _ = MessageService.SuccessAsync($"{filtered.Count} step(s) {action}");
+        await InvokeAsync(StateHasChanged);
+    }
+    catch (Exception ex)
+    {
+        Logger.LogError(ex, "Failed to toggle all steps");
+        _ = MessageService.ErrorAsync($"Failed to update steps: {ex.Message}");
+    }
 }
 
-private string GetLanguageColor(string language)
+// Search handler
+private void OnStepSearchInput(ChangeEventArgs e)
 {
-    return language?.ToLower() switch
-    {
-        "python" => "blue",
-        "batch" => "cyan",
-        "powershell" => "purple",
-        _ => "default"
-    };
+    stepSearchText = e.Value?.ToString() ?? "";
+    StateHasChanged();
+}
+
+// Helper class
+public class StepWithLinkStatus
+{
+    public LinkedStepInfo Step { get; set; } = new();
+    public bool IsLinked { get; set; }
 }
 ```
 
@@ -400,8 +288,8 @@ private string GetLanguageColor(string language)
     /* Backend Actions Tab Styles */
     .backend-actions-container {
         padding: 24px;
-        max-width: 1000px;
-        margin: 0 auto;
+        max-width: 100%;
+        margin: 0;
     }
 
     .backend-card {
@@ -409,52 +297,15 @@ private string GetLanguageColor(string language)
         border-radius: 8px;
     }
 
-    .steps-list {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-    }
-
-    .step-card {
-        transition: box-shadow 0.3s ease;
-    }
-
-    .step-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    .step-card-content {
+    .steps-toolbar {
+        margin-bottom: 16px;
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
+        align-items: center;
     }
 
-    .step-info {
-        flex: 1;
-    }
-
-    .step-details {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .step-name {
-        font-size: 16px;
-    }
-
-    .step-meta {
-        margin-top: 4px;
-    }
-
-    .step-description {
-        margin-top: 8px;
-        font-size: 13px;
-    }
-
-    .step-actions {
-        flex-shrink: 0;
-        margin-left: 16px;
+    .steps-table {
+        margin-top: 16px;
     }
 
     .code-example {
@@ -467,188 +318,18 @@ private string GetLanguageColor(string language)
         margin-top: 8px;
         white-space: pre-wrap;
     }
-
-    @@media (max-width: 768px) {
-        .step-card-content {
-            flex-direction: column;
-        }
-
-        .step-actions {
-            margin-left: 0;
-            margin-top: 12px;
-        }
-    }
 </style>
 ```
 
 ---
 
-### 4. Create `LinkStepDialog.razor`
+### 4. ~~Create `LinkStepDialog.razor`~~ (REMOVED)
 
-**Location:** `src/Automaton.Studio/Pages/Apps/Components/LinkStepDialog/LinkStepDialog.razor`
-
-```razor
-@using AntDesign
-@using Automaton.Studio.Models
-
-<div class="link-step-dialog">
-    <div class="search-box">
-        <Search Placeholder="Search steps..."
-                @bind-Value="searchText"
-                OnSearch="OnSearch"
-                Style="margin-bottom: 16px;" />
-    </div>
-
-    @if (loading)
-    {
-        <div style="text-align: center; padding: 40px;">
-            <Spin Tip="Loading available steps..." />
-        </div>
-    }
-    else if (!filteredSteps.Any())
-    {
-        <Empty Description="No available steps to link">
-            <ChildContent>
-                <Button Type="@ButtonType.Primary" 
-                        OnClick="CreateNewStep">
-                    Create New Step
-                </Button>
-            </ChildContent>
-        </Empty>
-    }
-    else
-    {
-        <div class="steps-grid">
-            @foreach (var step in filteredSteps)
-            {
-                <Card Class="step-option @(selectedStepId == step.Id ? "selected" : "")"
-                      Size="small"
-                      Hoverable="true"
-                      OnClick="() => SelectStep(step.Id)">
-                    <ChildContent>
-                        <div class="step-option-content">
-                            <Checkbox Checked="@(selectedStepId == step.Id)" 
-                                      OnChange="e => SelectStep(step.Id)" />
-                            <div class="step-option-info">
-                                <div class="step-option-name">
-                                    <Text Strong>@step.DisplayName</Text>
-                                </div>
-                                <div class="step-option-meta">
-                                    <Tag Color="@GetLanguageColor(step.Language)" Size="small">
-                                        @step.Language
-                                    </Tag>
-                                </div>
-                                @if (!string.IsNullOrEmpty(step.Description))
-                                {
-                                    <div class="step-option-description">
-                                        <Text Type="TextElementType.Secondary" 
-                                              Style="font-size: 12px;">
-                                            @step.Description
-                                        </Text>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </ChildContent>
-                </Card>
-            }
-        </div>
-    }
-</div>
-
-<style>
-    .link-step-dialog {
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
-    .steps-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .step-option {
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .step-option.selected {
-        border-color: #1890ff;
-        background: #e6f7ff;
-    }
-
-    .step-option-content {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-    }
-
-    .step-option-info {
-        flex: 1;
-    }
-
-    .step-option-name {
-        margin-bottom: 4px;
-    }
-
-    .step-option-description {
-        margin-top: 4px;
-    }
-</style>
-
-@code {
-    [CascadingParameter] public ModalRef ModalRef { get; set; }
-    [Parameter] public List<LinkedStepInfo> AvailableSteps { get; set; } = new();
-    
-    [Inject] private AppStepsService AppStepsService { get; set; }
-    [Inject] private NavigationManager NavigationManager { get; set; }
-
-    private string searchText = "";
-    private bool loading = false;
-    private Guid? selectedStepId;
-    private List<LinkedStepInfo> filteredSteps => string.IsNullOrWhiteSpace(searchText)
-        ? AvailableSteps
-        : AvailableSteps.Where(s => 
-            s.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-            s.DisplayName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-            (s.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false))
-            .ToList();
-
-    private void OnSearch(string value)
-    {
-        searchText = value;
-        StateHasChanged();
-    }
-
-    private void SelectStep(Guid stepId)
-    {
-        selectedStepId = selectedStepId == stepId ? null : stepId;
-        StateHasChanged();
-    }
-
-    private void CreateNewStep()
-    {
-        ModalRef.Close();
-        NavigationManager.NavigateTo("/customsteps/new");
-    }
-
-    private string GetLanguageColor(string language)
-    {
-        return language?.ToLower() switch
-        {
-            "python" => "blue",
-            "batch" => "cyan",
-            "powershell" => "purple",
-            _ => "default"
-        };
-    }
-}
-```
+**Note:** The dialog-based approach has been replaced with an inline table. No separate dialog component is needed.
 
 ---
 
-### 5. Create `AppStepsService.cs` (Frontend)
+### 5. Update `AppStepsService.cs` (Frontend)
 
 **Location:** `src/Automaton.Studio/Services/AppStepsService.cs`
 
@@ -681,7 +362,7 @@ public class AppStepsService
     }
 
     /// <summary>
-    /// Get available steps that can be linked
+    /// Get available steps that can be linked (not yet linked)
     /// </summary>
     public async Task<List<LinkedStepInfo>> GetAvailableStepsAsync(Guid appId)
     {
@@ -698,6 +379,17 @@ public class AppStepsService
         var response = await httpClient.PostAsJsonAsync(
             $"api/apps/{appId}/steps/{stepId}/link", 
             new { });
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Link multiple steps to an app
+    /// </summary>
+    public async Task LinkStepsAsync(Guid appId, List<Guid> stepIds)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/apps/{appId}/steps/link", 
+            stepIds);
         response.EnsureSuccessStatusCode();
     }
 
@@ -725,7 +417,7 @@ using Automaton.Core.Models;
 namespace Automaton.Studio.Models;
 
 /// <summary>
-/// Information about a Custom Step linked to an App
+/// Information about a Custom Step (linked or available to link)
 /// </summary>
 public class LinkedStepInfo
 {
@@ -803,6 +495,16 @@ public async Task<IActionResult> LinkStep(Guid appId, Guid stepId)
 }
 
 /// <summary>
+/// Link multiple steps to an app
+/// </summary>
+[HttpPost("{appId}/steps/link")]
+public async Task<IActionResult> LinkSteps(Guid appId, [FromBody] List<Guid> stepIds)
+{
+    await appStepsService.LinkStepsAsync(appId, stepIds);
+    return NoContent();
+}
+
+/// <summary>
 /// Unlink a step from an app
 /// </summary>
 [HttpDelete("{appId}/steps/{stepId}")]
@@ -818,15 +520,39 @@ public async Task<IActionResult> UnlinkStep(Guid appId, Guid stepId)
 ## Testing Checklist
 
 - [ ] Backend Actions tab displays correctly
-- [ ] Empty state shows when no steps are linked
-- [ ] Link Step dialog shows available steps
-- [ ] Search filtering works in Link Step dialog
-- [ ] Step cards display correct information (name, language, version, variables)
+- [ ] Table shows ALL steps user has access to (linked + available)
+- [ ] Linked steps have checkbox checked
+- [ ] Available steps have checkbox unchecked
+- [ ] Clicking checkbox links/unlinks the step immediately
+- [ ] "Select all" checkbox in header works correctly
+- [ ] Indeterminate state shows when some (not all) steps are linked
+- [ ] Search filters steps by name, display name, and description
+- [ ] Step count updates correctly ("X of Y steps")
+- [ ] Linked count in header updates when linking/unlinking
 - [ ] Edit button navigates to StepPage.razor
+- [ ] Copy button appears only for linked steps
 - [ ] Copy button copies correct `executeStep` code
-- [ ] Unlink confirmation works
-- [ ] Step list refreshes after link/unlink operations
+- [ ] Table uses full page width on large screens
 - [ ] Mobile responsive layout works
+
+---
+
+## Files Changed Summary
+
+### Created
+- `src/Automaton.Studio/Models/LinkedStepInfo.cs`
+- `src/Automaton.Studio/Services/AppStepsService.cs`
+
+### Modified
+- `src/Automaton.Studio/Pages/Apps/AppPage.razor` - Added Backend Actions tab with inline table
+- `src/Automaton.Studio/Pages/Apps/AppPage.razor.cs` - Added step loading, filtering, and toggle logic
+- `src/Automaton.Studio/Program.cs` - Register AppStepsService
+- `src/Automaton.Studio.Server/Controllers/AppsController.cs` - Added step endpoints
+
+### Removed
+- ~~`src/Automaton.Studio/Pages/Apps/Components/LinkStepDialog/LinkStepDialog.razor`~~ - Replaced by inline table
+- ~~`src/Automaton.Studio/Pages/Apps/Components/LinkStepDialog/LinkStepDialog.razor.cs`~~
+- ~~`src/Automaton.Studio/Pages/Apps/Components/LinkStepDialog/LinkStepDialogModel.cs`~~
 
 ---
 

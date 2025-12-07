@@ -133,4 +133,7 @@
       <LastGenOutput>Variables.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Pages\Apps\Components\LinkStepDialog\" />
+  </ItemGroup>
 </Project>
