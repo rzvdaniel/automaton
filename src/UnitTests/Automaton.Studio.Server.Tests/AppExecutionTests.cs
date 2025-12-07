@@ -3,7 +3,7 @@ using Automaton.Core.Models;
 
 namespace Automaton.Studio.Server.Tests;
 
-public class WebAppExecutionTests
+public class AppExecutionTests
 {
     [Test]
     public void ApplyInputVariables_SetsValuesAndReturnsMissing()
@@ -23,7 +23,7 @@ public class WebAppExecutionTests
         };
 
         // Act
-        var missing = WebAppExecutionTestsHelper.ApplyInputVariables(flow, inputs);
+        var missing = AppExecutionTestsHelper.ApplyInputVariables(flow, inputs);
 
         // Assert
         Assert.That(missing, Does.Contain("Age"));
@@ -41,7 +41,7 @@ public class WebAppExecutionTests
             new() { Id = Guid.NewGuid(), Name = "C", Status = RunnerStatus.Offline }
         };
 
-        var selected = WebAppExecutionTestsHelper.SelectRunners(runners, new List<string> { "B" });
+        var selected = AppExecutionTestsHelper.SelectRunners(runners, new List<string> { "B" });
 
         Assert.That(selected.Count, Is.EqualTo(1));
         Assert.That(selected[0], Is.EqualTo(runners[1].Id));
@@ -57,7 +57,7 @@ public class WebAppExecutionTests
             new() { Id = Guid.NewGuid(), Name = "Other", Status = RunnerStatus.Online }
         };
 
-        var selected = WebAppExecutionTestsHelper.SelectRunners(runners, null, execId);
+        var selected = AppExecutionTestsHelper.SelectRunners(runners, null, execId);
 
         Assert.That(selected.Count, Is.EqualTo(1));
         Assert.That(selected[0], Is.EqualTo(execId));
@@ -72,7 +72,7 @@ public class WebAppExecutionTests
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            WebAppExecutionTestsHelper.SelectRunners(runners, null, null)
+            AppExecutionTestsHelper.SelectRunners(runners, null, null)
         );
 
         Assert.That(ex.Message, Does.Contain("No runner specified"));
