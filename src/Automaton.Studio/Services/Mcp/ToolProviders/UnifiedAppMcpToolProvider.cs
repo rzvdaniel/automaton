@@ -318,8 +318,8 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
 
         try
         {
-            // Clean up markdown artifacts
-            var cleanedCode = CleanupHtmlCode(rawCode);
+            // Clean up markdown artifacts using the shared cleanup service
+            var cleanedCode = _codeCleanupService.CleanupGeneratedCode(rawCode);
 
             if (string.IsNullOrWhiteSpace(cleanedCode))
             {
@@ -677,31 +677,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             return value.GetString() ?? defaultValue;
         }
         return defaultValue;
-    }
-
-    private string CleanupHtmlCode(string rawCode)
-    {
-        if (string.IsNullOrEmpty(rawCode))
-            return rawCode;
-
-        var code = rawCode.Trim();
-
-        // Remove markdown code block markers if present
-        if (code.StartsWith("```html", StringComparison.OrdinalIgnoreCase))
-        {
-            code = code.Substring(7).TrimStart();
-        }
-        else if (code.StartsWith("```"))
-        {
-            code = code.Substring(3).TrimStart();
-        }
-
-        if (code.EndsWith("```"))
-        {
-            code = code.Substring(0, code.Length - 3).TrimEnd();
-        }
-
-        return code;
     }
 
     #endregion
