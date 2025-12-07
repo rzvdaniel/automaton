@@ -6,7 +6,7 @@ namespace Automaton.Studio.Services.Mcp.Clients;
 /// <summary>
 /// MCP client implementation for unified App Designer context.
 /// Handles tool discovery and execution for both web app development (HTML, CSS, JavaScript)
-/// and backend Custom Step creation (Python, PowerShell, Batch).
+/// and backend Custom Step creation (Python, Batch).
 /// </summary>
 public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
 {

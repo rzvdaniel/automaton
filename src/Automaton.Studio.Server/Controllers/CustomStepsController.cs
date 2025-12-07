@@ -66,6 +66,19 @@ public class CustomStepsController : BaseController
         return exists ? Ok(exists) : NotFound();
     }
 
+    [HttpGet("by-name/{name}")]
+    public async Task<ActionResult<Models.CustomStep>> GetByName(string name)
+    {
+        var step = customStepsService.GetByName(name);
+
+        if (step is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(step);
+    }
+
     [HttpPost("{id}/execute")]
     public async Task<ActionResult<IEnumerable<Models.RunnerCustomStepResult>>> Execute(Guid id, [FromBody] ExecuteCustomStepRequest request, CancellationToken cancellationToken)
     {

@@ -174,6 +174,17 @@ public class CustomStepsService
     }
 
     /// <summary>
+    /// Get a custom step by name (for API/MCP lookup)
+    /// </summary>
+    public CustomStep? GetByName(string name)
+    {
+        var entity = authorizationService.GetAccessibleCustomStepsQuery()
+            .FirstOrDefault(x => x.Name == name || x.DisplayName == name);
+
+        return entity != null ? MapToModel(entity) : null;
+    }
+
+    /// <summary>
     /// Execute a custom step on specified runners via SignalR
     /// </summary>
     public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)

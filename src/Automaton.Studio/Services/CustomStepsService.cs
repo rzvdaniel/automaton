@@ -91,6 +91,33 @@ public class CustomStepsService
     }
 
     /// <summary>
+    /// Get a custom step by name
+    /// </summary>
+    public async Task<CustomStep?> GetByName(string name)
+    {
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.CustomStepsUrl}/by-name/{Uri.EscapeDataString(name)}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var customStep = await response.Content.ReadAsAsync<CustomStep>();
+
+            return customStep;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "An error happened when loading custom step by name: {Name}", name);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Execute a custom step on specified runners via server API
     /// </summary>
     public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken = default)

@@ -657,17 +657,14 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
 
     private async Task<CustomStep?> ResolveStepAsync(string stepName)
     {
-        // First check session-created steps
+        // First check session-created steps (by ID for efficiency)
         if (_createdSteps.TryGetValue(stepName, out var context))
         {
             return await _customStepsService.Load(context.StepId);
         }
 
-        // Then search by name
-        var allSteps = await _customStepsService.List(null);
-        return allSteps.FirstOrDefault(s =>
-            s.Name.Equals(stepName, StringComparison.OrdinalIgnoreCase) ||
-            s.DisplayName?.Equals(stepName, StringComparison.OrdinalIgnoreCase) == true);
+        // Use efficient GetByName API instead of loading all steps
+        return await _customStepsService.GetByName(stepName);
     }
 
     private string GetStringArgument(JsonElement arguments, string key, string defaultValue = "")
