@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
 using Automaton.Studio.Services.Mcp.EditorBridges;
+using Automaton.Studio.Services.Mcp.Helpers;
 using Automaton.Studio.Domain;
 using Automaton.Core.Models;
 
@@ -507,20 +508,24 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 var inputVars = new List<StepVariable>();
                 foreach (var varElement in inputVarsElement.EnumerateArray())
                 {
-                    var varName = varElement.GetProperty("name").GetString();
-                    var varDesc = varElement.GetProperty("description").GetString();
-                    var isSensitive = varElement.TryGetProperty("is_sensitive", out var sensitiveProp) && 
-                                     sensitiveProp.GetBoolean();
+                    var varName = varElement.GetStringProperty("name");
+                    var varDesc = varElement.GetStringProperty("description");
+                    var varType = varElement.GetStringProperty("type", "String");
+                    var isSensitive = varElement.GetBoolProperty("is_sensitive");
 
-                    if (!string.IsNullOrEmpty(varName))
+                    // Skip variables without a name
+                    if (string.IsNullOrEmpty(varName))
                     {
-                        inputVars.Add(new StepVariable
-                        {
-                            Name = varName,
-                            Description = varDesc,
-                            IsSensitive = isSensitive
-                        });
+                        _logger.LogWarning("Skipping input variable with missing name");
+                        continue;
                     }
+
+                    inputVars.Add(new StepVariable
+                    {
+                        Name = varName,
+                        Description = varDesc,
+                        IsSensitive = isSensitive
+                    });
                 }
 
                 step.Definition.CodeInputVariables = inputVars;
@@ -532,17 +537,22 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 var outputVars = new List<StepVariable>();
                 foreach (var varElement in outputVarsElement.EnumerateArray())
                 {
-                    var varName = varElement.GetProperty("name").GetString();
-                    var varDesc = varElement.GetProperty("description").GetString();
+                    var varName = varElement.GetStringProperty("name");
+                    var varDesc = varElement.GetStringProperty("description");
+                    var varType = varElement.GetStringProperty("type", "String");
 
-                    if (!string.IsNullOrEmpty(varName))
+                    // Skip variables without a name
+                    if (string.IsNullOrEmpty(varName))
                     {
-                        outputVars.Add(new StepVariable
-                        {
-                            Name = varName,
-                            Description = varDesc
-                        });
+                        _logger.LogWarning("Skipping output variable with missing name");
+                        continue;
                     }
+
+                    outputVars.Add(new StepVariable
+                    {
+                        Name = varName,
+                        Description = varDesc
+                    });
                 }
 
                 step.Definition.CodeOutputVariables = outputVars;

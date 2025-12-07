@@ -4,6 +4,7 @@ using Automaton.Mcp.Services;
 using Automaton.Studio.Models;
 using Automaton.Mcp.Models;
 using Automaton.Studio.Services.Mcp.EditorBridges;
+using Automaton.Studio.Services.Mcp.Helpers;
 
 namespace Automaton.Studio.Services.Mcp.ToolProviders;
 
@@ -583,34 +584,42 @@ public class StepMcpToolProvider : IMcpToolProvider
             var inputVars = new List<(string Name, string Description)>();
             var outputVars = new List<(string Name, string Description)>();
 
-            // Parse input variables
+            // Parse input variables with safe property access
             if (arguments.TryGetProperty("inputVariables", out var inputVarsElement))
             {
                 foreach (var varElement in inputVarsElement.EnumerateArray())
                 {
-                    var name = varElement.GetProperty("name").GetString();
-                    var description = varElement.GetProperty("description").GetString();
+                    var name = varElement.GetStringProperty("name");
+                    var description = varElement.GetStringProperty("description");
                     
-                    if (!string.IsNullOrEmpty(name))
+                    // Skip variables without a name
+                    if (string.IsNullOrEmpty(name))
                     {
-                        inputVars.Add((name, description ?? ""));
+                        _logger.LogWarning("Skipping input variable with missing name");
+                        continue;
                     }
+                    
+                    inputVars.Add((name, description));
                 }
             }
 
-            // Parse output variables
+            // Parse output variables with safe property access
             if (arguments.TryGetProperty("outputVariables", out var outputVarsElement))
             {
                 foreach (var varElement in outputVarsElement.EnumerateArray())
                 {
-                    var name = varElement.GetProperty("name").GetString();
-                    var type = varElement.GetProperty("type").GetString();
-                    var description = varElement.GetProperty("description").GetString();
+                    var name = varElement.GetStringProperty("name");
+                    var type = varElement.GetStringProperty("type");
+                    var description = varElement.GetStringProperty("description");
                     
-                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(type))
+                    // Skip variables without a name
+                    if (string.IsNullOrEmpty(name))
                     {
-                        outputVars.Add((name, description ?? ""));
+                        _logger.LogWarning("Skipping output variable with missing name");
+                        continue;
                     }
+                    
+                    outputVars.Add((name, description));
                 }
             }
 
