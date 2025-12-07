@@ -374,12 +374,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             return new McpToolResult { Success = false, Error = "Step name is required" };
         }
 
-        // Validate language
-        if (!new[] { "Python", "Batch", "PowerShell" }.Any(l => l.Equals(language, StringComparison.OrdinalIgnoreCase)))
-        {
-            return new McpToolResult { Success = false, Error = "Language must be Python, Batch, or PowerShell" };
-        }
-
         try
         {
             // Create the step
