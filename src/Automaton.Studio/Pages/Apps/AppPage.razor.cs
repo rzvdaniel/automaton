@@ -56,6 +56,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
     [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
+    [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
     [Inject] private IAppMcpClient WebAppMcpClient { get; set; }
 
@@ -382,9 +383,27 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    private Automaton.Studio.Components.AiChat.Contexts.AppAiChatContext CreateAiChatContext()
+    private Automaton.Studio.Components.AiChat.Contexts.UnifiedAppAiChatContext CreateAiChatContext()
     {
-        return new Automaton.Studio.Components.AiChat.Contexts.AppAiChatContext(WebAppSystemPromptBuilder, AppId, GetCurrentCodeForAI);
+        // Use unified context that supports both frontend and backend generation
+        return new Automaton.Studio.Components.AiChat.Contexts.UnifiedAppAiChatContext(
+            UnifiedAppSystemPromptBuilder, 
+            AppId, 
+            GetCurrentCodeForAI,
+            GetLinkedStepsForAI
+        );
+    }
+
+    private async Task<List<LinkedStepInfo>> GetLinkedStepsForAI()
+    {
+        try
+        {
+            return await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
+        }
+        catch
+        {
+            return new List<LinkedStepInfo>();
+        }
     }
 
     private string GetDefaultHtmlContent()
