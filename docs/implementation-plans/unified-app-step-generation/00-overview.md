@@ -49,21 +49,23 @@ Users currently must perform **4 separate steps** across **3 different pages**:
 ???????????????????????????????????????????????????????????????????????????
 ?                                                                         ?
 ?  1. AppPage.razor (Single Page!)                                        ?
-?     ??? AI Chat ? User describes app with backend needs                 ?
+?     ? AI Chat ? User describes app with backend needs                   ?
 ?     ?                                                                   ?
 ?     ?   "Create a form that sends emails using SendGrid"                ?
 ?     ?                                                                   ?
-?     ??? AI analyzes complexity and generates:                           ?
-?     ?   ??? Frontend HTML/CSS/JS (existing capability)                  ?
-?     ?   ??? Backend Custom Step(s) (NEW: auto-created)                  ?
-?     ?   ??? Or: Backend Flow with multiple Steps (FUTURE)               ?
-?     ?   ??? Proper automatonApi calls in frontend                       ?
+?     ? AI analyzes complexity and generates:                             ?
+?     ?   ? Frontend HTML/CSS/JS (existing capability)                    ?
+?     ?   ? Backend Custom Step(s) (NEW: auto-created)                    ?
+?     ?   ? Or: Backend Flow with multiple Steps (FUTURE)                 ?
+?     ?   ? Proper automatonApi calls in frontend                         ?
 ?     ?                                                                   ?
-?     ??? "Backend Actions" Tab (NEW)                                     ?
-?     ?   ??? Lists all Custom Steps linked to this App                   ?
-?     ?   ??? Lists all Flows linked to this App (FUTURE)                 ?
+?     ? "Backend Actions" Tab (NEW - Inline Table)                        ?
+?     ?   ? Lists ALL Custom Steps user has access to                     ?
+?     ?   ? Checkboxes to instantly link/unlink steps                     ?
+?     ?   ? Search/filter and "select all" functionality                  ?
+?     ?   ? Lists all Flows linked to this App (FUTURE)                   ?
 ?     ?                                                                   ?
-?     ??? User hits Preview ? Everything works!                           ?
+?     ? User hits Preview ? Everything works!                             ?
 ?                                                                         ?
 ?  2. Optional: Navigate to StepPage.razor to edit individual steps       ?
 ?  3. Optional: Navigate to FlowDesigner to edit complex flows            ?
@@ -131,7 +133,10 @@ The solution supports different levels of backend complexity:
    - Users can skip Flow creation for simple single-step scenarios
 
 2. **Backend Actions Tab** (Phase 2 - UI Enhancement)
-   - New tab in `AppPage.razor` to list linked Custom Steps
+   - New tab in `AppPage.razor` showing ALL Custom Steps user has access to
+   - Inline table with checkboxes for instant link/unlink
+   - Search/filter functionality
+   - "Select all" checkbox for bulk operations
    - Navigate directly to `StepPage.razor` for editing
    - Visual indicator of step status and version
 
