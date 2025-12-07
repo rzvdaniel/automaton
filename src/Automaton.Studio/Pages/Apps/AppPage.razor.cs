@@ -14,6 +14,7 @@ using Automaton.Studio.Pages.Authentication.Config;
 using Automaton.Studio.Services.Mcp.Clients;
 using Automaton.Studio.Services.Mcp.EditorBridges;
 using Automaton.Studio.Services.Mcp.SystemPrompts;
+using Automaton.Studio.Components.AiChat.Contexts;
 
 namespace Automaton.Studio.Pages.Apps;
 
@@ -383,10 +384,10 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    private Automaton.Studio.Components.AiChat.Contexts.UnifiedAppAiChatContext CreateAiChatContext()
+    private UnifiedAppAiChatContext CreateAiChatContext()
     {
         // Use unified context that supports both frontend and backend generation
-        return new Automaton.Studio.Components.AiChat.Contexts.UnifiedAppAiChatContext(
+        return new UnifiedAppAiChatContext(
             UnifiedAppSystemPromptBuilder, 
             AppId, 
             GetCurrentCodeForAI,
@@ -400,8 +401,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         {
             return await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load linked steps for AI context");
             return new List<LinkedStepInfo>();
         }
     }
