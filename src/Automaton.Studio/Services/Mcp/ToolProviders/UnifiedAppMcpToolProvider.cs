@@ -158,7 +158,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             new McpTool
             {
                 Name = "suggest_step_variables",
-                Description = "Define input and output variables for a step",
+                Description = "Define input and output variables for a step. Variables store data passed to/from the step code.",
                 InputSchema = JsonDocument.Parse("""
                 {
                     "type": "object",
@@ -169,29 +169,27 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                         },
                         "input_variables": {
                             "type": "array",
-                            "description": "Array of input variables",
+                            "description": "Array of input variables that the step code will receive",
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "name": { "type": "string" },
-                                    "type": { "type": "string", "enum": ["String", "Text", "Number", "Boolean", "Date", "Json"] },
-                                    "description": { "type": "string" },
-                                    "is_sensitive": { "type": "boolean" }
+                                    "name": { "type": "string", "description": "Variable name (e.g., 'api_key', 'user_input')" },
+                                    "description": { "type": "string", "description": "What this variable is used for" },
+                                    "is_sensitive": { "type": "boolean", "description": "True for secrets like API keys or passwords (will be encrypted)" }
                                 },
-                                "required": ["name", "type", "description"]
+                                "required": ["name", "description"]
                             }
                         },
                         "output_variables": {
                             "type": "array",
-                            "description": "Array of output variables",
+                            "description": "Array of output variables that the step code will produce",
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "name": { "type": "string" },
-                                    "type": { "type": "string", "enum": ["String", "Text", "Number", "Boolean", "Date", "Json"] },
-                                    "description": { "type": "string" }
+                                    "name": { "type": "string", "description": "Variable name (e.g., 'result', 'status')" },
+                                    "description": { "type": "string", "description": "What this variable contains" }
                                 },
-                                "required": ["name", "type", "description"]
+                                "required": ["name", "description"]
                             }
                         }
                     },
@@ -503,7 +501,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 {
                     var varName = varElement.GetStringProperty("name");
                     var varDesc = varElement.GetStringProperty("description");
-                    var varType = varElement.GetStringProperty("type", "String");
                     var isSensitive = varElement.GetBoolProperty("is_sensitive");
 
                     // Skip variables without a name
@@ -532,7 +529,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 {
                     var varName = varElement.GetStringProperty("name");
                     var varDesc = varElement.GetStringProperty("description");
-                    var varType = varElement.GetStringProperty("type", "String");
 
                     // Skip variables without a name
                     if (string.IsNullOrEmpty(varName))
