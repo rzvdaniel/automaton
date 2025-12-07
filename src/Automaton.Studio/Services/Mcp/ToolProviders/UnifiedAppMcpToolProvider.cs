@@ -18,7 +18,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
 {
     private readonly ILogger<UnifiedAppMcpToolProvider> _logger;
     private readonly IAppEditorBridge _appEditorBridge;
-    private readonly IStepEditorBridge _stepEditorBridge;
     private readonly CustomStepsService _customStepsService;
     private readonly AppStepsService _appStepsService;
     private readonly AiCodeCleanupService _codeCleanupService;
@@ -37,7 +36,6 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     {
         _logger = logger;
         _appEditorBridge = appEditorBridge;
-        _stepEditorBridge = stepEditorBridge;
         _customStepsService = customStepsService;
         _appStepsService = appStepsService;
         _codeCleanupService = codeCleanupService;
