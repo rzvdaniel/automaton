@@ -17,6 +17,14 @@ public class AgentModeResultStrategy : IConversationResultStrategy
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
     private readonly ICodeExtractionService _codeExtractionService;
 
+    // Tools that save code and don't need additional code extraction from final response
+    private static readonly HashSet<string> CodeSavingTools = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "save_code",        // Step code saving
+        "save_app_code",    // App code saving
+        "save_step_code"    // Backend step code saving
+    };
+
     public AgentModeResultStrategy(
         List<ChatMessage> messages,
         EventCallback<string> onCodeGenerated,
@@ -33,6 +41,18 @@ public class AgentModeResultStrategy : IConversationResultStrategy
 
     public async Task ProcessResult(ConversationResult result, string userPrompt, bool isCode)
     {
+        // Check if code-saving tools were already executed
+        // If so, the code is already in the editor via MCP tool execution
+        var codeSavingToolExecuted = WasCodeSavingToolExecuted();
+        
+        if (codeSavingToolExecuted)
+        {
+            _logger.LogInformation("Code-saving tool was executed. Skipping code extraction from final response to avoid overwriting.");
+            // The code is already saved via MCP tools, don't extract from final response
+            ProcessTextResult(result);
+            return;
+        }
+
         if (isCode && !string.IsNullOrEmpty(result.GeneratedCode))
         {
             await ProcessCodeResult(result);
@@ -41,6 +61,18 @@ public class AgentModeResultStrategy : IConversationResultStrategy
         {
             ProcessTextResult(result);
         }
+    }
+
+    /// <summary>
+    /// Checks if any code-saving tool was executed in this conversation
+    /// </summary>
+    private bool WasCodeSavingToolExecuted()
+    {
+        return _messages.Any(m => 
+            m.Type == MessageType.ToolExecution && 
+            !string.IsNullOrEmpty(m.ToolName) &&
+            CodeSavingTools.Contains(m.ToolName) &&
+            m.ToolStatus == "success");
     }
 
     private async Task ProcessCodeResult(ConversationResult result)
