@@ -31,6 +31,10 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
             try:
                 # Your logic here
+                # NOTE: Input variables arrive as STRINGS - convert as needed:
+                # my_number = int(input_count) or float(input_value)
+                # my_bool = input_flag.lower() == 'true'
+                # my_dict = json.loads(input_json)
                 
                 success = True
                 print("INFO: Operation completed successfully")
@@ -44,9 +48,29 @@ public class PythonPromptProvider : ILanguagePromptProvider
     public string GetOutputVariableGuidance()
     {
         return """
-            ## PYTHON OUTPUT VARIABLE RULES:
+            ## PYTHON INPUT/OUTPUT VARIABLE RULES:
 
-            ### ? CORRECT - Output native Python types:
+            ### INPUT VARIABLES - Always arrive as STRINGS:
+            ```python
+            # Input variables are injected as global strings
+            # Convert them to the types you need:
+            
+            # String to int
+            count = int(input_count)  # input_count = "5" -> 5
+            
+            # String to float
+            threshold = float(input_threshold)  # input_threshold = "0.75" -> 0.75
+            
+            # String to boolean
+            include_details = input_include.lower() == 'true'  # "true" -> True
+            
+            # String (JSON) to dict/list
+            config = json.loads(input_config)  # '{"key": "value"}' -> {"key": "value"}
+            ```
+
+            ### OUTPUT VARIABLES - Use native Python types:
+
+            #### ? CORRECT - Output native Python types:
             ```python
             # Booleans - use Python True/False (not strings)
             success = True
@@ -67,7 +91,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
             }
             ```
 
-            ### ? WRONG - Don't stringify values:
+            #### ? WRONG - Don't stringify outputs:
             ```python
             # DON'T do this - causes double-escaping!
             success = "True"           # Wrong! Use: success = True
@@ -77,11 +101,9 @@ public class PythonPromptProvider : ILanguagePromptProvider
             ```
 
             ### Key Principles:
-            1. **Booleans**: Use Python `True`/`False`, not strings `"true"`/`"false"`
-            2. **Numbers**: Use native `int` or `float`, not strings
-            3. **Complex data**: Use `dict` or `list` directly - the runner serializes them
-            4. **Never call `json.dumps()`** on output variables - this causes double-escaping
-            5. **String outputs**: Only use strings for actual text data like `error_message`
+            1. **Inputs are strings**: Convert with `int()`, `float()`, `json.loads()`, etc.
+            2. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
+            3. **Never call `json.dumps()`** on outputs - the runner handles serialization
             """;
     }
 
@@ -140,7 +162,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
             Frontend can use directly:
             ```javascript
-            const outputs = response.data.outputVariables;
+            const outputs = result.outputVariables;
             if (outputs.success) {  // Native boolean
                 const cpu = outputs.cpu_percent;  // Native number
                 const data = outputs.metrics;     // Native object

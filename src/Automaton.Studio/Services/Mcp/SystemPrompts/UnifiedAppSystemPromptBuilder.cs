@@ -193,43 +193,75 @@ Just call:
 
     private static string GetBackendOutputRules()
     {
-        return @"## BACKEND CODE - OUTPUT VARIABLE RULES:
+        return @"## DATA FLOW - ALL VALUES ARE STRINGS IN TRANSPORT:
 
-**CRITICAL**: Output variables must be native types, NOT stringified!
-The runner automatically serializes outputs to JSON. Do NOT call json.dumps() on outputs.";
+The Automaton API uses `Dictionary<string, string>` for both inputs and outputs.
+All values are serialized to JSON strings.
+
+### Frontend ? API ? Backend:
+```
+JS: { inputs: { 'count': String(5) } }     // ""5"" (string)
+     ?
+API: Dictionary<string, string>             // { ""count"": ""5"" }
+     ?
+Python: count = int(input_count)            // 5 (int)
+```
+
+### Backend ? API ? Frontend:
+```
+Python: cpu_percent = 45.2                  // Native float
+     ?
+Runner: Serializes to JSON string           // ""45.2""
+     ?
+API: Dictionary<string, string>             // { ""cpu_percent"": ""45.2"" }
+     ?
+JS: parseFloat(outputs.cpu_percent)         // 45.2 (number)
+```
+
+### Key Points:
+- **Inputs**: Frontend sends strings, Python receives strings, convert as needed
+- **Outputs**: Python outputs native types, runner serializes, frontend parses JSON strings
+- **Never json.dumps()**: The runner handles serialization - don't double-serialize!";
     }
 
     private static string GetApiResponseStructure()
     {
         return @"## API RESPONSE STRUCTURE:
 
-The automatonApi.executeStep() returns this structure DIRECTLY (not nested under 'data'):
+The automatonApi.executeStep() returns this structure:
 
 ```javascript
 // Result from: const result = await automatonApi.executeStep('StepName', { inputs: {} });
 {
-    ""success"": true,              // Step execution succeeded (boolean)
+    ""success"": true,              // API-level success (boolean)
     ""stepId"": ""guid-here"",
     ""stepName"": ""GetSystemMetricsStep"",
-    ""status"": ""Completed"",        // or ""Failed""
+    ""status"": ""Completed"",
     ""runnerCount"": 1,
     ""executedAt"": ""2025-01-15T10:30:00Z"",
     ""completedAt"": ""2025-01-15T10:30:02Z"",
-    ""error"": null,                // Error message if failed
-    ""outputVariables"": {          // Your step's output variables
-        ""success"": true,          // Your custom success flag (boolean)
-        ""error_message"": """",
-        ""cpu_percent"": 45.2,
-        ""metrics"": { ... }        // Complex objects work directly
+    ""error"": null,
+    ""outputVariables"": {          // Your step's outputs (ALL VALUES ARE STRINGS!)
+        ""success"": ""true"",        // Boolean as string ""true""/""false""
+        ""error_message"": """",      // String
+        ""cpu_percent"": ""45.2"",    // Number as string
+        ""metrics"": ""{\""cpu\"":45.2}""  // Object as JSON string
     },
     ""logs"": [""...""]
 }
 ```
 
-**IMPORTANT**: The result is the DIRECT response, NOT nested under result.data!
-- Check result.success for API-level success
-- Check result.outputVariables.success for your step's success flag
-- Access outputs via result.outputVariables.variableName";
+**IMPORTANT - Output Values Are JSON Strings:**
+- `outputVariables.success` ? `""true""` or `""false""` (string, not boolean)
+- `outputVariables.cpu_percent` ? `""45.2""` (string, not number)
+- `outputVariables.metrics` ? `""{\""cpu\"":45.2}""` (JSON string, not object)
+
+Parse them in JavaScript:
+```javascript
+const success = outputs.success === 'true';
+const cpu = parseFloat(outputs.cpu_percent);
+const metrics = JSON.parse(outputs.metrics);
+```";
     }
 
     private static string GetFrontendIntegrationPattern()
@@ -245,50 +277,88 @@ async function loadData() {
     if (loadBtn) loadBtn.disabled = true;
     
     try {
-        // Result is DIRECT - not nested under result.data
-        const result = await automatonApi.executeStep('StepName', { inputs: {} });
+        // INPUTS: All values must be strings
+        // - Numbers: String(5) ? ""5""
+        // - Booleans: String(true) ? ""true""  
+        // - Objects/Arrays: JSON.stringify({...}) ? '{""key"":""value""}'
+        const result = await automatonApi.executeStep('StepName', { 
+            inputs: {
+                'count': String(5),
+                'include_details': String(true),
+                'config': JSON.stringify({ retries: 3, timeout: 30 })
+            } 
+        });
         
         // Check API-level success first
         if (result.success) {
-            // Access output variables directly from result.outputVariables
             const outputs = result.outputVariables;
             
-            // Check your step's custom success flag
-            if (outputs.success) {
-                // Access your data - can be object, number, string, etc.
-                const data = outputs.metrics;      // Object
-                const cpu = outputs.cpu_percent;   // Number
-                
-                if (!data || Object.keys(data).length === 0) {
-                    showEmptyState();
-                } else {
-                    updateUI(data);
-                    statusDiv.innerHTML = '<span class=""text-emerald-600"">Updated</span>';
-                }
+            // OUTPUTS: All values are JSON-serialized strings, parse as needed:
+            // - Booleans: outputs.success is ""true"" or ""false"" string
+            // - Numbers: outputs.cpu_percent is ""45.2"" string
+            // - Objects: outputs.metrics is '{""cpu"":45.2}' string
+            
+            const stepSuccess = outputs.success === 'true' || outputs.success === true;
+            const cpu = parseFloat(outputs.cpu_percent) || 0;
+            const metrics = typeof outputs.metrics === 'string' 
+                ? JSON.parse(outputs.metrics) 
+                : outputs.metrics;
+            
+            if (stepSuccess) {
+                updateUI(metrics, cpu);
+                statusDiv.innerHTML = '<span class=""text-emerald-600"">Updated</span>';
             } else {
-                // Step reported failure via outputVariables.success = false
                 statusDiv.innerHTML = '<span class=""text-red-600"">Error: ' + (outputs.error_message || 'Unknown error') + '</span>';
             }
         } else {
-            // API-level failure (runner offline, step not found, etc.)
             statusDiv.innerHTML = '<span class=""text-red-600"">Error: ' + (result.error || 'Request failed') + '</span>';
         }
     } catch (error) {
-        // Network or JavaScript error
         statusDiv.innerHTML = '<span class=""text-red-600"">Error: ' + error.message + '</span>';
     } finally {
         if (loadBtn) loadBtn.disabled = false;
     }
 }
+```
 
-function showEmptyState() {
-    document.getElementById('content').innerHTML = 
-        '<div class=""text-center py-12"">' +
-        '<div class=""text-slate-300 text-5xl mb-4"">No Data</div>' +
-        '<h3 class=""text-lg font-medium text-slate-600"">No data available</h3>' +
-        '<p class=""text-slate-400 mt-1"">Data will appear here once loaded</p>' +
-        '</div>';
+## DATA FORMAT SUMMARY:
+
+### Frontend ? Backend (Inputs):
+All input values are sent as **strings**:
+```javascript
+inputs: {
+    'text_value': 'hello',                    // String as-is
+    'number_value': String(42),               // Number ? ""42""
+    'bool_value': String(true),               // Boolean ? ""true""
+    'object_value': JSON.stringify({a: 1})    // Object ? '{""a"":1}'
 }
+```
+
+### Backend (Python) - Receiving Inputs:
+Convert string inputs to needed types:
+```python
+# Inputs arrive as strings
+count = int(input_count)                    # ""5"" ? 5
+enabled = input_enabled.lower() == 'true'   # ""true"" ? True  
+config = json.loads(input_config)           # '{""a"":1}' ? {""a"": 1}
+```
+
+### Backend (Python) - Sending Outputs:
+Output **native Python types** (runner serializes them):
+```python
+success = True              # Python bool ? JSON ""true""
+cpu_percent = 45.2          # Python float ? JSON ""45.2""
+metrics = {""cpu"": 45.2}     # Python dict ? JSON '{""cpu"":45.2}'
+# Do NOT use json.dumps() - runner handles serialization!
+```
+
+### Backend ? Frontend (Outputs):
+Parse JSON strings as needed:
+```javascript
+const outputs = result.outputVariables;
+const success = outputs.success === 'true';                    // String ? Boolean
+const cpu = parseFloat(outputs.cpu_percent);                   // String ? Number
+const data = JSON.parse(outputs.metrics);                      // String ? Object
 ```";
     }
 
@@ -360,8 +430,12 @@ For data, use:
 7. Include loading states and error handling
 8. Use modern, clean design with proper spacing and typography
 9. Handle empty/no data states with friendly UI messages
-10. **Backend outputs must be native types** - boolean True/False, numbers, dicts - NOT strings!
-11. **Never use json.dumps() on output variables** - the runner handles serialization
-12. **API response is DIRECT** - access result.outputVariables, NOT result.data.outputVariables";
+
+## DATA FORMAT RULES (ALL VALUES ARE STRINGS):
+10. **Frontend inputs**: Use `String(num)`, `String(bool)`, `JSON.stringify(obj)` 
+11. **Backend receives strings**: Convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
+12. **Backend outputs native types**: Use Python `True`, `45.2`, `{...}` - runner serializes to JSON strings
+13. **Frontend receives JSON strings**: Parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
+14. **NEVER use json.dumps()** on Python outputs - causes double-escaping";
     }
 }
