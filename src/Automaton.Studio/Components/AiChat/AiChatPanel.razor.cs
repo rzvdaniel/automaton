@@ -1,5 +1,6 @@
 ﻿using Automaton.Studio.Models;
 using Automaton.Studio.Services;
+using Automaton.Studio.Services.Mcp;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;

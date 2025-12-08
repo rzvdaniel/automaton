@@ -1,6 +1,7 @@
 using Automaton.Mcp.Models;
 using Automaton.Studio.Components.AiChat.ToolResults.Processors;
 using Automaton.Studio.Services;
+using Automaton.Studio.Services.Mcp;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -16,14 +17,6 @@ public class AgentModeResultStrategy : IConversationResultStrategy
     private readonly string _currentLanguage;
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
     private readonly ICodeExtractionService _codeExtractionService;
-
-    // Tools that save code and don't need additional code extraction from final response
-    private static readonly HashSet<string> CodeSavingTools = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "save_code",        // Step code saving
-        "save_app_code",    // App code saving
-        "save_step_code"    // Backend step code saving
-    };
 
     public AgentModeResultStrategy(
         List<ChatMessage> messages,
@@ -71,7 +64,7 @@ public class AgentModeResultStrategy : IConversationResultStrategy
         return _messages.Any(m => 
             m.Type == MessageType.ToolExecution && 
             !string.IsNullOrEmpty(m.ToolName) &&
-            CodeSavingTools.Contains(m.ToolName) &&
+            CodeSavingTools.IsCodeSavingTool(m.ToolName) &&
             m.ToolStatus == "success");
     }
 

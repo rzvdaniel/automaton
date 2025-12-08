@@ -19,6 +19,11 @@ public class StepMcpToolProvider : IMcpToolProvider
     private readonly AiCodeCleanupService _codeCleanupService;
     private readonly Dictionary<string, StepContext> _stepContexts = new();
 
+    /// <summary>
+    /// The name of the tool that saves code to the step editor
+    /// </summary>
+    public const string SaveCodeToolName = "save_code";
+
     public StepMcpToolProvider(
         ILogger<StepMcpToolProvider> logger,
         ICustomStepExecuteService executeService,
@@ -165,7 +170,7 @@ public class StepMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = "save_code",
+                Name = SaveCodeToolName,
                 Description = "Save generated code to a step",
                 InputSchema = JsonDocument.Parse("""
                 {
@@ -203,7 +208,7 @@ public class StepMcpToolProvider : IMcpToolProvider
                 "execute_code" => await ExecuteCodeAsync(arguments, contextId),
                 "get_step_variables" => await GetStepVariablesAsync(arguments, contextId),
                 "suggest_variables" => await SuggestVariablesAsync(arguments, contextId),
-                "save_code" => await SaveCodeAsync(arguments, contextId),
+                SaveCodeToolName => await SaveCodeAsync(arguments, contextId),
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }

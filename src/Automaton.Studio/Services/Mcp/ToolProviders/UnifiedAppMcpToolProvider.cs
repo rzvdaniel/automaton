@@ -37,6 +37,16 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     private Guid? _currentAppId;
 
     /// <summary>
+    /// The name of the tool that saves app (frontend) code
+    /// </summary>
+    public const string SaveAppCodeToolName = "save_app_code";
+
+    /// <summary>
+    /// The name of the tool that saves step (backend) code
+    /// </summary>
+    public const string SaveStepCodeToolName = "save_step_code";
+
+    /// <summary>
     /// Event fired when backend steps are created, updated, or linked to the app.
     /// UI components can subscribe to refresh their step lists.
     /// </summary>
@@ -93,7 +103,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = "save_app_code",
+                Name = SaveAppCodeToolName,
                 Description = "Save HTML/CSS/JavaScript code to the app editor",
                 InputSchema = JsonDocument.Parse("""
                 {
@@ -155,7 +165,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = "save_step_code",
+                Name = SaveStepCodeToolName,
                 Description = "Save code to a backend step",
                 InputSchema = JsonDocument.Parse("""
                 {
@@ -259,12 +269,12 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             {
                 // Frontend tools
                 "get_current_code" => await HandleGetCurrentCode(arguments),
-                "save_app_code" => await HandleSaveAppCode(arguments),
+                SaveAppCodeToolName => await HandleSaveAppCode(arguments),
                 
                 // Backend tools
                 "create_backend_step" => await HandleCreateBackendStep(arguments),
                 "get_step_code" => await HandleGetStepCode(arguments),
-                "save_step_code" => await HandleSaveStepCode(arguments),
+                SaveStepCodeToolName => await HandleSaveStepCode(arguments),
                 "suggest_step_variables" => await HandleSuggestStepVariables(arguments),
                 "link_step_to_app" => await HandleLinkStepToApp(arguments),
                 "get_linked_steps" => await HandleGetLinkedSteps(),
