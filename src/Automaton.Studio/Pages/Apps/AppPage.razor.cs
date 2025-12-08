@@ -504,6 +504,18 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                     await codeEditor.SetValue(e.NewCode);
                     currentApp.Definition.HtmlContent = e.NewCode;
                     StateHasChanged();
+                    
+                    // Auto-save the app after AI generates/modifies code
+                    try
+                    {
+                        await AppsService.Update(currentApp);
+                        Logger.LogInformation("App auto-saved after AI code generation");
+                    }
+                    catch (Exception saveEx)
+                    {
+                        Logger.LogWarning(saveEx, "Failed to auto-save app after AI code generation");
+                        // Don't show error to user - the code is still in the editor
+                    }
                 });
             }
         }
