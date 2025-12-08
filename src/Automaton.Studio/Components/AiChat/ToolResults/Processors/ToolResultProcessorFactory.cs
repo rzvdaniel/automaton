@@ -39,6 +39,11 @@ public class ToolResultProcessorFactory
         // Format tool name for display (e.g., "suggest_variables" -> "Suggest variables")
         var displayName = FormatToolNameForDisplay(toolName);
         
+        // Use the tool's actual result content as summary if available
+        var summary = toolResult.IsSuccess 
+            ? ExtractSummaryFromResult(toolResult.Result) 
+            : null;
+        
         return new ToolResultViewModel
         {
             Icon = "tool",
@@ -47,11 +52,52 @@ public class ToolResultProcessorFactory
             Status = toolResult.IsSuccess ? "Success" : "Failed",
             IsSuccess = toolResult.IsSuccess,
             ResultType = ToolResultType.Generic,
-            Summary = toolResult.IsSuccess ? "Tool executed successfully" : null,
+            Summary = summary,
             ErrorMessage = toolResult.IsSuccess ? null : toolResult.ErrorMessage
         };
     }
     
+    /// <summary>
+    /// Extracts a user-friendly summary from the tool result content.
+    /// Handles JSON responses and plain text.
+    /// </summary>
+    private string ExtractSummaryFromResult(string? resultContent)
+    {
+        if (string.IsNullOrWhiteSpace(resultContent))
+            return "Tool executed successfully";
+        
+        // Try to parse as JSON and extract a message field
+        try
+        {
+            if (resultContent.TrimStart().StartsWith('{') || resultContent.TrimStart().StartsWith('['))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(resultContent);
+                var root = doc.RootElement;
+                
+                // Look for common message fields in the JSON response
+                if (root.TryGetProperty("message", out var messageElement))
+                    return messageElement.GetString() ?? resultContent;
+                    
+                if (root.TryGetProperty("summary", out var summaryElement))
+                    return summaryElement.GetString() ?? resultContent;
+                    
+                if (root.TryGetProperty("content", out var contentElement) && contentElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                    return contentElement.GetString() ?? resultContent;
+            }
+        }
+        catch
+        {
+            // Not valid JSON, use as plain text
+        }
+        
+        // Use the result content directly (truncate if too long)
+        const int maxLength = 200;
+        if (resultContent.Length > maxLength)
+            return resultContent[..maxLength] + "...";
+            
+        return resultContent;
+    }
+
     private string FormatToolNameForDisplay(string toolName)
     {
         if (string.IsNullOrEmpty(toolName))
