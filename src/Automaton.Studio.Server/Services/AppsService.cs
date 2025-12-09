@@ -101,6 +101,34 @@ public class AppsService
         };
     }
 
+    /// <summary>
+    /// Get app metadata by ID for preview mode (doesn't require app to be published).
+    /// Used for testing backend steps in the App Designer before publishing.
+    /// </summary>
+    public async Task<Models.PublishedAppInfo> GetAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
+    {
+        var appEntity = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken);
+
+        if (appEntity == null)
+        {
+            return null;
+        }
+
+        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId;
+
+        return new Models.PublishedAppInfo
+        {
+            Id = appEntity.Id,
+            Name = appEntity.Name,
+            PublicUrl = appEntity.PublicUrl,
+            RequiresAuthentication = appEntity.RequiresAuthentication,
+            OwnerId = ownerId,
+            ExecutionRunnerId = appEntity.ExecutionRunnerId
+        };
+    }
+
     public async Task<Guid> Create(Models.NewApp app)
     {
         // If an execution runner id was provided, ensure it belongs to the owner (current user)

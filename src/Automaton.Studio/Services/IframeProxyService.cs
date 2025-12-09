@@ -63,6 +63,7 @@ public class IframeProxyService : IAsyncDisposable
             }
 
             // Only allow calls to /api/web-apps/* endpoints for security
+            // This includes both published app endpoints and preview endpoints
             if (!payload.Path.StartsWith("/api/web-apps/", StringComparison.OrdinalIgnoreCase))
             {
                 logger.Warning("Iframe proxy request {RequestId} rejected: invalid path {Path}", 
@@ -93,6 +94,7 @@ public class IframeProxyService : IAsyncDisposable
 
             // Get JWT token if user is authenticated
             // For public apps, this will be empty and that's fine - the API will allow anonymous access
+            // For preview mode, this is REQUIRED - preview endpoints require authentication
             var token = await authStateProvider.GetAccessTokenAsync();
             if (!string.IsNullOrEmpty(token))
             {

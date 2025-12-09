@@ -12,6 +12,7 @@ public class IframeMessageHandler : IAsyncDisposable
     private readonly IframeProxyService proxyService;
     private readonly ILogger logger;
     private DotNetObjectReference<IframeMessageHandler>? dotNetRef;
+    private bool _isInitialized;
 
     public IframeMessageHandler(
         IJSRuntime jsRuntime,
@@ -27,6 +28,13 @@ public class IframeMessageHandler : IAsyncDisposable
     /// </summary>
     public async Task InitializeAsync()
     {
+        // Prevent double initialization within same instance
+        if (_isInitialized)
+        {
+            logger.Information("[IframeMessageHandler] Already initialized, skipping");
+            return;
+        }
+
         logger.Information("[IframeMessageHandler] Initializing message handler");
 
         // Check if automatonMessageHandler exists
@@ -53,6 +61,9 @@ public class IframeMessageHandler : IAsyncDisposable
                     })();";
 
                     await jsRuntime.InvokeAsync<object>("eval", injectScript);
+                    
+                    // Wait a bit for the script to load
+                    await Task.Delay(100);
                 }
                 catch (Exception ex)
                 {
@@ -67,11 +78,17 @@ public class IframeMessageHandler : IAsyncDisposable
             throw;
         }
 
+        // Dispose any existing reference before creating a new one
+        dotNetRef?.Dispose();
+        
         // Create DotNet reference for callbacks
         dotNetRef = DotNetObjectReference.Create(this);
 
-        // Call global JavaScript function
+        // Call global JavaScript function - this will replace any stale dotNetHelper reference
+        // The init function in automatonMessageHandler.js stores the new reference
         await jsRuntime.InvokeVoidAsync("automatonMessageHandler.init", dotNetRef);
+        
+        _isInitialized = true;
 
         logger.Information("[IframeMessageHandler] Initialized - ready to receive messages");
     }
@@ -168,7 +185,10 @@ public class IframeMessageHandler : IAsyncDisposable
             }
 
             dotNetRef.Dispose();
+            dotNetRef = null;
         }
+        
+        _isInitialized = false;
     }
 
     // Helper classes for deserialization

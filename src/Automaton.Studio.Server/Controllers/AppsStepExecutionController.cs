@@ -27,7 +27,7 @@ public class AppsStepExecutionController : ControllerBase
     }
 
     /// <summary>
-    /// Execute a Custom Step from a published Web App
+    /// Execute a Custom Step from a published Web App (by slug)
     /// </summary>
     /// <param name="appSlug">The app's public URL slug</param>
     /// <param name="stepIdentifier">Step name or GUID</param>
@@ -98,6 +98,71 @@ public class AppsStepExecutionController : ControllerBase
     }
 
     /// <summary>
+    /// Execute a Custom Step in preview mode (by app ID, requires authentication).
+    /// This allows testing backend steps before publishing the app.
+    /// </summary>
+    /// <param name="appId">The app's GUID</param>
+    /// <param name="stepIdentifier">Step name or GUID</param>
+    /// <param name="request">Execution request with inputs and runner selection</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    [HttpPost("preview/{appId:guid}/steps/{stepIdentifier}/execute")]
+    [Authorize] // Preview mode always requires authentication
+    public async Task<ActionResult<AppStepExecutionResponse>> ExecuteStepPreview(
+        Guid appId,
+        string stepIdentifier,
+        [FromBody] AppStepExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.Information(
+                "Preview step execution request: AppId={AppId}, Step={StepIdentifier}", 
+                appId, stepIdentifier);
+
+            // 1. Get app by ID (doesn't need to be published for preview)
+            var app = await appsService.GetAppInfoByIdAsync(appId, cancellationToken);
+            
+            if (app == null)
+            {
+                logger.Warning("App not found: {AppId}", appId);
+                return NotFound(new { error = "App not found" });
+            }
+
+            if (app.OwnerId == null)
+            {
+                logger.Error("App has no owner: {AppId}", appId);
+                return StatusCode(500, new { error = "App configuration error: no owner" });
+            }
+
+            // 2. Execute the step
+            var result = await stepExecutionService.ExecuteStepForAppAsync(
+                app,
+                stepIdentifier,
+                request.Inputs ?? new Dictionary<string, string>(),
+                request.RunnerNames,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.Warning(ex, "Unauthorized preview step execution: {StepIdentifier}", stepIdentifier);
+            return Unauthorized(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.Warning(ex, "Invalid preview step execution: {StepIdentifier}", stepIdentifier);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Preview step execution failed: AppId={AppId}, Step={StepIdentifier}", 
+                appId, stepIdentifier);
+            return StatusCode(500, new { error = "Internal server error during step execution" });
+        }
+    }
+
+    /// <summary>
     /// List available steps for an app (for discovery/debugging)
     /// </summary>
     [HttpGet("{appSlug}/steps")]
@@ -125,6 +190,33 @@ public class AppsStepExecutionController : ControllerBase
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to list steps for app: {AppSlug}", appSlug);
+            return StatusCode(500, new { error = "Failed to list steps" });
+        }
+    }
+
+    /// <summary>
+    /// List available steps for an app in preview mode (by app ID)
+    /// </summary>
+    [HttpGet("preview/{appId:guid}/steps")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<AppStepInfo>>> ListStepsPreview(Guid appId)
+    {
+        try
+        {
+            var app = await appsService.GetAppInfoByIdAsync(appId);
+            
+            if (app == null)
+            {
+                return NotFound(new { error = "App not found" });
+            }
+
+            var steps = await stepExecutionService.GetLinkedStepsAsync(app.Id);
+            
+            return Ok(steps);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to list steps for app preview: {AppId}", appId);
             return StatusCode(500, new { error = "Failed to list steps" });
         }
     }

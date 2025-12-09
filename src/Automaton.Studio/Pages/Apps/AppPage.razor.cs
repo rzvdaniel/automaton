@@ -319,15 +319,27 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         try
         {
             var html = currentApp.Definition?.HtmlContent ?? GetDefaultHtmlContent();
+            
             if (currentApp.IsPublished && !string.IsNullOrEmpty(automatonApiScript) && !string.IsNullOrEmpty(currentApp.PublicUrl))
             {
+                // Published app: inject the real API with the app slug
                 var scriptWithSlug = automatonApiScript.Replace("'{{APP_SLUG}}'", $"'{currentApp.PublicUrl}'");
                 var wrappedScript = $"<script>{scriptWithSlug}</script>";
-                if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
-                    html = html.Replace("</body>", $"{wrappedScript}</body>", StringComparison.OrdinalIgnoreCase);
-                else
-                    html += wrappedScript;
+                html = InjectScriptAtStart(html, wrappedScript);
             }
+            else if (!string.IsNullOrEmpty(automatonApiScript))
+            {
+                // Unpublished app: inject the preview API that uses app ID instead of slug
+                var previewScript = GetPreviewApiScript(currentApp.Id);
+                html = InjectScriptAtStart(html, previewScript);
+            }
+            else
+            {
+                // No API script available: inject stub with error message
+                var stubScript = GetPreviewStubScript();
+                html = InjectScriptAtStart(html, stubScript);
+            }
+            
             return html;
         }
         catch (Exception ex)
@@ -335,6 +347,104 @@ partial class AppPage : ComponentBase, IAsyncDisposable
             Logger.LogError(ex, "Error generating preview HTML");
             return GetDefaultHtmlContent();
         }
+    }
+
+    /// <summary>
+    /// Inject script at the start of the document (after &lt;head&gt; or &lt;body&gt;) 
+    /// so it's available before any user code runs.
+    /// </summary>
+    private static string InjectScriptAtStart(string html, string script)
+    {
+        // Try to inject after <head> first (preferred location for API scripts)
+        if (html.Contains("<head>", StringComparison.OrdinalIgnoreCase))
+        {
+            var headIndex = html.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
+            var insertIndex = headIndex + 6; // Length of "<head>"
+            return html.Insert(insertIndex, script);
+        }
+        
+        // Fall back to after <body>
+        if (html.Contains("<body", StringComparison.OrdinalIgnoreCase))
+        {
+            // Find the end of the body tag (handles <body> and <body class="...">)
+            var bodyIndex = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
+            var bodyEndIndex = html.IndexOf('>', bodyIndex);
+            if (bodyEndIndex >= 0)
+            {
+                return html.Insert(bodyEndIndex + 1, script);
+            }
+        }
+        
+        // Last resort: prepend to the HTML
+        return script + html;
+    }
+
+    private static string InjectScriptIntoHtml(string html, string script)
+    {
+        if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+            return html.Replace("</body>", $"{script}</body>", StringComparison.OrdinalIgnoreCase);
+        else
+            return html + script;
+    }
+
+    /// <summary>
+    /// Generate a preview API script that uses the app ID and preview endpoints.
+    /// This allows testing backend steps before publishing the app.
+    /// </summary>
+    private string GetPreviewApiScript(Guid appId)
+    {
+        // Modify the automatonApi script to use preview endpoints with app ID
+        var previewScript = automatonApiScript!
+            .Replace("'{{APP_SLUG}}'", $"'preview/{appId}'");
+        
+        return $"""
+            <script>
+            {previewScript}
+            console.log('[AutomatonAPI Preview] Preview mode enabled for app ID: {appId}');
+            console.log('[AutomatonAPI Preview] Backend steps will execute using preview endpoints.');
+            </script>
+            """;
+    }
+
+    private static string GetPreviewStubScript()
+    {
+        return """
+            <script>
+            // Preview stub for automatonApi - shown when API script is not available
+            window.automatonApi = {
+                executeStep: function(stepName, options) {
+                    console.warn('[AutomatonAPI Preview] executeStep called for:', stepName);
+                    console.warn('[AutomatonAPI Preview] API script not loaded. Please refresh the page.');
+                    
+                    return Promise.resolve({
+                        success: false,
+                        error: 'Preview Mode: API script not loaded. Please refresh the page.',
+                        outputVariables: {
+                            success: 'false',
+                            error_message: 'API script not loaded.'
+                        },
+                        logs: ['[Preview] API script not loaded.']
+                    });
+                },
+                executeFlow: function(flowName, options) {
+                    console.warn('[AutomatonAPI Preview] executeFlow called for:', flowName);
+                    return Promise.resolve({
+                        success: false,
+                        error: 'Preview Mode: API script not loaded.',
+                        outputVariables: {},
+                        logs: ['[Preview] API script not loaded.']
+                    });
+                },
+                customCall: function(path, method, body) {
+                    return Promise.reject(new Error('Preview Mode: API script not loaded.'));
+                },
+                getAppSlug: function() {
+                    return null;
+                }
+            };
+            console.log('[AutomatonAPI Preview] Stub loaded - API script not available.');
+            </script>
+            """;
     }
 
     private async Task RefreshPreview()

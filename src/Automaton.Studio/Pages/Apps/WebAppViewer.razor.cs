@@ -1,4 +1,4 @@
-﻿using Automaton.Studio.Models;
+using Automaton.Studio.Models;
 using Automaton.Studio.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -177,24 +177,43 @@ partial class WebAppViewer
             
             var html = currentApp.Definition.HtmlContent;
 
-            // Try to inject before </body>, </html>, or at the end
-            if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase))
-            {
-                html = html.Replace("</body>", $"{wrappedScript}</body>", StringComparison.OrdinalIgnoreCase);
-            }
-            else if (html.Contains("</html>", StringComparison.OrdinalIgnoreCase))
-            {
-                html = html.Replace("</html>", $"{wrappedScript}</html>", StringComparison.OrdinalIgnoreCase);
-            }
-            else
-            {
-                html += wrappedScript;
-            }
+            // Inject at the START so automatonApi is available before any user code runs
+            html = InjectScriptAtStart(html, wrappedScript);
 
             return html;
         }
 
         return "<html><body><h1>Error: No content available</h1></body></html>";
+    }
+
+    /// <summary>
+    /// Inject script at the start of the document (after &lt;head&gt; or &lt;body&gt;) 
+    /// so it's available before any user code runs.
+    /// </summary>
+    private static string InjectScriptAtStart(string html, string script)
+    {
+        // Try to inject after <head> first (preferred location for API scripts)
+        if (html.Contains("<head>", StringComparison.OrdinalIgnoreCase))
+        {
+            var headIndex = html.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
+            var insertIndex = headIndex + 6; // Length of "<head>"
+            return html.Insert(insertIndex, script);
+        }
+        
+        // Fall back to after <body>
+        if (html.Contains("<body", StringComparison.OrdinalIgnoreCase))
+        {
+            // Find the end of the body tag (handles <body> and <body class="...">)
+            var bodyIndex = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
+            var bodyEndIndex = html.IndexOf('>', bodyIndex);
+            if (bodyEndIndex >= 0)
+            {
+                return html.Insert(bodyEndIndex + 1, script);
+            }
+        }
+        
+        // Last resort: prepend to the HTML
+        return script + html;
     }
 
     private void GoHome()

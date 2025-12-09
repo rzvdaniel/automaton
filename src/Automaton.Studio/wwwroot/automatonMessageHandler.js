@@ -9,12 +9,23 @@ console.log('[MessageHandler] Script loading...');
 
 window.automatonMessageHandler = {
     dotnetHelper: null,
+    messageHandler: null,  // Store the handler function so we can remove it
 
     init: function (helper) {
-        this.dotnetHelper = helper;
         console.log('[MessageHandler] init() called');
         
-        window.addEventListener('message', async (e) => {
+        // Remove any existing listener before adding a new one
+        // This prevents duplicate handlers when the component is re-rendered
+        if (this.messageHandler) {
+            window.removeEventListener('message', this.messageHandler);
+            console.log('[MessageHandler] Removed previous event listener');
+        }
+        
+        // Store the new dotnet helper (replaces any stale reference)
+        this.dotnetHelper = helper;
+        
+        // Create the message handler function
+        this.messageHandler = async (e) => {
             // SECURITY: Only accept messages from same origin or srcdoc iframes
             // srcdoc iframes have origin 'null' which is safe because they inherit parent's security context
             const isSameOrigin = e.origin === window.origin;
@@ -64,6 +75,23 @@ window.automatonMessageHandler = {
                 return;
             }
 
+            // Check if we have a valid dotnet helper
+            if (!this.dotnetHelper) {
+                console.error('[MessageHandler] No dotnet helper available - handler may have been disposed');
+                if (e.source) {
+                    e.source.postMessage({
+                        type: 'apiResponse',
+                        id: payload.id,
+                        result: { 
+                            error: 'Handler not ready', 
+                            message: 'Please refresh the page and try again', 
+                            success: false 
+                        }
+                    }, '*');
+                }
+                return;
+            }
+
             // SECURITY: Path validation happens in C# (IframeProxyService)
             // Only /api/web-apps/* endpoints are allowed
             try {
@@ -78,25 +106,44 @@ window.automatonMessageHandler = {
             } catch (err) {
                 console.error('[MessageHandler] ERROR:', err);
                 
+                // Check if the error is due to disposed object reference
+                const isDisposedError = err.message && (
+                    err.message.includes('disposed') || 
+                    err.message.includes('No .NET object')
+                );
+                
                 if (e.source && payload) {
                     e.source.postMessage({
                         type: 'apiResponse',
                         id: payload.id,
                         result: { 
-                            error: 'Handler error', 
-                            message: err.toString(), 
+                            error: isDisposedError ? 'Handler expired' : 'Handler error', 
+                            message: isDisposedError ? 'Please refresh the page and try again' : err.toString(), 
                             success: false 
                         }
                     }, '*');
                 }
             }
-        });
+        };
+        
+        // Bind the handler to this context so 'this' works correctly
+        this.messageHandler = this.messageHandler.bind(this);
+        
+        window.addEventListener('message', this.messageHandler);
         
         console.log('[MessageHandler] Event listener registered');
     },
 
     dispose: function () {
         console.log('[MessageHandler] dispose() called');
+        
+        // Remove the event listener
+        if (this.messageHandler) {
+            window.removeEventListener('message', this.messageHandler);
+            this.messageHandler = null;
+            console.log('[MessageHandler] Event listener removed');
+        }
+        
         this.dotnetHelper = null;
     }
 };
