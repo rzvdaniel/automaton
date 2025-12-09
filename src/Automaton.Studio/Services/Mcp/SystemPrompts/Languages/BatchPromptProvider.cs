@@ -11,7 +11,6 @@ public class BatchPromptProvider : ILanguagePromptProvider
     public string GetCodeTemplate()
     {
         return """
-            ```batch
             @echo off
             setlocal enabledelayedexpansion
 
@@ -21,6 +20,8 @@ public class BatchPromptProvider : ILanguagePromptProvider
             set "result="
 
             REM Your logic here
+            REM Input variables are available as environment variables with input_ prefix
+            REM Example: %input_api_key%, %input_filename%
 
             REM On success, set outputs
             set "success=true"
@@ -32,16 +33,33 @@ public class BatchPromptProvider : ILanguagePromptProvider
             echo ::OUTPUT::result=%result%
 
             endlocal
-            ```
             """;
     }
 
     public string GetOutputVariableGuidance()
     {
         return """
-            ## BATCH OUTPUT VARIABLE RULES:
+            ## BATCH INPUT/OUTPUT VARIABLE RULES:
 
-            ### Output Format:
+            ### INPUT VARIABLES:
+            
+            Input variables defined in the Step Editor are injected as environment variables 
+            with `input_` prefix. For example, an input variable named `api_key` becomes `%input_api_key%`.
+            
+            **IMPORTANT: ALWAYS use input variables FIRST. Only fall back to other environment 
+            variables if explicitly requested or as a documented fallback.**
+
+            ```batch
+            REM CORRECT: Use input variable directly
+            if not "%input_api_key%"=="" (
+                set "api_key=%input_api_key%"
+            ) else (
+                set "error_message=api_key input is required"
+                goto :error
+            )
+            ```
+
+            ### OUTPUT FORMAT:
             Batch scripts output variables using a special format that the runner captures:
             ```batch
             echo ::OUTPUT::variable_name=value
@@ -67,12 +85,14 @@ public class BatchPromptProvider : ILanguagePromptProvider
             ```
 
             ### Key Principles:
-            1. **Use `::OUTPUT::` prefix** for the runner to capture variables
-            2. **Booleans**: Use lowercase `true` or `false`
-            3. **Numbers**: Output as plain numbers
-            4. **JSON**: Keep on single line with proper escaping for batch
-            5. **Always initialize** variables with defaults at the start
-            6. **Error handling**: Use `if errorlevel` or check for failures
+            1. **Input variables have priority**: Always use `%input_*%` variables first
+            2. **Don't default to other environment variables** unless explicitly requested
+            3. **Use `::OUTPUT::` prefix** for the runner to capture output variables
+            4. **Booleans**: Use lowercase `true` or `false`
+            5. **Numbers**: Output as plain numbers
+            6. **JSON**: Keep on single line with proper escaping for batch
+            7. **Always initialize** variables with defaults at the start
+            8. **Error handling**: Use `if errorlevel` or check for failures
             """;
     }
 

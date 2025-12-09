@@ -32,7 +32,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
             try:
                 # Your logic here
                 # NOTE: Input variables arrive as STRINGS - convert as needed:
-                # my_number = int(input_count) or float(input_value)
+                # my_number = int(count) or float(input_value)
                 # my_bool = input_flag.lower() == 'true'
                 # my_dict = json.loads(input_json)
                 
@@ -51,21 +51,42 @@ public class PythonPromptProvider : ILanguagePromptProvider
             ## PYTHON INPUT/OUTPUT VARIABLE RULES:
 
             ### INPUT VARIABLES - Always arrive as STRINGS:
+            
+            Input variables defined in the Step Editor are injected as global variables using their **exact name** (no prefix).
+            For example, an input variable named `api_key` becomes `api_key`.
+            
+            **IMPORTANT: ALWAYS use input variables FIRST. Only fall back to environment 
+            variables if explicitly requested or as a documented fallback.**
+
+            ```python
+            # CORRECT: Check input variable first, use it if provided
+            api_key = ""
+            if 'api_key' in globals() and api_key:
+                api_key = api_key.strip()
+            
+            # Only if user explicitly wants env fallback AND input is empty:
+            # if not api_key:
+            #     api_key = os.environ.get("API_KEY", "")
+            
+            if not api_key:
+                raise ValueError("api_key input is required")
+            ```
+
             ```python
             # Input variables are injected as global strings
             # Convert them to the types you need:
             
             # String to int
-            count = int(input_count)  # input_count = "5" -> 5
+            count = int(count)  # count = "5" -> 5
             
             # String to float
-            threshold = float(input_threshold)  # input_threshold = "0.75" -> 0.75
+            threshold = float(threshold)  # threshold = "0.75" -> 0.75
             
             # String to boolean
-            include_details = input_include.lower() == 'true'  # "true" -> True
+            include_details = include.lower() == 'true'  # "true" -> True
             
             # String (JSON) to dict/list
-            config = json.loads(input_config)  # '{"key": "value"}' -> {"key": "value"}
+            config = json.loads(config)  # '{"key": "value"}' -> {"key": "value"}
             ```
 
             ### OUTPUT VARIABLES - Use native Python types:
@@ -102,8 +123,10 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
             ### Key Principles:
             1. **Inputs are strings**: Convert with `int()`, `float()`, `json.loads()`, etc.
-            2. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
-            3. **Never call `json.dumps()`** on outputs - the runner handles serialization
+            2. **Input variables use exact names**: `api_key` not `input_api_key`
+            3. **Don't default to environment variables** unless explicitly requested
+            4. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
+            5. **Never call `json.dumps()`** on outputs - the runner handles serialization
             """;
     }
 
