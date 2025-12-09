@@ -212,65 +212,26 @@ public class HubService
                 })
                 .Build();
 
-            // Register hub methods
+            // Increase server timeout for long-running script execution
+            // Default is 30 seconds which is too short for HTTP-based Python scripts
+            connection.ServerTimeout = TimeSpan.FromMinutes(5);
+            
+            // Keep-alive interval to maintain connection during long operations
+            connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
+
+            // Register workflow execution handler
+            // Note: SignalR client handlers with return values must return synchronously.
+            // We use Task.Run() to execute async work on a background thread,
+            // keeping SignalR's message processing thread free for keep-alives.
             connection.On<Guid, WorkflowExecution>(RunWorkflowMethod, (workflowId) =>
             {
-                try
-                {
-                    WriteLine($"▶️ Executing workflow: {workflowId}");
-                    var result = flowExecutionService.ExecuteWorkflowAsync(workflowId).GetAwaiter().GetResult();
-                    WriteLine($"✅ Workflow completed: {result.Status}");
-                    return result;
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, "Error executing workflow {WorkflowId}", workflowId);
-                    WriteLine($"❌ Workflow failed: {ex.Message}");
-
-                    // Return a failed execution so the server gets a response
-                    var failed = new WorkflowExecution(workflowId, configService.ApplicationName)
-                    {
-                        Status = WorkflowStatus.Error
-                    };
-                    failed.AddLog("Error", ex.Message);
-                    return failed;
-                }
+                return ExecuteWorkflowHandler(workflowId);
             });
 
-            // Register custom step execution handler that returns CustomStepExecutionResponse
-            // Using Func<> to support return values with SignalR
+            // Register custom step execution handler
             connection.On<CustomStepPayload, CustomStepExecutionResponse>(RunCustomStepMethod, (customStep) =>
             {
-                try
-                {
-                    // Create a scope and resolve CustomStepHandler for this request
-                    using var scope = serviceProvider.CreateScope();
-                    var handler = scope.ServiceProvider.GetRequiredService<CustomStepExecuteService>();
-                    
-                    // Execute and wait for result (SignalR requires synchronous return)
-                    var result = handler.RunCustomStep(customStep).GetAwaiter().GetResult();
-                    
-                    logger.Information("Custom step {CustomStepId} completed with status: {Success}", 
-                        customStep.Id, result.Success ? "Success" : "Failed");
-                    
-                    return result;
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, "Error executing custom step {CustomStepId}", customStep.Id);
-                    WriteLine($"❌ Custom step failed: {ex.Message}");
-                    
-                    // Return error result
-                    return new CustomStepExecutionResponse
-                    {
-                        Success = false,
-                        Output = null,
-                        Error = $"Handler exception: {ex.Message}",
-                        Started = DateTime.UtcNow,
-                        Finished = DateTime.UtcNow,
-                        OutputVariables = []
-                    };
-                }
+                return ExecuteCustomStepHandler(customStep);
             });
 
             connection.On(PingMethod, () =>
@@ -338,6 +299,77 @@ public class HubService
         }
     }
 
+    /// <summary>
+    /// Executes workflow on a background thread to avoid blocking SignalR's message loop.
+    /// This allows keep-alive pings to continue during long-running operations.
+    /// </summary>
+    private WorkflowExecution ExecuteWorkflowHandler(Guid workflowId)
+    {
+        try
+        {
+            WriteLine($"▶️ Executing workflow: {workflowId}");
+            
+            // Execute on a background thread to keep SignalR's message thread free
+            var task = Task.Run(async () => await flowExecutionService.ExecuteWorkflowAsync(workflowId));
+            var result = task.GetAwaiter().GetResult();
+            
+            WriteLine($"✅ Workflow completed: {result.Status}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing workflow {WorkflowId}", workflowId);
+            WriteLine($"❌ Workflow failed: {ex.Message}");
+
+            var failed = new WorkflowExecution(workflowId, configService.ApplicationName)
+            {
+                Status = WorkflowStatus.Error
+            };
+            failed.AddLog("Error", ex.Message);
+            return failed;
+        }
+    }
+
+    /// <summary>
+    /// Executes custom step on a background thread to avoid blocking SignalR's message loop.
+    /// This is crucial for long-running operations like HTTP calls in Python scripts.
+    /// </summary>
+    private CustomStepExecutionResponse ExecuteCustomStepHandler(CustomStepPayload customStep)
+    {
+        try
+        {
+            // Execute on a background thread - crucial for long-running operations
+            var task = Task.Run(async () =>
+            {
+                using var scope = serviceProvider.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<CustomStepExecuteService>();
+                return await handler.RunCustomStep(customStep);
+            });
+            
+            var result = task.GetAwaiter().GetResult();
+            
+            logger.Information("Custom step {CustomStepId} completed with status: {Success}", 
+                customStep.Id, result.Success ? "Success" : "Failed");
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing custom step {CustomStepId}", customStep.Id);
+            WriteLine($"❌ Custom step failed: {ex.Message}");
+            
+            return new CustomStepExecutionResponse
+            {
+                Success = false,
+                Output = null,
+                Error = $"Handler exception: {ex.Message}",
+                Started = DateTime.UtcNow,
+                Finished = DateTime.UtcNow,
+                OutputVariables = []
+            };
+        }
+    }
+
     private async Task HandleConnectionError(Exception ex)
     {
         // Get current hub URL for error reporting
@@ -363,7 +395,7 @@ public class HubService
         }
         
         WriteLine($"❌ Connection failed: {friendlyMessage}");
-            WriteLine();
+        WriteLine();
         
         // Provide specific troubleshooting guidance
         switch (ex)

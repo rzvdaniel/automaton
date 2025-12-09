@@ -117,6 +117,24 @@ services.AddHttpClient();
 
 services.AddRazorPages();
 services.AddServerSideBlazor();
+
+// Configure SignalR with extended timeouts for long-running script execution
+services.AddSignalR(options =>
+{
+    // Client timeout - how long the server waits before considering a client disconnected
+    // Default is 30 seconds, increased for long-running Python scripts with HTTP calls
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+    
+    // Keep-alive interval - how often the server sends pings to clients
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    
+    // Handshake timeout - how long to wait for initial handshake
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+    
+    // Enable detailed errors in development for debugging
+    options.EnableDetailedErrors = applicationBuilder.Environment.IsDevelopment();
+});
+
 services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
 services.AddControllers(options =>
 {

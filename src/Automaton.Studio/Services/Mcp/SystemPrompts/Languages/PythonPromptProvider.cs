@@ -32,9 +32,9 @@ public class PythonPromptProvider : ILanguagePromptProvider
             try:
                 # Your logic here
                 # NOTE: Input variables arrive as STRINGS - convert as needed:
-                # my_number = int(count) or float(input_value)
-                # my_bool = input_flag.lower() == 'true'
-                # my_dict = json.loads(input_json)
+                # my_number = int(count) or float(value)
+                # my_bool = enabled.lower() == 'true'
+                # my_dict = json.loads(config)
                 
                 success = True
                 print("INFO: Operation completed successfully")
@@ -60,15 +60,9 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
             ```python
             # CORRECT: Check input variable first, use it if provided
-            api_key = ""
             if 'api_key' in globals() and api_key:
-                api_key = api_key.strip()
-            
-            # Only if user explicitly wants env fallback AND input is empty:
-            # if not api_key:
-            #     api_key = os.environ.get("API_KEY", "")
-            
-            if not api_key:
+                key = api_key.strip()
+            else:
                 raise ValueError("api_key input is required")
             ```
 
@@ -77,16 +71,37 @@ public class PythonPromptProvider : ILanguagePromptProvider
             # Convert them to the types you need:
             
             # String to int
-            count = int(count)  # count = "5" -> 5
+            count_val = int(count)  # count = "5" -> 5
             
             # String to float
-            threshold = float(threshold)  # threshold = "0.75" -> 0.75
+            threshold_val = float(threshold)  # threshold = "0.75" -> 0.75
             
             # String to boolean
-            include_details = include.lower() == 'true'  # "true" -> True
+            include_details = enabled.lower() == 'true'  # "true" -> True
             
             # String (JSON) to dict/list
-            config = json.loads(config)  # '{"key": "value"}' -> {"key": "value"}
+            config_dict = json.loads(config)  # '{"key": "value"}' -> {"key": "value"}
+            ```
+
+            ### HTTP REQUESTS - Use `requests` library (NOT urllib):
+            
+            **IMPORTANT: Always use the `requests` library for HTTP calls.**
+            Do NOT use `urllib.request` - it can cause connection issues with the runner.
+
+            ```python
+            # ? CORRECT - Use requests library
+            import requests
+            
+            response = requests.get(url, params=params, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            ```
+
+            ```python
+            # ? WRONG - Do NOT use urllib.request (causes connection issues)
+            # import urllib.request
+            # with urllib.request.urlopen(url, timeout=15) as resp:  # DON'T DO THIS!
+            #     data = json.loads(resp.read())
             ```
 
             ### OUTPUT VARIABLES - Use native Python types:
@@ -122,11 +137,12 @@ public class PythonPromptProvider : ILanguagePromptProvider
             ```
 
             ### Key Principles:
-            1. **Inputs are strings**: Convert with `int()`, `float()`, `json.loads()`, etc.
-            2. **Input variables use exact names**: `api_key` not `input_api_key`
+            1. **Input variables use exact names**: `api_key` not `input_api_key`
+            2. **Inputs are strings**: Convert with `int()`, `float()`, `json.loads()`, etc.
             3. **Don't default to environment variables** unless explicitly requested
-            4. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
-            5. **Never call `json.dumps()`** on outputs - the runner handles serialization
+            4. **Use `requests` library** for HTTP calls (NOT urllib.request)
+            5. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
+            6. **Never call `json.dumps()`** on outputs - the runner handles serialization
             """;
     }
 
@@ -173,6 +189,38 @@ public class PythonPromptProvider : ILanguagePromptProvider
                 
                 success = True
                 print(f"INFO: CPU: {cpu}%, Memory: {memory.percent}%, Disk: {disk.percent}%")
+            except Exception as e:
+                error_message = str(e)
+                print(f"ERROR: {error_message}")
+            ```
+
+            ## PYTHON EXAMPLE - HTTP API Call:
+
+            ```python
+            import requests
+
+            # Initialize outputs
+            success = False
+            error_message = ""
+            data = {}
+            status_code = 0
+
+            try:
+                # Use requests library (NOT urllib.request!)
+                response = requests.get(
+                    "https://api.example.com/data",
+                    params={"key": api_key},
+                    timeout=15
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                status_code = response.status_code
+                success = True
+                print(f"INFO: API call successful, status {status_code}")
+            except requests.exceptions.RequestException as e:
+                error_message = f"Request failed: {e}"
+                print(f"ERROR: {error_message}")
             except Exception as e:
                 error_message = str(e)
                 print(f"ERROR: {error_message}")
