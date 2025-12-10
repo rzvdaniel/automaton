@@ -83,28 +83,27 @@ public class PythonPromptProvider : ILanguagePromptProvider
             config_dict = json.loads(config)  # '{"key": "value"}' -> {"key": "value"}
             ```
 
-            ### HTTP REQUESTS - Use `requests` library (NOT urllib):
-            
-            **IMPORTANT: Always use the `requests` library for HTTP calls.**
-            Do NOT use `urllib.request` - it can cause connection issues with the runner.
+            ### OUTPUT VARIABLES - Keep them small and focused:
+
+            **?? IMPORTANT: Do NOT store large raw API responses as output variables!**
+            Large output data can cause connection timeouts during serialization.
 
             ```python
-            # ? CORRECT - Use requests library
-            import requests
+            # ? WRONG - Storing entire API response (can be 100KB+)
+            raw_response = api_response  # DON'T DO THIS!
             
-            response = requests.get(url, params=params, timeout=15)
-            response.raise_for_status()
-            data = response.json()
+            # ? CORRECT - Extract only what you need
+            result_metadata = {
+                "status": api_response.get("status"),
+                "count": api_response.get("num_results"),
+            }
+            
+            # ? CORRECT - Extract specific fields from items
+            items = [
+                {"title": item["title"], "url": item["url"]}
+                for item in api_response.get("results", [])
+            ]
             ```
-
-            ```python
-            # ? WRONG - Do NOT use urllib.request (causes connection issues)
-            # import urllib.request
-            # with urllib.request.urlopen(url, timeout=15) as resp:  # DON'T DO THIS!
-            #     data = json.loads(resp.read())
-            ```
-
-            ### OUTPUT VARIABLES - Use native Python types:
 
             #### ? CORRECT - Output native Python types:
             ```python
@@ -120,6 +119,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
             status = "completed"
 
             # Complex data - use dict/list directly (NOT json.dumps!)
+            # Keep data focused - only include fields you actually need
             data = {
                 "cpu": 45.2,
                 "memory": 67.8,
@@ -140,7 +140,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
             1. **Input variables use exact names**: `api_key` not `input_api_key`
             2. **Inputs are strings**: Convert with `int()`, `float()`, `json.loads()`, etc.
             3. **Don't default to environment variables** unless explicitly requested
-            4. **Use `requests` library** for HTTP calls (NOT urllib.request)
+            4. **Keep output data small** - extract only needed fields, don't store raw API responses
             5. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
             6. **Never call `json.dumps()`** on outputs - the runner handles serialization
             """;
@@ -202,11 +202,11 @@ public class PythonPromptProvider : ILanguagePromptProvider
             # Initialize outputs
             success = False
             error_message = ""
-            data = {}
+            items = []  # Only the data we need
+            metadata = {}  # Just summary info
             status_code = 0
 
             try:
-                # Use requests library (NOT urllib.request!)
                 response = requests.get(
                     "https://api.example.com/data",
                     params={"key": api_key},
@@ -214,10 +214,23 @@ public class PythonPromptProvider : ILanguagePromptProvider
                 )
                 response.raise_for_status()
                 
-                data = response.json()
+                raw = response.json()
                 status_code = response.status_code
+                
+                # ? Extract only what you need - don't store entire response!
+                metadata = {
+                    "status": raw.get("status"),
+                    "total_results": raw.get("num_results")
+                }
+                
+                # ? Extract specific fields from items
+                items = [
+                    {"title": item["title"], "url": item["url"]}
+                    for item in raw.get("results", [])[:20]  # Limit if needed
+                ]
+                
                 success = True
-                print(f"INFO: API call successful, status {status_code}")
+                print(f"INFO: API call successful, got {len(items)} items")
             except requests.exceptions.RequestException as e:
                 error_message = f"Request failed: {e}"
                 print(f"ERROR: {error_message}")
@@ -228,15 +241,15 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
             This outputs:
             - `success`: true (boolean)
-            - `cpu_percent`: 45.2 (number)
-            - `metrics`: {"cpu": 45.2, "memory": 67.8, ...} (object)
+            - `items`: [{"title": "...", "url": "..."}, ...] (array of objects)
+            - `metadata`: {"status": "OK", "total_results": 25} (object)
 
             Frontend can use directly:
             ```javascript
             const outputs = result.outputVariables;
             if (outputs.success) {  // Native boolean
-                const cpu = outputs.cpu_percent;  // Native number
-                const data = outputs.metrics;     // Native object
+                const items = outputs.items;  // Native array
+                const meta = outputs.metadata;  // Native object
             }
             ```
             """;
