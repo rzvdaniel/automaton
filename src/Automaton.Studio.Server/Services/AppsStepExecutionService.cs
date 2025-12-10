@@ -45,7 +45,7 @@ public class AppsStepExecutionService
         {
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Starting step execution for app '{app.Name}'");
 
-            // 1. Resolve step by name or GUID
+            // 1. Resolve step by name or GUID with decrypted sensitive variables
             var step = await ResolveStepAsync(stepIdentifier, app.OwnerId ?? Guid.Empty);
             
             if (step == null)
@@ -55,9 +55,8 @@ public class AppsStepExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Resolved step: {step.Name} (ID: {step.Id})");
 
-            // 2. TODO!? Check if step is linked to this app (optional security check)
-            // For Phase 1, we allow any step owned by the app owner
-            // Phase 2+ can add explicit linking requirement
+            // 2. Apply runtime input overrides (only for non-sensitive variables)
+            ApplyRuntimeInputs(step, inputs);
 
             // 3. Get runners
             var runners = await ResolveRunnersAsync(app, runnerNames);
@@ -69,13 +68,10 @@ public class AppsStepExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Using {runners.Count()} runner(s)");
 
-            // 4. Prepare step with inputs
-            var stepWithInputs = PrepareStepForExecution(step, inputs);
+            // 4. Execute on runners
+            var results = await ExecuteOnRunnersAsync(step, runners, cancellationToken, logs);
 
-            // 5. Execute on runners
-            var results = await ExecuteOnRunnersAsync(stepWithInputs, runners, cancellationToken, logs);
-
-            // 6. Aggregate results
+            // 5. Aggregate results
             var success = results.All(r => r.Success);
             var outputVariables = AggregateOutputVariables(results);
             var errors = results.Where(r => !r.Success).Select(r => r.Error).ToList();
@@ -123,13 +119,42 @@ public class AppsStepExecutionService
         // Try parsing as GUID first
         if (Guid.TryParse(identifier, out var stepId))
         {
-            // ? Use GetForExecutionAsync to decrypt sensitive variables
             return await ownerScopedService.GetForExecutionAsync(stepId);
         }
 
         // Otherwise, search by name with decryption
-        // ? Use GetByNameForExecutionAsync to decrypt sensitive variables
         return await ownerScopedService.GetByNameForExecutionAsync(identifier);
+    }
+
+    /// <summary>
+    /// Apply runtime input overrides from the Web App caller.
+    /// 
+    /// SECURITY: Sensitive variables (API keys, passwords, etc.) cannot be overridden
+    /// at runtime - they always use the decrypted values from the step definition.
+    /// Only non-sensitive variables can be overridden by the caller.
+    /// </summary>
+    private void ApplyRuntimeInputs(CustomStep step, Dictionary<string, string> inputs)
+    {
+        if (step.Definition?.CodeInputVariables == null || inputs == null || inputs.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var inputVar in step.Definition.CodeInputVariables)
+        {
+            // SECURITY: Never allow runtime override of sensitive variables
+            // Sensitive values (API keys, etc.) must come from the step definition only
+            if (inputVar.IsSensitive)
+            {
+                continue;
+            }
+
+            // For non-sensitive variables, apply the runtime override if provided
+            if (inputs.TryGetValue(inputVar.Name, out var runtimeValue))
+            {
+                inputVar.Value = runtimeValue;
+            }
+        }
     }
 
     /// <summary>
@@ -155,30 +180,6 @@ public class AppsStepExecutionService
         }
 
         return await query.ToListAsync();
-    }
-
-    /// <summary>
-    /// Prepare step with input values.
-    /// Only overwrites input variables if a non-empty value is provided.
-    /// This preserves decrypted sensitive values that weren't overridden by the caller.
-    /// </summary>
-    private CustomStep PrepareStepForExecution(CustomStep step, Dictionary<string, string> inputs)
-    {
-        // Update input variable values only if provided and non-empty
-        if (step.Definition?.CodeInputVariables != null)
-        {
-            foreach (var inputVar in step.Definition.CodeInputVariables)
-            {
-                // Only overwrite if the caller provided a non-empty value for this input
-                if (inputs.TryGetValue(inputVar.Name, out var inputValue) && !string.IsNullOrEmpty(inputValue))
-                {
-                    inputVar.Value = inputValue;
-                }
-                // Otherwise, keep the existing value (which may be a decrypted sensitive value)
-            }
-        }
-
-        return step;
     }
 
     /// <summary>
