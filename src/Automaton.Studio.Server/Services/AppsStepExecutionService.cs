@@ -113,7 +113,7 @@ public class AppsStepExecutionService
     }
 
     /// <summary>
-    /// Resolve step by name or GUID
+    /// Resolve step by name or GUID with decrypted sensitive variables
     /// </summary>
     private async Task<CustomStep?> ResolveStepAsync(string identifier, Guid ownerId)
     {
@@ -123,13 +123,13 @@ public class AppsStepExecutionService
         // Try parsing as GUID first
         if (Guid.TryParse(identifier, out var stepId))
         {
-            return await Task.FromResult(ownerScopedService.Get(stepId));
+            // ? Use GetForExecutionAsync to decrypt sensitive variables
+            return await ownerScopedService.GetForExecutionAsync(stepId);
         }
 
-        // Otherwise, search by name for steps owned by the app owner
-        var steps = ownerScopedService.List(null);
-        return steps.FirstOrDefault(s => 
-            s.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
+        // Otherwise, search by name with decryption
+        // ? Use GetByNameForExecutionAsync to decrypt sensitive variables
+        return await ownerScopedService.GetByNameForExecutionAsync(identifier);
     }
 
     /// <summary>
@@ -158,18 +158,23 @@ public class AppsStepExecutionService
     }
 
     /// <summary>
-    /// Prepare step with input values
+    /// Prepare step with input values.
+    /// Only overwrites input variables if a non-empty value is provided.
+    /// This preserves decrypted sensitive values that weren't overridden by the caller.
     /// </summary>
     private CustomStep PrepareStepForExecution(CustomStep step, Dictionary<string, string> inputs)
     {
-        // Update input variable values
+        // Update input variable values only if provided and non-empty
         if (step.Definition?.CodeInputVariables != null)
         {
-            foreach (var inputVar in step.Definition.CodeInputVariables
-                 .Where(iv => inputs.ContainsKey(iv.Name)))
+            foreach (var inputVar in step.Definition.CodeInputVariables)
             {
-                inputVar.Value = inputs[inputVar.Name];
-
+                // Only overwrite if the caller provided a non-empty value for this input
+                if (inputs.TryGetValue(inputVar.Name, out var inputValue) && !string.IsNullOrEmpty(inputValue))
+                {
+                    inputVar.Value = inputValue;
+                }
+                // Otherwise, keep the existing value (which may be a decrypted sensitive value)
             }
         }
 
