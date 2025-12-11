@@ -1,0 +1,151 @@
+# Multi-User Docker Compose Configuration
+# This example shows how to run multiple Automaton Runners on a single host
+# Each user gets their own container with isolated data
+
+version: '3.8'
+
+services:
+  # User 1 Runner
+  automaton-runner-user1:
+    build:
+      context: ../../
+      dockerfile: Automaton.Runner/Dockerfile.production
+    image: automaton-runner:latest
+    container_name: automaton-runner-user1
+    restart: unless-stopped
+    
+    environment:
+      - AUTOMATON_API_KEY=${USER1_API_KEY}
+      - AUTOMATON_SERVER_URL=${AUTOMATON_SERVER_URL}
+      - AUTOMATON_RUNNER_NAME=user1-runner
+      - DOTNET_ENVIRONMENT=Production
+      
+    volumes:
+      - user1-data:/app/data
+      - user1-logs:/app/logs
+      - user1-config:/app/.config
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    
+    networks:
+      - automaton-network
+
+  # User 2 Runner
+  automaton-runner-user2:
+    build:
+      context: ../../
+      dockerfile: Automaton.Runner/Dockerfile.production
+    image: automaton-runner:latest
+    container_name: automaton-runner-user2
+    restart: unless-stopped
+    
+    environment:
+      - AUTOMATON_API_KEY=${USER2_API_KEY}
+      - AUTOMATON_SERVER_URL=${AUTOMATON_SERVER_URL}
+      - AUTOMATON_RUNNER_NAME=user2-runner
+      - DOTNET_ENVIRONMENT=Production
+      
+    volumes:
+      - user2-data:/app/data
+      - user2-logs:/app/logs
+      - user2-config:/app/.config
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    
+    networks:
+      - automaton-network
+
+  # User 3 Runner
+  automaton-runner-user3:
+    build:
+      context: ../../
+      dockerfile: Automaton.Runner/Dockerfile.production
+    image: automaton-runner:latest
+    container_name: automaton-runner-user3
+    restart: unless-stopped
+    
+    environment:
+      - AUTOMATON_API_KEY=${USER3_API_KEY}
+      - AUTOMATON_SERVER_URL=${AUTOMATON_SERVER_URL}
+      - AUTOMATON_RUNNER_NAME=user3-runner
+      - DOTNET_ENVIRONMENT=Production
+      
+    volumes:
+      - user3-data:/app/data
+      - user3-logs:/app/logs
+      - user3-config:/app/.config
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    
+    networks:
+      - automaton-network
+
+# Named volumes for data persistence
+volumes:
+  # User 1 volumes
+  user1-data:
+    driver: local
+  user1-logs:
+    driver: local
+  user1-config:
+    driver: local
+    
+  # User 2 volumes
+  user2-data:
+    driver: local
+  user2-logs:
+    driver: local
+  user2-config:
+    driver: local
+    
+  # User 3 volumes
+  user3-data:
+    driver: local
+  user3-logs:
+    driver: local
+  user3-config:
+    driver: local
+
+# Shared network
+networks:
+  automaton-network:
+    driver: bridge
