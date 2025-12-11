@@ -17,6 +17,30 @@ A cross-platform command-line runner for the Automaton workflow automation syste
 
 The easiest way to deploy Automaton Runner in production with Python 3.11 and all dependencies pre-installed.
 
+#### For Testers: Quick Local Setup 🧪
+
+Run our automated setup script to get a local runner ready in minutes:
+
+```bash
+cd src/Automaton.Runner
+./setup-local-test.sh
+```
+
+The script will:
+- ✅ Check Docker is running
+- ✅ Prompt for your API key (from Studio → Settings → API Keys)
+- ✅ Configure everything automatically
+- ✅ Build and start the runner
+- ✅ Show you the logs
+
+**See [LOCAL-TESTING.md](LOCAL-TESTING.md) for:**
+- Complete local testing guide
+- Troubleshooting (localhost vs host.docker.internal)
+- Testing different workflow scenarios
+- Development workflow
+
+#### Production Deployment
+
 **Quick Start:**
 ```bash
 # 1. Get API key from Automaton Studio (Settings → API Keys)

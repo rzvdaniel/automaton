@@ -49,6 +49,13 @@ A complete, production-ready Docker solution for deploying Automaton Runner with
 ### 📚 Documentation
 
 #### Main Guides
+- **`LOCAL-TESTING.md`** (8.9KB) - **NEW!** Complete local testing guide
+  - Quick setup for testers with automated script
+  - Step-by-step manual setup
+  - Troubleshooting localhost/Docker networking issues
+  - Testing different workflow scenarios
+  - Common commands and development workflow
+  
 - **`DOCKER.md`** (9.0KB) - Complete deployment guide
   - Quick start instructions
   - Production deployment on Hetzner
@@ -56,7 +63,8 @@ A complete, production-ready Docker solution for deploying Automaton Runner with
   - Volume management and backups
   - Troubleshooting and security best practices
   
-- **`QUICKSTART-DOCKER.md`** (4.1KB) - Fast getting-started guide
+- **`QUICKSTART-DOCKER.md`** (4.3KB) - Fast getting-started guide
+  - Reference to local testing script
   - 7-step setup process
   - Common commands
   - Troubleshooting tips
@@ -76,6 +84,13 @@ A complete, production-ready Docker solution for deploying Automaton Runner with
   - Resource requirements
   - Scaling strategies
 
+#### Scripts
+- **`setup-local-test.sh`** (9.4KB) - **NEW!** Automated setup for local testing
+  - Interactive prompts for API key and server URL
+  - Automatic Docker image build
+  - Container startup with logs
+  - Handles localhost/host.docker.internal issues
+
 #### Examples
 - **`examples/README.md`** (2.8KB) - Examples overview
 - **`examples/hetzner-deployment.md`** (2.3KB) - Hetzner-specific guide
@@ -83,7 +98,7 @@ A complete, production-ready Docker solution for deploying Automaton Runner with
 - **`examples/.env.multi-user.example`** (954 bytes) - Multi-user config
 
 #### Updated Files
-- **`README.md`** - Added Docker deployment section
+- **`README.md`** - Added Docker deployment section with local testing reference
 
 ### 🔒 Security Features
 
@@ -214,18 +229,19 @@ docker logs --since 1h automaton-runner      # Last hour
 ### ✨ Key Differentiators
 
 1. **Zero manual configuration** - Fully automated via environment variables
-2. **Production-grade security** - Non-root user, no sensitive data logging
-3. **Comprehensive documentation** - 35KB+ of guides and examples
-4. **Multi-user ready** - Designed for SaaS deployments
-5. **Cloud-agnostic** - Works on any Docker-compatible platform
-6. **Tested and validated** - Includes testing guide and scripts
+2. **Tester-friendly** - One-command setup script for local testing
+3. **Production-grade security** - Non-root user, no sensitive data logging
+4. **Comprehensive documentation** - 44KB+ of guides and examples
+5. **Multi-user ready** - Designed for SaaS deployments
+6. **Cloud-agnostic** - Works on any Docker-compatible platform
+7. **Tested and validated** - Includes testing guide and scripts
 
 ### 📦 Total Deliverable Size
 
-- **Code**: ~11KB (Dockerfile + scripts + configs)
-- **Documentation**: ~35KB (guides + examples)
+- **Code**: ~20KB (Dockerfile + scripts + configs)
+- **Documentation**: ~44KB (guides + examples)
 - **Examples**: ~6KB (multi-user configs)
-- **Total**: ~52KB of implementation files
+- **Total**: ~70KB of implementation files
 
 ### 🎯 Problem Statement Compliance
 
@@ -244,7 +260,8 @@ docker logs --since 1h automaton-runner      # Last hour
 
 ### 🔗 Quick Links
 
-- **Start Here**: [QUICKSTART-DOCKER.md](QUICKSTART-DOCKER.md)
+- **For Testers**: [LOCAL-TESTING.md](LOCAL-TESTING.md) ⭐ Start here!
+- **Quick Start**: [QUICKSTART-DOCKER.md](QUICKSTART-DOCKER.md)
 - **Full Guide**: [DOCKER.md](DOCKER.md)
 - **Testing**: [TESTING.md](TESTING.md)
 - **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)

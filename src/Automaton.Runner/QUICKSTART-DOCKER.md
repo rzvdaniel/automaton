@@ -2,6 +2,21 @@
 
 Get your Automaton Runner up and running in Docker in 5 minutes!
 
+## For Testers: Automated Local Setup 🧪
+
+If you want to test the runner **locally** with Automaton Studio, use our automated setup script:
+
+```bash
+cd src/Automaton.Runner
+./setup-local-test.sh
+```
+
+See [LOCAL-TESTING.md](LOCAL-TESTING.md) for complete local testing guide with troubleshooting.
+
+---
+
+## Production Deployment
+
 ## Prerequisites
 
 - Docker installed ([Get Docker](https://docs.docker.com/get-docker/))
