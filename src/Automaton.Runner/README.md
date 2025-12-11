@@ -13,19 +13,50 @@ A cross-platform command-line runner for the Automaton workflow automation syste
 
 ## Installation
 
-### Prerequisites
+### Docker Deployment (Recommended for Production) 🐳
 
-- .NET 8.0 Runtime
+The easiest way to deploy Automaton Runner in production with Python 3.11 and all dependencies pre-installed.
+
+**Quick Start:**
+```bash
+# 1. Get API key from Automaton Studio (Settings → API Keys)
+
+# 2. Configure
+cp .env.example .env
+nano .env  # Add your AUTOMATON_API_KEY and AUTOMATON_SERVER_URL
+
+# 3. Start
+docker-compose -f docker-compose.production.yml up -d
+```
+
+**Features:**
+- ✅ Python 3.11 with `requests` library pre-installed
+- ✅ Runs as a service automatically
+- ✅ Persistent volumes for data, logs, and configuration
+- ✅ Production-ready with health checks and resource limits
+- ✅ Perfect for Hetzner, AWS, Azure, or any Docker host
+
+**See [DOCKER.md](DOCKER.md) for complete deployment guide including:**
+- Hetzner Cloud deployment
+- Multi-user setup (one runner per user)
+- Volume management and backups
+- Security best practices
+- Troubleshooting
+
+### Prerequisites (Native Installation)
+
+- .NET 9.0 Runtime
+- Python 3.11+ (for workflow automation)
 
 ### Build from Source
 
 ```bash
-cd src/Automaton.Runner.Console
+cd src/Automaton.Runner
 dotnet build -c Release
 dotnet publish -c Release --self-contained false
 ```
 
-The executable will be located in `bin/Release/net8.0/publish/automaton-runner.exe` (Windows) or `bin/Release/net8.0/publish/automaton-runner` (Linux/macOS).
+The executable will be located in `bin/Release/net9.0/publish/automaton-runner.exe` (Windows) or `bin/Release/net9.0/publish/automaton-runner` (Linux/macOS).
 
 ## Authentication
 

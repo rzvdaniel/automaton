@@ -1,0 +1,68 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+
+# Environment and configuration
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+data/
+config/
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (exclude from build, but keep in repo)
+*.md
+!DOCKER.md
+
+# Docker files
+docker-compose*.yml
+!docker-compose.production.yml
+Dockerfile
+!Dockerfile.production
+
+# Scripts
+*.sh
+!docker-entrypoint.sh
+*.bat
+*.ps1
+
+# Misc
+.DS_Store
+Thumbs.db
+node_modules/

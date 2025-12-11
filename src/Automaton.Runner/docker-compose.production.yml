@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  automaton-runner:
+    build:
+      context: ../
+      dockerfile: Automaton.Runner/Dockerfile.production
+    image: automaton-runner:latest
+    container_name: automaton-runner
+    restart: unless-stopped
+    
+    # Required environment variables
+    environment:
+      # REQUIRED: API Key for authentication (get from Automaton Studio)
+      - AUTOMATON_API_KEY=${AUTOMATON_API_KEY}
+      
+      # REQUIRED: Automaton Studio server URL
+      - AUTOMATON_SERVER_URL=${AUTOMATON_SERVER_URL:-https://api.automaton.monster}
+      
+      # OPTIONAL: Custom runner name (defaults to docker-runner-<hostname>)
+      - AUTOMATON_RUNNER_NAME=${AUTOMATON_RUNNER_NAME:-docker-runner-01}
+      
+      # .NET environment
+      - DOTNET_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Production
+      
+    # Persistent volumes
+    volumes:
+      # Store databases, files, images, and other runtime data
+      - automaton-data:/app/data
+      
+      # Store application logs
+      - automaton-logs:/app/logs
+      
+      # Store runner configuration (API keys, registration)
+      - automaton-config:/app/.config
+      
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network configuration
+    networks:
+      - automaton-network
+
+# Named volumes for data persistence
+volumes:
+  automaton-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}
+      
+  automaton-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOGS_DIR:-./logs}
+      
+  automaton-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CONFIG_DIR:-./config}
+
+# Network
+networks:
+  automaton-network:
+    driver: bridge

@@ -1,0 +1,89 @@
+# Production Dockerfile for Automaton Runner
+# Includes Python 3.11 and requests library for automation workflows
+# Designed for multi-user deployment with persistent volumes
+
+# Stage 1: Build .NET application
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy project files for restore
+COPY ["Automaton.Runner/Automaton.Runner.csproj", "Automaton.Runner/"]
+COPY ["Automaton.Core/Automaton.Core.csproj", "Automaton.Core/"]
+COPY ["Automaton.Steps/Automaton.Steps.csproj", "Automaton.Steps/"]
+COPY ["Automaton.Core.Scripting/Automaton.Core.Scripting.csproj", "Automaton.Core.Scripting/"]
+
+# Restore dependencies
+RUN dotnet restore "Automaton.Runner/Automaton.Runner.csproj"
+
+# Copy all source code
+COPY . .
+
+# Build application
+WORKDIR "/src/Automaton.Runner"
+RUN dotnet build "Automaton.Runner.csproj" -c Release -o /app/build
+
+# Publish application
+RUN dotnet publish "Automaton.Runner.csproj" -c Release -o /app/publish --no-restore
+
+# Stage 2: Runtime with Python
+FROM mcr.microsoft.com/dotnet/runtime:9.0 AS runtime
+
+# Install Python 3.11 and required packages
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3-pip \
+    python3.11-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python requests library globally
+RUN pip3 install --no-cache-dir requests
+
+# Create symbolic links for python/pip if needed
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+# Set Python environment
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Create app directory
+WORKDIR /app
+
+# Copy published .NET application
+COPY --from=build /app/publish .
+
+# Create directories for persistent data
+RUN mkdir -p /app/data /app/logs /app/.config
+
+# Create non-root user for security
+RUN useradd -m -u 1000 automaton && \
+    chown -R automaton:automaton /app
+
+# Switch to non-root user
+USER automaton
+
+# Set .NET environment
+ENV DOTNET_ENVIRONMENT=Production
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Define volumes for persistent storage
+# - /app/data: For databases, files, images, and other user data
+# - /app/logs: For application logs
+# - /app/.config: For runner configuration (API keys, registration)
+VOLUME ["/app/data", "/app/logs", "/app/.config"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD pgrep -f "automaton-runner" || exit 1
+
+# Copy entrypoint script
+COPY Automaton.Runner/docker-entrypoint.sh /app/
+USER root
+RUN chmod +x /app/docker-entrypoint.sh
+USER automaton
+
+# Set entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# Default to service mode
+CMD ["service"]
