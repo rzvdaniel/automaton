@@ -23,14 +23,16 @@ Get your Automaton Runner up and running in Docker in 5 minutes!
 
 ```bash
 # Option A: Clone the repository
-git clone https://github.com/yourusername/automaton.git
+git clone https://github.com/rzvdaniel/automaton.git
 cd automaton/src/Automaton.Runner
 
 # Option B: Download just the Docker files
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/Dockerfile.production
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/docker-compose.production.yml
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/docker-entrypoint.sh
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/.env.example
+# Replace with your repository URL if you forked the project
+GITHUB_URL="https://raw.githubusercontent.com/rzvdaniel/automaton/main"
+curl -O ${GITHUB_URL}/src/Automaton.Runner/Dockerfile.production
+curl -O ${GITHUB_URL}/src/Automaton.Runner/docker-compose.production.yml
+curl -O ${GITHUB_URL}/src/Automaton.Runner/docker-entrypoint.sh
+curl -O ${GITHUB_URL}/src/Automaton.Runner/.env.example
 ```
 
 ### 3. Configure Environment

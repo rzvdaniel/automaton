@@ -39,8 +39,10 @@ apt-get install -y docker-compose-plugin
 
 # 4. Deploy runner
 mkdir -p /opt/automaton-runner && cd /opt/automaton-runner
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/docker-compose.production.yml
-curl -O https://raw.githubusercontent.com/yourusername/automaton/main/src/Automaton.Runner/.env.example
+# Clone full repository or download specific files
+git clone https://github.com/rzvdaniel/automaton.git temp
+mv temp/src/Automaton.Runner/* .
+rm -rf temp
 cp .env.example .env
 nano .env  # Add your AUTOMATON_API_KEY and AUTOMATON_SERVER_URL
 

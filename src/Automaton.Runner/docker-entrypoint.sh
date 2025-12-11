@@ -63,21 +63,21 @@ mkdir -p /app/.config/AutomatonRunner
 
 # Configure authentication non-interactively
 echo "🔐 Configuring authentication..."
-if dotnet automaton-runner.dll auth --api-key "$AUTOMATON_API_KEY" --server "$AUTOMATON_SERVER_URL" 2>&1 | tee /tmp/auth.log; then
+if dotnet automaton-runner.dll auth --api-key "$AUTOMATON_API_KEY" --server "$AUTOMATON_SERVER_URL" >/dev/null 2>&1; then
     echo "✓ Authentication configured successfully"
 else
     echo "⚠ Warning: Authentication configuration may have failed"
-    cat /tmp/auth.log
+    echo "   Check that API key and server URL are correct"
 fi
 echo ""
 
 # Register runner non-interactively
 echo "📝 Registering runner..."
-if dotnet automaton-runner.dll register --name "$AUTOMATON_RUNNER_NAME" 2>&1 | tee /tmp/register.log; then
+if dotnet automaton-runner.dll register --name "$AUTOMATON_RUNNER_NAME" >/dev/null 2>&1; then
     echo "✓ Runner registered successfully"
 else
     echo "⚠ Warning: Runner registration may have failed (may already be registered)"
-    cat /tmp/register.log
+    echo "   This is normal if the runner was previously registered"
 fi
 echo ""
 

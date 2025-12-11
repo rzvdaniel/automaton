@@ -3,6 +3,8 @@ version: '3.8'
 services:
   automaton-runner:
     build:
+      # Build context is parent directory (src/) to access all project files
+      # Run from: automaton/src/Automaton.Runner directory
       context: ../
       dockerfile: Automaton.Runner/Dockerfile.production
     image: automaton-runner:latest
