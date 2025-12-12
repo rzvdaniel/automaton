@@ -68,14 +68,20 @@
         else
         {
             <Tabs DefaultActiveKey="@GetDefaultTabKey()" OnChange="@OnTabChange" Style="margin-bottom: 16px;">
-                <TabPane Key="flow-steps" Tab="Flow Steps">
-                    <Badge Count="@GetFlowStepsCount()" Style="margin-left: 8px;" />
+                <TabPane Key="flow-steps">
+                    <TabTemplate>
+                        <span>Flow Steps <Badge Count="@GetFlowStepsCount()" Style="margin-left: 8px;" /></span>
+                    </TabTemplate>
                 </TabPane>
-                <TabPane Key="app-steps" Tab="App Steps">
-                    <Badge Count="@GetAppStepsCount()" Style="margin-left: 8px;" />
+                <TabPane Key="app-steps">
+                    <TabTemplate>
+                        <span>App Steps <Badge Count="@GetAppStepsCount()" Style="margin-left: 8px;" /></span>
+                    </TabTemplate>
                 </TabPane>
-                <TabPane Key="all" Tab="All Steps">
-                    <Badge Count="@GetAllStepsCount()" Style="margin-left: 8px;" />
+                <TabPane Key="all">
+                    <TabTemplate>
+                        <span>All Steps <Badge Count="@GetAllStepsCount()" Style="margin-left: 8px;" /></span>
+                    </TabTemplate>
                 </TabPane>
             </Tabs>
 

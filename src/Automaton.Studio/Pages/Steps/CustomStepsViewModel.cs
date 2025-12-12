@@ -33,6 +33,9 @@ public class CustomStepsViewModel
     private ICollection<CustomStepListItem> allCustomSteps = new List<CustomStepListItem>();
     private StepFilterType currentFilter = StepFilterType.FlowSteps;
     private ICollection<CustomStepListItem>? cachedFilteredSteps = null;
+    private int? cachedFlowStepsCount = null;
+    private int? cachedAppStepsCount = null;
+    private int? cachedAllStepsCount = null;
 
     public StepFilterType CurrentFilter 
     { 
@@ -71,7 +74,7 @@ public class CustomStepsViewModel
         var projectId = projectContextService.GetCurrentProjectId();
         var flowsInfo = await customStepsService.List(projectId);
         allCustomSteps = flowsInfo.Select(MapToCustomStepListItem).ToList();
-        cachedFilteredSteps = null; // Invalidate cache
+        InvalidateCaches();
     }
 
     public void SetFilter(StepFilterType filter)
@@ -83,19 +86,39 @@ public class CustomStepsViewModel
         }
     }
 
+    private void InvalidateCaches()
+    {
+        cachedFilteredSteps = null;
+        cachedFlowStepsCount = null;
+        cachedAppStepsCount = null;
+        cachedAllStepsCount = null;
+    }
+
     public int GetFlowStepsCount()
     {
-        return allCustomSteps.Count(s => !s.IsAppOnlyStep);
+        if (!cachedFlowStepsCount.HasValue)
+        {
+            cachedFlowStepsCount = allCustomSteps.Count(s => !s.IsAppOnlyStep);
+        }
+        return cachedFlowStepsCount.Value;
     }
 
     public int GetAppStepsCount()
     {
-        return allCustomSteps.Count(s => s.IsAppOnlyStep);
+        if (!cachedAppStepsCount.HasValue)
+        {
+            cachedAppStepsCount = allCustomSteps.Count(s => s.IsAppOnlyStep);
+        }
+        return cachedAppStepsCount.Value;
     }
 
     public int GetAllStepsCount()
     {
-        return allCustomSteps.Count;
+        if (!cachedAllStepsCount.HasValue)
+        {
+            cachedAllStepsCount = allCustomSteps.Count;
+        }
+        return cachedAllStepsCount.Value;
     }
 
     public async Task CreateCustomStep(NewCustomStep customStep)
@@ -104,7 +127,7 @@ public class CustomStepsViewModel
         var customStepModel = MapToCustomStepListItem(step);
         allCustomSteps.Add(customStepModel);
         stepFactory.AddCustomStep(step);
-        cachedFilteredSteps = null; // Invalidate cache
+        InvalidateCaches();
     }
 
     public async Task DeleteCustomStep(Guid id)
@@ -114,7 +137,7 @@ public class CustomStepsViewModel
         if (customStep != null)
             allCustomSteps.Remove(customStep);
         stepFactory.RemoveStepFromExplorer(id);
-        cachedFilteredSteps = null; // Invalidate cache
+        InvalidateCaches();
     }
 
     private CustomStepListItem MapToCustomStepListItem(dynamic step)
