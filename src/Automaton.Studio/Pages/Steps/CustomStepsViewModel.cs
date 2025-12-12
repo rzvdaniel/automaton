@@ -105,7 +105,7 @@ public class CustomStepsViewModel
             Name = step.Name,
             Created = step.Created,
             Updated = step.Updated,
-            LinkedAppCount = step.LinkedAppCount ?? 0
+            LinkedAppCount = step.LinkedAppCount
         };
     }
 }

@@ -46,20 +46,21 @@ public class CustomStepsService
         // Use authorization service to get custom steps filtered by project context
         var entities = authorizationService.GetCustomStepsQueryByContext(projectId);
         
-        // Include app linkage count for each step
-        var stepsWithAppCount = entities
-            .Select(e => new
-            {
-                Step = e,
-                AppLinkCount = dataContext.WebAppSteps
-                    .Count(was => was.CustomStepId == e.Id)
-            })
-            .ToList();
+        // Get all step IDs first
+        var stepIds = entities.Select(e => e.Id).ToList();
         
-        var steps = stepsWithAppCount.Select(x => 
+        // Get app link counts for all steps in a single query
+        var appLinkCounts = dataContext.WebAppSteps
+            .Where(was => stepIds.Contains(was.CustomStepId))
+            .GroupBy(was => was.CustomStepId)
+            .Select(g => new { CustomStepId = g.Key, Count = g.Count() })
+            .ToDictionary(x => x.CustomStepId, x => x.Count);
+        
+        // Map entities to models with app link counts
+        var steps = entities.ToList().Select(e => 
         {
-            var step = MapToModel(x.Step);
-            step.LinkedAppCount = x.AppLinkCount;
+            var step = MapToModel(e);
+            step.LinkedAppCount = appLinkCounts.TryGetValue(e.Id, out var count) ? count : 0;
             return step;
         });
 
@@ -72,6 +73,10 @@ public class CustomStepsService
         var stepEntity = authorizationService.GetAccessibleCustomStepsQuery()
             .SingleOrDefault(x => x.Id == id);
         var step = MapToModel(stepEntity);
+
+        // Get app link count for this step
+        step.LinkedAppCount = dataContext.WebAppSteps
+            .Count(was => was.CustomStepId == id);
 
         // Return step with encrypted references as-is for UI
         // UI password inputs will handle visual hiding
@@ -323,6 +328,10 @@ public class CustomStepsService
         }
 
         var step = MapToModel(stepEntity);
+
+        // Get app link count for this step
+        step.LinkedAppCount = dataContext.WebAppSteps
+            .Count(was => was.CustomStepId == id);
 
         // ✅ Decrypt sensitive variables for UI display/editing
         await DecryptSensitiveVariablesAsync(step.Definition);
