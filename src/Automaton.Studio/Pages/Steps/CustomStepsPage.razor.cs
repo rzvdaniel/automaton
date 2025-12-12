@@ -71,6 +71,45 @@ namespace Automaton.Studio.Pages.Steps
             };
         }
 
+        private string GetDefaultTabKey()
+        {
+            return CustomStepsViewModel.CurrentFilter switch
+            {
+                StepFilterType.FlowSteps => "flow-steps",
+                StepFilterType.AppSteps => "app-steps",
+                StepFilterType.All => "all",
+                _ => "flow-steps"
+            };
+        }
+
+        private void OnTabChange(string activeKey)
+        {
+            var filter = activeKey switch
+            {
+                "flow-steps" => StepFilterType.FlowSteps,
+                "app-steps" => StepFilterType.AppSteps,
+                "all" => StepFilterType.All,
+                _ => StepFilterType.FlowSteps
+            };
+            CustomStepsViewModel.SetFilter(filter);
+            StateHasChanged();
+        }
+
+        private int GetFlowStepsCount()
+        {
+            return CustomStepsViewModel.GetFlowStepsCount();
+        }
+
+        private int GetAppStepsCount()
+        {
+            return CustomStepsViewModel.GetAppStepsCount();
+        }
+
+        private int GetAllStepsCount()
+        {
+            return CustomStepsViewModel.GetAllStepsCount();
+        }
+
         private List<EnhancedEmpty.EmptyActionModel> GetCustomStepSecondaryActions()
         {
             return new List<EnhancedEmpty.EmptyActionModel>

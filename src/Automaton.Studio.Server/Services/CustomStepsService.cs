@@ -45,7 +45,23 @@ public class CustomStepsService
     {
         // Use authorization service to get custom steps filtered by project context
         var entities = authorizationService.GetCustomStepsQueryByContext(projectId);
-        var steps = entities.Select(MapToModel);
+        
+        // Include app linkage count for each step
+        var stepsWithAppCount = entities
+            .Select(e => new
+            {
+                Step = e,
+                AppLinkCount = dataContext.WebAppSteps
+                    .Count(was => was.CustomStepId == e.Id)
+            })
+            .ToList();
+        
+        var steps = stepsWithAppCount.Select(x => 
+        {
+            var step = MapToModel(x.Step);
+            step.LinkedAppCount = x.AppLinkCount;
+            return step;
+        });
 
         return steps;
     }

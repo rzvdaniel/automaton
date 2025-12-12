@@ -67,9 +67,34 @@
         }
         else
         {
+            <Tabs DefaultActiveKey="@GetDefaultTabKey()" OnChange="@OnTabChange" Style="margin-bottom: 16px;">
+                <TabPane Key="flow-steps" Tab="Flow Steps">
+                    <Badge Count="@GetFlowStepsCount()" Style="margin-left: 8px;" />
+                </TabPane>
+                <TabPane Key="app-steps" Tab="App Steps">
+                    <Badge Count="@GetAppStepsCount()" Style="margin-left: 8px;" />
+                </TabPane>
+                <TabPane Key="all" Tab="All Steps">
+                    <Badge Count="@GetAllStepsCount()" Style="margin-left: 8px;" />
+                </TabPane>
+            </Tabs>
+
             <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
             <Column Title="Name" @bind-Field="@context.Name">
-                @context.Name
+                <Space>
+                    <SpaceItem>@context.Name</SpaceItem>
+                    @if (context.LinkedAppCount > 0)
+                    {
+                        <SpaceItem>
+                            <Tooltip Title="@($"Linked to {context.LinkedAppCount} app(s)")">
+                                <Tag Color="@("blue")">
+                                    <Icon Type="appstore" Theme="IconThemeType.Outline" Style="margin-right: 4px;" />
+                                    @context.LinkedAppCount
+                                </Tag>
+                            </Tooltip>
+                        </SpaceItem>
+                    }
+                </Space>
             </Column>
 
             <Column Title="Created" @bind-Field="@context.Created">

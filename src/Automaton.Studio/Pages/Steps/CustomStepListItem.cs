@@ -6,4 +6,6 @@ public class CustomStepListItem
     public string Name { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+    public int LinkedAppCount { get; set; }
+    public bool IsAppOnlyStep => LinkedAppCount > 0;
 }

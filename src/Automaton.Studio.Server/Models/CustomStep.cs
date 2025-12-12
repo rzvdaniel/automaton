@@ -12,6 +12,7 @@ public class CustomStep
     public bool VisibleInExplorer { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+    public int LinkedAppCount { get; set; }
 
     public CustomStepDefinition Definition { get; set; } = new CustomStepDefinition();
 }
