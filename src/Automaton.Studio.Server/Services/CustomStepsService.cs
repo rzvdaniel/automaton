@@ -44,9 +44,12 @@ public class CustomStepsService
     public IEnumerable<CustomStep> List(Guid? projectId = null)
     {
         // Use authorization service to get custom steps filtered by project context
-        var entities = authorizationService.GetCustomStepsQueryByContext(projectId);
+        var entitiesQuery = authorizationService.GetCustomStepsQueryByContext(projectId);
         
-        // Get all step IDs first
+        // Materialize the query to execute it once
+        var entities = entitiesQuery.ToList();
+        
+        // Get all step IDs
         var stepIds = entities.Select(e => e.Id).ToList();
         
         // Get app link counts for all steps in a single query
@@ -57,7 +60,7 @@ public class CustomStepsService
             .ToDictionary(x => x.CustomStepId, x => x.Count);
         
         // Map entities to models with app link counts
-        var steps = entities.ToList().Select(e => 
+        var steps = entities.Select(e => 
         {
             var step = MapToModel(e);
             step.LinkedAppCount = appLinkCounts.TryGetValue(e.Id, out var count) ? count : 0;
