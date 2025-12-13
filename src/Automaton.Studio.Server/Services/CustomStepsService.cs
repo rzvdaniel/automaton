@@ -41,11 +41,26 @@ public class CustomStepsService
         this.logger = Log.ForContext<CustomStepsService>();
     }
 
-    public IEnumerable<CustomStep> List(Guid? projectId = null)
+    public IEnumerable<CustomStep> List(Guid? projectId = null, bool? excludeAppLinked = null)
     {
         // Use authorization service to get custom steps filtered by project context
         var entities = authorizationService.GetCustomStepsQueryByContext(projectId);
-        var steps = entities.Select(MapToModel);
+
+        // Exclude steps that are linked to any WebApp (for Flow designer use)
+        if (excludeAppLinked == true)
+        {
+            var appLinkedStepIds = dataContext.WebAppSteps.Select(was => was.CustomStepId).ToList();
+            entities = entities.Where(x => !appLinkedStepIds.Contains(x.Id));
+        }
+
+        // Get WebApp associations for these steps
+        var stepIds = entities.Select(x => x.Id).ToList();
+        var webAppSteps = dataContext.WebAppSteps
+            .Include(was => was.WebApp)
+            .Where(was => stepIds.Contains(was.CustomStepId))
+            .ToDictionary(was => was.CustomStepId, was => was.WebApp);
+
+        var steps = entities.Select(entity => MapToModel(entity, webAppSteps));
 
         return steps;
     }
@@ -517,7 +532,22 @@ public class CustomStepsService
 
     private static CustomStep MapToModel(Entities.CustomStep entity)
     {
+        return MapToModel(entity, null);
+    }
+
+    private static CustomStep MapToModel(Entities.CustomStep entity, Dictionary<Guid, Entities.WebApp>? webAppLookup)
+    {
         if (entity == null) return null;
+
+        // Look up WebApp info if available
+        Guid? webAppId = null;
+        string? webAppName = null;
+
+        if (webAppLookup != null && webAppLookup.TryGetValue(entity.Id, out var webApp))
+        {
+            webAppId = webApp.Id;
+            webAppName = !string.IsNullOrEmpty(webApp.DisplayName) ? webApp.DisplayName : webApp.Name;
+        }
 
         return new CustomStep
         {
@@ -531,6 +561,8 @@ public class CustomStepsService
             VisibleInExplorer = entity.VisibleInExplorer,
             Created = entity.Created,
             Updated = entity.Updated,
+            WebAppId = webAppId,
+            WebAppName = webAppName,
             Definition = JsonSerializer.Deserialize<CustomStepDefinition>(entity.Definition ?? "{}")
         };
     }

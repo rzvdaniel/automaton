@@ -26,7 +26,7 @@
                     @if (CustomStepsViewModel.CanManageCustomSteps)
                     {
                         <SpaceItem>
-                            <Tooltip Title="New custom step">
+                            <Tooltip Title="New custom step for Flows">
                                 <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@(() => ShowNewCustomStepDialog())">
                                     Create Step
                                 </Button>
@@ -40,10 +40,10 @@
     </Header>
 
     <Content Class="content-padding content-background">
-        @if (!loading && CustomStepsViewModel.CustomSteps?.Any() != true)
+        @if (!loading && !CustomStepsViewModel.FlowSteps.Any())
         {
             <EnhancedEmpty Title="Custom Steps in minutes." 
-                          Description="Custom Steps are reusable building blocks for your workflows. Each step you create is a new automation component you can use, either standalone or as part of larger workflows."
+                          Description="Custom Steps are reusable building blocks for your workflows. Each step you create here is available in the Flow Designer for use in your automation workflows."
                           BackgroundImageUrl="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
                           GradientOverlay="linear-gradient(135deg, rgba(139, 92, 246, 0.85) 0%, rgba(124, 58, 237, 0.85) 100%)"
                           ActionCardTitle="Build Custom Steps"
@@ -67,53 +67,53 @@
         }
         else
         {
-            <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.CustomSteps" Class="autoscroll-list" Loading="@loading">
-            <Column Title="Name" @bind-Field="@context.Name">
-                @context.Name
-            </Column>
-
-            <Column Title="Created" @bind-Field="@context.Created">
-                @context.Created
-            </Column>
-
-            <Column Title="Updated" @bind-Field="@context.Updated">
-                @context.Updated
-            </Column>
-
-            <ActionColumn Title="Action">
-                <div>
-                    <Space>
-                        <SpaceItem>
-                            <Tooltip Title="Edit step">
-                                <Button Icon="edit" @onclick="@(() => EditCustomStep(context.Id))">Edit</Button>
-                            </Tooltip>
-                        </SpaceItem>
-                    </Space>
-
-                    <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
-                        <Overlay>
-                            <Menu>
-                                <Popconfirm Title="Sure to delete?"
-                                            OnConfirm="()=> DeleteCustomStep(context.Id)"
-                                            OkText="Yes"
-                                            CancelText="No">
-                                    <MenuItem Icon="delete">                               
-                                        Delete
-                                    </MenuItem>
-                                </Popconfirm>
-                            </Menu>
-                        </Overlay>
-                        <ChildContent>
-                            <Tooltip Title="More actions">
-                                <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
-                                    <Icon Type="more" Theme="IconThemeType.Outline" />
-                                </a>
-                            </Tooltip>
-                        </ChildContent>
-                    </Dropdown>
-                </div>
-            </ActionColumn>
-        </Table>
+            <Alert Type="@AlertType.Info" 
+                   Message="@("These steps are available in the Flow Designer. App-specific steps can be managed within each App.")" 
+                   ShowIcon="true" 
+                   Style="margin-bottom: 16px;" />
+            <Table TItem="CustomStepListItem" DataSource="@CustomStepsViewModel.FlowSteps" Class="autoscroll-list" Loading="@loading">
+                <Column Title="Name" @bind-Field="@context.Name">
+                    @context.Name
+                </Column>
+                <Column Title="Created" @bind-Field="@context.Created">
+                    @context.Created
+                </Column>
+                <Column Title="Updated" @bind-Field="@context.Updated">
+                    @context.Updated
+                </Column>
+                <ActionColumn Title="Action">
+                    <div>
+                        <Space>
+                            <SpaceItem>
+                                <Tooltip Title="Edit step">
+                                    <Button Icon="edit" @onclick="@(() => EditCustomStep(context.Id))">Edit</Button>
+                                </Tooltip>
+                            </SpaceItem>
+                        </Space>
+                        <Dropdown Placement="@Placement.Bottom" Trigger="@(new Trigger[] { Trigger.Click })">
+                            <Overlay>
+                                <Menu>
+                                    <Popconfirm Title="Sure to delete?"
+                                                OnConfirm="()=> DeleteCustomStep(context.Id)"
+                                                OkText="Yes"
+                                                CancelText="No">
+                                        <MenuItem Icon="delete">                               
+                                            Delete
+                                        </MenuItem>
+                                    </Popconfirm>
+                                </Menu>
+                            </Overlay>
+                            <ChildContent>
+                                <Tooltip Title="More actions">
+                                    <a href="#" @onclick:preventDefault @onmousedown:stopPropagation>
+                                        <Icon Type="more" Theme="IconThemeType.Outline" />
+                                    </a>
+                                </Tooltip>
+                            </ChildContent>
+                        </Dropdown>
+                    </div>
+                </ActionColumn>
+            </Table>
         }
     </Content>
 </Layout>

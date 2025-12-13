@@ -1,4 +1,5 @@
 ﻿using Automaton.Core.Models;
+using Automaton.Studio.Enums;
 
 namespace Automaton.Studio.Domain;
 
@@ -15,6 +16,17 @@ public class CustomStep
     public string Icon { get; set; } = string.Empty;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+
+    /// <summary>
+    /// The WebApp ID this step is associated with (if linked to an app)
+    /// </summary>
+    public Guid? WebAppId { get; set; }
+
+    /// <summary>
+    /// The WebApp name this step is associated with (for display purposes)
+    /// </summary>
+    public string? WebAppName { get; set; }
+
     public CustomStepDefinition Definition { get; set; } = new CustomStepDefinition();
     public string Code => Definition.Code;
     public IList<StepVariable> InputVariables => Definition.CodeInputVariables;

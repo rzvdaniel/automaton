@@ -10,6 +10,7 @@ namespace Automaton.Studio.Pages.Steps
     partial class CustomStepsPage : ComponentBase
     {
         public bool loading;
+        private string activeTab = "flow";
 
         [Inject] private NavigationManager NavigationManager { get; set; } = default!;
         [Inject] private CustomStepsViewModel CustomStepsViewModel { get; set; } = default!;
@@ -46,6 +47,11 @@ namespace Automaton.Studio.Pages.Steps
             await CustomStepsViewModel.DeleteCustomStep(id);
 
             StateHasChanged();
+        }
+
+        private void NavigateToApp(Guid webAppId)
+        {
+            NavigationManager.NavigateTo($"app/{webAppId}");
         }
 
         private async Task ShowNewCustomStepDialog()

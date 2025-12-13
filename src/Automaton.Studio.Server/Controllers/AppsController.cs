@@ -420,6 +420,33 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Create a new step and automatically link it to the app
+    /// </summary>
+    [HttpPost("{appId}/steps/create")]
+    public async Task<ActionResult<Models.LinkedStepInfo>> CreateStepForApp(Guid appId, [FromBody] CreateAppStepRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request?.Name))
+            {
+                return BadRequest(new { message = "Step name is required" });
+            }
+
+            var step = await appStepsService.CreateStepForAppAsync(appId, request.Name);
+            return CreatedAtAction(nameof(GetLinkedSteps), new { id = appId }, step);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error creating step for app {AppId}", appId);
+            return StatusCode(500, new { message = "Failed to create step" });
+        }
+    }
+
+    /// <summary>
     /// Unlink a step from an app
     /// </summary>
     [HttpDelete("{appId}/steps/{stepId}")]
@@ -452,4 +479,9 @@ public class PublishAppRequest
 public class LinkMultipleStepsRequest
 {
     public IEnumerable<Guid> StepIds { get; set; } = new List<Guid>();
+}
+
+public class CreateAppStepRequest
+{
+    public string Name { get; set; } = string.Empty;
 }

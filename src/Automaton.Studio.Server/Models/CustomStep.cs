@@ -1,4 +1,6 @@
-﻿namespace Automaton.Studio.Server.Models;
+﻿using Automaton.Studio.Server.Enums;
+
+namespace Automaton.Studio.Server.Models;
 
 public class CustomStep
 {
@@ -12,6 +14,16 @@ public class CustomStep
     public bool VisibleInExplorer { get; set; }
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
+
+    /// <summary>
+    /// The WebApp ID this step is associated with (if linked to an app)
+    /// </summary>
+    public Guid? WebAppId { get; set; }
+
+    /// <summary>
+    /// The WebApp name this step is associated with (for display purposes)
+    /// </summary>
+    public string? WebAppName { get; set; }
 
     public CustomStepDefinition Definition { get; set; } = new CustomStepDefinition();
 }

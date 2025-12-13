@@ -35,8 +35,8 @@ partial class AppPage : ComponentBase, IAsyncDisposable
 
     private IEnumerable<RunnerModel> availableRunners = new List<RunnerModel>();
     
-    // Backend Actions tab support
-    private List<StepWithLinkStatus> allSteps = new();
+    // Backend Actions tab support - renamed to App Steps
+    private List<LinkedStepInfo> appSteps = new();
     private bool loadingSteps = false;
     private string stepSearchText = "";
     
@@ -65,17 +65,13 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Parameter] public string AppId { get; set; }
 
     // Computed properties for steps
-    private List<StepWithLinkStatus> FilteredSteps => string.IsNullOrWhiteSpace(stepSearchText)
-        ? allSteps
-        : allSteps.Where(s =>
-            (s.Step.Name?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (s.Step.DisplayName?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (s.Step.Description?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false))
+    private List<LinkedStepInfo> FilteredAppSteps => string.IsNullOrWhiteSpace(stepSearchText)
+        ? appSteps
+        : appSteps.Where(s =>
+            (s.Name?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.DisplayName?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.Description?.Contains(stepSearchText, StringComparison.OrdinalIgnoreCase) ?? false))
             .ToList();
-
-    private int LinkedStepsCount => allSteps.Count(s => s.IsLinked);
-    
-    private bool AllFilteredStepsLinked => FilteredSteps.Any() && FilteredSteps.All(s => s.IsLinked);
 
     protected override async Task OnInitializedAsync()
     {
@@ -657,84 +653,23 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         }
     }
     
-    // Backend Actions Tab Methods
+    // App Steps Tab Methods
     private async Task LoadAllSteps()
     {
         loadingSteps = true;
         try
         {
-            var linkedSteps = await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
-            var availableSteps = await AppStepsService.GetAvailableStepsAsync(currentApp.Id);
-            
-            allSteps = linkedSteps
-                .Select(s => new StepWithLinkStatus { Step = s, IsLinked = true })
-                .Concat(availableSteps.Select(s => new StepWithLinkStatus { Step = s, IsLinked = false }))
-                .OrderBy(s => s.Step.DisplayName ?? s.Step.Name)
-                .ToList();
+            // Only load steps that are linked to this app
+            appSteps = await AppStepsService.GetLinkedStepsAsync(currentApp.Id);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load steps");
+            Logger.LogError(ex, "Failed to load app steps");
             _ = MessageService.ErrorAsync("Failed to load steps");
         }
         finally
         {
             loadingSteps = false;
-        }
-    }
-
-    private async Task ToggleStepLink(StepWithLinkStatus stepWithStatus)
-    {
-        try
-        {
-            if (stepWithStatus.IsLinked)
-            {
-                await AppStepsService.UnlinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
-                stepWithStatus.IsLinked = false;
-            }
-            else
-            {
-                await AppStepsService.LinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
-                stepWithStatus.IsLinked = true;
-            }
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to toggle step link");
-            _ = MessageService.ErrorAsync($"Failed to update step link: {ex.Message}");
-        }
-    }
-
-    private async Task ToggleAllFilteredSteps()
-    {
-        try
-        {
-            var filtered = FilteredSteps;
-            if (!filtered.Any()) return;
-
-            var shouldLink = !AllFilteredStepsLinked;
-
-            foreach (var stepWithStatus in filtered)
-            {
-                if (stepWithStatus.IsLinked != shouldLink)
-                {
-                    if (shouldLink)
-                        await AppStepsService.LinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
-                    else
-                        await AppStepsService.UnlinkStepAsync(currentApp.Id, stepWithStatus.Step.Id);
-                    stepWithStatus.IsLinked = shouldLink;
-                }
-            }
-
-            var action = shouldLink ? "linked" : "unlinked";
-            _ = MessageService.SuccessAsync($"{filtered.Count} step(s) {action}");
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to toggle all steps");
-            _ = MessageService.ErrorAsync($"Failed to update steps: {ex.Message}");
         }
     }
 
@@ -744,13 +679,111 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         StateHasChanged();
     }
         
-    private void NavigateToStep(Guid stepId) => NavigationManager.NavigateTo($"/step/{stepId}");
-    
-    private async Task CopyStepCode(LinkedStepInfo step)
+    private void NavigateToStep(Guid stepId) => NavigationManager.NavigateTo($"/stepdesigner/{stepId}");
+
+    private async Task ShowCreateAppStepDialog()
+    {
+        var stepName = "";
+        
+        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Create New Step",
+            Content = new RenderFragment(builder =>
+            {
+                builder.OpenElement(0, "div");
+                builder.AddContent(1, "Enter a name for the new step:");
+                builder.OpenElement(2, "input");
+                builder.AddAttribute(3, "type", "text");
+                builder.AddAttribute(4, "placeholder", "Step name");
+                builder.AddAttribute(5, "style", "width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px;");
+                builder.AddAttribute(6, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(this, e => stepName = e.Value?.ToString() ?? ""));
+                builder.CloseElement();
+                builder.CloseElement();
+            }),
+            OkText = "Create",
+            CancelText = "Cancel"
+        });
+
+        if (confirmed && !string.IsNullOrWhiteSpace(stepName))
+        {
+            await CreateAppStep(stepName);
+        }
+    }
+
+    private async Task CreateAppStep(string stepName)
+    {
+        try
+        {
+            var newStep = await AppStepsService.CreateStepForAppAsync(currentApp.Id, stepName);
+            appSteps.Add(newStep);
+            await InvokeAsync(StateHasChanged);
+            _ = MessageService.SuccessAsync($"Step '{stepName}' created. Click Edit to configure it.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create app step");
+            _ = MessageService.ErrorAsync($"Failed to create step: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAppStep(Guid stepId)
+    {
+        try
+        {
+            // Delete the step completely (not just unlink)
+            await AppStepsService.DeleteStepAsync(stepId);
+            var step = appSteps.FirstOrDefault(s => s.Id == stepId);
+            if (step != null)
+            {
+                appSteps.Remove(step);
+            }
+            await InvokeAsync(StateHasChanged);
+            _ = MessageService.SuccessAsync("Step deleted");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete app step");
+            _ = MessageService.ErrorAsync($"Failed to delete step: {ex.Message}");
+        }
+    }
+
+    private async Task ShowStepCodeDialog(LinkedStepInfo step)
     {
         var code = GenerateStepCode(step);
-        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
-        _ = MessageService.SuccessAsync("Code copied to clipboard!");
+        
+        await ModalService.CreateModalAsync(new ModalOptions
+        {
+            Title = $"Code for '{step.DisplayName ?? step.Name}'",
+            Content = new RenderFragment(builder =>
+            {
+                builder.OpenElement(0, "div");
+                
+                // Code block
+                builder.OpenElement(1, "pre");
+                builder.AddAttribute(2, "style", "background: #f6f8fa; border-radius: 6px; padding: 16px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; overflow-x: auto; white-space: pre-wrap; margin: 0;");
+                builder.AddContent(3, code);
+                builder.CloseElement();
+                
+                // Copy button
+                builder.OpenElement(4, "div");
+                builder.AddAttribute(5, "style", "margin-top: 16px; text-align: right;");
+                builder.OpenComponent<Button>(6);
+                builder.AddAttribute(7, "Icon", "copy");
+                builder.AddAttribute(8, "Type", ButtonType.Primary);
+                builder.AddAttribute(9, "OnClick", EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, async () =>
+                {
+                    await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", code);
+                    _ = MessageService.SuccessAsync("Code copied to clipboard!");
+                }));
+                builder.AddAttribute(10, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Copy to Clipboard")));
+                builder.CloseComponent();
+                builder.CloseElement();
+                
+                builder.CloseElement();
+            }),
+            Footer = null,
+            Width = 600
+        });
     }
     
     private string GenerateStepCode(LinkedStepInfo step)
@@ -764,10 +797,4 @@ console.log(result.outputVariables);";
     
     private string GetStepIcon(string language) => StepHelpers.GetStepIcon(language);
     private string GetLanguageColor(string language) => StepHelpers.GetLanguageColor(language);
-
-    public class StepWithLinkStatus
-    {
-        public LinkedStepInfo Step { get; set; } = new();
-        public bool IsLinked { get; set; }
-    }
 }

@@ -23,7 +23,10 @@ public class CustomStepsViewModel
         this.projectContextService = projectContextService;
     }
 
-    public ICollection<CustomStepListItem> CustomSteps { get; set; } = new List<CustomStepListItem>();
+    /// <summary>
+    /// Flow steps - steps NOT linked to any App (available in Flow designer)
+    /// </summary>
+    public ICollection<CustomStepListItem> FlowSteps { get; set; } = new List<CustomStepListItem>();
 
     /// <summary>
     /// Check if user can manage resources (update/delete) in the current context.
@@ -33,36 +36,43 @@ public class CustomStepsViewModel
     public async Task GetCustomSteps()
     {
         var projectId = projectContextService.GetCurrentProjectId();
-        var flowsInfo = await customStepsService.List(projectId);
-        CustomSteps = flowsInfo.Select(MapToCustomStepListItem).ToList();
+        
+        // Load Flow steps only (NOT linked to any App)
+        var flowSteps = await customStepsService.List(projectId, excludeAppLinked: true);
+        FlowSteps = flowSteps.Select(MapToCustomStepListItem).ToList();
     }
 
     public async Task CreateCustomStep(NewCustomStep customStep)
     {
         var step = await customStepsService.Create(customStep);
         var customStepModel = MapToCustomStepListItem(step);
-        CustomSteps.Add(customStepModel);
+        
+        FlowSteps.Add(customStepModel);
         stepFactory.AddCustomStep(step);
     }
 
     public async Task DeleteCustomStep(Guid id)
     {
         await customStepsService.Delete(id);
-        var customStep = CustomSteps.SingleOrDefault(x => x.Id == id);
-        if (customStep != null)
-            CustomSteps.Remove(customStep);
-        stepFactory.RemoveStepFromExplorer(id);
+        
+        var flowStep = FlowSteps.SingleOrDefault(x => x.Id == id);
+        if (flowStep != null)
+        {
+            FlowSteps.Remove(flowStep);
+            stepFactory.RemoveStepFromExplorer(id);
+        }
     }
 
     private CustomStepListItem MapToCustomStepListItem(dynamic step)
     {
-        // Accepts both CustomStep and CustomStep (from different layers)
         return new CustomStepListItem
         {
             Id = step.Id,
             Name = step.Name,
             Created = step.Created,
-            Updated = step.Updated
+            Updated = step.Updated,
+            WebAppId = step.WebAppId,
+            WebAppName = step.WebAppName
         };
     }
 }

@@ -1,4 +1,4 @@
-﻿using Automaton.Core.Models;
+using Automaton.Core.Models;
 using Automaton.Studio.Domain;
 using Automaton.Studio.Extensions;
 using Automaton.Studio.Pages.Flows.Designer.Components.StepExplorer;
@@ -183,7 +183,9 @@ public class StepFactory
 
     private void LoadCustomSteps()
     {
-        var customStepsList = Task.Run(() => customStepsService.List(null)).Result;
+        // Only load steps that are NOT linked to any WebApp (for Flow designer use)
+        // App-linked steps should only be used within their respective Apps
+        var customStepsList = Task.Run(() => customStepsService.List(projectId: null, excludeAppLinked: true)).Result;
 
         foreach (var customStep in customStepsList)
         {

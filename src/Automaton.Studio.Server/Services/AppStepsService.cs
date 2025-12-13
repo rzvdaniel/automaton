@@ -16,6 +16,9 @@ public class AppStepsService
     private readonly ResourceAuthorizationService authorizationService;
     private readonly Serilog.ILogger logger;
 
+    private const string DefaultIcon = "code";
+    private const string DefaultGroup = "App Steps";
+
     private Guid UserId => userContextService.GetUserId();
 
     public AppStepsService(
@@ -27,6 +30,67 @@ public class AppStepsService
         this.userContextService = userContextService;
         this.authorizationService = authorizationService;
         this.logger = Serilog.Log.ForContext<AppStepsService>();
+    }
+
+    /// <summary>
+    /// Create a new step and automatically link it to the app
+    /// </summary>
+    public async Task<LinkedStepInfo> CreateStepForAppAsync(Guid appId, string stepName)
+    {
+        logger.Information("Creating step '{StepName}' for app {AppId}", stepName, appId);
+
+        // Verify user has access to this app
+        var hasAccess = await authorizationService.GetAccessibleAppsQuery()
+            .AnyAsync(a => a.Id == appId);
+
+        if (!hasAccess)
+        {
+            logger.Warning("User {UserId} attempted to create step for unauthorized app {AppId}", UserId, appId);
+            throw new UnauthorizedAccessException("You do not have access to this app");
+        }
+
+        // Create the custom step (linked to app via WebAppSteps table)
+        var stepEntity = new Entities.CustomStep
+        {
+            Id = Guid.NewGuid(),
+            Name = stepName,
+            DisplayName = stepName,
+            Description = string.Empty,
+            MoreInfo = string.Empty,
+            Icon = DefaultIcon,
+            Category = DefaultGroup,
+            VisibleInExplorer = false, // App steps are not visible in Flow designer
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            Definition = JsonSerializer.Serialize(new CustomStepDefinition())
+        };
+
+        dataContext.CustomSteps.Add(stepEntity);
+
+        // Add user ownership
+        var stepUser = new Entities.CustomStepUser
+        {
+            CustomStepId = stepEntity.Id,
+            UserId = UserId
+        };
+        dataContext.CustomStepUsers.Add(stepUser);
+
+        // Link to the app - this is now the source of truth for app association
+        var link = new Entities.WebAppStep
+        {
+            WebAppId = appId,
+            CustomStepId = stepEntity.Id,
+            LinkedAt = DateTime.UtcNow,
+            LinkedBy = UserId
+        };
+        dataContext.WebAppSteps.Add(link);
+
+        await dataContext.SaveChangesAsync();
+
+        logger.Information("Successfully created step {StepId} '{StepName}' and linked to app {AppId}", 
+            stepEntity.Id, stepName, appId);
+
+        return MapToLinkedStepInfo(stepEntity);
     }
 
     /// <summary>

@@ -36,6 +36,20 @@ public class AppStepsService
     }
 
     /// <summary>
+    /// Create a new step and automatically link it to the app
+    /// </summary>
+    public async Task<LinkedStepInfo> CreateStepForAppAsync(Guid appId, string stepName)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/apps/{appId}/steps/create",
+            new { Name = stepName });
+        response.EnsureSuccessStatusCode();
+        
+        var result = await response.Content.ReadFromJsonAsync<LinkedStepInfo>();
+        return result ?? throw new InvalidOperationException("Failed to create step");
+    }
+
+    /// <summary>
     /// Link a step to an app
     /// </summary>
     public async Task LinkStepAsync(Guid appId, Guid stepId)
@@ -64,6 +78,15 @@ public class AppStepsService
     {
         var response = await httpClient.DeleteAsync(
             $"api/apps/{appId}/steps/{stepId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Delete a step completely
+    /// </summary>
+    public async Task DeleteStepAsync(Guid stepId)
+    {
+        var response = await httpClient.DeleteAsync($"api/customsteps/{stepId}");
         response.EnsureSuccessStatusCode();
     }
 }

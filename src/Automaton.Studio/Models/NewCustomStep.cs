@@ -1,4 +1,6 @@
-﻿namespace Automaton.Studio.Models
+﻿using Automaton.Studio.Enums;
+
+namespace Automaton.Studio.Models
 {
     public class NewCustomStep
     {

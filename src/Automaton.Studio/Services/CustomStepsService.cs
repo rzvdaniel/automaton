@@ -20,14 +20,26 @@ public class CustomStepsService
         this.httpClient = httpClient;
     }
 
-    public async Task<ICollection<CustomStep>> List(Guid? projectId = null)
+    public async Task<ICollection<CustomStep>> List(Guid? projectId = null, bool? excludeAppLinked = null)
     {
         try
         {
             var url = configService.CustomStepsUrl;
+            var queryParams = new List<string>();
+
             if (projectId.HasValue)
             {
-                url += $"?projectId={projectId.Value}";
+                queryParams.Add($"projectId={projectId.Value}");
+            }
+
+            if (excludeAppLinked.HasValue)
+            {
+                queryParams.Add($"excludeAppLinked={excludeAppLinked.Value.ToString().ToLower()}");
+            }
+
+            if (queryParams.Count > 0)
+            {
+                url += "?" + string.Join("&", queryParams);
             }
 
             var result = await httpClient.GetAsync(url);

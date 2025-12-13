@@ -13,9 +13,9 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<Models.CustomStep> Get([FromQuery] Guid? projectId = null)
+    public IEnumerable<Models.CustomStep> Get([FromQuery] Guid? projectId = null, [FromQuery] bool? excludeAppLinked = null)
     {
-        return customStepsService.List(projectId);
+        return customStepsService.List(projectId, excludeAppLinked);
     }
 
     [HttpGet("{id}")]
