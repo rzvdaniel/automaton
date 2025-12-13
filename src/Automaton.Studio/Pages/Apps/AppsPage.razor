@@ -80,21 +80,53 @@
                 <div class="app-grid">
                     @foreach (var app in @AppsViewModel.Apps)
                     {
-                        <div class="app-card" style="@GetCardBackgroundColor(app)" @onclick="@(() => ExecuteApp(app))">
-                            <!-- Background image layer with opacity -->
-                            <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
-                            
-                            <!-- Content layer - not affected by background opacity -->
-                            <div class="app-card-content">
-                                <h2 class="app-card-title" style="@GetTitleStyle(app)">
-                                    @GetAppDisplayTitle(app)
-                                </h2>
-                                
-                                @if (!string.IsNullOrEmpty(app.Description))
+                        <div class="app-card-wrapper">
+                            <div class="app-card" style="@GetCardBackgroundColor(app)" @onclick="@(() => ExecuteApp(app))">
+                                <!-- Background image layer with opacity -->
+                                <div class="app-card-background" style="@GetCardBackgroundImage(app)"></div>
+                            </div>
+                            <!-- Title and actions displayed below the card -->
+                            <div class="app-card-footer">
+                                <h4 class="app-card-title">@GetAppDisplayTitle(app)</h4>
+                                @if (AppsViewModel.CanManageApps)
                                 {
-                                    <Tooltip Title="@app.Description">
-                                        <Icon Type="info-circle" Class="app-card-description-icon" />
-                                    </Tooltip>
+                                    <Dropdown Placement="@Placement.BottomRight" Trigger="@(new Trigger[] { Trigger.Click })">
+                                        <Overlay>
+                                            <Menu>
+                                                <MenuItem Icon="edit" @onclick="@(() => EditApp(app.Id))">
+                                                    Edit
+                                                </MenuItem>
+                                                @if (!app.IsPublished)
+                                                {
+                                                    <MenuItem Icon="cloud-upload" @onclick="@(() => ShowPublishDialog(app.Id))">
+                                                        Publish
+                                                    </MenuItem>
+                                                }
+                                                else
+                                                {
+                                                    <MenuItem Icon="cloud-download" @onclick="@(() => UnpublishApp(app.Id))">
+                                                        Unpublish
+                                                    </MenuItem>
+                                                }
+                                                <MenuDivider />
+                                                <Popconfirm Title="Sure to delete?"
+                                                            OnConfirm="()=> DeleteApp(app.Id)"
+                                                            OkText="Yes"
+                                                            CancelText="No">
+                                                    <MenuItem Icon="delete">
+                                                        Delete
+                                                    </MenuItem>
+                                                </Popconfirm>
+                                            </Menu>
+                                        </Overlay>
+                                        <ChildContent>
+                                            <Tooltip Title="More actions">
+                                                <a href="#" class="app-card-more-btn" @onclick:preventDefault @onmousedown:stopPropagation>
+                                                    <Icon Type="more" Theme="IconThemeType.Outline" />
+                                                </a>
+                                            </Tooltip>
+                                        </ChildContent>
+                                    </Dropdown>
                                 }
                             </div>
                         </div>
@@ -218,6 +250,11 @@
         padding: 24px 0;
     }
 
+    .app-card-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+
     .app-card {
         background: white;
         border-radius: 16px;
@@ -225,7 +262,7 @@
         transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
         overflow: hidden;
         cursor: pointer;
-        min-height: 280px;
+        min-height: 240px;
         display: flex;
         align-items: flex-end;
         position: relative;
@@ -249,29 +286,45 @@
         pointer-events: none;
     }
 
-    /* Content layer - not affected by background opacity */
-    .app-card-content {
-        position: relative;
-        z-index: 2;
-        padding: 32px 24px;
-        width: 100%;
-    }
-
-    .app-card-title {
-        margin: 0 0 16px 0;
-        font-size: 28px;
-        font-weight: 700;
-        line-height: 1.3;
+    /* Footer with title and actions */
+    .app-card-footer {
         display: flex;
         align-items: center;
-        gap: 12px;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 12px;
+        padding: 0 4px;
     }
 
-    .app-card-description-icon {
-        font-size: 20px;
-        opacity: 0.9;
-        cursor: help;
+    /* Title displayed below the card */
+    .app-card-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.4;
+        color: rgba(0, 0, 0, 0.85);
+        text-align: left;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .app-card-more-btn {
         flex-shrink: 0;
+        opacity: 0.6;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        color: rgba(0, 0, 0, 0.65);
+    }
+
+    .app-card-more-btn:hover {
+        opacity: 1;
+        color: rgba(0, 0, 0, 0.85);
     }
 
     /* Responsive */
@@ -282,7 +335,7 @@
         }
 
         .app-card-title {
-            font-size: 22px;
+            font-size: 16px;
         }
     }
 
@@ -293,7 +346,7 @@
         }
 
         .app-card-title {
-            font-size: 20px;
+            font-size: 15px;
         }
     }
 </style>

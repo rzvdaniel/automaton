@@ -2,6 +2,7 @@ using AntDesign;
 using Automaton.Studio.Models;
 using Automaton.Studio.Pages.Apps.Components.NewAppDialog;
 using Automaton.Studio.Pages.Apps.Components.PublishAppDialog;
+using Automaton.Studio.Services;
 using Automaton.Studio.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -79,11 +80,13 @@ partial class AppsPage : ComponentBase
             return;
         }
 
+        var displayName = !string.IsNullOrEmpty(app.DisplayName) ? app.DisplayName : app.Name;
+
         var model = new PublishAppModel
         {
             AppId = id,
-            DisplayName = app.DisplayName,
-            PublicUrl = app.PublicUrl ?? string.Empty,
+            DisplayName = displayName,
+            PublicUrl = app.PublicUrl ?? AppsService.GenerateSlugPreview(displayName),
             RequiresAuthentication = true, // Default to protected
             ExecutionRunnerId = app.ExecutionRunnerId
         };
@@ -204,22 +207,6 @@ partial class AppsPage : ComponentBase
             styles.Add($"background-size: cover");
             styles.Add($"background-position: center");
             styles.Add($"opacity: {app.Appearance.BackgroundImageOpacity}");
-        }
-        
-        return string.Join("; ", styles);
-    }
-
-    private string GetTitleStyle(AppListItem app)
-    {
-        var styles = new List<string>();
-        
-        if (!string.IsNullOrEmpty(app.Appearance?.TitleFontColor))
-        {
-            styles.Add($"color: {app.Appearance.TitleFontColor}");
-        }
-        else
-        {
-            styles.Add("color: #ffffff");
         }
         
         return string.Join("; ", styles);
