@@ -12,7 +12,6 @@
     else if (Status == "completed")
     {
         <div class="tool-inline">
-            <span class="status-icon success">?</span>
             <span class="tool-text">@Description</span>
         </div>
         <div class="message-footer">
@@ -29,18 +28,6 @@
     else
     {
         <div class="tool-inline">
-            @if (Status == "success")
-            {
-                <span class="status-icon success">?</span>
-            }
-            else if (Status == "error")
-            {
-                <span class="status-icon error">?</span>
-            }
-            else
-            {
-                <span class="status-icon default">•</span>
-            }
             <span class="tool-text">@Description</span>
             @if (Status == "error" && !string.IsNullOrEmpty(ErrorMessage))
             {
@@ -86,7 +73,7 @@
     .pulse-dot {
         width: 8px;
         height: 8px;
-        background: #f59e0b;
+        background: #94a3b8;
         border-radius: 50%;
         animation: pulse 1.5s ease-in-out infinite;
     }
@@ -100,32 +87,6 @@
             opacity: 0.5;
             transform: scale(0.8);
         }
-    }
-
-    .status-icon {
-        font-size: 12px;
-        font-weight: 600;
-        width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-    }
-
-    .status-icon.success {
-        background: #10b981;
-        color: white;
-    }
-
-    .status-icon.error {
-        background: #ef4444;
-        color: white;
-    }
-
-    .status-icon.default {
-        background: #94a3b8;
-        color: white;
     }
 
     .tool-text {
@@ -148,6 +109,6 @@
     .timestamp {
         font-size: 11px;
         color: #94a3b8;
-        font-family: 'SF Mono', Consolas, monospace;
+        font-family: monospace;
     }
 </style>

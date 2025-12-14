@@ -2,8 +2,7 @@
 
 <div class="reasoning-content">
     <div class="reasoning-header" @onclick="ToggleCollapsed">
-        <span class="reasoning-icon">💭</span>
-        <span class="reasoning-title">AI Activity</span>
+        <span class="reasoning-title">Reasoning</span>
         @if (!string.IsNullOrEmpty(Summary))
         {
             <span class="reasoning-preview">@Summary</span>
@@ -90,10 +89,6 @@
         opacity: 0.8;
     }
 
-    .reasoning-icon {
-        font-size: 14px;
-    }
-
     .reasoning-title {
         font-weight: 600;
         font-size: 13px;
@@ -139,7 +134,7 @@
     .timestamp {
         font-size: 11px;
         color: #94a3b8;
-        font-family: 'SF Mono', Consolas, monospace;
+        font-family: monospace;
     }
 
     /* Markdown styles for reasoning content */
@@ -173,7 +168,7 @@
         background: #e2e8f0;
         padding: 2px 5px;
         border-radius: 4px;
-        font-family: 'SF Mono', Consolas, monospace;
+        font-family: monospace;
         font-size: 0.9em;
         color: #475569;
     }
