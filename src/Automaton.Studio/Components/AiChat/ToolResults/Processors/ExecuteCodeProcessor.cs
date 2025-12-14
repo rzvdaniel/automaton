@@ -23,18 +23,11 @@ public class ExecuteCodeProcessor : IToolResultProcessor
         if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
         {
             viewModel.Summary = GetExecutionSummary(toolResult.Result);
-            viewModel.RawResult = toolResult.Result;
         }
         else if (!toolResult.IsSuccess)
         {
             // Extract detailed error information from the result
-            viewModel.ErrorMessage = ExtractErrorMessage(toolResult);
-            
-            // Also set raw result to full details if available
-            if (!string.IsNullOrEmpty(toolResult.Result))
-            {
-                viewModel.RawResult = toolResult.Result;
-            }
+            viewModel.ErrorMessage = ExtractErrorMessage(toolResult);        
         }
 
         return viewModel;

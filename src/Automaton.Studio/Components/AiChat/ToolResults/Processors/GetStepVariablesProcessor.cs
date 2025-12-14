@@ -22,7 +22,6 @@ public class GetStepVariablesProcessor : IToolResultProcessor
         if (toolResult.IsSuccess && !string.IsNullOrEmpty(toolResult.Result))
         {
             viewModel.Summary = GetVariableSummary(toolResult.Result);
-            viewModel.RawResult = toolResult.Result;
         }
         else if (!toolResult.IsSuccess)
         {

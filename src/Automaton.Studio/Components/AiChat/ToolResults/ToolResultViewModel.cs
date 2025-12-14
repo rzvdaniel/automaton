@@ -16,7 +16,6 @@ public class ToolResultViewModel
     public string? CodeContent { get; set; }
     public string? Language { get; set; }
     public int? LineCount { get; set; }
-    public string? RawResult { get; set; }
     public string? ErrorMessage { get; set; }
     public ToolResultType ResultType { get; set; }
 }

@@ -12,11 +12,7 @@
 
     @* Each result type component handles its own error display *@
     @switch (Result.ResultType)
-    {
-        case ToolResultType.Code:
-            <CodeResultDisplay Result="Result" />
-            break;
-            
+    {            
         case ToolResultType.Execution:
             <ExecutionResultDisplay Result="Result" />
             break;

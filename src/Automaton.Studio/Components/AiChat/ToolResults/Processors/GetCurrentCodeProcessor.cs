@@ -28,7 +28,6 @@ public class GetCurrentCodeProcessor : IToolResultProcessor
             {
                 viewModel.CodeContent = fullCode;
                 viewModel.LineCount = CodeExtractionUtility.GetCodeLineCount(fullCode);
-                viewModel.RawResult = CreateCodeResultData(fullCode, currentLanguage);
             }
         }
         else if (!toolResult.IsSuccess)
@@ -37,24 +36,5 @@ public class GetCurrentCodeProcessor : IToolResultProcessor
         }
 
         return viewModel;
-    }
-
-    private string CreateCodeResultData(string code, string language)
-    {
-        var codeResultData = new
-        {
-            stepId = "example-step-id",
-            language = language,
-            code = code,
-            codeAnalysis = new
-            {
-                linesOfCode = CodeExtractionUtility.GetCodeLineCount(code),
-                hasErrorHandling = code.Contains("try") || code.Contains("except"),
-                hasLogging = code.Contains("print") || code.Contains("log"),
-                isStepTemplate = false
-            }
-        };
-
-        return JsonSerializer.Serialize(codeResultData, new JsonSerializerOptions { WriteIndented = true });
     }
 }

@@ -68,22 +68,6 @@
     }
 }
 
-@if (!string.IsNullOrEmpty(Result.RawResult))
-{
-    <button class="raw-result-btn" @onclick="ToggleRawResult" title="View Raw Result">
-        <span class="raw-icon">🔍</span> Raw Result
-    </button>
-    
-    @if (showRawResult)
-    {
-        <div class="raw-result-collapsible">
-            <div class="raw-result-content">
-                <pre class="raw-result">@Result.RawResult</pre>
-            </div>
-        </div>
-    }
-}
-
 @code {
     [Parameter, EditorRequired] 
     public ToolResultViewModel Result { get; set; } = default!;
