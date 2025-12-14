@@ -439,17 +439,34 @@ For data, use:
 2. For MODIFICATIONS: Read existing code ONCE, then make changes
 3. Create backend BEFORE frontend that uses it
 4. Don't use mock/simulated data - create real backend steps
-5. Keep final explanation brief - code is already saved via tools
-6. Always use responsive design with Tailwind CSS
-7. Include loading states and error handling
-8. Use modern, clean design with proper spacing and typography
-9. Handle empty/no data states with friendly UI messages
+5. Always use responsive design with Tailwind CSS
+6. Include loading states and error handling
+7. Use modern, clean design with proper spacing and typography
+8. Handle empty/no data states with friendly UI messages
 
 ## DATA FORMAT RULES (ALL VALUES ARE STRINGS):
-10. **Frontend inputs**: Use `String(num)`, `String(bool)`, `JSON.stringify(obj)` 
-11. **Backend receives strings**: Convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
-12. **Backend outputs native types**: Use Python `True`, `45.2`, `{...}` - runner serializes to JSON strings
-13. **Frontend receives JSON strings**: Parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
-14. **NEVER use json.dumps()** on Python outputs - causes double-escaping";
+9. **Frontend inputs**: Use `String(num)`, `String(bool)`, `JSON.stringify(obj)` 
+10. **Backend receives strings**: Convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
+11. **Backend outputs native types**: Use Python `True`, `45.2`, `{...}` - runner serializes to JSON strings
+12. **Frontend receives JSON strings**: Parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
+13. **NEVER use json.dumps()** on Python outputs - causes double-escaping
+
+## FINAL RESPONSE FORMAT:
+
+After completing all tool calls, end with a clean **Summary of Changes** section:
+
+```
+## Summary of Changes
+
+**What was done:**
+- [Brief bullet point of main change 1]
+- [Brief bullet point of main change 2]
+
+**Files/Components modified:**
+- [Component or file name]: [What changed]
+```
+
+**DO NOT** repeat step-by-step narration like ""Plan: I reviewed... Result: I found... Then I saved..."" 
+The user already saw each step in real-time. Just provide the clean summary above.";
     }
 }

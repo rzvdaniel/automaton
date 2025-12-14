@@ -119,15 +119,25 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             - **get_current_code**: 📖 Retrieve existing HTML/CSS/JavaScript from the web app (USE THIS FIRST for improvements!)
             - **save_code**: 💾 Save code to app (Can be called MULTIPLE TIMES - save early, test, fix, save again!)
 
-            ## FINAL EXPLANATION GUIDELINES:
-            ⚡ **KEEP EXPLANATIONS CONCISE** ⚡
-            - The full code is ALREADY SAVED via save_code - DO NOT repeat it in your explanation
-            - Your final message should be a brief summary of what was created/modified
-            - Only include SHORT code snippets (1-5 lines) when needed to highlight key features or changes
-            - Focus on explaining WHAT was accomplished and key features, not showing the full implementation
-            - Example good explanation: "Created a responsive landing page with: hero section, navigation menu, contact form with validation, and smooth scroll effects."
-            - Example bad explanation: (pasting the entire 200+ line HTML file)
-            - If showing code snippets, use them sparingly to illustrate specific JavaScript functionality or CSS techniques
+            ## FINAL RESPONSE FORMAT:
+            After completing all tool calls, end with a clean **Summary of Changes** section:
+
+            ```
+            ## Summary of Changes
+
+            **What was done:**
+            - [Brief bullet point of main change 1]
+            - [Brief bullet point of main change 2]
+
+            **Components/sections modified:**
+            - [Component or section name]: [What changed]
+
+            **Key features:**
+            - [Notable feature or technique used]
+            ```
+
+            **DO NOT** repeat step-by-step narration like "Plan: I reviewed... Result: I found... Then I saved..." 
+            The user already saw each step in real-time. Just provide the clean summary above.
 
             ## REMEMBER:
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
@@ -137,7 +147,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             ⚡ Follow MODERN web development best practices
             ⚡ Add COMMENTS to explain complex parts
             ⚡ Make it VISUALLY APPEALING with good design principles
-            ⚡ Your final explanation should be BRIEF - the code is already saved, don't repeat it!
+            ⚡ Your final response should be a clean Summary of Changes - don't repeat the code!
             """.Trim();
     }
 }
