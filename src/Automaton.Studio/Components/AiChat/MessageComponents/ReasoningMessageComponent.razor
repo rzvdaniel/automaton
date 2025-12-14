@@ -3,7 +3,7 @@
 <div class="reasoning-message">
     <div class="reasoning-header" @onclick="ToggleCollapsed">
         <span class="reasoning-icon">@(IsCollapsed ? "▶" : "▼")</span>
-        <span class="reasoning-label">🧠 AI Reasoning</span>
+        <span class="reasoning-label">💭 AI Activity</span>
         @if (!string.IsNullOrEmpty(Summary))
         {
             <span class="reasoning-summary">@Summary</span>

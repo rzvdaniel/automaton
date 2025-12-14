@@ -70,7 +70,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         {
             InvokeAsync(() =>
             {
-                // Process AI reasoning messages (thinking/error analysis)
+                // Process AI messages (thinking, reasoning, explanations, etc.)
                 if (e.Messages?.Any() == true)
                 {
                     foreach (var message in e.Messages)
@@ -81,46 +81,43 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                             var normalizedNewContent = message.Content.Trim();
                             var isExactDuplicate = messages.Any(m => 
                                 m.Role == "AI" && 
-                                m.Type == MessageType.Text &&
+                                (m.Type == MessageType.Text || m.Type == MessageType.Reasoning) &&
                                 m.Content.Trim().Equals(normalizedNewContent, StringComparison.Ordinal));
-                            
+                        
                             if (isExactDuplicate)
                             {
                                 logger.LogInformation("Skipping exact duplicate AI message: {Length} chars", message.Content.Length);
                                 continue;
                             }
-                            
+                        
                             // Check for similar messages (near-duplicates)
                             var isSimilarDuplicate = messages.Any(m => 
                                 m.Role == "AI" && 
-                                m.Type == MessageType.Text &&
+                                (m.Type == MessageType.Text || m.Type == MessageType.Reasoning) &&
                                 TextSimilarityService.AreSimilar(m.Content, message.Content, similarityThreshold: 0.95));
-                            
+                        
                             if (isSimilarDuplicate)
                             {
                                 logger.LogInformation("Skipping similar duplicate AI message: {Length} chars", message.Content.Length);
                                 continue;
                             }
-                            
-                            // Check if this is a reasoning message (not a final code response)
-                            var isReasoningMessage = IsReasoningMessage(message.Content);
-                            
-                            if (isReasoningMessage)
+                        
+                            // Determine if this is an intermediate message (during generation) or a final response
+                            // Intermediate messages are shown as "Activity" (Reasoning type) for better UX
+                            var isIntermediateMessage = isGeneratingCode && IsIntermediateAiMessage(message.Content);
+                        
+                            // Use Reasoning type for intermediate messages (collapsible, shows AI is working)
+                            // Use Text type for final responses
+                            var messageType = isIntermediateMessage ? MessageType.Reasoning : MessageType.Text;
+                        
+                            var aiMsg = new ChatMessage("AI", message.Content, DateTime.Now)
                             {
-                                // Determine if this is actual reasoning (for reasoning-capable models) or just text
-                                var messageType = IsReasoningModel() ? MessageType.Reasoning : MessageType.Text;
-                                
-                                // Add as reasoning or text message to show AI's thinking
-                                var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
-                                {
-                                    Type = messageType,
-                                    IsReasoningCollapsed = false  // Show expanded initially, will auto-collapse after generation
-                                };
-                                messages.Add(reasoningMsg);
-                                logger.LogInformation("Added AI {MessageType} message: {Length} chars", messageType, message.Content.Length);
-                                InvokeAsync(StateHasChanged);
-                                
-                            }
+                                Type = messageType,
+                                IsReasoningCollapsed = false  // Show expanded initially, will auto-collapse after generation
+                            };
+                            messages.Add(aiMsg);
+                            logger.LogInformation("Added AI {MessageType} message: {Length} chars", messageType, message.Content.Length);
+                            InvokeAsync(StateHasChanged);
                         }
                     }
                 }
@@ -235,29 +232,31 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     }
     
     /// <summary>
-    /// Determine if a message should be displayed as AI response in the chat panel.
-    /// This includes reasoning messages, explanations, summaries, and final answers.
+    /// Determine if a message is an intermediate AI message (shown during generation).
+    /// Intermediate messages include reasoning, analysis, explanations between tool calls, etc.
+    /// Final messages are typically the complete response with code or final answer.
     /// </summary>
-    private bool IsReasoningMessage(string content)
+    private bool IsIntermediateAiMessage(string content)
     {
         // Skip if it's very short (likely not meaningful)
         if (content.Length < 10)
             return false;
             
-        // Skip if it contains ONLY code blocks (no explanation text)
-        // But allow messages that have code blocks WITH explanatory text
+        // Skip if it contains ONLY code blocks (this is likely a final code response)
         var trimmedContent = content.Trim();
         if (trimmedContent.StartsWith("```") && trimmedContent.EndsWith("```"))
         {
-            // Count backticks efficiently
-            var backtickCount = 0;
-            foreach (var c in content)
+            // Count code block markers
+            var codeBlockCount = 0;
+            var idx = 0;
+            while ((idx = content.IndexOf("```", idx)) >= 0)
             {
-                if (c == '`') backtickCount++;
+                codeBlockCount++;
+                idx += 3;
             }
             
-            // If it's just one code block (6 backticks for opening and closing ```)
-            if (backtickCount == 6)
+            // If it's just one code block (2 markers: opening and closing)
+            if (codeBlockCount == 2)
             {
                 var firstCodeBlockIndex = content.IndexOf("```");
                 var lastCodeBlockIndex = content.LastIndexOf("```");
@@ -270,70 +269,18 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     var hasTextAfter = afterCodeStart < content.Length && 
                                        content.AsSpan(afterCodeStart).Trim().Length > 0;
                     
+                    // Pure code block = final response, not intermediate
                     if (!hasTextBefore && !hasTextAfter)
                         return false;
                 }
             }
         }
         
-        // Include any AI message that appears to be text (not just code)
-        // This ensures final explanations and summaries are shown
+        // Any text message during generation is considered intermediate
+        // This includes AI's thoughts, explanations, analysis, etc.
         return true;
     }
     
-    /// <summary>
-    /// Check if the currently selected model supports reasoning/thinking tokens.
-    /// Supports detection across multiple AI providers (OpenAI, Google, Anthropic).
-    /// </summary>
-    private bool IsReasoningModel()
-    {
-        var model = GetSelectedModel();
-        var provider = GetSelectedProvider();
-        
-        if (string.IsNullOrEmpty(model) || provider == null) return false;
-        
-        var lowerModel = model.ToLowerInvariant();
-        
-        // Check for reasoning support based on provider and model
-        return provider.Provider switch
-        {
-            AiProviderType.OpenAI => IsOpenAiReasoningModel(lowerModel),
-            AiProviderType.Google => IsGoogleReasoningModel(lowerModel),
-            AiProviderType.Anthropic => IsAnthropicReasoningModel(lowerModel),
-            _ => lowerModel.Contains("reasoning") || lowerModel.Contains("thinking")
-        };
-    }
-    
-    /// <summary>
-    /// Check if an OpenAI model supports reasoning (o1, o3, o4 series)
-    /// </summary>
-    private bool IsOpenAiReasoningModel(string modelName)
-    {
-        return modelName.StartsWith("o1") || 
-               modelName.StartsWith("o3") || 
-               modelName.StartsWith("o4") ||
-               modelName.Contains("reasoning");
-    }
-    
-    /// <summary>
-    /// Check if a Google/Gemini model supports reasoning (thinking models)
-    /// </summary>
-    private bool IsGoogleReasoningModel(string modelName)
-    {
-        return modelName.Contains("thinking") || 
-               modelName.Contains("reasoning");
-    }
-    
-    /// <summary>
-    /// Check if an Anthropic/Claude model supports reasoning (extended thinking)
-    /// </summary>
-    private bool IsAnthropicReasoningModel(string modelName)
-    {
-        return modelName.Contains("thinking") || 
-               modelName.Contains("extended-thinking") ||
-               modelName.Contains("reasoning");
-    }
-
     private string FormatToolCall(ToolCall toolCall)
     {
         var icon = GetToolIcon(toolCall.Name);
