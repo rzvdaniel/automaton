@@ -31,6 +31,9 @@
     [Inject]
     private IAiMessageFormattingService FormattingService { get; set; } = default!;
 
+    private const int MaxSummaryLength = 60;
+    private const int SummaryTruncateLength = 57;
+    
     private bool IsCollapsed { get; set; }
     
     private string Summary 
@@ -41,8 +44,8 @@
             if (string.IsNullOrWhiteSpace(Content)) return string.Empty;
             
             var firstLine = Content.Split('\n').FirstOrDefault()?.Trim() ?? "";
-            if (firstLine.Length > 60)
-                return firstLine.Substring(0, 57) + "...";
+            if (firstLine.Length > MaxSummaryLength)
+                return firstLine.Substring(0, SummaryTruncateLength) + "...";
             return firstLine;
         } 
     }
