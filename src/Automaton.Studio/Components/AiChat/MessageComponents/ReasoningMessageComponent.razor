@@ -12,7 +12,7 @@
     
     @if (!IsCollapsed)
     {
-        <div class="reasoning-content">
+        <div class="reasoning-content markdown-content">
             @((MarkupString)FormattingService.FormatReasoningTextWithCode(Content))
         </div>
     }
@@ -125,17 +125,81 @@
         background: #f0f7ff;
     }
 
-    /* Styling for code blocks within reasoning */
-    .reasoning-content pre {
-        background: #fff;
-        border: 1px solid #cce5ff;
-        border-radius: 4px;
-        padding: 8px;
-        margin: 8px 0;
+    /* Allow global markdown styles to take effect */
+    .reasoning-content.markdown-content :deep(h1),
+    .reasoning-content.markdown-content :deep(h2),
+    .reasoning-content.markdown-content :deep(h3),
+    .reasoning-content.markdown-content :deep(h4) {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #1f2937;
     }
 
-    .reasoning-content code {
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 12px;
+    .reasoning-content.markdown-content :deep(h2) {
+        font-size: 1.2em;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+
+    .reasoning-content.markdown-content :deep(p) {
+        margin: 0 0 8px 0;
+    }
+
+    .reasoning-content.markdown-content :deep(ul),
+    .reasoning-content.markdown-content :deep(ol) {
+        margin: 8px 0;
+        padding-left: 20px;
+    }
+
+    .reasoning-content.markdown-content :deep(li) {
+        margin: 4px 0;
+    }
+
+    .reasoning-content.markdown-content :deep(strong) {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .reasoning-content.markdown-content :deep(code) {
+        background: #e5e7eb;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+    }
+
+    .reasoning-content.markdown-content :deep(pre) {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 6px;
+        padding: 12px;
+        margin: 12px 0;
+        overflow-x: auto;
+    }
+
+    .reasoning-content.markdown-content :deep(pre code) {
+        background: transparent;
+        padding: 0;
+        color: inherit;
+    }
+
+    .reasoning-content.markdown-content :deep(table) {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: 0.9em;
+    }
+
+    .reasoning-content.markdown-content :deep(th),
+    .reasoning-content.markdown-content :deep(td) {
+        padding: 6px 10px;
+        border: 1px solid #e5e7eb;
+        text-align: left;
+    }
+
+    .reasoning-content.markdown-content :deep(th) {
+        background: #f3f4f6;
+        font-weight: 600;
     }
 </style>

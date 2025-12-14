@@ -1,6 +1,6 @@
 @using Automaton.Studio.Services
 
-<div class="text-message">
+<div class="text-message markdown-content">
     @((MarkupString)FormattingService.FormatReasoningTextWithCode(Content))
 </div>
 
@@ -15,5 +15,120 @@
 <style>
     .text-message {
         line-height: 1.6;
+    }
+
+    /* Markdown content styling with :deep() for Blazor isolated CSS */
+    .text-message.markdown-content :deep(h1),
+    .text-message.markdown-content :deep(h2),
+    .text-message.markdown-content :deep(h3),
+    .text-message.markdown-content :deep(h4) {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .text-message.markdown-content :deep(h2) {
+        font-size: 1.2em;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+
+    .text-message.markdown-content :deep(h2:first-child) {
+        margin-top: 0;
+    }
+
+    .text-message.markdown-content :deep(p) {
+        margin: 0 0 8px 0;
+    }
+
+    .text-message.markdown-content :deep(p:last-child) {
+        margin-bottom: 0;
+    }
+
+    .text-message.markdown-content :deep(ul),
+    .text-message.markdown-content :deep(ol) {
+        margin: 8px 0;
+        padding-left: 20px;
+    }
+
+    .text-message.markdown-content :deep(li) {
+        margin: 4px 0;
+    }
+
+    .text-message.markdown-content :deep(strong) {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .text-message.markdown-content :deep(code) {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.875em;
+        color: #dc2626;
+    }
+
+    .text-message.markdown-content :deep(pre) {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin: 12px 0;
+        overflow-x: auto;
+        border: 1px solid #333;
+    }
+
+    .text-message.markdown-content :deep(pre code) {
+        background: transparent;
+        border: none;
+        padding: 0;
+        color: inherit;
+        font-size: 0.875rem;
+    }
+
+    .text-message.markdown-content :deep(table) {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: 0.9em;
+    }
+
+    .text-message.markdown-content :deep(th),
+    .text-message.markdown-content :deep(td) {
+        padding: 8px 12px;
+        border: 1px solid #e5e7eb;
+        text-align: left;
+    }
+
+    .text-message.markdown-content :deep(th) {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .text-message.markdown-content :deep(tr:nth-child(even)) {
+        background: #f9fafb;
+    }
+
+    .text-message.markdown-content :deep(blockquote) {
+        margin: 12px 0;
+        padding: 8px 16px;
+        border-left: 4px solid #3b82f6;
+        background: #eff6ff;
+        color: #1e40af;
+        border-radius: 0 4px 4px 0;
+    }
+
+    .text-message.markdown-content :deep(blockquote p) {
+        margin: 0;
+    }
+
+    .text-message.markdown-content :deep(hr) {
+        border: none;
+        border-top: 1px solid #e5e7eb;
+        margin: 16px 0;
     }
 </style>
