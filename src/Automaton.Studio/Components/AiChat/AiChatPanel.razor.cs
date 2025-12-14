@@ -282,19 +282,56 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     }
     
     /// <summary>
-    /// Check if the currently selected model supports reasoning/thinking tokens
+    /// Check if the currently selected model supports reasoning/thinking tokens.
+    /// Supports detection across multiple AI providers (OpenAI, Google, Anthropic).
     /// </summary>
     private bool IsReasoningModel()
     {
         var model = GetSelectedModel();
-        if (string.IsNullOrEmpty(model)) return false;
+        var provider = GetSelectedProvider();
         
-        // Models that support reasoning tokens (o1, o3, o4 series from OpenAI)
+        if (string.IsNullOrEmpty(model) || provider == null) return false;
+        
         var lowerModel = model.ToLowerInvariant();
-        return lowerModel.StartsWith("o1") || 
-               lowerModel.StartsWith("o3") || 
-               lowerModel.StartsWith("o4") ||
-               lowerModel.Contains("reasoning");
+        
+        // Check for reasoning support based on provider and model
+        return provider.Provider switch
+        {
+            AiProviderType.OpenAI => IsOpenAiReasoningModel(lowerModel),
+            AiProviderType.Google => IsGoogleReasoningModel(lowerModel),
+            AiProviderType.Anthropic => IsAnthropicReasoningModel(lowerModel),
+            _ => lowerModel.Contains("reasoning") || lowerModel.Contains("thinking")
+        };
+    }
+    
+    /// <summary>
+    /// Check if an OpenAI model supports reasoning (o1, o3, o4 series)
+    /// </summary>
+    private bool IsOpenAiReasoningModel(string modelName)
+    {
+        return modelName.StartsWith("o1") || 
+               modelName.StartsWith("o3") || 
+               modelName.StartsWith("o4") ||
+               modelName.Contains("reasoning");
+    }
+    
+    /// <summary>
+    /// Check if a Google/Gemini model supports reasoning (thinking models)
+    /// </summary>
+    private bool IsGoogleReasoningModel(string modelName)
+    {
+        return modelName.Contains("thinking") || 
+               modelName.Contains("reasoning");
+    }
+    
+    /// <summary>
+    /// Check if an Anthropic/Claude model supports reasoning (extended thinking)
+    /// </summary>
+    private bool IsAnthropicReasoningModel(string modelName)
+    {
+        return modelName.Contains("thinking") || 
+               modelName.Contains("extended-thinking") ||
+               modelName.Contains("reasoning");
     }
 
     private string FormatToolCall(ToolCall toolCall)
