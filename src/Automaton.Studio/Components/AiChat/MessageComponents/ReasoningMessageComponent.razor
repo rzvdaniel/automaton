@@ -1,18 +1,19 @@
 @using Automaton.Studio.Services
 
-<div class="reasoning-message">
+<div class="reasoning-card">
     <div class="reasoning-header" @onclick="ToggleCollapsed">
-        <span class="reasoning-icon">@(IsCollapsed ? "▶" : "▼")</span>
-        <span class="reasoning-label">💭 AI Activity</span>
+        <span class="reasoning-icon">💭</span>
+        <span class="reasoning-title">AI Activity</span>
         @if (!string.IsNullOrEmpty(Summary))
         {
-            <span class="reasoning-summary">@Summary</span>
+            <span class="reasoning-preview">@Summary</span>
         }
+        <span class="toggle-icon @(IsCollapsed ? "" : "expanded")">›</span>
     </div>
     
     @if (!IsCollapsed)
     {
-        <div class="reasoning-content markdown-content">
+        <div class="reasoning-body markdown-content">
             @((MarkupString)FormattingService.FormatReasoningTextWithCode(Content))
         </div>
     }
@@ -31,8 +32,7 @@
     [Inject]
     private IAiMessageFormattingService FormattingService { get; set; } = default!;
 
-    private const int MaxSummaryLength = 60;
-    private const int SummaryTruncateLength = 57;
+    private const int MaxSummaryLength = 50;
     
     private bool IsCollapsed { get; set; }
     
@@ -40,15 +40,12 @@
     { 
         get 
         {
-            // Generate a short summary from the first line or MaxSummaryLength characters
             if (string.IsNullOrWhiteSpace(Content)) return string.Empty;
             
             var firstLine = Content.Split('\n').FirstOrDefault()?.Trim() ?? "";
             if (firstLine.Length > MaxSummaryLength)
             {
-                // Use Substring for simplicity - performance is acceptable for UI display
-                // The summary is only computed when rendering, not during data processing
-                return firstLine.Substring(0, SummaryTruncateLength) + "...";
+                return firstLine.Substring(0, MaxSummaryLength - 3) + "...";
             }
             return firstLine;
         } 
@@ -70,106 +67,116 @@
 }
 
 <style>
-    .reasoning-message {
-        background: #f0f7ff;
-        border: 1px solid #b3d9ff;
-        border-radius: 6px;
-        margin: 4px 0;
+    .reasoning-card {
+        background: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
         overflow: hidden;
+        margin: 4px 0;
     }
 
     .reasoning-header {
-        padding: 8px 12px;
-        cursor: pointer;
-        user-select: none;
         display: flex;
         align-items: center;
         gap: 8px;
-        background: #e6f3ff;
-        transition: background-color 0.2s;
+        padding: 10px 14px;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        cursor: pointer;
+        transition: background 0.15s ease;
     }
 
     .reasoning-header:hover {
-        background: #d9edff;
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
     }
 
     .reasoning-icon {
-        font-size: 10px;
-        color: #0066cc;
-        transition: transform 0.2s;
-        display: inline-block;
-        width: 12px;
+        font-size: 14px;
     }
 
-    .reasoning-label {
+    .reasoning-title {
         font-weight: 600;
-        font-size: 12px;
-        color: #0066cc;
+        font-size: 13px;
+        color: #1e40af;
     }
 
-    .reasoning-summary {
-        font-size: 11px;
-        color: #666;
-        font-style: italic;
+    .reasoning-preview {
         flex: 1;
+        font-size: 12px;
+        color: #64748b;
+        font-style: italic;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .reasoning-content {
-        padding: 12px;
-        line-height: 1.6;
-        color: #333;
-        font-size: 13px;
-        background: #f0f7ff;
+    .toggle-icon {
+        font-size: 14px;
+        font-weight: 600;
+        color: #3b82f6;
+        transition: transform 0.2s ease;
     }
 
-    /* Essential Markdown styles */
-    .reasoning-content.markdown-content :deep(h2) {
-        margin: 16px 0 8px 0;
+    .toggle-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .reasoning-body {
+        padding: 14px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #374151;
+        border-top: 1px solid #e0f2fe;
+        background: #fafbff;
+    }
+
+    /* Markdown styles for reasoning content */
+    .reasoning-body.markdown-content ::deep h2 {
+        margin: 12px 0 8px 0;
         font-weight: 600;
-        color: #1f2937;
+        color: #1e40af;
         font-size: 1.1em;
     }
 
-    .reasoning-content.markdown-content :deep(p) {
+    .reasoning-body.markdown-content ::deep p {
         margin: 0 0 8px 0;
     }
 
-    .reasoning-content.markdown-content :deep(ul),
-    .reasoning-content.markdown-content :deep(ol) {
+    .reasoning-body.markdown-content ::deep ul,
+    .reasoning-body.markdown-content ::deep ol {
         margin: 8px 0;
-        padding-left: 20px;
+        padding-left: 18px;
     }
 
-    .reasoning-content.markdown-content :deep(li) {
-        margin: 4px 0;
+    .reasoning-body.markdown-content ::deep li {
+        margin: 3px 0;
     }
 
-    .reasoning-content.markdown-content :deep(strong) {
+    .reasoning-body.markdown-content ::deep strong {
         font-weight: 600;
+        color: #1e3a8a;
     }
 
-    .reasoning-content.markdown-content :deep(code) {
-        background: #e5e7eb;
-        padding: 2px 4px;
-        border-radius: 3px;
-        font-family: 'Consolas', monospace;
+    .reasoning-body.markdown-content ::deep code {
+        background: #e0f2fe;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: 'SF Mono', Consolas, monospace;
         font-size: 0.9em;
+        color: #0369a1;
     }
 
-    .reasoning-content.markdown-content :deep(pre) {
-        background: #1e1e1e;
-        color: #d4d4d4;
+    .reasoning-body.markdown-content ::deep pre {
+        background: #1e293b;
+        color: #e2e8f0;
         border-radius: 6px;
         padding: 12px;
-        margin: 12px 0;
+        margin: 10px 0;
         overflow-x: auto;
     }
 
-    .reasoning-content.markdown-content :deep(pre code) {
+    .reasoning-body.markdown-content ::deep pre code {
         background: transparent;
         padding: 0;
+        color: inherit;
     }
 </style>

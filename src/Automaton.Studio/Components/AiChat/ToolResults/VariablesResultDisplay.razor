@@ -2,70 +2,24 @@
 @using Automaton.Studio.Components.AiChat.ToolResults.Processors
 @using System.Net
 
-<style>
-    .variables-result-btn, .raw-result-btn {
-        background: none;
-        border: none;
-        color: #6c757d;
-        font-size: 0.875rem;
-        padding: 0.25rem 0.5rem;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        margin-top: 0.5rem;
-        text-decoration: none;
-    }
-
-    .variables-result-btn:hover, .raw-result-btn:hover {
-        color: #495057;
-        background-color: #f8f9fa;
-        border-radius: 0.25rem;
-    }
-
-    .variables-result-btn .variables-icon, .raw-result-btn .raw-icon {
-        font-size: 0.875rem;
-    }
-
-    .variables-result-collapsible, .raw-result-collapsible {
-        margin-top: 0.5rem;
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
-        overflow: hidden;
-    }
-
-    .variables-result-content, .raw-result-content {
-        /* No background or padding */
-    }
-
-    .variables-result-content .variables-result, .raw-result-content .raw-result {
-        margin: 0;
-        background-color: white;
-        border: 1px solid #dee2e6;
-        border-radius: 0.25rem;
-        padding: 0.75rem;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 0.875rem;
-        line-height: 1.4;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-</style>
-
 @if (!string.IsNullOrEmpty(Result.Summary))
 {
-    <button class="variables-result-btn" @onclick="ToggleVariablesResult" title="View Variables">
-        <span class="variables-icon">📊</span> Variables
-    </button>
-    
-    @if (showVariablesResult)
-    {
-        <div class="variables-result-collapsible">
-            <div class="variables-result-content">
-                <div class="variables-result">@((MarkupString)FormatSummaryForDisplay(Result.Summary))</div>
+    <div class="expandable-section">
+        <button class="expand-trigger" @onclick="ToggleVariablesResult">
+            <span class="trigger-icon @(showVariablesResult ? "expanded" : "")">›</span>
+            <span class="trigger-label">Variables</span>
+            <span class="var-count">@GetVariableCount()</span>
+        </button>
+        
+        @if (showVariablesResult)
+        {
+            <div class="expand-content">
+                <div class="variables-block">
+                    @((MarkupString)FormatSummaryForDisplay(Result.Summary))
+                </div>
             </div>
-        </div>
-    }
+        }
+    </div>
 }
 
 @code {
@@ -73,16 +27,18 @@
     public ToolResultViewModel Result { get; set; } = default!;
     
     private bool showVariablesResult = false;
-    private bool showRawResult = false;
 
     private void ToggleVariablesResult()
     {
         showVariablesResult = !showVariablesResult;
     }
 
-    private void ToggleRawResult()
+    private string GetVariableCount()
     {
-        showRawResult = !showRawResult;
+        if (string.IsNullOrEmpty(Result.Summary)) return "";
+        var lines = Result.Summary.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var count = lines.Count(l => l.Contains(':') || l.Contains('='));
+        return count > 0 ? count.ToString() : "";
     }
 
     private string FormatSummaryForDisplay(string summary)
@@ -95,3 +51,92 @@
             .Replace("\n", "<br>", StringComparison.Ordinal);
     }
 }
+
+<style>
+    .expandable-section {
+        margin-top: 8px;
+    }
+
+    .expand-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: transparent;
+        border: none;
+        color: #6b7280;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.15s ease;
+    }
+
+    .expand-trigger:hover {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .trigger-icon {
+        font-size: 14px;
+        font-weight: 600;
+        transition: transform 0.2s ease;
+        display: inline-block;
+    }
+
+    .trigger-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .trigger-label {
+        font-weight: 500;
+    }
+
+    .var-count {
+        background: #e5e7eb;
+        color: #374151;
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .expand-content {
+        margin-top: 8px;
+        animation: slideDown 0.15s ease-out;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .variables-block {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px 14px;
+        border-radius: 6px;
+        font-family: 'SF Mono', Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .variables-block ::deep strong {
+        color: #0369a1;
+        font-weight: 600;
+    }
+
+    .variables-block ::deep code {
+        background: #e0f2fe;
+        color: #0c4a6e;
+        padding: 1px 4px;
+        border-radius: 3px;
+    }
+</style>

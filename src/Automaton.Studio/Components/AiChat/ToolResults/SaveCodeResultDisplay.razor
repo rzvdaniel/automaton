@@ -3,7 +3,7 @@
 
 @if (!string.IsNullOrEmpty(Result.Summary))
 {
-    <div class="tool-result-summary">
+    <div class="result-summary">
         @((MarkupString)FormatSummaryForDisplay(Result.Summary))
     </div>
 }
@@ -22,3 +22,26 @@
             .Replace("\n", "<br>", StringComparison.Ordinal);
     }
 }
+
+<style>
+    .result-summary {
+        padding: 8px 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #374151;
+    }
+
+    .result-summary ::deep strong {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .result-summary ::deep code {
+        background: #f3f4f6;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 0.9em;
+        font-family: 'SF Mono', Consolas, monospace;
+        color: #dc2626;
+    }
+</style>
