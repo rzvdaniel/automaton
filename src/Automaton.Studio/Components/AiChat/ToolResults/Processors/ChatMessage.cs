@@ -24,4 +24,5 @@ public record ChatMessage
     public string? ToolArguments { get; init; }
     public string? ToolError { get; init; }
     public ToolResultViewModel? ToolResultViewModel { get; init; }
+    public bool IsReasoningCollapsed { get; init; } = false;  // For reasoning messages
 }

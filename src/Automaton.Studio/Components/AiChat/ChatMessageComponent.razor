@@ -40,6 +40,12 @@
                 <SystemMessageComponent Content="@Message.Content" />
                 break;
 
+            case MessageType.Reasoning:
+                <ReasoningMessageComponent 
+                    Content="@Message.Content" 
+                    InitiallyCollapsed="@Message.IsReasoningCollapsed" />
+                break;
+
             case MessageType.Text:
             default:
                 <TextMessageComponent Content="@Message.Content" />

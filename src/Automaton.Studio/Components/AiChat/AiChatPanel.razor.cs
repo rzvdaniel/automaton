@@ -107,13 +107,17 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                             
                             if (isReasoningMessage)
                             {
-                                // Add as text message to show AI's thinking
+                                // Determine if this is actual reasoning (for reasoning-capable models) or just text
+                                var messageType = IsReasoningModel() ? MessageType.Reasoning : MessageType.Text;
+                                
+                                // Add as reasoning or text message to show AI's thinking
                                 var reasoningMsg = new ChatMessage("AI", message.Content, DateTime.Now)
                                 {
-                                    Type = MessageType.Text
+                                    Type = messageType,
+                                    IsReasoningCollapsed = false  // Show expanded initially, will auto-collapse after generation
                                 };
                                 messages.Add(reasoningMsg);
-                                logger.LogInformation("Added AI reasoning message: {Length} chars", message.Content.Length);
+                                logger.LogInformation("Added AI {MessageType} message: {Length} chars", messageType, message.Content.Length);
                                 InvokeAsync(StateHasChanged);
                                 
                             }
@@ -275,6 +279,22 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         // Include any AI message that appears to be text (not just code)
         // This ensures final explanations and summaries are shown
         return true;
+    }
+    
+    /// <summary>
+    /// Check if the currently selected model supports reasoning/thinking tokens
+    /// </summary>
+    private bool IsReasoningModel()
+    {
+        var model = GetSelectedModel();
+        if (string.IsNullOrEmpty(model)) return false;
+        
+        // Models that support reasoning tokens (o1, o3, o4 series from OpenAI)
+        var lowerModel = model.ToLowerInvariant();
+        return lowerModel.StartsWith("o1") || 
+               lowerModel.StartsWith("o3") || 
+               lowerModel.StartsWith("o4") ||
+               lowerModel.Contains("reasoning");
     }
 
     private string FormatToolCall(ToolCall toolCall)
@@ -659,8 +679,27 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private async Task EndConversation()
     {
         isGeneratingCode = false;
+        
+        // Auto-collapse reasoning messages after generation completes
+        CollapseReasoningMessages();
+        
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
+    }
+    
+    /// <summary>
+    /// Auto-collapse all reasoning messages after AI finishes generating.
+    /// This helps keep the chat clean while preserving the reasoning for reference.
+    /// </summary>
+    private void CollapseReasoningMessages()
+    {
+        for (int i = 0; i < messages.Count; i++)
+        {
+            if (messages[i].Type == MessageType.Reasoning && !messages[i].IsReasoningCollapsed)
+            {
+                messages[i] = messages[i] with { IsReasoningCollapsed = true };
+            }
+        }
     }
 
     // Helper Classes for Better Structure

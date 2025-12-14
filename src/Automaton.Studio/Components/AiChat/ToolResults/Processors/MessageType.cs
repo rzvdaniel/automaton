@@ -8,6 +8,7 @@ public enum MessageType
     CodeError,
     System,
     ToolExecution,
+    Reasoning,           // AI reasoning/thinking process (collapsible)
     
     // New: Progressive AI operation status
     OperationInProgress,  // "🤖 Reading current code..." / "🧪 Testing code execution..."

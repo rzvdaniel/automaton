@@ -343,6 +343,31 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 switch (completion.Value.FinishReason)
                 {
                     case ChatFinishReason.Stop:
+                        // Check for reasoning content (o1, o3, o4 models)
+                        var reasoningContent = completion.Value.Content
+                            .Where(c => c.Kind == ChatMessageContentPartKind.Refusal || 
+                                       c.Text?.Contains("thinking") == true ||
+                                       c.Text?.Contains("reasoning") == true)
+                            .Select(c => c.Text)
+                            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+                        
+                        // Emit reasoning message if present (before final answer)
+                        if (!string.IsNullOrWhiteSpace(reasoningContent))
+                        {
+                            var reasoningMessage = new ConversationMessage("assistant", reasoningContent);
+                            allConversationMessages.Add(reasoningMessage);
+                            
+                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            {
+                                ConversationId = request.ConversationId,
+                                Messages = new List<ConversationMessage> { reasoningMessage },
+                                ToolCalls = new List<ToolCall>(),
+                                ToolResults = new List<ToolResult>()
+                            });
+                            
+                            _logger.LogInformation("AI reasoning content: {Length} chars", reasoningContent.Length);
+                        }
+                        
                         // Extract assistant's text response
                         var assistantText = completion.Value.Content[0].Text ?? "";
                         
