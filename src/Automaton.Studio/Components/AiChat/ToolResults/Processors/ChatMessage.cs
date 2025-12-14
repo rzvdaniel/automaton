@@ -25,4 +25,5 @@ public record ChatMessage
     public string? ToolError { get; init; }
     public ToolResultViewModel? ToolResultViewModel { get; init; }
     public bool IsReasoningCollapsed { get; init; } = false;  // For reasoning messages
+    public bool IsStreaming { get; init; } = false;  // For streaming messages (content still being received)
 }

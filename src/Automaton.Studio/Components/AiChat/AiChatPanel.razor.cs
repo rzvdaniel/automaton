@@ -77,6 +77,63 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     {
                         if (message.Role.ToLowerInvariant() == "assistant" && !string.IsNullOrWhiteSpace(message.Content))
                         {
+                            // Handle streaming messages - update existing streaming message instead of adding new
+                            if (message.IsStreaming)
+                            {
+                                // Find existing streaming message to update
+                                var existingStreamingMsg = messages.LastOrDefault(m => 
+                                    m.Role == "AI" && 
+                                    m.Type == MessageType.Reasoning &&
+                                    m.IsStreaming);
+                                
+                                if (existingStreamingMsg != null)
+                                {
+                                    // Update existing streaming message content
+                                    var index = messages.IndexOf(existingStreamingMsg);
+                                    messages[index] = existingStreamingMsg with 
+                                    { 
+                                        Content = message.Content,
+                                        IsStreaming = true
+                                    };
+                                    logger.LogDebug("Updated streaming message: {Length} chars", message.Content.Length);
+                                }
+                                else
+                                {
+                                    // Create new streaming message
+                                    var streamingMsg = new ChatMessage("AI", message.Content, DateTime.Now)
+                                    {
+                                        Type = MessageType.Reasoning,
+                                        IsReasoningCollapsed = false,
+                                        IsStreaming = true
+                                    };
+                                    messages.Add(streamingMsg);
+                                    logger.LogDebug("Created new streaming message: {Length} chars", message.Content.Length);
+                                }
+                                
+                                InvokeAsync(StateHasChanged);
+                                continue;
+                            }
+                        
+                            // For complete messages (not streaming), finalize any existing streaming message
+                            var existingStreamingMessage = messages.LastOrDefault(m => 
+                                m.Role == "AI" && 
+                                m.Type == MessageType.Reasoning &&
+                                m.IsStreaming);
+                        
+                            if (existingStreamingMessage != null)
+                            {
+                                // Finalize the streaming message with complete content
+                                var index = messages.IndexOf(existingStreamingMessage);
+                                messages[index] = existingStreamingMessage with 
+                                { 
+                                    Content = message.Content,
+                                    IsStreaming = false
+                                };
+                                logger.LogInformation("Finalized streaming message: {Length} chars", message.Content.Length);
+                                InvokeAsync(StateHasChanged);
+                                continue;
+                            }
+                        
                             // Check if this EXACT message already exists in the conversation
                             var normalizedNewContent = message.Content.Trim();
                             var isExactDuplicate = messages.Any(m => 

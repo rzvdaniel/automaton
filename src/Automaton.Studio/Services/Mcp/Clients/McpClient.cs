@@ -175,7 +175,7 @@ public class McpClient : IMcpClient
     }
 
     /// <summary>
-    /// Call OpenAI with MCP tools using the official OpenAI .NET SDK
+    /// Call OpenAI with MCP tools using the official OpenAI .NET SDK with streaming
     /// </summary>
     protected async Task<string> CallOpenAiAsync(ConversationRequest request, CancellationToken cancellationToken)
     {
@@ -231,146 +231,90 @@ public class McpClient : IMcpClient
             do
             {
                 requiresAction = false;
-                var completion = await client.CompleteChatAsync(messages, options, cancellationToken);
-
-                switch (completion.Value.FinishReason)
+                
+                // Use streaming for text responses
+                var streamingResult = await StreamOpenAiResponseAsync(
+                    client, messages, options, request.ConversationId, 
+                    responseBuilder, allConversationMessages, cancellationToken);
+                
+                requiresAction = streamingResult.RequiresAction;
+                
+                if (streamingResult.RequiresAction && streamingResult.ToolCalls.Any())
                 {
-                    case ChatFinishReason.Stop:
-                        // Extract assistant's text response
-                        var assistantText = completion.Value.Content[0].Text ?? "";
-
-                        // Add the assistant message to conversation history
-                        messages.Add(ChatMessage.CreateAssistantMessage(assistantText));
-                        responseBuilder.AppendLine(assistantText);
-
-                        // Emit AI reasoning message if it contains text
-                        if (!string.IsNullOrWhiteSpace(assistantText))
+                    try
+                    {
+                        // Add the assistant message with tool calls to conversation history
+                        var toolCallsList = new List<ChatToolCall>();
+                        foreach (var tc in streamingResult.ToolCalls)
                         {
-                            var reasoningMessage = new ConversationMessage("assistant", assistantText);
-                            allConversationMessages.Add(reasoningMessage);
-
-                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-                            {
-                                ConversationId = request.ConversationId,
-                                Messages = new List<ConversationMessage> { reasoningMessage },
-                                ToolCalls = new List<ToolCall>(),
-                                ToolResults = new List<ToolResult>()
-                            });
+                            var argsData = string.IsNullOrEmpty(tc.ArgumentsJson) ? "{}" : tc.ArgumentsJson;
+                            Logger.LogDebug("Creating tool call: Id={Id}, Name={Name}, Args={Args}", tc.Id, tc.Name, argsData);
+                            
+                            // BREAKPOINT HERE: Check if argsData is valid before calling BinaryData.FromString
+                            var binaryArgs = BinaryData.FromString(argsData);
+                            var toolCall = ChatToolCall.CreateFunctionToolCall(tc.Id, tc.Name, binaryArgs);
+                            toolCallsList.Add(toolCall);
                         }
-                        break;
+                        
+                        var assistantMessage = ChatMessage.CreateAssistantMessage(toolCallsList);
+                        messages.Add(assistantMessage);
+                    }
+                    catch (Exception ex)
+                    {
+                        // BREAKPOINT HERE: Catch error during tool call list creation
+                        Logger.LogError(ex, "Error creating tool call list: {Message}", ex.Message);
+                        throw;
+                    }
 
-                    case ChatFinishReason.ToolCalls:
-                        // Check if there's text content alongside tool calls (AI reasoning/thinking)
-                        var thinkingText = completion.Value.Content
-                            .Where(c => c.Kind == ChatMessageContentPartKind.Text)
-                            .Select(c => c.Text)
-                            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
-
-                        // Emit AI reasoning/thinking message if present
-                        if (!string.IsNullOrWhiteSpace(thinkingText))
+                    // Execute each tool call
+                    foreach (var toolCallInfo in streamingResult.ToolCalls)
+                    {
+                        var argsJson = string.IsNullOrEmpty(toolCallInfo.ArgumentsJson) ? "{}" : toolCallInfo.ArgumentsJson;
+                        
+                        // Emit tool call started event
+                        var currentToolCalls = new List<ToolCall>
                         {
-                            var thinkingMessage = new ConversationMessage("assistant", thinkingText);
-                            allConversationMessages.Add(thinkingMessage);
-
-                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                            new ToolCall
                             {
-                                ConversationId = request.ConversationId,
-                                Messages = new List<ConversationMessage> { thinkingMessage },
-                                ToolCalls = new List<ToolCall>(),
-                                ToolResults = new List<ToolResult>()
-                            });
+                                Id = toolCallInfo.Id,
+                                Name = toolCallInfo.Name,
+                                Arguments = ParseToolArguments(argsJson)
+                            }
+                        };
 
-                            Logger.LogInformation("AI reasoning: {Thinking}", thinkingText);
-                        }
-
-                        // First, add the assistant message with tool calls to conversation history
-                        messages.Add(ChatMessage.CreateAssistantMessage(completion.Value));
-
-                        // Then, execute each tool call and add results
-                        foreach (var toolCall in completion.Value.ToolCalls)
-                        {
-                            // Emit tool call started event
-                            var currentToolCalls = new List<ToolCall>
-                            {
-                                new ToolCall
-                                {
-                                    Id = toolCall.Id,
-                                    Name = toolCall.FunctionName,
-                                    Arguments = JsonDocument.Parse(toolCall.FunctionArguments?.ToString() ?? "{}").RootElement.EnumerateObject()
-                                        .ToDictionary(p => p.Name, p => (object?)p.Value.ToString())
-                                }
-                            };
-
-                            // Emit tool execution started
-                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-                            {
-                                ConversationId = request.ConversationId,
-                                Messages = new List<ConversationMessage>(),
-                                ToolCalls = currentToolCalls,
-                                ToolResults = new List<ToolResult>()
-                            });
-
-                            // Execute the tool
-                            var toolResult = await ExecuteMcpToolAsync(toolCall, request);
-
-                            // Create tool result
-                            var toolResultObj = new ToolResult
-                            {
-                                ToolCallId = toolCall.Id,
-                                Result = toolResult,
-                                IsSuccess = !toolResult.StartsWith("Tool execution failed:") && !toolResult.StartsWith("Error executing tool"),
-                                ErrorMessage = toolResult.StartsWith("Tool execution failed:") || toolResult.StartsWith("Error executing tool") ? toolResult : null
-                            };
-
-                            // Emit tool execution completed
-                            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-                            {
-                                ConversationId = request.ConversationId,
-                                Messages = new List<ConversationMessage>(),
-                                ToolCalls = currentToolCalls,
-                                ToolResults = new List<ToolResult> { toolResultObj }
-                            });
-
-                            // Add tool message to conversation
-                            messages.Add(ChatMessage.CreateToolMessage(toolCall.Id, toolResult));
-                        }
-
-                        requiresAction = true;
-                        break;
-
-                    case ChatFinishReason.Length:
-                        var lengthErrorMsg = "Incomplete model output due to token limit";
-
-                        // Emit error as conversation update so UI can display it
+                        // Emit tool execution started
                         ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
                         {
                             ConversationId = request.ConversationId,
-                            Messages = new List<ConversationMessage>
-                            {
-                                new ConversationMessage("assistant", $"Error: {lengthErrorMsg}")
-                            },
-                            ToolCalls = new List<ToolCall>(),
+                            Messages = new List<ConversationMessage>(),
+                            ToolCalls = currentToolCalls,
                             ToolResults = new List<ToolResult>()
                         });
 
-                        throw new InvalidOperationException(lengthErrorMsg);
+                        // Execute the tool
+                        var toolResult = await ExecuteMcpToolAsync(toolCallInfo.Id, toolCallInfo.Name, argsJson, request);
 
-                    default:
-                        var unexpectedErrorMsg = $"Unexpected finish reason: {completion.Value.FinishReason}";
+                        // Create tool result
+                        var toolResultObj = new ToolResult
+                        {
+                            ToolCallId = toolCallInfo.Id,
+                            Result = toolResult,
+                            IsSuccess = !toolResult.StartsWith("Tool execution failed:") && !toolResult.StartsWith("Error executing tool"),
+                            ErrorMessage = toolResult.StartsWith("Tool execution failed:") || toolResult.StartsWith("Error executing tool") ? toolResult : null
+                        };
 
-                        // Emit error as conversation update so UI can display it
+                        // Emit tool execution completed
                         ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
                         {
                             ConversationId = request.ConversationId,
-                            Messages = new List<ConversationMessage>
-                            {
-                                new ConversationMessage("assistant", $"Error: {unexpectedErrorMsg}")
-                            },
-                            ToolCalls = new List<ToolCall>(),
-                            ToolResults = new List<ToolResult>()
+                            Messages = new List<ConversationMessage>(),
+                            ToolCalls = currentToolCalls,
+                            ToolResults = new List<ToolResult> { toolResultObj }
                         });
 
-                        throw new InvalidOperationException(unexpectedErrorMsg);
+                        // Add tool message to conversation
+                        messages.Add(ChatMessage.CreateToolMessage(toolCallInfo.Id, toolResult));
+                    }
                 }
 
             } while (requiresAction);
@@ -398,6 +342,225 @@ public class McpClient : IMcpClient
     }
 
     /// <summary>
+    /// Parse tool arguments JSON into a dictionary, with error handling
+    /// </summary>
+    private Dictionary<string, object?> ParseToolArguments(string argsJson)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(argsJson) || argsJson == "{}")
+                return new Dictionary<string, object?>();
+                
+            return JsonDocument.Parse(argsJson).RootElement.EnumerateObject()
+                .ToDictionary(p => p.Name, p => (object?)p.Value.ToString());
+        }
+        catch
+        {
+            return new Dictionary<string, object?>();
+        }
+    }
+
+    /// <summary>
+    /// Stream OpenAI response and emit real-time updates
+    /// </summary>
+    private async Task<StreamingResult> StreamOpenAiResponseAsync(
+        ChatClient client,
+        List<ChatMessage> messages,
+        ChatCompletionOptions options,
+        string conversationId,
+        StringBuilder responseBuilder,
+        List<ConversationMessage> allConversationMessages,
+        CancellationToken cancellationToken)
+    {
+        var result = new StreamingResult();
+        var currentText = new StringBuilder();
+        var toolCallsById = new Dictionary<int, StreamingToolCallInfo>();
+        ChatFinishReason? finishReason = null;
+        
+        // Track when we last emitted an update for throttling
+        var lastEmitTime = DateTime.UtcNow;
+        var emitIntervalMs = 100; // Emit updates every 100ms
+
+        try
+        {
+            await foreach (var update in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
+            {
+                // Process content updates (streaming text)
+                if (update.ContentUpdate != null && update.ContentUpdate.Count > 0)
+                {
+                    foreach (var contentPart in update.ContentUpdate)
+                    {
+                        if (contentPart != null && !string.IsNullOrEmpty(contentPart.Text))
+                        {
+                            currentText.Append(contentPart.Text);
+                            
+                            // Throttle updates to avoid overwhelming the UI
+                            var now = DateTime.UtcNow;
+                            if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
+                            {
+                                EmitStreamingTextUpdate(conversationId, currentText.ToString(), isComplete: false);
+                                lastEmitTime = now;
+                            }
+                        }
+                    }
+                }
+
+                // Process tool call updates
+                if (update.ToolCallUpdates != null && update.ToolCallUpdates.Count > 0)
+                {
+                    foreach (var toolCallUpdate in update.ToolCallUpdates)
+                    {
+                        if (toolCallUpdate == null) continue;
+                        
+                        if (!toolCallsById.TryGetValue(toolCallUpdate.Index, out var toolInfo))
+                        {
+                            toolInfo = new StreamingToolCallInfo
+                            {
+                                Index = toolCallUpdate.Index,
+                                Id = toolCallUpdate.ToolCallId ?? "",
+                                Name = toolCallUpdate.FunctionName ?? "",
+                                ArgumentsBuilder = new StringBuilder()
+                            };
+                            toolCallsById[toolCallUpdate.Index] = toolInfo;
+                        }
+
+                        if (!string.IsNullOrEmpty(toolCallUpdate.ToolCallId))
+                            toolInfo.Id = toolCallUpdate.ToolCallId;
+                        if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
+                            toolInfo.Name = toolCallUpdate.FunctionName;
+                        
+                        // Safely extract function arguments - BinaryData.ToString() can throw if bytes are null
+                        if (toolCallUpdate.FunctionArgumentsUpdate != null)
+                        {
+                            try
+                            {
+                                // Check if the BinaryData has content before calling ToString()
+                                var binaryData = toolCallUpdate.FunctionArgumentsUpdate;
+                                if (binaryData.ToMemory().Length > 0)
+                                {
+                                    var argsUpdate = binaryData.ToString();
+                                    if (!string.IsNullOrEmpty(argsUpdate))
+                                        toolInfo.ArgumentsBuilder.Append(argsUpdate);
+                                }
+                            }
+                            catch (ArgumentNullException)
+                            {
+                                // BinaryData has null bytes - skip this update
+                                Logger.LogDebug("Skipping tool call arguments update with null bytes");
+                            }
+                        }
+                    }
+                }
+
+                // Capture finish reason
+                if (update.FinishReason.HasValue)
+                {
+                    finishReason = update.FinishReason.Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during OpenAI streaming: {Message}", ex.Message);
+            throw;
+        }
+
+        // Handle final state based on finish reason
+        if (finishReason == ChatFinishReason.Stop)
+        {
+            var finalText = currentText.ToString();
+            if (!string.IsNullOrWhiteSpace(finalText))
+            {
+                EmitStreamingTextUpdate(conversationId, finalText, isComplete: true);
+                responseBuilder.AppendLine(finalText);
+                messages.Add(ChatMessage.CreateAssistantMessage(finalText));
+                allConversationMessages.Add(new ConversationMessage("assistant", finalText));
+            }
+            result.RequiresAction = false;
+        }
+        else if (finishReason == ChatFinishReason.ToolCalls)
+        {
+            var thinkingText = currentText.ToString();
+            if (!string.IsNullOrWhiteSpace(thinkingText))
+            {
+                EmitStreamingTextUpdate(conversationId, thinkingText, isComplete: true);
+                allConversationMessages.Add(new ConversationMessage("assistant", thinkingText));
+                Logger.LogInformation("AI reasoning: {Thinking}", thinkingText);
+            }
+
+            foreach (var toolInfo in toolCallsById.Values.OrderBy(t => t.Index))
+            {
+                var argsString = toolInfo.ArgumentsBuilder.ToString();
+                result.ToolCalls.Add(new ToolCallInfo
+                {
+                    Id = toolInfo.Id,
+                    Name = toolInfo.Name,
+                    ArgumentsJson = string.IsNullOrEmpty(argsString) ? "{}" : argsString
+                });
+            }
+            result.RequiresAction = true;
+        }
+        else if (finishReason == ChatFinishReason.Length)
+        {
+            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+            {
+                ConversationId = conversationId,
+                Messages = new List<ConversationMessage>
+                {
+                    new ConversationMessage("assistant", "Error: Response truncated due to token limit")
+                },
+                ToolCalls = new List<ToolCall>(),
+                ToolResults = new List<ToolResult>()
+            });
+            throw new InvalidOperationException("Incomplete model output due to token limit");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Emit a streaming text update to the UI
+    /// </summary>
+    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete)
+    {
+        try
+        {
+            // Validate inputs to prevent null reference errors
+            if (string.IsNullOrEmpty(conversationId))
+            {
+                Logger.LogWarning("EmitStreamingTextUpdate called with null/empty conversationId");
+                return;
+            }
+            
+            if (string.IsNullOrEmpty(text))
+            {
+                Logger.LogDebug("EmitStreamingTextUpdate called with null/empty text, skipping");
+                return;
+            }
+
+            var message = new ConversationMessage("assistant", text)
+            {
+                IsStreaming = !isComplete
+            };
+
+            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+            {
+                ConversationId = conversationId,
+                Messages = new List<ConversationMessage> { message },
+                ToolCalls = new List<ToolCall>(),
+                ToolResults = new List<ToolResult>()
+            });
+        }
+        catch (Exception ex)
+        {
+            // BREAKPOINT HERE: This is where the error might be occurring
+            Logger.LogError(ex, "Error in EmitStreamingTextUpdate: {Message}. ConversationId={ConversationId}, TextLength={TextLength}, IsComplete={IsComplete}", 
+                ex.Message, conversationId, text?.Length ?? 0, isComplete);
+            throw; // Re-throw to see full stack trace
+        }
+    }
+
+    /// <summary>
     /// Create MCP tools that AI can use from the integrated tool provider
     /// </summary>
     private async Task<List<ChatTool>> CreateMcpToolsAsync()
@@ -421,17 +584,14 @@ public class McpClient : IMcpClient
     /// <summary>
     /// Execute an MCP tool call using the integrated tool provider
     /// </summary>
-    private async Task<string> ExecuteMcpToolAsync(ChatToolCall toolCall, ConversationRequest request)
+    private async Task<string> ExecuteMcpToolAsync(string toolCallId, string toolName, string argumentsJson, ConversationRequest request)
     {
         try
         {
-            var arguments = JsonDocument.Parse(toolCall.FunctionArguments?.ToString() ?? "{}");
+            var arguments = JsonDocument.Parse(string.IsNullOrEmpty(argumentsJson) ? "{}" : argumentsJson);
 
-            // Extract context ID from request - could be stepId, appId, or any other context identifier
             var contextId = request.Context?.GetValueOrDefault("contextId")?.ToString();
-
-            // Pass the full context dictionary to the tool provider so it can access context-specific functions
-            var result = await ToolProvider.ExecuteToolAsync(toolCall.FunctionName, arguments.RootElement, contextId, request.Context);
+            var result = await ToolProvider.ExecuteToolAsync(toolName, arguments.RootElement, contextId, request.Context);
 
             if (result.Success)
             {
@@ -439,22 +599,40 @@ public class McpClient : IMcpClient
             }
             else
             {
-                // Include both the error and the content (which contains the full error details in JSON)
                 var errorMessage = $"Tool execution failed: {result.Error}";
-
-                // If there's content with detailed error info, include it
                 if (!string.IsNullOrEmpty(result.Content))
                 {
                     errorMessage += $"\n\nDetailed Result:\n{result.Content}";
                 }
-
                 return errorMessage;
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error executing MCP tool {ToolName}", toolCall.FunctionName);
-            return $"Error executing tool {toolCall.FunctionName}: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
+            Logger.LogError(ex, "Error executing MCP tool {ToolName}", toolName);
+            return $"Error executing tool {toolName}: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
         }
+    }
+
+    // Helper classes for streaming
+    private class StreamingResult
+    {
+        public bool RequiresAction { get; set; }
+        public List<ToolCallInfo> ToolCalls { get; } = new();
+    }
+
+    private class ToolCallInfo
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ArgumentsJson { get; set; } = "{}";
+    }
+
+    private class StreamingToolCallInfo
+    {
+        public int Index { get; set; }
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public StringBuilder ArgumentsBuilder { get; set; } = new();
     }
 }
