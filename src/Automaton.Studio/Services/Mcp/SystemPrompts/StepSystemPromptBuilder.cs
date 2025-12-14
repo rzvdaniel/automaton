@@ -168,15 +168,19 @@ public class StepSystemPromptBuilder : IStepSystemPromptBuilder
             - [Key feature or technique used]
             ```
 
-            **DO NOT** repeat step-by-step narration like "Plan: I reviewed... Result: I found... Then I saved..." 
-            The user already saw each step in real-time. Just provide the clean summary above.
+            **CRITICAL RULES FOR FINAL RESPONSE:**
+            - **DO NOT** say "I'll update..." or "Now I'll..." after your last tool call - you're DONE!
+            - **DO NOT** describe future actions that you won't actually perform
+            - **DO NOT** repeat step-by-step narration like "Plan: I reviewed... Result: I found... Then I saved..."
+            - The user already saw each step in real-time. Just provide the clean summary above.
+            - If all changes are complete, your final message should ONLY be the Summary of Changes.
 
             ## REMEMBER: 
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
             ⚡ If step has NO variables but code needs them → CALL suggest_variables before generating code!
             ⚡ Save code EARLY and OFTEN - use save_code to show progress, then test and refine!
             ⚡ If execute_code returns Success: false → ANALYZE ERROR, FIX CODE, SAVE AGAIN, and retry!
-            ⚡ Your final response should be a clean Summary of Changes - don't repeat the code!
+            ⚡ Your final response should ONLY be a Summary of Changes - no future plans!
             ⚡ The save-test-fix cycle can repeat multiple times - that's normal and expected!
             Always test your code with execute_code and fix any errors by saving improved versions.
             """.Trim();

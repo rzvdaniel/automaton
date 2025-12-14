@@ -136,8 +136,12 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             - [Notable feature or technique used]
             ```
 
-            **DO NOT** repeat step-by-step narration like "Plan: I reviewed... Result: I found... Then I saved..." 
-            The user already saw each step in real-time. Just provide the clean summary above.
+            **CRITICAL RULES FOR FINAL RESPONSE:**
+            - **DO NOT** say "I'll update..." or "Now I'll..." after your last tool call - you're DONE!
+            - **DO NOT** describe future actions that you won't actually perform
+            - **DO NOT** repeat step-by-step narration like "Plan: I reviewed... Result: I found... Then I saved..." 
+            - The user already saw each step in real-time. Just provide the clean summary above.
+            - If all changes are complete, your final message should ONLY be the Summary of Changes.
 
             ## REMEMBER:
             ⚡ If user says "improve", "modify", "enhance" or mentions "existing code" → START WITH get_current_code!
@@ -147,7 +151,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             ⚡ Follow MODERN web development best practices
             ⚡ Add COMMENTS to explain complex parts
             ⚡ Make it VISUALLY APPEALING with good design principles
-            ⚡ Your final response should be a clean Summary of Changes - don't repeat the code!
+            ⚡ Your final response should ONLY be a Summary of Changes - no future plans!
             """.Trim();
     }
 }

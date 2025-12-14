@@ -453,9 +453,8 @@ For data, use:
 
 ## FINAL RESPONSE FORMAT:
 
-After completing all tool calls, end with a clean **Summary of Changes** section:
+After completing all tool calls, end with a clean Summary of Changes section:
 
-```
 ## Summary of Changes
 
 **What was done:**
@@ -464,9 +463,12 @@ After completing all tool calls, end with a clean **Summary of Changes** section
 
 **Files/Components modified:**
 - [Component or file name]: [What changed]
-```
 
-**DO NOT** repeat step-by-step narration like ""Plan: I reviewed... Result: I found... Then I saved..."" 
-The user already saw each step in real-time. Just provide the clean summary above.";
+**CRITICAL RULES FOR FINAL RESPONSE:**
+- NEVER say phrases like I will update or Now I will after your last tool call - you are DONE
+- NEVER describe future actions that you will not actually perform  
+- NEVER repeat step-by-step narration like Plan: I reviewed... Result: I found...
+- The user already saw each step in real-time. Just provide the clean summary above
+- If all changes are complete, your final message should ONLY be the Summary of Changes";
     }
 }
