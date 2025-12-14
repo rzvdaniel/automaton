@@ -1,74 +1,76 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Markdig;
+using Markdig.Extensions.AutoIdentifiers;
 
 namespace Automaton.Studio.Services;
 
 /// <summary>
-/// Service for formatting AI reasoning messages with code blocks
+/// Service for formatting AI messages with Markdown support
 /// </summary>
 public interface IAiMessageFormattingService
 {
     /// <summary>
+    /// Converts Markdown content to HTML with proper formatting for AI messages
+    /// </summary>
+    string FormatMarkdown(string content);
+
+    /// <summary>
     /// Formats AI reasoning text by converting code blocks (```) into HTML pre elements
+    /// Legacy method - kept for backward compatibility, now uses full Markdown parsing
     /// </summary>
     string FormatReasoningTextWithCode(string content);
 }
 
 /// <summary>
-/// Implementation of AI message formatting service
+/// Implementation of AI message formatting service using Markdig
 /// </summary>
 public class AiMessageFormattingService : IAiMessageFormattingService
 {
-    // Regex pattern to match code blocks with optional language identifier
-    private static readonly Regex CodeBlockRegex = new(@"```\w*\s*\n(.*?)\n```", 
-        RegexOptions.Singleline | RegexOptions.Compiled);
+    private readonly MarkdownPipeline _pipeline;
+
+    public AiMessageFormattingService()
+    {
+        // Configure Markdig pipeline with common extensions
+        _pipeline = new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()     // Includes tables, task lists, etc.
+            .UseAutoIdentifiers(AutoIdentifierOptions.GitHub) // GitHub-style header IDs
+            .UseEmojiAndSmiley()         // Emoji support :emoji:
+            .UseSoftlineBreakAsHardlineBreak() // Treat single newlines as <br>
+            .Build();
+    }
 
     /// <summary>
-    /// Formats AI reasoning text by converting code blocks (```) into HTML pre elements
+    /// Converts Markdown content to HTML with proper formatting for AI messages
     /// </summary>
-    public string FormatReasoningTextWithCode(string content)
+    public string FormatMarkdown(string content)
     {
         if (string.IsNullOrEmpty(content))
             return string.Empty;
-            
-        if (!content.Contains("```"))
-            return System.Net.WebUtility.HtmlEncode(content);
-        
+
         try
         {
-            var result = new StringBuilder();
-            int lastIndex = 0;
-            var matches = CodeBlockRegex.Matches(content);
+            // Convert Markdown to HTML
+            var html = Markdown.ToHtml(content, _pipeline);
             
-            foreach (Match match in matches)
-            {
-                // Add text before the code block
-                if (match.Index > lastIndex)
-                {
-                    var textBefore = content.Substring(lastIndex, match.Index - lastIndex);
-                    result.Append(System.Net.WebUtility.HtmlEncode(textBefore));
-                }
-                
-                // Add the code block using the shared CSS class
-                var code = match.Groups[1].Value;
-                result.Append($"<pre class='generated-code-block'><code>{System.Net.WebUtility.HtmlEncode(code)}</code></pre>");
-                
-                lastIndex = match.Index + match.Length;
-            }
+            // Add CSS class to code blocks for consistent styling
+            html = html.Replace("<pre><code", "<pre class='ai-code-block'><code");
             
-            // Add any remaining text after the last code block
-            if (lastIndex < content.Length)
-            {
-                var textAfter = content.Substring(lastIndex);
-                result.Append(System.Net.WebUtility.HtmlEncode(textAfter));
-            }
-            
-            return result.ToString();
+            return html;
         }
         catch
         {
             // Fallback to plain text if parsing fails
-            return System.Net.WebUtility.HtmlEncode(content);
+            return $"<p>{System.Net.WebUtility.HtmlEncode(content)}</p>";
         }
+    }
+
+    /// <summary>
+    /// Formats AI reasoning text - now uses full Markdown parsing
+    /// </summary>
+    public string FormatReasoningTextWithCode(string content)
+    {
+        // Use the new Markdown formatter
+        return FormatMarkdown(content);
     }
 }

@@ -23,6 +23,7 @@
     <PackageReference Include="CronExpressionDescriptor" Version="2.36.0" />
     <PackageReference Include="Cronos" Version="0.8.4" />
     <PackageReference Include="Hangfire" Version="1.8.16" />
+    <PackageReference Include="Markdig" Version="0.38.0" />
     <PackageReference Include="MediatR.Courier" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.10" />
