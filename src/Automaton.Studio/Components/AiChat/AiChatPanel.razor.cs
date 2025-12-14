@@ -693,13 +693,15 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     /// </summary>
     private void CollapseReasoningMessages()
     {
-        for (int i = 0; i < messages.Count; i++)
+        // Create a new list to avoid modifying collection during iteration
+        messages = messages.Select(msg =>
         {
-            if (messages[i].Type == MessageType.Reasoning && !messages[i].IsReasoningCollapsed)
+            if (msg.Type == MessageType.Reasoning && !msg.IsReasoningCollapsed)
             {
-                messages[i] = messages[i] with { IsReasoningCollapsed = true };
+                return msg with { IsReasoningCollapsed = true };
             }
-        }
+            return msg;
+        }).ToList();
     }
 
     // Helper Classes for Better Structure

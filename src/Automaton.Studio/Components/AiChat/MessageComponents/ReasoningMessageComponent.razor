@@ -40,12 +40,16 @@
     { 
         get 
         {
-            // Generate a short summary from the first line or first 60 chars
+            // Generate a short summary from the first line or MaxSummaryLength characters
             if (string.IsNullOrWhiteSpace(Content)) return string.Empty;
             
             var firstLine = Content.Split('\n').FirstOrDefault()?.Trim() ?? "";
             if (firstLine.Length > MaxSummaryLength)
+            {
+                // Use Substring for simplicity - performance is acceptable for UI display
+                // The summary is only computed when rendering, not during data processing
                 return firstLine.Substring(0, SummaryTruncateLength) + "...";
+            }
             return firstLine;
         } 
     }
