@@ -1,17 +1,17 @@
 ﻿@using System.Globalization
 
-<div class="tool-chip @GetStatusClass()">
-    <span class="chip-icon">@StatusIcon</span>
-    <span class="chip-text">@Title</span>
+<div class="tool-header @GetStatusClass()">
+    <span class="header-icon">@StatusIcon</span>
+    <span class="header-text">@Title</span>
     @if (ShowTimestamp && Timestamp.HasValue)
     {
-        <span class="chip-time">@Timestamp.Value.ToString("HH:mm:ss")</span>
+        <span class="header-time">@Timestamp.Value.ToString("HH:mm")</span>
     }
 </div>
 
 @code {
     [Parameter] 
-    public string StatusIcon { get; set; } = "🔧";
+    public string StatusIcon { get; set; } = "•";
     
     [Parameter] 
     public string StatusText { get; set; } = "Unknown";
@@ -32,57 +32,62 @@
     {
         return Status?.ToLowerInvariant() switch
         {
-            "executing" => "chip-executing",
-            "success" => "chip-success",
-            "error" or "failed" => "chip-error",
-            _ => "chip-default"
+            "executing" => "status-executing",
+            "success" => "status-success",
+            "error" or "failed" => "status-error",
+            _ => "status-default"
         };
     }
 }
 
 <style>
-    .tool-chip {
-        display: inline-flex;
+    .tool-header {
+        display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 16px;
-        font-size: 12px;
+        gap: 8px;
+        padding: 4px 0;
+        font-size: 13px;
         font-weight: 500;
-        transition: all 0.15s ease;
     }
 
-    .chip-icon {
-        font-size: 11px;
+    .header-icon {
+        font-size: 12px;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
     }
 
-    .chip-text {
-        color: inherit;
+    .status-executing .header-icon {
+        background: #fef3c7;
+        color: #d97706;
     }
 
-    .chip-time {
-        font-size: 10px;
-        opacity: 0.7;
-        font-family: 'SF Mono', Consolas, monospace;
+    .status-success .header-icon {
+        background: #d1fae5;
+        color: #059669;
     }
 
-    .chip-executing {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        color: #92400e;
+    .status-error .header-icon {
+        background: #fee2e2;
+        color: #dc2626;
     }
 
-    .chip-success {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        color: #065f46;
+    .status-default .header-icon {
+        background: #e2e8f0;
+        color: #64748b;
     }
 
-    .chip-error {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-        color: #991b1b;
-    }
-
-    .chip-default {
-        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    .header-text {
+        flex: 1;
         color: #475569;
+    }
+
+    .header-time {
+        font-size: 11px;
+        color: #94a3b8;
+        font-family: 'SF Mono', Consolas, monospace;
     }
 </style>

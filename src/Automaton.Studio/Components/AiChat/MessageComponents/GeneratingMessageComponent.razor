@@ -1,7 +1,8 @@
 @using AntDesign
 
 <div class="generating-indicator">
-    <p><em>@Content</em></p>
+    <div class="pulse-dot"></div>
+    <span class="generating-text">@Content</span>
 </div>
 
 @code {
@@ -12,7 +13,33 @@
 <style>
     .generating-indicator {
         display: flex;
-        flex-direction: column;
+        align-items: center;
         gap: 8px;
+        font-size: 13px;
+        color: #64748b;
+        font-style: italic;
+    }
+
+    .generating-text {
+        color: #64748b;
+    }
+
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background: #94a3b8;
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.5;
+            transform: scale(0.8);
+        }
     }
 </style>

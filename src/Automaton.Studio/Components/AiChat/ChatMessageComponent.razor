@@ -10,12 +10,13 @@
             <div class="bubble-content">
                 @Message.Content
             </div>
+            <div class="bubble-timestamp">@Message.Time.ToString("HH:mm")</div>
         </div>
     }
     else
     {
-        <!-- AI message: Left-aligned, no bubble for most types -->
-        <div class="ai-message">
+        <!-- AI message: Left-aligned bubble -->
+        <div class="message-bubble ai-bubble">
             @switch (Message.Type)
             {
                 case MessageType.Generating:
@@ -51,12 +52,13 @@
                 case MessageType.Reasoning:
                     <ReasoningMessageComponent 
                         Content="@Message.Content" 
+                        Timestamp="@Message.Time"
                         InitiallyCollapsed="false" />
                     break;
 
                 case MessageType.Text:
                 default:
-                    <TextMessageComponent Content="@Message.Content" />
+                    <TextMessageComponent Content="@Message.Content" Timestamp="@Message.Time" />
                     break;
             }
         </div>
@@ -109,7 +111,7 @@
     .chat-message {
         display: flex;
         flex-direction: column;
-        margin: 4px 0;
+        margin: 6px 0;
     }
 
     .chat-message.align-right {
@@ -120,19 +122,34 @@
         align-items: flex-start;
     }
 
-    /* User bubble - right aligned, colored */
+    /* Common bubble styles */
     .message-bubble {
         max-width: 85%;
         padding: 10px 14px;
-        border-radius: 18px;
+        border-radius: 16px;
         font-size: 14px;
         line-height: 1.5;
     }
 
+    /* User bubble - right aligned */
     .user-bubble {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        border-bottom-right-radius: 6px;
+        background: #e0e7ef;
+        color: #1e293b;
+        border-bottom-right-radius: 4px;
+    }
+
+    .user-bubble .bubble-timestamp {
+        text-align: right;
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    /* AI bubble - left aligned */
+    .ai-bubble {
+        background: #f1f5f9;
+        color: #334155;
+        border-bottom-left-radius: 4px;
     }
 
     .bubble-content {
@@ -140,18 +157,16 @@
         overflow-wrap: break-word;
     }
 
-    /* AI message - left aligned, no bubble background */
-    .ai-message {
-        max-width: 100%;
-        width: 100%;
-    }
-
     /* Thinking indicator */
     .thinking-indicator {
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 8px 0;
+        padding: 8px 14px;
+        background: #f1f5f9;
+        border-radius: 16px;
+        border-bottom-left-radius: 4px;
+        margin-top: 6px;
     }
 
     .thinking-indicator span {

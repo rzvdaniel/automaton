@@ -3,10 +3,16 @@
 <div class="text-message markdown-content">
     @((MarkupString)FormattingService.FormatReasoningTextWithCode(Content))
 </div>
+<div class="message-footer">
+    <span class="timestamp">@Timestamp.ToString("HH:mm")</span>
+</div>
 
 @code {
     [Parameter, EditorRequired]
     public string Content { get; set; } = string.Empty;
+
+    [Parameter]
+    public DateTime Timestamp { get; set; }
 
     [Inject]
     private IAiMessageFormattingService FormattingService { get; set; } = default!;
@@ -17,14 +23,24 @@
         line-height: 1.6;
     }
 
+    .message-footer {
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+    }
+
+    .timestamp {
+        font-size: 11px;
+        color: #94a3b8;
+        font-family: 'SF Mono', Consolas, monospace;
+    }
+
     /* Essential Markdown styles only */
     .text-message.markdown-content ::deep h2 {
-        margin: 16px 0 8px 0;
+        margin: 12px 0 8px 0;
         font-weight: 600;
-        color: #1f2937;
-        font-size: 1.2em;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 4px;
+        color: #334155;
+        font-size: 1.1em;
     }
 
     .text-message.markdown-content ::deep h2:first-child {
@@ -47,11 +63,11 @@
 
     .text-message.markdown-content ::deep strong {
         font-weight: 600;
-        color: #111827;
+        color: #1e293b;
     }
 
     .text-message.markdown-content ::deep code {
-        background: #f3f4f6;
+        background: #e2e8f0;
         padding: 2px 6px;
         border-radius: 4px;
         font-family: 'Consolas', monospace;
@@ -59,8 +75,8 @@
     }
 
     .text-message.markdown-content ::deep pre {
-        background: #1e1e1e;
-        color: #d4d4d4;
+        background: #1e293b;
+        color: #e2e8f0;
         border-radius: 6px;
         padding: 12px;
         margin: 12px 0;
@@ -81,12 +97,12 @@
     .text-message.markdown-content ::deep th,
     .text-message.markdown-content ::deep td {
         padding: 8px 12px;
-        border: 1px solid #e5e7eb;
+        border: 1px solid #e2e8f0;
         text-align: left;
     }
 
     .text-message.markdown-content ::deep th {
-        background: #f9fafb;
+        background: #f1f5f9;
         font-weight: 600;
     }
 </style>

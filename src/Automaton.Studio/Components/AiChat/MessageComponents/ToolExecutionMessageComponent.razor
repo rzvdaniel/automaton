@@ -1,7 +1,7 @@
 @using AntDesign
 @using Automaton.Studio.Components.AiChat.ToolResults
 
-<div class="tool-message @GetStatusClass()">
+<div class="tool-message">
     @if (Status == "executing")
     {
         <div class="tool-inline">
@@ -14,6 +14,9 @@
         <div class="tool-inline">
             <span class="status-icon success">?</span>
             <span class="tool-text">@Description</span>
+        </div>
+        <div class="message-footer">
+            <span class="timestamp">@Timestamp.ToString("HH:mm")</span>
         </div>
     }
     else if (ResultViewModel != null)
@@ -36,13 +39,16 @@
             }
             else
             {
-                <span class="status-icon default">?</span>
+                <span class="status-icon default">•</span>
             }
             <span class="tool-text">@Description</span>
             @if (Status == "error" && !string.IsNullOrEmpty(ErrorMessage))
             {
                 <span class="error-hint">@ErrorMessage</span>
             }
+        </div>
+        <div class="message-footer">
+            <span class="timestamp">@Timestamp.ToString("HH:mm")</span>
         </div>
     }
 </div>
@@ -62,22 +68,10 @@
 
     [Parameter]
     public DateTime Timestamp { get; set; }
-
-    private string GetStatusClass()
-    {
-        return Status?.ToLowerInvariant() switch
-        {
-            "executing" => "status-executing",
-            "completed" or "success" => "status-success",
-            "error" => "status-error",
-            _ => "status-default"
-        };
-    }
 }
 
 <style>
     .tool-message {
-        margin: 6px 0;
         transition: all 0.2s ease;
     }
 
@@ -85,32 +79,14 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 20px;
         font-size: 13px;
-    }
-
-    .tool-message.status-executing .tool-inline {
-        background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
-        border-color: #fde047;
-    }
-
-    .tool-message.status-success .tool-inline {
-        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-        border-color: #86efac;
-    }
-
-    .tool-message.status-error .tool-inline {
-        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-        border-color: #fca5a5;
+        padding: 4px 0;
     }
 
     .pulse-dot {
         width: 8px;
         height: 8px;
-        background: #eab308;
+        background: #f59e0b;
         border-radius: 50%;
         animation: pulse 1.5s ease-in-out infinite;
     }
@@ -138,7 +114,7 @@
     }
 
     .status-icon.success {
-        background: #22c55e;
+        background: #10b981;
         color: white;
     }
 
@@ -153,7 +129,7 @@
     }
 
     .tool-text {
-        color: #374151;
+        color: #475569;
         font-weight: 500;
     }
 
@@ -161,5 +137,17 @@
         color: #dc2626;
         font-size: 12px;
         margin-left: 4px;
+    }
+
+    .message-footer {
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+    }
+
+    .timestamp {
+        font-size: 11px;
+        color: #94a3b8;
+        font-family: 'SF Mono', Consolas, monospace;
     }
 </style>

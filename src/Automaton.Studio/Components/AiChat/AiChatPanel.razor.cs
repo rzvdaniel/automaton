@@ -380,7 +380,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         return toolName switch
         {
-            "get_current_code" => "Reading current code from editor",
+            "get_current_code" => "Reading code",
             "execute_code" => "Testing code execution",
             "get_step_variables" => "Analyzing step variables",
             "suggest_variables" => "Creating input/output variables",

@@ -2,14 +2,14 @@
 @using Automaton.Studio.Components.AiChat.ToolResults.Utilities
 @using System.Net
 
-<div class="code-result-card">
-    <div class="card-content">
+<div class="code-result-content">
+    <div class="content-body">
         @((MarkupString)FormatContentForDisplay())
     </div>
     
     @if (!string.IsNullOrEmpty(CodeId) && OnApplyCode.HasDelegate)
     {
-        <div class="card-actions">
+        <div class="content-actions">
             <button class="action-btn primary" @onclick="HandleApplyCode" disabled="@IsApplyDisabled">
                 <span class="btn-icon">?</span>
                 Apply Changes
@@ -52,50 +52,45 @@
 }
 
 <style>
-    .code-result-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    .code-result-content {
+        width: 100%;
     }
 
-    .card-content {
-        padding: 14px 16px;
-        color: #374151;
+    .content-body {
+        color: #475569;
         font-size: 13px;
         line-height: 1.6;
     }
 
-    .card-content ::deep strong {
+    .content-body ::deep strong {
         font-weight: 600;
-        color: #111827;
+        color: #334155;
     }
 
-    .card-content ::deep ul,
-    .card-content ::deep ol {
+    .content-body ::deep ul,
+    .content-body ::deep ol {
         margin: 8px 0;
         padding-left: 18px;
     }
 
-    .card-content ::deep li {
+    .content-body ::deep li {
         margin: 4px 0;
     }
 
-    .card-content ::deep code {
-        background: #f3f4f6;
+    .content-body ::deep code {
+        background: #e2e8f0;
         padding: 2px 5px;
         border-radius: 4px;
         font-size: 0.9em;
         font-family: 'SF Mono', Consolas, monospace;
     }
 
-    .card-actions {
-        padding: 10px 16px;
-        background: #f9fafb;
-        border-top: 1px solid #e5e7eb;
+    .content-actions {
+        padding-top: 10px;
+        margin-top: 10px;
+        border-top: 1px solid #e2e8f0;
         display: flex;
-        justify-content: flex-end;
+        justify-content: flex-start;
     }
 
     .action-btn {
@@ -112,20 +107,17 @@
     }
 
     .action-btn.primary {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        background: #475569;
         color: white;
     }
 
     .action-btn.primary:hover:not(:disabled) {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        background: #334155;
     }
 
     .action-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        transform: none;
     }
 
     .btn-icon {
