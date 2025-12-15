@@ -330,13 +330,15 @@ public class StepMcpToolProvider : IMcpToolProvider
                     inputVariables[prop.Name] = prop.Value.ToString() ?? "";
                 }
             }
-            else
-            {
-                // Provide default test data following Studio's patterns
-                inputVariables["input_text"] = "Test data for processing";
-                inputVariables["input_number"] = "42";
-                inputVariables["input_data"] = JsonSerializer.Serialize(new Dictionary<string, string> { ["key"] = "value" });
-            }
+            
+
+            // Get the step's defined output variable names for filtering
+            var outputVariableNames = _stepContextService.GetOutputVariables()
+                ?.Select(v => v.Name)
+                .ToList() ?? new List<string>();
+            
+            _logger.LogDebug("Step has {Count} defined output variables: {Names}", 
+                outputVariableNames.Count, string.Join(", ", outputVariableNames));
 
             // Use the existing Studio execution service
             var executionResult = await _executeService.ExecuteCustomStepCodeAsync(
@@ -349,6 +351,40 @@ public class StepMcpToolProvider : IMcpToolProvider
             if (!string.IsNullOrEmpty(stepId))
             {
                 _stepContexts[stepId] = new StepContext { Code = code, Language = language };
+            }
+
+            // Filter output variables to only include defined output variables
+            var filteredOutputVariables = new Dictionary<string, string>();
+            if (executionResult.OutputVariables != null && outputVariableNames.Any())
+            {
+                foreach (var outputVarName in outputVariableNames)
+                {
+                    if (executionResult.OutputVariables.TryGetValue(outputVarName, out var value))
+                    {
+                        filteredOutputVariables[outputVarName] = value;
+                    }
+                }
+                _logger.LogDebug("Filtered output variables from {Total} to {Filtered} based on step definition",
+                    executionResult.OutputVariables.Count, filteredOutputVariables.Count);
+            }
+            else if (executionResult.OutputVariables != null && !outputVariableNames.Any())
+            {
+                // No output variables defined - return all (for debugging/exploration)
+                // but exclude internal variables and input variables
+                var internalAndInputKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "error", "stackTrace", "errorOutput", "stdout", "stderr",
+                    "input_text", "input_number", "input_data"
+                };
+                
+                // Also exclude module imports and other Python internals
+                filteredOutputVariables = executionResult.OutputVariables
+                    .Where(kvp => !internalAndInputKeys.Contains(kvp.Key))
+                    .Where(kvp => !kvp.Value.Contains("<module ") && !kvp.Value.Contains("<Response "))
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                    
+                _logger.LogDebug("No output variables defined, filtered to {Count} variables (excluding internals)",
+                    filteredOutputVariables.Count);
             }
 
             // Enhanced result with detailed feedback and full error information
@@ -366,9 +402,10 @@ public class StepMcpToolProvider : IMcpToolProvider
                     stackTrace = executionResult.ErrorInfo.StackTrace,
                     formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
                 } : null,
-                outputVariables = executionResult.OutputVariables ?? [],
+                outputVariables = filteredOutputVariables,
                 executionTime = executionResult.ExecutionTime ?? "0ms",
                 inputVariablesUsed = inputVariables,
+                definedOutputVariables = outputVariableNames,
                 codeAnalysis = new
                 {
                     linesOfCode = code?.Split('\n').Length ?? 0,
