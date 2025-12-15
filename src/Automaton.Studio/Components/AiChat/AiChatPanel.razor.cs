@@ -527,46 +527,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         
         var userMessage = new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now);
         messages.Add(userMessage);
-        
-        var generatingMessage = CreateGeneratingMessage();
-        messages.Add(generatingMessage);
-        
+                
         promptText = string.Empty;
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
-    }
-
-    // SRP: Message Creation
-    private ChatMessage CreateGeneratingMessage()
-    {
-        var selectedProvider = GetSelectedProvider();
-        var selectedModel = GetSelectedModel();
-        var selectedApiKeyId = GetSelectedApiKeyId();
-        
-        var contextMessage = BuildContextMessage(selectedProvider, selectedModel, selectedApiKeyId);
-        
-        return new ChatMessage("AI", contextMessage, DateTime.Now) 
-        { 
-            IsGenerating = true, 
-            Type = MessageType.Generating 
-        };
-    }
-
-    // SRP: Context Message Building
-    private string BuildContextMessage(AiProviderInfo? provider, string model, string? apiKeyId)
-    {
-        var contextMessage = $"Using {provider?.ProviderName} - {model} with frontend tools";
-        
-        if (!string.IsNullOrEmpty(apiKeyId) && provider?.StoredKeys?.Any() == true)
-        {
-            var selectedKey = provider.StoredKeys.FirstOrDefault(k => k.Id.ToString() == apiKeyId);
-            if (selectedKey != null)
-            {
-                contextMessage += $" (Key: {selectedKey.Name})";
-            }
-        }
-        
-        return contextMessage;
     }
 
     // SRP: Conversation Context Preparation

@@ -1,7 +1,10 @@
-﻿@using System.Globalization
+﻿@using AntDesign
+@using System.Globalization
 
 <div class="tool-header @GetStatusClass()">
-    <span class="header-icon">@StatusIcon</span>
+    <span class="header-icon" role="img" aria-label="@GetStatusAria(Status)">
+        <Icon Type="@GetIconType(Status)" Theme="IconThemeType.Outline" />
+    </span>
     <span class="header-text">@Title</span>
     @if (ShowTimestamp && Timestamp.HasValue)
     {
@@ -10,24 +13,21 @@
 </div>
 
 @code {
-    [Parameter] 
-    public string StatusIcon { get; set; } = "•";
-    
-    [Parameter] 
+    [Parameter]
     public string StatusText { get; set; } = "Unknown";
-    
-    [Parameter] 
+
+    [Parameter]
     public string Status { get; set; } = "unknown";
-    
-    [Parameter] 
+
+    [Parameter]
     public string? Title { get; set; }
-    
-    [Parameter] 
+
+    [Parameter]
     public DateTime? Timestamp { get; set; }
-    
-    [Parameter] 
+
+    [Parameter]
     public bool ShowTimestamp { get; set; } = true;
-    
+
     private string GetStatusClass()
     {
         return Status?.ToLowerInvariant() switch
@@ -36,6 +36,28 @@
             "success" => "status-success",
             "error" or "failed" => "status-error",
             _ => "status-default"
+        };
+    }
+
+    private string GetIconType(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "executing" => "loading",
+            "success" => "check",
+            "error" or "failed" => "close",
+            _ => "setting"
+        };
+    }
+
+    private string GetStatusAria(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "executing" => "Running",
+            "success" => "Success",
+            "error" or "failed" => "Error",
+            _ => "Status"
         };
     }
 }
@@ -51,33 +73,11 @@
     }
 
     .header-icon {
-        font-size: 12px;
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
-    }
-
-    .status-executing .header-icon {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .status-success .header-icon {
-        background: #d1fae5;
-        color: #059669;
-    }
-
-    .status-error .header-icon {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-
-    .status-default .header-icon {
-        background: #e2e8f0;
-        color: #64748b;
     }
 
     .header-text {
@@ -88,6 +88,6 @@
     .header-time {
         font-size: 11px;
         color: #94a3b8;
-        font-family: 'SF Mono', Consolas, monospace;
+        font-family: monospace;
     }
 </style>
