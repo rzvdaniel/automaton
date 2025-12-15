@@ -321,7 +321,10 @@ public class StepMcpToolProvider : IMcpToolProvider
         {
             _logger.LogInformation("Executing {Language} code for step {StepId}", language, stepId);
             
-            // Prepare input variables with realistic test data
+            // Get the step's defined input variables for test data
+            var stepInputVariables = _stepContextService.GetInputVariables();
+            
+            // Prepare input variables - use step's defined inputs or provided ones
             var inputVariables = new Dictionary<string, string>();
             if (arguments.TryGetProperty("inputVariables", out var inputVarsProp))
             {
@@ -331,60 +334,39 @@ public class StepMcpToolProvider : IMcpToolProvider
                 }
             }
             
+            // Also include step's defined input variables with their current values
+            if (stepInputVariables != null)
+            {
+                foreach (var inputVar in stepInputVariables)
+                {
+                    if (!inputVariables.ContainsKey(inputVar.Name) && !string.IsNullOrEmpty(inputVar.Value))
+                    {
+                        inputVariables[inputVar.Name] = inputVar.Value;
+                    }
+                }
+            }
 
             // Get the step's defined output variable names for filtering
             var outputVariableNames = _stepContextService.GetOutputVariables()
                 ?.Select(v => v.Name)
                 .ToList() ?? new List<string>();
             
-            _logger.LogDebug("Step has {Count} defined output variables: {Names}", 
-                outputVariableNames.Count, string.Join(", ", outputVariableNames));
+            _logger.LogDebug("Step has {InputCount} input and {OutputCount} output variables", 
+                inputVariables.Count, outputVariableNames.Count);
 
-            // Use the existing Studio execution service
+            // Use the unified execution service with output variable filtering
+            // This now uses CustomStepExecutor internally for consistency with Runner execution
             var executionResult = await _executeService.ExecuteCustomStepCodeAsync(
                 code, 
                 language, 
                 inputVariables, 
-                stepId ?? Guid.NewGuid().ToString());
+                stepId ?? Guid.NewGuid().ToString(),
+                outputVariableNames);  // Pass output variable names for filtering
             
             // Store updated context
             if (!string.IsNullOrEmpty(stepId))
             {
                 _stepContexts[stepId] = new StepContext { Code = code, Language = language };
-            }
-
-            // Filter output variables to only include defined output variables
-            var filteredOutputVariables = new Dictionary<string, string>();
-            if (executionResult.OutputVariables != null && outputVariableNames.Any())
-            {
-                foreach (var outputVarName in outputVariableNames)
-                {
-                    if (executionResult.OutputVariables.TryGetValue(outputVarName, out var value))
-                    {
-                        filteredOutputVariables[outputVarName] = value;
-                    }
-                }
-                _logger.LogDebug("Filtered output variables from {Total} to {Filtered} based on step definition",
-                    executionResult.OutputVariables.Count, filteredOutputVariables.Count);
-            }
-            else if (executionResult.OutputVariables != null && !outputVariableNames.Any())
-            {
-                // No output variables defined - return all (for debugging/exploration)
-                // but exclude internal variables and input variables
-                var internalAndInputKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "error", "stackTrace", "errorOutput", "stdout", "stderr",
-                    "input_text", "input_number", "input_data"
-                };
-                
-                // Also exclude module imports and other Python internals
-                filteredOutputVariables = executionResult.OutputVariables
-                    .Where(kvp => !internalAndInputKeys.Contains(kvp.Key))
-                    .Where(kvp => !kvp.Value.Contains("<module ") && !kvp.Value.Contains("<Response "))
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                    
-                _logger.LogDebug("No output variables defined, filtered to {Count} variables (excluding internals)",
-                    filteredOutputVariables.Count);
             }
 
             // Enhanced result with detailed feedback and full error information
@@ -402,7 +384,7 @@ public class StepMcpToolProvider : IMcpToolProvider
                     stackTrace = executionResult.ErrorInfo.StackTrace,
                     formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
                 } : null,
-                outputVariables = filteredOutputVariables,
+                outputVariables = executionResult.OutputVariables ?? new Dictionary<string, string>(),
                 executionTime = executionResult.ExecutionTime ?? "0ms",
                 inputVariablesUsed = inputVariables,
                 definedOutputVariables = outputVariableNames,
