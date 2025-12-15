@@ -143,7 +143,8 @@ public static class CodeExtractionUtility
     }
 
     /// <summary>
-    /// Determines if a string is likely to be code based on common programming patterns
+    /// Determines if a string is likely to be code based on common programming patterns.
+    /// This method is conservative to avoid false positives from explanatory text.
     /// </summary>
     /// <param name="content">The content to analyze</param>
     /// <returns>True if the content appears to be code</returns>
@@ -152,13 +153,37 @@ public static class CodeExtractionUtility
         if (string.IsNullOrWhiteSpace(content))
             return false;
 
+        // First, check for explanatory text indicators - if found, this is NOT code
+        var explanatoryIndicators = new[]
+        {
+            "summary of changes",
+            "what was done",
+            "variables created",
+            "variables modified", 
+            "code highlights",
+            "here's what",
+            "here is what",
+            "the code has been",
+            "i've updated",
+            "i have updated",
+            "successfully executed",
+            "execution complete",
+            "the following",
+            "changes made",
+        };
+        
+        var lowerContent = content.ToLowerInvariant();
+        if (explanatoryIndicators.Any(phrase => lowerContent.Contains(phrase)))
+        {
+            return false; // This is explanatory text, not code
+        }
+
         var codeIndicators = new[]
         {
             "def ", "class ", "import ", "from ", // Python
             "function ", "const ", "let ", "var ", // JavaScript
             "public ", "private ", "void ", "int ", "string ", // C#
             "if ", "for ", "while ", "try ", "catch ", // General programming constructs
-            "{", "}", "()", "[]", "=", ";", // Code symbols
         };
 
         var indicatorCount = codeIndicators.Count(indicator => 
@@ -170,7 +195,11 @@ public static class CodeExtractionUtility
                               (content.Contains("{") && content.Contains("}")) ||
                               (content.Contains("(") && content.Contains(")"));
 
-        return indicatorCount >= 3 || (indicatorCount >= 1 && hasCodeStructure);
+        // Be more conservative: require at least 3 indicators, or 2 with strong code structure
+        // This reduces false positives from explanatory text that mentions code keywords
+        return indicatorCount >= 3 || (indicatorCount >= 2 && hasCodeStructure && 
+            // Additional check: must have some code-specific symbols
+            (content.Contains("=") || content.Contains(":") || content.Contains(";")));
     }
 
     /// <summary>
