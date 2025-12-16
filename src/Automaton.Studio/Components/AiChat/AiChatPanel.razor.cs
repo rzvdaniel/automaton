@@ -188,7 +188,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                     if (existingToolMessage == null)
                     {
-                        var toolMessage = new ChatMessage("AI", FormatToolCall(toolCall), DateTime.Now)
+                        var toolMessage = new ChatMessage("AI", GetToolDescription(toolCall.Name), DateTime.Now)
                         {
                             Type = MessageType.ToolExecution,
                             ToolCallId = toolCall.Id,
@@ -337,13 +337,6 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         // This includes AI's thoughts, explanations, analysis, etc.
         return true;
     }
-    
-    private string FormatToolCall(ToolCall toolCall)
-    {
-        var icon = GetToolIcon(toolCall.Name);
-        var description = GetToolDescription(toolCall.Name);
-        return $"{icon} {description}";
-    }
 
     private string FormatToolResultFromViewModel(ToolResultViewModel viewModel)
     {
@@ -360,20 +353,6 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
         
         return result;
-    }
-
-    // Proper Unicode emoji icons - these work in browsers
-    private string GetToolIcon(string toolName)
-    {
-        return toolName switch
-        {
-            "get_current_code" => "📖",    // Book emoji
-            "execute_code" => "🧪",        // Test tube emoji  
-            "get_step_variables" => "🔍",  // Magnifying glass emoji
-            "suggest_variables" => "✨",    // Sparkles emoji (for creating variables)
-            "save_code" => "💾",           // Floppy disk emoji
-            _ => "🔧"                      // Wrench emoji
-        };
     }
 
     private string GetToolDescription(string toolName)
