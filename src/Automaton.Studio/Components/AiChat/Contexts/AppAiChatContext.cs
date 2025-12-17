@@ -21,8 +21,6 @@ public class AppAiChatContext : IAiChatContext
         _getCurrentCode = getCurrentCode;
     }
 
-    public string Title => "AI Web Code Generation";
-
     public string InputPlaceholder => "Describe the web page you want to create (HTML/CSS/JavaScript)...";
 
     public string InitialSystemMessage => "AI web code generation ready with MCP integration. AI can now see and edit your HTML code in real-time.";

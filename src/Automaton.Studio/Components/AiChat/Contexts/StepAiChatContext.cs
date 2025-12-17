@@ -31,8 +31,6 @@ public class StepAiChatContext : IAiChatContext
         _getCurrentCode = getCurrentCode;
     }
 
-    public string Title => "AI Code Generation (MCP)";
-
     public string InputPlaceholder => "Describe what you want the AI to do... (MCP tools will be used automatically)";
 
     public string InitialSystemMessage => "AI code panel ready with MCP integration. AI can now see and test your code in real-time.";

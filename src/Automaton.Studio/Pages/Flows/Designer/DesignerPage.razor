@@ -190,15 +190,7 @@
                                         <Tabs Size="TabSize.Small" Class="right-panel" ActiveKey="@rightPanelActiveTab" OnChange="@OnRightPanelTabChange">
                                             <TabPane Tab="Properties" Key="properties">
                                                 <div class="tab-content-scrollable">                                              
-                                                    <div class="properties-container">
-                                                        <PanelHeader Title="Step Details"
-                                                            ShowClearButton="false"
-                                                            ShowPinButton="true"
-                                                            ShowCloseButton="true"
-                                                            OnCloseClick="ClosePropertiesPanel"
-                                                            PinTooltip="Pin properties panel"
-                                                            CloseTooltip="Close properties" />
-                                                        
+                                                    <div class="properties-container">                                                        
                                                         @if (selectedStep != null)
                                                         {
                                                             <div class="properties-content">

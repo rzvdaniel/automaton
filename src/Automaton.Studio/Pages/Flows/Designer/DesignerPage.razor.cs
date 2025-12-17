@@ -285,13 +285,6 @@ partial class DesignerPage : ComponentBase
         StateHasChanged();
     }
 
-    private void ClosePropertiesPanel()
-    {
-        selectedStep = null;
-        rightPanelActiveTab = "ai"; // Switch back to AI Chat tab when properties are closed
-        StateHasChanged();
-    }
-
     private async Task OnStepUpdated(bool success)
     {
         if (success)

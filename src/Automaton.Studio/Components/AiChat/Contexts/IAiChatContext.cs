@@ -6,11 +6,6 @@ namespace Automaton.Studio.Components.AiChat.Contexts;
 public interface IAiChatContext
 {
     /// <summary>
-    /// Title displayed in the chat panel header
-    /// </summary>
-    string Title { get; }
-
-    /// <summary>
     /// Placeholder text for the input area
     /// </summary>
     string InputPlaceholder { get; }

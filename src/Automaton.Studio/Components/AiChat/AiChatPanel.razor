@@ -13,16 +13,6 @@
 @implements IDisposable
 
 <div class="ai-chat-panel">
-	<PanelHeader Title="@Context.Title"
-				 ShowClearButton="true"
-				 OnClearClick="ClearConversationHistory"
-				 ClearDisabled="@isGeneratingCode"
-				 ClearTooltip="Clear conversation history"
-				 ShowPinButton="true"
-				 ShowCloseButton="true"
-				 PinTooltip="Pin panel"
-				 CloseTooltip="Close panel" />
-
 	<div class="ai-chat-body" @ref="messagesContainer" id="ai-chat-messages">
 		<div class="messages">
 			@for (int i = 0; i < messages.Count; i++)

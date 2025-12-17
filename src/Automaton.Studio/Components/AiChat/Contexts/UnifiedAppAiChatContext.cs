@@ -25,8 +25,6 @@ public class UnifiedAppAiChatContext : IAiChatContext
         _getLinkedSteps = getLinkedSteps;
     }
 
-    public string Title => "AI application Generation";
-
     public string InputPlaceholder => "Describe your complete app (frontend + backend)...";
 
     public string InitialSystemMessage => "I can create both frontend (HTML/CSS/JavaScript) and backend (Custom Steps) in a single interaction.";
