@@ -15,7 +15,7 @@ This document outlines the v3 plan for implementing Cloud Runners with a **provi
 7. **Admin-Only Execution** - Only Admins can trigger infrastructure flows
 8. **User Choice** - Users select server based on location/specs/price/provider
 
-### What's New in v3
+### Key Features
 
 - **Generic Server Entity** with JSON metadata for provider-specific attributes
 - **Provider Abstraction Layer** for different infrastructure types
@@ -212,7 +212,7 @@ public enum CloudServerStatus
 }
 ```
 
-### CloudRunner Entity (Unchanged from v2, Provider-Agnostic)
+### CloudRunner Entity (Provider-Agnostic)
 
 Represents a user's Cloud Runner container on any server.
 
@@ -483,7 +483,7 @@ These flows work consistently across all providers since they operate at the Doc
 | `apiUrl` | string | Studio.Server URL |
 | `imageTag` | string | Runner image tag (default: "latest") |
 
-**Bash Script** (Same as v2, provider-independent):
+**Bash Script** (provider-independent):
 ```bash
 #!/bin/bash
 set -e
@@ -544,9 +544,9 @@ echo "Container ${CONTAINER_NAME} started successfully"
 docker inspect --format='{{.Id}}' "${CONTAINER_NAME}"
 ```
 
-### Flow 2-6: Same as v2
+### Flows 2-6: Additional Management Flows
 
-All other management flows (Remove, Restart, Get Status, Get Stats, Install Docker) remain identical to v2 since they are Docker-focused and provider-agnostic.
+All other management flows (Remove, Restart, Get Status, Get Stats, Install Docker) are Docker-focused and provider-agnostic.
 
 ---
 
@@ -636,12 +636,12 @@ public class ServerProviderFactory : IServerProviderFactory
 }
 ```
 
-### CloudRunnerService (Minimal changes from v2)
+### CloudRunnerService
 
 ```csharp
 public class CloudRunnerService
 {
-    // Same methods as v2, unchanged
+    // Core service methods
     Task<List<CloudRunnerDto>> GetUserCloudRunnersAsync(Guid userId);
     Task<CloudRunnerDto?> GetCloudRunnerAsync(Guid id, Guid userId);
     Task<CloudRunnerResult> CreateCloudRunnerAsync(Guid userId, CreateCloudRunnerRequest request);
@@ -672,7 +672,7 @@ POST   /api/cloud-servers/{id}/health-check  - Perform health check
 GET    /api/cloud-servers/{id}/stats         - Get server stats (triggers flow)
 ```
 
-### CloudRunners Controller (User) - Unchanged from v2
+### CloudRunners Controller (User)
 
 ```
 GET    /api/cloud-runners              - List user's Cloud Runners
@@ -1109,56 +1109,29 @@ The setup process is now more flexible to support different infrastructure types
 
 ## Security Considerations
 
-### Same as v2, Plus:
+- **Management Runner Security**
+  - Runs as root with Docker socket access
+  - API key is admin-level, never exposed to users
+  - Only accessible by Admin users for flow execution
+  - Marked as `IsManagementRunner = true` in database
+
+- **Cloud Runner Isolation**
+  - Each container has resource limits (CPU, memory, PIDs)
+  - Runs with `--security-opt=no-new-privileges:true`
+  - Cannot access Docker socket
+  - Cannot access other containers
+  - Unique API key per Cloud Runner
+
+- **API Security**
+  - Cloud Runner endpoints require authentication
+  - Users can only manage their own Cloud Runners
+  - Server registration/management requires Admin role
+  - Management flow execution requires Admin role
 
 - **Provider Credential Storage**: If providers require API keys, store them encrypted
 - **Multi-Tenancy**: Ensure users can only see servers available to them
 - **Provider Validation**: Validate provider metadata to prevent injection attacks
 - **Network Isolation**: On-premise servers might need special network rules
-
----
-
-## Migration from v2 to v3
-
-### Database Migration Steps
-
-1. **Add new columns to CloudServer**:
-   - `Provider` (enum)
-   - `ProviderRegion` (nullable string)
-   - `Capabilities` (JSON string)
-   - `ProviderMetadata` (JSON string)
-   - `ConnectionSettings` (JSON string)
-   - `Tags` (JSON string)
-   - `PublicIpAddress` (nullable string)
-
-2. **Convert existing v2 data**:
-   ```sql
-   UPDATE CloudServer 
-   SET Provider = 'Hetzner',
-       ProviderRegion = Location,
-       Capabilities = JSON_OBJECT(
-           'CpuCores', CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(Specs, ' vCPU', 1), ' ', -1) AS UNSIGNED),
-           'MemoryMB', CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(Specs, 'GB', 1), ' ', -1) AS UNSIGNED) * 1024,
-           'StorageGB', CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(Specs, 'GB', 2), ' ', -1) AS UNSIGNED),
-           'StorageType', 'SSD'
-       ),
-       ProviderMetadata = JSON_OBJECT(
-           'ServerType', ServerType
-       )
-   WHERE Provider IS NULL;
-   ```
-
-3. **Remove old columns** (after validation):
-   - `ServerType` (moved to ProviderMetadata)
-   - `Specs` (replaced by Capabilities)
-   - If `Location` and `ProviderRegion` are duplicates, keep only one
-
-### Code Migration
-
-- Existing v2 services will mostly work unchanged
-- Add provider factory initialization in `Program.cs`
-- Update UI to show provider information
-- Update API controllers to support provider filtering
 
 ---
 
@@ -1182,9 +1155,9 @@ This flexibility allows administrators to:
 
 ---
 
-## Benefits of v3 over v2
+## Key Benefits
 
-1. **No Vendor Lock-in**: Can migrate between providers or use multiple simultaneously
+1. **No Vendor Lock-in**: Use any infrastructure provider or mix multiple providers simultaneously
 2. **Cost Optimization**: Choose the most cost-effective provider per region
 3. **Leverage Existing Infrastructure**: Use on-premise servers without additional cost
 4. **Compliance Flexibility**: Meet data residency requirements with provider choice
@@ -1253,7 +1226,7 @@ public class GcpServerMetadata
 
 2. **Provider API Integration?**
    - Should the system integrate with provider APIs (Hetzner, AWS) for automated provisioning?
-   - Or keep it manual as in v2?
+   - Or keep it manual for initial implementation?
 
 3. **Multi-Region Support?**
    - Should users be able to deploy to multiple servers simultaneously?
@@ -1330,6 +1303,6 @@ src/Automaton.Studio/
 
 ## Conclusion
 
-This v3 plan transforms the Cloud Runner deployment from a Hetzner-specific solution to a **truly provider-agnostic architecture** that can scale across multiple cloud providers, on-premise infrastructure, and bare metal servers. The use of JSON for flexible metadata ensures the system can evolve without constant schema changes, while the provider abstraction layer makes it easy to add support for new infrastructure types.
+This plan outlines a **provider-agnostic architecture** for Cloud Runner deployment that can scale across multiple cloud providers, on-premise infrastructure, and bare metal servers. The use of JSON for flexible metadata ensures the system can evolve without constant schema changes, while the provider abstraction layer makes it easy to add support for new infrastructure types.
 
-The core Docker-based deployment model remains unchanged, ensuring consistency and reliability across all provider types while maintaining the security and isolation benefits established in v2.
+The Docker-based deployment model ensures consistency and reliability across all provider types while maintaining strong security and isolation for Cloud Runner containers.
