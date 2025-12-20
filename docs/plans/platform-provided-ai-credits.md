@@ -4,6 +4,8 @@
 
 This document outlines the plan for implementing a platform-provided AI credits system for Automaton Studio, allowing users to utilize AI Chat panels in the Step Designer and App Designer without initially providing their own AI API keys. This feature will enable new users to start building Apps, Flows, and Custom Steps using AI assistance immediately after subscription, following industry best practices from platforms like Cursor, Vercel v0, GitHub Copilot, and Replit.
 
+> **Note**: This document is part of the overall [Automaton Studio Subscription Model](./subscription-model.md). Please refer to that document for comprehensive subscription tier details, pricing, and how AI credits integrate with other platform features like Cloud Runners and core platform capabilities.
+
 ### Key Design Decisions
 
 1. **Platform-Managed AI Keys** - Studio server stores and manages master AI API keys for supported providers
@@ -238,6 +240,8 @@ public class PlatformAiKey
 
 ## Proposed Subscription Tiers & Quotas
 
+> **See also**: [Subscription Model](./subscription-model.md) for the complete tier comparison including Cloud Runners, published apps, flows, and other platform features.
+
 Based on industry standards and cost considerations:
 
 ### Free Tier
@@ -248,6 +252,7 @@ Based on industry standards and cost considerations:
   - Platform models only (user can't select specific model)
   - Rate limit: 100 requests/day
   - Standard response time
+- **Add-ons**: ❌ Not available (upgrade to Pro for add-ons)
 
 ### Pro Tier ($20/month)
 - **Monthly AI Credits**: 500,000 tokens (~1,250-2,500 AI chat interactions)
@@ -258,6 +263,10 @@ Based on industry standards and cost considerations:
   - Higher rate limit: 1,000 requests/day
   - Priority processing
   - Rollover of unused credits (up to 50%)
+- **Add-ons**: ✅ Purchase additional tokens
+  - **$10 per 250,000 tokens** (no expiration)
+  - Automatically used when monthly quota exhausted
+  - Stack unlimited add-on purchases
 
 ### Enterprise Tier (Custom pricing)
 - **Monthly AI Credits**: 5,000,000+ tokens (unlimited in practice)
@@ -268,6 +277,7 @@ Based on industry standards and cost considerations:
   - Custom models/fine-tuning support
   - SSO integration
   - Priority support
+- **Add-ons**: ✅ Custom volume pricing available
 
 ### Bring Your Own Key (BYOK)
 - Available on **all tiers** (including Free)
