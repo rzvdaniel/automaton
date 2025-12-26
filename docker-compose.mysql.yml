@@ -1,0 +1,50 @@
+# MySQL Database Docker Compose
+# Usage: docker compose -f docker-compose.mysql.yml up -d
+#
+# This provides a standalone MySQL database for development.
+# Use this when you want to run the Studio Server locally but need the database in Docker.
+#
+# Default credentials (can be overridden with environment variables):
+#   - Root password: AutomatonRoot123!
+#   - Database: automaton
+#   - User: automaton_user
+#   - Password: AutomatonPass123!
+#
+# Connection string for Studio Server:
+#   Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: automaton-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
+      MYSQL_USER: ${MYSQL_USER:-automaton_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AutomatonPass123!}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # Persist MySQL data
+      - mysql-data:/var/lib/mysql
+      # Optional: Add custom MySQL configuration
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      # Optional: Add initialization scripts
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mysql-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  mysql-network:
+    driver: bridge

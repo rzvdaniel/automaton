@@ -65,12 +65,20 @@ public class RunnerHostService
             // Set up HTTP client authentication
             await SetupHttpClientAuth();
 
-            // Check if runner is registered - if not, use default name
+            // Check if runner is registered - if not, use environment variable or default name
             if (!configService.IsRunnerRegistered())
             {
                 logger.Warning("Runner not registered - will register with default name");
-                var defaultName = $"Service-{Environment.MachineName}";
-                var registerSuccess = await RegisterRunnerAsync(defaultName);
+                
+                // Priority: AUTOMATON_RUNNER_NAME env var > Service-{MachineName}
+                var runnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
+                if (string.IsNullOrEmpty(runnerName))
+                {
+                    runnerName = $"Service-{Environment.MachineName}";
+                }
+                
+                logger.Information("Registering runner with name: {RunnerName}", runnerName);
+                var registerSuccess = await RegisterRunnerAsync(runnerName);
 
                 if (!registerSuccess)
                 {

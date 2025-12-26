@@ -1,0 +1,39 @@
+# Production Docker Compose for Automaton Runner
+# Usage: docker compose -f docker-compose.runner.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.example to .env
+#   2. Configure AUTOMATON_SERVER_URL and AUTOMATON_API_KEY in .env
+#
+# See docs/runners/docker-runner.md for detailed setup instructions.
+
+services:
+  runner:
+    build:
+      context: ./src
+      dockerfile: Automaton.Runner/Dockerfile
+    image: automaton-runner:latest
+    container_name: automaton-runner
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+    command: ["service"]  # Run in non-interactive service mode
+    volumes:
+      # Persist runner configuration and registration
+      - runner-config:/app/.config/AutomatonRunner
+      # Persist logs
+      - runner-logs:/app/logs
+    networks:
+      - runner-network
+
+volumes:
+  runner-config:
+    driver: local
+  runner-logs:
+    driver: local
+
+networks:
+  runner-network:
+    driver: bridge

@@ -202,6 +202,22 @@ public class HubService
                     options.Headers.Add("X-API-Key", apiKey);
                     options.Headers.Add(RunnerIdHeader, configService.RunnerId);
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
+                    
+                    // Bypass SSL validation in development mode (for self-signed certificates)
+                    var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
+                                       Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+                    if (isDevelopment)
+                    {
+                        options.HttpMessageHandlerFactory = (handler) =>
+                        {
+                            if (handler is HttpClientHandler clientHandler)
+                            {
+                                clientHandler.ServerCertificateCustomValidationCallback = 
+                                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                            }
+                            return handler;
+                        };
+                    }
                 })
                 .WithAutomaticReconnect(new[] 
                 { 

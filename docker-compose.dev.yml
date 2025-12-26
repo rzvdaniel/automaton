@@ -48,8 +48,44 @@ services:
   #   volumes:
   #     - ./logs:/app/Logs
 
+  # =============================================================================
+  # Automaton Runner (Development)
+  # =============================================================================
+  # Prerequisites:
+  #   1. Copy .env.example to .env
+  #   2. Create an API key in Studio (Settings > API Keys)
+  #   3. Add the API key to .env (AUTOMATON_API_KEY)
+  #
+  # Usage: docker compose -f docker-compose.dev.yml up runner-dev --build
+  # =============================================================================
+  runner-dev:
+    build:
+      context: ./src
+      dockerfile: Automaton.Runner/Dockerfile
+    image: automaton-runner-dev:latest
+    container_name: automaton-runner-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+    volumes:
+      # Persist runner configuration and registration
+      - runner-config:/app/.config/AutomatonRunner
+      # Persist logs
+      - runner-logs:/app/logs
+    networks:
+      - automaton-network
+    # Add host entry for Linux compatibility (optional, Windows/Mac use host.docker.internal)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   mysql-data:
+    driver: local
+  runner-config:
+    driver: local
+  runner-logs:
     driver: local
 
 networks:

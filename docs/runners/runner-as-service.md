@@ -2,6 +2,61 @@
 
 This guide shows you how to configure Automaton Runner to run as a system service on Windows, Linux, and macOS. Running as a service provides automatic startup, resilience, and better resource management for production deployments.
 
+## The `service` Command
+
+When running as a system service, use the **`service`** command:
+
+```bash
+automaton-runner service
+```
+
+This runs the runner in **non-interactive mode**, which:
+- ✅ Reads configuration from environment variables only (no prompts)
+- ✅ Auto-registers with the server if not already registered
+- ✅ Uses default name `Service-{MachineName}` for auto-registration
+- ✅ Runs indefinitely without console interaction
+- ✅ Logs errors and exits with proper exit codes for service managers
+
+**Required Environment Variables:**
+| Variable | Description |
+|----------|-------------|
+| `AUTOMATON_SERVER_URL` | Server URL (e.g., `https://studio.automaton.monster`) |
+| `AUTOMATON_API_KEY` | Your API key from Automaton Studio |
+
+**Alternative for Server URL:** You can also use `AppConfig__BaseUrl` (standard .NET configuration binding).
+
+## Understanding Service Managers vs. the `service` Command
+
+The `service` command does **one thing**: run the runner in headless mode (no prompts, read config from environment variables, run forever). The **service manager** handles everything else:
+
+| Deployment | Service Manager | What handles lifecycle? |
+|------------|-----------------|------------------------|
+| **Docker container** | Docker (`restart: unless-stopped`) | Docker manages start, stop, restart, health |
+| **Windows native** | NSSM (Non-Sucking Service Manager) | NSSM wraps the process as a Windows Service |
+| **Linux native** | systemd | systemd manages the service unit |
+| **macOS native** | launchd | launchd manages the launch daemon/agent |
+
+**What the service manager provides:**
+- ✅ Start on system boot
+- ✅ Restart on crash/failure
+- ✅ Graceful stop on shutdown
+- ✅ Health monitoring and status reporting
+- ✅ Log management
+
+**What the `service` command provides:**
+- ✅ Non-interactive mode (no console prompts)
+- ✅ Read configuration from environment variables
+- ✅ Auto-registration with default naming
+- ✅ Proper exit codes for service managers
+
+### Docker vs. Native Installation
+
+**Docker containers:** You do NOT install the runner as a service inside the container. Docker itself is the service manager. The container runs `automaton-runner service` as its main process (PID 1), and Docker handles restarts via the `restart` policy in docker-compose.
+
+**Native installations (Windows/Linux/macOS):** Users install the runner as a system service using platform-specific tools (NSSM, systemd, launchd). These tools wrap `automaton-runner service` and manage its lifecycle.
+
+> **See also:** [Running Runner in Docker](docker-runner.md) for container-based deployments.
+
 ## Quick Setup with Scripts
 
 For simplified installation, we provide automated setup scripts:
@@ -108,11 +163,11 @@ $serviceName = "AutomatonRunner"
 $apiKey = "ak_your_api_key_here"
 $serverUrl = "https://studio.automaton.monster"
 
-# Install service
-nssm install $serviceName $runnerPath
+# Install service with 'service' command argument
+nssm install $serviceName $runnerPath service
 
 # Configure environment variables
-nssm set $serviceName AppEnvironmentExtra "AUTOMATON_API_KEY=$apiKey" "AppConfig__BaseUrl=$serverUrl"
+nssm set $serviceName AppEnvironmentExtra "AUTOMATON_API_KEY=$apiKey" "AUTOMATON_SERVER_URL=$serverUrl"
 
 # Set description
 nssm set $serviceName Description "Automaton workflow runner for automation"
@@ -192,9 +247,9 @@ Type=simple
 User=<your-username>
 Group=<your-username>
 WorkingDirectory=/home/<your-username>
-Environment="AppConfig__BaseUrl=https://studio.automaton.monster"
+Environment="AUTOMATON_SERVER_URL=https://studio.automaton.monster"
 Environment="AUTOMATON_API_KEY=ak_your_api_key_here"
-ExecStart=/usr/local/bin/automaton-runner
+ExecStart=/usr/local/bin/automaton-runner service
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -211,7 +266,8 @@ WantedBy=multi-user.target
 **Configuration Notes:**
 - Replace `<your-username>` with your actual username
 - Update `AUTOMATON_API_KEY` with your API key
-- Update `AppConfig__BaseUrl` if using a different server
+- Update `AUTOMATON_SERVER_URL` to your server URL
+- Note the `service` argument in `ExecStart` — this is required for non-interactive mode
 - Adjust `WorkingDirectory` if runner stores files
 
 ### Step 2: Set Permissions
@@ -326,6 +382,7 @@ Add the following content:
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/automaton-runner</string>
+        <string>service</string>
     </array>
     
     <key>RunAtLoad</key>
@@ -342,7 +399,7 @@ Add the following content:
     
     <key>EnvironmentVariables</key>
     <dict>
-        <key>AppConfig__BaseUrl</key>
+        <key>AUTOMATON_SERVER_URL</key>
         <string>https://studio.automaton.monster</string>
         <key>AUTOMATON_API_KEY</key>
         <string>ak_your_api_key_here</string>
@@ -353,6 +410,8 @@ Add the following content:
 </dict>
 </plist>
 ```
+
+> **Note:** The `service` argument is included in `ProgramArguments` to run in non-interactive mode.
 
 #### Step 2: Set Permissions
 
@@ -422,7 +481,8 @@ All platforms support environment variables for configuration:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `AUTOMATON_API_KEY` | Yes | Your API key from Automaton Studio |
-| `AppConfig__BaseUrl` | Yes | Server URL (e.g., https://studio.automaton.monster) |
+| `AUTOMATON_SERVER_URL` | Yes | Server URL (e.g., `https://studio.automaton.monster`) |
+| `AppConfig__BaseUrl` | Alt | Alternative to `AUTOMATON_SERVER_URL` (.NET config binding) |
 | `DOTNET_ENVIRONMENT` | No | Set to `Production` for production deployments |
 | `DOTNET_ThreadPool_MinThreads` | No | Minimum thread pool size (default: CPU count) |
 | `DOTNET_ThreadPool_MaxThreads` | No | Maximum thread pool size (default: CPU count × 250) |
@@ -433,13 +493,14 @@ All platforms support environment variables for configuration:
 
 **Windows (NSSM):**
 ```powershell
-nssm set AutomatonRunner AppEnvironmentExtra "AUTOMATON_API_KEY=ak_..."
+nssm set AutomatonRunner AppEnvironmentExtra "AUTOMATON_API_KEY=ak_..." "AUTOMATON_SERVER_URL=https://..."
 ```
 
 **Linux (systemd):**
 ```ini
 [Service]
 Environment="AUTOMATON_API_KEY=ak_..."
+Environment="AUTOMATON_SERVER_URL=https://..."
 ```
 
 **macOS (launchd):**
@@ -447,6 +508,8 @@ Environment="AUTOMATON_API_KEY=ak_..."
 <key>EnvironmentVariables</key>
 <dict>
     <key>AUTOMATON_API_KEY</key>
+    <string>ak_...</string>
+    <key>AUTOMATON_SERVER_URL</key>
     <string>ak_...</string>
 </dict>
 ```
