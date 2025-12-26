@@ -11,11 +11,33 @@ public class PythonPromptProvider : ILanguagePromptProvider
 
     public string GetCodeTemplate()
     {
-        return """
+        return """"
             ```python
             import json
+            import subprocess
+            import sys
 
+            # =============================================================================
+            # Helper function to install missing packages at runtime
+            # =============================================================================
+            def ensure_package(package_name, import_name=None):
+                """Install a package if it's not available. Use import_name if different from package_name."""
+                name = import_name or package_name
+                try:
+                    __import__(name)
+                except ImportError:
+                    print(f"INFO: Installing missing package: {package_name}")
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", package_name])
+
+            # Install required packages (if not already available)
+            # Common packages (requests, pandas, numpy, boto3, etc.) are pre-installed in Docker.
+            # Add any additional packages your step needs here:
+            # ensure_package("some-package")
+            # ensure_package("package-name", "import_name")  # When import name differs
+
+            # =============================================================================
             # Standard output variables - ALWAYS include these
+            # =============================================================================
             success = False
             error_message = ""
 
@@ -42,7 +64,7 @@ public class PythonPromptProvider : ILanguagePromptProvider
                 error_message = str(e)
                 print(f"ERROR: {error_message}")
             ```
-            """;
+            """";
     }
 
     public string GetOutputVariableGuidance()
@@ -143,6 +165,30 @@ public class PythonPromptProvider : ILanguagePromptProvider
             4. **Keep output data small** - extract only needed fields, don't store raw API responses
             5. **Outputs are native types**: Booleans, numbers, dicts, lists - NOT stringified
             6. **Never call `json.dumps()`** on outputs - the runner handles serialization
+
+            ## PACKAGE MANAGEMENT:
+
+            The Docker runner has common packages pre-installed: `requests`, `httpx`, `aiohttp`, 
+            `pandas`, `numpy`, `pyyaml`, `boto3`, `beautifulsoup4`, `lxml`, `Pillow`, `pymysql`, 
+            `psycopg2-binary`, `python-dotenv`, `jinja2`, `python-dateutil`.
+
+            **For packages NOT in the pre-installed list**, use the `ensure_package()` helper 
+            at the top of your script:
+
+            ```python
+            # Install packages before importing them
+            ensure_package("openai")           # Package name same as import
+            ensure_package("python-telegram-bot", "telegram")  # Package name differs from import
+            ensure_package("google-cloud-storage", "google.cloud.storage")
+
+            # Now import and use
+            import openai
+            from telegram import Bot
+            from google.cloud import storage
+            ```
+
+            **IMPORTANT**: Always call `ensure_package()` BEFORE importing the package.
+            The helper silently succeeds if the package is already installed.
             """;
     }
 
@@ -197,6 +243,22 @@ public class PythonPromptProvider : ILanguagePromptProvider
             ## PYTHON EXAMPLE - HTTP API Call:
 
             ```python
+            import subprocess
+            import sys
+
+            # Helper to install missing packages
+            def ensure_package(package_name, import_name=None):
+                name = import_name or package_name
+                try:
+                    __import__(name)
+                except ImportError:
+                    print(f"INFO: Installing missing package: {package_name}")
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", package_name])
+
+            # Ensure required packages (requests is pre-installed, but shown for reference)
+            # ensure_package("requests")  # Pre-installed in Docker
+            # ensure_package("some-other-package")  # Add non-standard packages here
+
             import requests
 
             # Initialize outputs
