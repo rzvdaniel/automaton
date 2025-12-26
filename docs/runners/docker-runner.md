@@ -124,6 +124,60 @@ The development runner image includes:
 - **Python 3.13** — for executing custom Python steps
 - **Non-root user** — runs as `automaton` user for security
 
+### Pre-installed Python Packages
+
+The runner image comes with commonly-used Python packages pre-installed:
+
+| Category | Packages |
+|----------|----------|
+| **HTTP & API** | `requests`, `httpx`, `aiohttp` |
+| **Data Processing** | `pandas`, `numpy` |
+| **Serialization** | `pyyaml`, `python-dateutil` |
+| **Databases** | `pymysql`, `psycopg2-binary` |
+| **Cloud** | `boto3` (AWS SDK) |
+| **Utilities** | `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2` |
+
+### Installing Additional Packages
+
+If your custom step needs a package that's not pre-installed, you have several options:
+
+**Option 1: Install at the start of your step (temporary)**
+```python
+import subprocess
+import sys
+
+# Install package if not available
+try:
+    import some_package
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "some_package"])
+    import some_package
+
+# Your step code here...
+```
+
+**Option 2: Extend the Docker image (permanent)**
+
+Create a custom Dockerfile:
+```dockerfile
+FROM automaton-runner:latest
+
+USER root
+RUN pip install --no-cache-dir \
+    your-package-1 \
+    your-package-2
+USER automaton
+```
+
+Build and use your custom image:
+```bash
+docker build -t my-automaton-runner .
+```
+
+**Option 3: Request package addition**
+
+If a package is commonly needed, consider requesting it be added to the base image by opening an issue or PR.
+
 ## Why Docker for Python Steps?
 
 **Docker is the recommended way to run Python custom steps** because it provides a controlled, reproducible environment.

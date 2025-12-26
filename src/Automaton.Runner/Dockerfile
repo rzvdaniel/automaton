@@ -60,6 +60,31 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
     && rm dotnet-install.sh \
     && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 
+# Install common Python packages for custom steps
+# These are the most frequently used packages in automation workflows
+RUN pip install --no-cache-dir \
+    # HTTP & API
+    requests \
+    httpx \
+    aiohttp \
+    # Data processing
+    pandas \
+    numpy \
+    # JSON/YAML/CSV
+    pyyaml \
+    python-dateutil \
+    # Database connectors
+    pymysql \
+    psycopg2-binary \
+    # Cloud SDKs
+    boto3 \
+    # Utilities
+    beautifulsoup4 \
+    lxml \
+    Pillow \
+    python-dotenv \
+    jinja2
+
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton
 
