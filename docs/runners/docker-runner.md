@@ -1,14 +1,44 @@
-# Running Automaton Runner in Docker (Development)
+# Running Automaton Runner in Docker
 
-This guide explains how to run the Automaton Runner as a Docker container for local development.
+This guide explains how to run the Automaton Runner as a Docker container.
 
-## Prerequisites
+## Quick Start (Production)
+
+The easiest way to deploy a runner that connects to **https://automaton.monster**:
+
+```bash
+docker run -d \
+  --name automaton-runner \
+  --restart unless-stopped \
+  -e AUTOMATON_API_KEY=ak_your_key_here \
+  -e AUTOMATON_RUNNER_NAME=My-Runner \
+  rzvdaniel/automaton-runner:latest
+```
+
+That's it! The runner will:
+1. Connect to the Automaton production server automatically
+2. Register with the name you specified
+3. Wait for workflow executions
+
+### Get an API Key
+
+1. Log in to [https://automaton.monster](https://automaton.monster)
+2. Go to **Settings > API Keys**
+3. Click **Create API Key**
+4. Select scope: **Runner**
+5. Copy the generated key (starts with `ak_`)
+
+---
+
+## Development Setup
+
+For **local development** (connecting to a local Studio Server):
+
+### Prerequisites
 
 - Docker Desktop installed and running
 - Automaton Studio Server running locally (default: `https://localhost:7091`)
 - An API key created in Automaton Studio
-
-## Quick Start
 
 ### 1. Create an API Key
 

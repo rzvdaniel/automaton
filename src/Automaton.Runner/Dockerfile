@@ -96,9 +96,11 @@ COPY --from=build /app/publish .
 # Set ownership for non-root user
 RUN chown -R automaton:automaton /app
 
-# Environment defaults (Production by default, override with DOTNET_ENVIRONMENT=Development)
+# Environment defaults
+# - Production server URL is the default (override for development)
+# - API key must be provided by the user
 ENV DOTNET_ENVIRONMENT=Production
-ENV AUTOMATON_SERVER_URL=""
+ENV AUTOMATON_SERVER_URL="https://api.automaton.monster"
 ENV AUTOMATON_API_KEY=""
 ENV AUTOMATON_RUNNER_NAME=""
 

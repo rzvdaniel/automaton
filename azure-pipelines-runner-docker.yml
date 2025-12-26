@@ -1,0 +1,106 @@
+# Azure Pipeline: Build and Publish Automaton Runner to Docker Hub
+#
+# This pipeline builds the runner Docker image and publishes it to Docker Hub.
+#
+# Prerequisites:
+#   1. Create a Docker Hub account (e.g., rzvdaniel or automatonhq)
+#   2. Create a Docker Hub repository: automaton-runner
+#   3. Create a Docker Hub Access Token: https://hub.docker.com/settings/security
+#   4. In Azure DevOps, create a Service Connection:
+#      - Project Settings > Service Connections > New > Docker Registry
+#      - Registry type: Docker Hub
+#      - Docker ID: your-docker-hub-username
+#      - Password: your-access-token
+#      - Service connection name: DockerHub
+#
+# Trigger: Manual or on tags (e.g., v1.0.0, runner-v1.0.0)
+
+trigger:
+  tags:
+    include:
+      - 'v*'
+      - 'runner-v*'
+  paths:
+    include:
+      - src/Automaton.Runner/**
+      - src/Automaton.Core/**
+      - src/Automaton.Core.Scripting/**
+      - src/Automaton.Steps/**
+      - src/Automaton.Mcp/**
+
+pr: none  # Don't run on PRs
+
+variables:
+  dockerRegistryServiceConnection: 'DockerHub'
+  imageRepository: 'rzvdaniel/automaton-runner'
+  dockerfilePath: 'src/Automaton.Runner/Dockerfile'
+  buildContext: 'src'
+  
+  # Tag with version from git tag, or 'latest' for main branch
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+    imageTag: ${{ replace(variables['Build.SourceBranchName'], 'runner-', '') }}
+  ${{ else }}:
+    imageTag: 'latest'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Build
+    displayName: 'Build and Push Docker Image'
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Build and Push'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: Docker@2
+            displayName: 'Login to Docker Hub'
+            inputs:
+              command: login
+              containerRegistry: $(dockerRegistryServiceConnection)
+
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              command: build
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              buildContext: $(buildContext)
+              tags: |
+                $(imageTag)
+                latest
+              arguments: '--no-cache'
+
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              command: push
+              repository: $(imageRepository)
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: 'Logout from Docker Hub'
+            inputs:
+              command: logout
+              containerRegistry: $(dockerRegistryServiceConnection)
+
+          - script: |
+              echo "##[section]Docker Image Published Successfully!"
+              echo ""
+              echo "Image: $(imageRepository):$(imageTag)"
+              echo "Image: $(imageRepository):latest"
+              echo ""
+              echo "Users can now run:"
+              echo ""
+              echo "  docker run -d \\"
+              echo "    --name automaton-runner \\"
+              echo "    --restart unless-stopped \\"
+              echo "    -e AUTOMATON_API_KEY=ak_your_key_here \\"
+              echo "    -e AUTOMATON_RUNNER_NAME=My-Runner \\"
+              echo "    $(imageRepository):latest"
+              echo ""
+            displayName: 'Print Usage Instructions'
