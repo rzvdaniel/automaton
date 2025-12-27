@@ -326,25 +326,26 @@ partial class DesignerPage : ComponentBase
 
     private void NavigateToDownloadRunner()
     {
-        // Show informative modal with option to navigate to runner download
+        // Show informative modal with option to navigate to runner deployment
         var modal = ModalService.Info(new ConfirmOptions()
         {
-            Title = "Install a Runner",
+            Title = "Deploy a Runner",
             Content = @"
                 <div style='margin: 16px 0;'>
-                    <p>To execute workflows from the web interface, you need to install and run an Automaton Runner on your local machine or server.</p>
+                    <p>To execute workflows from the web interface, you need to deploy an Automaton Runner.</p>
+                    <p><strong>The easiest way:</strong> Deploy a Docker container with a single command.</p>
                     <p><strong>The runner will:</strong></p>
                     <ul style='margin: 12px 0 12px 24px;'>
-                        <li>Connect securely to your Automaton Studio</li>
+                        <li>Connect securely to Automaton</li>
                         <li>Execute workflows on your behalf</li>
-                        <li>Provide access to local files and applications</li>
+                        <li>Run Python custom steps with pre-installed packages</li>
                     </ul>
                 </div>",
-            OkText = "Download Runner",
+            OkText = "Deploy Runner",
             CancelText = "Later",
             OnOk = (args) => 
             {
-                NavigationManager.NavigateTo("/downloads-runner", true);
+                NavigationManager.NavigateTo("/runners", true);
                 return Task.CompletedTask;
             }
         });

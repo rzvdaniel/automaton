@@ -48,7 +48,29 @@ A **Runner** is a lightweight agent that connects to your Automaton platform and
 
 > 💡 **Quick Start**: For complete setup instructions including installation, configuration, and troubleshooting, see the [Runner Setup Guide](runner-setup.md).
 
-### Quick Setup Overview
+### Deployment Options
+
+| Method | Recommended For | Time to Deploy |
+|--------|-----------------|----------------|
+| **🐳 Docker** (Recommended) | Production, Cloud, CI/CD | ~1 minute |
+| **📦 Native Executable** | Local development, Bare metal | ~5 minutes |
+
+### Docker Deployment (Recommended)
+
+The fastest way to get a runner up and running:
+
+```bash
+docker run -d \
+  --name automaton-runner \
+  -e AUTOMATON_API_KEY=ak_your_api_key_here \
+  rzvdaniel/automaton-runner:latest
+```
+
+The Docker image includes:
+- .NET 9.0 Runtime
+- Python 3.13 with pre-installed packages (pandas, numpy, requests, boto3, etc.)
+
+### Quick Setup Overview (Native Executable)
 
 1. **Download the Runner**: 
    - Go to **Downloads Hub** in Automaton Studio
@@ -74,8 +96,8 @@ A **Runner** is a lightweight agent that connects to your Automaton platform and
 ### Detailed Setup Instructions
 
 For comprehensive documentation including:
+- Docker deployment (Docker CLI, Docker Desktop, Docker Compose)
 - Detailed installation for all platforms
-- Docker and container deployment
 - CI/CD integration examples
 - System service configuration
 - Troubleshooting common issues

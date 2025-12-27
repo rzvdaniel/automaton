@@ -1,32 +1,32 @@
-# Console Runner Setup Guide
+
 
 <div class="doc-hero hero-runners">
   <div class="doc-hero-content">
     <div class="doc-hero-icon">🏃</div>
-    <h1>Console Runner Setup</h1>
+    <h1>Runner Deployment</h1>
     <p class="hero-subtitle">
-      Complete guide to installing, configuring, and running the Automaton Console Runner on any platform
+      Complete guide to deploying and running Automaton Runners using Docker or native executables
     </p>
     <div class="doc-hero-stats">
       <div class="doc-hero-stat">
-        <span class="doc-hero-stat-number">🖥️</span>
-        <span class="doc-hero-stat-label">Cross-Platform</span>
+        <span class="doc-hero-stat-number">🐳</span>
+        <span class="doc-hero-stat-label">Docker Ready</span>
       </div>
       <div class="doc-hero-stat">
         <span class="doc-hero-stat-number">⚡</span>
         <span class="doc-hero-stat-label">One-Command Setup</span>
       </div>
       <div class="doc-hero-stat">
-        <span class="doc-hero-stat-number">🔐</span>
-        <span class="doc-hero-stat-label">Secure API Keys</span>
+        <span class="doc-hero-stat-number">🐍</span>
+        <span class="doc-hero-stat-label">Python 3.13 Included</span>
       </div>
     </div>
   </div>
 </div>
 
-## What is the Console Runner?
+## What is the Runner?
 
-The **Automaton Console Runner** is a cross-platform command-line application that executes automation workflows on your machines. It's perfect for:
+The **Automaton Runner** is a cross-platform application that executes automation workflows on your machines. It's perfect for:
 
 - **Production Deployments**: Run workflows on servers without GUI
 - **CI/CD Pipelines**: Integrate automation into your build and deployment processes
@@ -35,39 +35,158 @@ The **Automaton Console Runner** is a cross-platform command-line application th
 
 ### Key Features
 
+- ✅ **Docker Ready**: Pre-built image with Python 3.13 and common packages
 - ✅ **Cross-platform**: Works on Windows, Linux, and macOS
-- ✅ **Interactive Setup**: One-command wizard guides you through configuration
+- ✅ **One-Command Setup**: Single `docker run` command to get started
 - ✅ **API Key Authentication**: Secure, automation-friendly authentication
 - ✅ **Auto-reconnection**: Handles network interruptions gracefully
-- ✅ **Service Mode**: Run as a system service/daemon
-- ✅ **Zero UI Dependencies**: Pure console application
+- ✅ **Python Packages Included**: requests, pandas, numpy, boto3, beautifulsoup4, and more
 
 ## Prerequisites
 
-Before installing the Console Runner, ensure you have:
+Before deploying a Runner, ensure you have:
 
-### System Requirements
-- **Operating System**: Windows 10+, Linux (Ubuntu 20.04+, RHEL 8+, etc.), or macOS 11+
-- **.NET Runtime**: .NET 8.0 Runtime (automatically installed with installation scripts)
+### For Docker Deployment (Recommended)
+- **Docker**: Docker Desktop (Windows/Mac) or Docker Engine (Linux)
 - **Network Access**: Connection to your Automaton Studio server
 - **API Key**: Created in Automaton Studio (see [Getting an API Key](#getting-an-api-key) below)
 
+### For Native Executable
+- **Operating System**: Windows 10+, Linux (Ubuntu 20.04+, RHEL 8+, etc.), or macOS 11+
+- **.NET Runtime**: .NET 9.0 Runtime (automatically installed with installation scripts)
+- **Python 3.x**: Required for Python-based custom steps (Docker image includes this)
+- **Network Access**: Connection to your Automaton Studio server
+- **API Key**: Created in Automaton Studio
+
 ### Supported Platforms
-| Platform | Architecture | Status |
-|----------|-------------|--------|
-| Windows | x64, ARM64 | ✅ Fully Supported |
-| Linux | x64, ARM64 | ✅ Fully Supported |
-| macOS | Intel, Apple Silicon | ✅ Fully Supported |
+| Platform | Architecture | Docker | Native |
+|----------|-------------|--------|--------|
+| Windows | x64, ARM64 | ✅ | ✅ |
+| Linux | x64, ARM64 | ✅ | ✅ |
+| macOS | Intel, Apple Silicon | ✅ | ✅ |
 
-## Installation
+## Installation Methods
 
-There are two ways to install the Console Runner:
+### 🐳 Docker Deployment (Recommended)
 
-### Option 1: Quick Installation (Recommended)
+Docker is the **fastest and easiest** way to deploy a runner. The official Docker image includes:
 
-The quickest way to get started is using our automated installation scripts.
+- **.NET 9.0 Runtime** - Ready to execute workflows
+- **Python 3.13** - For Python-based custom steps
+- **Pre-installed Python packages**: requests, pandas, numpy, beautifulsoup4, boto3, lxml, pyyaml, openpyxl, xlrd, pillow, pyodbc, psycopg2-binary, sqlalchemy, and more
 
-#### Windows (PowerShell)
+#### Quick Start: Docker CLI
+
+Run this single command to start a runner:
+
+```bash
+docker run -d \
+  --name automaton-runner \
+  -e AUTOMATON_API_KEY=ak_your_api_key_here \
+  rzvdaniel/automaton-runner:latest
+```
+
+That's it! Your runner will automatically connect to Automaton Studio.
+
+#### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTOMATON_API_KEY` | ✅ Yes | - | Your API key from Automaton Studio |
+| `AUTOMATON_RUNNER_NAME` | No | Container hostname | Display name for this runner |
+| `AUTOMATON_SERVER_URL` | No | `https://api.automaton.monster` | Automaton Studio server URL |
+
+#### Custom Server URL
+
+If you're using a self-hosted Automaton server:
+
+```bash
+docker run -d \
+  --name automaton-runner \
+  -e AUTOMATON_API_KEY=ak_your_api_key_here \
+  -e AUTOMATON_SERVER_URL=https://your-server.com \
+  -e AUTOMATON_RUNNER_NAME=my-runner-01 \
+  rzvdaniel/automaton-runner:latest
+```
+
+#### Docker Desktop
+
+If you're using Docker Desktop (Windows/macOS):
+
+1. Open **Docker Desktop**
+2. Click **Images** → **Search images to run**
+3. Search for `rzvdaniel/automaton-runner`
+4. Click **Pull** to download the image
+5. Click **Run** and configure:
+   - **Container name**: `automaton-runner`
+   - **Environment variables**: Add your `AUTOMATON_API_KEY`
+6. Click **Run** to start
+
+#### Docker Compose
+
+For more complex setups or multiple runners, use Docker Compose:
+
+```yaml
+version: '3.8'
+services:
+  automaton-runner:
+    image: rzvdaniel/automaton-runner:latest
+    container_name: automaton-runner
+    restart: unless-stopped
+    environment:
+      - AUTOMATON_API_KEY=${AUTOMATON_API_KEY}
+      - AUTOMATON_RUNNER_NAME=docker-runner-01
+      # Uncomment for self-hosted server:
+      # - AUTOMATON_SERVER_URL=https://your-server.com
+```
+
+Save as `docker-compose.yml`, then run:
+
+```bash
+# Set your API key
+export AUTOMATON_API_KEY=ak_your_api_key_here
+
+# Start the runner
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+#### Managing Docker Runners
+
+```bash
+# View logs
+docker logs automaton-runner
+
+# Stop the runner
+docker stop automaton-runner
+
+# Start the runner
+docker start automaton-runner
+
+# Remove the runner
+docker rm -f automaton-runner
+
+# Update to latest version
+docker pull rzvdaniel/automaton-runner:latest
+docker rm -f automaton-runner
+docker run -d --name automaton-runner \
+  -e AUTOMATON_API_KEY=ak_your_api_key_here \
+  rzvdaniel/automaton-runner:latest
+```
+
+---
+
+### 📦 Native Executable Installation
+
+If you prefer to run the runner as a native executable (without Docker), use these methods:
+
+#### Option 1: Quick Install Scripts
+
+The quickest way to get the native executable is using our automated installation scripts.
+
+##### Windows (PowerShell)
 
 **Run as Administrator:**
 
@@ -81,7 +200,7 @@ This script will:
 - Add the runner to your PATH
 - Create the `automaton-runner` command globally
 
-#### Linux / macOS (Terminal)
+##### Linux / macOS (Terminal)
 
 ```bash
 curl -sSL https://your-automaton-server.com/downloads/install.sh | bash
@@ -412,55 +531,22 @@ This removes:
 
 Environment variables are not affected.
 
-## Docker Deployment
+## Docker Deployment Reference
 
-Running the Console Runner in Docker containers.
+For Docker deployment options including Docker CLI, Docker Desktop, and Docker Compose, see the [Docker Deployment (Recommended)](#-docker-deployment-recommended) section at the top of this guide.
 
-### Dockerfile Example
+### Pre-built Docker Image
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/runtime:8.0
+The official Docker image is available on Docker Hub:
 
-# Copy the runner binary
-COPY automaton-runner /app/
-WORKDIR /app
-
-# Make executable (Linux containers)
-RUN chmod +x automaton-runner
-
-# Set environment variables
-ENV AUTOMATON_API_KEY=""
-ENV AppConfig__BaseUrl=""
-
-# Run the runner
-ENTRYPOINT ["./automaton-runner"]
+```
+rzvdaniel/automaton-runner:latest
 ```
 
-### Docker Compose Example
-
-```yaml
-version: '3.8'
-
-services:
-  automaton-runner:
-    image: automaton-runner:latest
-    environment:
-      - AUTOMATON_API_KEY=ak_runner_1234567890abcdef
-      - AppConfig__BaseUrl=https://automaton.company.com
-    restart: unless-stopped
-    container_name: automaton-runner-01
-```
-
-### Running with Docker
-
-```bash
-docker run -d \
-  --name automaton-runner \
-  --restart unless-stopped \
-  -e AUTOMATON_API_KEY="ak_runner_xxx" \
-  -e AppConfig__BaseUrl="https://automaton.company.com" \
-  automaton-runner:latest
-```
+This image includes:
+- .NET 9.0 Runtime
+- Python 3.13
+- Pre-installed Python packages (requests, pandas, numpy, beautifulsoup4, boto3, and more)
 
 ## CI/CD Integration
 
@@ -478,16 +564,16 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Install Automaton Runner
-      run: |
-        curl -sSL https://automaton.company.com/downloads/install.sh | bash
-    
-    - name: Configure Runner
+    - name: Run with Docker (Recommended)
       env:
         AUTOMATON_API_KEY: ${{ secrets.AUTOMATON_API_KEY }}
-        AppConfig__BaseUrl: ${{ secrets.AUTOMATON_SERVER_URL }}
+        AUTOMATON_SERVER_URL: ${{ secrets.AUTOMATON_SERVER_URL }}
       run: |
-        automaton-runner register --name "CI-Runner-${{ github.run_id }}"
+        docker run --rm \
+          -e AUTOMATON_API_KEY \
+          -e AUTOMATON_SERVER_URL \
+          -e AUTOMATON_RUNNER_NAME="CI-Runner-${{ github.run_id }}" \
+          rzvdaniel/automaton-runner:latest
 ```
 
 ### Azure DevOps Example
@@ -503,14 +589,12 @@ pool:
 
 steps:
 - script: |
-    curl -sSL $(AUTOMATON_SERVER_URL)/downloads/install.sh | bash
-  displayName: 'Install Automaton Runner'
-
-- script: |
-    export AUTOMATON_API_KEY=$(AUTOMATON_API_KEY)
-    export AppConfig__BaseUrl=$(AUTOMATON_SERVER_URL)
-    automaton-runner register --name "Azure-Runner-$(Build.BuildId)"
-  displayName: 'Register Runner'
+    docker run --rm \
+      -e AUTOMATON_API_KEY=$(AUTOMATON_API_KEY) \
+      -e AUTOMATON_SERVER_URL=$(AUTOMATON_SERVER_URL) \
+      -e AUTOMATON_RUNNER_NAME="Azure-Runner-$(Build.BuildId)" \
+      rzvdaniel/automaton-runner:latest
+  displayName: 'Run Automaton Runner'
 ```
 
 ### GitLab CI Example
@@ -518,11 +602,15 @@ steps:
 ```yaml
 deploy:
   stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
   script:
-    - curl -sSL $AUTOMATON_SERVER_URL/downloads/install.sh | bash
-    - export AUTOMATON_API_KEY=$AUTOMATON_API_KEY
-    - export AppConfig__BaseUrl=$AUTOMATON_SERVER_URL
-    - automaton-runner register --name "GitLab-Runner-$CI_PIPELINE_ID"
+    - docker run --rm \
+        -e AUTOMATON_API_KEY=$AUTOMATON_API_KEY \
+        -e AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL \
+        -e AUTOMATON_RUNNER_NAME="GitLab-Runner-$CI_PIPELINE_ID" \
+        rzvdaniel/automaton-runner:latest
   only:
     - main
 ```

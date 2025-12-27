@@ -387,7 +387,7 @@ partial class StepPage : ComponentBase, IDisposable
 
     private void NavigateToDownloadRunner()
     {
-        NavigationManager.NavigateTo("/downloads-runner", true);
+        NavigationManager.NavigateTo("/runners", true);
     }
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)

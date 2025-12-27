@@ -58,7 +58,17 @@ For a native desktop experience on Windows:
 #### Automaton Runner
 Runners execute your automation flows. To set up your first runner:
 
-**Quick Setup:**
+**🐳 Docker (Recommended):**
+```bash
+docker run -d \
+  --name automaton-runner \
+  -e AUTOMATON_API_KEY=ak_your_api_key_here \
+  rzvdaniel/automaton-runner:latest
+```
+
+The Docker image includes Python 3.13 and common packages pre-installed.
+
+**📦 Native Executable:**
 1. Go to **Settings → API Keys** and create a new API key with "Runner" scope
 2. Download the runner from **Downloads Hub → Console Runner**
 3. Run the one-command installer (Windows PowerShell or Linux/macOS Terminal)
@@ -67,8 +77,9 @@ Runners execute your automation flows. To set up your first runner:
 **👉 For detailed instructions, see the [Runner Setup Guide](user-guide/runner-setup.md)**
 
 This includes:
+- Docker deployment (Docker CLI, Docker Desktop, Docker Compose)
 - Complete installation instructions for all platforms
-- Docker and CI/CD integration examples
+- CI/CD integration examples
 - Troubleshooting common issues
 - System service configuration
 ### 4. Creating Your First Flow

@@ -25,9 +25,9 @@
             <Col Class="right-actions">
                 <Space Class="right-header-items">
                     <SpaceItem>
-                        <Button Type="@ButtonType.Primary" OnClick="@(() => NavigationManager.NavigateTo("/downloads-runner"))">
-                            <Icon Type="download" />
-                            Download Runner
+                        <Button Type="@ButtonType.Primary" OnClick="@ShowDeployRunnerModal">
+                            <Icon Type="plus" />
+                            Deploy Runner
                         </Button>
                     </SpaceItem>
                 </Space>
@@ -38,17 +38,17 @@
     <Content Class="content-padding content-background">
         @if (!loading && RunnersViewModel.Runners?.Any() != true)
         {
-            <EnhancedEmpty Title="Runners in minutes." 
-                          Description="Runners execute your workflows on different environments. Each runner you connect extends your automation capabilities to new systems and platforms."
+            <EnhancedEmpty Title="Deploy a Runner in seconds." 
+                          Description="Runners execute your workflows. Deploy a Docker container with a single command and start automating immediately."
                           BackgroundImageUrl="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
                           GradientOverlay="linear-gradient(135deg, rgba(16, 185, 129, 0.85) 0%, rgba(5, 150, 105, 0.85) 100%)"
-                          ActionCardTitle="Connect Runners"
-                          ActionCardDescription="Download and connect runners to execute workflows across different environments and platforms."
+                          ActionCardTitle="Deploy with Docker"
+                          ActionCardDescription="The fastest way to get a runner up and running. Just copy the command, add your API key, and you're ready to go."
                           ActionCardBulletPoints="@GetRunnerActionCardBullets()"
                           FeatureSectionTitle="Distributed automation anyone can setup in seconds!"
                           FeatureSectionSubtitle="Connect runners to different environments and scale your automation infrastructure"
                           HelpSectionTitle="Learn more about Runners"
-                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Download Runner", Icon = "download", OnClick = () => { NavigationManager.NavigateTo("/downloads-runner"); return Task.CompletedTask; } })"
+                          PrimaryAction="@(new EnhancedEmpty.EmptyActionModel { Text = "Deploy Runner", Icon = "cloud-server", OnClick = () => { ShowDeployRunnerModal(); return Task.CompletedTask; } })"
                           SecondaryActions="@GetRunnerSecondaryActions()"
                           FeatureCards="@GetRunnerFeatureCards()"
                           HelpLinks="@GetRunnerHelpLinks()">
@@ -94,5 +94,123 @@
         }
     </Content>
 </Layout>
+
+<!-- Deploy Runner Modal -->
+<Modal Title="Deploy a Runner"
+       Visible="@deployModalVisible"
+       OnCancel="@(() => deployModalVisible = false)"
+       Footer="null"
+       Width="720">
+    <div class="deploy-runner-modal">
+        <Alert Type="@AlertType.Info" 
+               Message="You'll need an API Key to deploy a runner." 
+               Description="If you don't have one yet, go to API Keys and create one with Runner scope."
+               ShowIcon="true"
+               Style="margin-bottom: 24px;" />
+        
+        <Tabs DefaultActiveKey="1">
+            <TabPane Key="1" Tab="Docker CLI">
+                <div style="padding: 16px 0;">
+                    <Paragraph>
+                        <Text Strong>Run this command in your terminal:</Text>
+                    </Paragraph>
+                    
+                    <div class="code-block" style="background: #1e1e1e; border-radius: 8px; padding: 16px; margin: 16px 0; position: relative;">
+                        <pre style="color: #d4d4d4; margin: 0; white-space: pre-wrap; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;"><span style="color: #569cd6;">docker run</span> -d \
+  --name automaton-runner \
+  --restart unless-stopped \
+  -e <span style="color: #9cdcfe;">AUTOMATON_API_KEY</span>=<span style="color: #ce9178;">ak_your_key_here</span> \
+  -e <span style="color: #9cdcfe;">AUTOMATON_RUNNER_NAME</span>=<span style="color: #ce9178;">My-Runner</span> \
+  rzvdaniel/automaton-runner:latest</pre>
+                        <Button Type="@ButtonType.Primary" 
+                                Size="@ButtonSize.Small" 
+                                Icon="copy"
+                                Style="position: absolute; top: 8px; right: 8px;"
+                                OnClick="@CopyDockerCommand">
+                            Copy
+                        </Button>
+                    </div>
+                    
+                    <Divider Orientation="@DividerOrientation.Left" Style="font-size: 14px;">Configuration</Divider>
+                    
+                    <Descriptions Bordered Column="1" Size="@DescriptionsSize.Small">
+                        <DescriptionsItem Title="AUTOMATON_API_KEY">
+                            <Text Type="@TextElementType.Secondary">Required. Get this from <a @onclick="@GoToApiKeys" style="cursor: pointer;">API Keys</a></Text>
+                        </DescriptionsItem>
+                        <DescriptionsItem Title="AUTOMATON_RUNNER_NAME">
+                            <Text Type="@TextElementType.Secondary">Display name shown in Studio (optional, defaults to container ID)</Text>
+                        </DescriptionsItem>
+                        <DescriptionsItem Title="Server URL">
+                            <Text Type="@TextElementType.Secondary">Automatically configured to connect to automaton.monster</Text>
+                        </DescriptionsItem>
+                    </Descriptions>
+
+                    <Alert Type="@AlertType.Success" 
+                           Message="That's it! Once the container starts, your runner will appear in the list above."
+                           ShowIcon="true"
+                           Style="margin-top: 24px;" />
+                </div>
+            </TabPane>
+
+            <TabPane Key="2" Tab="Docker Desktop">
+                <div style="padding: 16px 0;">
+                    <Paragraph>
+                        <Text Type="@TextElementType.Secondary" Style="margin-bottom: 16px;">
+                            If you prefer Docker Desktop's graphical interface, follow these steps:
+                        </Text>
+                    </Paragraph>
+
+                    <Steps Direction="@StepsDirection.Vertical" Current="99" Size="@StepsSize.Small">
+                        <Step Title="Open Docker Desktop" Description="Make sure Docker Desktop is running on your machine" />
+                        <Step Title="Search for the image" Description="Go to the Images tab and search for 'rzvdaniel/automaton-runner'" />
+                        <Step Title="Pull the image" Description="Click 'Pull' to download the latest image" />
+                        <Step Title="Run the container">
+                            <DescriptionTemplate>
+                                <div>
+                                    <p>Click 'Run' and add these environment variables:</p>
+                                    <ul style="margin-top: 8px; margin-bottom: 0;">
+                                        <li><Text Code>AUTOMATON_API_KEY=YOUR_API_KEY</Text></li>
+                                        <li><Text Code>AUTOMATON_RUNNER_NAME=My-Runner</Text> (optional)</li>
+                                    </ul>
+                                </div>
+                            </DescriptionTemplate>
+                        </Step>
+                    </Steps>
+
+                    <Alert Type="@AlertType.Info" 
+                           ShowIcon="true"
+                           Style="margin-top: 16px;">
+                        <MessageTemplate>
+                            <strong>Tip:</strong> Set restart policy to "Unless stopped" so the runner auto-starts with Docker Desktop.
+                        </MessageTemplate>
+                    </Alert>
+
+                    <div style="margin-top: 16px; padding: 12px; background: #fafafa; border-radius: 8px;">
+                        <Text Type="@TextElementType.Secondary">
+                            Don't have Docker Desktop? <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener noreferrer">Download it here</a> (Windows, Mac, Linux)
+                        </Text>
+                    </div>
+                </div>
+            </TabPane>
+            
+            <TabPane Key="3" Tab="Download Executable">
+                <div style="padding: 16px 0;">
+                    <Paragraph>
+                        <Text Type="@TextElementType.Secondary">
+                            For advanced users who need to run the runner as a Windows service, on systems without Docker, 
+                            or with custom configurations.
+                        </Text>
+                    </Paragraph>
+                    
+                    <Button Type="@ButtonType.Default" 
+                            Icon="download"
+                            OnClick="@(() => NavigationManager.NavigateTo("/downloads"))">
+                        Go to Downloads
+                    </Button>
+                </div>
+            </TabPane>
+        </Tabs>
+    </div>
+</Modal>
 
 
