@@ -37,7 +37,7 @@ For **local development** (connecting to a local Studio Server):
 ### Prerequisites
 
 - Docker Desktop installed and running
-- Automaton Studio Server running locally (default: `https://localhost:7091`)
+- Automaton Studio Server running locally (default: `http://localhost:5091`)
 - An API key created in Automaton Studio
 
 ### 1. Create an API Key
@@ -61,7 +61,7 @@ cp .env.example .env
 Edit `.env` and set your API key in the Runner Configuration section:
 
 ```env
-AUTOMATON_SERVER_URL=https://host.docker.internal:7091
+AUTOMATON_SERVER_URL=http://host.docker.internal:5091
 AUTOMATON_API_KEY=ak_your_copied_key_here
 AUTOMATON_RUNNER_NAME=Docker-Dev-Runner
 ```
