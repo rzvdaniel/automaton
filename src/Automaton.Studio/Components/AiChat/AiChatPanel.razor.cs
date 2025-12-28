@@ -463,12 +463,6 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         }
     }
 
-    private void OnInputChange(ChangeEventArgs e)
-    {
-        promptText = e.Value?.ToString() ?? string.Empty;
-        StateHasChanged();
-    }
-
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !(e.CtrlKey || e.ShiftKey))

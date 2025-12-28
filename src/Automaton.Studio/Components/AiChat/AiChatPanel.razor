@@ -32,15 +32,13 @@
 
 	<div class="ai-chat-input">
 		<div class="input-area">
-			<TextArea @bind-Value="promptText"
-					  Placeholder="@Context.InputPlaceholder"
-					  Disabled="@isGeneratingCode"
-					  ShowCount="false"
-					  AutoSize="false"
-					  Rows="3"
-					  Style="resize: none; border: none; box-shadow: none; padding: 12px;"
-					  @oninput="OnInputChange"
-					  @onkeydown="OnKeyDown" />
+			<textarea @bind="promptText"
+					  @bind:event="oninput"
+					  class="prompt-textarea"
+					  placeholder="@Context.InputPlaceholder"
+					  disabled="@isGeneratingCode"
+					  rows="3"
+					  @onkeydown="OnKeyDown"></textarea>
 		</div>
 
 		<div class="input-controls">
@@ -170,18 +168,17 @@
 		border-bottom: 1px solid #f0f0f0;
 	}
 
-		.input-area .ant-input {
-			border: none !important;
-			box-shadow: none !important;
-			background: transparent !important;
-			resize: none !important;
-		}
-
-			.input-area .ant-input:focus,
-			.input-area .ant-input:hover {
-				border: none !important;
-				box-shadow: none !important;
-			}
+	.prompt-textarea {
+		padding: 12px;
+		width: 100%;
+		border: none !important;
+		box-shadow: none !important;
+		background: transparent !important;
+		resize: none !important;
+		outline: none;
+		font-family: inherit;
+		font-size: inherit;
+	}
 
 	.input-controls {
 		display: flex;
