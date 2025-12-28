@@ -19,7 +19,6 @@ The website uses a **tech-focused design** that emphasizes:
 ### Visual Elements
 - **Hero section** with interactive code editor mockup and workflow diagram
 - **Feature cards** showcasing platform capabilities
-- **Use case examples** with real-world applications
 - **Documentation preview** with interactive tabs
 - **High-quality Unsplash images** for professional appearance
 
