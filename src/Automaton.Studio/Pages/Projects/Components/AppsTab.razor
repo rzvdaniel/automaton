@@ -6,8 +6,7 @@
     <div style="margin-bottom: 16px; display: flex; gap: 8px;">
         @if (ViewModel.CanManageResources)
         {
-            <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal">
-                <Icon Type="plus" />
+            <Button Type="@ButtonType.Primary" OnClick="@ShowAddAppModal" Icon="plus">
                 Add App to Project
             </Button>
         }

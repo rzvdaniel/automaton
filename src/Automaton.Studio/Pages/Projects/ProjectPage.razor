@@ -80,44 +80,36 @@
                 <!-- Tabs -->
                 <Tabs ActiveKey="@ActiveTab" OnChange="@OnTabChange">
                     <TabPane Key="members" Tab="Members">
-                        <Icon Type="user" />
                         <MembersTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="apps" Tab="Apps">
-                        <Icon Type="appstore" />
                         <AppsTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="flows" Tab="Flows">
-                        <Icon Type="branches" />
                         <FlowsTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="runners" Tab="Runners">
-                        <Icon Type="robot" />
                         <RunnersTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="customsteps" Tab="Custom Steps">
-                        <Icon Type="code" />
                         <CustomStepsTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="apikeys" Tab="API Keys">
-                        <Icon Type="key" />
                         <ApiKeysTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     <TabPane Key="aiapikeys" Tab="AI API Keys">
-                        <Icon Type="robot" />
                         <AiApiKeysTab ViewModel="@ViewModel" />
                     </TabPane>
 
                     @if (ViewModel.IsProjectAdmin)
                     {
                         <TabPane Key="settings" Tab="Settings">
-                            <Icon Type="setting" />
                             <SettingsTab ViewModel="@ViewModel" />
                         </TabPane>
                     }
