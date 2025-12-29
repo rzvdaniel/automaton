@@ -67,3 +67,6 @@ App_Data/
 
 # AppSettings files
 appsettings*.json
+
+# Ignore files created by Claude AI
+.claude
