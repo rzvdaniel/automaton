@@ -23,7 +23,6 @@ using Serilog.Events;
 using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Transactions;
-using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
 
@@ -244,11 +243,7 @@ services.AddTransient<ScheduleService>();
 
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
-
-services.AddScoped<OpenAiProvider>();
-services.AddScoped<AnthropicProvider>();
-services.AddScoped<GoogleProvider>();
-services.AddScoped<AiProviderFactory>();
+services.AddScoped<AiProviderMetadataService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();

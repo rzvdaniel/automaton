@@ -1,7 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Entities.Enums;
-using Automaton.Studio.Server.Services.AiProviders;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,20 +12,17 @@ public class AiApiKeyService
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiApiKeyService> logger;
     private readonly ConfigurationService configuration;
-    private readonly AiProviderFactory aiProviderFactory;
     private readonly ResourceAuthorizationService authorizationService;
 
     public AiApiKeyService(
-        ApplicationDbContext dbContext, 
-        ILogger<AiApiKeyService> logger, 
-        ConfigurationService configuration, 
-        AiProviderFactory aiProviderFactory,
+        ApplicationDbContext dbContext,
+        ILogger<AiApiKeyService> logger,
+        ConfigurationService configuration,
         ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.configuration = configuration;
-        this.aiProviderFactory = aiProviderFactory;
         this.authorizationService = authorizationService;
     }
 
@@ -185,6 +181,7 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get available AI providers with their key status (for UI selection)
+    /// Now uses database instead of appsettings.json
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false)
     {
@@ -197,24 +194,41 @@ public class AiApiKeyService
         // Get environment keys (for desktop)
         var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<AiProviderType, string?>();
 
-        foreach (AiProviderType provider in Enum.GetValues<AiProviderType>())
+        // Get active AI providers from database with their models
+        var dbProviders = await dbContext.AiProviders
+            .Where(p => p.IsActive)
+            .Include(p => p.Models.Where(m => m.IsActive))
+            .OrderBy(p => p.SortOrder)
+            .ToListAsync();
+
+        foreach (var dbProvider in dbProviders)
         {
-            var storedKeysForProvider = groupedKeys.FirstOrDefault(g => g.Key == provider)?.ToList() ?? new List<AiApiKey>();
-            var hasEnvironmentKey = envKeys.TryGetValue(provider, out var envKey) && !string.IsNullOrEmpty(envKey);
+            // Map database provider name to AiProviderType enum
+            if (!Enum.TryParse<AiProviderType>(dbProvider.Name, true, out var providerType))
+            {
+                logger.LogWarning("Unknown provider type in database: {ProviderName}", dbProvider.Name);
+                continue;
+            }
+
+            var storedKeysForProvider = groupedKeys.FirstOrDefault(g => g.Key == providerType)?.ToList() ?? new List<AiApiKey>();
+            var hasEnvironmentKey = envKeys.TryGetValue(providerType, out var envKey) && !string.IsNullOrEmpty(envKey);
 
             providers.Add(new AiProviderInfo
             {
-                Provider = provider,
-                ProviderName = GetProviderDisplayName(provider),
+                Provider = providerType,
+                ProviderName = dbProvider.DisplayName,
                 HasStoredKeys = storedKeysForProvider.Any(),
                 StoredKeyCount = storedKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
                 StoredKeys = storedKeysForProvider,
-                SupportedModels = GetSupportedModels(provider)
+                SupportedModels = dbProvider.Models
+                    .OrderBy(m => m.SortOrder)
+                    .Select(m => m.ModelId)
+                    .ToList()
             });
         }
 
-        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey || p.Provider != AiProviderType.Custom)
+        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey)
                       .OrderByDescending(p => p.HasStoredKeys || p.HasEnvironmentKey);
     }
 
@@ -269,32 +283,6 @@ public class AiApiKeyService
         return sha256.ComputeHash(Encoding.UTF8.GetBytes(keyString));
     }
 
-    private static string GetProviderDisplayName(AiProviderType provider) => provider switch
-    {
-        AiProviderType.OpenAI => "OpenAI",
-        AiProviderType.Anthropic => "Anthropic", 
-        AiProviderType.Google => "Google",
-        AiProviderType.Custom => "Custom Provider",
-        _ => provider.ToString()
-    };
-
-    private List<string> GetSupportedModels(AiProviderType provider)
-    {
-        try
-        {
-            if (provider == AiProviderType.Custom)
-            {
-                return new List<string> { "custom-model" };
-            }
-            
-            return aiProviderFactory.GetSupportedModels(provider).ToList();
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to get supported models for provider {Provider}, falling back to config", provider);
-            return new List<string>();
-        }
-    }
 }
 
 public class AiProviderInfo
