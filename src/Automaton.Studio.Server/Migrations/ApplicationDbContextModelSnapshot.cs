@@ -177,6 +177,10 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("ApiKeyHelpUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
                     b.Property<string>("BaseUrl")
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
@@ -196,6 +200,10 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("EnvironmentKeyName")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()

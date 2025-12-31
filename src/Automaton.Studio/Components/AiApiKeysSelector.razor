@@ -74,6 +74,7 @@ else
 
 @code {
 	private IEnumerable<AiApiKeyModel> AvailableAiApiKeys { get; set; } = new List<AiApiKeyModel>();
+	private IEnumerable<AiProviderInfo> AvailableProviders { get; set; } = new List<AiProviderInfo>();
 
 	private Guid? _selectedValue;
 
@@ -162,12 +163,19 @@ else
 			isLoading = true;
 			StateHasChanged();
 
-			var list = await AiApiKeyService.GetAiApiKeysAsync();
-			AvailableAiApiKeys = list ?? new List<AiApiKeyModel>();
+			// Load keys and providers in parallel
+			var keysTask = AiApiKeyService.GetAiApiKeysAsync();
+			var providersTask = AiApiKeyService.GetAvailableProvidersAsync(includeEnvironment: false);
+
+			await Task.WhenAll(keysTask, providersTask);
+
+			AvailableAiApiKeys = await keysTask ?? new List<AiApiKeyModel>();
+			AvailableProviders = await providersTask ?? new List<AiProviderInfo>();
 		}
 		catch
 		{
 			AvailableAiApiKeys = new List<AiApiKeyModel>();
+			AvailableProviders = new List<AiProviderInfo>();
 		}
 		finally
 		{
@@ -176,23 +184,25 @@ else
 		}
 	}
 
-	private string GetProviderIcon(string providerName) => providerName?.ToLowerInvariant() switch
+	private string GetProviderIcon(string providerName)
 	{
-		"openai" => "robot",
-		"anthropic" => "thunderbolt",
-		"google" => "google",
-		"custom" => "api",
-		_ => "api",
-	};
+		var provider = AvailableProviders?.FirstOrDefault(p =>
+			string.Equals(p.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
+		return provider?.IconName ?? "api";
+	}
 
-	private string GetProviderColor(string providerName) => providerName?.ToLowerInvariant() switch
+	private string GetProviderColor(string providerName)
 	{
-		"openai" => "green",
-		"anthropic" => "orange",
-		"google" => "blue",
-		"custom" => "purple",
-		_ => "default",
-	};
+		// Use a simple color mapping based on provider name for tag colors
+		// This could also be stored in database if needed
+		return providerName?.ToLowerInvariant() switch
+		{
+			"openai" => "green",
+			"anthropic" => "orange",
+			"google" => "blue",
+			_ => "default",
+		};
+	}
 }
 
 <style>

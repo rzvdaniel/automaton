@@ -216,6 +216,9 @@ public class AiApiKeyService
             {
                 ProviderName = dbProvider.Name,
                 DisplayName = dbProvider.DisplayName,
+                Description = dbProvider.Description,
+                IconName = dbProvider.IconName,
+                ApiKeyHelpUrl = dbProvider.ApiKeyHelpUrl,
                 HasStoredKeys = storedKeysForProvider.Any(),
                 StoredKeyCount = storedKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
@@ -227,8 +230,8 @@ public class AiApiKeyService
             });
         }
 
-        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey)
-                      .OrderByDescending(p => p.HasStoredKeys || p.HasEnvironmentKey);
+        // Return all providers - UI will show all but disable ones without keys
+        return providers;
     }
 
     private string EncryptApiKey(string apiKey)
@@ -295,6 +298,21 @@ public class AiProviderInfo
     /// Display name for UI (e.g., "OpenAI", "Anthropic Claude")
     /// </summary>
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Description of the provider
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Icon name for UI (e.g., "openai", "anthropic", "google")
+    /// </summary>
+    public string? IconName { get; set; }
+
+    /// <summary>
+    /// URL where users can get their API key
+    /// </summary>
+    public string? ApiKeyHelpUrl { get; set; }
 
     public bool HasStoredKeys { get; set; }
     public int StoredKeyCount { get; set; }

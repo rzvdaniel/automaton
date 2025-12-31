@@ -32,6 +32,12 @@ public class AiProvider
     [MaxLength(100)]
     public string? EnvironmentKeyName { get; set; } // "OPENAI_API_KEY", "ANTHROPIC_API_KEY"
 
+    [MaxLength(500)]
+    public string? ApiKeyHelpUrl { get; set; } // "https://platform.openai.com/api-keys"
+
+    [MaxLength(50)]
+    public string? IconName { get; set; } // "openai", "anthropic", "google" for UI icon
+
     public int SortOrder { get; set; } = 0;
 
     [Required]

@@ -143,13 +143,17 @@
                 <FormItem Label="Provider" Required>
                     <Select @bind-Value="ViewModel.CreateRequest.ProviderName"
                             TItemValue="string"
-                            TItem="string"
+                            TItem="AiProviderInfo"
+                            DataSource="@ViewModel.AvailableProviders"
+                            ValueProperty="p => p.ProviderName"
+                            LabelProperty="p => p.DisplayName"
                             OnSelectedItemChanged="OnProviderChanged">
-                        <SelectOptions>
-                            <SelectOption TItemValue="string" TItem="string" Value="@("OpenAI")" Label="OpenAI" />
-                            <SelectOption TItemValue="string" TItem="string" Value="@("Anthropic")" Label="Anthropic" />
-                            <SelectOption TItemValue="string" TItem="string" Value="@("Google")" Label="Google" />
-                        </SelectOptions>
+                        <ItemTemplate Context="provider">
+                            <span>
+                                <Icon Type="@(provider.IconName ?? "api")" Style="margin-right: 8px;" />
+                                @provider.DisplayName
+                            </span>
+                        </ItemTemplate>
                     </Select>
                 </FormItem>
 
@@ -216,35 +220,35 @@
 </style>
 
 @code {
-    private void OnProviderChanged(string providerName)
+    private void OnProviderChanged(AiProviderInfo? provider)
     {
         StateHasChanged();
     }
 
-    private string GetProviderIcon(string providerName) => providerName?.ToLowerInvariant() switch
+    private string GetProviderIcon(string providerName)
     {
-        "openai" => "openai",
-        "anthropic" => "anthropic",
-        "google" => "google",
-        _ => "robot"
-    };
+        var provider = ViewModel.AvailableProviders?.FirstOrDefault(p =>
+            string.Equals(p.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
+        return provider?.IconName ?? "api";
+    }
 
     private string GetProviderClass(string providerName) => $"provider-{providerName?.ToLowerInvariant() ?? "unknown"}";
 
-    private string GetProviderDisplayName(string providerName) => providerName?.ToLowerInvariant() switch
+    private string GetProviderDisplayName(string providerName)
     {
-        "openai" => "OpenAI",
-        "anthropic" => "Anthropic",
-        "google" => "Google",
-        "custom" => "Custom",
-        _ => providerName ?? "Unknown"
-    };
+        var provider = ViewModel.AvailableProviders?.FirstOrDefault(p =>
+            string.Equals(p.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
+        return provider?.DisplayName ?? providerName ?? "Unknown";
+    }
 
-    private string GetApiKeyHelpText(string providerName) => providerName?.ToLowerInvariant() switch
+    private string GetApiKeyHelpText(string providerName)
     {
-        "openai" => "Get your API key from: https://platform.openai.com/api-keys",
-        "anthropic" => "Get your API key from: https://console.anthropic.com/",
-        "google" => "Get your API key from: https://aistudio.google.com/app/apikey",
-        _ => "Enter the API key from your AI provider"
-    };
+        var provider = ViewModel.AvailableProviders?.FirstOrDefault(p =>
+            string.Equals(p.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(provider?.ApiKeyHelpUrl))
+        {
+            return $"Get your API key from: {provider.ApiKeyHelpUrl}";
+        }
+        return "Enter the API key from your AI provider";
+    }
 }

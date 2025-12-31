@@ -25,6 +25,21 @@ public class AiProviderInfo
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Description of the provider
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Icon name for UI (e.g., "openai", "anthropic", "google")
+    /// </summary>
+    public string? IconName { get; set; }
+
+    /// <summary>
+    /// URL where users can get their API key
+    /// </summary>
+    public string? ApiKeyHelpUrl { get; set; }
+
+    /// <summary>
     /// Whether there is a registered implementation for this provider
     /// </summary>
     public bool IsImplemented { get; set; }
