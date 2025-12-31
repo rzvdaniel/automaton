@@ -24,8 +24,9 @@ public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
 
     public UnifiedAppMcpClient(
         ILogger<UnifiedAppMcpClient> logger,
-        UnifiedAppMcpToolProvider toolProvider)
-        : base(logger, toolProvider)
+        UnifiedAppMcpToolProvider toolProvider,
+        IAiProviderRegistry providerRegistry)
+        : base(logger, toolProvider, providerRegistry)
     {
         _unifiedToolProvider = toolProvider;
     }

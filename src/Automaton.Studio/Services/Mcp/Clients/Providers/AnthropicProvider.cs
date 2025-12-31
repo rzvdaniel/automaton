@@ -17,6 +17,9 @@ public class AnthropicProvider : IAiProvider
 {
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
 
+    /// <inheritdoc />
+    public string ProviderName => "Anthropic";
+
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     public AnthropicProvider(Microsoft.Extensions.Logging.ILogger logger)

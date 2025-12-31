@@ -1,5 +1,4 @@
 @using AntDesign
-@using Automaton.Mcp.Enums
 @using Automaton.Studio.Models
 @using Automaton.Studio.Services
 
@@ -31,14 +30,14 @@ else if (Multiple)
 			Style="@Style">
 		<ItemTemplate Context="keyContext">
 			<span class="aiapikey-item">
-				<Icon Type="@GetProviderIcon(keyContext.Provider)" class="aiapikey-icon" />
+				<Icon Type="@GetProviderIcon(keyContext.ProviderName)" class="aiapikey-icon" />
 				<span class="aiapikey-label">@keyContext.Name</span>
-				<Tag Color="@GetProviderColor(keyContext.Provider)" Style="margin-left: 8px;">@keyContext.Provider</Tag>
+				<Tag Color="@GetProviderColor(keyContext.ProviderName)" Style="margin-left: 8px;">@keyContext.ProviderName</Tag>
 			</span>
 		</ItemTemplate>
 		<LabelTemplate Context="keyContext">
 			<span class="aiapikey-label-inline">
-				<Icon Type="@GetProviderIcon(keyContext.Provider)" class="aiapikey-icon" />
+				<Icon Type="@GetProviderIcon(keyContext.ProviderName)" class="aiapikey-icon" />
 				<span class="aiapikey-label">@keyContext.Name</span>
 			</span>
 		</LabelTemplate>
@@ -59,14 +58,14 @@ else
 			Style="@Style">
 		<ItemTemplate Context="keyContext">
 			<span class="aiapikey-item">
-				<Icon Type="@GetProviderIcon(keyContext.Provider)" class="aiapikey-icon" />
+				<Icon Type="@GetProviderIcon(keyContext.ProviderName)" class="aiapikey-icon" />
 				<span class="aiapikey-label">@keyContext.Name</span>
-				<Tag Color="@GetProviderColor(keyContext.Provider)" Style="margin-left: 8px;">@keyContext.Provider</Tag>
+				<Tag Color="@GetProviderColor(keyContext.ProviderName)" Style="margin-left: 8px;">@keyContext.ProviderName</Tag>
 			</span>
 		</ItemTemplate>
 		<LabelTemplate Context="keyContext">
 			<span class="aiapikey-label-inline">
-				<Icon Type="@GetProviderIcon(keyContext.Provider)" class="aiapikey-icon" />
+				<Icon Type="@GetProviderIcon(keyContext.ProviderName)" class="aiapikey-icon" />
 				<span class="aiapikey-label">@keyContext.Name</span>
 			</span>
 		</LabelTemplate>
@@ -177,21 +176,21 @@ else
 		}
 	}
 
-	private string GetProviderIcon(AiProviderType provider) => provider switch
+	private string GetProviderIcon(string providerName) => providerName?.ToLowerInvariant() switch
 	{
-		AiProviderType.OpenAI => "robot",
-		AiProviderType.Anthropic => "thunderbolt",
-		AiProviderType.Google => "google",
-		AiProviderType.Custom => "api",
+		"openai" => "robot",
+		"anthropic" => "thunderbolt",
+		"google" => "google",
+		"custom" => "api",
 		_ => "api",
 	};
 
-	private string GetProviderColor(AiProviderType provider) => provider switch
+	private string GetProviderColor(string providerName) => providerName?.ToLowerInvariant() switch
 	{
-		AiProviderType.OpenAI => "green",
-		AiProviderType.Anthropic => "orange",
-		AiProviderType.Google => "blue",
-		AiProviderType.Custom => "purple",
+		"openai" => "green",
+		"anthropic" => "orange",
+		"google" => "blue",
+		"custom" => "purple",
 		_ => "default",
 	};
 }

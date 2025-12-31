@@ -39,7 +39,9 @@ using Automaton.Studio.Pages.Flows.Components;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowSchedule;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowSettings;
 using Automaton.Studio.Pages.Flows.Designer.Components.FlowActivity;
+using Automaton.Studio.Services.Mcp;
 using Automaton.Studio.Services.Mcp.Clients;
+using Automaton.Studio.Services.Mcp.Clients.Providers;
 using Automaton.Studio.Services.Mcp.ToolProviders;
 using Automaton.Studio.Services.Mcp.EditorBridges;
 using Automaton.Studio.Services.Mcp.SystemPrompts;
@@ -74,11 +76,30 @@ public static class ServiceCollectionExtensions
         services.AddCourier(Assembly.GetExecutingAssembly());
         services.AddScoped<IAuthenticationStorage, WebAuthenticationStorage>();
 
+        // Register AI Provider Registry as singleton - holds all registered provider implementations
+        services.AddSingleton<IAiProviderRegistry>(sp =>
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            var registry = new AiProviderRegistry();
+
+            // Explicit registration of AI providers
+            var openAiProvider = new OpenAiProvider(loggerFactory.CreateLogger<OpenAiProvider>());
+            registry.Register(openAiProvider);
+
+            var anthropicProvider = new AnthropicProvider(loggerFactory.CreateLogger<AnthropicProvider>());
+            registry.Register(anthropicProvider);
+
+            // Future providers can be added here:
+            // registry.Register(new GoogleProvider(loggerFactory.CreateLogger<GoogleProvider>()));
+
+            return registry;
+        });
+
         // Register MCP services - Tool providers and explicit context clients
         services.AddScoped<StepMcpToolProvider>();
         services.AddScoped<AppMcpToolProvider>();
         services.AddScoped<UnifiedAppMcpToolProvider>();
-        
+
         // Register context-specific MCP clients
         services.AddScoped<IStepMcpClient, StepMcpClient>();
         services.AddScoped<IAppMcpClient, AppMcpClient>();

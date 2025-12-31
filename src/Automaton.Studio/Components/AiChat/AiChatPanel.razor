@@ -79,7 +79,7 @@
 								{
 									@foreach (var model in provider.SupportedModels)
 									{
-										var value = $"{provider.Provider}:{model}";
+										var value = $"{provider.ProviderName}:{model}";
 										var label = $"{model}";
 										var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
 

@@ -1,5 +1,4 @@
 @page "/ai-keys"
-@using Automaton.Mcp.Enums
 @using Automaton.Studio.Models
 
 <PageTitle>AI API Keys - Automaton Studio</PageTitle>
@@ -52,17 +51,17 @@
         {
             @if (ViewModel.AiApiKeys?.Any() == true)
             {
-                <Table TItem="AiApiKeyModel" 
-                       DataSource="@ViewModel.AiApiKeys" 
+                <Table TItem="AiApiKeyModel"
+                       DataSource="@ViewModel.AiApiKeys"
                        PageSize="10">
                     <Column Title="Name" @bind-Field="@context.Name">
-                        <Icon Type="@GetProviderIcon(context.Provider)" Style="margin-right: 8px;" />
+                        <Icon Type="@GetProviderIcon(context.ProviderName)" Style="margin-right: 8px;" />
                         @context.Name
                     </Column>
-                    
-                    <Column Title="Provider" @bind-Field="@context.Provider">
-                        <span class="@GetProviderClass(context.Provider)">
-                            @GetProviderDisplayName(context.Provider)
+
+                    <Column Title="Provider" @bind-Field="@context.ProviderName">
+                        <span class="@GetProviderClass(context.ProviderName)">
+                            @GetProviderDisplayName(context.ProviderName)
                         </span>
                     </Column>
                     
@@ -142,32 +141,32 @@
                Width="700">
             <Form Model="@ViewModel.CreateRequest" Layout="@FormLayout.Vertical">
                 <FormItem Label="Provider" Required>
-                    <Select @bind-Value="ViewModel.CreateRequest.Provider" 
-                            TItemValue="AiProviderType" 
-                            TItem="AiProviderType"
+                    <Select @bind-Value="ViewModel.CreateRequest.ProviderName"
+                            TItemValue="string"
+                            TItem="string"
                             OnSelectedItemChanged="OnProviderChanged">
                         <SelectOptions>
-                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.OpenAI" Label="OpenAI" />
-                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.Anthropic" Label="Anthropic" />
-                            <SelectOption TItemValue="AiProviderType" TItem="AiProviderType" Value="AiProviderType.Google" Label="Google" />
+                            <SelectOption TItemValue="string" TItem="string" Value="@("OpenAI")" Label="OpenAI" />
+                            <SelectOption TItemValue="string" TItem="string" Value="@("Anthropic")" Label="Anthropic" />
+                            <SelectOption TItemValue="string" TItem="string" Value="@("Google")" Label="Google" />
                         </SelectOptions>
                     </Select>
                 </FormItem>
-                
+
                 <FormItem Label="Name" Required>
                     <Input @bind-Value="ViewModel.CreateRequest.Name" Placeholder="e.g., My OpenAI Key, Production Claude" />
                 </FormItem>
-                
+
                 <FormItem Label="API Key" Required>
-                    <InputPassword @bind-Value="ViewModel.CreateRequest.ApiKey" 
+                    <InputPassword @bind-Value="ViewModel.CreateRequest.ApiKey"
                                   Placeholder="Enter your API key from the provider" />
                     <div class="form-help-text">
-                        @GetApiKeyHelpText(ViewModel.CreateRequest.Provider)
+                        @GetApiKeyHelpText(ViewModel.CreateRequest.ProviderName)
                     </div>
                 </FormItem>
-                
+
                 <FormItem Label="Description (Optional)">
-                    <TextArea @bind-Value="ViewModel.CreateRequest.Description" 
+                    <TextArea @bind-Value="ViewModel.CreateRequest.Description"
                              Placeholder="Optional description for this API key"
                              Rows="3" />
                 </FormItem>
@@ -217,35 +216,35 @@
 </style>
 
 @code {
-    private void OnProviderChanged(AiProviderType provider)
+    private void OnProviderChanged(string providerName)
     {
         StateHasChanged();
     }
 
-    private string GetProviderIcon(AiProviderType provider) => provider switch
+    private string GetProviderIcon(string providerName) => providerName?.ToLowerInvariant() switch
     {
-        AiProviderType.OpenAI => "openai",
-        AiProviderType.Anthropic => "anthropic", 
-        AiProviderType.Google => "google",
+        "openai" => "openai",
+        "anthropic" => "anthropic",
+        "google" => "google",
         _ => "robot"
     };
 
-    private string GetProviderClass(AiProviderType provider) => $"provider-{provider.ToString().ToLower()}";
+    private string GetProviderClass(string providerName) => $"provider-{providerName?.ToLowerInvariant() ?? "unknown"}";
 
-    private string GetProviderDisplayName(AiProviderType provider) => provider switch
+    private string GetProviderDisplayName(string providerName) => providerName?.ToLowerInvariant() switch
     {
-        AiProviderType.OpenAI => "OpenAI",
-        AiProviderType.Anthropic => "Anthropic",
-        AiProviderType.Google => "Google",
-        AiProviderType.Custom => "Custom",
-        _ => provider.ToString()
+        "openai" => "OpenAI",
+        "anthropic" => "Anthropic",
+        "google" => "Google",
+        "custom" => "Custom",
+        _ => providerName ?? "Unknown"
     };
 
-    private string GetApiKeyHelpText(AiProviderType provider) => provider switch
+    private string GetApiKeyHelpText(string providerName) => providerName?.ToLowerInvariant() switch
     {
-        AiProviderType.OpenAI => "Get your API key from: https://platform.openai.com/api-keys",
-        AiProviderType.Anthropic => "Get your API key from: https://console.anthropic.com/",
-        AiProviderType.Google => "Get your API key from: https://aistudio.google.com/app/apikey",
+        "openai" => "Get your API key from: https://platform.openai.com/api-keys",
+        "anthropic" => "Get your API key from: https://console.anthropic.com/",
+        "google" => "Get your API key from: https://aistudio.google.com/app/apikey",
         _ => "Enter the API key from your AI provider"
     };
 }

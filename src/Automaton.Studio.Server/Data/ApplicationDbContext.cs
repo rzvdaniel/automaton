@@ -245,12 +245,20 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Provider).IsRequired();
+                entity.Property(e => e.ProviderName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AiProviderId).IsRequired(false);
                 entity.Property(e => e.EncryptedApiKey).IsRequired().HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Description).HasMaxLength(500);
 
+                // Optional FK relationship to AiProvider for referential integrity
+                entity.HasOne(e => e.AiProvider)
+                    .WithMany()
+                    .HasForeignKey(e => e.AiProviderId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProviderName);
                 entity.HasIndex(e => e.LastUsedAt);
             });
             
