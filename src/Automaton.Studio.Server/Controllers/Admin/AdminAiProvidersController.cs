@@ -1,6 +1,5 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +12,7 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 /// </summary>
 [ApiController]
 [Route("api/admin/ai-providers")]
-[Authorize(Roles = nameof(UserRole.Administrators))]
+[Authorize(Policy = "Administrators")]
 public class AdminAiProvidersController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
@@ -28,6 +27,25 @@ public class AdminAiProvidersController : ControllerBase
     }
 
     #region Providers
+
+    /// <summary>
+    /// Debug endpoint to check user claims
+    /// </summary>
+    [HttpGet("debug-claims")]
+    [AllowAnonymous]
+    public IActionResult DebugClaims()
+    {
+        var claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList();
+        var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+        var authType = User.Identity?.AuthenticationType;
+        
+        return Ok(new 
+        { 
+            IsAuthenticated = isAuthenticated,
+            AuthenticationType = authType,
+            Claims = claims 
+        });
+    }
 
     /// <summary>
     /// Get all AI providers with their model counts

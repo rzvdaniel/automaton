@@ -25,6 +25,7 @@ using System.Reflection;
 using System.Transactions;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Studio.Server.Enums;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -92,6 +93,10 @@ services.AddAuthorization(options =>
     // Policy for anonymous endpoints (validation, etc.)
     options.AddPolicy("AllowAnonymous", policy =>
         policy.RequireAssertion(_ => true));
+
+    // Admin policy for users with Admin or SysAdmin roles
+    options.AddPolicy("Administrators", policy =>
+        policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
 
     // Project-based authorization policies
     options.AddPolicy("ProjectAdmin", policy =>
