@@ -10,18 +10,10 @@ public class AdminAiModelsViewModel
     private readonly MessageService messageService;
 
     public bool Loading { get; set; } = false;
-    public bool CreateModalVisible { get; set; } = false;
-    public bool EditModalVisible { get; set; } = false;
-    public bool CreateLoading { get; set; } = false;
-    public bool EditLoading { get; set; } = false;
 
     public IEnumerable<AiModelAdminModel> Models { get; set; } = new List<AiModelAdminModel>();
     public IEnumerable<AiProviderAdminModel> Providers { get; set; } = new List<AiProviderAdminModel>();
-    public AdminCreateAiModelRequest CreateRequest { get; set; } = new();
-    public AdminUpdateAiModelRequest EditRequest { get; set; } = new();
-    public AiModelAdminModel? SelectedModel { get; set; }
     public Guid? SelectedProviderId { get; set; }
-    public Guid CreateProviderId { get; set; }
 
     public AdminAiModelsViewModel(
         AdminAiProviderService adminAiProviderService,
@@ -38,7 +30,7 @@ public class AdminAiModelsViewModel
         {
             SelectedProviderId = providerId;
 
-            // Load providers for filter and create modal
+            // Load providers for filter
             Providers = await adminAiProviderService.GetProvidersAsync();
 
             if (providerId.HasValue)
@@ -57,123 +49,6 @@ public class AdminAiModelsViewModel
         finally
         {
             Loading = false;
-        }
-    }
-
-    public void ShowCreateModal()
-    {
-        CreateRequest = new AdminCreateAiModelRequest
-        {
-            IsActive = true,
-            IsDefault = false,
-            MaxTokens = 4096,
-            SupportsStreaming = true,
-            SupportsTools = false,
-            SupportsVision = false,
-            SortOrder = 0
-        };
-        CreateProviderId = SelectedProviderId ?? (Providers.FirstOrDefault()?.Id ?? Guid.Empty);
-        CreateModalVisible = true;
-    }
-
-    public void ShowEditModal(AiModelAdminModel model)
-    {
-        SelectedModel = model;
-        EditRequest = new AdminUpdateAiModelRequest
-        {
-            ModelId = model.ModelId,
-            DisplayName = model.DisplayName,
-            Description = model.Description,
-            IsActive = model.IsActive,
-            IsDefault = model.IsDefault,
-            MaxTokens = model.MaxTokens,
-            SupportsStreaming = model.SupportsStreaming,
-            SupportsTools = model.SupportsTools,
-            SupportsVision = model.SupportsVision,
-            CostPer1kTokensInput = model.CostPer1kTokensInput.Value,
-            CostPer1kTokensOutput = model.CostPer1kTokensOutput.Value,
-            SortOrder = model.SortOrder
-        };
-        EditModalVisible = true;
-    }
-
-    public async Task CreateModel()
-    {
-        CreateLoading = true;
-        try
-        {
-            if (CreateProviderId == Guid.Empty)
-            {
-                _ = messageService.ErrorAsync("Please select a provider");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(CreateRequest?.ModelId))
-            {
-                _ = messageService.ErrorAsync("Model ID is required");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(CreateRequest?.DisplayName))
-            {
-                _ = messageService.ErrorAsync("Display Name is required");
-                return;
-            }
-
-            var newModel = await adminAiProviderService.CreateModelAsync(CreateProviderId, CreateRequest);
-
-            if (newModel != null)
-            {
-                var list = Models.ToList();
-                list.Add(newModel);
-                Models = list.OrderBy(m => m.ProviderName).ThenBy(m => m.SortOrder).ThenBy(m => m.ModelId);
-
-                CreateModalVisible = false;
-                _ = messageService.SuccessAsync("AI model created successfully!");
-            }
-            else
-            {
-                _ = messageService.ErrorAsync("Failed to create AI model");
-            }
-        }
-        catch (Exception ex)
-        {
-            _ = messageService.ErrorAsync($"Failed to create AI model: {ex.Message}");
-        }
-        finally
-        {
-            CreateLoading = false;
-        }
-    }
-
-    public async Task UpdateModel()
-    {
-        if (SelectedModel == null) return;
-
-        EditLoading = true;
-        try
-        {
-            var success = await adminAiProviderService.UpdateModelAsync(SelectedModel.Id, EditRequest);
-
-            if (success)
-            {
-                // Reload to get updated data
-                await LoadModels(SelectedProviderId);
-                EditModalVisible = false;
-                _ = messageService.SuccessAsync("AI model updated successfully!");
-            }
-            else
-            {
-                _ = messageService.ErrorAsync("Failed to update AI model");
-            }
-        }
-        catch (Exception ex)
-        {
-            _ = messageService.ErrorAsync($"Failed to update AI model: {ex.Message}");
-        }
-        finally
-        {
-            EditLoading = false;
         }
     }
 

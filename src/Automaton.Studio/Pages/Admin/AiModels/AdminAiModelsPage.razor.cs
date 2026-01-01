@@ -25,5 +25,16 @@ namespace Automaton.Studio.Pages.Admin.AiModels
         {
             await ViewModel.LoadModels(provider?.Id);
         }
+
+        private void NavigateToCreate()
+        {
+            var queryString = !string.IsNullOrEmpty(ProviderIdQuery) ? $"?providerId={ProviderIdQuery}" : "";
+            NavigationManager.NavigateTo($"/admin/ai-models/create{queryString}");
+        }
+
+        private void NavigateToEdit(Guid modelId)
+        {
+            NavigationManager.NavigateTo($"/admin/ai-models/edit/{modelId}");
+        }
     }
 }

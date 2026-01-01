@@ -25,7 +25,7 @@
                         Style="width: 200px" />
             </SpaceItem>
             <SpaceItem>
-                <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@ViewModel.ShowCreateModal">
+                <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@NavigateToCreate">
                     Add Model
                 </Button>
             </SpaceItem>
@@ -131,7 +131,7 @@ else
                             <Button Type="@ButtonType.Text"
                                     Icon="edit"
                                     Size="@ButtonSize.Small"
-                                    OnClick="@(() => ViewModel.ShowEditModal(context))" />
+                                    OnClick="@(() => NavigateToEdit(context.Id))" />
                         </Tooltip>
                     </SpaceItem>
                     <SpaceItem>
@@ -152,202 +152,6 @@ else
         </Table>
     </Card>
 }
-
-<!-- Create Model Modal -->
-<Modal Title="Add AI Model"
-       @bind-Visible="ViewModel.CreateModalVisible"
-       OnOk="@ViewModel.CreateModel"
-       ConfirmLoading="@ViewModel.CreateLoading"
-       Width="700">
-    <Form Model="@ViewModel.CreateRequest" Layout="@FormLayout.Vertical">
-        <FormItem Label="Provider" Required>
-            <Select TItem="AiProviderAdminModel"
-                    TItemValue="Guid"
-                    DataSource="@ViewModel.Providers"
-                    ValueProperty="p => p.Id"
-                    LabelProperty="p => p.DisplayName"
-                    @bind-Value="ViewModel.CreateProviderId"
-                    Style="width: 100%" />
-        </FormItem>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Model ID" Required>
-                    <Input @bind-Value="ViewModel.CreateRequest.ModelId"
-                           Placeholder="e.g., gpt-4, claude-3-opus" />
-                    <div class="form-help">The API identifier for the model</div>
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Display Name" Required>
-                    <Input @bind-Value="ViewModel.CreateRequest.DisplayName"
-                           Placeholder="e.g., GPT-4, Claude 3 Opus" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        <FormItem Label="Description">
-            <TextArea @bind-Value="ViewModel.CreateRequest.Description"
-                     Placeholder="Brief description of the model's capabilities"
-                     Rows="2" />
-        </FormItem>
-
-        <Row Gutter="16">
-            <Col Span="8">
-                <FormItem Label="Max Tokens">
-                    <AntDesign.InputNumber @bind-Value="ViewModel.CreateRequest.MaxTokens" Min="1" Style="width:100%" />
-                </FormItem>
-            </Col>
-            <Col Span="8">
-                <FormItem Label="Sort Order">
-                    <AntDesign.InputNumber @bind-Value="ViewModel.CreateRequest.SortOrder" Min="0" Style="width:100%" />
-                </FormItem>
-            </Col>
-            <Col Span="8">
-                <FormItem Label="Status">
-                    <Space>
-                        <SpaceItem>
-                            <Checkbox @bind-Checked="ViewModel.CreateRequest.IsActive">Active</Checkbox>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Checkbox @bind-Checked="ViewModel.CreateRequest.IsDefault">Default</Checkbox>
-                        </SpaceItem>
-                    </Space>
-                </FormItem>
-            </Col>
-        </Row>
-
-        <Divider Orientation="@DividerOrientation.Left">Capabilities</Divider>
-
-        <Row Gutter="16">
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.CreateRequest.SupportsStreaming">Supports Streaming</Checkbox>
-            </Col>
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.CreateRequest.SupportsTools">Supports Tools/Functions</Checkbox>
-            </Col>
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.CreateRequest.SupportsVision">Supports Vision</Checkbox>
-            </Col>
-        </Row>
-
-        <Divider Orientation="@DividerOrientation.Left">Pricing (per 1K tokens)</Divider>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Input Cost ($)">
-                <AntDesign.InputNumber @bind-Value="ViewModel.CreateRequest.CostPer1kTokensInput"
-                    Min="0"
-                    Step="0.0001"
-                    Style="width:100%"
-                    Placeholder="e.g., 0.0015" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Output Cost ($)">
-                <AntDesign.InputNumber @bind-Value="ViewModel.CreateRequest.CostPer1kTokensOutput"
-                    Min="0"
-                    Step="0.0001"
-                    Style="width:100%"
-                    Placeholder="e.g., 0.002" />
-                </FormItem>
-            </Col>
-        </Row>
-    </Form>
-</Modal>
-
-<!-- Edit Model Modal -->
-<Modal Title="Edit AI Model"
-       @bind-Visible="ViewModel.EditModalVisible"
-       OnOk="@ViewModel.UpdateModel"
-       ConfirmLoading="@ViewModel.EditLoading"
-       Width="700">
-    <Form Model="@ViewModel.EditRequest" Layout="@FormLayout.Vertical">
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Model ID" Required>
-                    <Input @bind-Value="ViewModel.EditRequest.ModelId"
-                           Placeholder="e.g., gpt-4, claude-3-opus" />
-                    <div class="form-help">The API identifier for the model</div>
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Display Name" Required>
-                    <Input @bind-Value="ViewModel.EditRequest.DisplayName"
-                           Placeholder="e.g., GPT-4, Claude 3 Opus" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        <FormItem Label="Description">
-            <TextArea @bind-Value="ViewModel.EditRequest.Description"
-                     Placeholder="Brief description of the model's capabilities"
-                     Rows="2" />
-        </FormItem>
-
-        <Row Gutter="16">
-            <Col Span="8">
-                <FormItem Label="Max Tokens">
-                <AntDesign.InputNumber @bind-Value="ViewModel.EditRequest.MaxTokens" Min="1" Style="width:100%" />
-                </FormItem>
-            </Col>
-            <Col Span="8">
-                <FormItem Label="Sort Order">
-                <AntDesign.InputNumber @bind-Value="ViewModel.EditRequest.SortOrder" Min="0" Style="width:100%" />
-                </FormItem>
-            </Col>
-            <Col Span="8">
-                <FormItem Label="Status">
-                    <Space>
-                        <SpaceItem>
-                            <Checkbox @bind-Checked="ViewModel.EditRequest.IsActive">Active</Checkbox>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Checkbox @bind-Checked="ViewModel.EditRequest.IsDefault">Default</Checkbox>
-                        </SpaceItem>
-                    </Space>
-                </FormItem>
-            </Col>
-        </Row>
-
-        <Divider Orientation="@DividerOrientation.Left">Capabilities</Divider>
-
-        <Row Gutter="16">
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.EditRequest.SupportsStreaming">Supports Streaming</Checkbox>
-            </Col>
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.EditRequest.SupportsTools">Supports Tools/Functions</Checkbox>
-            </Col>
-            <Col Span="8">
-                <Checkbox @bind-Checked="ViewModel.EditRequest.SupportsVision">Supports Vision</Checkbox>
-            </Col>
-        </Row>
-
-        <Divider Orientation="@DividerOrientation.Left">Pricing (per 1K tokens)</Divider>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Input Cost ($)">
-                <AntDesign.InputNumber @bind-Value="ViewModel.EditRequest.CostPer1kTokensInput"
-                    Min="0"
-                    Step="0.0001"
-                    Style="width:100%"
-                    Placeholder="e.g., 0.0015" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Output Cost ($)">
-                <AntDesign.InputNumber @bind-Value="ViewModel.EditRequest.CostPer1kTokensOutput"
-                    Min="0"
-                    Step="0.0001"
-                    Style="width:100%"
-                    Placeholder="e.g., 0.002" />
-                </FormItem>
-            </Col>
-        </Row>
-    </Form>
-</Modal>
 
 <style>
     .admin-page-header {

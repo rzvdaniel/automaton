@@ -11,7 +11,7 @@
         <h2>AI Providers</h2>
     </div>
     <div class="admin-page-actions">
-        <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@ViewModel.ShowCreateModal">
+        <Button Type="@ButtonType.Primary" Icon="plus" OnClick="@NavigateToCreate">
             Add Provider
         </Button>
     </div>
@@ -92,7 +92,7 @@ else
                             <Button Type="@ButtonType.Text"
                                     Icon="edit"
                                     Size="@ButtonSize.Small"
-                                    OnClick="@(() => ViewModel.ShowEditModal(context))" />
+                                    OnClick="@(() => NavigateToEdit(context.Id))" />
                         </Tooltip>
                     </SpaceItem>
                     <SpaceItem>
@@ -113,148 +113,6 @@ else
         </Table>
     </Card>
 }
-
-<!-- Create Provider Modal -->
-<Modal Title="Add AI Provider"
-       @bind-Visible="ViewModel.CreateModalVisible"
-       OnOk="@ViewModel.CreateProvider"
-       ConfirmLoading="@ViewModel.CreateLoading"
-       Width="600">
-    <Form Model="@ViewModel.CreateRequest" Layout="@FormLayout.Vertical">
-        <FormItem Label="Name" Required>
-            <Input @bind-Value="ViewModel.CreateRequest.Name"
-                   Placeholder="e.g., OpenAI, Anthropic, Google" />
-            <div class="form-help">Internal identifier. Use lowercase letters, no spaces.</div>
-        </FormItem>
-
-        <FormItem Label="Display Name" Required>
-            <Input @bind-Value="ViewModel.CreateRequest.DisplayName"
-                   Placeholder="e.g., OpenAI, Anthropic Claude, Google AI" />
-        </FormItem>
-
-        <FormItem Label="Description">
-            <TextArea @bind-Value="ViewModel.CreateRequest.Description"
-                     Placeholder="Brief description of the provider"
-                     Rows="2" />
-        </FormItem>
-
-        <FormItem Label="Base URL">
-            <Input @bind-Value="ViewModel.CreateRequest.BaseUrl"
-                   Placeholder="e.g., https://api.openai.com/v1" />
-        </FormItem>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Icon Name">
-                    <Input @bind-Value="ViewModel.CreateRequest.IconName"
-                           Placeholder="e.g., robot, cloud" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Sort Order">
-                    <AntDesign.InputNumber @bind-Value="ViewModel.CreateRequest.SortOrder" Min="0" Style="width:100%" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Requires API Key">
-                    <Switch @bind-Checked="ViewModel.CreateRequest.RequiresApiKey" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Active">
-                    <Switch @bind-Checked="ViewModel.CreateRequest.IsActive" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        @if (ViewModel.CreateRequest.RequiresApiKey)
-        {
-            <FormItem Label="Environment Variable Name">
-                <Input @bind-Value="ViewModel.CreateRequest.EnvironmentKeyName"
-                       Placeholder="e.g., OPENAI_API_KEY" />
-            </FormItem>
-
-            <FormItem Label="API Key Help URL">
-                <Input @bind-Value="ViewModel.CreateRequest.ApiKeyHelpUrl"
-                       Placeholder="e.g., https://platform.openai.com/api-keys" />
-            </FormItem>
-        }
-    </Form>
-</Modal>
-
-<!-- Edit Provider Modal -->
-<Modal Title="Edit AI Provider"
-       @bind-Visible="ViewModel.EditModalVisible"
-       OnOk="@ViewModel.UpdateProvider"
-       ConfirmLoading="@ViewModel.EditLoading"
-       Width="600">
-    <Form Model="@ViewModel.EditRequest" Layout="@FormLayout.Vertical">
-        <FormItem Label="Name" Required>
-            <Input @bind-Value="ViewModel.EditRequest.Name"
-                   Placeholder="e.g., OpenAI, Anthropic, Google" />
-            <div class="form-help">Internal identifier. Use lowercase letters, no spaces.</div>
-        </FormItem>
-
-        <FormItem Label="Display Name" Required>
-            <Input @bind-Value="ViewModel.EditRequest.DisplayName"
-                   Placeholder="e.g., OpenAI, Anthropic Claude, Google AI" />
-        </FormItem>
-
-        <FormItem Label="Description">
-            <TextArea @bind-Value="ViewModel.EditRequest.Description"
-                     Placeholder="Brief description of the provider"
-                     Rows="2" />
-        </FormItem>
-
-        <FormItem Label="Base URL">
-            <Input @bind-Value="ViewModel.EditRequest.BaseUrl"
-                   Placeholder="e.g., https://api.openai.com/v1" />
-        </FormItem>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Icon Name">
-                    <Input @bind-Value="ViewModel.EditRequest.IconName"
-                           Placeholder="e.g., robot, cloud" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Sort Order">
-                    <AntDesign.InputNumber @bind-Value="ViewModel.EditRequest.SortOrder" Min="0" Style="width:100%" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        <Row Gutter="16">
-            <Col Span="12">
-                <FormItem Label="Requires API Key">
-                    <Switch @bind-Checked="ViewModel.EditRequest.RequiresApiKey" />
-                </FormItem>
-            </Col>
-            <Col Span="12">
-                <FormItem Label="Active">
-                    <Switch @bind-Checked="ViewModel.EditRequest.IsActive" />
-                </FormItem>
-            </Col>
-        </Row>
-
-        @if (ViewModel.EditRequest.RequiresApiKey == true)
-        {
-            <FormItem Label="Environment Variable Name">
-                <Input @bind-Value="ViewModel.EditRequest.EnvironmentKeyName"
-                       Placeholder="e.g., OPENAI_API_KEY" />
-            </FormItem>
-
-            <FormItem Label="API Key Help URL">
-                <Input @bind-Value="ViewModel.EditRequest.ApiKeyHelpUrl"
-                       Placeholder="e.g., https://platform.openai.com/api-keys" />
-            </FormItem>
-        }
-    </Form>
-</Modal>
 
 <style>
     .admin-page-header {

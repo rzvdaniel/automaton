@@ -16,5 +16,15 @@ namespace Automaton.Studio.Pages.Admin.AiProviders
         {
             NavigationManager.NavigateTo($"/admin/ai-models?providerId={providerId}");
         }
+
+        private void NavigateToCreate()
+        {
+            NavigationManager.NavigateTo("/admin/ai-providers/create");
+        }
+
+        private void NavigateToEdit(Guid providerId)
+        {
+            NavigationManager.NavigateTo($"/admin/ai-providers/edit/{providerId}");
+        }
     }
 }
