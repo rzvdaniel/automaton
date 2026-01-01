@@ -45,6 +45,9 @@ using Automaton.Studio.Services.Mcp.Clients.Providers;
 using Automaton.Studio.Services.Mcp.ToolProviders;
 using Automaton.Studio.Services.Mcp.EditorBridges;
 using Automaton.Studio.Services.Mcp.SystemPrompts;
+using Automaton.Studio.Services.Admin;
+using Automaton.Studio.Pages.Admin.AiProviders;
+using Automaton.Studio.Pages.Admin.AiModels;
 
 namespace Automaton.Studio.Extensions;
 
@@ -160,6 +163,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DashboardContextService>();
         services.AddScoped<ResourceAuthorizationService>();
 
+        // Admin services
+        services.AddScoped<AdminAiProviderService>();
+
         // Add Studio-specific persistence service
         services.AddScoped<StudioWorkflowExecutionPersistenceService>();
         services.AddScoped<IWorkflowExecutionPersistenceService, StudioWorkflowExecutionPersistenceService>();
@@ -183,6 +189,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FlowScheduleViewModel>();
         services.AddScoped<FlowSettingsViewModel>();
         services.AddScoped<DashboardViewModel>();
+
+        // Admin ViewModels
+        services.AddScoped<AdminAiProvidersViewModel>();
+        services.AddScoped<AdminAiModelsViewModel>();
 
         // Studio steps
         services.AddTransient<EmitLogStep>();
