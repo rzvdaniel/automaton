@@ -34,6 +34,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
         public virtual DbSet<AiApiKeyUser> AiApiKeyUsers { get; set; }
+        public virtual DbSet<AiProvider> AiProviders { get; set; }
+        public virtual DbSet<AiModel> AiModels { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
@@ -248,12 +250,20 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Provider).IsRequired();
+                entity.Property(e => e.ProviderName).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AiProviderId).IsRequired(false);
                 entity.Property(e => e.EncryptedApiKey).IsRequired().HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Description).HasMaxLength(500);
 
+                // Optional FK relationship to AiProvider for referential integrity
+                entity.HasOne(e => e.AiProvider)
+                    .WithMany()
+                    .HasForeignKey(e => e.AiProviderId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.ProviderName);
                 entity.HasIndex(e => e.LastUsedAt);
             });
             
@@ -263,6 +273,51 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.AiApiKeyId, "IX_AiApiKeyUser_AiApiKeyId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.AiApiKeyId).IsRequired();
+            });
+
+            modelBuilder.Entity<AiProvider>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.BaseUrl).HasMaxLength(200);
+                entity.Property(e => e.EnvironmentKeyName).HasMaxLength(100);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.RequiresApiKey).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.Name).IsUnique();
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.SortOrder);
+            });
+
+            modelBuilder.Entity<AiModel>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AiProviderId).IsRequired();
+                entity.Property(e => e.ModelId).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(300);
+                entity.Property(e => e.Description).HasMaxLength(1000);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.IsDefault).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.MaxTokens).IsRequired().HasDefaultValue(4096);
+                entity.Property(e => e.SupportsStreaming).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.SupportsTools).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.SupportsVision).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasOne(e => e.Provider)
+                    .WithMany(p => p.Models)
+                    .HasForeignKey(e => e.AiProviderId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.AiProviderId);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.IsDefault);
+                entity.HasIndex(e => new { e.AiProviderId, e.ModelId }).IsUnique();
             });
 
             modelBuilder.Entity<FlowExecutionLog>(entity =>

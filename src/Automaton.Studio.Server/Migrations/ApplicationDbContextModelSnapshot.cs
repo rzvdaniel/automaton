@@ -28,6 +28,9 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("AiProviderId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -53,12 +56,18 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-                    b.Property<int>("Provider")
-                        .HasColumnType("int");
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AiProviderId");
+
                     b.HasIndex("LastUsedAt");
+
+                    b.HasIndex("ProviderName");
 
                     b.ToTable("AiApiKeys");
                 });
@@ -76,6 +85,159 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex(new[] { "AiApiKeyId" }, "IX_AiApiKeyUser_AiApiKeyId");
 
                     b.ToTable("AiApiKeyUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AiProviderId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<decimal?>("CostPer1kTokensInput")
+                        .HasColumnType("decimal(10, 6)");
+
+                    b.Property<decimal?>("CostPer1kTokensOutput")
+                        .HasColumnType("decimal(10, 6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("MaxTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(4096);
+
+                    b.Property<string>("ModelId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("SupportsStreaming")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("SupportsTools")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("SupportsVision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AiProviderId");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("IsDefault");
+
+                    b.HasIndex("AiProviderId", "ModelId")
+                        .IsUnique();
+
+                    b.ToTable("AiModels");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ApiKeyHelpUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("EnvironmentKeyName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<bool>("RequiresApiKey")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("AiProviders");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
@@ -1184,6 +1346,16 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "AiProvider")
+                        .WithMany()
+                        .HasForeignKey("AiProviderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AiProvider");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKeyUser", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.AiApiKey", null)
@@ -1191,6 +1363,17 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("AiApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "Provider")
+                        .WithMany("Models")
+                        .HasForeignKey("AiProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
@@ -1566,6 +1749,11 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AiApiKeyUsers");
 
                     b.Navigation("ProjectAiApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
+                {
+                    b.Navigation("Models");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>

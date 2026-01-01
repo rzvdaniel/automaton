@@ -14,8 +14,9 @@ public class AiApiKeysViewModel
     public bool Loading { get; set; } = false;
     public bool CreateModalVisible { get; set; } = false;
     public bool CreateLoading { get; set; } = false;
-    
+
     public IEnumerable<AiApiKeyModel> AiApiKeys { get; set; } = new List<AiApiKeyModel>();
+    public IEnumerable<AiProviderInfo> AvailableProviders { get; set; } = new List<AiProviderInfo>();
     public CreateAiApiKeyRequest CreateRequest { get; set; } = new();
 
     /// <summary>
@@ -41,7 +42,15 @@ public class AiApiKeysViewModel
         try
         {
             var projectId = projectContextService.GetCurrentProjectId();
-            AiApiKeys = await aiApiKeyService.GetAiApiKeysAsync(projectId);
+
+            // Load keys and providers in parallel
+            var keysTask = aiApiKeyService.GetAiApiKeysAsync(projectId);
+            var providersTask = aiApiKeyService.GetAvailableProvidersAsync(includeEnvironment: false);
+
+            await Task.WhenAll(keysTask, providersTask);
+
+            AiApiKeys = await keysTask;
+            AvailableProviders = await providersTask;
         }
         catch (Exception ex)
         {

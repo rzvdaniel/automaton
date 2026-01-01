@@ -11,8 +11,9 @@ public class AppMcpClient : McpClient, IAppMcpClient
 {
     public AppMcpClient(
         ILogger<AppMcpClient> logger,
-        AppMcpToolProvider toolProvider)
-        : base(logger, toolProvider)
+        AppMcpToolProvider toolProvider,
+        IAiProviderRegistry providerRegistry)
+        : base(logger, toolProvider, providerRegistry)
     {
     }
 }

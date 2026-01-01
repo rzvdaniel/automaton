@@ -1,4 +1,3 @@
-using Automaton.Mcp.Enums;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
 using Automaton.Studio.Services.Mcp.Clients.Providers;
@@ -16,30 +15,22 @@ public class McpClient : IMcpClient
 {
     protected readonly Microsoft.Extensions.Logging.ILogger Logger;
     protected readonly IMcpToolProvider ToolProvider;
+    protected readonly IAiProviderRegistry ProviderRegistry;
     private readonly ConcurrentDictionary<string, ConversationContext> _conversations = new();
-    private readonly Dictionary<AiProviderType, IAiProvider> _providers = [];
 
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
-    public McpClient(ILogger<McpClient> logger, IMcpToolProvider toolProvider)
+    public McpClient(ILogger<McpClient> logger, IMcpToolProvider toolProvider, IAiProviderRegistry providerRegistry)
     {
         Logger = logger;
         ToolProvider = toolProvider;
+        ProviderRegistry = providerRegistry;
 
-        InitializeProviders();
-    }
-
-    private void InitializeProviders()
-    {
-        // Create OpenAI provider
-        var openAiProvider = new OpenAiProvider(Logger);
-        openAiProvider.ConversationUpdated += OnProviderConversationUpdated;
-        _providers[AiProviderType.OpenAI] = openAiProvider;
-
-        // Create Anthropic provider
-        var anthropicProvider = new AnthropicProvider(Logger);
-        anthropicProvider.ConversationUpdated += OnProviderConversationUpdated;
-        _providers[AiProviderType.Anthropic] = anthropicProvider;
+        // Subscribe to events from all registered providers
+        foreach (var provider in ProviderRegistry.Providers.Values)
+        {
+            provider.ConversationUpdated += OnProviderConversationUpdated;
+        }
     }
 
     private void OnProviderConversationUpdated(object? sender, ConversationUpdatedEvent e)
@@ -136,8 +127,9 @@ public class McpClient : IMcpClient
 
             string responseText;
 
-            // Check if we have a provider for the requested type
-            if (_providers.TryGetValue(request.Provider, out var provider))
+            // Check if we have a provider for the requested type (string-based lookup)
+            var provider = ProviderRegistry.GetProvider(request.Provider);
+            if (provider != null)
             {
                 // Get tools from the tool provider
                 var providerTools = await CreateProviderToolsAsync();
@@ -151,8 +143,9 @@ public class McpClient : IMcpClient
             }
             else
             {
-                Logger.LogWarning("Provider {Provider} not supported", request.Provider);
-                responseText = $"Provider {request.Provider} is not yet supported. Please use OpenAI or Anthropic.";
+                var implementedProviders = string.Join(", ", ProviderRegistry.GetImplementedProviderNames());
+                Logger.LogWarning("Provider {Provider} not implemented. Available: {Available}", request.Provider, implementedProviders);
+                responseText = $"Provider '{request.Provider}' is not implemented. Available providers: {implementedProviders}";
             }
 
             // Add conversation messages

@@ -1,7 +1,5 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Entities.Enums;
-using Automaton.Studio.Server.Services.AiProviders;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,33 +11,35 @@ public class AiApiKeyService
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiApiKeyService> logger;
     private readonly ConfigurationService configuration;
-    private readonly AiProviderFactory aiProviderFactory;
     private readonly ResourceAuthorizationService authorizationService;
 
     public AiApiKeyService(
-        ApplicationDbContext dbContext, 
-        ILogger<AiApiKeyService> logger, 
-        ConfigurationService configuration, 
-        AiProviderFactory aiProviderFactory,
+        ApplicationDbContext dbContext,
+        ILogger<AiApiKeyService> logger,
+        ConfigurationService configuration,
         ResourceAuthorizationService authorizationService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.configuration = configuration;
-        this.aiProviderFactory = aiProviderFactory;
         this.authorizationService = authorizationService;
     }
 
-    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, AiProviderType provider, string apiKey, string? description = null, Guid? projectId = null)
+    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, string providerName, string apiKey, string? description = null, Guid? projectId = null)
     {
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
+
+        // Optionally look up AiProvider by name for FK
+        var aiProvider = await dbContext.AiProviders
+            .FirstOrDefaultAsync(p => p.Name == providerName);
 
         var entity = new AiApiKey
         {
             Id = Guid.NewGuid(),
             Name = name,
-            Provider = provider,
+            ProviderName = providerName,
+            AiProviderId = aiProvider?.Id,
             EncryptedApiKey = encryptedApiKey,
             CreatedAt = DateTime.UtcNow,
             Description = description,
@@ -47,7 +47,7 @@ public class AiApiKeyService
         };
 
         dbContext.AiApiKeys.Add(entity);
-        
+
         // Create personal ownership link
         var aiApiKeyUser = new AiApiKeyUser
         {
@@ -55,7 +55,7 @@ public class AiApiKeyService
             UserId = userId
         };
         dbContext.AiApiKeyUsers.Add(aiApiKeyUser);
-        
+
         // If project is specified, add to project
         if (projectId.HasValue)
         {
@@ -68,10 +68,10 @@ public class AiApiKeyService
             };
             dbContext.ProjectAiApiKeys.Add(projectAiApiKey);
         }
-        
+
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key created for user {UserId} with provider {Provider}", userId, provider);
+        logger.LogInformation("AI API key created for user {UserId} with provider {ProviderName}", userId, providerName);
         return entity;
     }
 
@@ -157,11 +157,11 @@ public class AiApiKeyService
         return true;
     }
 
-    public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, AiProviderType provider)
+    public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, string providerName)
     {
         // Use authorization service query to get accessible AI API keys
         return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
-            .Where(ak => ak.Provider == provider)
+            .Where(ak => ak.ProviderName == providerName)
             .OrderByDescending(ak => ak.LastUsedAt ?? ak.CreatedAt)
             .ToListAsync();
     }
@@ -169,15 +169,15 @@ public class AiApiKeyService
     /// <summary>
     /// For Desktop environments - read from environment variables
     /// </summary>
-    public Dictionary<AiProviderType, string?> GetEnvironmentApiKeys()
+    public Dictionary<string, string?> GetEnvironmentApiKeys()
     {
-        var environmentKeys = new Dictionary<AiProviderType, string?>();
+        var environmentKeys = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         // Check common environment variable names for each provider
-        environmentKeys[AiProviderType.OpenAI] = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        environmentKeys[AiProviderType.Anthropic] = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") 
+        environmentKeys["OpenAI"] = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        environmentKeys["Anthropic"] = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
             ?? Environment.GetEnvironmentVariable("CLAUDE_API_KEY");
-        environmentKeys[AiProviderType.Google] = Environment.GetEnvironmentVariable("GOOGLE_AI_API_KEY") 
+        environmentKeys["Google"] = Environment.GetEnvironmentVariable("GOOGLE_AI_API_KEY")
             ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
         return environmentKeys;
@@ -185,6 +185,7 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get available AI providers with their key status (for UI selection)
+    /// Now uses database instead of appsettings.json
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false)
     {
@@ -192,30 +193,45 @@ public class AiApiKeyService
 
         // Get stored keys
         var storedKeys = await GetUserAiApiKeysAsync(userId);
-        var groupedKeys = storedKeys.GroupBy(k => k.Provider);
+        var groupedKeys = storedKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase);
 
         // Get environment keys (for desktop)
-        var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<AiProviderType, string?>();
+        var envKeys = includeEnvironment ? GetEnvironmentApiKeys() : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (AiProviderType provider in Enum.GetValues<AiProviderType>())
+        // Get active AI providers from database with their models
+        var dbProviders = await dbContext.AiProviders
+            .Where(p => p.IsActive)
+            .Include(p => p.Models.Where(m => m.IsActive))
+            .OrderBy(p => p.SortOrder)
+            .ToListAsync();
+
+        foreach (var dbProvider in dbProviders)
         {
-            var storedKeysForProvider = groupedKeys.FirstOrDefault(g => g.Key == provider)?.ToList() ?? new List<AiApiKey>();
-            var hasEnvironmentKey = envKeys.TryGetValue(provider, out var envKey) && !string.IsNullOrEmpty(envKey);
+            var storedKeysForProvider = groupedKeys
+                .FirstOrDefault(g => string.Equals(g.Key, dbProvider.Name, StringComparison.OrdinalIgnoreCase))
+                ?.ToList() ?? new List<AiApiKey>();
+            var hasEnvironmentKey = envKeys.TryGetValue(dbProvider.Name, out var envKey) && !string.IsNullOrEmpty(envKey);
 
             providers.Add(new AiProviderInfo
             {
-                Provider = provider,
-                ProviderName = GetProviderDisplayName(provider),
+                ProviderName = dbProvider.Name,
+                DisplayName = dbProvider.DisplayName,
+                Description = dbProvider.Description,
+                IconName = dbProvider.IconName,
+                ApiKeyHelpUrl = dbProvider.ApiKeyHelpUrl,
                 HasStoredKeys = storedKeysForProvider.Any(),
                 StoredKeyCount = storedKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
                 StoredKeys = storedKeysForProvider,
-                SupportedModels = GetSupportedModels(provider)
+                SupportedModels = dbProvider.Models
+                    .OrderBy(m => m.SortOrder)
+                    .Select(m => m.ModelId)
+                    .ToList()
             });
         }
 
-        return providers.Where(p => p.HasStoredKeys || p.HasEnvironmentKey || p.Provider != AiProviderType.Custom)
-                      .OrderByDescending(p => p.HasStoredKeys || p.HasEnvironmentKey);
+        // Return all providers - UI will show all but disable ones without keys
+        return providers;
     }
 
     private string EncryptApiKey(string apiKey)
@@ -269,38 +285,35 @@ public class AiApiKeyService
         return sha256.ComputeHash(Encoding.UTF8.GetBytes(keyString));
     }
 
-    private static string GetProviderDisplayName(AiProviderType provider) => provider switch
-    {
-        AiProviderType.OpenAI => "OpenAI",
-        AiProviderType.Anthropic => "Anthropic", 
-        AiProviderType.Google => "Google",
-        AiProviderType.Custom => "Custom Provider",
-        _ => provider.ToString()
-    };
-
-    private List<string> GetSupportedModels(AiProviderType provider)
-    {
-        try
-        {
-            if (provider == AiProviderType.Custom)
-            {
-                return new List<string> { "custom-model" };
-            }
-            
-            return aiProviderFactory.GetSupportedModels(provider).ToList();
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to get supported models for provider {Provider}, falling back to config", provider);
-            return new List<string>();
-        }
-    }
 }
 
 public class AiProviderInfo
 {
-    public AiProviderType Provider { get; set; }
+    /// <summary>
+    /// Provider identifier name (e.g., "OpenAI", "Anthropic")
+    /// </summary>
     public string ProviderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Display name for UI (e.g., "OpenAI", "Anthropic Claude")
+    /// </summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Description of the provider
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Icon name for UI (e.g., "openai", "anthropic", "google")
+    /// </summary>
+    public string? IconName { get; set; }
+
+    /// <summary>
+    /// URL where users can get their API key
+    /// </summary>
+    public string? ApiKeyHelpUrl { get; set; }
+
     public bool HasStoredKeys { get; set; }
     public int StoredKeyCount { get; set; }
     public bool HasEnvironmentKey { get; set; }

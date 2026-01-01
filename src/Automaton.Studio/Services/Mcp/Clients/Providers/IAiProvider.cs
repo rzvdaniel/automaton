@@ -8,6 +8,11 @@ namespace Automaton.Studio.Services.Mcp.Clients.Providers;
 public interface IAiProvider
 {
     /// <summary>
+    /// Unique provider name that matches AiProvider.Name in database (e.g., "OpenAI", "Anthropic")
+    /// </summary>
+    string ProviderName { get; }
+
+    /// <summary>
     /// Event fired when conversation is updated during streaming
     /// </summary>
     event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;

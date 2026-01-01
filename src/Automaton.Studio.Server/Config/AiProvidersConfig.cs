@@ -1,5 +1,3 @@
-using Automaton.Studio.Server.Entities.Enums;
-
 namespace Automaton.Studio.Server.Config;
 
 public class AiProvidersConfig
@@ -16,9 +14,8 @@ public class AiProviderConfig
 
 public static class AiProvidersConfigExtensions
 {
-    public static AiProviderConfig? GetProviderConfig(this AiProvidersConfig config, AiProviderType provider)
+    public static AiProviderConfig? GetProviderConfig(this AiProvidersConfig config, string providerName)
     {
-        var providerKey = provider.ToString();
-        return config.Providers.TryGetValue(providerKey, out var providerConfig) ? providerConfig : null;
+        return config.Providers.TryGetValue(providerName, out var providerConfig) ? providerConfig : null;
     }
 }

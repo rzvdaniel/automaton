@@ -9,7 +9,6 @@ using Automaton.Mcp.Models;
 using Microsoft.Extensions.Logging;
 using Automaton.Studio.Components.AiChat.ToolResults;
 using Automaton.Studio.Components.AiChat.ToolResults.Processors;
-using Automaton.Mcp.Enums;
 using Automaton.Studio.Components.AiChat.Models;
 using Automaton.Studio.Components.AiChat.Contexts;
 using Automaton.Studio.Services.Mcp.Clients;
@@ -380,7 +379,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 var firstAvailableProvider = availableProviders.FirstOrDefault(p => (p.HasStoredKeys || p.HasEnvironmentKey) && p.SupportedModels?.Any() == true);
                 if (firstAvailableProvider != null && firstAvailableProvider.SupportedModels?.Any() == true)
                 {
-                    selectedProviderModel = $"{firstAvailableProvider.Provider}:{firstAvailableProvider.SupportedModels.First()}";
+                    selectedProviderModel = $"{firstAvailableProvider.ProviderName}:{firstAvailableProvider.SupportedModels.First()}";
                 }
             }
 
@@ -402,11 +401,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             return null;
 
         var providerName = selectedProviderModel.Split(':')[0];
-        if (Enum.TryParse<AiProviderType>(providerName, out var provider))
-        {
-            return availableProviders?.FirstOrDefault(p => p.Provider == provider);
-        }
-        return null;
+        return availableProviders?.FirstOrDefault(p =>
+            string.Equals(p.ProviderName, providerName, StringComparison.OrdinalIgnoreCase));
     }
 
     private string GetSelectedModel()
@@ -539,7 +535,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         {
             InitialMessage = userPrompt,
             SystemPrompt = Context.BuildSystemPrompt(),
-            Provider = provider.Provider,
+            Provider = provider.ProviderName,
             ApiKey = apiKey,
             Model = model,
             ConversationHistory = BuildMcpConversationHistory(),
@@ -548,7 +544,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 ["contextId"] = Context.GetContextId()
             }
         };
-        
+
         return request;
     }
 
@@ -726,13 +722,13 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         if (provider.HasEnvironmentKey)
         {
             var envKeys = await AiApiKeyService.GetEnvironmentApiKeysAsync();
-            if (envKeys.TryGetValue(provider.Provider, out var envKey) && !string.IsNullOrEmpty(envKey))
+            if (envKeys.TryGetValue(provider.ProviderName, out var envKey) && !string.IsNullOrEmpty(envKey))
             {
                 return envKey;
             }
         }
 
-        logger.LogWarning("No valid API key found for provider {Provider}", provider.Provider);
+        logger.LogWarning("No valid API key found for provider {ProviderName}", provider.ProviderName);
         return string.Empty;
     }
 

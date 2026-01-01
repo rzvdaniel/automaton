@@ -11,8 +11,9 @@ public class StepMcpClient : McpClient, IStepMcpClient
 {
     public StepMcpClient(
         ILogger<StepMcpClient> logger,
-        StepMcpToolProvider toolProvider)
-        : base(logger, toolProvider)
+        StepMcpToolProvider toolProvider,
+        IAiProviderRegistry providerRegistry)
+        : base(logger, toolProvider, providerRegistry)
     {
     }
 }
