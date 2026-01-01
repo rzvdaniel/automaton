@@ -244,6 +244,7 @@ services.AddTransient<ScheduleService>();
 
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
+services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
 
 services.AddScoped<OpenAiProvider>();
 services.AddScoped<AnthropicProvider>();

@@ -52,6 +52,11 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ProjectAiApiKey> ProjectAiApiKeys { get; set; }
         public virtual DbSet<InvitationToken> InvitationTokens { get; set; }
 
+        // AI Chat History entities
+        public virtual DbSet<AiChatSession> AiChatSessions { get; set; }
+        public virtual DbSet<AiChatMessage> AiChatMessages { get; set; }
+        public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // No-op, configuration is handled by DI
@@ -539,6 +544,66 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.Token).IsUnique();
                 entity.HasIndex(e => e.ProjectId);
                 entity.HasIndex(e => e.Email);
+            });
+
+            // AI Chat History
+            modelBuilder.Entity<AiChatSession>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ResourceType).IsRequired();
+                entity.Property(e => e.ResourceId).IsRequired();
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Provider).HasMaxLength(50);
+                entity.Property(e => e.Model).HasMaxLength(100);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Indexes for efficient querying
+                entity.HasIndex(e => new { e.ResourceType, e.ResourceId });
+                entity.HasIndex(e => new { e.ResourceType, e.ResourceId, e.IsActive });
+                entity.HasIndex(e => e.CreatedAt);
+            });
+
+            modelBuilder.Entity<AiChatMessage>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.SessionId).IsRequired();
+                entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Content).IsRequired();
+                entity.Property(e => e.MessageType).IsRequired();
+                entity.Property(e => e.Metadata).HasColumnType("json");
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                // Configure relationship
+                entity.HasOne(e => e.Session)
+                    .WithMany(s => s.Messages)
+                    .HasForeignKey(e => e.SessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Indexes for efficient querying
+                entity.HasIndex(e => e.SessionId);
+                entity.HasIndex(e => e.CreatedAt);
+            });
+
+            modelBuilder.Entity<AiChatSessionUser>(entity =>
+            {
+                entity.HasKey(e => new { e.SessionId, e.UserId });
+                entity.HasIndex(e => e.SessionId, "IX_AiChatSessionUser_SessionId");
+                entity.HasIndex(e => e.UserId, "IX_AiChatSessionUser_UserId");
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.SessionId).IsRequired();
+
+                // Configure relationships
+                entity.HasOne(e => e.Session)
+                    .WithMany(s => s.AiChatSessionUsers)
+                    .HasForeignKey(e => e.SessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
 
