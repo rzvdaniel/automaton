@@ -110,10 +110,10 @@ services.AddAuthorization(options =>
 
     options.AddPolicy("ProjectMember", policy =>
         policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
-            Automaton.Studio.Server.Enums.ProjectRole.ProjectAdmin,
-            Automaton.Studio.Server.Enums.ProjectRole.Developer,
-            Automaton.Studio.Server.Enums.ProjectRole.AppUser,
-            Automaton.Studio.Server.Enums.ProjectRole.Viewer)));
+            ProjectRole.ProjectAdmin,
+            ProjectRole.Developer,
+            ProjectRole.AppUser,
+            ProjectRole.Viewer)));
 });
 
 services.AddHttpClient();
