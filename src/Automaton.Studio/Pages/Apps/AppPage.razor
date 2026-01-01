@@ -120,7 +120,9 @@
 											<div class="tab-content-scrollable">
 												<AiChatPanel Context="@CreateAiChatContext()"
 												 McpClient="@UnifiedAppMcpClient"
-												 OnCodeGenerated="OnCodeGenerated" />
+												 OnCodeGenerated="OnCodeGenerated"
+												 ResourceType="ChatResourceType.WebApp"
+												 ResourceId="@Guid.Parse(AppId)" />
 											</div>
 										</TabPane>
 									</Tabs>
