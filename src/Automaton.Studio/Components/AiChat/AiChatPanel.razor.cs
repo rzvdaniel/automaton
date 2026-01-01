@@ -56,6 +56,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private List<ChatSessionModel> availableSessions = new();
     private bool isLoadingHistory = false;
     private bool showSessionSelector = false;
+    private int lastSavedMessageCount = 0; // Track how many messages have been saved
 
     protected override async Task OnInitializedAsync()
     {
@@ -107,6 +108,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                 logger.LogInformation("Loaded {Count} messages from session {SessionId}",
                     previousMessages.Count(), currentSession.Id);
+
+                // Track that these messages are already saved
+                lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
 
                 // Load all available sessions for this resource
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
@@ -639,6 +643,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             SaveChatMessageRequest saveRequest = new SaveChatMessageRequest { SessionId = currentSession.Id, Role = message.Role, Content = message.Content, MessageType = (ChatMessageType)(int)message.Type, Metadata = metadataJson };
 
             await ChatHistoryService.SaveMessageAsync(saveRequest);
+
+            // Update the counter to reflect that this message has been saved
+            lastSavedMessageCount++;
         }
         catch (Exception ex)
         {
@@ -818,19 +825,26 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 return;
             }
 
-            // Get all messages that should be saved (exclude system and generating)
-            var messagesToSave = messages.Where(m =>
+            // Get all saveable messages (exclude system and generating)
+            var allSaveableMessages = messages.Where(m =>
                 m.Type != MessageType.System &&
                 m.Type != MessageType.Generating &&
                 !string.IsNullOrWhiteSpace(m.Content)
             ).ToList();
 
-            // For efficiency, we'll save only new messages since last save
-            // We can check this by comparing message count or timestamps
-            // For now, let's use a simple batch save approach
+            // Only save messages we haven't saved yet
+            var unsavedMessages = allSaveableMessages.Skip(lastSavedMessageCount).ToList();
+
+            if (!unsavedMessages.Any())
+            {
+                logger.LogDebug("No new messages to save for session {SessionId}", currentSession.Id);
+                return;
+            }
+
+            // Build list of messages to save
             var newMessages = new List<ChatMessageItem>();
 
-            foreach (var message in messagesToSave)
+            foreach (var message in unsavedMessages)
             {
                 var metadata = new ChatMessageMetadata
                 {
@@ -855,14 +869,23 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 });
             }
 
-            if (newMessages.Any())
+            logger.LogInformation("Saving {Count} new messages to history for session {SessionId}",
+                newMessages.Count, currentSession.Id);
+
+            var saveRequest = new SaveChatMessagesRequest
             {
-                // Note: This will save all messages. In a production scenario, you might want to
-                // track which messages have been saved to avoid duplicates. For now, the backend
-                // will handle duplicate prevention if needed.
-                logger.LogInformation("Saving {Count} messages to history for session {SessionId}",
-                    newMessages.Count, currentSession.Id);
-            }
+                SessionId = currentSession.Id,
+                Messages = newMessages
+            };
+
+            // Save the new messages to the backend
+            await ChatHistoryService.SaveMessagesAsync(saveRequest);
+
+            // Update the tracking counter
+            lastSavedMessageCount = allSaveableMessages.Count;
+
+            logger.LogInformation("Successfully saved {Count} messages to session {SessionId}. Total saved: {Total}",
+                newMessages.Count, currentSession.Id, lastSavedMessageCount);
         }
         catch (Exception ex)
         {
@@ -1022,6 +1045,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             if (currentSession != null)
             {
+                // Reset the saved message counter for the new session
+                lastSavedMessageCount = 0;
+
                 // Refresh available sessions list
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
                 logger.LogInformation("Created new chat session {SessionId}", currentSession.Id);
@@ -1066,6 +1092,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     var chatMessage = ConvertToChatMessage(savedMsg);
                     messages.Add(chatMessage);
                 }
+
+                // Update the counter to reflect loaded messages
+                lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
 
                 // Refresh available sessions
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
