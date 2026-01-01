@@ -27,7 +27,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .Include(s => s.Messages)
                 .Where(s => s.ResourceType == resourceType &&
                            s.ResourceId == resourceId &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .OrderByDescending(s => s.UpdatedAt)
                 .Select(s => new ChatSessionDto
                 {
@@ -61,7 +61,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .Include(s => s.AiChatSessionUsers)
                 .Include(s => s.Messages)
                 .Where(s => s.Id == sessionId &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .Select(s => new ChatSessionDto
                 {
                     Id = s.Id,
@@ -93,7 +93,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             // Verify user has access to the session
             var hasAccess = await dataContext.AiChatSessions
                 .AnyAsync(s => s.Id == sessionId &&
-                              s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                              s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (!hasAccess)
             {
@@ -166,7 +166,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .Where(s => s.ResourceType == resourceType &&
                            s.ResourceId == resourceId &&
                            s.IsActive &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .Select(s => new ChatSessionDto
                 {
                     Id = s.Id,
@@ -230,7 +230,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var sessionUser = new AiChatSessionUser
             {
                 SessionId = sessionEntity.Id,
-                UserId = userId.ToString()
+                UserId = userId
             };
 
             dataContext.AiChatSessionUsers.Add(sessionUser);
@@ -240,7 +240,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .Where(s => s.ResourceType == request.ResourceType &&
                            s.ResourceId == request.ResourceId &&
                            s.Id != sessionEntity.Id &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .ToListAsync();
 
             foreach (var session in otherSessions)
@@ -281,7 +281,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var session = await dataContext.AiChatSessions
                 .Include(s => s.AiChatSessionUsers)
                 .FirstOrDefaultAsync(s => s.Id == sessionId &&
-                                         s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (session == null)
             {
@@ -294,7 +294,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 .Where(s => s.ResourceType == session.ResourceType &&
                            s.ResourceId == session.ResourceId &&
                            s.Id != sessionId &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .ToListAsync();
 
             foreach (var otherSession in otherSessions)
@@ -325,7 +325,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var session = await dataContext.AiChatSessions
                 .Include(s => s.AiChatSessionUsers)
                 .FirstOrDefaultAsync(s => s.Id == sessionId &&
-                                         s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (session == null)
             {
@@ -356,7 +356,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var session = await dataContext.AiChatSessions
                 .Include(s => s.AiChatSessionUsers)
                 .FirstOrDefaultAsync(s => s.Id == sessionId &&
-                                         s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (session == null)
             {
@@ -385,7 +385,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             // Verify user has access to the session
             var hasAccess = await dataContext.AiChatSessions
                 .AnyAsync(s => s.Id == request.SessionId &&
-                              s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                              s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (!hasAccess)
             {
@@ -440,7 +440,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             // Verify user has access to the session
             var hasAccess = await dataContext.AiChatSessions
                 .AnyAsync(s => s.Id == request.SessionId &&
-                              s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                              s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (!hasAccess)
             {
@@ -505,7 +505,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var session = await dataContext.AiChatSessions
                 .Include(s => s.AiChatSessionUsers)
                 .FirstOrDefaultAsync(s => s.Id == sessionId &&
-                                         s.AiChatSessionUsers.Any(su => su.UserId == userId.ToString()));
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
 
             if (session == null)
             {

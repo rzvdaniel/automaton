@@ -185,7 +185,6 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get available AI providers with their key status (for UI selection)
-    /// Now uses database instead of appsettings.json
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false)
     {
@@ -222,7 +221,16 @@ public class AiApiKeyService
                 HasStoredKeys = storedKeysForProvider.Any(),
                 StoredKeyCount = storedKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
-                StoredKeys = storedKeysForProvider,
+                StoredKeys = storedKeysForProvider.Select(k => new AiApiKeyModel
+                {
+                    Id = k.Id,
+                    Name = k.Name,
+                    ProviderName = k.ProviderName,
+                    Description = k.Description,
+                    CreatedAt = k.CreatedAt,
+                    LastUsedAt = k.LastUsedAt,
+                    IsActive = k.IsActive
+                }).ToList(),
                 SupportedModels = dbProvider.Models
                     .OrderBy(m => m.SortOrder)
                     .Select(m => m.ModelId)
@@ -284,7 +292,6 @@ public class AiApiKeyService
         using var sha256 = SHA256.Create();
         return sha256.ComputeHash(Encoding.UTF8.GetBytes(keyString));
     }
-
 }
 
 public class AiProviderInfo
@@ -317,6 +324,17 @@ public class AiProviderInfo
     public bool HasStoredKeys { get; set; }
     public int StoredKeyCount { get; set; }
     public bool HasEnvironmentKey { get; set; }
-    public List<AiApiKey> StoredKeys { get; set; } = new();
+    public List<AiApiKeyModel> StoredKeys { get; set; } = new();
     public List<string> SupportedModels { get; set; } = new();
+}
+
+public class AiApiKeyModel
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string ProviderName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastUsedAt { get; set; }
+    public bool IsActive { get; set; }
 }

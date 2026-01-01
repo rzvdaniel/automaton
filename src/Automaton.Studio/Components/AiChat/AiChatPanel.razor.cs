@@ -89,7 +89,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             currentSession = await ChatHistoryService.GetOrCreateActiveSessionAsync(
                 ResourceType,
                 ResourceId,
-                GetSelectedProvider()?.Provider.ToString(),
+                GetSelectedProvider()?.ProviderName,
                 GetSelectedModel()
             );
 
@@ -636,14 +636,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
 
-            var saveRequest = new SaveChatMessageRequest
-            {
-                SessionId = currentSession.Id,
-                Role = message.Role,
-                Content = message.Content,
-                MessageType = (Models.ChatMessageType)(int)message.Type,
-                Metadata = metadataJson
-            };
+            SaveChatMessageRequest saveRequest = new SaveChatMessageRequest { SessionId = currentSession.Id, Role = message.Role, Content = message.Content, MessageType = (ChatMessageType)(int)message.Type, Metadata = metadataJson };
 
             await ChatHistoryService.SaveMessageAsync(saveRequest);
         }
@@ -857,7 +850,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 {
                     Role = message.Role,
                     Content = message.Content,
-                    MessageType = (Models.ChatMessageType)(int)message.Type,
+                    MessageType = (ChatMessageType)(int)message.Type,
                     Metadata = System.Text.Json.JsonSerializer.Serialize(metadata)
                 });
             }
@@ -1021,7 +1014,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 ResourceType = ResourceType,
                 ResourceId = ResourceId,
                 Title = $"Chat {DateTime.Now:MMM dd, HH:mm}",
-                Provider = GetSelectedProvider()?.Provider.ToString(),
+                Provider = GetSelectedProvider()?.ProviderName,
                 Model = GetSelectedModel()
             };
 

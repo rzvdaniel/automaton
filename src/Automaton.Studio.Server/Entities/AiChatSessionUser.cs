@@ -1,3 +1,5 @@
+using System;
+
 namespace Automaton.Studio.Server.Entities;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace Automaton.Studio.Server.Entities;
 public class AiChatSessionUser
 {
     public Guid SessionId { get; set; }
-    public string UserId { get; set; } = string.Empty;
+    public Guid UserId { get; set; }
 
     // Navigation properties
     public virtual AiChatSession Session { get; set; } = null!;

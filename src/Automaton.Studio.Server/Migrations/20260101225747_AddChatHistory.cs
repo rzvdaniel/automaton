@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Automaton.Studio.Server.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAiChatHistory : Migration
+    public partial class AddChatHistory : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -45,7 +45,8 @@ namespace Automaton.Studio.Server.Migrations
                     Content = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     MessageType = table.Column<int>(type: "int", nullable: false),
-                    Metadata = table.Column<string>(type: "json", nullable: true),
+                    Metadata = table.Column<string>(type: "json", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
@@ -65,8 +66,7 @@ namespace Automaton.Studio.Server.Migrations
                 columns: table => new
                 {
                     SessionId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
-                    UserId = table.Column<string>(type: "varchar(255)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
+                    UserId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci")
                 },
                 constraints: table =>
                 {
@@ -87,18 +87,8 @@ namespace Automaton.Studio.Server.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AiChatSessions_ResourceType_ResourceId",
-                table: "AiChatSessions",
-                columns: new[] { "ResourceType", "ResourceId" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AiChatSessions_ResourceType_ResourceId_IsActive",
-                table: "AiChatSessions",
-                columns: new[] { "ResourceType", "ResourceId", "IsActive" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AiChatSessions_CreatedAt",
-                table: "AiChatSessions",
+                name: "IX_AiChatMessages_CreatedAt",
+                table: "AiChatMessages",
                 column: "CreatedAt");
 
             migrationBuilder.CreateIndex(
@@ -107,9 +97,19 @@ namespace Automaton.Studio.Server.Migrations
                 column: "SessionId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AiChatMessages_CreatedAt",
-                table: "AiChatMessages",
+                name: "IX_AiChatSessions_CreatedAt",
+                table: "AiChatSessions",
                 column: "CreatedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AiChatSessions_ResourceType_ResourceId",
+                table: "AiChatSessions",
+                columns: new[] { "ResourceType", "ResourceId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AiChatSessions_ResourceType_ResourceId_IsActive",
+                table: "AiChatSessions",
+                columns: new[] { "ResourceType", "ResourceId", "IsActive" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_AiChatSessionUser_SessionId",
