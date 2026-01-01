@@ -4,8 +4,6 @@ using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
-using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -17,7 +15,7 @@ public class AiChatHistoryService : IAiChatHistoryService
     public AiChatHistoryService(ApplicationDbContext dataContext)
     {
         this.dataContext = dataContext;
-        this.logger = Log.ForContext<AiChatHistoryService>();
+        this.logger = Serilog.Log.ForContext<AiChatHistoryService>();
     }
 
     public async Task<List<ChatSessionDto>> GetSessionsAsync(ChatResourceType resourceType, Guid resourceId, Guid userId)

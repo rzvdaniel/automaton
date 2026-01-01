@@ -250,11 +250,6 @@ services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
 
-services.AddScoped<OpenAiProvider>();
-services.AddScoped<AnthropicProvider>();
-services.AddScoped<GoogleProvider>();
-services.AddScoped<AiProviderFactory>();
-
 services.AddScoped<AiProviderMetadataService>();
 
 // Project/Organization services
