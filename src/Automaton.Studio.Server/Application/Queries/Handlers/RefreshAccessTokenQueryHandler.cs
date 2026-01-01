@@ -1,12 +1,10 @@
-﻿using AuthServer.Core.Events;
-using Automaton.Studio.Server.Core.Commands;
+﻿using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Common.Authentication;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
-using Microsoft.EntityFrameworkCore.Update;
 
 namespace Automaton.Studio.Server.Application.Queries.Handlers
 {
@@ -87,8 +85,6 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
             var roles = (await userManagerService.GetRoles(user.Id)).ToImmutableList();
             var jwt = jwtService.GenerateToken(user.Id.ToString("N"), user.UserName, roles, claims);
             jwt.RefreshToken = newRefreshToken.Token;
-
-            await mediator.Publish(new AccessTokenRefreshedEvent(user.Id, jwt.AccessToken, newRefreshToken.Token), cancellationToken);
 
             logger.Log(LogLevel.Debug, "AccessTokenRefreshed Event Published.");
 
