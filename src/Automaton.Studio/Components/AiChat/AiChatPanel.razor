@@ -164,48 +164,54 @@
 	<!-- Session History Drawer -->
 	<Drawer Closable="true"
 			Visible="@showSessionDrawer"
-			Title="Chat Sessions"
 			Width="400"
 			OnClose="() => showSessionDrawer = false">
-		<div class="sessions-list">
-			@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
-			{
-				<div class="session-item @(session.Id == currentSession?.Id ? "active" : "")">
-					<div class="session-info" @onclick="() => SelectAndCloseDrawerAsync(session.Id)">
-						<div class="session-title">@session.Title</div>
-						<div class="session-meta">
-							<span class="session-date">@session.UpdatedAt.ToString("MMM dd, HH:mm")</span>
-							@if (session.Provider != null && session.Model != null)
-							{
-								<span class="session-model">@session.Model</span>
-							}
+		<TitleTemplate>
+			<span>Chat Sessions</span>
+		</TitleTemplate>
+		<ChildContent>
+			<div class="sessions-list">
+				@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
+				{
+					<div class="session-item @(session.Id == currentSession?.Id ? "active" : "")">
+						<div class="session-info" @onclick="() => SelectAndCloseDrawerAsync(session.Id)">
+							<div class="session-title">@session.Title</div>
+							<div class="session-meta">
+								<span class="session-date">@session.UpdatedAt.ToString("MMM dd, HH:mm")</span>
+								@if (session.Provider != null && session.Model != null)
+								{
+									<span class="session-model">@session.Model</span>
+								}
+							</div>
 						</div>
-					</div>
-					<div class="session-actions">
-						<Button Icon="edit"
-								Size="@ButtonSize.Small"
-								Type="@ButtonType.Text"
-								OnClick="() => StartRenameSession(session.Id, session.Title)"
-								Title="Rename" />
-						<Popconfirm Title="Delete this session?"
-									OnConfirm="() => DeleteSessionAsync(session.Id)"
-									OkText="Delete"
-									CancelText="Cancel">
-							<Button Icon="delete"
+						<div class="session-actions">
+							<Button Icon="edit"
 									Size="@ButtonSize.Small"
 									Type="@ButtonType.Text"
-									Danger="true"
-									Title="Delete" />
-						</Popconfirm>
+									OnClick="() => StartRenameSession(session.Id, session.Title)"
+									Title="Rename" />
+							<Popconfirm Title="Delete this session?"
+										OnConfirm="() => DeleteSessionAsync(session.Id)"
+										OkText="Delete"
+										CancelText="Cancel">
+								<Button Icon="delete"
+										Size="@ButtonSize.Small"
+										Type="@ButtonType.Text"
+										Danger="true"
+										Title="Delete" />
+							</Popconfirm>
+						</div>
 					</div>
-				</div>
-			}
+				}
 
-			@if (!availableSessions.Any())
-			{
-				<Empty Description="No sessions yet" />
-			}
-		</div>
+				@if (!availableSessions.Any())
+				{
+					<Empty>
+						<DescriptionTemplate>No sessions yet</DescriptionTemplate>
+					</Empty>
+				}
+			</div>
+		</ChildContent>
 	</Drawer>
 
 	<!-- Rename Session Modal -->
