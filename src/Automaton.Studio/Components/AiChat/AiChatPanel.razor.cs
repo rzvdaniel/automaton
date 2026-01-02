@@ -1031,8 +1031,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
         foreach (var message in messages.Where(m =>
             m.Type != MessageType.System &&
-            m.Type != MessageType.Generating &&
-            m.Type != MessageType.ToolExecution))
+            m.Type != MessageType.Generating))
         {
             string role = message.Role.ToLowerInvariant() switch
             {
@@ -1041,14 +1040,36 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 _ => "user"
             };
 
-            string content = message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode)
-                ? $"{message.Content}\n\n```{Context.Language?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
-                : message.Content;
+            string content;
+
+            // Handle different message types
+            if (message.Type == MessageType.ToolExecution && !string.IsNullOrEmpty(message.ToolName))
+            {
+                // Format tool execution as descriptive text
+                var toolDescription = message.Content;
+                var toolResult = !string.IsNullOrEmpty(message.ToolResult)
+                    ? $"\nResult: {message.ToolResult}"
+                    : string.Empty;
+
+                content = $"[Tool: {message.ToolName}] {toolDescription}{toolResult}";
+
+                logger.LogDebug("Including tool execution in history: {ToolName}", message.ToolName);
+            }
+            else if (message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode))
+            {
+                // Include generated code in code blocks
+                content = $"{message.Content}\n\n```{Context.Language?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
+            }
+            else
+            {
+                // Regular text, reasoning, etc.
+                content = message.Content;
+            }
 
             conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));
         }
 
-        logger.LogInformation("Built conversation history with {Count} messages (excluded {Excluded} tool executions)",
+        logger.LogInformation("Built conversation history with {Count} messages (including {ToolCount} tool executions)",
             conversationHistory.Count,
             messages.Count(m => m.Type == MessageType.ToolExecution));
 
