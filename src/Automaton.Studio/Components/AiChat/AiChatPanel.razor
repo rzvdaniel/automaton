@@ -30,7 +30,9 @@
 					<SelectOptions>
 						@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
 						{
-							<SelectOption TItemValue="Guid" TItem="Guid"
+							<SelectOption @key="session.Id"
+										  TItemValue="Guid"
+										  TItem="Guid"
 										  Value="@session.Id"
 										  Label="@session.Title" />
 						}
@@ -171,7 +173,7 @@
 			<div class="sessions-list">
 				@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
 				{
-					<div class="session-item @(session.Id == currentSession?.Id ? "active" : "")">
+					<div @key="session.Id" class="session-item @(session.Id == currentSession?.Id ? "active" : "")">
 						<div class="session-info" @onclick="() => SelectAndCloseDrawerAsync(session.Id)">
 							<div class="session-title">@session.Title</div>
 							<div class="session-meta">
