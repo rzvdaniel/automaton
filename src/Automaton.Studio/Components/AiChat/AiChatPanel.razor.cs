@@ -707,14 +707,23 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     // SRP: MCP Request Building
     private ConversationRequest BuildConversationRequest(string userPrompt, AiProviderInfo provider, string model, string apiKey)
     {
+        var conversationHistory = BuildMcpConversationHistory();
+        var baseSystemPrompt = Context.BuildSystemPrompt();
+
+        // Add continuation context if this is a restored session with existing history
+        // We check for > 1 because the current user message is not yet in the history
+        var systemPrompt = conversationHistory.Count > 1
+            ? $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so."
+            : baseSystemPrompt;
+
         var request = new ConversationRequest
         {
             InitialMessage = userPrompt,
-            SystemPrompt = Context.BuildSystemPrompt(),
+            SystemPrompt = systemPrompt,
             Provider = provider.ProviderName,
             ApiKey = apiKey,
             Model = model,
-            ConversationHistory = BuildMcpConversationHistory(),
+            ConversationHistory = conversationHistory,
             Context = new Dictionary<string, object>(Context.GetAdditionalContext())
             {
                 ["contextId"] = Context.GetContextId()
