@@ -714,11 +714,21 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         var conversationHistory = BuildMcpConversationHistory();
         var baseSystemPrompt = Context.BuildSystemPrompt();
 
+        // Log what we're sending for debugging
+        logger.LogInformation("Building conversation request: isRestoredSession={IsRestored}, historyCount={Count}, totalMessages={Total}",
+            isRestoredSession, conversationHistory.Count, messages.Count);
+
         // Add continuation context ONLY for the first message after restoring a session
         // This prevents the AI from being overly cautious in ongoing conversations
         var systemPrompt = isRestoredSession
             ? $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so."
             : baseSystemPrompt;
+
+        if (isRestoredSession)
+        {
+            logger.LogInformation("Added continuation prompt. History preview: {Preview}",
+                string.Join(" | ", conversationHistory.Take(3).Select(m => $"{m.Role}: {m.Content.Substring(0, Math.Min(50, m.Content.Length))}...")));
+        }
 
         var request = new ConversationRequest
         {
@@ -1013,10 +1023,15 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private List<Automaton.Mcp.Models.ConversationMessage> BuildMcpConversationHistory()
     {
         var conversationHistory = new List<Automaton.Mcp.Models.ConversationMessage>();
-        
-        foreach (var message in messages.Where(m => 
-            m.Type != MessageType.System && 
-            m.Type != MessageType.Generating && 
+
+        // Log message type breakdown for debugging
+        var messagesByType = messages.GroupBy(m => m.Type).ToDictionary(g => g.Key, g => g.Count());
+        logger.LogInformation("Message breakdown: {Breakdown}",
+            string.Join(", ", messagesByType.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+
+        foreach (var message in messages.Where(m =>
+            m.Type != MessageType.System &&
+            m.Type != MessageType.Generating &&
             m.Type != MessageType.ToolExecution))
         {
             string role = message.Role.ToLowerInvariant() switch
@@ -1032,6 +1047,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));
         }
+
+        logger.LogInformation("Built conversation history with {Count} messages (excluded {Excluded} tool executions)",
+            conversationHistory.Count,
+            messages.Count(m => m.Type == MessageType.ToolExecution));
 
         return conversationHistory;
     }
