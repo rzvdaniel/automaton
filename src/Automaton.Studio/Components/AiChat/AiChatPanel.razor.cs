@@ -53,11 +53,18 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
     // Chat history state
     private ChatSessionModel? currentSession;
+    private Guid currentSessionId;
     private List<ChatSessionModel> availableSessions = new();
     private bool isLoadingHistory = false;
     private bool showSessionSelector = false;
     private int lastSavedMessageCount = 0; // Track how many messages have been saved
     private bool isRestoredSession = false; // Track if this is a freshly restored session
+
+    // Session management UI state
+    private bool showSessionDrawer = false;
+    private bool showRenameModal = false;
+    private string renameSessionTitle = string.Empty;
+    private Guid renameSessionId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,6 +104,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             if (currentSession != null)
             {
+                currentSessionId = currentSession.Id;
+
                 // Load previous messages from this session
                 var previousMessages = await ChatHistoryService.GetMessagesAsync(currentSession.Id);
 
@@ -674,11 +683,54 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             // Update the counter to reflect that this message has been saved
             lastSavedMessageCount++;
+
+            // Auto-generate session title from first user message
+            if (message.Role == "User" && lastSavedMessageCount == 1)
+            {
+                await UpdateSessionTitleFromMessageAsync(message.Content);
+            }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error saving message to history");
             // Don't throw - history saving shouldn't break the chat experience
+        }
+    }
+
+    private async Task UpdateSessionTitleFromMessageAsync(string userMessage)
+    {
+        try
+        {
+            if (currentSession == null || string.IsNullOrWhiteSpace(userMessage))
+                return;
+
+            // Only auto-update if the title is still the default format
+            if (currentSession.Title.StartsWith("Chat ", StringComparison.OrdinalIgnoreCase))
+            {
+                // Generate title from user message (max 60 chars)
+                var title = userMessage.Length > 60
+                    ? userMessage.Substring(0, 57) + "..."
+                    : userMessage;
+
+                // Remove any newlines
+                title = title.Replace("\n", " ").Replace("\r", " ");
+
+                var success = await ChatHistoryService.UpdateSessionTitleAsync(currentSession.Id, title);
+
+                if (success)
+                {
+                    currentSession = currentSession with { Title = title };
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                    await InvokeAsync(StateHasChanged);
+
+                    logger.LogInformation("Auto-updated session title to: {Title}", title);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating session title");
+            // Don't throw - title update shouldn't break the chat
         }
     }
 
@@ -1130,6 +1182,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
             if (currentSession != null)
             {
+                currentSessionId = currentSession.Id;
+
                 // Reset the saved message counter for the new session
                 lastSavedMessageCount = 0;
 
@@ -1169,6 +1223,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             if (sessionWithMessages != null)
             {
                 currentSession = sessionWithMessages.Session;
+                currentSessionId = currentSession.Id;
 
                 // Clear current messages (except system message)
                 messages.RemoveAll(m => m.Type != MessageType.System);
@@ -1233,6 +1288,61 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         showSessionSelector = !showSessionSelector;
         StateHasChanged();
+    }
+
+    // Session Management UI Methods
+    private async Task OnSessionSelectedAsync()
+    {
+        if (currentSessionId != Guid.Empty && currentSessionId != currentSession?.Id)
+        {
+            await SwitchSessionAsync(currentSessionId);
+        }
+    }
+
+    private async Task SelectAndCloseDrawerAsync(Guid sessionId)
+    {
+        showSessionDrawer = false;
+        currentSessionId = sessionId;
+        await SwitchSessionAsync(sessionId);
+    }
+
+    private void StartRenameSession(Guid sessionId, string currentTitle)
+    {
+        renameSessionId = sessionId;
+        renameSessionTitle = currentTitle;
+        showRenameModal = true;
+    }
+
+    private async Task SaveRenameSessionAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(renameSessionTitle))
+            {
+                var success = await ChatHistoryService.UpdateSessionTitleAsync(renameSessionId, renameSessionTitle.Trim());
+
+                if (success)
+                {
+                    // Update local session
+                    if (currentSession?.Id == renameSessionId)
+                    {
+                        currentSession = currentSession with { Title = renameSessionTitle.Trim() };
+                    }
+
+                    // Refresh available sessions
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+
+            showRenameModal = false;
+            renameSessionTitle = string.Empty;
+            renameSessionId = Guid.Empty;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error renaming session");
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
