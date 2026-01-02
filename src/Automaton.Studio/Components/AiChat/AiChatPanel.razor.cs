@@ -127,6 +127,14 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                 // Load all available sessions for this resource
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                // Debug: Log actual UpdatedAt values received from API
+                logger.LogInformation("Loaded {Count} sessions:", availableSessions.Count);
+                foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
+                {
+                    logger.LogInformation("  Session {Id}: Title='{Title}', UpdatedAt={UpdatedAt:yyyy-MM-dd HH:mm:ss.ffffff}, Kind={Kind}",
+                        session.Id, session.Title, session.UpdatedAt, session.UpdatedAt.Kind);
+                }
             }
         }
         catch (Exception ex)
