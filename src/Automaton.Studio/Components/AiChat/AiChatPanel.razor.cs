@@ -57,6 +57,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private bool isLoadingHistory = false;
     private bool showSessionSelector = false;
     private int lastSavedMessageCount = 0; // Track how many messages have been saved
+    private bool isRestoredSession = false; // Track if this is a freshly restored session
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,6 +112,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                 // Track that these messages are already saved
                 lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
+
+                // Mark as restored session if we loaded previous messages
+                isRestoredSession = previousMessages.Any();
 
                 // Load all available sessions for this resource
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
@@ -710,9 +714,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         var conversationHistory = BuildMcpConversationHistory();
         var baseSystemPrompt = Context.BuildSystemPrompt();
 
-        // Add continuation context if this is a restored session with existing history
-        // We check for > 1 because the current user message is not yet in the history
-        var systemPrompt = conversationHistory.Count > 1
+        // Add continuation context ONLY for the first message after restoring a session
+        // This prevents the AI from being overly cautious in ongoing conversations
+        var systemPrompt = isRestoredSession
             ? $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so."
             : baseSystemPrompt;
 
@@ -739,13 +743,21 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         _conversationId = context.ConversationRequest.ConversationId;
         var result = await McpClient.StartConversationAsync(context.ConversationRequest);
         _conversationId = result.ConversationId;
-        
+
         // Clean up generating message
         RemoveGeneratingMessage();
-        
-        logger.LogInformation("Messages after conversation: {Count}, Tool messages: {ToolCount}", 
+
+        // Reset restored session flag after first message
+        // This ensures continuation prompt is only used once
+        if (isRestoredSession)
+        {
+            isRestoredSession = false;
+            logger.LogInformation("Cleared restored session flag after first message");
+        }
+
+        logger.LogInformation("Messages after conversation: {Count}, Tool messages: {ToolCount}",
             messages.Count, messages.Count(m => m.Type == MessageType.ToolExecution));
-            
+
         return result;
     }
 
@@ -1081,6 +1093,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 // Reset the saved message counter for the new session
                 lastSavedMessageCount = 0;
 
+                // New session, not restored
+                isRestoredSession = false;
+
                 // Refresh available sessions list
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
                 logger.LogInformation("Created new chat session {SessionId}", currentSession.Id);
@@ -1128,6 +1143,9 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                 // Update the counter to reflect loaded messages
                 lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
+
+                // Mark as restored session if we loaded messages
+                isRestoredSession = sessionWithMessages.Messages.Any();
 
                 // Refresh available sessions
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
