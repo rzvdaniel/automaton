@@ -450,9 +450,13 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             var now = DateTime.UtcNow;
             var savedMessages = new List<ChatMessageDto>();
+            var messageIndex = 0;
 
             foreach (var message in request.Messages)
             {
+                // Increment timestamp by milliseconds to preserve message order
+                var messageTimestamp = now.AddMilliseconds(messageIndex);
+
                 var messageEntity = new AiChatMessage
                 {
                     Id = Guid.NewGuid(),
@@ -461,10 +465,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                     Content = message.Content,
                     MessageType = message.MessageType,
                     Metadata = message.Metadata,
-                    CreatedAt = now
+                    CreatedAt = messageTimestamp
                 };
 
                 dataContext.AiChatMessages.Add(messageEntity);
+                messageIndex++;
 
                 savedMessages.Add(new ChatMessageDto
                 {
