@@ -18,7 +18,8 @@
 		<div class="session-controls">
 			@if (currentSession != null)
 			{
-				<Select @bind-Value="@currentSessionId"
+				<Select @key="@($"{currentSessionId}_{currentSession.Title}")"
+						@bind-Value="@currentSessionId"
 						TItemValue="Guid"
 						TItem="Guid"
 						Size="@InputSize.Small"
