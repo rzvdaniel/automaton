@@ -190,7 +190,7 @@
 								Rename
 							</Button>
 							<Popconfirm Title="@("Delete this session?")"
-										OnConfirm="() => DeleteSessionAsync(session.Id)"
+										OnConfirm="async () => await DeleteSessionAsync(session.Id)"
 										OkText="@("Delete")"
 										CancelText="@("Cancel")">
 								<Button Icon="delete"

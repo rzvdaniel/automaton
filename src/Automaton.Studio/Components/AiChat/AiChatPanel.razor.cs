@@ -1190,9 +1190,17 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 // New session, not restored
                 isRestoredSession = false;
 
+                // Clear messages for fresh session (keep system message)
+                messages.RemoveAll(m => m.Type != MessageType.System);
+                pendingCodes.Clear();
+
                 // Refresh available sessions list
                 availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
                 logger.LogInformation("Created new chat session {SessionId}", currentSession.Id);
+
+                // Update UI to reflect the new session
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
@@ -1262,25 +1270,53 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         try
         {
+            logger.LogInformation("Attempting to delete session {SessionId}", sessionId);
+
             var success = await ChatHistoryService.DeleteSessionAsync(sessionId);
 
             if (success)
             {
-                // Refresh available sessions
-                availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                logger.LogInformation("Successfully deleted session {SessionId}", sessionId);
 
-                // If we deleted the current session, create a new one
+                // If we deleted the current session, switch to another or create new
                 if (currentSession?.Id == sessionId)
                 {
-                    await ClearConversationHistory();
+                    // Clear messages first
+                    messages.RemoveAll(m => m.Type != MessageType.System);
+                    pendingCodes.Clear();
+
+                    // Refresh sessions list
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                    // Try to switch to the most recent session, or create a new one
+                    var mostRecentSession = availableSessions.OrderByDescending(s => s.UpdatedAt).FirstOrDefault();
+                    if (mostRecentSession != null)
+                    {
+                        await SwitchSessionAsync(mostRecentSession.Id);
+                    }
+                    else
+                    {
+                        // No sessions left, create a new one
+                        await CreateNewSessionAsync();
+                    }
+                }
+                else
+                {
+                    // Just refresh the sessions list
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
                 }
 
                 await InvokeAsync(StateHasChanged);
+                logger.LogInformation("UI updated after session deletion");
+            }
+            else
+            {
+                logger.LogWarning("Failed to delete session {SessionId} - service returned false", sessionId);
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error deleting session");
+            logger.LogError(ex, "Error deleting session {SessionId}", sessionId);
         }
     }
 
