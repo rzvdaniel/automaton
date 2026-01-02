@@ -23,7 +23,7 @@
 						TItemValue="Guid"
 						TItem="Guid"
 						Size="@InputSize.Small"
-						Style="flex: 1; max-width: 200px;"
+						Style="flex: 1; max-width: 350px;"
 						Placeholder="Select session"
 						AllowClear="false"
 						Disabled="@isGeneratingCode"
@@ -31,11 +31,12 @@
 					<SelectOptions>
 						@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
 						{
+							var label = $"{session.Title} • {session.UpdatedAt.ToString("MMM dd, HH:mm")}";
 							<SelectOption @key="session.Id"
 										  TItemValue="Guid"
 										  TItem="Guid"
 										  Value="@session.Id"
-										  Label="@session.Title" />
+										  Label="@label" />
 						}
 					</SelectOptions>
 				</Select>
@@ -44,16 +45,14 @@
 			<Button Icon="plus"
 					Size="@ButtonSize.Small"
 					OnClick="CreateNewSessionAsync"
-					Disabled="@isGeneratingCode">
-				New Session
-			</Button>
+					Disabled="@isGeneratingCode"
+					Title="New Session" />
 
 			<Button Icon="history"
 					Size="@ButtonSize.Small"
 					OnClick="() => showSessionDrawer = true"
-					Disabled="@isGeneratingCode">
-				View All Sessions
-			</Button>
+					Disabled="@isGeneratingCode"
+					Title="View All Sessions" />
 		</div>
 	</div>
 
