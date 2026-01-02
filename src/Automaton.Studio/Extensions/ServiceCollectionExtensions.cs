@@ -154,6 +154,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAiMessageFormattingService, AiMessageFormattingService>();
         services.AddScoped<ApiKeysService>();
         services.AddScoped<AiApiKeyService>();
+        services.AddScoped<AiChatHistoryService>();
 
         // Project services
         services.AddScoped<ProjectsService>();

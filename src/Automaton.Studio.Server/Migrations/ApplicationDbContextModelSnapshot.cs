@@ -87,6 +87,106 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiApiKeyUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MessageType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("json");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("AiChatMessages");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("ResourceType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("ResourceType", "ResourceId");
+
+                    b.HasIndex("ResourceType", "ResourceId", "IsActive");
+
+                    b.ToTable("AiChatSessions");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSessionUser", b =>
+                {
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("SessionId", "UserId");
+
+                    b.HasIndex(new[] { "SessionId" }, "IX_AiChatSessionUser_SessionId");
+
+                    b.HasIndex(new[] { "UserId" }, "IX_AiChatSessionUser_UserId");
+
+                    b.ToTable("AiChatSessionUsers");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1365,6 +1465,36 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.AiChatSession", "Session")
+                        .WithMany("Messages")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSessionUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.AiChatSession", "Session")
+                        .WithMany("AiChatSessionUsers")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "Provider")
@@ -1749,6 +1879,13 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AiApiKeyUsers");
 
                     b.Navigation("ProjectAiApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSession", b =>
+                {
+                    b.Navigation("AiChatSessionUsers");
+
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>

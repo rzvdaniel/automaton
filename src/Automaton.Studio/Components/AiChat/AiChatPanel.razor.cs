@@ -21,8 +21,11 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     [Parameter] public IMcpClient McpClient { get; set; } = default!;
     [Parameter] public EventCallback<string> OnSend { get; set; }
     [Parameter] public EventCallback<string> OnCodeGenerated { get; set; }
+    [Parameter] public ChatResourceType ResourceType { get; set; }
+    [Parameter] public Guid ResourceId { get; set; }
 
     [Inject] private AiApiKeyService AiApiKeyService { get; set; } = default!;
+    [Inject] private AiChatHistoryService ChatHistoryService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] private ILogger<AiChatPanel> logger { get; set; } = default!;
     [Inject] private ICodeExtractionService CodeExtractionService { get; set; } = default!;
@@ -48,18 +51,164 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
     private List<ChatMessage> messages = new();
 
+    // Chat history state
+    private ChatSessionModel? currentSession;
+    private Guid currentSessionId;
+    private List<ChatSessionModel> availableSessions = new();
+    private bool isLoadingHistory = false;
+    private bool showSessionSelector = false;
+    private int lastSavedMessageCount = 0; // Track how many messages have been saved
+    private bool isRestoredSession = false; // Track if this is a freshly restored session
+
+    // Session management UI state
+    private bool showSessionDrawer = false;
+    private bool showRenameModal = false;
+    private string renameSessionTitle = string.Empty;
+    private Guid renameSessionId;
+
     protected override async Task OnInitializedAsync()
     {
         // Initialize with context-specific system message
-        messages.Add(new ChatMessage("System", Context.InitialSystemMessage, DateTime.Now) 
-        { 
-            Type = MessageType.System 
+        messages.Add(new ChatMessage("System", Context.InitialSystemMessage, DateTime.Now)
+        {
+            Type = MessageType.System
         });
 
         // Subscribe to MCP client events
         McpClient.ConversationUpdated += OnConversationUpdated;
-        
+
         await LoadProvidersAsync();
+        await LoadChatHistoryAsync();
+    }
+
+    private async Task LoadChatHistoryAsync()
+    {
+        try
+        {
+            if (ResourceId == Guid.Empty)
+            {
+                logger.LogWarning("Cannot load chat history: ResourceId is empty");
+                return;
+            }
+
+            isLoadingHistory = true;
+            StateHasChanged();
+
+            // Get or create active session
+            currentSession = await ChatHistoryService.GetOrCreateActiveSessionAsync(
+                ResourceType,
+                ResourceId,
+                GetSelectedProvider()?.ProviderName,
+                GetSelectedModel()
+            );
+
+            if (currentSession != null)
+            {
+                currentSessionId = currentSession.Id;
+
+                // Load previous messages from this session
+                var previousMessages = await ChatHistoryService.GetMessagesAsync(currentSession.Id);
+
+                // Convert saved messages to ChatMessage objects and add to messages list
+                foreach (var savedMsg in previousMessages)
+                {
+                    var chatMessage = ConvertToChatMessage(savedMsg);
+                    messages.Add(chatMessage);
+                }
+
+                logger.LogInformation("Loaded {Count} messages from session {SessionId}",
+                    previousMessages.Count(), currentSession.Id);
+
+                // Track that these messages are already saved
+                lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
+
+                // Mark as restored session if we loaded previous messages
+                isRestoredSession = previousMessages.Any();
+
+                // Load all available sessions for this resource
+                availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                // Debug: Log actual UpdatedAt values received from API
+                logger.LogInformation("Loaded {Count} sessions:", availableSessions.Count);
+                foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
+                {
+                    logger.LogInformation("  Session {Id}: Title='{Title}', UpdatedAt={UpdatedAt:yyyy-MM-dd HH:mm:ss.ffffff}, Kind={Kind}",
+                        session.Id, session.Title, session.UpdatedAt, session.UpdatedAt.Kind);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading chat history");
+            // Don't show error to user, just continue without history
+        }
+        finally
+        {
+            isLoadingHistory = false;
+            StateHasChanged();
+        }
+    }
+
+    private ChatMessage ConvertToChatMessage(ChatMessageModel savedMsg)
+    {
+        var metadata = !string.IsNullOrEmpty(savedMsg.Metadata)
+            ? System.Text.Json.JsonSerializer.Deserialize<ChatMessageMetadata>(savedMsg.Metadata)
+            : null;
+
+        var chatMessage = new ChatMessage(savedMsg.Role, savedMsg.Content, savedMsg.CreatedAt)
+        {
+            Type = (MessageType)(int)savedMsg.MessageType,
+            CodeId = metadata?.CodeId,
+            GeneratedCode = metadata?.GeneratedCode,
+            ToolName = metadata?.ToolName,
+            ToolResult = metadata?.ToolResult,
+            ToolCallId = metadata?.ToolCallId,
+            ToolStatus = metadata?.ToolStatus,
+            ToolArguments = metadata?.ToolArguments,
+            ToolError = metadata?.ToolError,
+            IsReasoningCollapsed = metadata?.IsReasoningCollapsed ?? true,
+            IsSuccess = metadata?.IsSuccess ?? true
+        };
+
+        // Reconstruct ToolResultViewModel for tool execution messages
+        if (chatMessage.Type == MessageType.ToolExecution && !string.IsNullOrEmpty(metadata?.ToolName))
+        {
+            var toolResult = new Automaton.Mcp.Models.ToolResult
+            {
+                ToolCallId = metadata.ToolCallId ?? string.Empty,
+                Result = metadata.ToolResult ?? string.Empty,
+                IsSuccess = metadata.IsSuccess,
+                ErrorMessage = metadata.ToolError
+            };
+
+            var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                metadata.ToolName,
+                toolResult,
+                Context.Language
+            );
+
+            chatMessage = chatMessage with
+            {
+                ToolResultViewModel = processedResult,
+                Content = FormatToolResultFromViewModel(processedResult)
+            };
+        }
+
+        return chatMessage;
+    }
+
+    private class ChatMessageMetadata
+    {
+        public string? CodeId { get; set; }
+        public string? GeneratedCode { get; set; }
+        public string? ToolName { get; set; }
+        public string? ToolResult { get; set; }
+        public string? ToolCallId { get; set; }
+        public string? ToolStatus { get; set; }
+        public string? ToolArguments { get; set; }
+        public string? ToolError { get; set; }
+        public bool IsReasoningCollapsed { get; set; }
+        public bool IsSuccess { get; set; }
     }
 
     // Handle real-time conversation updates from MCP client
@@ -493,13 +642,104 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         isGeneratingCode = true;
         pendingCodes.Clear();
-        
+
         var userMessage = new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now);
         messages.Add(userMessage);
-                
+
+        // Save user message to history
+        await SaveMessageToHistoryAsync(userMessage);
+
         promptText = string.Empty;
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
+    }
+
+    private async Task SaveMessageToHistoryAsync(ChatMessage message)
+    {
+        try
+        {
+            if (currentSession == null || ResourceId == Guid.Empty)
+            {
+                return;
+            }
+
+            // Skip system and generating messages
+            if (message.Type == MessageType.System || message.Type == MessageType.Generating)
+            {
+                return;
+            }
+
+            var metadata = new ChatMessageMetadata
+            {
+                CodeId = message.CodeId,
+                GeneratedCode = message.GeneratedCode,
+                ToolName = message.ToolName,
+                ToolResult = message.ToolResult,
+                ToolCallId = message.ToolCallId,
+                ToolStatus = message.ToolStatus,
+                ToolArguments = message.ToolArguments,
+                ToolError = message.ToolError,
+                IsReasoningCollapsed = message.IsReasoningCollapsed,
+                IsSuccess = message.IsSuccess
+            };
+
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+
+            SaveChatMessageRequest saveRequest = new SaveChatMessageRequest { SessionId = currentSession.Id, Role = message.Role, Content = message.Content, MessageType = (ChatMessageType)(int)message.Type, Metadata = metadataJson };
+
+            await ChatHistoryService.SaveMessageAsync(saveRequest);
+
+            // Update the counter to reflect that this message has been saved
+            lastSavedMessageCount++;
+
+            // Auto-generate session title from first user message
+            if (message.Role == "User" && lastSavedMessageCount == 1)
+            {
+                await UpdateSessionTitleFromMessageAsync(message.Content);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error saving message to history");
+            // Don't throw - history saving shouldn't break the chat experience
+        }
+    }
+
+    private async Task UpdateSessionTitleFromMessageAsync(string userMessage)
+    {
+        try
+        {
+            if (currentSession == null || string.IsNullOrWhiteSpace(userMessage))
+                return;
+
+            // Only auto-update if the title is still the default format
+            if (currentSession.Title.StartsWith("Chat ", StringComparison.OrdinalIgnoreCase))
+            {
+                // Generate title from user message (max 60 chars)
+                var title = userMessage.Length > 60
+                    ? userMessage.Substring(0, 57) + "..."
+                    : userMessage;
+
+                // Remove any newlines
+                title = title.Replace("\n", " ").Replace("\r", " ");
+
+                var success = await ChatHistoryService.UpdateSessionTitleAsync(currentSession.Id, title);
+
+                if (success)
+                {
+                    currentSession.Title = title;
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                    await InvokeAsync(StateHasChanged);
+
+                    logger.LogInformation("Auto-updated session title to: {Title}", title);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating session title");
+            // Don't throw - title update shouldn't break the chat
+        }
     }
 
     // SRP: Conversation Context Preparation
@@ -531,14 +771,33 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     // SRP: MCP Request Building
     private ConversationRequest BuildConversationRequest(string userPrompt, AiProviderInfo provider, string model, string apiKey)
     {
+        var conversationHistory = BuildMcpConversationHistory();
+        var baseSystemPrompt = Context.BuildSystemPrompt();
+
+        // Log what we're sending for debugging
+        logger.LogInformation("Building conversation request: isRestoredSession={IsRestored}, historyCount={Count}, totalMessages={Total}",
+            isRestoredSession, conversationHistory.Count, messages.Count);
+
+        // Add continuation context ONLY for the first message after restoring a session
+        // This prevents the AI from being overly cautious in ongoing conversations
+        var systemPrompt = isRestoredSession
+            ? $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so."
+            : baseSystemPrompt;
+
+        if (isRestoredSession)
+        {
+            logger.LogInformation("Added continuation prompt. History preview: {Preview}",
+                string.Join(" | ", conversationHistory.Take(3).Select(m => $"{m.Role}: {m.Content.Substring(0, Math.Min(50, m.Content.Length))}...")));
+        }
+
         var request = new ConversationRequest
         {
             InitialMessage = userPrompt,
-            SystemPrompt = Context.BuildSystemPrompt(),
+            SystemPrompt = systemPrompt,
             Provider = provider.ProviderName,
             ApiKey = apiKey,
             Model = model,
-            ConversationHistory = BuildMcpConversationHistory(),
+            ConversationHistory = conversationHistory,
             Context = new Dictionary<string, object>(Context.GetAdditionalContext())
             {
                 ["contextId"] = Context.GetContextId()
@@ -554,13 +813,21 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         _conversationId = context.ConversationRequest.ConversationId;
         var result = await McpClient.StartConversationAsync(context.ConversationRequest);
         _conversationId = result.ConversationId;
-        
+
         // Clean up generating message
         RemoveGeneratingMessage();
-        
-        logger.LogInformation("Messages after conversation: {Count}, Tool messages: {ToolCount}", 
+
+        // Reset restored session flag after first message
+        // This ensures continuation prompt is only used once
+        if (isRestoredSession)
+        {
+            isRestoredSession = false;
+            logger.LogInformation("Cleared restored session flag after first message");
+        }
+
+        logger.LogInformation("Messages after conversation: {Count}, Tool messages: {ToolCount}",
             messages.Count, messages.Count(m => m.Type == MessageType.ToolExecution));
-            
+
         return result;
     }
 
@@ -653,12 +920,93 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private async Task EndConversation()
     {
         isGeneratingCode = false;
-        
+
         // Auto-collapse reasoning messages after generation completes
         CollapseReasoningMessages();
-        
+
+        // Save all new AI messages from this conversation to history
+        await SaveConversationMessagesToHistoryAsync();
+
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
+    }
+
+    private async Task SaveConversationMessagesToHistoryAsync()
+    {
+        try
+        {
+            if (currentSession == null || ResourceId == Guid.Empty)
+            {
+                return;
+            }
+
+            // Get all saveable messages (exclude system and generating)
+            var allSaveableMessages = messages.Where(m =>
+                m.Type != MessageType.System &&
+                m.Type != MessageType.Generating &&
+                !string.IsNullOrWhiteSpace(m.Content)
+            ).ToList();
+
+            // Only save messages we haven't saved yet
+            var unsavedMessages = allSaveableMessages.Skip(lastSavedMessageCount).ToList();
+
+            if (!unsavedMessages.Any())
+            {
+                logger.LogDebug("No new messages to save for session {SessionId}", currentSession.Id);
+                return;
+            }
+
+            // Build list of messages to save
+            var newMessages = new List<ChatMessageItem>();
+
+            foreach (var message in unsavedMessages)
+            {
+                var metadata = new ChatMessageMetadata
+                {
+                    CodeId = message.CodeId,
+                    GeneratedCode = message.GeneratedCode,
+                    ToolName = message.ToolName,
+                    ToolResult = message.ToolResult,
+                    ToolCallId = message.ToolCallId,
+                    ToolStatus = message.ToolStatus,
+                    ToolArguments = message.ToolArguments,
+                    ToolError = message.ToolError,
+                    IsReasoningCollapsed = message.IsReasoningCollapsed,
+                    IsSuccess = message.IsSuccess
+                };
+
+                newMessages.Add(new ChatMessageItem
+                {
+                    Role = message.Role,
+                    Content = message.Content,
+                    MessageType = (ChatMessageType)(int)message.Type,
+                    Metadata = System.Text.Json.JsonSerializer.Serialize(metadata)
+                });
+            }
+
+            logger.LogInformation("Saving {Count} new messages to history for session {SessionId}",
+                newMessages.Count, currentSession.Id);
+
+            var saveRequest = new SaveChatMessagesRequest
+            {
+                SessionId = currentSession.Id,
+                Messages = newMessages
+            };
+
+            // Save the new messages to the backend
+            await ChatHistoryService.SaveMessagesAsync(saveRequest);
+
+            // Update the tracking counter
+            lastSavedMessageCount = allSaveableMessages.Count;
+
+            logger.LogInformation("Successfully saved {Count} messages to session {SessionId}. Total saved: {Total}",
+                newMessages.Count, currentSession.Id, lastSavedMessageCount);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error saving conversation messages to history");
+            // Don't throw - history saving shouldn't break the chat experience
+        }
     }
     
     /// <summary>
@@ -735,11 +1083,15 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private List<Automaton.Mcp.Models.ConversationMessage> BuildMcpConversationHistory()
     {
         var conversationHistory = new List<Automaton.Mcp.Models.ConversationMessage>();
-        
-        foreach (var message in messages.Where(m => 
-            m.Type != MessageType.System && 
-            m.Type != MessageType.Generating && 
-            m.Type != MessageType.ToolExecution))
+
+        // Log message type breakdown for debugging
+        var messagesByType = messages.GroupBy(m => m.Type).ToDictionary(g => g.Key, g => g.Count());
+        logger.LogInformation("Message breakdown: {Breakdown}",
+            string.Join(", ", messagesByType.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+
+        foreach (var message in messages.Where(m =>
+            m.Type != MessageType.System &&
+            m.Type != MessageType.Generating))
         {
             string role = message.Role.ToLowerInvariant() switch
             {
@@ -748,12 +1100,38 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                 _ => "user"
             };
 
-            string content = message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode)
-                ? $"{message.Content}\n\n```{Context.Language?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```"
-                : message.Content;
+            string content;
+
+            // Handle different message types
+            if (message.Type == MessageType.ToolExecution && !string.IsNullOrEmpty(message.ToolName))
+            {
+                // Format tool execution as descriptive text
+                var toolDescription = message.Content;
+                var toolResult = !string.IsNullOrEmpty(message.ToolResult)
+                    ? $"\nResult: {message.ToolResult}"
+                    : string.Empty;
+
+                content = $"[Tool: {message.ToolName}] {toolDescription}{toolResult}";
+
+                logger.LogDebug("Including tool execution in history: {ToolName}", message.ToolName);
+            }
+            else if (message.Type == MessageType.CodeSuccess && !string.IsNullOrEmpty(message.GeneratedCode))
+            {
+                // Include generated code in code blocks
+                content = $"{message.Content}\n\n```{Context.Language?.ToLowerInvariant() ?? "python"}\n{message.GeneratedCode}\n```";
+            }
+            else
+            {
+                // Regular text, reasoning, etc.
+                content = message.Content;
+            }
 
             conversationHistory.Add(new Automaton.Mcp.Models.ConversationMessage(role, content));
         }
+
+        logger.LogInformation("Built conversation history with {Count} messages (including {ToolCount} tool executions)",
+            conversationHistory.Count,
+            messages.Count(m => m.Type == MessageType.ToolExecution));
 
         return conversationHistory;
     }
@@ -775,16 +1153,240 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             _conversationId = null;
         }
 
+        // Create a new session for fresh conversation
+        await CreateNewSessionAsync();
+
         messages.RemoveAll(m => m.Type != MessageType.System);
         pendingCodes.Clear();
 
-        messages.Add(new ChatMessage("System", "Conversation history cleared. AI can now see and test your code in real-time.", DateTime.Now) 
-        { 
-            Type = MessageType.System 
+        messages.Add(new ChatMessage("System", "Started new chat session. Previous conversations are saved and can be accessed from session history.", DateTime.Now)
+        {
+            Type = MessageType.System
         });
 
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
+    }
+
+    private async Task CreateNewSessionAsync()
+    {
+        try
+        {
+            if (ResourceId == Guid.Empty)
+            {
+                return;
+            }
+
+            var request = new CreateChatSessionRequest
+            {
+                ResourceType = ResourceType,
+                ResourceId = ResourceId,
+                Title = $"Chat {DateTime.Now:MMM dd, HH:mm}",
+                Provider = GetSelectedProvider()?.ProviderName,
+                Model = GetSelectedModel()
+            };
+
+            currentSession = await ChatHistoryService.CreateSessionAsync(request);
+
+            if (currentSession != null)
+            {
+                currentSessionId = currentSession.Id;
+
+                // Reset the saved message counter for the new session
+                lastSavedMessageCount = 0;
+
+                // New session, not restored
+                isRestoredSession = false;
+
+                // Clear messages for fresh session (keep system message)
+                messages.RemoveAll(m => m.Type != MessageType.System);
+                pendingCodes.Clear();
+
+                // Refresh available sessions list
+                availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                logger.LogInformation("Created new chat session {SessionId}", currentSession.Id);
+
+                // Update UI to reflect the new session
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error creating new session");
+        }
+    }
+
+    private async Task SwitchSessionAsync(Guid sessionId)
+    {
+        try
+        {
+            if (isGeneratingCode) return;
+
+            // End current conversation if any
+            if (!string.IsNullOrEmpty(_conversationId))
+            {
+                await McpClient.EndConversationAsync(_conversationId);
+                _conversationId = null;
+            }
+
+            // Set this session as active
+            await ChatHistoryService.SetActiveSessionAsync(sessionId);
+
+            // Load the session and its messages
+            var sessionWithMessages = await ChatHistoryService.GetSessionWithMessagesAsync(sessionId);
+
+            if (sessionWithMessages != null)
+            {
+                currentSession = sessionWithMessages.Session;
+                currentSessionId = currentSession.Id;
+
+                // Clear current messages (except system message)
+                messages.RemoveAll(m => m.Type != MessageType.System);
+                pendingCodes.Clear();
+
+                // Load messages from the selected session
+                foreach (var savedMsg in sessionWithMessages.Messages)
+                {
+                    var chatMessage = ConvertToChatMessage(savedMsg);
+                    messages.Add(chatMessage);
+                }
+
+                // Update the counter to reflect loaded messages
+                lastSavedMessageCount = messages.Count(m => m.Type != MessageType.System && m.Type != MessageType.Generating);
+
+                // Mark as restored session if we loaded messages
+                isRestoredSession = sessionWithMessages.Messages.Any();
+
+                // Refresh available sessions
+                availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                logger.LogInformation("Switched to session {SessionId} with {Count} messages",
+                    sessionId, sessionWithMessages.Messages.Count);
+
+                await InvokeAsync(StateHasChanged);
+                await ScrollToBottom();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error switching session");
+        }
+    }
+
+    private async Task DeleteSessionAsync(Guid sessionId)
+    {
+        try
+        {
+            logger.LogInformation("Attempting to delete session {SessionId}", sessionId);
+
+            var success = await ChatHistoryService.DeleteSessionAsync(sessionId);
+
+            if (success)
+            {
+                logger.LogInformation("Successfully deleted session {SessionId}", sessionId);
+
+                // If we deleted the current session, switch to another or create new
+                if (currentSession?.Id == sessionId)
+                {
+                    // Clear messages first
+                    messages.RemoveAll(m => m.Type != MessageType.System);
+                    pendingCodes.Clear();
+
+                    // Refresh sessions list
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+
+                    // Try to switch to the most recent session, or create a new one
+                    var mostRecentSession = availableSessions.OrderByDescending(s => s.UpdatedAt).FirstOrDefault();
+                    if (mostRecentSession != null)
+                    {
+                        await SwitchSessionAsync(mostRecentSession.Id);
+                    }
+                    else
+                    {
+                        // No sessions left, create a new one
+                        await CreateNewSessionAsync();
+                    }
+                }
+                else
+                {
+                    // Just refresh the sessions list
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                }
+
+                await InvokeAsync(StateHasChanged);
+                logger.LogInformation("UI updated after session deletion");
+            }
+            else
+            {
+                logger.LogWarning("Failed to delete session {SessionId} - service returned false", sessionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error deleting session {SessionId}", sessionId);
+        }
+    }
+
+    private void ToggleSessionSelector()
+    {
+        showSessionSelector = !showSessionSelector;
+        StateHasChanged();
+    }
+
+    // Session Management UI Methods
+    private async Task OnSessionSelectedAsync()
+    {
+        if (currentSessionId != Guid.Empty && currentSessionId != currentSession?.Id)
+        {
+            await SwitchSessionAsync(currentSessionId);
+        }
+    }
+
+    private async Task SelectAndCloseDrawerAsync(Guid sessionId)
+    {
+        showSessionDrawer = false;
+        currentSessionId = sessionId;
+        await SwitchSessionAsync(sessionId);
+    }
+
+    private void StartRenameSession(Guid sessionId, string currentTitle)
+    {
+        renameSessionId = sessionId;
+        renameSessionTitle = currentTitle;
+        showRenameModal = true;
+    }
+
+    private async Task SaveRenameSessionAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(renameSessionTitle))
+            {
+                var success = await ChatHistoryService.UpdateSessionTitleAsync(renameSessionId, renameSessionTitle.Trim());
+
+                if (success)
+                {
+                    // Update local session
+                    if (currentSession?.Id == renameSessionId)
+                    {
+                        currentSession.Title = renameSessionTitle.Trim();
+                    }
+
+                    // Refresh available sessions
+                    availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+
+            showRenameModal = false;
+            renameSessionTitle = string.Empty;
+            renameSessionId = Guid.Empty;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error renaming session");
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

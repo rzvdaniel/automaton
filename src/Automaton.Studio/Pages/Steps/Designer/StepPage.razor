@@ -251,7 +251,9 @@
                                             <div class="tab-content-scrollable">
                                                 <AiChatPanel Context="@CreateAiChatContext()"
                                                              McpClient="@StudioMcpClient"
-                                                             OnCodeGenerated="OnCodeGenerated" />
+                                                             OnCodeGenerated="OnCodeGenerated"
+                                                             ResourceType="ChatResourceType.CustomStep"
+                                                             ResourceId="@Guid.Parse(StepId)" />
                                             </div>
                                         </TabPane>
                                         <TabPane Tab="Test Variables" Key="variables">
