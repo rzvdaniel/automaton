@@ -41,15 +41,15 @@
 			<Button Icon="plus"
 					Size="@ButtonSize.Small"
 					OnClick="CreateNewSessionAsync"
-					Disabled="@isGeneratingCode"
-					Title="New Session">
+					Disabled="@isGeneratingCode">
+				New Session
 			</Button>
 
 			<Button Icon="history"
 					Size="@ButtonSize.Small"
 					OnClick="() => showSessionDrawer = true"
-					Disabled="@isGeneratingCode"
-					Title="View All Sessions">
+					Disabled="@isGeneratingCode">
+				View All Sessions
 			</Button>
 		</div>
 	</div>
@@ -165,10 +165,8 @@
 	<Drawer Closable="true"
 			Visible="@showSessionDrawer"
 			Width="400"
+			Title="@("Chat Sessions")"
 			OnClose="() => showSessionDrawer = false">
-		<TitleTemplate>
-			<span>Chat Sessions</span>
-		</TitleTemplate>
 		<ChildContent>
 			<div class="sessions-list">
 				@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
@@ -188,17 +186,19 @@
 							<Button Icon="edit"
 									Size="@ButtonSize.Small"
 									Type="@ButtonType.Text"
-									OnClick="() => StartRenameSession(session.Id, session.Title)"
-									Title="Rename" />
-							<Popconfirm Title="Delete this session?"
+									OnClick="() => StartRenameSession(session.Id, session.Title)">
+								Rename
+							</Button>
+							<Popconfirm Title="@("Delete this session?")"
 										OnConfirm="() => DeleteSessionAsync(session.Id)"
-										OkText="Delete"
-										CancelText="Cancel">
+										OkText="@("Delete")"
+										CancelText="@("Cancel")">
 								<Button Icon="delete"
 										Size="@ButtonSize.Small"
 										Type="@ButtonType.Text"
-										Danger="true"
-										Title="Delete" />
+										Danger="true">
+									Delete
+								</Button>
 							</Popconfirm>
 						</div>
 					</div>
@@ -215,12 +215,12 @@
 	</Drawer>
 
 	<!-- Rename Session Modal -->
-	<Modal Title="Rename Session"
+	<Modal Title="@("Rename Session")"
 		   Visible="@showRenameModal"
 		   OnOk="SaveRenameSessionAsync"
 		   OnCancel="() => showRenameModal = false"
-		   OkText="Save"
-		   CancelText="Cancel">
+		   OkText="@("Save")"
+		   CancelText="@("Cancel")">
 		<Input @bind-Value="@renameSessionTitle" Placeholder="Enter session title" />
 	</Modal>
 </div>
@@ -358,7 +358,7 @@
 			line-height: 22px !important;
 			font-size: 11px;
 		}
-</style>
+
 	/* Session Management Toolbar */
 	.session-toolbar {
 		display: flex;

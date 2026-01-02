@@ -719,7 +719,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
 
                 if (success)
                 {
-                    currentSession = currentSession with { Title = title };
+                    currentSession.Title = title;
                     availableSessions = (await ChatHistoryService.GetSessionsAsync(ResourceType, ResourceId)).ToList();
                     await InvokeAsync(StateHasChanged);
 
@@ -1326,7 +1326,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
                     // Update local session
                     if (currentSession?.Id == renameSessionId)
                     {
-                        currentSession = currentSession with { Title = renameSessionTitle.Trim() };
+                        currentSession.Title = renameSessionTitle.Trim();
                     }
 
                     // Refresh available sessions
