@@ -149,6 +149,30 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             IsSuccess = metadata?.IsSuccess ?? true
         };
 
+        // Reconstruct ToolResultViewModel for tool execution messages
+        if (chatMessage.Type == MessageType.ToolExecution && !string.IsNullOrEmpty(metadata?.ToolName))
+        {
+            var toolResult = new Automaton.Mcp.Models.ToolResult
+            {
+                ToolCallId = metadata.ToolCallId ?? string.Empty,
+                Result = metadata.ToolResult ?? string.Empty,
+                IsSuccess = metadata.IsSuccess,
+                ErrorMessage = metadata.ToolError
+            };
+
+            var processedResult = _toolResultProcessorFactory.ProcessToolResult(
+                metadata.ToolName,
+                toolResult,
+                Context.Language
+            );
+
+            chatMessage = chatMessage with
+            {
+                ToolResultViewModel = processedResult,
+                Content = FormatToolResultFromViewModel(processedResult)
+            };
+        }
+
         return chatMessage;
     }
 
