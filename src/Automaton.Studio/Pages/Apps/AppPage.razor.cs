@@ -20,7 +20,6 @@ namespace Automaton.Studio.Pages.Apps;
 
 partial class AppPage : ComponentBase, IAsyncDisposable
 {
-    private StandaloneCodeEditor codeEditor;
     private bool loading = false;
     private bool saving = false;
     private bool publishing = false;
@@ -56,6 +55,32 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     private bool githubCreatingRepo = false;
     private string? githubStatusMessage = null;
     private AlertType githubStatusType = AlertType.Info;
+
+    // File tree and multi-file editor support
+    private List<FileTreeNode> fileTreeData = new();
+    private List<OpenFileInfo> openFiles = new();
+    private string? activeFileTab = null;
+    private bool loadingFiles = false;
+    private StandaloneCodeEditor? codeEditor; // Legacy single editor - kept for AI context compatibility
+
+    private class OpenFileInfo
+    {
+        public string Path { get; set; } = "";
+        public string Content { get; set; } = "";
+        public string Language { get; set; } = "html";
+        public StandaloneCodeEditor? Editor { get; set; }
+        public bool IsDirty { get; set; }
+    }
+
+    public class FileTreeNode
+    {
+        public string Key { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Icon { get; set; } = "file";
+        public bool IsLeaf { get; set; } = true;
+        public List<FileTreeNode>? Children { get; set; }
+        public string FullPath { get; set; } = "";
+    }
 
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private AppStepsService AppStepsService { get; set; }
@@ -111,6 +136,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                     
                 await LoadAllSteps();
                 await LoadGitHubStatus();
+                await LoadFileTree();
             }
         }
         catch
@@ -216,13 +242,22 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         saving = true;
         try
         {
-            var code = await codeEditor.GetValue();
-            currentApp.Definition.HtmlContent = code;
-            await AppsService.Update(currentApp);
+            // Save all open files
+            foreach (var file in openFiles.Where(f => f.Editor != null))
+            {
+                var content = await file.Editor!.GetValue();
+                await AppsService.WriteAppFileAsync(Guid.Parse(AppId), file.Path, content);
+                file.IsDirty = false;
+            }
+
+            // Reload the current app to get updated Definition.HtmlContent
+            currentApp = await AppsService.Load(Guid.Parse(AppId));
+            
             _ = MessageService.SuccessAsync("App saved successfully");
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to save app");
             _ = MessageService.ErrorAsync("Failed to save app");
         }
         finally
@@ -500,6 +535,17 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     {
         try
         {
+            // Get content from active file tab if available
+            if (!string.IsNullOrEmpty(activeFileTab))
+            {
+                var activeFile = openFiles.FirstOrDefault(f => f.Path == activeFileTab);
+                if (activeFile?.Editor != null)
+                {
+                    return await activeFile.Editor.GetValue() ?? string.Empty;
+                }
+            }
+            
+            // Fall back to legacy single editor or app definition
             if (codeEditor != null) return await codeEditor.GetValue() ?? string.Empty;
             return currentApp.Definition?.HtmlContent ?? string.Empty;
         }
@@ -1076,6 +1122,256 @@ console.log(result.outputVariables);";
             Logger.LogError(ex, "Failed to save GitHub settings");
             throw;
         }
+    }
+
+    // File tree and multi-file editor methods
+    private async Task LoadFileTree()
+    {
+        try
+        {
+            loadingFiles = true;
+            await InvokeAsync(StateHasChanged);
+
+            var files = await AppsService.GetAppFilesAsync(Guid.Parse(AppId));
+            fileTreeData = BuildFileTree(files);
+
+            // Auto-open index.html if it exists and no files are open
+            if (!openFiles.Any() && files.Contains("index.html"))
+            {
+                await OpenFile("index.html");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load file tree");
+            _ = MessageService.ErrorAsync("Failed to load files");
+        }
+        finally
+        {
+            loadingFiles = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private List<FileTreeNode> BuildFileTree(List<string> files)
+    {
+        var root = new List<FileTreeNode>();
+        var folderMap = new Dictionary<string, FileTreeNode>();
+
+        foreach (var file in files.Where(f => f != "_metadata.json").OrderBy(f => f))
+        {
+            var parts = file.Split('/');
+            var currentLevel = root;
+            var currentPath = "";
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                currentPath = string.IsNullOrEmpty(currentPath) ? part : $"{currentPath}/{part}";
+                var isFile = i == parts.Length - 1;
+
+                if (isFile)
+                {
+                    // Add file node
+                    currentLevel.Add(new FileTreeNode
+                    {
+                        Key = currentPath,
+                        Title = part,
+                        Icon = GetFileIcon(part),
+                        IsLeaf = true,
+                        FullPath = currentPath
+                    });
+                }
+                else
+                {
+                    // Add or get folder node
+                    if (!folderMap.ContainsKey(currentPath))
+                    {
+                        var folderNode = new FileTreeNode
+                        {
+                            Key = currentPath,
+                            Title = part,
+                            Icon = "folder",
+                            IsLeaf = false,
+                            FullPath = currentPath,
+                            Children = new List<FileTreeNode>()
+                        };
+                        currentLevel.Add(folderNode);
+                        folderMap[currentPath] = folderNode;
+                    }
+                    currentLevel = folderMap[currentPath].Children!;
+                }
+            }
+        }
+
+        return root;
+    }
+
+    private string GetFileIcon(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return extension switch
+        {
+            ".html" => "file-text",
+            ".css" => "file-text",
+            ".js" => "file-text",
+            ".json" => "file-text",
+            ".md" => "file-markdown",
+            ".svg" => "file-image",
+            ".png" or ".jpg" or ".jpeg" or ".gif" => "file-image",
+            _ => "file"
+        };
+    }
+
+    private string GetLanguageFromFileName(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return extension switch
+        {
+            ".html" => "html",
+            ".css" => "css",
+            ".js" => "javascript",
+            ".json" => "json",
+            ".md" => "markdown",
+            ".svg" => "xml",
+            _ => "plaintext"
+        };
+    }
+
+    private Task OnTreeNodeLoad(TreeEventArgs<FileTreeNode> args)
+    {
+        // No lazy loading needed - we load all files upfront
+        return Task.CompletedTask;
+    }
+
+    private async Task OnFileTreeNodeClick(TreeEventArgs<FileTreeNode> args)
+    {
+        if (args.Node?.DataItem?.IsLeaf == true)
+        {
+            await OpenFile(args.Node.DataItem.FullPath);
+        }
+    }
+
+    private async Task OpenFile(string filePath)
+    {
+        try
+        {
+            // Check if file is already open
+            var existingFile = openFiles.FirstOrDefault(f => f.Path == filePath);
+            if (existingFile != null)
+            {
+                activeFileTab = filePath;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            // Load file content
+            var content = await AppsService.ReadAppFileAsync(Guid.Parse(AppId), filePath);
+            if (content == null)
+            {
+                _ = MessageService.WarningAsync($"File {filePath} not found");
+                return;
+            }
+
+            // Create new open file
+            var openFile = new OpenFileInfo
+            {
+                Path = filePath,
+                Content = content,
+                Language = GetLanguageFromFileName(filePath),
+                IsDirty = false
+            };
+
+            openFiles.Add(openFile);
+            activeFileTab = filePath;
+
+            await InvokeAsync(StateHasChanged);
+
+            // Set editor content after render
+            await Task.Delay(100); // Give time for editor to render
+            if (openFile.Editor != null)
+            {
+                await openFile.Editor.SetValue(content);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to open file {FilePath}", filePath);
+            _ = MessageService.ErrorAsync($"Failed to open file: {ex.Message}");
+        }
+    }
+
+    private async Task CloseFileTab(string filePath)
+    {
+        var file = openFiles.FirstOrDefault(f => f.Path == filePath);
+        if (file == null) return;
+
+        // TODO: Check if file is dirty and prompt to save
+        if (file.IsDirty)
+        {
+            var confirm = await ModalService.ConfirmAsync(new ConfirmOptions
+            {
+                Title = "Unsaved changes",
+                Content = $"File {GetFileName(filePath)} has unsaved changes. Close anyway?",
+                OkText = "Close",
+                CancelText = "Cancel"
+            });
+
+            if (!confirm) return;
+        }
+
+        openFiles.Remove(file);
+
+        // Select another tab if this was the active one
+        if (activeFileTab == filePath)
+        {
+            activeFileTab = openFiles.Any() ? openFiles.Last().Path : null;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetFileName(string path)
+    {
+        return Path.GetFileName(path);
+    }
+
+    private async Task OnEditorContentChanged(string filePath)
+    {
+        var file = openFiles.FirstOrDefault(f => f.Path == filePath);
+        if (file != null)
+        {
+            file.IsDirty = true;
+        }
+    }
+
+    private StandaloneEditorConstructionOptions GetEditorOptions(StandaloneCodeEditor editor, string language)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            Language = language,
+            AutomaticLayout = true,
+            Theme = "vs",
+            Minimap = new EditorMinimapOptions { Enabled = false },
+            LineNumbers = "on",
+            RenderLineHighlight = "all",
+            ScrollBeyondLastLine = false,
+            FontSize = 14
+        };
+    }
+
+    private async Task ShowCreateFileDialog()
+    {
+        // TODO: Implement file creation dialog
+        MessageService.Info("File creation dialog - to be implemented");
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowCreateFolderDialog()
+    {
+        // TODO: Implement folder creation dialog
+        MessageService.Info("Folder creation dialog - to be implemented");
+        await Task.CompletedTask;
     }
 
     private void NavigateToGitHubSettings()

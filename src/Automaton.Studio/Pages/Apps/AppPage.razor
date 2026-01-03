@@ -105,14 +105,97 @@
 				<Tabs DefaultActiveKey="1">
 					<TabPane Tab="Code" Key="1">
 						<Splitter Layout="@SplitterLayout.Horizontal" Class="main-splitter">
-							<SplitterPanel Size="70%">
-								<div class="left-panel">
-									<div class="monaco-container">
-										<StandaloneCodeEditor Id="app-code-editor" ConstructionOptions="EditorConstructionOptions" @ref="codeEditor" />
+							<!-- File tree panel -->
+							<SplitterPanel Size="15%" MinSize="10%" MaxSize="30%">
+								<div class="file-tree-panel">
+									<div class="file-tree-header">
+										<Space Style="width: 100%; justify-content: space-between;">
+											<SpaceItem><strong>Files</strong></SpaceItem>
+											<SpaceItem>
+												<Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+													<Overlay>
+														<Menu>
+															<MenuItem OnClick="async () => await ShowCreateFileDialog()">
+																<Icon Type="file-add" /> New File
+															</MenuItem>
+															<MenuItem OnClick="async () => await ShowCreateFolderDialog()">
+																<Icon Type="folder-add" /> New Folder
+															</MenuItem>
+														</Menu>
+													</Overlay>
+													<ChildContent>
+														<Button Type="@ButtonType.Text" Icon="plus" Size="@ButtonSize.Small" />
+													</ChildContent>
+												</Dropdown>
+											</SpaceItem>
+										</Space>
+									</div>
+									<div class="file-tree-content">
+										@if (loadingFiles)
+										{
+											<Spin />
+										}
+										else if (fileTreeData.Any())
+										{
+											<Tree TItem="FileTreeNode"
+												  DataSource="fileTreeData"
+												  TitleExpression="@(node => node.DataItem.Title)"
+												  KeyExpression="@(node => node.DataItem.Key)"
+												  IconExpression="@(node => node.DataItem.Icon)"
+												  IsLeafExpression="@(node => node.DataItem.IsLeaf)"
+												  ChildrenExpression="@(node => node.DataItem.Children)"
+												  OnNodeLoadDelayAsync="OnTreeNodeLoad"
+												  OnClick="OnFileTreeNodeClick"
+												  DefaultExpandAll="true"
+												  ShowIcon="true">
+											</Tree>
+										}
+										else
+										{
+											<Empty>
+												<DescriptionTemplate>No files</DescriptionTemplate>
+											</Empty>
+										}
 									</div>
 								</div>
 							</SplitterPanel>
 
+							<!-- Editor panel with tabs -->
+							<SplitterPanel Size="55%">
+								<div class="editor-panel">
+									@if (openFiles.Any())
+									{
+										<Tabs Type="@TabType.EditableCard"
+											  @bind-ActiveKey="activeFileTab"
+											  OnClose="CloseFileTab"
+											  HideAdd="true"
+											  Size="@TabSize.Small"
+											  Class="editor-tabs">
+											@foreach (var file in openFiles)
+											{
+												<TabPane Tab="@GetFileName(file.Path)" Key="@file.Path" Closable="true">
+													<div class="monaco-container">
+														<StandaloneCodeEditor Id="@($"editor-{file.Path.Replace("/", "-")}")"
+																			  ConstructionOptions="@((editor) => GetEditorOptions(editor, file.Language))"
+																			  @ref="file.Editor"
+																			  OnDidChangeModelContent="@((e) => OnEditorContentChanged(file.Path))" />
+													</div>
+												</TabPane>
+											}
+										</Tabs>
+									}
+									else
+									{
+										<div class="empty-editor">
+											<Empty>
+												<DescriptionTemplate>No file open - Select a file from the tree to start editing</DescriptionTemplate>
+											</Empty>
+										</div>
+									}
+								</div>
+							</SplitterPanel>
+
+							<!-- AI Chat panel -->
 							<SplitterPanel Size="30%">
 								<div class="right-panel-container">
 									<Tabs Size="TabSize.Small" Class="right-panel">
@@ -807,5 +890,70 @@ console.log(result.outputVariables);</pre>
 			margin-left: 0;
 			margin-top: 12px;
 		}
+	}
+
+	/* File tree styles */
+	.file-tree-panel {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		border-right: 1px solid #f0f0f0;
+	}
+
+	.file-tree-header {
+		padding: 8px 12px;
+		border-bottom: 1px solid #f0f0f0;
+		background: #fafafa;
+	}
+
+	.file-tree-content {
+		flex: 1;
+		overflow-y: auto;
+		padding: 8px;
+	}
+
+	/* Editor panel with tabs */
+	.editor-panel {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		width: 100%;
+	}
+
+	.editor-tabs {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+	}
+
+	.editor-tabs .ant-tabs-content-holder {
+		flex: 1;
+		overflow: hidden;
+	}
+
+	.editor-tabs .ant-tabs-content {
+		height: 100%;
+	}
+
+	.editor-tabs .ant-tabs-tabpane {
+		height: 100%;
+	}
+
+	.empty-editor {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		background: #fafafa;
+	}
+
+	/* Updated monaco container for tabs */
+	.monaco-container {
+		flex: 1 1 auto;
+		width: 100%;
+		height: 100%;
+		display: flex;
+		overflow: hidden;
 	}
 </style>

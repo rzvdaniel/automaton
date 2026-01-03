@@ -13,6 +13,7 @@ public class AppsController : BaseController
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly GitHubService? githubService;
     private readonly UserContextService userContextService;
+    private readonly AppFileStorageService fileStorageService;
 
     public AppsController(
         AppsService appsService,
@@ -21,6 +22,7 @@ public class AppsController : BaseController
         ILogger<AppsController> logger,
         IWebHostEnvironment webHostEnvironment,
         UserContextService userContextService,
+        AppFileStorageService fileStorageService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -30,6 +32,7 @@ public class AppsController : BaseController
         this.webHostEnvironment = webHostEnvironment;
         this.githubService = githubService;
         this.userContextService = userContextService;
+        this.fileStorageService = fileStorageService;
     }
 
     [HttpGet]
@@ -647,6 +650,146 @@ public class AppsController : BaseController
             return BadRequest(new { success = false, message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Get list of all files in an app directory
+    /// </summary>
+    [HttpGet("{id}/files")]
+    public async Task<IActionResult> GetAppFiles(Guid id)
+    {
+        try
+        {
+            var ownerId = userContextService.GetUserId();
+            var files = await fileStorageService.GetAppFilesAsync(ownerId, id);
+            
+            return Ok(new
+            {
+                success = true,
+                files = files.ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get files for app {AppId}", id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Read content of a specific file from app directory
+    /// </summary>
+    [HttpGet("{id}/files/{*path}")]
+    public async Task<IActionResult> GetAppFile(Guid id, string path)
+    {
+        try
+        {
+            var ownerId = userContextService.GetUserId();
+            var content = await fileStorageService.ReadAppFileAsync(ownerId, id, path);
+            
+            if (content == null)
+            {
+                return NotFound(new { success = false, message = "File not found" });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                content = content,
+                path = path
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Unauthorized file access attempt for app {AppId}, path {Path}", id, path);
+            return Unauthorized(new { success = false, message = "Access denied" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to read file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Write content to a specific file in app directory
+    /// </summary>
+    [HttpPut("{id}/files/{*path}")]
+    public async Task<IActionResult> PutAppFile(Guid id, string path, [FromBody] WriteFileRequest request)
+    {
+        try
+        {
+            var ownerId = userContextService.GetUserId();
+            await fileStorageService.WriteAppFileAsync(ownerId, id, path, request.Content);
+            
+            // If this is index.html, also update the app definition
+            if (path == "index.html")
+            {
+                var app = appsService.Get(id);
+                if (app != null)
+                {
+                    app.Definition.HtmlContent = request.Content;
+                    await appsService.Update(id, app);
+                }
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "File saved successfully",
+                path = path
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Unauthorized file write attempt for app {AppId}, path {Path}", id, path);
+            return Unauthorized(new { success = false, message = "Access denied" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to write file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a specific file from app directory
+    /// </summary>
+    [HttpDelete("{id}/files/{*path}")]
+    public async Task<IActionResult> DeleteAppFile(Guid id, string path)
+    {
+        try
+        {
+            // Don't allow deleting index.html or _metadata.json
+            if (path == "index.html" || path == "_metadata.json")
+            {
+                return BadRequest(new { success = false, message = "Cannot delete system files" });
+            }
+
+            var ownerId = userContextService.GetUserId();
+            await fileStorageService.DeleteAppFileAsync(ownerId, id, path);
+            
+            return Ok(new
+            {
+                success = true,
+                message = "File deleted successfully"
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Unauthorized file delete attempt for app {AppId}, path {Path}", id, path);
+            return Unauthorized(new { success = false, message = "Access denied" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+}
+
+public class WriteFileRequest
+{
+    public required string Content { get; set; }
 }
 
 public class GitHubPushRequest

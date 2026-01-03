@@ -169,4 +169,79 @@ public class AppsService
         var response = await httpClient.PutAsJsonAsync($"{configService.BaseUrl}/api/{endpoint}", data);
         response.EnsureSuccessStatusCode();
     }
+
+    // File operations for multi-file apps
+    public async Task<List<string>> GetAppFilesAsync(Guid appId)
+    {
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.AppsUrl}/{appId}/files");
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadAsAsync<AppFilesResponse>();
+            return result.Files ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to get files for app {AppId}", appId);
+            throw;
+        }
+    }
+
+    public async Task<string?> ReadAppFileAsync(Guid appId, string path)
+    {
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.AppsUrl}/{appId}/files/{path}");
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadAsAsync<AppFileContentResponse>();
+            return result.Content;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to read file {Path} for app {AppId}", path, appId);
+            throw;
+        }
+    }
+
+    public async Task WriteAppFileAsync(Guid appId, string path, string content)
+    {
+        try
+        {
+            var request = new { Content = content };
+            var response = await httpClient.PutAsJsonAsync($"{configService.AppsUrl}/{appId}/files/{path}", request);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to write file {Path} for app {AppId}", path, appId);
+            throw;
+        }
+    }
+
+    public async Task DeleteAppFileAsync(Guid appId, string path)
+    {
+        try
+        {
+            var response = await httpClient.DeleteAsync($"{configService.AppsUrl}/{appId}/files/{path}");
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to delete file {Path} for app {AppId}", path, appId);
+            throw;
+        }
+    }
+
+    private class AppFilesResponse
+    {
+        public bool Success { get; set; }
+        public List<string>? Files { get; set; }
+    }
+
+    private class AppFileContentResponse
+    {
+        public bool Success { get; set; }
+        public string? Content { get; set; }
+        public string? Path { get; set; }
+    }
 }
