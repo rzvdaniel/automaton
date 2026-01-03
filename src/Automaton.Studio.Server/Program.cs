@@ -227,6 +227,10 @@ services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 
+// GitHub integration services
+services.AddScoped<GitHubTokenService>();
+services.AddScoped<GitHubService>();
+
 // Register email service implementation based on environment and configuration.
 var useNoOpEmail = applicationBuilder.Environment.IsDevelopment() && !configurationService.EmailConfig.SendEmailsInDevelopment;
 if (useNoOpEmail)
