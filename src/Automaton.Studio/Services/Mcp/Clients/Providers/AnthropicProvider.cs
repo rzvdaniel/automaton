@@ -17,6 +17,13 @@ public class AnthropicProvider : IAiProvider
 {
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
 
+    /// <summary>
+    /// Maximum number of conversation messages to keep in history (sliding window).
+    /// Prevents unbounded token growth. Each turn = 2 messages (user + assistant).
+    /// 10 messages = last 5 turns, typically 2,000-5,000 tokens saved per call.
+    /// </summary>
+    private const int MaxConversationHistoryMessages = 10;
+
     /// <inheritdoc />
     public string ProviderName => "Anthropic";
 
@@ -158,10 +165,24 @@ public class AnthropicProvider : IAiProvider
     {
         var messages = new List<Message>();
 
-        // Add conversation history
+        // Add conversation history with sliding window to prevent unbounded token growth
         if (request.ConversationHistory?.Any() == true)
         {
-            foreach (var msg in request.ConversationHistory)
+            var historyToInclude = request.ConversationHistory;
+
+            // Apply sliding window: keep only last N messages
+            if (request.ConversationHistory.Count > MaxConversationHistoryMessages)
+            {
+                var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
+                historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
+
+                _logger.LogInformation(
+                    "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
+                    request.ConversationHistory.Count,
+                    historyToInclude.Count);
+            }
+
+            foreach (var msg in historyToInclude)
             {
                 var role = msg.Role.ToLowerInvariant() == "assistant" ? RoleType.Assistant : RoleType.User;
                 messages.Add(new Message

@@ -94,11 +94,9 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
-    [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
-    [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
+    [Inject] private IAppSystemPromptBuilder AppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
-    [Inject] private IAppMcpClient WebAppMcpClient { get; set; }
-    [Inject] private IUnifiedAppMcpClient UnifiedAppMcpClient { get; set; }
+    [Inject] private IAppMcpClient AppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -116,7 +114,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         loading = true;
 
         CurrentWebAppContextService.CodeChanged += OnCodeChangedByMcpTools;
-        UnifiedAppMcpClient.BackendStepsChanged += OnBackendStepsChanged;
+        AppMcpClient.BackendStepsChanged += OnBackendStepsChanged;
 
         try
         {
@@ -132,7 +130,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                     GetCurrentCodeForAI);
                     
                 // Set up unified MCP client with app context
-                UnifiedAppMcpClient.SetCurrentApp(currentApp.Id);
+                AppMcpClient.SetCurrentApp(currentApp.Id);
                     
                 await LoadAllSteps();
                 await LoadGitHubStatus();
@@ -555,11 +553,11 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    private UnifiedAppAiChatContext CreateAiChatContext()
+    private AppAiChatContext CreateAiChatContext()
     {
         // Use unified context that supports both frontend and backend generation
-        return new UnifiedAppAiChatContext(
-            UnifiedAppSystemPromptBuilder, 
+        return new AppAiChatContext(
+            AppSystemPromptBuilder, 
             AppId, 
             GetCurrentCodeForAI,
             GetLinkedStepsForAI
@@ -655,7 +653,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         CurrentWebAppContextService.CodeChanged -= OnCodeChangedByMcpTools;
-        UnifiedAppMcpClient.BackendStepsChanged -= OnBackendStepsChanged;
+        AppMcpClient.BackendStepsChanged -= OnBackendStepsChanged;
         if (PreviewMessageHandler != null) await PreviewMessageHandler.DisposeAsync();
     }
 
