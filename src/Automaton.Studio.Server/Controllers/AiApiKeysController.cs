@@ -1,4 +1,3 @@
-using Automaton.Studio.Server.Entities.Enums;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,7 +31,7 @@ public class AiApiKeysController : ControllerBase
         {
             Id = ak.Id,
             Name = ak.Name,
-            Provider = ak.Provider,
+            ProviderName = ak.ProviderName,
             Description = ak.Description,
             CreatedAt = ak.CreatedAt,
             LastUsedAt = ak.LastUsedAt,
@@ -54,11 +53,11 @@ public class AiApiKeysController : ControllerBase
     public async Task<ActionResult<AiApiKeyResponse>> CreateAiApiKey([FromBody] CreateAiApiKeyRequest request)
     {
         var userId = GetUserId();
-        
+
         var aiApiKey = await aiApiKeyService.CreateAiApiKeyAsync(
-            userId, 
-            request.Name, 
-            request.Provider, 
+            userId,
+            request.Name,
+            request.ProviderName,
             request.ApiKey,
             request.Description);
 
@@ -66,7 +65,7 @@ public class AiApiKeysController : ControllerBase
         {
             Id = aiApiKey.Id,
             Name = aiApiKey.Name,
-            Provider = aiApiKey.Provider,
+            ProviderName = aiApiKey.ProviderName,
             Description = aiApiKey.Description,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
@@ -81,7 +80,7 @@ public class AiApiKeysController : ControllerBase
     {
         var userId = GetUserId();
         var aiApiKey = await aiApiKeyService.GetAiApiKeyAsync(id, userId);
-        
+
         if (aiApiKey == null)
             return NotFound();
 
@@ -89,7 +88,7 @@ public class AiApiKeysController : ControllerBase
         {
             Id = aiApiKey.Id,
             Name = aiApiKey.Name,
-            Provider = aiApiKey.Provider,
+            ProviderName = aiApiKey.ProviderName,
             Description = aiApiKey.Description,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
@@ -145,15 +144,15 @@ public class AiApiKeysController : ControllerBase
     /// Get environment API keys for desktop scenarios
     /// </summary>
     [HttpGet("environment")]
-    public ActionResult<Dictionary<AiProviderType, string?>> GetEnvironmentApiKeys()
+    public ActionResult<Dictionary<string, string?>> GetEnvironmentApiKeys()
     {
         var environmentKeys = aiApiKeyService.GetEnvironmentApiKeys();
-        
+
         // Filter out null/empty values for security
         var filteredKeys = environmentKeys
             .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            
+
         return Ok(filteredKeys);
     }
 
@@ -172,7 +171,7 @@ public class AiApiKeysController : ControllerBase
 public class CreateAiApiKeyRequest
 {
     public string Name { get; set; } = string.Empty;
-    public AiProviderType Provider { get; set; }
+    public string ProviderName { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string? Description { get; set; }
 }
@@ -187,7 +186,7 @@ public class AiApiKeyResponse
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public AiProviderType Provider { get; set; }
+    public string ProviderName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }

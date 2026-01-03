@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
 using OpenAI.Chat;
-using Automaton.Mcp.Enums;
 
 namespace Automaton.Mcp.Client;
 
@@ -110,16 +109,18 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             
             string responseText;
             
-            switch (request.Provider)
+            // String-based provider matching (case-insensitive)
+            var providerName = request.Provider?.ToLowerInvariant() ?? string.Empty;
+            switch (providerName)
             {
-                case AiProviderType.OpenAI:
+                case "openai":
                     responseText = await CallOpenAiAsync(request, cancellationToken);
                     break;
-                    
-                case AiProviderType.Anthropic:
+
+                case "anthropic":
                     responseText = await FallbackAiCallAsync(request, cancellationToken);
                     break;
-                    
+
                 default:
                     _logger.LogWarning("Provider {Provider} not supported, using fallback", request.Provider);
                     responseText = await FallbackAiCallAsync(request, cancellationToken);

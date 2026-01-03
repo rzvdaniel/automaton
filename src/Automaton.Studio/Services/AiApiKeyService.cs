@@ -1,7 +1,6 @@
 using Automaton.Studio.Models;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Automaton.Mcp.Enums;
 
 namespace Automaton.Studio.Services;
 
@@ -137,44 +136,44 @@ public class AiApiKeyService
     /// <summary>
     /// Get environment API keys (for desktop scenarios)
     /// </summary>
-    public async Task<Dictionary<AiProviderType, string?>> GetEnvironmentApiKeysAsync()
+    public async Task<Dictionary<string, string?>> GetEnvironmentApiKeysAsync()
     {
         try
         {
             var response = await httpClient.GetAsync("api/aiApiKeys/environment");
             if (!response.IsSuccessStatusCode)
             {
-                return new Dictionary<AiProviderType, string?>();
+                return new Dictionary<string, string?>();
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<Dictionary<AiProviderType, string?>>(json, new JsonSerializerOptions
+            var result = JsonSerializer.Deserialize<Dictionary<string, string?>>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
-            return result ?? new Dictionary<AiProviderType, string?>();
+            return result ?? new Dictionary<string, string?>();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting environment API keys");
-            return new Dictionary<AiProviderType, string?>();
+            return new Dictionary<string, string?>();
         }
     }
 
     /// <summary>
     /// Get API keys by provider for MCP integration
     /// </summary>
-    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysByProviderAsync(AiProviderType provider)
+    public async Task<IEnumerable<AiApiKeyModel>> GetAiApiKeysByProviderAsync(string providerName)
     {
         try
         {
             var allKeys = await GetAiApiKeysAsync();
-            return allKeys.Where(k => k.Provider == provider && k.IsActive);
+            return allKeys.Where(k => string.Equals(k.ProviderName, providerName, StringComparison.OrdinalIgnoreCase) && k.IsActive);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error getting API keys for provider {Provider}", provider);
+            logger.LogError(ex, "Error getting API keys for provider {ProviderName}", providerName);
             return new List<AiApiKeyModel>();
         }
     }

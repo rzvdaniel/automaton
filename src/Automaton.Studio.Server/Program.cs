@@ -23,9 +23,9 @@ using Serilog.Events;
 using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Transactions;
-using Automaton.Studio.Server.Services.AiProviders;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Studio.Server.Enums;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -94,6 +94,10 @@ services.AddAuthorization(options =>
     options.AddPolicy("AllowAnonymous", policy =>
         policy.RequireAssertion(_ => true));
 
+    // Admin policy for users with Admin or SysAdmin roles
+    options.AddPolicy("Administrators", policy =>
+        policy.RequireRole(UserRole.Administrator, UserRole.SystemAdministrator));
+
     // Project-based authorization policies
     options.AddPolicy("ProjectAdmin", policy =>
         policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectAdminRequirement()));
@@ -106,10 +110,10 @@ services.AddAuthorization(options =>
 
     options.AddPolicy("ProjectMember", policy =>
         policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
-            Automaton.Studio.Server.Enums.ProjectRole.ProjectAdmin,
-            Automaton.Studio.Server.Enums.ProjectRole.Developer,
-            Automaton.Studio.Server.Enums.ProjectRole.AppUser,
-            Automaton.Studio.Server.Enums.ProjectRole.Viewer)));
+            ProjectRole.ProjectAdmin,
+            ProjectRole.Developer,
+            ProjectRole.AppUser,
+            ProjectRole.Viewer)));
 });
 
 services.AddHttpClient();
@@ -244,11 +248,9 @@ services.AddTransient<ScheduleService>();
 
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
+services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
 
-services.AddScoped<OpenAiProvider>();
-services.AddScoped<AnthropicProvider>();
-services.AddScoped<GoogleProvider>();
-services.AddScoped<AiProviderFactory>();
+services.AddScoped<AiProviderMetadataService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();

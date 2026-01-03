@@ -13,6 +13,9 @@ public class OpenAiProvider : IAiProvider
 {
     private readonly Microsoft.Extensions.Logging.ILogger _logger;
 
+    /// <inheritdoc />
+    public string ProviderName => "OpenAI";
+
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     public OpenAiProvider(Microsoft.Extensions.Logging.ILogger logger)

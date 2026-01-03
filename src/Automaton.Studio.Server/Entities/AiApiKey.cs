@@ -1,5 +1,5 @@
-using Automaton.Studio.Server.Entities.Enums;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Automaton.Studio.Server.Entities;
 
@@ -16,8 +16,20 @@ public class AiApiKey
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty; // User-friendly name like "My OpenAI Key"
 
+    /// <summary>
+    /// Provider name string matching AiProvider.Name (e.g., "OpenAI", "Anthropic", "Google")
+    /// </summary>
     [Required]
-    public AiProviderType Provider { get; set; }
+    [MaxLength(100)]
+    public string ProviderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional foreign key to AiProvider for referential integrity
+    /// </summary>
+    public Guid? AiProviderId { get; set; }
+
+    [ForeignKey(nameof(AiProviderId))]
+    public virtual AiProvider? AiProvider { get; set; }
 
     [Required]
     [MaxLength(1000)]

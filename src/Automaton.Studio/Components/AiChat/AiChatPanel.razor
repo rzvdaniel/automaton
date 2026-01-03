@@ -13,6 +13,50 @@
 @implements IDisposable
 
 <div class="ai-chat-panel">
+	<!-- Session Management Toolbar -->
+	<div class="session-toolbar">
+		<div class="session-controls">
+			@if (currentSession != null)
+			{
+				<Select @key="@($"{currentSessionId}_{currentSession.Title}")"
+						@bind-Value="@currentSessionId"
+						TItemValue="Guid"
+						TItem="Guid"
+						Size="@InputSize.Small"
+						Style="flex: 1; max-width: 350px;"
+						Placeholder="Select session"
+						AllowClear="false"
+						Disabled="@isGeneratingCode"
+						OnSelectedItemChanged="OnSessionSelectedAsync">
+					<SelectOptions>
+						@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
+						{
+							// Show full timestamp with seconds to debug the issue
+							var label = $"{session.Title} • {session.UpdatedAt:MMM dd, HH:mm:ss}";
+							<SelectOption @key="session.Id"
+										  TItemValue="Guid"
+										  TItem="Guid"
+										  Value="@session.Id"
+										  Label="@label" />
+						}
+					</SelectOptions>
+				</Select>
+			}
+
+			<Button Icon="plus"
+					Size="@ButtonSize.Small"
+					OnClick="CreateNewSessionAsync"
+					Disabled="@isGeneratingCode"
+					Title="New Session" />
+
+			<Button Icon="history"
+					Size="@ButtonSize.Small"
+					OnClick="() => showSessionDrawer = true"
+					Disabled="@isGeneratingCode"
+					Title="View All Sessions" />
+		</div>
+	</div>
+
 	<div class="ai-chat-body" @ref="messagesContainer" id="ai-chat-messages">
 		<div class="messages">
 			@for (int i = 0; i < messages.Count; i++)
@@ -79,7 +123,7 @@
 								{
 									@foreach (var model in provider.SupportedModels)
 									{
-										var value = $"{provider.Provider}:{model}";
+										var value = $"{provider.ProviderName}:{model}";
 										var label = $"{model}";
 										var isDisabled = !provider.HasStoredKeys && !provider.HasEnvironmentKey;
 
@@ -131,6 +175,69 @@
 			</div>
 		}
 	</div>
+
+	<!-- Session History Drawer -->
+	<Drawer Closable="true"
+			Visible="@showSessionDrawer"
+			Width="400"
+			Title="@("Chat Sessions")"
+			OnClose="() => showSessionDrawer = false">
+		<ChildContent>
+			<div class="sessions-list">
+				@foreach (var session in availableSessions.OrderByDescending(s => s.UpdatedAt))
+				{
+					<div @key="session.Id" class="session-item @(session.Id == currentSession?.Id ? "active" : "")">
+						<div class="session-info" @onclick="() => SelectAndCloseDrawerAsync(session.Id)">
+							<div class="session-title">@session.Title</div>
+							<div class="session-meta">
+								<span class="session-date">@session.UpdatedAt.ToString("MMM dd, HH:mm")</span>
+								@if (session.Provider != null && session.Model != null)
+								{
+									<span class="session-model">@session.Model</span>
+								}
+							</div>
+						</div>
+						<div class="session-actions">
+							<Button Icon="edit"
+									Size="@ButtonSize.Small"
+									Type="@ButtonType.Text"
+									OnClick="() => StartRenameSession(session.Id, session.Title)">
+								Rename
+							</Button>
+							<Popconfirm Title="@("Delete this session?")"
+										OnConfirm="async () => await DeleteSessionAsync(session.Id)"
+										OkText="@("Delete")"
+										CancelText="@("Cancel")">
+								<Button Icon="delete"
+										Size="@ButtonSize.Small"
+										Type="@ButtonType.Text"
+										Danger="true">
+									Delete
+								</Button>
+							</Popconfirm>
+						</div>
+					</div>
+				}
+
+				@if (!availableSessions.Any())
+				{
+					<Empty>
+						<DescriptionTemplate>No sessions yet</DescriptionTemplate>
+					</Empty>
+				}
+			</div>
+		</ChildContent>
+	</Drawer>
+
+	<!-- Rename Session Modal -->
+	<Modal Title="@("Rename Session")"
+		   Visible="@showRenameModal"
+		   OnOk="SaveRenameSessionAsync"
+		   OnCancel="() => showRenameModal = false"
+		   OkText="@("Save")"
+		   CancelText="@("Cancel")">
+		<Input @bind-Value="@renameSessionTitle" Placeholder="Enter session title" />
+	</Modal>
 </div>
 
 <script>
@@ -266,4 +373,94 @@
 			line-height: 22px !important;
 			font-size: 11px;
 		}
+
+	/* Session Management Toolbar */
+	.session-toolbar {
+		display: flex;
+		align-items: center;
+		padding: 8px 12px;
+		background: #fafafa;
+		border-bottom: 1px solid #e8e8e8;
+		flex-shrink: 0;
+	}
+
+	.session-controls {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+	}
+
+	/* Session List in Drawer */
+	.sessions-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.session-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 12px;
+		border: 1px solid #e8e8e8;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+		.session-item:hover {
+			background: #f5f5f5;
+			border-color: #d9d9d9;
+		}
+
+		.session-item.active {
+			background: #e6f7ff;
+			border-color: #1890ff;
+		}
+
+	.session-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.session-title {
+		font-weight: 500;
+		color: #262626;
+		margin-bottom: 4px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.session-meta {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 12px;
+		color: #8c8c8c;
+	}
+
+	.session-date {
+		font-size: 11px;
+	}
+
+	.session-model {
+		padding: 2px 6px;
+		background: #f0f0f0;
+		border-radius: 3px;
+		font-size: 10px;
+	}
+
+	.session-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		opacity: 0;
+		transition: opacity 0.2s;
+	}
+
+	.session-item:hover .session-actions {
+		opacity: 1;
+	}
 </style>

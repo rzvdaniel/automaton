@@ -55,6 +55,14 @@
         }
     }
 
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MenuItem Key="14" Icon="control" RouterLink="/admin" Class="admin-menu-item">
+                <b>Admin</b>
+            </MenuItem>
+        </Authorized>
+    </AuthorizeView>
+
     <MenuItem Key="12" Icon="user" RouterLink="/account/">
         <b>Account</b>
     </MenuItem>
