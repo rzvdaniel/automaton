@@ -3,9 +3,9 @@ using Automaton.Studio.Services.Mcp.ToolProviders;
 namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
-/// Interface for unified App MCP client that supports both frontend and backend operations
+/// Interface for App MCP client that supports both frontend and backend operations
 /// </summary>
-public interface IUnifiedAppMcpClient : IMcpClient
+public interface IAppMcpClient : IMcpClient
 {
     /// <summary>
     /// Set the current app context for this MCP client session

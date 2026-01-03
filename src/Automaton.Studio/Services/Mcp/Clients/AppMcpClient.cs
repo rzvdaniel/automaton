@@ -4,13 +4,13 @@ using Microsoft.Extensions.Logging;
 namespace Automaton.Studio.Services.Mcp.Clients;
 
 /// <summary>
-/// MCP client implementation for unified App Designer context.
+/// MCP client implementation for App Designer context.
 /// Handles tool discovery and execution for both web app development (HTML, CSS, JavaScript)
 /// and backend Custom Step creation (Python, Batch).
 /// </summary>
-public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
+public class AppMcpClient : McpClient, IAppMcpClient
 {
-    private readonly UnifiedAppMcpToolProvider _unifiedToolProvider;
+    private readonly AppMcpToolProvider _toolProvider;
 
     /// <summary>
     /// Event fired when backend steps are created, updated, or linked to the app.
@@ -18,17 +18,17 @@ public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
     /// </summary>
     public event EventHandler<BackendStepsChangedEventArgs>? BackendStepsChanged
     {
-        add => _unifiedToolProvider.BackendStepsChanged += value;
-        remove => _unifiedToolProvider.BackendStepsChanged -= value;
+        add => _toolProvider.BackendStepsChanged += value;
+        remove => _toolProvider.BackendStepsChanged -= value;
     }
 
-    public UnifiedAppMcpClient(
-        ILogger<UnifiedAppMcpClient> logger,
-        UnifiedAppMcpToolProvider toolProvider,
+    public AppMcpClient(
+        ILogger<AppMcpClient> logger,
+        AppMcpToolProvider toolProvider,
         IAiProviderRegistry providerRegistry)
         : base(logger, toolProvider, providerRegistry)
     {
-        _unifiedToolProvider = toolProvider;
+        _toolProvider = toolProvider;
     }
 
     /// <summary>
@@ -37,6 +37,6 @@ public class UnifiedAppMcpClient : McpClient, IUnifiedAppMcpClient
     /// </summary>
     public void SetCurrentApp(Guid appId)
     {
-        _unifiedToolProvider.SetCurrentApp(appId);
+        _toolProvider.SetCurrentApp(appId);
     }
 }
