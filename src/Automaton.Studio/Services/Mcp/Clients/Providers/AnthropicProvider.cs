@@ -90,7 +90,8 @@ public class AnthropicProvider : IAiProvider
                     {
                         Id = toolUse.Id,
                         Name = toolUse.Name,
-                        Input = toolUse.Input
+                        // Anthropic API requires Input to be non-null; use empty object if null
+                        Input = toolUse.Input ?? JsonNode.Parse("{}")
                     });
                 }
 
