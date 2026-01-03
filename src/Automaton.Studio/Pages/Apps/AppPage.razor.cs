@@ -44,6 +44,19 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     private bool previewHandlerInitialized = false;
     private string? automatonApiScript;
 
+    // GitHub integration
+    private bool hasGitHubToken = false;
+    private bool githubSyncEnabled = false;
+    private string githubRepoUrl = "";
+    private string githubBranch = "main";
+    private string? githubPath = null;
+    private bool githubPushing = false;
+    private bool githubPulling = false;
+    private bool githubCheckingStatus = false;
+    private bool githubCreatingRepo = false;
+    private string? githubStatusMessage = null;
+    private AlertType githubStatusType = AlertType.Info;
+
     [Inject] private AppsService AppsService { get; set; }
     [Inject] private AppStepsService AppStepsService { get; set; }
     [Inject] private MessageService MessageService { get; set; }
@@ -97,6 +110,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                 UnifiedAppMcpClient.SetCurrentApp(currentApp.Id);
                     
                 await LoadAllSteps();
+                await LoadGitHubStatus();
             }
         }
         catch
@@ -797,4 +811,312 @@ console.log(result.outputVariables);";
     
     private string GetStepIcon(string language) => StepHelpers.GetStepIcon(language);
     private string GetLanguageColor(string language) => StepHelpers.GetLanguageColor(language);
+
+    // GitHub Integration Methods
+    
+    private async Task LoadGitHubStatus()
+    {
+        try
+        {
+            var response = await AppsService.GetFromApiAsync<GitHubTokenStatusResponse>("github/token/status");
+            hasGitHubToken = response?.HasToken ?? false;
+
+            if (currentApp.Definition.GitHub != null)
+            {
+                githubSyncEnabled = currentApp.Definition.GitHub.SyncEnabled;
+                githubRepoUrl = currentApp.Definition.GitHub.RepositoryUrl ?? "";
+                githubBranch = currentApp.Definition.GitHub.Branch ?? "main";
+                githubPath = currentApp.Definition.GitHub.Path;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load GitHub status");
+        }
+    }
+
+    private async Task OnGitHubSyncToggle(bool enabled)
+    {
+        githubSyncEnabled = enabled;
+        
+        if (!enabled)
+        {
+            // Disable sync
+            currentApp.Definition.GitHub = null;
+            await Save();
+        }
+        else
+        {
+            // Enable sync - initialize settings
+            currentApp.Definition.GitHub = new GitHubSettings
+            {
+                SyncEnabled = true,
+                Branch = "main"
+            };
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PushToGitHub()
+    {
+        if (string.IsNullOrWhiteSpace(githubRepoUrl))
+        {
+            _ = MessageService.WarningAsync("Please enter a repository URL first");
+            return;
+        }
+
+        githubPushing = true;
+        githubStatusMessage = null;
+
+        try
+        {
+            // Save current settings
+            await SaveGitHubSettings();
+
+            var response = await AppsService.PostToApiAsync<GitHubPushResponse>(
+                $"apps/{currentApp.Id}/github/push",
+                new { commitMessage = $"Update {currentApp.Name} from Automaton" });
+
+            if (response?.Success == true)
+            {
+                githubStatusMessage = "Successfully pushed to GitHub!";
+                githubStatusType = AlertType.Success;
+                _ = MessageService.SuccessAsync("App pushed to GitHub successfully");
+                
+                // Reload app to get updated sync status
+                currentApp = await AppsService.Load(Guid.Parse(AppId));
+                await LoadGitHubStatus();
+            }
+            else
+            {
+                githubStatusMessage = response?.Message ?? "Failed to push to GitHub";
+                githubStatusType = AlertType.Error;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to push to GitHub");
+            githubStatusMessage = $"Error: {ex.Message}";
+            githubStatusType = AlertType.Error;
+            _ = MessageService.ErrorAsync($"Failed to push to GitHub: {ex.Message}");
+        }
+        finally
+        {
+            githubPushing = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task PullFromGitHub()
+    {
+        if (string.IsNullOrWhiteSpace(githubRepoUrl))
+        {
+            _ = MessageService.WarningAsync("Please enter a repository URL first");
+            return;
+        }
+
+        var confirmed = await ModalService.ConfirmAsync(new ConfirmOptions
+        {
+            Title = "Pull from GitHub?",
+            Content = "This will overwrite your local changes with the version from GitHub. Are you sure?",
+            OkText = "Pull",
+            CancelText = "Cancel"
+        });
+
+        if (!confirmed) return;
+
+        githubPulling = true;
+        githubStatusMessage = null;
+
+        try
+        {
+            // Save current settings first
+            await SaveGitHubSettings();
+
+            var response = await AppsService.PostToApiAsync<GitHubPullResponse>(
+                $"apps/{currentApp.Id}/github/pull",
+                null);
+
+            if (response?.Success == true)
+            {
+                githubStatusMessage = "Successfully pulled from GitHub!";
+                githubStatusType = AlertType.Success;
+                _ = MessageService.SuccessAsync("App pulled from GitHub successfully");
+                
+                // Reload app to get updated content
+                currentApp = await AppsService.Load(Guid.Parse(AppId));
+                await LoadGitHubStatus();
+                
+                // Update editor
+                if (codeEditor != null && !string.IsNullOrEmpty(currentApp.Definition.HtmlContent))
+                {
+                    await codeEditor.SetValue(currentApp.Definition.HtmlContent);
+                }
+            }
+            else
+            {
+                githubStatusMessage = response?.Message ?? "Failed to pull from GitHub";
+                githubStatusType = AlertType.Error;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to pull from GitHub");
+            githubStatusMessage = $"Error: {ex.Message}";
+            githubStatusType = AlertType.Error;
+            _ = MessageService.ErrorAsync($"Failed to pull from GitHub: {ex.Message}");
+        }
+        finally
+        {
+            githubPulling = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CheckGitHubStatus()
+    {
+        if (string.IsNullOrWhiteSpace(githubRepoUrl))
+        {
+            _ = MessageService.WarningAsync("Please enter a repository URL first");
+            return;
+        }
+
+        githubCheckingStatus = true;
+        githubStatusMessage = null;
+
+        try
+        {
+            await SaveGitHubSettings();
+
+            var response = await AppsService.GetFromApiAsync<GitHubStatusResponse>(
+                $"apps/{currentApp.Id}/github/status");
+
+            if (response != null)
+            {
+                githubStatusMessage = $"Status: {response.Status}";
+                githubStatusType = response.Status == "Synced" ? AlertType.Success : AlertType.Warning;
+                _ = MessageService.InfoAsync($"GitHub status: {response.Status}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to check GitHub status");
+            githubStatusMessage = $"Error: {ex.Message}";
+            githubStatusType = AlertType.Error;
+        }
+        finally
+        {
+            githubCheckingStatus = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CreateGitHubRepo()
+    {
+        githubCreatingRepo = true;
+        githubStatusMessage = null;
+
+        try
+        {
+            var response = await AppsService.PostToApiAsync<CreateGitHubRepoResponse>(
+                "github/repositories",
+                new
+                {
+                    name = currentApp.Name.ToLowerInvariant().Replace(" ", "-"),
+                    description = currentApp.Description ?? $"Web app created with Automaton",
+                    isPrivate = true
+                });
+
+            if (response?.Success == true && !string.IsNullOrEmpty(response.RepositoryUrl))
+            {
+                githubRepoUrl = response.RepositoryUrl;
+                githubStatusMessage = $"Repository created: {response.RepositoryUrl}";
+                githubStatusType = AlertType.Success;
+                _ = MessageService.SuccessAsync("GitHub repository created successfully!");
+                
+                await SaveGitHubSettings();
+            }
+            else
+            {
+                githubStatusMessage = response?.Message ?? "Failed to create repository";
+                githubStatusType = AlertType.Error;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create GitHub repository");
+            githubStatusMessage = $"Error: {ex.Message}";
+            githubStatusType = AlertType.Error;
+            _ = MessageService.ErrorAsync($"Failed to create repository: {ex.Message}");
+        }
+        finally
+        {
+            githubCreatingRepo = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task SaveGitHubSettings()
+    {
+        try
+        {
+            await AppsService.PutToApiAsync(
+                $"apps/{currentApp.Id}/github/settings",
+                new
+                {
+                    repositoryUrl = githubRepoUrl,
+                    branch = githubBranch,
+                    path = githubPath,
+                    syncEnabled = githubSyncEnabled
+                });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save GitHub settings");
+            throw;
+        }
+    }
+
+    private void NavigateToGitHubSettings()
+    {
+        // Navigate to a settings page where users can configure their GitHub token
+        NavigationManager.NavigateTo("/settings?tab=github");
+    }
+
+    private class GitHubTokenStatusResponse
+    {
+        public bool HasToken { get; set; }
+        public string? Username { get; set; }
+    }
+
+    private class GitHubPushResponse
+    {
+        public bool Success { get; set; }
+        public string? CommitSha { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private class GitHubPullResponse
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public bool IsMultiFile { get; set; }
+    }
+
+    private class GitHubStatusResponse
+    {
+        public bool SyncEnabled { get; set; }
+        public string Status { get; set; } = "None";
+        public string? RepositoryUrl { get; set; }
+        public string? Branch { get; set; }
+        public DateTime? LastSyncedAt { get; set; }
+    }
+
+    private class CreateGitHubRepoResponse
+    {
+        public bool Success { get; set; }
+        public string? RepositoryUrl { get; set; }
+        public string? Message { get; set; }
+    }
 }

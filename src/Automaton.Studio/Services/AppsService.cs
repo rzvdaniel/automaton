@@ -148,4 +148,25 @@ public class AppsService
     {
         await UnpublishAsync(id);
     }
+
+    // GitHub integration helpers
+    public async Task<T?> GetFromApiAsync<T>(string endpoint)
+    {
+        var response = await httpClient.GetAsync($"{configService.BaseUrl}/api/{endpoint}");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsAsync<T>();
+    }
+
+    public async Task<T?> PostToApiAsync<T>(string endpoint, object? data)
+    {
+        var response = await httpClient.PostAsJsonAsync($"{configService.BaseUrl}/api/{endpoint}", data);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsAsync<T>();
+    }
+
+    public async Task PutToApiAsync(string endpoint, object data)
+    {
+        var response = await httpClient.PutAsJsonAsync($"{configService.BaseUrl}/api/{endpoint}", data);
+        response.EnsureSuccessStatusCode();
+    }
 }

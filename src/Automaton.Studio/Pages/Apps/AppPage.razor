@@ -489,6 +489,106 @@ console.log(result.outputVariables);</pre>
 
 								</ChildContent>
 							</Card>
+
+							<Card Class="settings-card" Bordered="true" Style="margin-top: 24px;">
+								<TitleTemplate>
+									<Space>
+										<SpaceItem>
+											<Icon Type="github" Style="color: #1890ff;" />
+										</SpaceItem>
+										<SpaceItem>
+											<span>GitHub Integration</span>
+										</SpaceItem>
+									</Space>
+								</TitleTemplate>
+								<ChildContent>
+									<Alert Message="Connect this app to a GitHub repository for version control and backup" Type="@AlertType.Info" ShowIcon="true" Style="margin-bottom: 16px;" />
+
+									@if (!hasGitHubToken)
+									{
+										<Alert Message="No GitHub token configured. Please add a GitHub Personal Access Token in your account settings first." Type="@AlertType.Warning" ShowIcon="true" Style="margin-bottom: 16px;" />
+										<Button Type="@ButtonType.Primary" Icon="key" OnClick="NavigateToGitHubSettings">
+											Configure GitHub Token
+										</Button>
+									}
+									else
+									{
+										<FormItem Label="Enable GitHub Sync">
+											<Switch @bind-Value="@githubSyncEnabled" OnChange="@((bool enabled) => OnGitHubSyncToggle(enabled))" />
+											<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 8px;">
+												Sync this app with a GitHub repository
+											</Text>
+										</FormItem>
+
+										@if (githubSyncEnabled)
+										{
+											<Row Gutter="(24, 16)">
+												<Col Xs="24" Md="12">
+												<FormItem Label="Repository URL" Required>
+													<Input @bind-Value="@githubRepoUrl"
+														   Placeholder="username/repo-name"
+														   Size="@InputSize.Large" />
+													<Text Type="TextElementType.Secondary">Format: username/repository-name</Text>
+												</FormItem>
+												</Col>
+												<Col Xs="24" Md="12">
+												<FormItem Label="Branch">
+													<Input @bind-Value="@githubBranch"
+														   Placeholder="main"
+														   Size="@InputSize.Large" />
+												</FormItem>
+												</Col>
+											</Row>
+
+											<Row Gutter="(24, 16)">
+												<Col Xs="24" Md="12">
+												<FormItem Label="Path in Repository">
+													<Input @bind-Value="@githubPath"
+														   Placeholder="apps/my-app"
+														   Size="@InputSize.Large" />
+													<Text Type="TextElementType.Secondary">Optional: folder path within the repository</Text>
+												</FormItem>
+												</Col>
+											</Row>
+
+											<Space>
+												<SpaceItem>
+													<Button Type="@ButtonType.Primary" Icon="cloud-upload" OnClick="PushToGitHub" Loading="@githubPushing">
+														Push to GitHub
+													</Button>
+												</SpaceItem>
+												<SpaceItem>
+													<Button Icon="cloud-download" OnClick="PullFromGitHub" Loading="@githubPulling">
+														Pull from GitHub
+													</Button>
+												</SpaceItem>
+												<SpaceItem>
+													<Button Icon="sync" OnClick="CheckGitHubStatus" Loading="@githubCheckingStatus">
+														Check Status
+													</Button>
+												</SpaceItem>
+												<SpaceItem>
+													<Button Icon="plus" OnClick="CreateGitHubRepo" Loading="@githubCreatingRepo">
+														Create New Repo
+													</Button>
+												</SpaceItem>
+											</Space>
+
+											@if (!string.IsNullOrEmpty(githubStatusMessage))
+											{
+												<Alert Message="@githubStatusMessage" Type="@githubStatusType" ShowIcon="true" Style="margin-top: 16px;" Closable />
+											}
+
+											@if (currentApp.Definition.GitHub?.LastSyncedAt != null)
+											{
+												<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 16px;">
+													Last synced: @currentApp.Definition.GitHub.LastSyncedAt?.ToString("yyyy-MM-dd HH:mm")
+												</Text>
+											}
+										}
+									}
+								</ChildContent>
+							</Card>
 						</div>
 					</TabPane>
 				</Tabs>
