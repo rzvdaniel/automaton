@@ -59,7 +59,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
     [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
-    [Inject] private IUnifiedAppMcpClient UnifiedAppMcpClient { get; set; }
+    [Inject] private IAppMcpClient AppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
 
@@ -77,7 +77,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         loading = true;
 
         CurrentWebAppContextService.CodeChanged += OnCodeChangedByMcpTools;
-        UnifiedAppMcpClient.BackendStepsChanged += OnBackendStepsChanged;
+        AppMcpClient.BackendStepsChanged += OnBackendStepsChanged;
 
         try
         {
@@ -93,7 +93,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
                     GetCurrentCodeForAI);
                     
                 // Set up unified MCP client with app context
-                UnifiedAppMcpClient.SetCurrentApp(currentApp.Id);
+                AppMcpClient.SetCurrentApp(currentApp.Id);
                     
                 await LoadAllSteps();
             }
@@ -594,7 +594,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         CurrentWebAppContextService.CodeChanged -= OnCodeChangedByMcpTools;
-        UnifiedAppMcpClient.BackendStepsChanged -= OnBackendStepsChanged;
+        AppMcpClient.BackendStepsChanged -= OnBackendStepsChanged;
         if (PreviewMessageHandler != null) await PreviewMessageHandler.DisposeAsync();
     }
 

@@ -22,12 +22,12 @@ public class BackendStepsChangedEventArgs : EventArgs
 }
 
 /// <summary>
-/// Unified MCP tool provider that supports both frontend (App) and backend (Step) operations.
+/// MCP tool provider that supports both frontend (App) and backend (Step) operations.
 /// Enables AI to create complete full-stack apps with backend Custom Steps in a single interaction.
 /// </summary>
-public class UnifiedAppMcpToolProvider : IMcpToolProvider
+public class AppMcpToolProvider : IMcpToolProvider
 {
-    private readonly ILogger<UnifiedAppMcpToolProvider> _logger;
+    private readonly ILogger<AppMcpToolProvider> _logger;
     private readonly IAppEditorBridge _appEditorBridge;
     private readonly CustomStepsService _customStepsService;
     private readonly AppStepsService _appStepsService;
@@ -54,8 +54,8 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     /// </summary>
     public event EventHandler<BackendStepsChangedEventArgs>? BackendStepsChanged;
 
-    public UnifiedAppMcpToolProvider(
-        ILogger<UnifiedAppMcpToolProvider> logger,
+    public AppMcpToolProvider(
+        ILogger<AppMcpToolProvider> logger,
         IAppEditorBridge appEditorBridge,
         IStepEditorBridge stepEditorBridge,
         CustomStepsService customStepsService,
