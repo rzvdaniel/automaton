@@ -47,7 +47,7 @@ public class AppFileStorageService
             var appPath = GetAppPath(userId, appId);
             Directory.CreateDirectory(appPath);
 
-            if (definition.IsMultiFile && definition.Files != null)
+            if (definition.IsMultiFile)
             {
                 // Save multi-file structure
                 await SaveMultiFileAppAsync(appPath, definition);
@@ -188,109 +188,130 @@ public class AppFileStorageService
 
     private async Task SaveMultiFileAppAsync(string appPath, AppDefinition definition)
     {
-        // Save index.html
+        // For multi-file apps, HtmlContent represents index.html
         var indexPath = Path.Combine(appPath, "index.html");
-        await File.WriteAllTextAsync(indexPath, definition.Files?.IndexHtml ?? "");
-
-        // Save HTML files
-        if (definition.Files?.HtmlFiles?.Any() == true)
-        {
-            foreach (var (fileName, content) in definition.Files.HtmlFiles)
-            {
-                var filePath = Path.Combine(appPath, fileName);
-                await File.WriteAllTextAsync(filePath, content);
-            }
-        }
-
-        // Save CSS files
-        if (definition.Files?.CssFiles?.Any() == true)
-        {
-            var cssDir = Path.Combine(appPath, "css");
-            Directory.CreateDirectory(cssDir);
-            foreach (var (fileName, content) in definition.Files.CssFiles)
-            {
-                var filePath = Path.Combine(cssDir, fileName);
-                await File.WriteAllTextAsync(filePath, content);
-            }
-        }
-
-        // Save JS files
-        if (definition.Files?.JsFiles?.Any() == true)
-        {
-            var jsDir = Path.Combine(appPath, "js");
-            Directory.CreateDirectory(jsDir);
-            foreach (var (fileName, content) in definition.Files.JsFiles)
-            {
-                var filePath = Path.Combine(jsDir, fileName);
-                await File.WriteAllTextAsync(filePath, content);
-            }
-        }
-
-        // Save assets
-        if (definition.Files?.Assets?.Any() == true)
-        {
-            var assetsDir = Path.Combine(appPath, "assets");
-            Directory.CreateDirectory(assetsDir);
-            foreach (var (fileName, content) in definition.Files.Assets)
-            {
-                var filePath = Path.Combine(assetsDir, fileName);
-                await File.WriteAllTextAsync(filePath, content);
-            }
-        }
+        await File.WriteAllTextAsync(indexPath, definition.HtmlContent ?? "");
+        
+        // Note: Other files in multi-file apps are managed directly on the file system
+        // The AI or user can create any structure they want in the app directory
+        // This method only ensures index.html exists
     }
 
     private async Task LoadMultiFileAppAsync(string appPath, AppDefinition definition)
     {
-        definition.Files = new AppFileStructure();
-
-        // Load index.html
+        // For multi-file apps, only load index.html into HtmlContent
+        // All other files remain on disk and are served/accessed as needed
         var indexPath = Path.Combine(appPath, "index.html");
         if (File.Exists(indexPath))
         {
-            definition.Files.IndexHtml = await File.ReadAllTextAsync(indexPath);
+            definition.HtmlContent = await File.ReadAllTextAsync(indexPath);
+        }
+        
+        // The file system structure is flexible - any files/folders can exist
+        // They will be discovered and served as needed without being loaded into memory
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Get the file system path for an app (useful for direct file access)
+    /// </summary>
+    public string GetAppDirectoryPath(Guid userId, Guid appId)
+    {
+        return GetAppPath(userId, appId);
+    }
+
+    /// <summary>
+    /// Get all files in an app directory (for listing/inspection)
+    /// </summary>
+    public async Task<IEnumerable<string>> GetAppFilesAsync(Guid userId, Guid appId)
+    {
+        var appPath = GetAppPath(userId, appId);
+        if (!Directory.Exists(appPath))
+        {
+            return Enumerable.Empty<string>();
         }
 
-        // Load additional HTML files (in root directory, not index.html)
-        var htmlFiles = Directory.GetFiles(appPath, "*.html")
-            .Where(f => Path.GetFileName(f) != "index.html");
-        foreach (var htmlFile in htmlFiles)
+        // Get all files recursively, excluding metadata
+        var files = Directory.GetFiles(appPath, "*.*", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith("_metadata.json"))
+            .Select(f => Path.GetRelativePath(appPath, f))
+            .ToList();
+
+        return await Task.FromResult(files);
+    }
+
+    /// <summary>
+    /// Read a specific file from an app directory
+    /// </summary>
+    public async Task<string?> ReadAppFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var filePath = Path.Combine(appPath, relativePath);
+        
+        // Security: ensure the path is within the app directory
+        var fullPath = Path.GetFullPath(filePath);
+        var fullAppPath = Path.GetFullPath(appPath);
+        if (!fullPath.StartsWith(fullAppPath))
         {
-            var fileName = Path.GetFileName(htmlFile);
-            definition.Files.HtmlFiles[fileName] = await File.ReadAllTextAsync(htmlFile);
+            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
         }
 
-        // Load CSS files
-        var cssDir = Path.Combine(appPath, "css");
-        if (Directory.Exists(cssDir))
+        if (!File.Exists(filePath))
         {
-            foreach (var cssFile in Directory.GetFiles(cssDir, "*.css"))
-            {
-                var fileName = Path.GetFileName(cssFile);
-                definition.Files.CssFiles[fileName] = await File.ReadAllTextAsync(cssFile);
-            }
+            return null;
         }
 
-        // Load JS files
-        var jsDir = Path.Combine(appPath, "js");
-        if (Directory.Exists(jsDir))
+        return await File.ReadAllTextAsync(filePath);
+    }
+
+    /// <summary>
+    /// Write a specific file to an app directory
+    /// </summary>
+    public async Task WriteAppFileAsync(Guid userId, Guid appId, string relativePath, string content)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var filePath = Path.Combine(appPath, relativePath);
+        
+        // Security: ensure the path is within the app directory
+        var fullPath = Path.GetFullPath(filePath);
+        var fullAppPath = Path.GetFullPath(appPath);
+        if (!fullPath.StartsWith(fullAppPath))
         {
-            foreach (var jsFile in Directory.GetFiles(jsDir, "*.js"))
-            {
-                var fileName = Path.GetFileName(jsFile);
-                definition.Files.JsFiles[fileName] = await File.ReadAllTextAsync(jsFile);
-            }
+            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
         }
 
-        // Load assets
-        var assetsDir = Path.Combine(appPath, "assets");
-        if (Directory.Exists(assetsDir))
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
         {
-            foreach (var assetFile in Directory.GetFiles(assetsDir))
-            {
-                var fileName = Path.GetFileName(assetFile);
-                definition.Files.Assets[fileName] = await File.ReadAllTextAsync(assetFile);
-            }
+            Directory.CreateDirectory(directory);
         }
+
+        await File.WriteAllTextAsync(filePath, content);
+    }
+
+    /// <summary>
+    /// Delete a specific file from an app directory
+    /// </summary>
+    public async Task DeleteAppFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var filePath = Path.Combine(appPath, relativePath);
+        
+        // Security: ensure the path is within the app directory
+        var fullPath = Path.GetFullPath(filePath);
+        var fullAppPath = Path.GetFullPath(appPath);
+        if (!fullPath.StartsWith(fullAppPath))
+        {
+            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
+        }
+
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+
+        await Task.CompletedTask;
     }
 
     private class AppMetadata

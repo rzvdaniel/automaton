@@ -12,6 +12,7 @@ public class AppsController : BaseController
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly GitHubService? githubService;
+    private readonly UserContextService userContextService;
 
     public AppsController(
         AppsService appsService,
@@ -19,6 +20,7 @@ public class AppsController : BaseController
         UserImpersonationServiceFactory<AppsService> appsServiceFactory,
         ILogger<AppsController> logger,
         IWebHostEnvironment webHostEnvironment,
+        UserContextService userContextService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -27,6 +29,7 @@ public class AppsController : BaseController
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
         this.githubService = githubService;
+        this.userContextService = userContextService;
     }
 
     [HttpGet]
@@ -490,7 +493,8 @@ public class AppsController : BaseController
                 return NotFound(new { success = false, message = "App not found" });
             }
 
-            var commitSha = await githubService.PushToGitHubAsync(app, request.CommitMessage ?? "Update app from Automaton");
+            var ownerId = userContextService.GetUserId();
+            var commitSha = await githubService.PushToGitHubAsync(app, request.CommitMessage ?? "Update app from Automaton", ownerId);
 
             // Update app's GitHub settings
             if (app.Definition.GitHub != null)
@@ -539,11 +543,11 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "App is not connected to a GitHub repository" });
             }
 
-            var pulledDefinition = await githubService.PullFromGitHubAsync(app.Definition.GitHub);
+            var ownerId = userContextService.GetUserId();
+            var pulledDefinition = await githubService.PullFromGitHubAsync(app.Definition.GitHub, ownerId, id);
 
             // Merge pulled definition into current app
             app.Definition.HtmlContent = pulledDefinition.HtmlContent;
-            app.Definition.Files = pulledDefinition.Files;
             app.Definition.IsMultiFile = pulledDefinition.IsMultiFile;
             app.Definition.GitHub = pulledDefinition.GitHub;
 

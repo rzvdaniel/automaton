@@ -12,13 +12,16 @@ public class GitHubService
     private readonly Serilog.ILogger logger;
     private readonly UserContextService userContextService;
     private readonly GitHubTokenService tokenService;
+    private readonly AppFileStorageService fileStorageService;
 
     public GitHubService(
         UserContextService userContextService,
-        GitHubTokenService tokenService)
+        GitHubTokenService tokenService,
+        AppFileStorageService fileStorageService)
     {
         this.userContextService = userContextService;
         this.tokenService = tokenService;
+        this.fileStorageService = fileStorageService;
         this.logger = Serilog.Log.ForContext<GitHubService>();
     }
 
@@ -58,7 +61,7 @@ public class GitHubService
     /// <summary>
     /// Push app files to GitHub repository
     /// </summary>
-    public async Task<string> PushToGitHubAsync(AppModel app, string commitMessage)
+    public async Task<string> PushToGitHubAsync(AppModel app, string commitMessage, Guid ownerId)
     {
         if (app.Definition.GitHub == null || string.IsNullOrEmpty(app.Definition.GitHub.RepositoryUrl))
         {
@@ -80,35 +83,16 @@ public class GitHubService
             // Create tree items for all files
             var treeItems = new List<NewTreeItem>();
 
-            if (app.Definition.IsMultiFile && app.Definition.Files != null)
+            // Get all files from the file system
+            var appFiles = await fileStorageService.GetAppFilesAsync(ownerId, app.Id);
+            
+            foreach (var file in appFiles)
             {
-                // Multi-file app: push all files
-                AddFileToTree(treeItems, $"{basePath}/index.html", app.Definition.Files.IndexHtml);
-
-                foreach (var (fileName, content) in app.Definition.Files.HtmlFiles)
+                var content = await fileStorageService.ReadAppFileAsync(ownerId, app.Id, file);
+                if (content != null)
                 {
-                    AddFileToTree(treeItems, $"{basePath}/{fileName}", content);
+                    AddFileToTree(treeItems, $"{basePath}/{file}", content);
                 }
-
-                foreach (var (fileName, content) in app.Definition.Files.CssFiles)
-                {
-                    AddFileToTree(treeItems, $"{basePath}/css/{fileName}", content);
-                }
-
-                foreach (var (fileName, content) in app.Definition.Files.JsFiles)
-                {
-                    AddFileToTree(treeItems, $"{basePath}/js/{fileName}", content);
-                }
-
-                foreach (var (fileName, content) in app.Definition.Files.Assets)
-                {
-                    AddFileToTree(treeItems, $"{basePath}/assets/{fileName}", content);
-                }
-            }
-            else
-            {
-                // Single-file app: push as index.html
-                AddFileToTree(treeItems, $"{basePath}/index.html", app.Definition.HtmlContent ?? "");
             }
 
             // Add a README with app metadata
@@ -144,9 +128,9 @@ public class GitHubService
     }
 
     /// <summary>
-    /// Pull app files from GitHub repository
+    /// Pull app files from GitHub repository and write them to file system
     /// </summary>
-    public async Task<AppDefinition> PullFromGitHubAsync(GitHubSettings githubSettings)
+    public async Task<AppDefinition> PullFromGitHubAsync(GitHubSettings githubSettings, Guid ownerId, Guid appId)
     {
         if (string.IsNullOrEmpty(githubSettings.RepositoryUrl))
         {
@@ -160,59 +144,33 @@ public class GitHubService
 
         try
         {
-            // Get contents of the directory
-            var contents = await client.Repository.Content.GetAllContents(owner, repoName, basePath);
+            // Get contents of the directory recursively
+            var contents = await GetAllContentsRecursiveAsync(client, owner, repoName, basePath);
 
             var definition = new AppDefinition
             {
-                IsMultiFile = false,
                 GitHub = githubSettings
             };
 
-            // Check if it's a multi-file app
-            var hasMultipleFiles = contents.Count(c => c.Type == ContentType.File && 
-                (c.Name.EndsWith(".html") || c.Name.EndsWith(".js") || c.Name.EndsWith(".css"))) > 1;
+            // Check if it's a multi-file app (more than just index.html)
+            var fileCount = contents.Count(c => c.Type == ContentType.File && c.Name != "README.md");
+            definition.IsMultiFile = fileCount > 1;
 
-            if (hasMultipleFiles)
+            // Download all files and write them to the file system
+            foreach (var item in contents)
             {
-                definition.IsMultiFile = true;
-                definition.Files = new AppFileStructure();
+                if (item.Type != ContentType.File || item.Name == "README.md") continue;
 
-                foreach (var item in contents)
+                var content = await GetFileContentAsync(client, owner, repoName, item.Path, branch);
+                var relativePath = item.Path.Substring(basePath.Length).TrimStart('/');
+                
+                // Write file to app directory
+                await fileStorageService.WriteAppFileAsync(ownerId, appId, relativePath, content);
+
+                // Also store index.html content in HtmlContent for compatibility
+                if (item.Name == "index.html")
                 {
-                    if (item.Type != ContentType.File) continue;
-
-                    var content = await GetFileContentAsync(client, owner, repoName, item.Path, branch);
-
-                    if (item.Name == "index.html")
-                    {
-                        definition.Files.IndexHtml = content;
-                    }
-                    else if (item.Name.EndsWith(".html"))
-                    {
-                        definition.Files.HtmlFiles[item.Name] = content;
-                    }
-                    else if (item.Name.EndsWith(".css"))
-                    {
-                        definition.Files.CssFiles[item.Name] = content;
-                    }
-                    else if (item.Name.EndsWith(".js"))
-                    {
-                        definition.Files.JsFiles[item.Name] = content;
-                    }
-                    else if (item.Name != "README.md")
-                    {
-                        definition.Files.Assets[item.Name] = content;
-                    }
-                }
-            }
-            else
-            {
-                // Single file app
-                var indexFile = contents.FirstOrDefault(c => c.Name == "index.html");
-                if (indexFile != null)
-                {
-                    definition.HtmlContent = await GetFileContentAsync(client, owner, repoName, indexFile.Path, branch);
+                    definition.HtmlContent = content;
                 }
             }
 
@@ -232,6 +190,28 @@ public class GitHubService
             logger.Error(ex, "Failed to pull app from GitHub: {Owner}/{Repo}", owner, repoName);
             throw;
         }
+    }
+
+    private async Task<List<RepositoryContent>> GetAllContentsRecursiveAsync(GitHubClient client, string owner, string repo, string path)
+    {
+        var allContents = new List<RepositoryContent>();
+        var contents = await client.Repository.Content.GetAllContents(owner, repo, path);
+        
+        foreach (var item in contents)
+        {
+            if (item.Type == ContentType.Dir)
+            {
+                // Recursively get directory contents
+                var subContents = await GetAllContentsRecursiveAsync(client, owner, repo, item.Path);
+                allContents.AddRange(subContents);
+            }
+            else
+            {
+                allContents.Add(item);
+            }
+        }
+
+        return allContents;
     }
 
     /// <summary>
@@ -341,16 +321,9 @@ public class GitHubService
         {
             sb.AppendLine();
             sb.AppendLine("## File Structure");
-            sb.AppendLine("This is a multi-file web app with the following structure:");
-            sb.AppendLine("- `index.html` - Main entry point");
-            if (app.Definition.Files?.CssFiles.Any() == true)
-            {
-                sb.AppendLine("- `css/` - Stylesheets");
-            }
-            if (app.Definition.Files?.JsFiles.Any() == true)
-            {
-                sb.AppendLine("- `js/` - JavaScript modules (ES modules supported)");
-            }
+            sb.AppendLine("This is a multi-file web app.");
+            sb.AppendLine("The file structure is flexible and determined by the app's requirements.");
+            sb.AppendLine("All files and folders are managed directly in the file system.");
         }
 
         sb.AppendLine();

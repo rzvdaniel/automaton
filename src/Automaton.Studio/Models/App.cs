@@ -31,17 +31,14 @@ public class AppModel
 public class AppDefinition
 {
     /// <summary>
-    /// Legacy single-file HTML content (for backward compatibility)
+    /// Single-file HTML content (for single-file apps or backward compatibility)
+    /// For multi-file apps, this is the content of index.html
     /// </summary>
     public string? HtmlContent { get; set; }
     
     /// <summary>
-    /// Multi-file structure for apps with separate HTML/CSS/JS files
-    /// </summary>
-    public AppFileStructure? Files { get; set; }
-    
-    /// <summary>
     /// Indicates whether this app uses multi-file structure
+    /// When true, the app files are stored in the file system directory structure
     /// </summary>
     public bool IsMultiFile { get; set; } = false;
     
@@ -49,37 +46,6 @@ public class AppDefinition
     public AppSettings Settings { get; set; } = new AppSettings();
     public GitHubSettings? GitHub { get; set; }
     public int Version { get; set; } = 1;
-}
-
-/// <summary>
-/// File structure for multi-file apps
-/// </summary>
-public class AppFileStructure
-{
-    /// <summary>
-    /// Entry point HTML file
-    /// </summary>
-    public string IndexHtml { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// Additional HTML files
-    /// </summary>
-    public Dictionary<string, string> HtmlFiles { get; set; } = new();
-    
-    /// <summary>
-    /// CSS files
-    /// </summary>
-    public Dictionary<string, string> CssFiles { get; set; } = new();
-    
-    /// <summary>
-    /// JavaScript files (supports ES modules)
-    /// </summary>
-    public Dictionary<string, string> JsFiles { get; set; } = new();
-    
-    /// <summary>
-    /// Other static assets (JSON, images as base64, etc.)
-    /// </summary>
-    public Dictionary<string, string> Assets { get; set; } = new();
 }
 
 /// <summary>
