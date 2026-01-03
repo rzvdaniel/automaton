@@ -43,17 +43,20 @@
 				</Select>
 			}
 
-			<Button Icon="plus"
-					Size="@ButtonSize.Small"
-					OnClick="CreateNewSessionAsync"
-					Disabled="@isGeneratingCode"
-					Title="New Session" />
+			<Tooltip Title="New Session">
+				<Button Icon="plus"
+						Size="@ButtonSize.Small"
+						OnClick="CreateNewSessionAsync"
+						Disabled="@isGeneratingCode" />
+			</Tooltip>
 
-			<Button Icon="history"
-					Size="@ButtonSize.Small"
-					OnClick="() => showSessionDrawer = true"
-					Disabled="@isGeneratingCode"
-					Title="View All Sessions" />
+			<Tooltip Title="View All Sessions">
+				<Button Icon="history"
+						Size="@ButtonSize.Small"
+						OnClick="() => showSessionDrawer = true"
+						Disabled="@isGeneratingCode"/>
+			</Tooltip>
+
 		</div>
 	</div>
 
@@ -142,15 +145,16 @@
 			<div class="right-controls">
 				@if (isGeneratingCode)
 				{
-					<Button Icon="stop"
-							Type="@ButtonType.Default"
-							Size="@ButtonSize.Small"
-							Shape="@ButtonShape.Circle"
-							OnClick="StopConversation"
-							Danger="true"
-							Title="Stop generation"
-							Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px;">
-					</Button>
+					<Tooltip Title="Stop generation">
+						<Button Icon="stop"
+								Type="@ButtonType.Default"
+								Size="@ButtonSize.Small"
+								Shape="@ButtonShape.Circle"
+								OnClick="StopConversation"
+								Danger="true"
+								Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px;">
+						</Button>
+					</Tooltip>
 				}
 				<Button Icon="@(isGeneratingCode ? "loading" : "caret-right")"
 						Type="@ButtonType.Primary"
