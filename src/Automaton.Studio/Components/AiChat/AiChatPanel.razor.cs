@@ -46,6 +46,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private List<CodeVersion> codeHistory = new();
     private string? _conversationId;
     private readonly ToolResultProcessorFactory _toolResultProcessorFactory = new();
+    private CancellationTokenSource? _conversationCancellationTokenSource;
 
     private List<AiProviderInfo>? availableProviders;
 
@@ -627,6 +628,10 @@ public partial class AiChatPanel : ComponentBase, IDisposable
             var result = await ExecuteConversation(conversationContext);
             await ProcessConversationResult(result, conversationContext.UserPrompt);
         }
+        catch (OperationCanceledException)
+        {
+            HandleConversationCancellation();
+        }
         catch (Exception ex)
         {
             HandleConversationError(ex);
@@ -642,7 +647,11 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     {
         isGeneratingCode = true;
         pendingCodes.Clear();
-
+        
+        // Create a new cancellation token source for this conversation
+        _conversationCancellationTokenSource?.Dispose();
+        _conversationCancellationTokenSource = new CancellationTokenSource();
+        
         var userMessage = new ChatMessage("User", System.Net.WebUtility.HtmlEncode(promptText), DateTime.Now);
         messages.Add(userMessage);
 
@@ -811,7 +820,7 @@ public partial class AiChatPanel : ComponentBase, IDisposable
     private async Task<ConversationResult> ExecuteConversation(ConversationContext context)
     {
         _conversationId = context.ConversationRequest.ConversationId;
-        var result = await McpClient.StartConversationAsync(context.ConversationRequest);
+        var result = await McpClient.StartConversationAsync(context.ConversationRequest, _conversationCancellationTokenSource?.Token ?? default);
         _conversationId = result.ConversationId;
 
         // Clean up generating message
@@ -916,6 +925,27 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         logger.LogError(ex, "Error during conversation execution");
     }
 
+    // SRP: Cancellation Handling
+    private void HandleConversationCancellation()
+    {
+        RemoveGeneratingMessage();
+        
+        // Remove any streaming messages
+        var streamingMessage = messages.LastOrDefault(m => m.IsStreaming);
+        if (streamingMessage != null)
+        {
+            messages.Remove(streamingMessage);
+        }
+        
+        var cancelMessage = new ChatMessage("System", "Conversation stopped by user.", DateTime.Now)
+        {
+            Type = MessageType.System
+        };
+        
+        messages.Add(cancelMessage);
+        logger.LogInformation("Conversation cancelled by user");
+    }
+
     // SRP: Cleanup
     private async Task EndConversation()
     {
@@ -930,6 +960,34 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
     }
+
+    /// <summary>
+    /// Stop the current conversation by canceling the ongoing operation
+    /// </summary>
+    private async Task StopConversation()
+    {
+        if (!isGeneratingCode || _conversationCancellationTokenSource == null)
+            return;
+
+        logger.LogInformation("User requested to stop conversation");
+        
+        try
+        {
+            // Cancel the ongoing operation
+            _conversationCancellationTokenSource.Cancel();
+            
+            // End the conversation on the server
+            if (!string.IsNullOrEmpty(_conversationId))
+            {
+                await McpClient.EndConversationAsync(_conversationId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error stopping conversation");
+        }
+    }
+    
 
     private async Task SaveConversationMessagesToHistoryAsync()
     {
@@ -1442,6 +1500,8 @@ public partial class AiChatPanel : ComponentBase, IDisposable
         {
             _ = Task.Run(() => McpClient.EndConversationAsync(_conversationId));
         }
+
+        _conversationCancellationTokenSource?.Dispose();
 
         try
         {

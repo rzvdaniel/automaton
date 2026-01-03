@@ -140,6 +140,18 @@
 			</div>
 
 			<div class="right-controls">
+				@if (isGeneratingCode)
+				{
+					<Button Icon="stop"
+							Type="@ButtonType.Default"
+							Size="@ButtonSize.Small"
+							Shape="@ButtonShape.Circle"
+							OnClick="StopConversation"
+							Danger="true"
+							Title="Stop generation"
+							Style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px;">
+					</Button>
+				}
 				<Button Icon="@(isGeneratingCode ? "loading" : "caret-right")"
 						Type="@ButtonType.Primary"
 						Size="@ButtonSize.Small"
