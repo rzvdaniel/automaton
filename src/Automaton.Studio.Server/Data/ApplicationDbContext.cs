@@ -43,6 +43,9 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
         public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
         
+        // GitHub integration
+        public virtual DbSet<UserGitHubToken> UserGitHubTokens { get; set; }
+        
         // Project/Organization entities
         public virtual DbSet<Project> Projects { get; set; }
         public virtual DbSet<ProjectMember> ProjectMembers { get; set; }
