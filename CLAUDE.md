@@ -282,6 +282,19 @@ dotnet publish -c Release --self-contained true -r osx-x64
   - Tool execution for testing generated code
   - Support for OpenAI, Anthropic, Google, and Azure AI providers
 
+**MCP Tool Providers (January 2026 Updates):**
+- **StepMcpToolProvider**: Custom step designer with code execution testing
+- **AppMcpToolProvider**: Full-stack app generation (frontend + backend)
+  - Auto-linking: Backend steps automatically linked to apps on creation
+  - Testing capability: `execute_backend_step_code` tool validates steps before deployment
+  - Shared execution service ensures consistency with Runner execution
+- **Recent Improvements**:
+  - Steps created via `create_backend_step` are automatically linked (atomic operation)
+  - AI must test backend steps with `execute_backend_step_code` before finalizing apps
+  - Detailed error reporting with line numbers, stack traces, and recommendations
+  - System prompts enforce test-fix-retest workflow for quality assurance
+- See `docs/mcp/BACKEND_STEP_TESTING.md` for testing workflow documentation
+
 ## Important Implementation Patterns
 
 ### Service Registration
