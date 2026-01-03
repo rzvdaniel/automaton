@@ -706,43 +706,64 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 step.Id.ToString(),
                 outputVariableNames);
 
-            // Build detailed result
-            var result = new
+            // For successful tests: return abbreviated result to save tokens
+            // For failed tests: return full detailed error information
+            if (executionResult.Success)
             {
-                success = executionResult.Success,
-                output = executionResult.Output ?? "",
-                errors = executionResult.Errors ?? Array.Empty<string>(),
-                errorInfo = executionResult.ErrorInfo != null ? new
+                // Abbreviated success result - just confirmation and key outputs
+                var successResult = new
                 {
-                    errorType = executionResult.ErrorInfo.ErrorType,
-                    message = executionResult.ErrorInfo.Message,
-                    lineNumber = executionResult.ErrorInfo.LineNumber,
-                    columnNumber = executionResult.ErrorInfo.ColumnNumber,
-                    stackTrace = executionResult.ErrorInfo.StackTrace,
-                    formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
-                } : null,
-                outputVariables = executionResult.OutputVariables ?? new Dictionary<string, string>(),
-                executionTime = executionResult.ExecutionTime ?? "0ms",
-                inputVariablesUsed = inputVariables,
-                definedOutputVariables = outputVariableNames,
-                stepInfo = new
-                {
-                    name = step.DisplayName,
-                    language = language,
-                    inputsExpected = step.Definition.CodeInputVariables?.Count ?? 0,
-                    outputsExpected = step.Definition.CodeOutputVariables?.Count ?? 0
-                },
-                recommendations = GetCodeRecommendations(executionResult, code)
-            };
+                    success = true,
+                    message = "✓ Test passed",
+                    executionTime = executionResult.ExecutionTime ?? "0ms",
+                    outputVariables = executionResult.OutputVariables ?? new Dictionary<string, string>()
+                };
 
-            return new McpToolResult
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = JsonSerializer.Serialize(successResult, new JsonSerializerOptions { WriteIndented = true })
+                };
+            }
+            else
             {
-                Success = executionResult.Success,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }),
-                Error = executionResult.Success ? null :
-                    (executionResult.ErrorInfo?.GetFormattedErrorForAI() ??
-                     string.Join("\n", executionResult.Errors ?? Array.Empty<string>()))
-            };
+                // Detailed error result for failures - include all diagnostic info
+                var errorResult = new
+                {
+                    success = false,
+                    output = executionResult.Output ?? "",
+                    errors = executionResult.Errors ?? Array.Empty<string>(),
+                    errorInfo = executionResult.ErrorInfo != null ? new
+                    {
+                        errorType = executionResult.ErrorInfo.ErrorType,
+                        message = executionResult.ErrorInfo.Message,
+                        lineNumber = executionResult.ErrorInfo.LineNumber,
+                        columnNumber = executionResult.ErrorInfo.ColumnNumber,
+                        stackTrace = executionResult.ErrorInfo.StackTrace,
+                        formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
+                    } : null,
+                    outputVariables = executionResult.OutputVariables ?? new Dictionary<string, string>(),
+                    executionTime = executionResult.ExecutionTime ?? "0ms",
+                    inputVariablesUsed = inputVariables,
+                    definedOutputVariables = outputVariableNames,
+                    stepInfo = new
+                    {
+                        name = step.DisplayName,
+                        language = language,
+                        inputsExpected = step.Definition.CodeInputVariables?.Count ?? 0,
+                        outputsExpected = step.Definition.CodeOutputVariables?.Count ?? 0
+                    },
+                    recommendations = GetCodeRecommendations(executionResult, code)
+                };
+
+                return new McpToolResult
+                {
+                    Success = false,
+                    Content = JsonSerializer.Serialize(errorResult, new JsonSerializerOptions { WriteIndented = true }),
+                    Error = executionResult.ErrorInfo?.GetFormattedErrorForAI() ??
+                            string.Join("\n", executionResult.Errors ?? Array.Empty<string>())
+                };
+            }
         }
         catch (Exception ex)
         {
