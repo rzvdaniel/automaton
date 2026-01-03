@@ -2,7 +2,50 @@
 
 ## Overview
 
-Automaton now supports GitHub integration for web apps, allowing you to version control, backup, and sync your apps with GitHub repositories. This feature supports both single-file and multi-file app structures.
+Automaton now supports two storage modes for web apps:
+
+1. **File System Storage (Default & Recommended):** Apps are stored in local folders on the server (`/AppData/apps/{userId}/{appId}/`), providing automatic history tracking and full ownership without requiring any external services.
+
+2. **GitHub Integration (Optional):** Sync your file-based apps to your personal GitHub repositories for backup, collaboration, and remote access.
+
+This architecture gives you **full ownership and history** by default, with GitHub as an optional enhancement for backup and collaboration.
+
+## Storage Architecture
+
+### File System Storage (Default)
+
+- **Location:** `/AppData/apps/{userId}/{appId}/`
+- **Benefits:**
+  - Full history tracking through file system
+  - Complete ownership of your app data
+  - No external dependencies required
+  - Fast local access
+  - Automatic backups
+- **Structure:**
+  ```
+  AppData/apps/
+  ├── {userId}/
+  │   ├── {appId}/
+  │   │   ├── index.html
+  │   │   ├── css/
+  │   │   ├── js/
+  │   │   ├── assets/
+  │   │   └── _metadata.json
+  ```
+
+### Database Storage
+
+- **What's Stored:** Only metadata (name, description, publish status, appearance settings)
+- **What's NOT Stored:** App content (HTML/CSS/JS) - this is now in the file system
+
+### GitHub Integration (Optional)
+
+- **Purpose:** Sync file-based apps to your personal GitHub repository
+- **Use Cases:**
+  - Remote backup
+  - Collaboration with team members
+  - Version control across multiple servers
+  - Public sharing via GitHub Pages
 
 ## Features
 
@@ -43,6 +86,19 @@ The GitHub integration supports both single-file and multi-file app structures:
   ```
 
 ## Getting Started
+
+### Default Workflow (No GitHub Required)
+
+1. Create an app in the App Designer
+2. Your app is automatically saved to the file system
+3. Edit and preview your app
+4. Publish when ready
+
+That's it! You have full ownership and history tracking without any external services.
+
+### Optional: Enable GitHub Sync
+
+If you want to sync your app to GitHub for backup or collaboration:
 
 ### 1. Configure GitHub Token
 

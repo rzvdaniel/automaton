@@ -70,3 +70,5 @@ appsettings*.json
 
 # Ignore files created by Claude AI
 .claude
+# App file storage
+AppData/

@@ -227,6 +227,9 @@ services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 
+// App file storage service
+services.AddSingleton<AppFileStorageService>();
+
 // GitHub integration services
 services.AddScoped<GitHubTokenService>();
 services.AddScoped<GitHubService>();

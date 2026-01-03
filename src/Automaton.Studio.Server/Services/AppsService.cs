@@ -13,6 +13,7 @@ public class AppsService
     private readonly RecentActivityService recentActivityService;
     private readonly UserContextService userContextService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly AppFileStorageService fileStorageService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -22,13 +23,15 @@ public class AppsService
         ApplicationDbContext dataContext,
         UserContextService userContextService,
         RecentActivityService recentActivityService,
-        ResourceAuthorizationService authorizationService
+        ResourceAuthorizationService authorizationService,
+        AppFileStorageService fileStorageService
     )
     {
         this.dataContext = dataContext;
         this.userContextService = userContextService;
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
+        this.fileStorageService = fileStorageService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -36,7 +39,7 @@ public class AppsService
     {
         // Use authorization service to get apps filtered by project context
         var entities = authorizationService.GetAppsQueryByContext(projectId);
-        var apps = entities.Select(MapToModel);
+        var apps = entities.Select(e => MapToModel(e, null));
 
         return apps;
     }
@@ -46,7 +49,27 @@ public class AppsService
         // Use authorization service query to check access (personal + project-based)
         var appEntity = authorizationService.GetAccessibleAppsQuery()
             .SingleOrDefault(x => x.Id == id);
-        var app = MapToModel(appEntity);
+        
+        if (appEntity == null)
+        {
+            return null;
+        }
+
+        // Load app definition from file system
+        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var definition = fileStorageService.LoadAppAsync(ownerId, id).Result;
+        
+        // If not in file system, fall back to database (for migration)
+        if (definition == null && !string.IsNullOrEmpty(appEntity.Definition))
+        {
+            definition = JsonSerializer.Deserialize<Models.AppDefinition>(appEntity.Definition) ?? new Models.AppDefinition();
+            
+            // Migrate to file system
+            fileStorageService.SaveAppAsync(ownerId, id, definition).Wait();
+            logger.Information("Migrated app {AppId} from database to file system", id);
+        }
+
+        var app = MapToModel(appEntity, definition);
 
         return app;
     }
@@ -65,7 +88,26 @@ public class AppsService
                 x.IsPublished &&
                 x.WebAppUsers.Any(u => u.UserId == UserId));
 
-        return MapToModel(appEntity);
+        if (appEntity == null)
+        {
+            return null;
+        }
+
+        // Load app definition from file system
+        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var definition = fileStorageService.LoadAppAsync(ownerId, appEntity.Id).Result;
+        
+        // If not in file system, fall back to database (for migration)
+        if (definition == null && !string.IsNullOrEmpty(appEntity.Definition))
+        {
+            definition = JsonSerializer.Deserialize<Models.AppDefinition>(appEntity.Definition) ?? new Models.AppDefinition();
+            
+            // Migrate to file system
+            fileStorageService.SaveAppAsync(ownerId, appEntity.Id, definition).Wait();
+            logger.Information("Migrated app {AppId} from database to file system", appEntity.Id);
+        }
+
+        return MapToModel(appEntity, definition);
     }
 
     /// <summary>
@@ -155,7 +197,7 @@ public class AppsService
             Version = 1,
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            Definition = JsonSerializer.Serialize(new Models.AppDefinition()),
+            Definition = "{}", // Empty - content is now in file system
             ExecutionRunnerId = app.ExecutionRunnerId
         };
 
@@ -170,10 +212,50 @@ public class AppsService
         dataContext.WebAppUsers.Add(appUser);
         dataContext.SaveChanges();
 
+        // Create default app definition in file system
+        var defaultDefinition = new Models.AppDefinition
+        {
+            HtmlContent = GetDefaultHtmlContent(),
+            IsMultiFile = false,
+            Version = 1
+        };
+        await fileStorageService.SaveAppAsync(UserId, entity.Id, defaultDefinition);
+
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
 
+        logger.Information("Created app {AppId} with file system storage for user {UserId}", entity.Id, UserId);
+
         return entity.Id;
+    }
+
+    private string GetDefaultHtmlContent()
+    {
+        return @"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>My App</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 600px; width: 100%; }
+        h1 { color: #333; margin-top: 0; }
+        p { color: #666; line-height: 1.6; }
+        .button { background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; }
+        .button:hover { background: #5568d3; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h1>Welcome to Your App!</h1>
+        <p>This is your app's starting template. Your app is now stored in the file system with full history tracking.</p>
+        <p>Enable GitHub integration in Settings to sync with your personal repository for backup and collaboration.</p>
+        <button class=""button"" onclick=""alert('Hello!')"">Click Me</button>
+    </div>
+    <script>console.log('App loaded!');</script>
+</body>
+</html>";
     }
 
     public async Task Update(Guid id, Models.AppModel app)
@@ -191,21 +273,30 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
+        // Get owner ID for file storage
+        var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+
         entity.Name = app.Name;
         entity.DisplayName = app.DisplayName;
         entity.Description = app.Description;
         entity.IsPublished = app.IsPublished;
         entity.PublicUrl = app.PublicUrl;
         entity.Updated = DateTime.UtcNow;
-        entity.Definition = JsonSerializer.Serialize(app.Definition);
+        // Definition is now empty - content in file system
+        entity.Definition = "{}";
         
         // Persist appearance configuration as JSON
         entity.Appearance = JsonSerializer.Serialize(app.Appearance);
 
         dataContext.SaveChanges();
 
+        // Save app content to file system
+        await fileStorageService.SaveAppAsync(ownerId, id, app.Definition);
+
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUpdated, app.Name, id);
+        
+        logger.Information("Updated app {AppId} in file system for user {UserId}", id, ownerId);
     }
 
     public async Task Remove(Guid id)
@@ -233,12 +324,19 @@ public class AppsService
         }
 
         var appName = app.Name;
+        var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
 
+        // Delete from file system
+        await fileStorageService.DeleteAppAsync(ownerId, id);
+
+        // Delete from database
         dataContext.WebApps.Remove(app);
         dataContext.SaveChanges();
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
+        
+        logger.Information("Deleted app {AppId} from file system and database for user {UserId}", id, ownerId);
     }
 
     public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
@@ -362,7 +460,7 @@ public class AppsService
         return !string.IsNullOrEmpty(slug) && Regex.IsMatch(slug, @"^[a-z0-9\-]+$");
     }
 
-    private static Models.AppModel MapToModel(Entities.WebApp entity)
+    private static Models.AppModel MapToModel(Entities.WebApp entity, Models.AppDefinition? definition = null)
     {
         if (entity == null) return null;
 
@@ -385,7 +483,7 @@ public class AppsService
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
             Appearance = appearance,
-            Definition = JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
+            Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
         };
     }
 }
