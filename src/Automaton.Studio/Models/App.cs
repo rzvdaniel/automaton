@@ -31,16 +31,10 @@ public class AppModel
 public class AppDefinition
 {
     /// <summary>
-    /// Single-file HTML content (for single-file apps or backward compatibility)
-    /// For multi-file apps, this is the content of index.html
+    /// HTML content for index.html
+    /// This is loaded from the file system for editing in the UI
     /// </summary>
     public string? HtmlContent { get; set; }
-    
-    /// <summary>
-    /// Indicates whether this app uses multi-file structure
-    /// When true, the app files are stored in the file system directory structure
-    /// </summary>
-    public bool IsMultiFile { get; set; } = false;
     
     public IList<string>? ConnectedFlowIds { get; set; } = new List<string>();
     public AppSettings Settings { get; set; } = new AppSettings();

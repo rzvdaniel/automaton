@@ -47,22 +47,14 @@ public class AppFileStorageService
             var appPath = GetAppPath(userId, appId);
             Directory.CreateDirectory(appPath);
 
-            if (definition.IsMultiFile)
-            {
-                // Save multi-file structure
-                await SaveMultiFileAppAsync(appPath, definition);
-            }
-            else
-            {
-                // Save single-file app
-                await SaveSingleFileAppAsync(appPath, definition);
-            }
+            // Save index.html
+            var indexPath = Path.Combine(appPath, "index.html");
+            await File.WriteAllTextAsync(indexPath, definition.HtmlContent ?? "");
 
             // Save metadata file
             var metadataPath = Path.Combine(appPath, "_metadata.json");
             var metadata = new
             {
-                isMultiFile = definition.IsMultiFile,
                 version = definition.Version,
                 settings = definition.Settings,
                 github = definition.GitHub,
@@ -106,7 +98,6 @@ public class AppFileStorageService
                 
                 definition = new AppDefinition
                 {
-                    IsMultiFile = metadata?.IsMultiFile ?? false,
                     Version = metadata?.Version ?? 1,
                     Settings = metadata?.Settings ?? new AppSettings(),
                     GitHub = metadata?.GitHub,
@@ -118,14 +109,11 @@ public class AppFileStorageService
                 definition = new AppDefinition();
             }
 
-            // Load content
-            if (definition.IsMultiFile)
+            // Load index.html content
+            var indexPath = Path.Combine(appPath, "index.html");
+            if (File.Exists(indexPath))
             {
-                await LoadMultiFileAppAsync(appPath, definition);
-            }
-            else
-            {
-                await LoadSingleFileAppAsync(appPath, definition);
+                definition.HtmlContent = await File.ReadAllTextAsync(indexPath);
             }
 
             logger.Information("Loaded app {AppId} for user {UserId} from file system", appId, userId);
@@ -169,47 +157,6 @@ public class AppFileStorageService
     {
         var appPath = GetAppPath(userId, appId);
         return Directory.Exists(appPath);
-    }
-
-    private async Task SaveSingleFileAppAsync(string appPath, AppDefinition definition)
-    {
-        var indexPath = Path.Combine(appPath, "index.html");
-        await File.WriteAllTextAsync(indexPath, definition.HtmlContent ?? "");
-    }
-
-    private async Task LoadSingleFileAppAsync(string appPath, AppDefinition definition)
-    {
-        var indexPath = Path.Combine(appPath, "index.html");
-        if (File.Exists(indexPath))
-        {
-            definition.HtmlContent = await File.ReadAllTextAsync(indexPath);
-        }
-    }
-
-    private async Task SaveMultiFileAppAsync(string appPath, AppDefinition definition)
-    {
-        // For multi-file apps, HtmlContent represents index.html
-        var indexPath = Path.Combine(appPath, "index.html");
-        await File.WriteAllTextAsync(indexPath, definition.HtmlContent ?? "");
-        
-        // Note: Other files in multi-file apps are managed directly on the file system
-        // The AI or user can create any structure they want in the app directory
-        // This method only ensures index.html exists
-    }
-
-    private async Task LoadMultiFileAppAsync(string appPath, AppDefinition definition)
-    {
-        // For multi-file apps, only load index.html into HtmlContent
-        // All other files remain on disk and are served/accessed as needed
-        var indexPath = Path.Combine(appPath, "index.html");
-        if (File.Exists(indexPath))
-        {
-            definition.HtmlContent = await File.ReadAllTextAsync(indexPath);
-        }
-        
-        // The file system structure is flexible - any files/folders can exist
-        // They will be discovered and served as needed without being loaded into memory
-        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -316,7 +263,6 @@ public class AppFileStorageService
 
     private class AppMetadata
     {
-        public bool IsMultiFile { get; set; }
         public int Version { get; set; }
         public AppSettings? Settings { get; set; }
         public GitHubSettings? GitHub { get; set; }

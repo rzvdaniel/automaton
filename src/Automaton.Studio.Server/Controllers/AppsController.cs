@@ -548,7 +548,6 @@ public class AppsController : BaseController
 
             // Merge pulled definition into current app
             app.Definition.HtmlContent = pulledDefinition.HtmlContent;
-            app.Definition.IsMultiFile = pulledDefinition.IsMultiFile;
             app.Definition.GitHub = pulledDefinition.GitHub;
 
             await appsService.Update(id, app);
@@ -556,8 +555,7 @@ public class AppsController : BaseController
             return Ok(new
             {
                 success = true,
-                message = "App pulled from GitHub successfully",
-                isMultiFile = app.Definition.IsMultiFile
+                message = "App pulled from GitHub successfully"
             });
         }
         catch (Exception ex)

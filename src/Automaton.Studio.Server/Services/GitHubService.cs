@@ -152,10 +152,6 @@ public class GitHubService
                 GitHub = githubSettings
             };
 
-            // Check if it's a multi-file app (more than just index.html)
-            var fileCount = contents.Count(c => c.Type == ContentType.File && c.Name != "README.md");
-            definition.IsMultiFile = fileCount > 1;
-
             // Download all files and write them to the file system
             foreach (var item in contents)
             {
@@ -167,7 +163,7 @@ public class GitHubService
                 // Write file to app directory
                 await fileStorageService.WriteAppFileAsync(ownerId, appId, relativePath, content);
 
-                // Also store index.html content in HtmlContent for compatibility
+                // Store index.html content in HtmlContent for editing in UI
                 if (item.Name == "index.html")
                 {
                     definition.HtmlContent = content;
@@ -317,14 +313,10 @@ public class GitHubService
         sb.AppendLine($"- **Last Updated**: {app.Updated:yyyy-MM-dd}");
         sb.AppendLine($"- **Version**: {app.Version}");
         
-        if (app.Definition.IsMultiFile)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## File Structure");
-            sb.AppendLine("This is a multi-file web app.");
-            sb.AppendLine("The file structure is flexible and determined by the app's requirements.");
-            sb.AppendLine("All files and folders are managed directly in the file system.");
-        }
+        sb.AppendLine();
+        sb.AppendLine("## File Structure");
+        sb.AppendLine("The file structure is flexible and determined by the app's requirements.");
+        sb.AppendLine("All files and folders are managed directly in the file system.");
 
         sb.AppendLine();
         sb.AppendLine("---");

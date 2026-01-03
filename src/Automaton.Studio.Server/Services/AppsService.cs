@@ -216,7 +216,6 @@ public class AppsService
         var defaultDefinition = new Models.AppDefinition
         {
             HtmlContent = GetDefaultHtmlContent(),
-            IsMultiFile = false,
             Version = 1
         };
         await fileStorageService.SaveAppAsync(UserId, entity.Id, defaultDefinition);
