@@ -56,8 +56,7 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IframeMessageHandler PreviewMessageHandler { get; set; }
     [Inject] private Services.ConfigurationService ConfigurationService { get; set; }
     [Inject] private IAuthenticationStorage AuthenticationStorage { get; set; }
-    [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
-    [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
+    [Inject] private IAppSystemPromptBuilder AppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
     [Inject] private IAppMcpClient AppMcpClient { get; set; }
 
@@ -494,11 +493,11 @@ partial class AppPage : ComponentBase, IAsyncDisposable
         }
     }
 
-    private UnifiedAppAiChatContext CreateAiChatContext()
+    private AppAiChatContext CreateAiChatContext()
     {
         // Use unified context that supports both frontend and backend generation
-        return new UnifiedAppAiChatContext(
-            UnifiedAppSystemPromptBuilder, 
+        return new AppAiChatContext(
+            AppSystemPromptBuilder, 
             AppId, 
             GetCurrentCodeForAI,
             GetLinkedStepsForAI
