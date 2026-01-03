@@ -6,6 +6,7 @@ using Automaton.Mcp.Models;
 using Automaton.Studio.Services.Mcp.EditorBridges;
 using Automaton.Studio.Services.Mcp.Helpers;
 using Automaton.Studio.Domain;
+using Automaton.Studio.Models;
 using Automaton.Core.Models;
 
 namespace Automaton.Studio.Services.Mcp.ToolProviders;
@@ -31,6 +32,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
     private readonly CustomStepsService _customStepsService;
     private readonly AppStepsService _appStepsService;
     private readonly AiCodeCleanupService _codeCleanupService;
+    private readonly ICustomStepExecuteService _customStepExecuteService;
 
     // Track created steps in this session (thread-safe)
     private readonly ConcurrentDictionary<string, CustomStepContext> _createdSteps = new();
@@ -58,13 +60,15 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
         IStepEditorBridge stepEditorBridge,
         CustomStepsService customStepsService,
         AppStepsService appStepsService,
-        AiCodeCleanupService codeCleanupService)
+        AiCodeCleanupService codeCleanupService,
+        ICustomStepExecuteService customStepExecuteService)
     {
         _logger = logger;
         _appEditorBridge = appEditorBridge;
         _customStepsService = customStepsService;
         _appStepsService = appStepsService;
         _codeCleanupService = codeCleanupService;
+        _customStepExecuteService = customStepExecuteService;
     }
 
     /// <summary>
@@ -123,7 +127,7 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             new McpTool
             {
                 Name = "create_backend_step",
-                Description = "Create a new Custom Step for backend logic. The step will execute on a Runner.",
+                Description = "Create a new Custom Step for backend logic and automatically link it to the current app. The step will execute on a Runner. No need to call link_step_to_app after creation.",
                 InputSchema = JsonDocument.Parse($$"""
                 {
                     "type": "object",
@@ -228,15 +232,37 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = "link_step_to_app",
-                Description = "Link a backend step to the current app",
+                Name = "execute_backend_step_code",
+                Description = "Execute and test a backend step's code with input variables. CRITICAL: Always use this to test the step after creating it and before finalizing the app. This verifies the step works correctly and catches errors early.",
                 InputSchema = JsonDocument.Parse("""
                 {
                     "type": "object",
                     "properties": {
                         "step_name": {
                             "type": "string",
-                            "description": "Name of the step to link"
+                            "description": "Name of the step to execute"
+                        },
+                        "input_variables": {
+                            "type": "object",
+                            "description": "Test input variables as key-value pairs (optional)",
+                            "additionalProperties": true
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "link_step_to_app",
+                Description = "Link an EXISTING step (created outside this app context) to the current app. Note: Steps created with create_backend_step are already automatically linked - this is only for reusing existing steps across multiple apps.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the existing step to link"
                         }
                     },
                     "required": ["step_name"]
@@ -270,15 +296,16 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 // Frontend tools
                 "get_current_code" => await HandleGetCurrentCode(arguments),
                 SaveAppCodeToolName => await HandleSaveAppCode(arguments),
-                
+
                 // Backend tools
                 "create_backend_step" => await HandleCreateBackendStep(arguments),
                 "get_step_code" => await HandleGetStepCode(arguments),
                 SaveStepCodeToolName => await HandleSaveStepCode(arguments),
                 "suggest_step_variables" => await HandleSuggestStepVariables(arguments),
+                "execute_backend_step_code" => await HandleExecuteBackendStepCode(arguments),
                 "link_step_to_app" => await HandleLinkStepToApp(arguments),
                 "get_linked_steps" => await HandleGetLinkedSteps(),
-                
+
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }
@@ -399,19 +426,22 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
             return new McpToolResult { Success = false, Error = "Step name is required" };
         }
 
+        if (!_currentAppId.HasValue)
+        {
+            return new McpToolResult { Success = false, Error = "No app context available" };
+        }
+
         try
         {
-            // Create the step
-            var newStep = new Models.NewCustomStep { Name = name };
-            var createdStep = await _customStepsService.Create(newStep);
+            // Use AppStepsService to create AND link in one atomic operation
+            var linkedStep = await _appStepsService.CreateStepForAppAsync(_currentAppId.Value, name);
 
-            // Update with additional properties
-            createdStep.DisplayName = name;
-            createdStep.Description = description;
+            // Load the full step to update language and description
+            var createdStep = await _customStepsService.Load(linkedStep.Id);
             createdStep.Definition.Language = language;
+            createdStep.Description = description;
             createdStep.VisibleInExplorer = true;
             createdStep.Category = "My Steps";
-
             await _customStepsService.Update(createdStep);
 
             // Track the created step
@@ -422,24 +452,21 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
                 Language = language
             };
 
-            _logger.LogInformation("Created backend step: {StepName} ({Language}, ID: {StepId})", 
+            _logger.LogInformation("Created and auto-linked backend step: {StepName} ({Language}, ID: {StepId})",
                 name, language, createdStep.Id);
 
-            // Notify subscribers that a step was created
-            if (_currentAppId.HasValue)
+            // Notify subscribers that a step was created and linked
+            BackendStepsChanged?.Invoke(this, new BackendStepsChangedEventArgs
             {
-                BackendStepsChanged?.Invoke(this, new BackendStepsChangedEventArgs
-                {
-                    AppId = _currentAppId.Value,
-                    StepName = name,
-                    ChangeType = "created"
-                });
-            }
+                AppId = _currentAppId.Value,
+                StepName = name,
+                ChangeType = "created_and_linked"
+            });
 
             return new McpToolResult
             {
                 Success = true,
-                Content = $"Created backend step '{name}' (ID: {createdStep.Id})"
+                Content = $"Created backend step '{name}' and automatically linked to app (ID: {createdStep.Id})"
             };
         }
         catch (Exception ex)
@@ -612,6 +639,160 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
         }
     }
 
+    private async Task<McpToolResult> HandleExecuteBackendStepCode(JsonElement arguments)
+    {
+        var stepName = GetStringArgument(arguments, "step_name");
+
+        if (string.IsNullOrEmpty(stepName))
+        {
+            return new McpToolResult { Success = false, Error = "Step name is required" };
+        }
+
+        var step = await ResolveStepAsync(stepName);
+        if (step == null)
+        {
+            return new McpToolResult { Success = false, Error = $"Step '{stepName}' not found" };
+        }
+
+        try
+        {
+            var code = step.Definition?.Code ?? "";
+            var language = step.Definition?.Language ?? "python";
+
+            if (string.IsNullOrEmpty(code))
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = "Step has no code to execute. Save code first using save_step_code."
+                };
+            }
+
+            // Prepare input variables
+            var inputVariables = new Dictionary<string, string>();
+            if (arguments.TryGetProperty("input_variables", out var inputVarsProp))
+            {
+                foreach (var prop in inputVarsProp.EnumerateObject())
+                {
+                    inputVariables[prop.Name] = prop.Value.ToString() ?? "";
+                }
+            }
+
+            // If no input variables provided, use step's defined input variables with empty values
+            if (!inputVariables.Any() && step.Definition.CodeInputVariables?.Any() == true)
+            {
+                foreach (var inputVar in step.Definition.CodeInputVariables)
+                {
+                    if (!inputVariables.ContainsKey(inputVar.Name))
+                    {
+                        inputVariables[inputVar.Name] = ""; // Empty test value
+                    }
+                }
+            }
+
+            // Get output variable names for filtering
+            var outputVariableNames = step.Definition.CodeOutputVariables?
+                .Select(v => v.Name)
+                .ToList() ?? new List<string>();
+
+            _logger.LogInformation("Executing backend step: {StepName} ({Language}) with {InputCount} inputs",
+                stepName, language, inputVariables.Count);
+
+            // Execute using the same service as StepMcpToolProvider
+            var executionResult = await _customStepExecuteService.ExecuteCustomStepCodeAsync(
+                code,
+                language,
+                inputVariables,
+                step.Id.ToString(),
+                outputVariableNames);
+
+            // Build detailed result
+            var result = new
+            {
+                success = executionResult.Success,
+                output = executionResult.Output ?? "",
+                errors = executionResult.Errors ?? Array.Empty<string>(),
+                errorInfo = executionResult.ErrorInfo != null ? new
+                {
+                    errorType = executionResult.ErrorInfo.ErrorType,
+                    message = executionResult.ErrorInfo.Message,
+                    lineNumber = executionResult.ErrorInfo.LineNumber,
+                    columnNumber = executionResult.ErrorInfo.ColumnNumber,
+                    stackTrace = executionResult.ErrorInfo.StackTrace,
+                    formattedError = executionResult.ErrorInfo.GetFormattedErrorForAI()
+                } : null,
+                outputVariables = executionResult.OutputVariables ?? new Dictionary<string, string>(),
+                executionTime = executionResult.ExecutionTime ?? "0ms",
+                inputVariablesUsed = inputVariables,
+                definedOutputVariables = outputVariableNames,
+                stepInfo = new
+                {
+                    name = step.DisplayName,
+                    language = language,
+                    inputsExpected = step.Definition.CodeInputVariables?.Count ?? 0,
+                    outputsExpected = step.Definition.CodeOutputVariables?.Count ?? 0
+                },
+                recommendations = GetCodeRecommendations(executionResult, code)
+            };
+
+            return new McpToolResult
+            {
+                Success = executionResult.Success,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }),
+                Error = executionResult.Success ? null :
+                    (executionResult.ErrorInfo?.GetFormattedErrorForAI() ??
+                     string.Join("\n", executionResult.Errors ?? Array.Empty<string>()))
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing backend step: {StepName}", stepName);
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Execution failed: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Provide code improvement recommendations based on execution results
+    /// </summary>
+    private object GetCodeRecommendations(CodeExecutionResult executionResult, string? code)
+    {
+        var recommendations = new List<string>();
+
+        if (!executionResult.Success)
+        {
+            recommendations.Add("Add proper error handling with try/catch blocks");
+            recommendations.Add("Initialize output variables with default values");
+        }
+
+        if (code != null)
+        {
+            if (!code.Contains("INFO:") && !code.Contains("WARN:") && !code.Contains("ERROR:"))
+            {
+                recommendations.Add("Add standardized logging with INFO:, WARN:, ERROR: prefixes");
+            }
+
+            if (!code.Contains("try") && !code.Contains("except") && !code.Contains("catch"))
+            {
+                recommendations.Add("Add exception handling to make code more robust");
+            }
+        }
+
+        if (executionResult.OutputVariables?.Any() != true)
+        {
+            recommendations.Add("Ensure all expected output variables are assigned at global scope");
+        }
+
+        return new
+        {
+            items = recommendations,
+            followsStudioPatterns = recommendations.Count == 0
+        };
+    }
+
     private async Task<McpToolResult> HandleLinkStepToApp(JsonElement arguments)
     {
         var stepName = GetStringArgument(arguments, "step_name");
@@ -619,6 +800,16 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
         if (!_currentAppId.HasValue)
         {
             return new McpToolResult { Success = false, Error = "No app context available" };
+        }
+
+        // Check if this step was created in this session (already auto-linked)
+        if (_createdSteps.ContainsKey(stepName))
+        {
+            return new McpToolResult
+            {
+                Success = true,
+                Content = $"Step '{stepName}' was created in this session and is already linked to the app. No action needed."
+            };
         }
 
         var step = await ResolveStepAsync(stepName);
@@ -630,21 +821,21 @@ public class UnifiedAppMcpToolProvider : IMcpToolProvider
         try
         {
             await _appStepsService.LinkStepAsync(_currentAppId.Value, step.Id);
-            
-            _logger.LogInformation("Linked step '{StepName}' to app '{AppId}'", stepName, _currentAppId.Value);
-            
+
+            _logger.LogInformation("Linked existing step '{StepName}' to app '{AppId}'", stepName, _currentAppId.Value);
+
             // Notify subscribers that a step was linked
             BackendStepsChanged?.Invoke(this, new BackendStepsChangedEventArgs
             {
                 AppId = _currentAppId.Value,
                 StepName = stepName,
-                ChangeType = "linked"
+                ChangeType = "linked_existing"
             });
-            
+
             return new McpToolResult
             {
                 Success = true,
-                Content = $"Step '{stepName}' linked to app"
+                Content = $"Existing step '{stepName}' linked to app"
             };
         }
         catch (Exception ex)
