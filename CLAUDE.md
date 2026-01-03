@@ -284,7 +284,7 @@ dotnet publish -c Release --self-contained true -r osx-x64
 
 **MCP Tool Providers (January 2026 Updates):**
 - **StepMcpToolProvider**: Custom step designer with code execution testing
-- **UnifiedAppMcpToolProvider**: Full-stack app generation (frontend + backend)
+- **AppMcpToolProvider**: Full-stack app generation (frontend + backend)
   - Auto-linking: Backend steps automatically linked to apps on creation
   - Testing capability: `execute_backend_step_code` tool validates steps before deployment
   - Shared execution service ensures consistency with Runner execution

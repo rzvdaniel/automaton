@@ -17,7 +17,7 @@ public static class CodeSavingTools
             return false;
 
         return toolName.Equals(StepMcpToolProvider.SaveCodeToolName, StringComparison.OrdinalIgnoreCase) ||
-               toolName.Equals(UnifiedAppMcpToolProvider.SaveAppCodeToolName, StringComparison.OrdinalIgnoreCase) ||
-               toolName.Equals(UnifiedAppMcpToolProvider.SaveStepCodeToolName, StringComparison.OrdinalIgnoreCase);
+               toolName.Equals(AppMcpToolProvider.SaveAppCodeToolName, StringComparison.OrdinalIgnoreCase) ||
+               toolName.Equals(AppMcpToolProvider.SaveStepCodeToolName, StringComparison.OrdinalIgnoreCase);
     }
 }
