@@ -59,7 +59,6 @@ partial class AppPage : ComponentBase, IAsyncDisposable
     [Inject] private IAppSystemPromptBuilder WebAppSystemPromptBuilder { get; set; }
     [Inject] private IUnifiedAppSystemPromptBuilder UnifiedAppSystemPromptBuilder { get; set; }
     [Inject] private IAppEditorBridge CurrentWebAppContextService { get; set; }
-    [Inject] private IAppMcpClient WebAppMcpClient { get; set; }
     [Inject] private IUnifiedAppMcpClient UnifiedAppMcpClient { get; set; }
 
     [Parameter] public string AppId { get; set; }
