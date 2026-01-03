@@ -73,7 +73,7 @@ After each tool result, briefly acknowledge it:
 ## WHEN IS BACKEND REQUIRED?
 
 Create backend steps when user needs:
-- System information (CPU, memory, disk) 
+- System information (CPU, memory, disk)
 - External API calls (weather, email, payment)
 - Database operations
 - File system access
@@ -82,7 +82,41 @@ Create backend steps when user needs:
 NO backend needed for:
 - Pure UI components
 - Client-side calculations
-- Static content pages";
+- Static content pages
+
+## BACKEND TESTING - ABSOLUTELY CRITICAL:
+
+? **ALWAYS TEST BACKEND STEPS BEFORE FINALIZING** ?
+
+After saving backend step code:
+1. IMMEDIATELY call **execute_backend_step_code** with realistic test inputs
+2. If execution FAILS (errors, exceptions, wrong output):
+   - Analyze the error message and stack trace
+   - Fix the code (common issues: wrong API endpoints, missing imports, type errors)
+   - Save the fixed code
+   - Test AGAIN until successful
+3. If execution SUCCEEDS:
+   - Verify output variables are correct
+   - Check that data format matches expectations
+   - Proceed to frontend integration
+
+**Why testing is critical:**
+- Catches API endpoint errors (404, 500, authentication failures)
+- Detects missing Python imports or syntax errors
+- Validates output variables are assigned correctly
+- Prevents broken apps from untested backend code
+
+**Example testing workflow:**
+```
+AI: save_step_code(step_name=""FetchWeatherStep"", code=""..."")
+AI: execute_backend_step_code(step_name=""FetchWeatherStep"", input_variables={""city"": ""London""})
+Result: ERROR - requests.exceptions.HTTPError: 404 Client Error
+AI: *fixes API endpoint in code*
+AI: save_step_code(step_name=""FetchWeatherStep"", code=""...fixed..."")
+AI: execute_backend_step_code(step_name=""FetchWeatherStep"", input_variables={""city"": ""London""})
+Result: SUCCESS - {""temperature"": ""15.2"", ""conditions"": ""Cloudy""}
+AI: *proceeds to save frontend code*
+```";
     }
 
     private static string GetFrontendDesignStandards()
@@ -138,11 +172,12 @@ NO backend needed for:
 
 Call these tools in order:
 
-1. **create_backend_step** - name=""GetSystemMetricsStep"", language=""Python""
-2. **save_step_code** - Write the Python implementation
-3. **suggest_step_variables** - Define outputs (success, error_message, data fields)
-4. **link_step_to_app** - Connect step to the app
-5. **save_app_code** - Save HTML/JS that calls automatonApi.executeStep()
+1. **create_backend_step** - name=""GetSystemMetricsStep"", language=""Python"" (auto-links to app)
+2. **suggest_step_variables** - Define inputs/outputs (success, error_message, data fields)
+3. **save_step_code** - Write the Python implementation
+4. **execute_backend_step_code** - ? CRITICAL: TEST the step with sample inputs
+5. **Fix and re-test** - If errors found, fix code and test again until successful
+6. **save_app_code** - Save HTML/JS that calls automatonApi.executeStep()
 
 ## TOOL SEQUENCE FOR FRONTEND-ONLY APPS:
 
@@ -410,8 +445,20 @@ When user requests charts/graphs, include:
     {
         return @"## AVAILABLE TOOLS:
 
-**Backend:** create_backend_step, save_step_code, suggest_step_variables, link_step_to_app, get_step_code, get_linked_steps
-**Frontend:** get_current_code, save_app_code
+**Backend Step Development (use in this order):**
+1. **create_backend_step** - Creates step and auto-links to app
+2. **suggest_step_variables** - Define input/output variables
+3. **save_step_code** - Write the step code
+4. **execute_backend_step_code** - ? TEST the step (REQUIRED!)
+5. **get_step_code** - Read existing step code
+6. **get_linked_steps** - View all steps linked to app
+
+**Frontend Development:**
+- **get_current_code** - Get current app HTML/CSS/JS
+- **save_app_code** - Save app HTML/CSS/JS
+
+**Reusing Existing Steps (advanced):**
+- **link_step_to_app** - Link pre-existing step to current app
 
 ## NAMING CONVENTIONS:
 
@@ -438,18 +485,20 @@ For data, use:
 1. For NEW apps: Start creating immediately, don't read existing code first
 2. For MODIFICATIONS: Read existing code ONCE, then make changes
 3. Create backend BEFORE frontend that uses it
-4. Don't use mock/simulated data - create real backend steps
-5. Always use responsive design with Tailwind CSS
-6. Include loading states and error handling
-7. Use modern, clean design with proper spacing and typography
-8. Handle empty/no data states with friendly UI messages
+4. ? **ALWAYS TEST backend steps with execute_backend_step_code BEFORE finalizing** ?
+5. Don't use mock/simulated data - create real backend steps
+6. Auto-linking: create_backend_step automatically links to app (no manual link needed)
+7. Always use responsive design with Tailwind CSS
+8. Include loading states and error handling
+9. Use modern, clean design with proper spacing and typography
+10. Handle empty/no data states with friendly UI messages
 
 ## DATA FORMAT RULES (ALL VALUES ARE STRINGS):
-9. **Frontend inputs**: Use `String(num)`, `String(bool)`, `JSON.stringify(obj)` 
-10. **Backend receives strings**: Convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
-11. **Backend outputs native types**: Use Python `True`, `45.2`, `{...}` - runner serializes to JSON strings
-12. **Frontend receives JSON strings**: Parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
-13. **NEVER use json.dumps()** on Python outputs - causes double-escaping
+11. **Frontend inputs**: Use `String(num)`, `String(bool)`, `JSON.stringify(obj)`
+12. **Backend receives strings**: Convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
+13. **Backend outputs native types**: Use Python `True`, `45.2`, `{...}` - runner serializes to JSON strings
+14. **Frontend receives JSON strings**: Parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
+15. **NEVER use json.dumps()** on Python outputs - causes double-escaping
 
 ## FINAL RESPONSE FORMAT:
 
