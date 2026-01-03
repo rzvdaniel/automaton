@@ -522,36 +522,27 @@ console.log(result.outputVariables);</pre>
 
 										@if (githubSyncEnabled)
 										{
-											<Row Gutter="(24, 16)">
-												<Col Xs="24" Md="12">
-												<FormItem Label="Repository URL" Required>
-													<Input @bind-Value="@githubRepoUrl"
-														   Placeholder="username/repo-name"
-														   Size="@InputSize.Large" />
-													<Text Type="TextElementType.Secondary">Format: username/repository-name</Text>
-												</FormItem>
-												</Col>
-												<Col Xs="24" Md="12">
-												<FormItem Label="Branch">
-													<Input @bind-Value="@githubBranch"
-														   Placeholder="main"
-														   Size="@InputSize.Large" />
-												</FormItem>
-												</Col>
-											</Row>
+											<FormItem Label="Repository URL" Required>
+												<Input @bind-Value="@githubRepoUrl"
+													   Placeholder="username/repo-name"
+													   Size="@InputSize.Large" />
+												<Text Type="TextElementType.Secondary">Format: username/repository-name</Text>
+											</FormItem>
+											
+											<FormItem Label="Branch">
+												<Input @bind-Value="@githubBranch"
+													   Placeholder="main"
+													   Size="@InputSize.Large" />
+											</FormItem>
+											
+											<FormItem Label="Path in Repository">
+												<Input @bind-Value="@githubPath"
+													   Placeholder="apps/my-app"
+													   Size="@InputSize.Large" />
+												<Text Type="TextElementType.Secondary">Optional: folder path within the repository</Text>
+											</FormItem>
 
-											<Row Gutter="(24, 16)">
-												<Col Xs="24" Md="12">
-												<FormItem Label="Path in Repository">
-													<Input @bind-Value="@githubPath"
-														   Placeholder="apps/my-app"
-														   Size="@InputSize.Large" />
-													<Text Type="TextElementType.Secondary">Optional: folder path within the repository</Text>
-												</FormItem>
-												</Col>
-											</Row>
-
-											<Space>
+											<Space Style="margin-top: 16px;">
 												<SpaceItem>
 													<Button Type="@ButtonType.Primary" Icon="cloud-upload" OnClick="PushToGitHub" Loading="@githubPushing">
 														Push to GitHub
@@ -581,9 +572,9 @@ console.log(result.outputVariables);</pre>
 
 											@if (currentApp.Definition.GitHub?.LastSyncedAt != null)
 											{
-												<Text Type="TextElementType.Secondary" Style="display: block; margin-top: 16px;">
+												<div style="color: rgba(0, 0, 0, 0.45); display: block; margin-top: 16px;">
 													Last synced: @currentApp.Definition.GitHub.LastSyncedAt?.ToString("yyyy-MM-dd HH:mm")
-												</Text>
+												</div>
 											}
 										}
 									}
