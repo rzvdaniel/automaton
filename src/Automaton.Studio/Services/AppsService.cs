@@ -234,14 +234,22 @@ public class AppsService
 
     private class AppFilesResponse
     {
+        [System.Text.Json.Serialization.JsonPropertyName("success")]
         public bool Success { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("files")]
         public List<string>? Files { get; set; }
     }
 
     private class AppFileContentResponse
     {
+        [System.Text.Json.Serialization.JsonPropertyName("success")]
         public bool Success { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("content")]
         public string? Content { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("path")]
         public string? Path { get; set; }
     }
 }

@@ -131,19 +131,15 @@
 										</Space>
 									</div>
 									<div class="file-tree-content">
-										@if (loadingFiles)
-										{
-											<Spin />
-										}
-										else if (fileTreeData.Any())
+										@if (fileTreeData?.Count > 0)
 										{
 											<Tree TItem="FileTreeNode"
-												  DataSource="fileTreeData"
-												  TitleExpression="@(node => node.DataItem.Title)"
-												  KeyExpression="@(node => node.DataItem.Key)"
-												  IconExpression="@(node => node.DataItem.Icon)"
-												  IsLeafExpression="@(node => node.DataItem.IsLeaf)"
-												  ChildrenExpression="@(node => node.DataItem.Children)"
+												  DataSource="@fileTreeData"
+												  TitleExpression="x => x.DataItem.Title"
+												  KeyExpression="x => x.DataItem.Key"
+												  IconExpression="x => x.DataItem.Icon"
+												  IsLeafExpression="x => x.DataItem.IsLeaf"
+												  ChildrenExpression="x => x.DataItem.Children"
 												  OnNodeLoadDelayAsync="OnTreeNodeLoad"
 												  OnClick="OnFileTreeNodeClick"
 												  DefaultExpandAll="true"
@@ -153,7 +149,7 @@
 										else
 										{
 											<Empty>
-												<DescriptionTemplate>No files</DescriptionTemplate>
+												<DescriptionTemplate>No files loaded yet</DescriptionTemplate>
 											</Empty>
 										}
 									</div>

@@ -1125,18 +1125,35 @@ console.log(result.outputVariables);";
     // File tree and multi-file editor methods
     private async Task LoadFileTree()
     {
+        loadingFiles = true;
+        
         try
         {
-            loadingFiles = true;
-            await InvokeAsync(StateHasChanged);
-
             var files = await AppsService.GetAppFilesAsync(Guid.Parse(AppId));
-            fileTreeData = BuildFileTree(files);
+            
+            Logger.LogInformation("LoadFileTree: Received {FileCount} files from API", files.Count);
+            
+            // Normalize paths to use forward slashes
+            var normalizedFiles = files
+                .Select(f => f.Replace("\\", "/"))
+                .ToList();
+            
+            // Build the tree
+            var newTree = BuildFileTree(normalizedFiles);
+            
+            // Create a NEW list reference - this is critical for Blazor change detection
+            fileTreeData = new List<FileTreeNode>(newTree);
+            
+            Logger.LogInformation("LoadFileTree: Set fileTreeData with {Count} nodes", fileTreeData.Count);
 
             // Auto-open index.html if it exists and no files are open
-            if (!openFiles.Any() && files.Contains("index.html"))
+            if (!openFiles.Any() && normalizedFiles.Any(f => f.EndsWith("index.html")))
             {
-                await OpenFile("index.html");
+                var indexFile = normalizedFiles.FirstOrDefault(f => f.EndsWith("index.html"));
+                if (indexFile != null)
+                {
+                    await OpenFile("index.html");
+                }
             }
         }
         catch (Exception ex)
