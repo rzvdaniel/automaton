@@ -48,8 +48,9 @@ public class AppsService
     {
         // Use authorization service query to check access (personal + project-based)
         var appEntity = authorizationService.GetAccessibleAppsQuery()
+            .Include(x => x.WebAppUsers)
             .SingleOrDefault(x => x.Id == id);
-        
+
         if (appEntity == null)
         {
             return null;
@@ -265,7 +266,9 @@ public class AppsService
             throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
         }
 
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
+        var entity = dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {
@@ -315,7 +318,9 @@ public class AppsService
             throw new UnauthorizedAccessException($"You do not have permission to delete app {id}");
         }
 
-        var app = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
+        var app = dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .SingleOrDefault(x => x.Id == id);
 
         if (app == null)
         {

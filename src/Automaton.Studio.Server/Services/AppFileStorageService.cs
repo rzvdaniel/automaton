@@ -15,6 +15,24 @@ public class AppFileStorageService
     private readonly Serilog.ILogger logger;
     private readonly string baseStoragePath;
 
+    /// <summary>
+    /// Whitelist of allowed file extensions for security.
+    /// Prevents users from uploading executable scripts (ps1, sh, php, etc.)
+    /// </summary>
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Web files
+        ".html", ".htm", ".css", ".js", ".mjs", ".json", ".xml",
+        // Text/documentation
+        ".txt", ".md", ".markdown",
+        // Images
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".bmp",
+        // Fonts
+        ".woff", ".woff2", ".ttf", ".eot", ".otf",
+        // Other web assets
+        ".map", ".ts", ".tsx", ".jsx", ".vue", ".scss", ".sass", ".less"
+    };
+
     public AppFileStorageService(IWebHostEnvironment webHostEnvironment)
     {
         this.webHostEnvironment = webHostEnvironment;
@@ -218,7 +236,10 @@ public class AppFileStorageService
     {
         var appPath = GetAppPath(userId, appId);
         var filePath = Path.Combine(appPath, relativePath);
-        
+
+        // Security: validate file extension to prevent executable uploads
+        ValidateFileExtension(relativePath);
+
         // Security: ensure the path is within the app directory
         var fullPath = Path.GetFullPath(filePath);
         var fullAppPath = Path.GetFullPath(appPath);
@@ -235,6 +256,28 @@ public class AppFileStorageService
         }
 
         await File.WriteAllTextAsync(filePath, content);
+    }
+
+    /// <summary>
+    /// Validates that the file extension is in the allowed whitelist.
+    /// Throws InvalidOperationException if the extension is not allowed.
+    /// </summary>
+    private static void ValidateFileExtension(string relativePath)
+    {
+        var extension = Path.GetExtension(relativePath);
+
+        // Allow files without extension (like LICENSE, Makefile, etc.)
+        if (string.IsNullOrEmpty(extension))
+        {
+            return;
+        }
+
+        if (!AllowedExtensions.Contains(extension))
+        {
+            throw new InvalidOperationException(
+                $"File type '{extension}' is not allowed. " +
+                $"Allowed types: {string.Join(", ", AllowedExtensions.Order())}");
+        }
     }
 
     /// <summary>

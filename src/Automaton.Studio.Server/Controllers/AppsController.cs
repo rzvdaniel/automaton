@@ -659,9 +659,16 @@ public class AppsController : BaseController
     {
         try
         {
-            var ownerId = userContextService.GetUserId();
+            // Get the app owner ID from database (not current user)
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var files = await fileStorageService.GetAppFilesAsync(ownerId, id);
-            
+
             return Ok(new
             {
                 success = true,
@@ -683,9 +690,16 @@ public class AppsController : BaseController
     {
         try
         {
-            var ownerId = userContextService.GetUserId();
+            // Get the app owner ID from database (not current user)
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var content = await fileStorageService.ReadAppFileAsync(ownerId, id, path);
-            
+
             if (content == null)
             {
                 return NotFound(new { success = false, message = "File not found" });
@@ -718,9 +732,16 @@ public class AppsController : BaseController
     {
         try
         {
-            var ownerId = userContextService.GetUserId();
+            // Get the app owner ID from database (not current user)
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             await fileStorageService.WriteAppFileAsync(ownerId, id, path, request.Content);
-            
+
             // If this is index.html, also update the app definition
             if (path == "index.html")
             {
@@ -765,9 +786,16 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Cannot delete system files" });
             }
 
-            var ownerId = userContextService.GetUserId();
+            // Get the app owner ID from database (not current user)
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             await fileStorageService.DeleteAppFileAsync(ownerId, id, path);
-            
+
             return Ok(new
             {
                 success = true,

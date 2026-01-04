@@ -110,10 +110,10 @@ services.AddAuthorization(options =>
 
     options.AddPolicy("ProjectMember", policy =>
         policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
-            ProjectRole.ProjectAdmin,
-            ProjectRole.Developer,
-            ProjectRole.AppUser,
-            ProjectRole.Viewer)));
+            Automaton.Studio.Server.Enums.ProjectRole.ProjectAdmin,
+            Automaton.Studio.Server.Enums.ProjectRole.Developer,
+            Automaton.Studio.Server.Enums.ProjectRole.AppUser,
+            Automaton.Studio.Server.Enums.ProjectRole.Viewer)));
 });
 
 services.AddHttpClient();
@@ -226,13 +226,7 @@ services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
-
-// App file storage service
-services.AddSingleton<AppFileStorageService>();
-
-// GitHub integration services
-services.AddScoped<GitHubTokenService>();
-services.AddScoped<GitHubService>();
+services.AddScoped<AppFileStorageService>();
 
 // Register email service implementation based on environment and configuration.
 var useNoOpEmail = applicationBuilder.Environment.IsDevelopment() && !configurationService.EmailConfig.SendEmailsInDevelopment;
@@ -255,8 +249,6 @@ services.AddTransient<ScheduleService>();
 
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
-services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
-
 services.AddScoped<AiProviderMetadataService>();
 
 // Project/Organization services
@@ -340,6 +332,28 @@ else
 }
 
 app.UseStaticFiles();
+
+// Serve user app files as static content (for better performance)
+// Files are served from: /app-content/{userId}/{appId}/{file}
+// This bypasses controller logic for faster delivery
+var appFilesPath = Path.Combine(app.Environment.ContentRootPath, "AppData", "apps");
+if (Directory.Exists(appFilesPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(appFilesPath),
+        RequestPath = "/app-content",
+        OnPrepareResponse = ctx =>
+        {
+            // Cache static app files for 1 hour (CDN will respect this)
+            ctx.Context.Response.Headers.CacheControl = "public, max-age=3600";
+
+            // Security headers for user-generated content
+            ctx.Context.Response.Headers.XContentTypeOptions = "nosniff";
+            ctx.Context.Response.Headers.XFrameOptions = "SAMEORIGIN";
+        }
+    });
+}
 
 // Enable CORS before authentication (only if configured)
 if (corsOrigins != null && corsOrigins.Length > 0)

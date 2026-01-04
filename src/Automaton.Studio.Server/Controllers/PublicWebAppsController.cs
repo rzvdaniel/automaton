@@ -1,29 +1,41 @@
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
 
+/// <summary>
+/// Controller for serving published web apps.
+/// Apps are served from the file system (AppData/apps/{ownerId}/{appId}/).
+///
+/// Routes:
+/// - GET /api/web/{slug}              → Returns app metadata + index.html content
+/// - GET /api/web/{slug}/files/{path} → Returns any file from the app
+/// </summary>
 [ApiController]
 [Route("api/web")]
 [AllowAnonymous]
 public class PublicWebAppsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly AppFileStorageService _fileStorageService;
     private readonly ILogger<PublicWebAppsController> _logger;
 
     public PublicWebAppsController(
         ApplicationDbContext context,
+        AppFileStorageService fileStorageService,
         ILogger<PublicWebAppsController> logger)
     {
         _context = context;
+        _fileStorageService = fileStorageService;
         _logger = logger;
     }
 
     /// <summary>
     /// Get published web app by slug (public access, authentication checked client-side)
+    /// Now reads HTML content from file system instead of database.
     /// </summary>
     [HttpGet("{slug}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -32,8 +44,9 @@ public class PublicWebAppsController : ControllerBase
     {
         try
         {
-            // Query published app by slug
+            // Query published app by slug with owner info
             var app = await _context.WebApps
+                .Include(w => w.WebAppUsers)
                 .Where(w => w.IsPublished && w.PublicUrl == slug)
                 .Select(w => new
                 {
@@ -41,9 +54,9 @@ public class PublicWebAppsController : ControllerBase
                     w.Name,
                     w.DisplayName,
                     w.Description,
-                    w.Definition,
                     w.PublishedAt,
-                    w.RequiresAuthentication
+                    w.RequiresAuthentication,
+                    OwnerId = w.WebAppUsers.FirstOrDefault() != null ? w.WebAppUsers.FirstOrDefault()!.UserId : (Guid?)null
                 })
                 .FirstOrDefaultAsync();
 
@@ -75,21 +88,29 @@ public class PublicWebAppsController : ControllerBase
                     app.Name, slug, isAuthenticated);
             }
 
-            // Deserialize definition to get HTML content
-            var definition = JsonSerializer.Deserialize<Models.AppDefinition>(app.Definition ?? "{}");
+            // Read index.html from file system
+            string htmlContent;
+            if (app.OwnerId.HasValue)
+            {
+                htmlContent = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "index.html")
+                    ?? GetDefaultHtmlContent();
+            }
+            else
+            {
+                _logger.LogWarning("App '{AppId}' has no owner, using default content", app.Id);
+                htmlContent = GetDefaultHtmlContent();
+            }
 
-            // Always return the app data with RequiresAuthentication flag and authentication status
-            // Authentication is checked server-side where session/cookies are available
             return Ok(new
             {
                 app.Id,
                 app.Name,
                 app.DisplayName,
                 app.Description,
-                HtmlContent = definition?.HtmlContent ?? GetDefaultHtmlContent(),
+                HtmlContent = htmlContent,
                 app.PublishedAt,
                 app.RequiresAuthentication,
-                IsUserAuthenticated = isAuthenticated  // Add this so client knows
+                IsUserAuthenticated = isAuthenticated
             });
         }
         catch (Exception ex)
@@ -97,6 +118,110 @@ public class PublicWebAppsController : ControllerBase
             _logger.LogError(ex, "Error retrieving published app with slug '{Slug}'", slug);
             return StatusCode(500, new { message = "Internal server error" });
         }
+    }
+
+    /// <summary>
+    /// Get a specific file from a published app.
+    /// Allows multi-file apps to load CSS, JS, images, etc.
+    /// Example: GET /api/web/my-app/files/styles.css
+    /// </summary>
+    [HttpGet("{slug}/files/{*path}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPublishedAppFile(string slug, string path)
+    {
+        try
+        {
+            // Query published app by slug with owner info
+            var app = await _context.WebApps
+                .Include(w => w.WebAppUsers)
+                .Where(w => w.IsPublished && w.PublicUrl == slug)
+                .Select(w => new
+                {
+                    w.Id,
+                    w.Name,
+                    w.RequiresAuthentication,
+                    OwnerId = w.WebAppUsers.FirstOrDefault() != null ? w.WebAppUsers.FirstOrDefault()!.UserId : (Guid?)null
+                })
+                .FirstOrDefaultAsync();
+
+            if (app == null)
+            {
+                return NotFound(new { message = "App not found or not published" });
+            }
+
+            // Check authentication if required
+            if (app.RequiresAuthentication)
+            {
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                if (!isAuthenticated)
+                {
+                    return Unauthorized(new { message = "Authentication required" });
+                }
+            }
+
+            if (!app.OwnerId.HasValue)
+            {
+                return NotFound(new { message = "App configuration error" });
+            }
+
+            // Read file from file system
+            var content = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, path);
+            if (content == null)
+            {
+                return NotFound(new { message = "File not found" });
+            }
+
+            // Return with appropriate content type
+            var contentType = GetContentType(path);
+
+            // Add cache headers
+            Response.Headers.CacheControl = "public, max-age=3600";
+            Response.Headers.XContentTypeOptions = "nosniff";
+
+            return Content(content, contentType);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Path traversal attempt for app slug '{Slug}', path '{Path}'", slug, path);
+            return BadRequest(new { message = "Invalid file path" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving file '{Path}' for app slug '{Slug}'", path, slug);
+            return StatusCode(500, new { message = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Get the MIME content type for a file based on extension
+    /// </summary>
+    private static string GetContentType(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        return extension switch
+        {
+            ".html" or ".htm" => "text/html; charset=utf-8",
+            ".css" => "text/css; charset=utf-8",
+            ".js" or ".mjs" => "application/javascript; charset=utf-8",
+            ".json" => "application/json; charset=utf-8",
+            ".xml" => "application/xml; charset=utf-8",
+            ".txt" => "text/plain; charset=utf-8",
+            ".md" => "text/markdown; charset=utf-8",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".svg" => "image/svg+xml",
+            ".webp" => "image/webp",
+            ".ico" => "image/x-icon",
+            ".woff" => "font/woff",
+            ".woff2" => "font/woff2",
+            ".ttf" => "font/ttf",
+            ".eot" => "application/vnd.ms-fontobject",
+            ".otf" => "font/otf",
+            ".map" => "application/json",
+            _ => "application/octet-stream"
+        };
     }
 
     private static string GetDefaultHtmlContent()
