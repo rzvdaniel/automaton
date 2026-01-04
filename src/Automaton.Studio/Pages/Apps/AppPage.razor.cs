@@ -1301,13 +1301,6 @@ console.log(result.outputVariables);";
             activeFileTab = filePath;
 
             await InvokeAsync(StateHasChanged);
-
-            // Set editor content after render
-            await Task.Delay(100);
-            if (openFile.Editor != null)
-            {
-                await openFile.Editor.SetValue(content);
-            }
         }
         catch (Exception ex)
         {
@@ -1360,11 +1353,12 @@ console.log(result.outputVariables);";
         }
     }
 
-    private StandaloneEditorConstructionOptions GetEditorOptions(StandaloneCodeEditor editor, string language)
+    private StandaloneEditorConstructionOptions GetEditorOptions(StandaloneCodeEditor editor, string language, string content)
     {
         return new StandaloneEditorConstructionOptions
         {
             Language = language,
+            Value = content,
             AutomaticLayout = true,
             Theme = "vs",
             Minimap = new EditorMinimapOptions { Enabled = false },

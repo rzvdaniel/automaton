@@ -172,7 +172,7 @@
 												<TabPane Tab="@GetFileName(file.Path)" Key="@file.Path" Closable="true">
 													<div class="monaco-container">
 														<StandaloneCodeEditor Id="@($"editor-{file.Path.Replace("/", "-")}")"
-																			  ConstructionOptions="@((editor) => GetEditorOptions(editor, file.Language))"
+																			  ConstructionOptions="@((editor) => GetEditorOptions(editor, file.Language, file.Content))"
 																			  @ref="file.Editor"
 																			  OnDidChangeModelContent="@((e) => OnEditorContentChanged(file.Path))" />
 													</div>
