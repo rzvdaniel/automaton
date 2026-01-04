@@ -1,6 +1,6 @@
 using Automaton.Studio.Models;
-using Serilog;
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 
 namespace Automaton.Studio.Services;
 
@@ -234,22 +234,22 @@ public class AppsService
 
     private class AppFilesResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("success")]
+        [JsonPropertyName("success")]
         public bool Success { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("files")]
+        [JsonPropertyName("files")]
         public List<string>? Files { get; set; }
     }
 
     private class AppFileContentResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("success")]
+        [JsonPropertyName("success")]
         public bool Success { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("content")]
+        [JsonPropertyName("content")]
         public string? Content { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("path")]
+        [JsonPropertyName("path")]
         public string? Path { get; set; }
     }
 }

@@ -1303,7 +1303,7 @@ console.log(result.outputVariables);";
             await InvokeAsync(StateHasChanged);
 
             // Set editor content after render
-            await Task.Delay(100); // Give time for editor to render
+            await Task.Delay(100);
             if (openFile.Editor != null)
             {
                 await openFile.Editor.SetValue(content);
