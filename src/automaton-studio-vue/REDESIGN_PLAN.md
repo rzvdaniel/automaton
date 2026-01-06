@@ -1959,7 +1959,7 @@ Production URLs:
 
 Development:
 http://localhost:5173       → Vue.js dev server (Vite)
-http://localhost:5000       → ASP.NET API
+http://localhost:7091       → ASP.NET API
 ```
 
 ### Deployment Architecture
@@ -1972,6 +1972,301 @@ http://localhost:5000       → ASP.NET API
 │  /api/*         → ASP.NET Core API      │  ← Backend
 │  /web/{slug}    → Published apps        │
 └─────────────────────────────────────────┘
+```
+
+---
+
+## Deployment & Testing Strategy
+
+### GitHub Pages Deployment
+
+The Vue.js app can be automatically deployed to GitHub Pages for testing/preview purposes before production deployment.
+
+#### Deployment URLs
+
+```
+Production:    https://automaton.monster          → Full deployment (Vue.js + API)
+Preview/Test:  https://rzvdaniel.github.io/automaton/  → GitHub Pages (Vue.js only)
+API:           https://api.automaton.monster      → Existing deployed API
+```
+
+#### GitHub Actions Workflow
+
+Create `.github/workflows/deploy-vue-preview.yml` to automatically deploy the Vue app to GitHub Pages on every push to `main` or on PR merge:
+
+```yaml
+name: Deploy Vue.js Preview to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/automaton-studio-vue/**'
+  workflow_dispatch:  # Allow manual trigger
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/automaton-studio-vue/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: src/automaton-studio-vue
+        run: npm ci
+      
+      - name: Build for GitHub Pages
+        working-directory: src/automaton-studio-vue
+        env:
+          VITE_API_BASE_URL: https://api.automaton.monster
+          VITE_APP_TITLE: Automaton Studio (Preview)
+        run: |
+          npm run build
+          # GitHub Pages serves from repo root, adjust base path
+          # If deploying to https://username.github.io/repo-name/
+          # Update vite.config.ts base: '/automaton/'
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'src/automaton-studio-vue/dist'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+#### Vite Configuration for GitHub Pages
+
+Update `vite.config.ts` to support deployment to a subdirectory:
+
+```typescript
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vuetify from 'vite-plugin-vuetify'
+import path from 'path'
+
+export default defineConfig(({ mode }) => {
+  // GitHub Pages base path (repository name)
+  const base = mode === 'production' 
+    ? '/automaton/'  // For https://rzvdaniel.github.io/automaton/
+    : '/'            // For local dev
+
+  return {
+    base,
+    plugins: [
+      vue(),
+      vuetify({ autoImport: true })
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src')
+      }
+    },
+    server: {
+      port: 5173
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: mode !== 'production'
+    }
+  }
+})
+```
+
+#### Environment Configuration
+
+**`.env.development` (Local dev):**
+```env
+VITE_API_BASE_URL=http://localhost:7091
+VITE_APP_TITLE=Automaton Studio (Dev)
+VITE_ENABLE_MOCK_API=false
+```
+
+**`.env.production` (GitHub Pages preview):**
+```env
+VITE_API_BASE_URL=https://api.automaton.monster
+VITE_APP_TITLE=Automaton Studio (Preview)
+VITE_ENABLE_MOCK_API=false
+```
+
+**Usage in code:**
+```typescript
+// src/shared/services/api/axios-instance.ts
+import axios from 'axios'
+
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+export default apiClient
+```
+
+#### CORS Configuration Required
+
+**Important:** The API at `api.automaton.monster` must allow CORS requests from GitHub Pages:
+
+```csharp
+// In ASP.NET Core Startup.cs or Program.cs
+services.AddCors(options =>
+{
+    options.AddPolicy("AllowGitHubPages", builder =>
+    {
+        builder.WithOrigins(
+            "https://rzvdaniel.github.io",
+            "http://localhost:5173"  // Local dev
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
+    });
+});
+
+app.UseCors("AllowGitHubPages");
+```
+
+#### GitHub Repository Settings
+
+1. Go to **Settings** → **Pages**
+2. **Source**: Deploy from a branch
+3. **Branch**: Select `gh-pages` (created by GitHub Actions)
+4. **Folder**: `/ (root)`
+5. Save
+
+Alternatively, for modern GitHub Actions deployment:
+1. **Source**: GitHub Actions (recommended)
+2. Workflow will handle deployment automatically
+
+#### AI Agent Instructions for Deployment Setup
+
+**Prompt for AI Agent (to be run during Phase 1.1 or as a separate task):**
+
+```
+Set up automatic GitHub Pages deployment for the Vue.js app.
+
+Tasks:
+1. Create .github/workflows/deploy-vue-preview.yml with the workflow above
+2. Update vite.config.ts to support base path for GitHub Pages
+3. Verify .env.development and .env.production files exist
+4. Update axios-instance.ts to use import.meta.env.VITE_API_BASE_URL
+5. Add deployment instructions to README.md
+
+Testing:
+1. Push to main branch
+2. Verify GitHub Actions workflow runs successfully
+3. Check deployment at https://rzvdaniel.github.io/automaton/
+4. Verify API calls work (check browser console for CORS errors)
+
+CORS Note:
+If API calls fail with CORS errors, the backend at api.automaton.monster 
+needs to be configured to allow requests from GitHub Pages origin.
+Document this requirement in the deployment notes.
+
+Deliverables:
+- [ ] GitHub Actions workflow file created
+- [ ] Vite config updated for GitHub Pages
+- [ ] Environment files configured
+- [ ] First deployment successful
+- [ ] API connectivity verified (or CORS issue documented)
+```
+
+#### Manual Deployment (Alternative)
+
+If GitHub Actions are not available, deploy manually:
+
+```bash
+cd src/automaton-studio-vue
+
+# Build for production
+npm run build
+
+# Deploy to GitHub Pages using gh-pages package
+npm install -g gh-pages
+gh-pages -d dist -b gh-pages
+
+# Or use GitHub CLI
+gh workflow run deploy-vue-preview.yml
+```
+
+#### Preview Deployment Benefits
+
+1. **Early Testing**: Test the Vue.js UI before full production deployment
+2. **Stakeholder Demos**: Share a live URL with team/stakeholders for feedback
+3. **Parallel Development**: Multiple branches can have preview deployments
+4. **API Integration Testing**: Test against real API (api.automaton.monster)
+5. **No Infrastructure Needed**: GitHub Pages is free for public repos
+
+#### Multi-Environment Strategy
+
+```
+Development:   localhost:5173        → Local dev, mock API or localhost API
+Preview (PR):  PR-123.automaton.dev  → Preview deployments per PR (optional)
+Preview (Main): rzvdaniel.github.io  → Latest main branch, real API
+Production:    automaton.monster     → Full production deployment
+```
+
+For PR preview deployments, consider services like:
+- **Vercel** (automatic PR previews, free tier)
+- **Netlify** (automatic PR previews, free tier)
+- **GitHub Pages + custom workflow** (requires more setup)
+
+#### Recommended: Vercel for Better Preview Deployments
+
+**Why Vercel over GitHub Pages:**
+- Automatic PR preview deployments (each PR gets its own URL)
+- Better build caching (faster deployments)
+- Environment variables management (no need to commit .env files)
+- Custom domains easily
+- Serverless functions support (if needed later)
+
+**Setup Vercel:**
+
+1. Connect GitHub repo to Vercel
+2. Configure build settings:
+   ```
+   Framework Preset: Vite
+   Build Command: npm run build
+   Output Directory: dist
+   Root Directory: src/automaton-studio-vue
+   ```
+3. Add environment variables in Vercel dashboard:
+   ```
+   VITE_API_BASE_URL = https://api.automaton.monster
+   VITE_APP_TITLE = Automaton Studio (Preview)
+   ```
+4. Deploy! Every PR gets a preview URL automatically
+
+**Vercel URLs:**
+```
+Production:  https://automaton-studio.vercel.app  (main branch)
+PR Preview:  https://automaton-studio-git-feature-xyz.vercel.app (per PR)
 ```
 
 ---
