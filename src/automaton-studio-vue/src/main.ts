@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
 
 // PrimeVue imports - MUST be in this order
 import PrimeVue from 'primevue/config'
@@ -12,18 +11,7 @@ import 'primeflex/primeflex.css'
 import './assets/styles/main.css'
 
 import App from './App.vue'
-
-// Router setup
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: () => import('./views/HomeView.vue'),
-    },
-  ],
-})
+import router from './router'
 
 // Create app
 const app = createApp(App)
