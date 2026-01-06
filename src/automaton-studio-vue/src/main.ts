@@ -6,6 +6,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
 import 'primeicons/primeicons.css'
+import 'primeflex/primeflex.css'
 
 // Application styles - AFTER PrimeVue imports
 import './assets/styles/main.css'
