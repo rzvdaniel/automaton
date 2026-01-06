@@ -1671,7 +1671,7 @@ Before implementing each page, verify:
 
 **IMPORTANT:** We follow a **stub-first, then functionality** approach:
 
-**Phase A: Create All Page Stubs (Week 2)**
+**Phase A: Create All Page Stubs (Phase 1.2)**
 1. **Review All Design Specs** - Read through all page designs in [UI/UX Redesign](#uiux-redesign) section
 2. **Create Page Structure** - Build all pages as Vue components with proper layout structure
 3. **Use Placeholder Content** - Static text, empty cards, skeleton loaders where data would go
@@ -1699,7 +1699,7 @@ For each page/feature, follow this process:
 - Easy to demo progress to stakeholders
 - Reduces risk of architectural changes later
 
-### Page Stub Implementation Guide (Week 2)
+### Page Stub Implementation Guide (Phase 1.2)
 
 **Goal:** Create visual structure for all pages using Vuetify components with placeholder/static content.
 
@@ -1780,9 +1780,9 @@ const mockData = ref([
 
 ### Development Phases
 
-#### Phase 1: Foundation (Month 1)
+#### Phase 1: Project Setup & Foundation
 
-**Week 1: Vue.js Project Setup + Design System**
+**1.1: Vue.js Project Initialization**
 - [ ] Create Vue 3 + Vite + TypeScript project
 - [ ] Install Vuetify, Pinia, Vue Router, Axios
 - [ ] Configure TypeScript, ESLint, Prettier
@@ -1790,11 +1790,10 @@ const mockData = ref([
 - [ ] Set up JetBrains Mono font for code editors
 - [ ] Set up dev/prod environment configs
 - [ ] Build application shell (App Bar + Navigation Rail + Router)
-- [ ] Implement authentication (login/register pages)
-- [ ] Connect to existing API for auth
 
-**Week 2: Page Structure & Stubs**
+**1.2: Page Structure & Stubs**
 - [ ] **Create all page view stubs following the UI/UX design specs**
+- [ ] **Auth Pages Stub** - Login and Register forms with validation
 - [ ] **Dashboard Page Stub** - Layout with stat cards placeholders, charts area, quick actions panel
 - [ ] **Flows List Page Stub** - Layout with AI input area, flow cards grid/list toggle
 - [ ] **Flow Generation Page Stub** - Three-column layout (timeline, details, AI assistant)
@@ -1811,24 +1810,48 @@ const mockData = ref([
 - [ ] **Verify responsive breakpoints work on all page stubs**
 - [ ] **Test dark mode toggle on all page stubs**
 
-**Weeks 3-4: Backend Flow Generation API**
+**Deliverable:** Vue.js shell with all page stubs navigable
+
+#### Phase 2: Authentication & Dashboard
+
+**2.1: Authentication**
+- [ ] **Follow Project Structure** for `auth/` feature (see Section 6)
+- [ ] Implement authentication feature
+- [ ] Build `LoginView` with form validation
+- [ ] Build `RegisterView` with email confirmation
+- [ ] Create `useAuth` composable for auth state management
+- [ ] Implement auth store (Pinia) with JWT token handling
+- [ ] Create auth service for API calls (login, register, logout, refresh)
+- [ ] Add auth guards to router (protected routes)
+- [ ] Connect to existing API for authentication
+
+**2.2: Dashboard**
+- [ ] **Follow Project Structure** for `dashboard/` feature (see Section 6)
+- [ ] **Review Dashboard design spec** (see Section 7.1)
+- [ ] **Review Blazor implementation** for feature parity
+- [ ] Build `DashboardView` with stats cards
+- [ ] Implement execution trend chart
+- [ ] Add quick actions panel
+- [ ] Connect to existing Dashboard API
+
+**Deliverable:** Authentication working + functional dashboard
+
+#### Phase 3: Feature Parity
+
+**Important:** For all Phase 3 features, review the existing Blazor implementation to ensure feature parity while applying the new Vue.js design system.
+
+**3.1: Flow Generation**
+- [ ] **Follow Project Structure** for `flows/` feature (see Section 6)
+- [ ] **Backend Flow Generation API**
 - [ ] Create `FlowGenerationController`
 - [ ] Implement `FlowGenerationService`
 - [ ] Integrate with existing AI provider (Mcp)
 - [ ] Add step search/reuse logic
 - [ ] Write unit tests for AI prompt building
 - [ ] Test with real AI model (OpenAI/Anthropic)
-
-**Deliverable:** Working API that generates flows from natural language + authenticated Vue.js shell with all page stubs navigable
-
-#### Phase 2: Core UI (Month 2)
-
-**Weeks 1-2: Dashboard + Flow Generation UI**
-- [ ] **Review Dashboard design spec** (see Section 7.1)
-- [ ] Build `DashboardView` with stats cards
-- [ ] Implement execution trend chart
-- [ ] Add quick actions panel
+- [ ] **Frontend Flow Generation UI**
 - [ ] **Review Flows page design spec** (see Section 7.2)
+- [ ] **Review Blazor Flows implementation** for feature parity
 - [ ] Build `FlowGenerationView` component
 - [ ] Implement natural language input with examples
 - [ ] Create `FlowTimeline` visualization component
@@ -1837,8 +1860,20 @@ const mockData = ref([
 - [ ] Implement flow refinement dialog
 - [ ] Connect to Flow Generation API
 
-**Weeks 3-4: Apps View**
+**3.2: Flow Management & Execution**
+- [ ] **Follow Project Structure** for `flows/` feature (see Section 6)
+- [ ] **Review Blazor Flow management** for feature parity
+- [ ] Build `FlowListView` with grid/list toggle
+- [ ] Build `FlowEditorView` for manual flow editing
+- [ ] Implement flow execution controls (run, test, schedule)
+- [ ] Port execution history views
+- [ ] Implement real-time execution monitoring (SignalR client)
+- [ ] Add flow execution logs display
+
+**3.3: Apps**
+- [ ] **Follow Project Structure** for `apps/` feature (see Section 6)
 - [ ] **Review Apps page design spec** (see Section 7.3)
+- [ ] **Review Blazor Apps implementation** for feature parity
 - [ ] Build `AppListView` (list of apps with cards)
 - [ ] Build `AppEditorView` with three-panel layout
 - [ ] Integrate Monaco Editor (direct, no wrapper!)
@@ -1846,37 +1881,51 @@ const mockData = ref([
 - [ ] Add resizable panels
 - [ ] Add app preview iframe with responsive toggles
 - [ ] Connect to existing Apps API
+- [ ] Port app publish/unpublish functionality
+- [ ] Implement PWA settings
 
-**Deliverable:** Can create flows and apps in new Vue.js UI
-
-#### Phase 3: Feature Parity (Month 3)
-
-**Weeks 1-2: Steps & Execution**
+**3.4: Steps**
+- [ ] **Follow Project Structure** for `steps/` feature (see Section 6)
 - [ ] **Review Steps page design spec** (see Section 7.4)
+- [ ] **Review Blazor Steps implementation** for feature parity
 - [ ] Build `StepListView` with search and filters
 - [ ] Build `StepEditorView` with Monaco + config panel
-- [ ] Port execution history views
-- [ ] Implement real-time execution monitoring (SignalR client)
-- [ ] Add flow execution logs display
+- [ ] Implement step testing functionality
+- [ ] Port step execution and debugging features
 
-**Weeks 3-4: Projects, Runners, Settings**
+**3.5: Projects**
+- [ ] **Follow Project Structure** for `projects/` feature (see Section 6)
 - [ ] **Review Projects page design spec** (see Section 7.6)
+- [ ] **Review Blazor Projects implementation** for feature parity
 - [ ] Build project switcher in app bar
 - [ ] Build Projects list view (Your Projects + Shared)
 - [ ] Build Project settings page with tabs (General, Members, Resources)
 - [ ] Implement member invitation and role management
+- [ ] Port project-level permissions and access control
+
+**3.6: Runners**
+- [ ] **Follow Project Structure** for `runners/` feature (see Section 6)
 - [ ] **Review Runners page design spec** (see Section 7.5)
+- [ ] **Review Blazor Runners implementation** for feature parity
 - [ ] Implement runners management page with status cards
+- [ ] Port runner connection and monitoring features
+- [ ] Add runner registration and configuration UI
+- [ ] Implement real-time runner status updates
+
+**3.7: Settings**
+- [ ] **Follow Project Structure** for `settings/` feature (see Section 6)
 - [ ] **Review Settings page design spec** (see Section 7.7)
+- [ ] **Review Blazor Settings implementation** for feature parity
 - [ ] Port settings pages (account, API keys, AI keys)
 - [ ] Implement appearance settings (dark mode toggle)
+- [ ] Add notification preferences
 - [ ] Ensure all existing features are available
 
-**Deliverable:** Full feature complete
+**Deliverable:** Full feature parity with existing Blazor application
 
-#### Phase 4: Polish & Launch (Month 4)
+#### Phase 4: Polish & Launch
 
-**Week 1-2: Design QA & Bug Fixes**
+**4.1: Quality Assurance**
 - [ ] **Design review of all pages against specs**
 - [ ] Verify consistent spacing, typography, colors
 - [ ] End-to-end testing of all workflows
@@ -1885,17 +1934,19 @@ const mockData = ref([
 - [ ] Accessibility audit (WCAG compliance)
 - [ ] **Dark mode testing across all pages**
 
-**Week 3: Beta Testing**
+**4.2: Beta Testing**
 - [ ] Deploy Vue.js UI to beta subdomain (beta.automaton.com)
 - [ ] Invite beta testers
 - [ ] Collect feedback on design and usability
 - [ ] Fix issues
 - [ ] Monitor error logs, performance metrics
 
-**Week 4: Production Launch**
+**4.3: Production Launch**
 - [ ] Deploy Vue.js UI as default
 - [ ] Update documentation
 - [ ] Monitor metrics closely
+
+**Deliverable:** Vue.js UI live in production
 
 ### URL Routing
 
@@ -1925,30 +1976,616 @@ http://localhost:5000       → ASP.NET API
 
 ---
 
-## Timeline & Milestones
+## AI-Assisted Implementation Guide
 
-### High-Level Timeline
+This section provides specific instructions for AI agents/models implementing this redesign, including strategies for parallel development.
+
+### Parallel Development Strategy
+
+#### Phase 1: Sequential Only
+**Phase 1 must be completed sequentially** - it creates the foundation that all other work depends on.
+
+- ✅ **1.1** must complete first (project setup)
+- ✅ **1.2** must complete second (all page stubs)
+- ❌ Cannot parallelize Phase 1 - it's foundational
+
+#### Phase 2: Can Be Parallelized After Phase 1
+
+Once Phase 1 is complete, Phase 2 tasks can run in parallel:
+
+**Parallel Tracks for Phase 2:**
 
 ```
-Month 1 (Jan 2026)
-├─ Week 1-2: Vue.js foundation + auth
-├─ Week 3-4: Backend flow generation API
-└─ Milestone: Working flow generation API
+PR #1: Phase 2.1 - Authentication
+├─ Branch: feature/phase-2.1-authentication
+├─ Dependencies: Phase 1 complete
+├─ Blocked by: None
+├─ Blocks: All Phase 3 work (need auth guards)
+└─ Can start: Immediately after Phase 1
 
-Month 2 (Feb 2026)
-├─ Week 1-2: Flow generation UI
-├─ Week 3-4: Apps editor with Monaco
-└─ Milestone: Can create flows and apps
+PR #2: Phase 2.2 - Dashboard  
+├─ Branch: feature/phase-2.2-dashboard
+├─ Dependencies: Phase 1 complete, Phase 2.1 (auth guards)
+├─ Blocked by: Phase 2.1 (needs authenticated API calls)
+├─ Blocks: Nothing
+└─ Can start: After Phase 2.1 completes
+```
 
-Month 3 (Mar 2026)
-├─ Week 1-2: Steps, execution, monitoring
-├─ Week 3-4: Dashboard, settings
-└─ Milestone: Feature parity achieved
+**Note:** Phase 2.2 depends on 2.1 because it needs authentication to make API calls. They cannot run truly in parallel.
 
-Month 4 (Apr 2026)
-├─ Week 1-2: Testing, bug fixes
-├─ Week 3: Beta testing
-├─ Week 4: Production launch
+#### Phase 3: Maximum Parallelization
+
+Phase 3 has the most opportunities for parallel work. After Phase 2 completes, you can run **up to 7 parallel PRs**:
+
+**Parallel Tracks for Phase 3:**
+
+```
+PR #3: Phase 3.1 - Flow Generation
+├─ Branch: feature/phase-3.1-flow-generation
+├─ Files: features/flows/ (generation components only)
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Phase 3.2 (same feature folder)
+├─ Conflicts with: Phase 3.2 (same feature - must do sequentially)
+└─ Can start: Immediately after Phase 2
+
+PR #4: Phase 3.2 - Flow Management
+├─ Branch: feature/phase-3.2-flow-management  
+├─ Files: features/flows/ (management components)
+├─ Dependencies: Phase 2 complete, Phase 3.1 complete
+├─ Blocked by: Phase 3.1 (same feature folder)
+├─ Blocks: Nothing
+└─ Can start: After Phase 3.1 completes
+
+PR #5: Phase 3.3 - Apps
+├─ Branch: feature/phase-3.3-apps
+├─ Files: features/apps/
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Nothing
+├─ Conflicts with: None
+└─ Can start: Immediately after Phase 2 (parallel with 3.1)
+
+PR #6: Phase 3.4 - Steps
+├─ Branch: feature/phase-3.4-steps
+├─ Files: features/steps/
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Nothing
+├─ Conflicts with: None
+└─ Can start: Immediately after Phase 2 (parallel with 3.1, 3.3)
+
+PR #7: Phase 3.5 - Projects
+├─ Branch: feature/phase-3.5-projects
+├─ Files: features/projects/
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Nothing
+├─ Conflicts with: None
+└─ Can start: Immediately after Phase 2 (parallel with 3.1, 3.3, 3.4)
+
+PR #8: Phase 3.6 - Runners
+├─ Branch: feature/phase-3.6-runners
+├─ Files: features/runners/
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Nothing
+├─ Conflicts with: None
+└─ Can start: Immediately after Phase 2 (parallel with 3.1, 3.3, 3.4, 3.5)
+
+PR #9: Phase 3.7 - Settings
+├─ Branch: feature/phase-3.7-settings
+├─ Files: features/settings/
+├─ Dependencies: Phase 2 complete
+├─ Blocked by: None
+├─ Blocks: Nothing
+├─ Conflicts with: None
+└─ Can start: Immediately after Phase 2 (parallel with 3.1, 3.3, 3.4, 3.5, 3.6)
+```
+
+**Optimal Phase 3 Parallelization Strategy:**
+
+1. **Wave 1 (Immediately after Phase 2):** Start 3.1, 3.3, 3.4, 3.5, 3.6, 3.7 in parallel (6 PRs)
+2. **Wave 2 (After 3.1 completes):** Start 3.2 (1 PR)
+
+**File Conflict Prevention:**
+- Phase 3 sub-phases work in **separate feature folders**
+- Only exception: 3.1 and 3.2 both touch `features/flows/` - must be sequential
+- All other Phase 3 work can run simultaneously
+- Shared files (`shared/`, `router/`, `App.vue`) may need coordination
+
+#### Phase 4: Sequential Validation
+
+Phase 4 must be sequential - it's validation and cleanup work that requires all features to be complete.
+
+### AI Agent Instructions Per Phase
+
+#### Phase 1.1 - Project Initialization
+
+**Prompt for AI Agent:**
+
+```
+Implement Phase 1.1 - Vue.js Project Initialization from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based)
+- Section 8: Implementation Strategy
+- Common Pitfalls for AI Agents (avoid these mistakes!)
+
+Key Instructions:
+1. Create a new Vite + Vue 3 + TypeScript project in src/automaton-studio-vue/
+2. Install latest stable versions from package.json template
+3. Configure Vuetify with DEFAULT Material Design 3 theme (no custom themes)
+4. Use vite-plugin-vuetify with autoImport: true
+5. Load JetBrains Mono font for code editors ONLY (Roboto loaded by Vuetify)
+6. Create App.vue with AppShell layout: AppBar + NavigationRail + Router
+7. Set up environment files (.env.development, .env.production) with API_BASE_URL
+8. Configure TypeScript with strict mode
+9. Set up ESLint + Prettier
+
+Deliverables:
+- [ ] npm run dev starts successfully
+- [ ] App displays with AppBar and NavigationRail
+- [ ] Dark mode toggle works
+- [ ] No console errors
+- [ ] TypeScript compiles without errors
+
+Do NOT:
+- Create custom Vuetify themes (use defaults)
+- Implement any page content yet (stubs come in Phase 1.2)
+- Make API calls (backend not connected yet)
+```
+
+#### Phase 1.2 - Page Stubs
+
+**Prompt for AI Agent:**
+
+```
+Implement Phase 1.2 - All Page Stubs from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based) - follow this exactly!
+- Section 7: UI/UX Redesign - contains all page design specs
+- Common Pitfalls for AI Agents - avoid these mistakes!
+- Page Stub Implementation Guide - follow the stub examples
+
+CRITICAL: Follow the UI/UX design specs in Section 7 EXACTLY for each page layout.
+
+For EACH page stub:
+1. Read the corresponding design spec (Section 7.1-7.7)
+2. Create the view component in features/{feature-name}/views/
+3. Use ONLY Vuetify components (v-card, v-row, v-col, v-btn, etc.)
+4. Implement the EXACT layout structure from the design (columns, panels, sections)
+5. Use v-skeleton-loader for data areas
+6. Use placeholder/mock data (no API calls)
+7. Add route to features/{feature-name}/routes.ts
+8. Import route in router/index.ts
+9. Add navigation item to NavigationRail component
+10. Test responsive behavior (mobile/tablet/desktop)
+11. Test dark mode
+
+Page Stubs to Create:
+- [ ] Auth: LoginView, RegisterView (features/auth/)
+- [ ] Dashboard: DashboardView (features/dashboard/)
+- [ ] Flows: FlowListView, FlowGenerationView (features/flows/)
+- [ ] Apps: AppListView, AppEditorView (features/apps/)
+- [ ] Steps: StepListView, StepEditorView (features/steps/)
+- [ ] Runners: RunnersView (features/runners/)
+- [ ] Projects: ProjectsListView, ProjectSettingsView (features/projects/)
+- [ ] Settings: SettingsView (features/settings/)
+
+Deliverables:
+- [ ] All 13 page stubs created
+- [ ] All routes work (can navigate between all pages)
+- [ ] NavigationRail has all menu items
+- [ ] Every page matches layout from design spec
+- [ ] Responsive works on all pages
+- [ ] Dark mode works on all pages
+- [ ] No console errors
+
+Do NOT:
+- Make API calls
+- Implement real data loading
+- Add complex state management (use ref() for mock data only)
+- Implement form submissions
+```
+
+#### Phase 2.1 - Authentication
+
+**Prompt for AI Agent:**
+
+```
+Implement Phase 2.1 - Authentication from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based) - create features/auth/ structure
+- Common Pitfalls for AI Agents - avoid these mistakes!
+- Quality Gates (Phase 2.x) - your deliverable checklist
+
+IMPORTANT: 
+- Follow Project Structure (Section 6) for features/auth/ folder
+- Review existing Blazor authentication implementation for API contract
+- Replace Phase 1.2 auth stubs with full implementation
+
+Tasks:
+1. Create auth.types.ts (LoginRequest, RegisterRequest, AuthResponse, User types)
+2. Create auth.service.ts (login, register, logout, refresh API calls)
+3. Create auth.store.ts (Pinia store for user state, token management)
+4. Create useAuth.ts composable (auth state helpers, login/logout methods)
+5. Update LoginView with real form validation (Vuelidate or VeeValidate)
+6. Update RegisterView with email confirmation flow
+7. Add auth guards to router (requireAuth middleware)
+8. Configure Axios interceptor for JWT token injection
+9. Handle token refresh on 401 responses
+10. Add logout functionality
+
+API Integration:
+- Connect to existing ASP.NET endpoints: POST /api/auth/login, POST /api/auth/register
+- Store JWT in localStorage (or httpOnly cookie if available)
+- Add Authorization: Bearer {token} header to all authenticated requests
+
+Deliverables:
+- [ ] Can register new user
+- [ ] Can login with credentials
+- [ ] Token stored and used for API calls
+- [ ] Protected routes redirect to login
+- [ ] Logout clears token and redirects to login
+- [ ] Token refresh works on expiration
+- [ ] No console errors
+
+Testing:
+- Test login with valid/invalid credentials
+- Test registration with validation errors
+- Test navigation to protected pages (should redirect)
+- Test logout and re-login
+```
+
+#### Phase 2.2 - Dashboard
+
+**Prompt for AI Agent:**
+
+```
+Implement Phase 2.2 - Dashboard from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based) - create features/dashboard/ structure
+- Section 7.1: Dashboard design spec - follow exact layout
+- Common Pitfalls for AI Agents - avoid these mistakes!
+- Quality Gates (Phase 2.x) - your deliverable checklist
+
+IMPORTANT:
+- Follow Project Structure (Section 6) for features/dashboard/ folder
+- Review Dashboard design spec (Section 7.1) for exact layout
+- Review Blazor Dashboard implementation for feature parity
+
+Prerequisites:
+- Phase 2.1 (Authentication) must be complete
+
+Tasks:
+1. Create dashboard.types.ts (DashboardStats, RecentExecution types)
+2. Create dashboard.service.ts (API calls for stats, recent executions)
+3. Create dashboard.store.ts (Pinia store for dashboard data)
+4. Create useDashboardStats.ts composable
+5. Create StatsCard.vue component (shows count + icon + label)
+6. Create RecentExecutions.vue component (list of recent flows)
+7. Create QuickActions.vue component (buttons for common actions)
+8. Create ExecutionTrendChart.vue (using Chart.js or similar)
+9. Update DashboardView to use real data from API
+
+API Integration:
+- GET /api/dashboard/stats (total flows, executions, success rate)
+- GET /api/dashboard/recent-executions (last 10 executions)
+
+Deliverables:
+- [ ] Dashboard displays real stats from API
+- [ ] Recent executions list populated
+- [ ] Quick action buttons navigate correctly
+- [ ] Execution trend chart displays data
+- [ ] Loading states work (skeleton loaders)
+- [ ] Error states work (error messages)
+- [ ] Responsive layout works
+- [ ] Dark mode works
+
+Testing:
+- Test with no data (empty state)
+- Test with API errors (error state)
+- Test loading states
+- Test all quick action buttons
+```
+
+#### Phase 3.x - Feature Implementation Template
+
+**Generic Prompt for Phase 3 Features:**
+
+```
+Implement Phase 3.{X} - {Feature Name} from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based) - create features/{feature}/ structure
+- Section 7.{X}: {Feature} design spec - follow exact layout
+- Common Pitfalls for AI Agents - avoid these mistakes!
+- Quality Gates (Phase 3.x) - your deliverable checklist
+- File Change Tracking - see which files you should modify
+- Merge Conflict Prevention - coordinate with other parallel PRs
+
+IMPORTANT:
+- Follow Project Structure (Section 6) for features/{feature}/ folder
+- Review {Feature} design spec (Section 7.{X}) for exact layout
+- Review Blazor {Feature} implementation for feature parity
+- All Phase 3 work can run in parallel (except 3.1 and 3.2 - those are sequential)
+
+Prerequisites:
+- Phase 2 (Authentication & Dashboard) must be complete
+
+Standard Tasks for Each Feature:
+1. Create {feature}.types.ts (all TypeScript interfaces)
+2. Create {feature}.service.ts (API service class)
+3. Create {feature}.store.ts (Pinia store)
+4. Create use{Feature}.ts composables (as needed)
+5. Create feature-specific components (in components/ folder)
+6. Update view components (replace stubs with real implementation)
+7. Add routes.ts for feature routing
+8. Connect to existing ASP.NET API endpoints
+
+For Each View Component:
+- Replace placeholder/mock data with API calls
+- Implement all CRUD operations (Create, Read, Update, Delete)
+- Add form validation
+- Add loading states (v-skeleton-loader)
+- Add error states (error messages, retry buttons)
+- Add empty states (when no data)
+- Test responsive layouts
+- Test dark mode
+
+API Integration:
+- Review Blazor implementation to find existing API endpoints
+- Use same endpoint contracts (don't break existing API)
+- Add Authorization header (handled by Axios interceptor from Phase 2.1)
+
+Deliverables:
+- [ ] All CRUD operations work
+- [ ] Data loads from API
+- [ ] Forms validate correctly
+- [ ] Loading/error/empty states work
+- [ ] Navigation between views works
+- [ ] Responsive layout works
+- [ ] Dark mode works
+- [ ] No console errors
+- [ ] Feature parity with Blazor implementation verified
+
+Testing Checklist:
+- [ ] Test with empty data
+- [ ] Test with API errors (network failure)
+- [ ] Test all form validations
+- [ ] Test all buttons/actions
+- [ ] Test responsive on mobile/tablet/desktop
+- [ ] Test dark mode toggle
+```
+
+### Quality Gates
+
+**Before Moving to Next Phase:**
+
+Each phase must pass these quality gates before proceeding:
+
+#### Phase 1.1 Quality Gate
+- [ ] `npm run dev` starts without errors
+- [ ] `npm run build` succeeds
+- [ ] `npm run type-check` passes
+- [ ] App displays with AppBar + NavigationRail
+- [ ] Dark mode toggle works
+- [ ] No TypeScript errors
+- [ ] No console errors/warnings
+
+#### Phase 1.2 Quality Gate
+- [ ] All 13 page stubs exist and are navigable
+- [ ] All routes work (no 404s)
+- [ ] NavigationRail shows all menu items
+- [ ] Every page matches layout from design spec (visual review)
+- [ ] Responsive works on mobile (375px), tablet (768px), desktop (1440px)
+- [ ] Dark mode works on all pages
+- [ ] No console errors
+- [ ] No TypeScript errors
+
+#### Phase 2.x Quality Gate
+- [ ] Feature functionality works end-to-end
+- [ ] API integration works (real data loads)
+- [ ] All forms validate correctly
+- [ ] Loading states display during API calls
+- [ ] Error states display on API failures
+- [ ] Empty states display when no data
+- [ ] Navigation works correctly
+- [ ] Responsive works on all breakpoints
+- [ ] Dark mode works
+- [ ] No console errors
+- [ ] No TypeScript errors
+
+#### Phase 3.x Quality Gate
+Same as Phase 2.x, plus:
+- [ ] Feature parity verified against Blazor implementation
+- [ ] All existing features from Blazor are present
+- [ ] No regressions (existing functionality still works)
+
+### Common Pitfalls for AI Agents
+
+**Avoid These Mistakes:**
+
+1. **❌ Custom Vuetify Themes**
+   - Don't create custom themes - use Vuetify defaults
+   - Don't add CSS variables for colors - use Vuetify's theme system
+
+2. **❌ Importing Vuetify Styles Manually**
+   - Don't import 'vuetify/styles' in plugins/vuetify.ts
+   - vite-plugin-vuetify with autoImport handles this
+
+3. **❌ Custom CSS Before Vuetify**
+   - Import custom CSS AFTER Vuetify initialization in main.ts
+   - Wrong: Import main.css before createVuetify()
+   - Correct: Import main.css after app.use(vuetify)
+
+4. **❌ Not Following Project Structure**
+   - Don't put all components in src/components/
+   - Use feature-based structure: features/{feature}/components/
+   - Keep feature code isolated
+
+5. **❌ Skipping Design Spec Review**
+   - Don't guess at layouts - read Section 7 design specs
+   - Match the exact structure from ASCII diagrams
+   - Use correct Vuetify components (v-card, v-row, v-col, etc.)
+
+6. **❌ Mock Data in Production Code**
+   - Remove all mock/placeholder data when implementing features
+   - Connect to real API endpoints
+   - Don't leave hardcoded arrays in production components
+
+7. **❌ Missing States**
+   - Don't forget loading states (use v-skeleton-loader)
+   - Don't forget error states (show error messages)
+   - Don't forget empty states (show helpful message when no data)
+
+8. **❌ Not Testing Responsive**
+   - Don't only test on desktop
+   - Test on mobile (375px), tablet (768px), desktop (1440px)
+   - Use Vuetify's responsive props (cols, sm, md, lg)
+
+9. **❌ Not Testing Dark Mode**
+   - Don't only test in light mode
+   - Toggle dark mode and verify all pages
+   - Use Vuetify's theme colors (not hardcoded colors)
+
+10. **❌ TypeScript Errors Ignored**
+    - Don't proceed with `any` types everywhere
+    - Create proper interfaces in {feature}.types.ts
+    - Run `npm run type-check` before committing
+
+### File Change Tracking
+
+**Per Phase, Track Which Files Are Modified:**
+
+This helps prevent merge conflicts when running parallel PRs.
+
+**Phase 1.1 Files:**
+```
+CREATE: src/automaton-studio-vue/ (entire project)
+CREATE: package.json, vite.config.ts, tsconfig.json
+CREATE: src/main.ts, src/App.vue
+CREATE: src/plugins/vuetify.ts
+CREATE: src/router/index.ts
+CREATE: src/shared/components/layout/AppShell.vue
+CREATE: src/shared/components/layout/AppBar.vue
+CREATE: src/shared/components/layout/NavigationRail.vue
+CREATE: src/assets/styles/main.css
+```
+
+**Phase 1.2 Files:**
+```
+MODIFY: src/router/index.ts (add all routes)
+MODIFY: src/shared/components/layout/NavigationRail.vue (add menu items)
+
+CREATE: features/auth/routes.ts
+CREATE: features/auth/views/LoginView.vue (stub)
+CREATE: features/auth/views/RegisterView.vue (stub)
+
+CREATE: features/dashboard/routes.ts
+CREATE: features/dashboard/views/DashboardView.vue (stub)
+
+CREATE: features/flows/routes.ts
+CREATE: features/flows/views/FlowListView.vue (stub)
+CREATE: features/flows/views/FlowGenerationView.vue (stub)
+
+... (repeat for all 8 features)
+```
+
+**Phase 2.1 Files (Auth):**
+```
+MODIFY: src/router/index.ts (add auth guards)
+MODIFY: src/shared/services/api/axios-instance.ts (add interceptors)
+
+CREATE: features/auth/types/auth.types.ts
+CREATE: features/auth/services/auth.service.ts
+CREATE: features/auth/stores/auth.store.ts
+CREATE: features/auth/composables/useAuth.ts
+
+MODIFY: features/auth/views/LoginView.vue (full implementation)
+MODIFY: features/auth/views/RegisterView.vue (full implementation)
+```
+
+**Phase 3.3 Files (Apps) - Example of Parallel PR:**
+```
+Only touches features/apps/ folder - safe to run in parallel with other Phase 3 PRs
+
+CREATE: features/apps/types/apps.types.ts
+CREATE: features/apps/services/apps.service.ts
+CREATE: features/apps/stores/apps.store.ts
+CREATE: features/apps/composables/useAppEditor.ts
+CREATE: features/apps/composables/useMonacoEditor.ts
+
+MODIFY: features/apps/views/AppListView.vue (full implementation)
+MODIFY: features/apps/views/AppEditorView.vue (full implementation)
+
+CREATE: features/apps/components/AppCard.vue
+CREATE: features/apps/components/AppEditor.vue
+CREATE: features/apps/components/AppPreview.vue
+... (other components)
+```
+
+### Merge Conflict Prevention
+
+**When Running Parallel PRs:**
+
+1. **Shared Files Coordination:**
+   - `src/router/index.ts` - Each feature adds its own routes; merge carefully
+   - `src/shared/components/layout/NavigationRail.vue` - Each feature may add menu items; merge carefully
+   - `package.json` - Lock dependencies in Phase 1.1; no changes in later phases
+
+2. **Strategy:**
+   - Merge Phase 1 first (foundation)
+   - Merge Phase 2.1 (auth) before any Phase 3 PRs
+   - Merge Phase 3 PRs in any order (they don't conflict)
+   - If two Phase 3 PRs both modify router/index.ts:
+     - Merge one first
+     - Rebase the other and resolve conflicts
+     - Both route additions should be preserved
+
+3. **Review Checklist for Merging Parallel PRs:**
+   - [ ] No TypeScript errors after merge
+   - [ ] npm run dev still works
+   - [ ] All routes still work (no 404s)
+   - [ ] NavigationRail shows all menu items
+   - [ ] No duplicate route paths
+   - [ ] No duplicate imports in router
+
+---
+
+## Timeline & Milestones
+
+### High-Level Milestones
+
+```
+Phase 1: Project Setup & Foundation
+├─ Setup complete
+├─ All page stubs navigable
+└─ Milestone: Navigable app shell with all page stubs
+
+Phase 2: Authentication & Dashboard
+├─ Authentication working
+├─ Dashboard functional
+└─ Milestone: Users can log in and view dashboard
+
+Phase 3: Feature Parity
+├─ Flow generation and management
+├─ Apps, Steps, Projects
+├─ Runners and Settings
+└─ Milestone: All features from Blazor app available
+
+Phase 4: Polish & Launch
+├─ Quality assurance complete
+├─ Beta testing complete
 └─ Milestone: Vue.js UI live in production
 ```
 
