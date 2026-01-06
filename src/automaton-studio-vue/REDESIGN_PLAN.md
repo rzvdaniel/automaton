@@ -13,7 +13,7 @@ This document outlines the complete redesign of Automaton Studio from Blazor Web
 
 ### Key Changes
 
-1. **Frontend Framework:** Blazor WASM + Ant Design Blazor → Vue 3 + TypeScript + Vuetify
+1. **Frontend Framework:** Blazor WASM + Ant Design Blazor → Vue 3 + TypeScript + PrimeVue
 2. **Flow Creation:** Drag-and-drop designer → AI-powered natural language generation
 3. **Step Library:** Pre-built steps → AI-generated custom steps with intelligent reuse
 4. **Developer Experience:** Limited debugging → Full browser DevTools access
@@ -92,7 +92,7 @@ This document outlines the complete redesign of Automaton Studio from Blazor Web
 │  │   Flows     │    Apps      │   Steps/Settings   │   │
 │  │ (AI-First)  │ (Visual IDE) │   (Management)     │   │
 │  └─────────────┴──────────────┴────────────────────┘   │
-│         Vue 3 + TypeScript + Vuetify                    │
+│         Vue 3 + TypeScript + PrimeVue                   │
 └─────────────────────────────────────────────────────────┘
                           │
                     HTTPS/REST
@@ -130,7 +130,7 @@ This document outlines the complete redesign of Automaton Studio from Blazor Web
 | **Framework** | Vue.js | 3.4+ | Mature, reactive, excellent TypeScript support |
 | **Language** | TypeScript | 5.0+ | Type safety, better DX than pure JavaScript |
 | **Build Tool** | Vite | 5.0+ | Fast HMR, modern ESM-based build |
-| **UI Library** | Vuetify | 3.4+ | Most popular Vue UI library, Material Design, 80+ components, excellent docs |
+| **UI Library** | PrimeVue | 4.0+ | Enterprise-grade Vue UI library, 90+ components, excellent TypeScript support, professional themes |
 | **State Management** | Pinia | 2.1+ | Vue 3's official state management |
 | **Router** | Vue Router | 4.0+ | Official routing solution |
 | **HTTP Client** | Axios | 1.6+ | Industry standard, interceptors for auth |
@@ -802,7 +802,7 @@ src/automaton-studio-vue/
 │   │   ├── styles/
 │   │   │   ├── main.css
 │   │   │   ├── variables.css
-│   │   │   ├── vuetify-overrides.css
+│   │   │   ├── primevue-overrides.css
 │   │   │   └── themes/
 │   │   │       ├── light.css
 │   │   │       └── dark.css
@@ -1005,58 +1005,59 @@ This section defines the visual design system and page-by-page redesign specific
 
 ### Design System
 
-#### Material Design 3 Principles
+#### Design Principles
 
-Automaton Studio follows [Material Design 3](https://m3.material.io/) guidelines using Vuetify's default implementation:
+Automaton Studio follows modern design principles using PrimeVue's professional theme system:
 
-1. **Dynamic Color** - Consistent color theming with light/dark mode support
-2. **Elevated Surfaces** - Clear visual hierarchy through elevation
+1. **Consistent Theming** - Built-in light/dark mode support with professional color palettes
+2. **Visual Hierarchy** - Clear component elevation and spacing
 3. **Responsive Layout** - Adaptive layouts for desktop, tablet, and mobile
-4. **Motion** - Meaningful animations for state transitions
-5. **Accessibility** - WCAG 2.1 AA compliance
+4. **Smooth Interactions** - Meaningful animations for state transitions
+5. **Accessibility** - WCAG 2.1 AA compliance built into all components
 
-**Note:** We use Vuetify's **default theme, colors, typography, and spacing**. This ensures:
-- Consistent Material Design 3 implementation
-- Automatic updates when Vuetify evolves
+**Note:** We use PrimeVue's **default Aura theme** (their modern design system). This ensures:
+- Professional, enterprise-grade appearance
+- Automatic updates when PrimeVue evolves
 - No custom theme maintenance overhead
 - Battle-tested accessibility and responsive behavior
 
 #### Color Palette
 
-We use **Vuetify's default color palette** with built-in light/dark mode support:
-- **Primary:** Blue (configurable per Vuetify's theme system)
-- **Secondary, Success, Warning, Error, Info:** Vuetify defaults
-- **Surface & Background:** Material Design 3 defaults
-- **Dark Mode:** Automatic theme switching
+We use **PrimeVue's default Aura theme palette** with built-in light/dark mode support:
+- **Primary:** Blue (customizable via PrimeVue theme configuration)
+- **Secondary, Success, Warning, Error, Info:** Aura theme defaults
+- **Surface & Background:** Semantic color tokens for light/dark modes
+- **Dark Mode:** Automatic theme switching with semantic tokens
 
-See: [Vuetify Theme Configuration](https://vuetifyjs.com/en/features/theme/)
+See: [PrimeVue Theming](https://primevue.org/theming/)
 
 #### Typography
 
-We use **Vuetify's default typography** based on Material Design 3:
-- **Font Family:** Roboto (loaded via Vuetify)
-- **Headings:** h1-h6 with Material Design 3 scale
-- **Body Text:** Material Design 3 text styles
-- **Code/Monospace:** Use `class="font-mono"` with JetBrains Mono (loaded separately for code editors)
+We use **PrimeVue's default typography system**:
+- **Font Family:** Inter (modern, highly readable sans-serif)
+- **Headings:** Semantic heading styles with proper hierarchy
+- **Body Text:** Optimized for readability
+- **Code/Monospace:** Use PrimeVue's `<Code>` component or `class="font-mono"` with JetBrains Mono (loaded separately for code editors)
 
-See: [Vuetify Typography](https://vuetifyjs.com/en/styles/text-and-typography/)
+See: [PrimeVue Typography](https://primevue.org/typography/)
 
 #### Spacing & Layout
 
-We use **Vuetify's default spacing system** (4px base unit):
-- **Spacing:** `ma-1` to `ma-16` (margins), `pa-1` to `pa-16` (padding)
-- **Grid System:** 12-column responsive grid with built-in breakpoints
-- **Breakpoints:** `xs`, `sm`, `md`, `lg`, `xl` (Vuetify defaults)
+We use **PrimeVue's spacing utilities and Flex CSS Grid**:
+- **Spacing:** Based on rem units for consistent scaling
+- **Grid System:** Flex CSS Grid with responsive breakpoints
+- **Breakpoints:** Standard responsive breakpoints (sm, md, lg, xl)
+- **Utilities:** Built-in spacing, padding, and margin utilities
 
-See: [Vuetify Spacing](https://vuetifyjs.com/en/styles/spacing/)
+See: [PrimeVue Flex Grid](https://primevue.org/flexgrid/)
 
 #### Component Styling
 
-We use **Vuetify's default component styles**:
+We use **PrimeVue's default component styles from Aura theme**:
 - **Cards:** Default border radius, elevation, and padding
-- **Buttons:** Default variants (flat, outlined, text, etc.)
-- **Inputs:** Default variants (outlined, filled, solo, etc.)
-- **Navigation:** Default navigation drawer and app bar dimensions
+- **Buttons:** Default variants (primary, secondary, outlined, text, etc.)
+- **Inputs:** Default variants with floating labels
+- **Navigation:** Default menu, sidebar, and toolbar dimensions
 
 **Custom overrides:** Only when necessary for code editor integration (Monaco) or specific UX requirements
 
@@ -1248,7 +1249,82 @@ We use **Vuetify's default component styles**:
 
 ---
 
-#### 3. Apps Page (Visual IDE)
+#### 3. Apps List Page
+
+**Current:** Missing - users go directly to app editor
+**New:** Organized gallery with search and quick actions
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Apps                                              [+ New App]   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  🔍 Search apps...                      [All ▼] [Published ▼]  │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ My Apps (8)                                                 ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │ ┌───────────────────┐ ┌───────────────────┐ ┌─────────────┐ ││
+│  │ │ 🌐 Customer Portal│ │ 🌐 Admin Dashboard│ │ 🌐 Feedback │ ││
+│  │ │                   │ │                   │ │   Form      │ ││
+│  │ │ Internal tool for │ │ Monitor system    │ │ Collect user│ ││
+│  │ │ customer support  │ │ health and manage │ │ feedback    │ ││
+│  │ │ team              │ │ users             │ │             │ ││
+│  │ │                   │ │                   │ │             │ ││
+│  │ │ ✅ Published      │ │ 📝 Draft          │ │ ✅ Published│ ││
+│  │ │ 3 files, 2 steps  │ │ 5 files, 4 steps  │ │ 1 file      │ ││
+│  │ │ Updated: 2h ago   │ │ Updated: 1d ago   │ │ Updated: 3d │ ││
+│  │ │                   │ │                   │ │             │ ││
+│  │ │ [Edit] [View] ⋮   │ │ [Edit] [Publish]⋮ │ │ [Edit] [⋮]  │ ││
+│  │ └───────────────────┘ └───────────────────┘ └─────────────┘ ││
+│  │                                                             ││
+│  │ ┌───────────────────┐ ┌───────────────────┐ ┌─────────────┐ ││
+│  │ │ 🌐 Workflow Viewer│ │ 🌐 Data Export    │ │ 🌐 API Tester││
+│  │ │                   │ │   Tool            │ │             │ ││
+│  │ │ View flow status  │ │ Export reports to │ │ Test API    │ ││
+│  │ │ and execution     │ │ CSV/PDF           │ │ endpoints   │ ││
+│  │ │ history           │ │                   │ │             │ ││
+│  │ │                   │ │                   │ │             │ ││
+│  │ │ ✅ Published      │ │ ✅ Published      │ │ 📝 Draft    │ ││
+│  │ │ 4 files, 1 step   │ │ 2 files, 3 steps  │ │ 2 files     │ ││
+│  │ │ Updated: 5d ago   │ │ Updated: 1w ago   │ │ Updated: 2w │ ││
+│  │ │                   │ │                   │ │             │ ││
+│  │ │ [Edit] [View] ⋮   │ │ [Edit] [View] ⋮   │ │ [Edit] [⋮]  │ ││
+│  │ └───────────────────┘ └───────────────────┘ └─────────────┘ ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 💡 Quick Start                                              ││
+│  │                                                             ││
+│  │ New to apps? Create your first web app with AI:            ││
+│  │ • Simple data entry form                                   ││
+│  │ • Dashboard with charts                                    ││
+│  │ • Customer feedback portal                                 ││
+│  │                                                             ││
+│  │ [Create with AI] [View Examples]                           ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+- Card-based gallery layout with app previews
+- Status indicators (Published/Draft)
+- File and step counts for quick overview
+- Quick actions: Edit, View (for published), Publish (for drafts)
+- Search and filter by status
+- Quick start section for new users
+- More menu (⋮) for additional actions: Duplicate, Delete, Settings, Unpublish
+
+**App Card Details:**
+- Icon (🌐) with app name
+- Description (2 lines max)
+- Status badge (✅ Published or 📝 Draft)
+- Metadata: file count, backend step count, last update time
+- Primary actions visible, secondary in menu
+
+---
+
+#### 4. App Editor (Visual IDE)
 
 **Current Issues:**
 - Tabs don't render properly (Blazor bug)
@@ -1291,7 +1367,7 @@ We use **Vuetify's default component styles**:
 
 **Key Changes:**
 - Three-panel layout: Files | Editor | Preview
-- Tabs work correctly (Vue.js/Vuetify)
+- Tabs work correctly (Vue.js/PrimeVue)
 - Resizable panels via drag handles
 - Backend steps shown separately in file tree
 - AI assistant panel at bottom
@@ -1299,7 +1375,7 @@ We use **Vuetify's default component styles**:
 
 ---
 
-#### 4. Steps Page
+#### 5. Steps Page
 
 **Current:** Simple list of custom steps
 **New:** Organized library with search and categories
@@ -1370,7 +1446,7 @@ We use **Vuetify's default component styles**:
 
 ---
 
-#### 5. Runners Page
+#### 6. Runners Page
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1405,7 +1481,7 @@ We use **Vuetify's default component styles**:
 
 ---
 
-#### 6. Projects Page (Multi-Tenancy)
+#### 7. Projects Page (Multi-Tenancy)
 
 **Current:** Projects dropdown in top-left, basic project management
 **New:** Enhanced project switcher + comprehensive project management
@@ -1574,7 +1650,7 @@ We use **Vuetify's default component styles**:
 
 ---
 
-#### 7. Settings Page
+#### 8. Settings Page
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1701,7 +1777,7 @@ For each page/feature, follow this process:
 
 ### Page Stub Implementation Guide (Phase 1.2)
 
-**Goal:** Create visual structure for all pages using Vuetify components with placeholder/static content.
+**Goal:** Create visual structure for all pages using PrimeVue components with placeholder/static content.
 
 **Example Stub Structure:**
 
@@ -1718,51 +1794,49 @@ const mockData = ref([
 </script>
 
 <template>
-  <div>
+  <div class="p-4">
     <!-- Page Header -->
-    <div class="d-flex align-center justify-space-between mb-6">
+    <div class="flex align-items-center justify-content-between mb-6">
       <div>
-        <h1 class="text-h5 font-weight-bold">Page Title</h1>
-        <p class="text-body-2 text-medium-emphasis">Page description</p>
+        <h1 class="text-3xl font-bold">Page Title</h1>
+        <p class="text-color-secondary">Page description</p>
       </div>
-      <v-btn color="primary" prepend-icon="mdi-plus">
-        Create New
-      </v-btn>
+      <Button icon="pi pi-plus" label="Create New" />
     </div>
 
     <!-- Main Content Area -->
-    <v-row>
-      <v-col cols="12" md="8">
-        <v-card>
-          <v-card-title>Section Title</v-card-title>
-          <v-divider />
-          <v-card-text>
+    <div class="grid">
+      <div class="col-12 md:col-8">
+        <Card>
+          <template #title>Section Title</template>
+          <template #content>
             <!-- Placeholder content -->
-            <v-skeleton-loader type="list-item-three-line" />
-          </v-card-text>
-        </v-card>
-      </v-col>
+            <Skeleton height="4rem" class="mb-2" />
+            <Skeleton height="4rem" class="mb-2" />
+            <Skeleton height="4rem" />
+          </template>
+        </Card>
+      </div>
 
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Side Panel</v-card-title>
-          <v-divider />
-          <v-card-text>
-            <p class="text-body-2 text-medium-emphasis">
+      <div class="col-12 md:col-4">
+        <Card>
+          <template #title>Side Panel</template>
+          <template #content>
+            <p class="text-color-secondary">
               This panel will show details...
             </p>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+          </template>
+        </Card>
+      </div>
+    </div>
   </div>
 </template>
 ```
 
 **Key Principles for Stubs:**
-- ✅ Use Vuetify components only (v-card, v-btn, v-row, etc.)
+- ✅ Use PrimeVue components only (Card, Button, DataTable, etc.)
 - ✅ Follow the layout structure from the design spec exactly
-- ✅ Use `v-skeleton-loader` for data areas
+- ✅ Use `Skeleton` component for data areas
 - ✅ Use placeholder text for descriptions
 - ✅ Include all major UI sections (headers, panels, sidebars)
 - ✅ Wire up navigation (buttons can route to other stubs)
@@ -1784,9 +1858,9 @@ const mockData = ref([
 
 **1.1: Vue.js Project Initialization**
 - [ ] Create Vue 3 + Vite + TypeScript project
-- [ ] Install Vuetify, Pinia, Vue Router, Axios
+- [ ] Install PrimeVue, Pinia, Vue Router, Axios
 - [ ] Configure TypeScript, ESLint, Prettier
-- [ ] Configure Vuetify with default Material Design 3 theme
+- [ ] Configure PrimeVue with default Aura theme
 - [ ] Set up JetBrains Mono font for code editors
 - [ ] Set up dev/prod environment configs
 - [ ] Build application shell (App Bar + Navigation Rail + Router)
@@ -1872,7 +1946,7 @@ const mockData = ref([
 
 **3.3: Apps**
 - [ ] **Follow Project Structure** for `apps/` feature (see Section 6)
-- [ ] **Review Apps page design spec** (see Section 7.3)
+- [ ] **Review Apps page design specs** (see Sections 7.3 and 7.4)
 - [ ] **Review Blazor Apps implementation** for feature parity
 - [ ] Build `AppListView` (list of apps with cards)
 - [ ] Build `AppEditorView` with three-panel layout
@@ -1886,7 +1960,7 @@ const mockData = ref([
 
 **3.4: Steps**
 - [ ] **Follow Project Structure** for `steps/` feature (see Section 6)
-- [ ] **Review Steps page design spec** (see Section 7.4)
+- [ ] **Review Steps page design spec** (see Section 7.5)
 - [ ] **Review Blazor Steps implementation** for feature parity
 - [ ] Build `StepListView` with search and filters
 - [ ] Build `StepEditorView` with Monaco + config panel
@@ -1895,7 +1969,7 @@ const mockData = ref([
 
 **3.5: Projects**
 - [ ] **Follow Project Structure** for `projects/` feature (see Section 6)
-- [ ] **Review Projects page design spec** (see Section 7.6)
+- [ ] **Review Projects page design spec** (see Section 7.7)
 - [ ] **Review Blazor Projects implementation** for feature parity
 - [ ] Build project switcher in app bar
 - [ ] Build Projects list view (Your Projects + Shared)
@@ -1905,7 +1979,7 @@ const mockData = ref([
 
 **3.6: Runners**
 - [ ] **Follow Project Structure** for `runners/` feature (see Section 6)
-- [ ] **Review Runners page design spec** (see Section 7.5)
+- [ ] **Review Runners page design spec** (see Section 7.6)
 - [ ] **Review Blazor Runners implementation** for feature parity
 - [ ] Implement runners management page with status cards
 - [ ] Port runner connection and monitoring features
@@ -1914,7 +1988,7 @@ const mockData = ref([
 
 **3.7: Settings**
 - [ ] **Follow Project Structure** for `settings/` feature (see Section 6)
-- [ ] **Review Settings page design spec** (see Section 7.7)
+- [ ] **Review Settings page design spec** (see Section 7.8)
 - [ ] **Review Blazor Settings implementation** for feature parity
 - [ ] Port settings pages (account, API keys, AI keys)
 - [ ] Implement appearance settings (dark mode toggle)
@@ -2066,20 +2140,18 @@ Update `vite.config.ts` to support deployment to a subdirectory:
 ```typescript
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vuetify from 'vite-plugin-vuetify'
 import path from 'path'
 
 export default defineConfig(({ mode }) => {
   // GitHub Pages base path (repository name)
-  const base = mode === 'production' 
+  const base = mode === 'production'
     ? '/automaton/'  // For https://rzvdaniel.github.io/automaton/
     : '/'            // For local dev
 
   return {
     base,
     plugins: [
-      vue(),
-      vuetify({ autoImport: true })
+      vue()
     ],
     resolve: {
       alias: {
@@ -2411,23 +2483,23 @@ Pay special attention to:
 Key Instructions:
 1. Create a new Vite + Vue 3 + TypeScript project in src/automaton-studio-vue/
 2. Install latest stable versions from package.json template
-3. Configure Vuetify with DEFAULT Material Design 3 theme (no custom themes)
-4. Use vite-plugin-vuetify with autoImport: true
-5. Load JetBrains Mono font for code editors ONLY (Roboto loaded by Vuetify)
-6. Create App.vue with AppShell layout: AppBar + NavigationRail + Router
+3. Configure PrimeVue with DEFAULT Aura theme (no custom themes)
+4. Import PrimeVue styles and components in main.ts
+5. Load JetBrains Mono font for code editors ONLY (Inter loaded by PrimeVue)
+6. Create App.vue with AppShell layout: Toolbar + Sidebar + Router
 7. Set up environment files (.env.development, .env.production) with API_BASE_URL
 8. Configure TypeScript with strict mode
 9. Set up ESLint + Prettier
 
 Deliverables:
 - [ ] npm run dev starts successfully
-- [ ] App displays with AppBar and NavigationRail
+- [ ] App displays with Toolbar and Sidebar
 - [ ] Dark mode toggle works
 - [ ] No console errors
 - [ ] TypeScript compiles without errors
 
 Do NOT:
-- Create custom Vuetify themes (use defaults)
+- Create custom PrimeVue themes (use Aura defaults)
 - Implement any page content yet (stubs come in Phase 1.2)
 - Make API calls (backend not connected yet)
 ```
@@ -2449,15 +2521,15 @@ Pay special attention to:
 CRITICAL: Follow the UI/UX design specs in Section 7 EXACTLY for each page layout.
 
 For EACH page stub:
-1. Read the corresponding design spec (Section 7.1-7.7)
+1. Read the corresponding design spec (Section 7.1-7.8)
 2. Create the view component in features/{feature-name}/views/
-3. Use ONLY Vuetify components (v-card, v-row, v-col, v-btn, etc.)
+3. Use ONLY PrimeVue components (Card, Button, DataTable, Panel, etc.)
 4. Implement the EXACT layout structure from the design (columns, panels, sections)
-5. Use v-skeleton-loader for data areas
+5. Use Skeleton component for data areas
 6. Use placeholder/mock data (no API calls)
 7. Add route to features/{feature-name}/routes.ts
 8. Import route in router/index.ts
-9. Add navigation item to NavigationRail component
+9. Add navigation item to Sidebar component
 10. Test responsive behavior (mobile/tablet/desktop)
 11. Test dark mode
 
@@ -2710,18 +2782,19 @@ Same as Phase 2.x, plus:
 
 **Avoid These Mistakes:**
 
-1. **❌ Custom Vuetify Themes**
-   - Don't create custom themes - use Vuetify defaults
-   - Don't add CSS variables for colors - use Vuetify's theme system
+1. **❌ Custom PrimeVue Themes**
+   - Don't create custom themes - use Aura theme defaults
+   - Don't add CSS variables for colors - use PrimeVue's theme tokens
 
-2. **❌ Importing Vuetify Styles Manually**
-   - Don't import 'vuetify/styles' in plugins/vuetify.ts
-   - vite-plugin-vuetify with autoImport handles this
+2. **❌ Importing PrimeVue Incorrectly**
+   - Import 'primevue/resources/themes/aura-light-blue/theme.css' in main.ts
+   - Import 'primevue/resources/primevue.min.css' for component styles
+   - Import 'primeicons/primeicons.css' for icons
 
-3. **❌ Custom CSS Before Vuetify**
-   - Import custom CSS AFTER Vuetify initialization in main.ts
-   - Wrong: Import main.css before createVuetify()
-   - Correct: Import main.css after app.use(vuetify)
+3. **❌ Custom CSS Conflicting with PrimeVue**
+   - Import custom CSS AFTER PrimeVue styles in main.ts
+   - Wrong: Import main.css before PrimeVue styles
+   - Correct: Import main.css after all PrimeVue imports
 
 4. **❌ Not Following Project Structure**
    - Don't put all components in src/components/
@@ -2731,7 +2804,7 @@ Same as Phase 2.x, plus:
 5. **❌ Skipping Design Spec Review**
    - Don't guess at layouts - read Section 7 design specs
    - Match the exact structure from ASCII diagrams
-   - Use correct Vuetify components (v-card, v-row, v-col, etc.)
+   - Use correct PrimeVue components (Card, Button, DataTable, Panel, etc.)
 
 6. **❌ Mock Data in Production Code**
    - Remove all mock/placeholder data when implementing features
@@ -2739,19 +2812,19 @@ Same as Phase 2.x, plus:
    - Don't leave hardcoded arrays in production components
 
 7. **❌ Missing States**
-   - Don't forget loading states (use v-skeleton-loader)
-   - Don't forget error states (show error messages)
+   - Don't forget loading states (use Skeleton component)
+   - Don't forget error states (show error messages with Message component)
    - Don't forget empty states (show helpful message when no data)
 
 8. **❌ Not Testing Responsive**
    - Don't only test on desktop
    - Test on mobile (375px), tablet (768px), desktop (1440px)
-   - Use Vuetify's responsive props (cols, sm, md, lg)
+   - Use PrimeVue's responsive grid (col-12, md:col-8, etc.)
 
 9. **❌ Not Testing Dark Mode**
    - Don't only test in light mode
    - Toggle dark mode and verify all pages
-   - Use Vuetify's theme colors (not hardcoded colors)
+   - Use PrimeVue's theme tokens (not hardcoded colors)
 
 10. **❌ TypeScript Errors Ignored**
     - Don't proceed with `any` types everywhere
@@ -2769,18 +2842,17 @@ This helps prevent merge conflicts when running parallel PRs.
 CREATE: src/automaton-studio-vue/ (entire project)
 CREATE: package.json, vite.config.ts, tsconfig.json
 CREATE: src/main.ts, src/App.vue
-CREATE: src/plugins/vuetify.ts
 CREATE: src/router/index.ts
 CREATE: src/shared/components/layout/AppShell.vue
-CREATE: src/shared/components/layout/AppBar.vue
-CREATE: src/shared/components/layout/NavigationRail.vue
+CREATE: src/shared/components/layout/AppToolbar.vue
+CREATE: src/shared/components/layout/AppSidebar.vue
 CREATE: src/assets/styles/main.css
 ```
 
 **Phase 1.2 Files:**
 ```
 MODIFY: src/router/index.ts (add all routes)
-MODIFY: src/shared/components/layout/NavigationRail.vue (add menu items)
+MODIFY: src/shared/components/layout/AppSidebar.vue (add menu items)
 
 CREATE: features/auth/routes.ts
 CREATE: features/auth/views/LoginView.vue (stub)
@@ -2956,7 +3028,7 @@ Phase 4: Polish & Launch
 
 ### References
 
-- [Vuetify Documentation](https://vuetifyjs.com/)
+- [PrimeVue Documentation](https://primevue.org/)
 - [Vue 3 Documentation](https://vuejs.org/)
 - [Vite Documentation](https://vitejs.dev/)
 - [Pinia Documentation](https://pinia.vuejs.org/)
@@ -2970,6 +3042,11 @@ Phase 4: Polish & Launch
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** January 6, 2026
 **Status:** ✅ Approved for Implementation
+
+**Recent Changes:**
+- v1.2: Replaced Vuetify with PrimeVue component library
+- v1.2: Added Apps List page design (Section 7.3)
+- v1.2: Renumbered subsequent sections (App Editor is now 7.4, Settings is now 7.8)
