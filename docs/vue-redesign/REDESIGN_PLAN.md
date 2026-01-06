@@ -1007,7 +1007,7 @@ This section defines the visual design system and page-by-page redesign specific
 
 #### Material Design 3 Principles
 
-Automaton Studio will follow [Material Design 3](https://m3.material.io/) guidelines with Vuetify's implementation:
+Automaton Studio follows [Material Design 3](https://m3.material.io/) guidelines using Vuetify's default implementation:
 
 1. **Dynamic Color** - Consistent color theming with light/dark mode support
 2. **Elevated Surfaces** - Clear visual hierarchy through elevation
@@ -1015,108 +1015,50 @@ Automaton Studio will follow [Material Design 3](https://m3.material.io/) guidel
 4. **Motion** - Meaningful animations for state transitions
 5. **Accessibility** - WCAG 2.1 AA compliance
 
+**Note:** We use Vuetify's **default theme, colors, typography, and spacing**. This ensures:
+- Consistent Material Design 3 implementation
+- Automatic updates when Vuetify evolves
+- No custom theme maintenance overhead
+- Battle-tested accessibility and responsive behavior
+
 #### Color Palette
 
-```
-Primary Colors:
-├── Primary:        #1976D2 (Blue 700)      - Main actions, navigation
-├── Primary Light:  #42A5F5 (Blue 400)      - Hover states
-├── Primary Dark:   #0D47A1 (Blue 900)      - Active states
+We use **Vuetify's default color palette** with built-in light/dark mode support:
+- **Primary:** Blue (configurable per Vuetify's theme system)
+- **Secondary, Success, Warning, Error, Info:** Vuetify defaults
+- **Surface & Background:** Material Design 3 defaults
+- **Dark Mode:** Automatic theme switching
 
-Secondary Colors:
-├── Secondary:      #7C4DFF (Deep Purple A200) - AI features, highlights
-├── Secondary Light:#B47CFF                    - AI hover states
-
-Semantic Colors:
-├── Success:        #4CAF50 (Green 500)     - Completed, running
-├── Warning:        #FF9800 (Orange 500)    - Pending, attention
-├── Error:          #F44336 (Red 500)       - Failed, errors
-├── Info:           #2196F3 (Blue 500)      - Information
-
-Neutral Colors:
-├── Background:     #FAFAFA (Grey 50)       - Page background
-├── Surface:        #FFFFFF                  - Cards, dialogs
-├── Surface Variant:#F5F5F5 (Grey 100)      - Secondary surfaces
-├── On Surface:     #212121 (Grey 900)      - Text on surfaces
-├── Outline:        #BDBDBD (Grey 400)      - Borders, dividers
-
-Dark Mode:
-├── Background:     #121212
-├── Surface:        #1E1E1E
-├── Surface Variant:#2D2D2D
-├── On Surface:     #E0E0E0
-```
+See: [Vuetify Theme Configuration](https://vuetifyjs.com/en/features/theme/)
 
 #### Typography
 
-```
-Font Family: Roboto (Material Design default)
+We use **Vuetify's default typography** based on Material Design 3:
+- **Font Family:** Roboto (loaded via Vuetify)
+- **Headings:** h1-h6 with Material Design 3 scale
+- **Body Text:** Material Design 3 text styles
+- **Code/Monospace:** Use `class="font-mono"` with JetBrains Mono (loaded separately for code editors)
 
-Headings:
-├── H1: 96px / Light    - Hero sections only
-├── H2: 60px / Light    - Page titles
-├── H3: 48px / Regular  - Section headers
-├── H4: 34px / Regular  - Card titles
-├── H5: 24px / Regular  - Subsection headers
-├── H6: 20px / Medium   - Component headers
-
-Body:
-├── Body 1: 16px / Regular - Primary content
-├── Body 2: 14px / Regular - Secondary content
-├── Caption: 12px / Regular - Labels, hints
-├── Overline: 10px / Medium - Category labels
-
-Code:
-├── Mono: 14px / JetBrains Mono - Code editor, logs
-```
+See: [Vuetify Typography](https://vuetifyjs.com/en/styles/text-and-typography/)
 
 #### Spacing & Layout
 
-```
-Spacing Scale (8px base):
-├── xs: 4px   - Tight spacing
-├── sm: 8px   - Default component spacing
-├── md: 16px  - Section spacing
-├── lg: 24px  - Card padding
-├── xl: 32px  - Section margins
-├── xxl: 48px - Page sections
+We use **Vuetify's default spacing system** (4px base unit):
+- **Spacing:** `ma-1` to `ma-16` (margins), `pa-1` to `pa-16` (padding)
+- **Grid System:** 12-column responsive grid with built-in breakpoints
+- **Breakpoints:** `xs`, `sm`, `md`, `lg`, `xl` (Vuetify defaults)
 
-Grid System:
-├── 12-column grid
-├── Gutter: 24px
-├── Margin: 24px (desktop), 16px (tablet), 8px (mobile)
-
-Breakpoints:
-├── xs: 0-599px      - Mobile
-├── sm: 600-959px    - Tablet portrait
-├── md: 960-1279px   - Tablet landscape
-├── lg: 1280-1919px  - Desktop
-├── xl: 1920px+      - Large desktop
-```
+See: [Vuetify Spacing](https://vuetifyjs.com/en/styles/spacing/)
 
 #### Component Styling
 
-```
-Cards:
-├── Border Radius: 12px
-├── Elevation: 1 (rest), 4 (hover), 8 (selected)
-├── Padding: 16px (compact), 24px (default)
+We use **Vuetify's default component styles**:
+- **Cards:** Default border radius, elevation, and padding
+- **Buttons:** Default variants (flat, outlined, text, etc.)
+- **Inputs:** Default variants (outlined, filled, solo, etc.)
+- **Navigation:** Default navigation drawer and app bar dimensions
 
-Buttons:
-├── Border Radius: 8px
-├── Height: 36px (default), 28px (small), 48px (large)
-├── Padding: 16px horizontal
-
-Inputs:
-├── Variant: Outlined (default)
-├── Border Radius: 4px
-├── Height: 56px (default), 40px (dense)
-
-Navigation:
-├── Rail Width: 72px (collapsed)
-├── Drawer Width: 256px (expanded)
-├── App Bar Height: 64px
-```
+**Custom overrides:** Only when necessary for code editor integration (Monaco) or specific UX requirements
 
 ---
 
