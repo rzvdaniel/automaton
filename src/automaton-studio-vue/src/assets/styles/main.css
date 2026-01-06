@@ -1,0 +1,32 @@
+/* Import JetBrains Mono for code editors only */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* Roboto is loaded by Vuetify automatically */
+
+/* Code editor font class */
+.font-mono,
+.monaco-editor,
+pre,
+code {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Base styles */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  font-family: Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility classes */
+.v-application {
+  font-family: Roboto, sans-serif !important;
+}
