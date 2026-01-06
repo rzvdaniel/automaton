@@ -41,12 +41,24 @@ pre {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  background-color: var(--p-surface-50);
+}
+
+.app-dark .app-shell {
+  background-color: var(--p-surface-950);
 }
 
 .app-sidebar {
   width: 72px;
   flex-shrink: 0;
   transition: width 0.2s ease;
+  background-color: var(--p-surface-0);
+  border-right: 1px solid var(--p-surface-200);
+}
+
+.app-dark .app-sidebar {
+  background-color: var(--p-surface-900);
+  border-right-color: var(--p-surface-700);
 }
 
 .app-sidebar.expanded {
@@ -63,12 +75,22 @@ pre {
 .app-toolbar {
   height: 64px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--p-surface-200);
+}
+
+.app-dark .app-toolbar {
+  border-bottom-color: var(--p-surface-700);
 }
 
 .app-main {
   flex: 1;
   overflow: auto;
   padding: 1.5rem;
+}
+
+/* Sidebar navigation divider dark mode */
+.app-dark .nav-divider {
+  background-color: var(--p-surface-700);
 }
 
 /* Utility classes for spacing */

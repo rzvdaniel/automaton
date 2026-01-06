@@ -37,13 +37,8 @@ const { isDark, toggleDarkMode } = useTheme()
 </template>
 
 <style scoped>
+/* Dark mode styles handled in main.css */
 .app-toolbar {
-  height: 64px;
   padding: 0 1rem;
-  border-bottom: 1px solid var(--p-surface-200);
-}
-
-:deep(.app-dark) .app-toolbar {
-  border-bottom-color: var(--p-surface-700);
 }
 </style>

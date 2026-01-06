@@ -96,17 +96,10 @@ const sidebarClass = computed(() => ({
 </template>
 
 <style scoped>
+/* Base sidebar styles - dark mode handled in main.css */
 .app-sidebar {
-  width: 72px;
   min-height: 100vh;
-  background-color: var(--p-surface-0);
-  border-right: 1px solid var(--p-surface-200);
-  transition: width 0.2s ease;
   overflow: hidden;
-}
-
-.app-sidebar.expanded {
-  width: 256px;
 }
 
 .sidebar-content {
@@ -172,15 +165,5 @@ const sidebarClass = computed(() => ({
 
 .sidebar-nav-bottom {
   margin-top: auto;
-}
-
-/* Dark mode */
-:global(.app-dark) .app-sidebar {
-  background-color: var(--p-surface-900);
-  border-right-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .nav-divider {
-  background-color: var(--p-surface-700);
 }
 </style>

@@ -32,26 +32,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-  background-color: var(--p-surface-50);
-}
-
-:global(.app-dark) .app-shell {
-  background-color: var(--p-surface-950);
-}
-
-.app-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.app-main {
-  flex: 1;
-  overflow: auto;
-  padding: 1.5rem;
-}
+/* Layout styles are in main.css for proper dark mode support */
 </style>
