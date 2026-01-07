@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 // Import feature routes
 import { authRoutes } from '@/features/auth/routes'
@@ -33,6 +34,38 @@ const router = createRouter({
       redirect: '/',
     },
   ],
+})
+
+// Navigation guard for authentication
+router.beforeEach(async (to, _from, next) => {
+  const authStore = useAuthStore()
+
+  // Initialize auth state if not already done
+  if (!authStore.isInitialized) {
+    await authStore.initialize()
+  }
+
+  // Check if route requires authentication
+  const requiresAuth = to.meta.requiresAuth !== false && to.meta.layout !== 'auth'
+
+  // If route requires auth and user is not authenticated
+  if (requiresAuth && !authStore.isAuthenticated) {
+    // Redirect to login with return URL
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
+    return
+  }
+
+  // If user is authenticated and tries to access auth pages (login/register)
+  if (authStore.isAuthenticated && to.meta.layout === 'auth') {
+    // Redirect to dashboard
+    next({ path: '/' })
+    return
+  }
+
+  next()
 })
 
 export default router
