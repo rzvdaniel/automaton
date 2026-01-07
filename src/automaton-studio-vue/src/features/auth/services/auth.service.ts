@@ -7,6 +7,9 @@ import type {
   LoginRequest,
   RegisterRequest,
   RefreshTokenRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  ChangePasswordRequest,
   JsonWebToken,
   User,
 } from '../types/auth.types'
@@ -84,6 +87,30 @@ class AuthService {
    */
   getStoredRefreshToken(): string | null {
     return tokenStorage.getRefreshToken()
+  }
+
+  /**
+   * Request password reset email
+   * POST /api/Account/ForgotUserPassword
+   */
+  async forgotPassword(request: ForgotPasswordRequest): Promise<void> {
+    await apiClient.post('/api/Account/ForgotUserPassword', request)
+  }
+
+  /**
+   * Reset password with code from email
+   * POST /api/Account/ResetUserPassword
+   */
+  async resetPassword(request: ResetPasswordRequest): Promise<void> {
+    await apiClient.post('/api/Account/ResetUserPassword', request)
+  }
+
+  /**
+   * Change password for authenticated user
+   * PUT /api/Account/UpdateUserPassword
+   */
+  async changePassword(request: ChangePasswordRequest): Promise<void> {
+    await apiClient.put('/api/Account/UpdateUserPassword', request)
   }
 }
 

@@ -1,21 +1,36 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import Dialog from 'primevue/dialog'
+import Message from 'primevue/message'
 import { useTheme } from '@/shared/composables/useTheme'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { authService } from '@/features/auth/services/auth.service'
+import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 
 const { isDark, toggleDarkMode } = useTheme()
+const authStore = useAuthStore()
 
 const activeSection = ref('account')
 
-// Account settings
-const displayName = ref('John Doe')
-const email = ref('john@example.com')
+// Account settings - use actual user data
+const displayName = ref('')
+const email = ref('')
+
+onMounted(() => {
+  // Load user data from store
+  if (authStore.user) {
+    displayName.value = authStore.user.name || ''
+    email.value = authStore.user.email || ''
+  }
+})
 
 // Theme settings
 const themeOptions = ref([
@@ -38,12 +53,113 @@ const aiKeys = ref([
   { id: 3, provider: 'Google', model: 'gemini-pro', configured: false },
 ])
 
+// Change password dialog state
+const showPasswordDialog = ref(false)
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordFormErrors = ref<ChangePasswordFormErrors>({})
+const passwordSubmitted = ref(false)
+const passwordLoading = ref(false)
+const passwordError = ref<string | null>(null)
+const passwordSuccess = ref(false)
+
 const handleThemeChange = (value: string) => {
   if (value === 'dark' && !isDark.value) {
     toggleDarkMode()
   } else if (value === 'light' && isDark.value) {
     toggleDarkMode()
   }
+}
+
+// Open password change dialog
+function openPasswordDialog() {
+  // Reset form state
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordFormErrors.value = {}
+  passwordSubmitted.value = false
+  passwordError.value = null
+  passwordSuccess.value = false
+  showPasswordDialog.value = true
+}
+
+// Validate password form
+function validatePasswordForm(): boolean {
+  passwordFormErrors.value = {}
+  let isValid = true
+
+  if (!oldPassword.value) {
+    passwordFormErrors.value.oldPassword = 'Current password is required'
+    isValid = false
+  }
+
+  if (!newPassword.value) {
+    passwordFormErrors.value.newPassword = 'New password is required'
+    isValid = false
+  } else if (newPassword.value.length < 6) {
+    passwordFormErrors.value.newPassword = 'Password must be at least 6 characters'
+    isValid = false
+  } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword.value)) {
+    passwordFormErrors.value.newPassword = 'Password must contain uppercase, lowercase, and number'
+    isValid = false
+  }
+
+  if (!confirmPassword.value) {
+    passwordFormErrors.value.confirmPassword = 'Please confirm your password'
+    isValid = false
+  } else if (newPassword.value !== confirmPassword.value) {
+    passwordFormErrors.value.confirmPassword = 'Passwords do not match'
+    isValid = false
+  }
+
+  return isValid
+}
+
+// Submit password change
+async function handlePasswordSubmit() {
+  passwordSubmitted.value = true
+  passwordError.value = null
+
+  if (!validatePasswordForm()) {
+    return
+  }
+
+  passwordLoading.value = true
+
+  try {
+    await authService.changePassword({
+      oldPassword: oldPassword.value,
+      newPassword: newPassword.value,
+    })
+    passwordSuccess.value = true
+    // Close dialog after 2 seconds
+    setTimeout(() => {
+      showPasswordDialog.value = false
+    }, 2000)
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
+    if (axiosError.response?.status === 400 || axiosError.response?.status === 401) {
+      passwordError.value = 'Current password is incorrect'
+    } else if (axiosError.response?.data?.message) {
+      passwordError.value = axiosError.response.data.message
+    } else {
+      passwordError.value = 'Failed to change password. Please try again.'
+    }
+  } finally {
+    passwordLoading.value = false
+  }
+}
+
+// Check if field has error
+function hasPasswordError(field: keyof ChangePasswordFormErrors): boolean {
+  return passwordSubmitted.value && !!passwordFormErrors.value[field]
+}
+
+// Clear password error
+function clearPasswordError() {
+  passwordError.value = null
 }
 </script>
 
@@ -128,7 +244,12 @@ const handleThemeChange = (value: string) => {
 
               <div class="flex flex-column gap-2">
                 <label class="font-medium">Password</label>
-                <Button label="Change Password" outlined class="w-auto align-self-start" />
+                <Button
+                  label="Change Password"
+                  outlined
+                  class="w-auto align-self-start"
+                  @click="openPasswordDialog"
+                />
               </div>
 
               <div class="flex justify-content-end">
@@ -273,6 +394,105 @@ const handleThemeChange = (value: string) => {
         </Card>
       </div>
     </div>
+
+    <!-- Change Password Dialog -->
+    <Dialog
+      v-model:visible="showPasswordDialog"
+      header="Change Password"
+      :modal="true"
+      :closable="!passwordLoading"
+      :style="{ width: '400px' }"
+    >
+      <template v-if="passwordSuccess">
+        <Message severity="success" :closable="false">
+          Password changed successfully!
+        </Message>
+      </template>
+
+      <template v-else>
+        <Message v-if="passwordError" severity="error" :closable="false" class="mb-4">
+          {{ passwordError }}
+        </Message>
+
+        <form class="flex flex-column gap-4" @submit.prevent="handlePasswordSubmit">
+          <div class="flex flex-column gap-2">
+            <label for="oldPassword" class="font-medium">Current Password</label>
+            <Password
+              id="oldPassword"
+              v-model="oldPassword"
+              placeholder="Enter current password"
+              :feedback="false"
+              toggle-mask
+              class="w-full"
+              input-class="w-full"
+              :invalid="hasPasswordError('oldPassword')"
+              :disabled="passwordLoading"
+              @input="clearPasswordError"
+            />
+            <small v-if="hasPasswordError('oldPassword')" class="text-red-500">
+              {{ passwordFormErrors.oldPassword }}
+            </small>
+          </div>
+
+          <div class="flex flex-column gap-2">
+            <label for="newPassword" class="font-medium">New Password</label>
+            <Password
+              id="newPassword"
+              v-model="newPassword"
+              placeholder="Enter new password"
+              toggle-mask
+              class="w-full"
+              input-class="w-full"
+              :invalid="hasPasswordError('newPassword')"
+              :disabled="passwordLoading"
+              @input="clearPasswordError"
+            />
+            <small v-if="hasPasswordError('newPassword')" class="text-red-500">
+              {{ passwordFormErrors.newPassword }}
+            </small>
+            <small v-else class="text-color-secondary">
+              Must contain uppercase, lowercase, and number
+            </small>
+          </div>
+
+          <div class="flex flex-column gap-2">
+            <label for="confirmNewPassword" class="font-medium">Confirm New Password</label>
+            <Password
+              id="confirmNewPassword"
+              v-model="confirmPassword"
+              placeholder="Confirm new password"
+              :feedback="false"
+              toggle-mask
+              class="w-full"
+              input-class="w-full"
+              :invalid="hasPasswordError('confirmPassword')"
+              :disabled="passwordLoading"
+              @input="clearPasswordError"
+            />
+            <small v-if="hasPasswordError('confirmPassword')" class="text-red-500">
+              {{ passwordFormErrors.confirmPassword }}
+            </small>
+          </div>
+        </form>
+      </template>
+
+      <template #footer>
+        <template v-if="!passwordSuccess">
+          <Button
+            label="Cancel"
+            text
+            :disabled="passwordLoading"
+            @click="showPasswordDialog = false"
+          />
+          <Button
+            label="Change Password"
+            :loading="passwordLoading"
+            :disabled="passwordLoading"
+            @click="handlePasswordSubmit"
+          />
+        </template>
+      </template>
+    </Dialog>
   </div>
 </template>
 

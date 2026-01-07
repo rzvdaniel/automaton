@@ -152,9 +152,9 @@ function hasError(field: keyof LoginFormErrors): boolean {
               <Checkbox v-model="rememberMe" input-id="remember" binary :disabled="isLoading" />
               <label for="remember" class="text-sm">Remember me</label>
             </div>
-            <a href="#" class="text-sm text-primary no-underline hover:underline">
+            <router-link to="/forgot-password" class="text-sm text-primary no-underline hover:underline">
               Forgot password?
-            </a>
+            </router-link>
           </div>
 
           <Button
