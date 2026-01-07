@@ -18,7 +18,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
   { label: 'Flows', icon: 'pi pi-bolt', to: '/flows' },
   { label: 'Apps', icon: 'pi pi-globe', to: '/apps' },
-  { label: 'Steps', icon: 'pi pi-puzzle-piece', to: '/steps' },
+  { label: 'Steps', icon: 'pi pi-code', to: '/steps' },
   { label: 'Runners', icon: 'pi pi-desktop', to: '/runners' },
   { label: 'Projects', icon: 'pi pi-building', to: '/projects' },
 ]
