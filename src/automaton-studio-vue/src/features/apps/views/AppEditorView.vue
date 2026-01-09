@@ -78,7 +78,7 @@ const aiPrompt = ref('')
       <!-- File Tree Panel -->
       <div class="file-panel">
         <div class="font-semibold mb-3 px-2">Files</div>
-        <Tree :value="files" selection-mode="single" v-model:selection-keys="selectedFile" class="w-full border-none p-0" />
+        <Tree v-model:selection-keys="selectedFile" :value="files" selection-mode="single" class="w-full border-none p-0" />
         <Button label="+ New File" text class="w-full mt-3" size="small" />
       </div>
 
