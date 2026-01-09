@@ -10,8 +10,6 @@ import Dropdown from 'primevue/dropdown'
 import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
-import ConfirmDialog from 'primevue/confirmdialog'
-import Toast from 'primevue/toast'
 import AppCard from '../components/AppCard.vue'
 import { useAppsStore } from '../stores/apps.store'
 import type { App } from '../types/apps.types'
@@ -453,12 +451,6 @@ const handleViewExamples = () => {
         </div>
       </template>
     </Dialog>
-
-    <!-- Confirm Dialog -->
-    <ConfirmDialog />
-
-    <!-- Toast -->
-    <Toast />
   </div>
 </template>
 
