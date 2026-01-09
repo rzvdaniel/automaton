@@ -1679,6 +1679,102 @@ We use **PrimeVue's default component styles from Aura theme**:
 
 ---
 
+#### 9. Install Page (First-Time Setup)
+
+**Current:** Simple form with admin account creation
+**New:** Wizard-style setup with welcome message and validation
+
+**Install Status Check:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                          Automaton                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │                    ✅ Installation Complete                 ││
+│  │                                                             ││
+│  │         Automaton has already been installed and           ││
+│  │                     configured.                             ││
+│  │                                                             ││
+│  │                   [Go to Dashboard]                         ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**First-Time Installation Form:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                          Automaton                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │               Welcome to Automaton Studio                   ││
+│  │                                                             ││
+│  │     Let's set up your administrator account to get started  ││
+│  │                                                             ││
+│  │  Name                                                       ││
+│  │  ┌─────────────────────────────────────────────────────┐   ││
+│  │  │ John Doe                                            │   ││
+│  │  └─────────────────────────────────────────────────────┘   ││
+│  │                                                             ││
+│  │  Email                                                      ││
+│  │  ┌─────────────────────────────────────────────────────┐   ││
+│  │  │ admin@example.com                                   │   ││
+│  │  └─────────────────────────────────────────────────────┘   ││
+│  │                                                             ││
+│  │  Password                                                   ││
+│  │  ┌─────────────────────────────────────────────────────┐   ││
+│  │  │ ••••••••••••                                        │   ││
+│  │  └─────────────────────────────────────────────────────┘   ││
+│  │  Must be at least 6 characters long                        ││
+│  │                                                             ││
+│  │  Confirm Password                                           ││
+│  │  ┌─────────────────────────────────────────────────────┐   ││
+│  │  │ ••••••••••••                                        │   ││
+│  │  └─────────────────────────────────────────────────────┘   ││
+│  │                                                             ││
+│  │                      [Complete Setup]                       ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+- **Centered layout** - Simple, focused form in the center of the page
+- **Two states:**
+  - Already installed: Show completion message with link to dashboard
+  - Not installed: Show setup form
+- **Form validation:**
+  - Name: Required, max 256 characters
+  - Email: Required, valid email format
+  - Password: Required, 6-100 characters
+  - Confirm Password: Required, must match password
+- **Loading state** - Show progress indicator during installation
+- **No authentication required** - This is the only page accessible without login
+- **Success behavior** - Automatically redirect to dashboard after successful setup
+- **Error handling** - Display error message if installation fails
+
+**Form Validation Rules:**
+- Name: Required, StringLength(256)
+- Email: Required, EmailAddress format
+- Password: Required, 6-100 characters
+- Confirm Password: Required, must match Password field
+
+**API Endpoints:**
+- `GET /api/install/status` - Check if installation is complete
+- `POST /api/install` - Submit installation with admin user details
+
+**Route Guard:**
+- This page should be accessible without authentication ([AllowAnonymous])
+- Redirect to dashboard if installation is already complete (optional UX improvement)
+
+---
+
 ### Dark Mode
 
 All pages support dark mode toggle in the app bar:
@@ -1879,8 +1975,9 @@ const mockData = ref([
 - [ ] **Projects List Page Stub** - Layout with project cards (yours + shared)
 - [ ] **Project Settings Page Stub** - Tabs layout (general, members, resources)
 - [ ] **Settings Page Stub** - Sidebar + content area layout
+- [ ] **Install Page Stub** - Centered form layout (no auth required)
 - [ ] Wire up routing for all pages
-- [ ] Add navigation items to app shell
+- [ ] Add navigation items to app shell (exclude Install from nav menu)
 - [ ] **Verify responsive breakpoints work on all page stubs**
 - [ ] **Test dark mode toggle on all page stubs**
 
@@ -1994,6 +2091,30 @@ const mockData = ref([
 - [ ] Implement appearance settings (dark mode toggle)
 - [ ] Add notification preferences
 - [ ] Ensure all existing features are available
+
+**3.8: Install Page (First-Time Setup)**
+- [ ] **Follow Project Structure** for `install/` feature (see Section 6)
+- [ ] **Review Install page design spec** (see Section 7.9)
+- [ ] **Review Blazor Install implementation** for feature parity
+- [ ] Create `InstallView` component with centered form layout
+- [ ] Implement installation status check (`GET /api/install/status`)
+- [ ] Build two-state UI:
+  - Installation complete: Show completion message with dashboard link
+  - Not installed: Show setup form
+- [ ] Create install service for API calls
+- [ ] Implement form with validation:
+  - Name: Required, max 256 characters
+  - Email: Required, email format validation
+  - Password: Required, 6-100 characters with strength indicator
+  - Confirm Password: Required, must match password
+- [ ] Add loading state during installation submission
+- [ ] Handle success: Auto-redirect to dashboard after setup
+- [ ] Handle errors: Display error message if installation fails
+- [ ] Configure route as [AllowAnonymous] (no auth required)
+- [ ] Add route guard: Redirect to dashboard if already installed (optional UX)
+- [ ] Test form validation for all fields
+- [ ] Test error scenarios (network failure, server error)
+- [ ] Verify responsive layout on mobile/tablet/desktop
 
 **Deliverable:** Full feature parity with existing Blazor application
 
@@ -2521,7 +2642,7 @@ Pay special attention to:
 CRITICAL: Follow the UI/UX design specs in Section 7 EXACTLY for each page layout.
 
 For EACH page stub:
-1. Read the corresponding design spec (Section 7.1-7.8)
+1. Read the corresponding design spec (Section 7.1-7.9)
 2. Create the view component in features/{feature-name}/views/
 3. Use ONLY PrimeVue components (Card, Button, DataTable, Panel, etc.)
 4. Implement the EXACT layout structure from the design (columns, panels, sections)
@@ -2542,9 +2663,10 @@ Page Stubs to Create:
 - [ ] Runners: RunnersView (features/runners/)
 - [ ] Projects: ProjectsListView, ProjectSettingsView (features/projects/)
 - [ ] Settings: SettingsView (features/settings/)
+- [ ] Install: InstallView (features/install/) - No auth required, not in nav menu
 
 Deliverables:
-- [ ] All 13 page stubs created
+- [ ] All 14 page stubs created
 - [ ] All routes work (can navigate between all pages)
 - [ ] NavigationRail has all menu items
 - [ ] Every page matches layout from design spec
@@ -2734,6 +2856,142 @@ Testing Checklist:
 - [ ] Test dark mode toggle
 ```
 
+---
+
+#### Phase 3.8 - Install Page
+
+**Prompt for AI Agent:**
+
+```
+Implement Phase 3.8 - Install Page (First-Time Setup) from REDESIGN_PLAN.md.
+
+PREREQUISITE: Before starting, READ THE ENTIRE src/automaton-studio-vue/REDESIGN_PLAN.md file.
+Pay special attention to:
+- Section 6: Project Structure (Feature-Based) - create features/install/ structure
+- Section 7.9: Install Page design spec - follow exact layout
+- Common Pitfalls for AI Agents - avoid these mistakes!
+- Quality Gates (Phase 3.8) - your deliverable checklist
+
+IMPORTANT:
+- Follow Project Structure (Section 6) for features/install/ folder
+- Review Install page design spec (Section 7.9) for exact layout
+- Review Blazor Install implementation for feature parity:
+  - src/Automaton.Studio/Pages/Install/InstallPage.razor
+  - src/Automaton.Studio/Pages/Install/InstallViewModel.cs
+  - src/Automaton.Studio/Pages/Install/Services/InstallService.cs
+
+Key Implementation Tasks:
+
+1. Create Install Feature Structure:
+   - features/install/types/install.types.ts
+   - features/install/services/install.service.ts
+   - features/install/views/InstallView.vue
+   - features/install/routes.ts
+
+2. TypeScript Interfaces (install.types.ts):
+   ```typescript
+   export interface InstallCommand {
+     name: string
+     email: string
+     password: string
+   }
+
+   export interface InstallationStatusResponse {
+     installationComplete: boolean
+   }
+   ```
+
+3. Install Service (install.service.ts):
+   - GET /api/install/status - Check if installation is complete
+   - POST /api/install - Submit admin account details
+   - Handle errors gracefully (return false if status check fails)
+
+4. Install View (InstallView.vue):
+   - Two-state UI:
+     a) Installation Complete:
+        - Card with ✅ icon
+        - "Installation Complete" title
+        - Message: "Automaton has already been installed and configured"
+        - [Go to Dashboard] button (router.push('/'))
+
+     b) Installation Form:
+        - Centered card layout (400px width)
+        - Welcome header and subtitle
+        - Form fields with PrimeVue components:
+          * Name: InputText (required, maxLength: 256)
+          * Email: InputText type="email" (required, email validation)
+          * Password: Password (required, 6-100 chars, show strength meter)
+          * Confirm Password: Password (required, must match password)
+        - [Complete Setup] Button (primary)
+        - Loading state during submission
+        - Error message display (use Message component with severity="error")
+
+   - Form Validation Rules:
+     * Name: Required, max 256 characters
+     * Email: Required, valid email format
+     * Password: Required, 6-100 characters
+     * Confirm Password: Required, must match Password
+
+   - On Success:
+     * Show success message (optional)
+     * Auto-redirect to "/" (dashboard)
+
+   - On Error:
+     * Display error message: "Installation failed. Please try again."
+     * Keep form visible for retry
+
+5. Routing Configuration:
+   - Route: /install
+   - Meta: { requiresAuth: false } - No authentication required
+   - Add to router/index.ts
+   - DO NOT add to navigation menu (direct URL access only)
+
+6. Styling:
+   - Centered layout (full viewport height, flexbox center)
+   - Card with proper spacing (p-6)
+   - White/surface background for card
+   - Form inputs with consistent spacing (mb-4)
+   - Responsive: Same layout on mobile/tablet/desktop
+
+Deliverables:
+- [ ] Installation status check works (GET /api/install/status)
+- [ ] Installation form displays when not installed
+- [ ] Completion message displays when already installed
+- [ ] All form fields validate correctly
+- [ ] Password strength indicator shows
+- [ ] Confirm password validation works
+- [ ] Form submits to POST /api/install
+- [ ] Loading state shows during submission
+- [ ] Success redirects to dashboard
+- [ ] Error message displays on failure
+- [ ] Route is accessible without auth
+- [ ] NOT in navigation menu
+- [ ] Responsive layout works (mobile/tablet/desktop)
+- [ ] Dark mode works
+- [ ] No console errors
+
+Testing Checklist:
+- [ ] Test when installation is already complete (should show completion message)
+- [ ] Test when installation is not complete (should show form)
+- [ ] Test all form validations:
+  - Empty fields (should show required errors)
+  - Invalid email format
+  - Password too short (< 6 chars)
+  - Password too long (> 100 chars)
+  - Passwords don't match
+- [ ] Test form submission success (should redirect to dashboard)
+- [ ] Test form submission failure (should show error, keep form visible)
+- [ ] Test network error during status check (should show form)
+- [ ] Test responsive on mobile (375px), tablet (768px), desktop (1440px)
+- [ ] Test dark mode toggle
+- [ ] Verify route is accessible without login
+- [ ] Verify NOT in navigation menu
+
+CRITICAL: This page is the FIRST THING users see on a fresh installation. Make it clean, simple, and error-free.
+```
+
+---
+
 ### Quality Gates
 
 **Before Moving to Next Phase:**
@@ -2750,7 +3008,7 @@ Each phase must pass these quality gates before proceeding:
 - [ ] No console errors/warnings
 
 #### Phase 1.2 Quality Gate
-- [ ] All 13 page stubs exist and are navigable
+- [ ] All 14 page stubs exist and are navigable (including Install page)
 - [ ] All routes work (no 404s)
 - [ ] NavigationRail shows all menu items
 - [ ] Every page matches layout from design spec (visual review)
@@ -3042,11 +3300,12 @@ Phase 4: Polish & Launch
 
 ---
 
-**Document Version:** 1.2
-**Last Updated:** January 6, 2026
+**Document Version:** 1.3
+**Last Updated:** January 9, 2026
 **Status:** ✅ Approved for Implementation
 
 **Recent Changes:**
+- v1.3: Added Install page design (Section 7.9), Phase 3.8 implementation tasks, and AI Agent prompt
 - v1.2: Replaced Vuetify with PrimeVue component library
 - v1.2: Added Apps List page design (Section 7.3)
 - v1.2: Renumbered subsequent sections (App Editor is now 7.4, Settings is now 7.8)
