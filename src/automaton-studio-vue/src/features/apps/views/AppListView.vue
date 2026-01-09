@@ -11,6 +11,9 @@ import Dropdown from 'primevue/dropdown'
 import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
+import SelectButton from 'primevue/selectbutton'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import AppCard from '../components/AppCard.vue'
 import { useAppsStore } from '../stores/apps.store'
 import type { App } from '../types/apps.types'
@@ -21,6 +24,13 @@ const appsStore = useAppsStore()
 
 // AI generation state
 const aiDescription = ref('')
+
+// View mode state
+const viewMode = ref('grid')
+const viewOptions = ref([
+  { icon: 'pi pi-th-large', value: 'grid' },
+  { icon: 'pi pi-list', value: 'list' },
+])
 
 // Local state
 const searchQuery = ref('')
@@ -256,10 +266,10 @@ const handleRetry = async () => {
         <Tag :value="`${appsStore.filteredApps.length} apps`" severity="secondary" />
       </div>
       <div class="flex align-items-center gap-3">
-        <span class="p-input-icon-left">
-          <i class="pi pi-search" />
+        <IconField>
+          <InputIcon class="pi pi-search" />
           <InputText v-model="searchQuery" placeholder="Search apps..." />
-        </span>
+        </IconField>
         <Dropdown
           v-model="selectedStatus"
           :options="statusOptions"
@@ -268,6 +278,11 @@ const handleRetry = async () => {
           placeholder="Status"
           class="w-10rem"
         />
+        <SelectButton v-model="viewMode" :options="viewOptions" option-value="value">
+          <template #option="{ option }">
+            <i :class="option.icon"></i>
+          </template>
+        </SelectButton>
       </div>
     </div>
 
