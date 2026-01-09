@@ -5,6 +5,7 @@ import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
 import Dropdown from 'primevue/dropdown'
 import Skeleton from 'primevue/skeleton'
@@ -17,6 +18,9 @@ import type { App } from '../types/apps.types'
 const router = useRouter()
 const toast = useToast()
 const appsStore = useAppsStore()
+
+// AI generation state
+const aiDescription = ref('')
 
 // Local state
 const searchQuery = ref('')
@@ -42,10 +46,6 @@ const isPublishing = ref(false)
 const urlError = ref('')
 
 // Computed
-const showQuickStart = computed(() => {
-  return !appsStore.hasApps && !appsStore.isLoading && !searchQuery.value
-})
-
 const showEmptySearch = computed(() => {
   return (
     appsStore.filteredApps.length === 0 &&
@@ -77,6 +77,16 @@ onUnmounted(() => {
 })
 
 // Handlers
+const handleGenerateApp = () => {
+  // TODO: Navigate to AI app generation page with description
+  toast.add({
+    severity: 'info',
+    summary: 'Coming Soon',
+    detail: 'AI-powered app generation will be available soon',
+    life: 3000,
+  })
+}
+
 const handleCreateApp = async () => {
   if (!newAppName.value.trim()) {
     toast.add({
@@ -185,26 +195,6 @@ const handleRetry = async () => {
     // Error is handled in the store
   }
 }
-
-const handleCreateWithAI = () => {
-  // Navigate to AI-powered app creation
-  toast.add({
-    severity: 'info',
-    summary: 'Coming Soon',
-    detail: 'AI-powered app creation will be available soon',
-    life: 3000,
-  })
-}
-
-const handleViewExamples = () => {
-  // Navigate to examples
-  toast.add({
-    severity: 'info',
-    summary: 'Coming Soon',
-    detail: 'Example apps will be available soon',
-    life: 3000,
-  })
-}
 </script>
 
 <template>
@@ -218,28 +208,71 @@ const handleViewExamples = () => {
       <Button label="New App" icon="pi pi-plus" @click="openCreateDialog" />
     </div>
 
-    <!-- Search and Filters -->
-    <div class="flex align-items-center gap-3 mb-5">
-      <span class="p-input-icon-left flex-1" style="max-width: 400px">
-        <i class="pi pi-search" />
-        <InputText v-model="searchQuery" placeholder="Search apps..." class="w-full" />
-      </span>
-      <Dropdown
-        v-model="selectedStatus"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        placeholder="Status"
-        class="w-10rem"
-      />
+    <!-- AI Generation Input -->
+    <Card class="mb-5">
+      <template #content>
+        <div class="flex align-items-start gap-3">
+          <div
+            class="flex align-items-center justify-content-center border-round flex-shrink-0"
+            style="
+              width: 48px;
+              height: 48px;
+              background-color: var(--p-primary-100);
+              color: var(--p-primary-600);
+            "
+          >
+            <i class="pi pi-sparkles text-xl"></i>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-2">What would you like to build?</div>
+            <Textarea
+              v-model="aiDescription"
+              rows="3"
+              placeholder="Describe your app in plain English. For example: 'A customer feedback form that saves responses to a database and sends email notifications...'"
+              class="w-full"
+            />
+            <div class="flex align-items-center justify-content-between mt-3">
+              <div class="text-color-secondary text-sm">
+                <span class="font-medium">Examples:</span>
+                "Employee directory with search" •
+                "Invoice generator with PDF export"
+              </div>
+              <Button
+                label="Generate App"
+                icon="pi pi-sparkles"
+                :disabled="!aiDescription"
+                @click="handleGenerateApp"
+              />
+            </div>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <!-- Apps List Header -->
+    <div class="flex align-items-center justify-content-between mb-4">
+      <div class="flex align-items-center gap-3">
+        <span class="font-semibold">Your Apps</span>
+        <Tag :value="`${appsStore.filteredApps.length} apps`" severity="secondary" />
+      </div>
+      <div class="flex align-items-center gap-3">
+        <span class="p-input-icon-left">
+          <i class="pi pi-search" />
+          <InputText v-model="searchQuery" placeholder="Search apps..." />
+        </span>
+        <Dropdown
+          v-model="selectedStatus"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Status"
+          class="w-10rem"
+        />
+      </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="appsStore.isLoading" class="mb-5">
-      <div class="flex align-items-center gap-3 mb-4">
-        <Skeleton width="5rem" height="1.5rem" />
-        <Skeleton width="4rem" height="1.5rem" border-radius="1rem" />
-      </div>
+    <div v-if="appsStore.isLoading">
       <div class="grid">
         <div v-for="i in 6" :key="i" class="col-12 md:col-6 lg:col-4">
           <Card class="h-full">
@@ -264,7 +297,7 @@ const handleViewExamples = () => {
     </div>
 
     <!-- Error State -->
-    <Message v-else-if="appsStore.error" severity="error" :closable="false" class="mb-5">
+    <Message v-else-if="appsStore.error" severity="error" :closable="false">
       <div class="flex align-items-center justify-content-between w-full">
         <span>{{ appsStore.error }}</span>
         <Button label="Retry" severity="danger" size="small" outlined @click="handleRetry" />
@@ -274,25 +307,18 @@ const handleViewExamples = () => {
     <!-- Content -->
     <template v-else>
       <!-- Apps Grid -->
-      <div v-if="appsStore.filteredApps.length > 0" class="mb-5">
-        <div class="flex align-items-center gap-3 mb-4">
-          <span class="font-semibold">My Apps</span>
-          <Tag :value="`${appsStore.filteredApps.length} apps`" severity="secondary" />
-        </div>
-
-        <div class="grid">
-          <div
-            v-for="app in appsStore.filteredApps"
-            :key="app.id"
-            class="col-12 md:col-6 lg:col-4"
-          >
-            <AppCard :app="app" @publish="openPublishDialog" />
-          </div>
+      <div v-if="appsStore.filteredApps.length > 0" class="grid">
+        <div
+          v-for="app in appsStore.filteredApps"
+          :key="app.id"
+          class="col-12 md:col-6 lg:col-4"
+        >
+          <AppCard :app="app" @publish="openPublishDialog" />
         </div>
       </div>
 
       <!-- Empty Search Results -->
-      <Card v-else-if="showEmptySearch" class="mb-5">
+      <Card v-else-if="showEmptySearch">
         <template #content>
           <div class="text-center py-5">
             <i class="pi pi-search text-5xl text-color-secondary mb-4"></i>
@@ -314,37 +340,15 @@ const handleViewExamples = () => {
       </Card>
 
       <!-- Empty State (No Apps) -->
-      <Card v-else-if="!appsStore.hasApps" class="mb-5">
+      <Card v-else-if="!appsStore.hasApps">
         <template #content>
           <div class="text-center py-5">
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
-            <p class="text-color-secondary mb-4">Get started by creating your first app</p>
+            <p class="text-color-secondary mb-4">
+              Describe your app above and let AI generate it, or create one manually
+            </p>
             <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
-          </div>
-        </template>
-      </Card>
-
-      <!-- Quick Start Section -->
-      <Card v-if="showQuickStart" class="quick-start-card">
-        <template #title>
-          <div class="flex align-items-center gap-2">
-            <i class="pi pi-lightbulb" style="color: var(--p-yellow-500)"></i>
-            <span>Quick Start</span>
-          </div>
-        </template>
-        <template #content>
-          <p class="text-color-secondary mt-0 mb-4">
-            New to apps? Create your first web app with AI:
-          </p>
-          <ul class="text-color-secondary m-0 mb-4 pl-4">
-            <li>Simple data entry form</li>
-            <li>Dashboard with charts</li>
-            <li>Customer feedback portal</li>
-          </ul>
-          <div class="flex gap-3">
-            <Button label="Create with AI" icon="pi pi-sparkles" @click="handleCreateWithAI" />
-            <Button label="View Examples" outlined severity="secondary" @click="handleViewExamples" />
           </div>
         </template>
       </Card>
@@ -458,9 +462,5 @@ const handleViewExamples = () => {
 .apps-view {
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.quick-start-card {
-  max-width: 600px;
 }
 </style>
