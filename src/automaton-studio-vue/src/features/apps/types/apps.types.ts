@@ -97,6 +97,7 @@ export interface LinkedStepInfo {
   description: string
   language: string
   isLinked: boolean
+  code?: string // Step code for editing in the IDE
 }
 
 /**
@@ -115,4 +116,164 @@ export interface AppFile {
 export interface AppStats {
   fileCount: number
   backendStepCount: number
+}
+
+// ============================================
+// App Editor Types (Phase 3.3b - Visual IDE)
+// ============================================
+
+/**
+ * File tree node for displaying in file explorer
+ */
+export interface FileNode {
+  key: string
+  name: string
+  path: string
+  type: 'file' | 'folder'
+  extension?: string
+  icon?: string
+  children?: FileNode[]
+  isOpen?: boolean
+}
+
+/**
+ * Open file in editor with content and state
+ */
+export interface OpenFile {
+  path: string
+  content: string
+  language: string // 'html', 'css', 'javascript', 'json', etc.
+  isDirty: boolean // Has unsaved changes
+  originalContent: string // For detecting changes
+  isBackendStep?: boolean // True if this is a backend step file
+  stepId?: string // Backend step ID if isBackendStep is true
+  stepName?: string // Backend step name for display
+}
+
+/**
+ * Step variable definition
+ */
+export interface StepVariable {
+  name: string
+  description?: string
+  type?: string
+  isSensitive: boolean
+}
+
+/**
+ * Extended linked step info with variable details
+ */
+export interface LinkedStepInfoExtended extends LinkedStepInfo {
+  inputCount: number
+  outputCount: number
+  hasInputVariables: boolean
+  hasOutputVariables: boolean
+  inputVariables: StepVariable[]
+  outputVariables: StepVariable[]
+}
+
+/**
+ * Preview mode for responsive testing
+ */
+export type PreviewMode = 'desktop' | 'tablet' | 'mobile'
+
+/**
+ * Preview viewport sizes
+ */
+export const PREVIEW_SIZES: Record<PreviewMode, { width: string; height: string }> = {
+  desktop: { width: '100%', height: '100%' },
+  tablet: { width: '768px', height: '1024px' },
+  mobile: { width: '375px', height: '667px' },
+}
+
+/**
+ * Create file request
+ */
+export interface CreateFileRequest {
+  path: string
+  content: string
+}
+
+/**
+ * Create step for app request
+ */
+export interface CreateAppStepRequest {
+  name: string
+  language?: string
+  description?: string
+}
+
+/**
+ * File API response
+ */
+export interface FileApiResponse {
+  success: boolean
+  message?: string
+  files?: string[]
+  content?: string
+  path?: string
+}
+
+/**
+ * Get language from file extension
+ */
+export function getLanguageFromExtension(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'html':
+    case 'htm':
+      return 'html'
+    case 'css':
+      return 'css'
+    case 'js':
+      return 'javascript'
+    case 'ts':
+      return 'typescript'
+    case 'json':
+      return 'json'
+    case 'md':
+      return 'markdown'
+    case 'xml':
+    case 'svg':
+      return 'xml'
+    case 'py':
+      return 'python'
+    case 'ps1':
+      return 'powershell'
+    case 'sh':
+    case 'bash':
+      return 'shell'
+    default:
+      return 'plaintext'
+  }
+}
+
+/**
+ * Get file icon based on extension
+ */
+export function getFileIcon(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'html':
+    case 'htm':
+      return 'pi pi-file'
+    case 'css':
+      return 'pi pi-palette'
+    case 'js':
+    case 'ts':
+      return 'pi pi-code'
+    case 'json':
+      return 'pi pi-file'
+    case 'md':
+      return 'pi pi-file'
+    case 'svg':
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'webp':
+      return 'pi pi-image'
+    default:
+      return 'pi pi-file'
+  }
 }
