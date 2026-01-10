@@ -2,7 +2,8 @@
 /**
  * AppEditorView.vue
  * Main Visual IDE for editing apps
- * Three-panel layout: Files | Editor | Preview
+ * AI-first layout: Files | Editor | AI Assistant
+ * Preview opens as full-screen overlay
  */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,15 +19,14 @@ import { useToast } from 'primevue/usetoast'
 // Import components
 import FileTree from '../components/FileTree.vue'
 import CodeEditor from '../components/CodeEditor.vue'
-import PreviewFrame from '../components/PreviewFrame.vue'
-import StepsPanel from '../components/StepsPanel.vue'
 import AiAssistant from '../components/AiAssistant.vue'
+import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { CreateAppStepRequest, LinkedStepInfo, PublishAppRequest } from '../types/apps.types'
+import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -338,12 +338,6 @@ async function handleDeleteFile(path: string) {
   })
 }
 
-// Handle view step code
-function handleViewStepCode(step: LinkedStepInfo) {
-  // Navigate to step designer
-  router.push(`/steps/${step.id}/edit`)
-}
-
 // Start editing app name
 function startEditingName() {
   if (editorStore.currentApp) {
@@ -415,6 +409,14 @@ function saveAppName() {
 
         <div class="header-right">
           <Button
+            icon="pi pi-eye"
+            label="Preview"
+            outlined
+            severity="secondary"
+            @click="editorStore.openPreviewOverlay()"
+            v-tooltip.bottom="'Open full-screen preview'"
+          />
+          <Button
             v-if="editorStore.hasUnsavedChanges"
             label="Save All"
             icon="pi pi-save"
@@ -435,13 +437,6 @@ function saveAppName() {
             icon="pi pi-cloud-upload"
             @click="showPublishDialog = true"
           />
-          <Button
-            :icon="editorStore.showAiPanel ? 'pi pi-times' : 'pi pi-sparkles'"
-            :label="editorStore.showAiPanel ? 'Hide AI' : 'AI'"
-            outlined
-            severity="secondary"
-            @click="editorStore.toggleAiPanel()"
-          />
         </div>
       </div>
 
@@ -460,7 +455,7 @@ function saveAppName() {
           <!-- File Tabs -->
           <div class="editor-tabs-container">
             <div
-              v-for="(file, index) in editorStore.openFiles"
+              v-for="file in editorStore.openFiles"
               :key="file.path"
               class="editor-tab"
               :class="{ active: editorStore.activeFilePath === file.path }"
@@ -503,38 +498,14 @@ function saveAppName() {
           </div>
         </div>
 
-        <!-- Right Panel: Preview / Steps -->
-        <div class="right-panel">
-          <div class="right-panel-tabs">
-            <Button
-              label="Preview"
-              :outlined="editorStore.rightPanelTab !== 'preview'"
-              size="small"
-              @click="editorStore.setRightPanelTab('preview')"
-            />
-            <Button
-              label="Backend"
-              :outlined="editorStore.rightPanelTab !== 'steps'"
-              size="small"
-              @click="editorStore.setRightPanelTab('steps')"
-            />
-          </div>
-
-          <div class="right-panel-content">
-            <PreviewFrame v-if="editorStore.rightPanelTab === 'preview'" />
-            <StepsPanel
-              v-else
-              @create-step="showCreateStepDialog = true"
-              @view-code="handleViewStepCode"
-            />
-          </div>
+        <!-- Right Panel: AI Assistant (always visible) -->
+        <div class="ai-sidebar">
+          <AiAssistant @create-step="showCreateStepDialog = true" />
         </div>
       </div>
 
-      <!-- Bottom Panel: AI Assistant (collapsible) -->
-      <div v-if="editorStore.showAiPanel" class="ai-panel">
-        <AiAssistant />
-      </div>
+      <!-- Full-screen Preview Overlay -->
+      <PreviewOverlay v-if="editorStore.showPreviewOverlay" />
     </template>
 
     <!-- Error state -->
@@ -714,35 +685,13 @@ function saveAppName() {
   color: var(--p-text-secondary);
 }
 
-.right-panel {
-  width: 350px;
+.ai-sidebar {
+  width: 380px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--p-surface-200);
-}
-
-.right-panel-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-}
-
-.right-panel-tabs .p-button {
-  flex: 1;
-  border-radius: 0;
-}
-
-.right-panel-content {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.ai-panel {
-  height: 250px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--p-surface-200);
+  background-color: var(--p-surface-0);
 }
 
 /* Dark mode */
@@ -774,15 +723,8 @@ function saveAppName() {
   background-color: var(--p-surface-900);
 }
 
-:global(.app-dark) .right-panel {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .right-panel-tabs {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .ai-panel {
+:global(.app-dark) .ai-sidebar {
+  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 </style>

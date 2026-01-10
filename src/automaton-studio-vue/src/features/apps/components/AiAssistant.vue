@@ -1,20 +1,35 @@
 <script setup lang="ts">
 /**
  * AiAssistant.vue
- * AI Assistant placeholder component for the App Editor
- * Will connect to MCP server for AI-powered code generation
+ * AI Assistant sidebar component for the App Editor
+ * Includes chat interface and collapsible Backend Steps section
  *
- * NOTE: This is a placeholder implementation.
+ * NOTE: AI chat is a placeholder implementation.
  * Full AI integration requires:
  * - WebSocket/SignalR connection to MCP server
  * - Message handling for AI responses
  * - Tool execution feedback
  * - Code update synchronization with editor
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import Panel from 'primevue/panel'
+import Tag from 'primevue/tag'
+import { useConfirm } from 'primevue/useconfirm'
+import { useToast } from 'primevue/usetoast'
 import { useAppEditorStore } from '../stores/app-editor.store'
+import type { LinkedStepInfo } from '../types/apps.types'
+
+const emit = defineEmits<{
+  createStep: []
+}>()
+
+const router = useRouter()
+const confirm = useConfirm()
+const toast = useToast()
+const editorStore = useAppEditorStore()
 
 interface Message {
   id: string
@@ -23,8 +38,6 @@ interface Message {
   timestamp: Date
 }
 
-const editorStore = useAppEditorStore()
-
 // Messages
 const messages = ref<Message[]>([])
 const userInput = ref('')
@@ -32,10 +45,10 @@ const isLoading = ref(false)
 
 // Quick suggestions
 const suggestions = [
-  'Add a login form with email and password',
-  'Create a navigation bar with links',
-  'Add a contact form with validation',
-  'Create a data table from an API',
+  'Add a login form',
+  'Create a navigation bar',
+  'Add a contact form',
+  'Create a data table',
 ]
 
 // Send message
@@ -45,7 +58,6 @@ async function sendMessage() {
   const messageContent = userInput.value.trim()
   userInput.value = ''
 
-  // Add user message
   messages.value.push({
     id: crypto.randomUUID(),
     role: 'user',
@@ -56,7 +68,6 @@ async function sendMessage() {
   isLoading.value = true
 
   try {
-    // Placeholder response - will be replaced with actual MCP client
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
     messages.value.push({
@@ -68,7 +79,7 @@ async function sendMessage() {
         '"',
       timestamp: new Date(),
     })
-  } catch (err) {
+  } catch {
     messages.value.push({
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -80,12 +91,10 @@ async function sendMessage() {
   }
 }
 
-// Handle suggestion click
 function handleSuggestion(suggestion: string) {
   userInput.value = suggestion
 }
 
-// Handle key press
 function handleKeyPress(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
@@ -93,22 +102,112 @@ function handleKeyPress(event: KeyboardEvent) {
   }
 }
 
-// Clear messages
 function clearMessages() {
   messages.value = []
 }
+
+// Backend Steps functions
+function getLanguageIcon(language: string): string {
+  switch (language?.toLowerCase()) {
+    case 'python':
+      return 'pi pi-code'
+    case 'powershell':
+      return 'pi pi-terminal'
+    case 'batch':
+      return 'pi pi-desktop'
+    default:
+      return 'pi pi-file'
+  }
+}
+
+function getLanguageColor(language: string): 'info' | 'success' | 'warn' | 'danger' | undefined {
+  switch (language?.toLowerCase()) {
+    case 'python':
+      return 'info'
+    case 'powershell':
+      return 'warn'
+    case 'batch':
+      return 'success'
+    default:
+      return undefined
+  }
+}
+
+function handleEditStep(stepId: string) {
+  router.push(`/steps/${stepId}/edit`)
+}
+
+function handleUnlinkStep(step: LinkedStepInfo) {
+  confirm.require({
+    message: `Unlink step "${step.displayName || step.name}" from this app?`,
+    header: 'Confirm Unlink',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Unlink',
+    rejectLabel: 'Cancel',
+    accept: async () => {
+      try {
+        await editorStore.unlinkStep(step.id)
+        toast.add({
+          severity: 'success',
+          summary: 'Unlinked',
+          detail: 'Step unlinked from app',
+          life: 3000,
+        })
+      } catch (err: unknown) {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: err instanceof Error ? err.message : 'Failed to unlink step',
+          life: 5000,
+        })
+      }
+    },
+  })
+}
+
+function generateUsageCode(step: LinkedStepInfo): string {
+  return `await automatonApi.executeStep('${step.name}', { inputs: {} });`
+}
+
+async function copyCode(step: LinkedStepInfo) {
+  try {
+    await navigator.clipboard.writeText(generateUsageCode(step))
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'Code copied to clipboard',
+      life: 2000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to copy code',
+      life: 3000,
+    })
+  }
+}
+
+const stepsCount = computed(() => editorStore.linkedSteps.length)
 </script>
 
 <template>
   <div class="ai-assistant">
+    <!-- Header -->
+    <div class="ai-header">
+      <div class="flex align-items-center gap-2">
+        <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
+        <span class="font-semibold">AI Assistant</span>
+      </div>
+    </div>
+
     <!-- Messages area -->
     <div class="messages-area">
       <!-- Empty state -->
       <div v-if="messages.length === 0" class="empty-state">
-        <i class="pi pi-sparkles text-4xl text-color-secondary mb-3"></i>
-        <h3 class="mb-2">AI Assistant</h3>
+        <i class="pi pi-sparkles text-3xl text-color-secondary mb-2"></i>
         <p class="text-color-secondary text-sm mb-3">
-          Ask me to create or modify your app's code
+          Ask me to create or modify your app
         </p>
 
         <!-- Quick suggestions -->
@@ -160,7 +259,7 @@ function clearMessages() {
       <div class="flex gap-2">
         <InputText
           v-model="userInput"
-          placeholder="Ask AI to create or modify your app..."
+          placeholder="Describe what you want..."
           class="flex-1"
           :disabled="isLoading"
           @keypress="handleKeyPress"
@@ -177,10 +276,98 @@ function clearMessages() {
           severity="secondary"
           text
           @click="clearMessages"
-          v-tooltip.top="'Clear messages'"
+          v-tooltip.top="'Clear'"
         />
       </div>
     </div>
+
+    <!-- Backend Steps Panel -->
+    <Panel
+      :collapsed="!editorStore.isStepsPanelExpanded"
+      toggleable
+      class="steps-panel"
+      @update:collapsed="editorStore.toggleStepsPanel()"
+    >
+      <template #header>
+        <div class="flex align-items-center gap-2">
+          <i class="pi pi-puzzle-piece"></i>
+          <span>Backend Steps</span>
+          <Tag v-if="stepsCount > 0" :value="String(stepsCount)" severity="secondary" rounded />
+        </div>
+      </template>
+
+      <template #icons>
+        <Button
+          icon="pi pi-plus"
+          text
+          rounded
+          size="small"
+          severity="secondary"
+          @click.stop="emit('createStep')"
+          v-tooltip.left="'New Step'"
+        />
+      </template>
+
+      <div class="steps-content">
+        <!-- Empty state -->
+        <div v-if="editorStore.linkedSteps.length === 0" class="steps-empty">
+          <p class="text-color-secondary text-sm mb-2">No backend steps</p>
+          <Button
+            label="Create Step"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="emit('createStep')"
+          />
+        </div>
+
+        <!-- Steps list -->
+        <div v-else class="steps-list">
+          <div
+            v-for="step in editorStore.linkedSteps"
+            :key="step.id"
+            class="step-item"
+          >
+            <div class="step-info">
+              <div class="flex align-items-center gap-2 mb-1">
+                <i :class="getLanguageIcon(step.language)" class="text-color-secondary"></i>
+                <span class="step-name">{{ step.displayName || step.name }}</span>
+              </div>
+              <Tag :value="step.language" :severity="getLanguageColor(step.language)" size="small" />
+            </div>
+            <div class="step-actions">
+              <Button
+                icon="pi pi-pencil"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                @click="handleEditStep(step.id)"
+                v-tooltip.top="'Edit'"
+              />
+              <Button
+                icon="pi pi-copy"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                @click="copyCode(step)"
+                v-tooltip.top="'Copy code'"
+              />
+              <Button
+                icon="pi pi-times"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                @click="handleUnlinkStep(step)"
+                v-tooltip.top="'Unlink'"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Panel>
   </div>
 </template>
 
@@ -192,10 +379,17 @@ function clearMessages() {
   background-color: var(--p-surface-0);
 }
 
+.ai-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+  min-height: 200px;
 }
 
 .empty-state {
@@ -205,14 +399,14 @@ function clearMessages() {
   justify-content: center;
   height: 100%;
   text-align: center;
+  padding: 1rem;
 }
 
 .suggestions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.25rem;
   justify-content: center;
-  max-width: 400px;
 }
 
 .suggestion-btn {
@@ -222,25 +416,25 @@ function clearMessages() {
 .messages {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .message {
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--p-border-radius);
-  max-width: 85%;
+  max-width: 90%;
 }
 
 .message.user {
   background-color: var(--p-primary-100);
   align-self: flex-end;
-  margin-left: 15%;
+  margin-left: 10%;
 }
 
 .message.assistant {
   background-color: var(--p-surface-100);
   align-self: flex-start;
-  margin-right: 15%;
+  margin-right: 10%;
 }
 
 .message.loading {
@@ -252,7 +446,7 @@ function clearMessages() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
 }
 
 .message-role {
@@ -264,20 +458,89 @@ function clearMessages() {
 }
 
 .message-content {
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.4;
   white-space: pre-wrap;
 }
 
 .input-area {
-  padding: 1rem;
+  padding: 0.75rem;
   border-top: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+/* Steps Panel */
+.steps-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--p-surface-200);
+}
+
+.steps-panel :deep(.p-panel-header) {
+  padding: 0.5rem 0.75rem;
+  background-color: var(--p-surface-50);
+}
+
+.steps-panel :deep(.p-panel-content) {
+  padding: 0;
+}
+
+.steps-content {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.steps-empty {
+  padding: 1rem;
+  text-align: center;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--p-surface-100);
+}
+
+.step-item:last-child {
+  border-bottom: none;
+}
+
+.step-item:hover {
+  background-color: var(--p-surface-50);
+}
+
+.step-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-actions {
+  display: flex;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
 /* Dark mode */
 :global(.app-dark) .ai-assistant {
   background-color: var(--p-surface-800);
+}
+
+:global(.app-dark) .ai-header {
+  border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .message.user {
@@ -290,5 +553,21 @@ function clearMessages() {
 
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .steps-panel {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .steps-panel :deep(.p-panel-header) {
+  background-color: var(--p-surface-900);
+}
+
+:global(.app-dark) .step-item {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .step-item:hover {
+  background-color: var(--p-surface-700);
 }
 </style>

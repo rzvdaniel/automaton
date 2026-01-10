@@ -50,11 +50,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Error state
   const error = ref<string | null>(null)
 
-  // AI panel visibility
-  const showAiPanel = ref(false)
+  // Preview overlay visibility (full-screen preview)
+  const showPreviewOverlay = ref(false)
 
-  // Right panel active tab
-  const rightPanelTab = ref<'preview' | 'steps'>('preview')
+  // Backend steps panel expanded in AI sidebar
+  const isStepsPanelExpanded = ref(false)
 
   // ============================================
   // Computed
@@ -442,17 +442,31 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Toggle AI panel visibility
+   * Toggle preview overlay visibility
    */
-  function toggleAiPanel(): void {
-    showAiPanel.value = !showAiPanel.value
+  function togglePreviewOverlay(): void {
+    showPreviewOverlay.value = !showPreviewOverlay.value
   }
 
   /**
-   * Set right panel active tab
+   * Open preview overlay
    */
-  function setRightPanelTab(tab: 'preview' | 'steps'): void {
-    rightPanelTab.value = tab
+  function openPreviewOverlay(): void {
+    showPreviewOverlay.value = true
+  }
+
+  /**
+   * Close preview overlay
+   */
+  function closePreviewOverlay(): void {
+    showPreviewOverlay.value = false
+  }
+
+  /**
+   * Toggle steps panel in AI sidebar
+   */
+  function toggleStepsPanel(): void {
+    isStepsPanelExpanded.value = !isStepsPanelExpanded.value
   }
 
   /**
@@ -477,8 +491,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isSaving.value = false
     isLoadingPreview.value = false
     error.value = null
-    showAiPanel.value = false
-    rightPanelTab.value = 'preview'
+    showPreviewOverlay.value = false
+    isStepsPanelExpanded.value = false
   }
 
   /**
@@ -513,8 +527,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isSaving,
     isLoadingPreview,
     error,
-    showAiPanel,
-    rightPanelTab,
+    showPreviewOverlay,
+    isStepsPanelExpanded,
 
     // Computed
     activeFile,
@@ -540,8 +554,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     createBackendStep,
     unlinkStep,
     refreshLinkedSteps,
-    toggleAiPanel,
-    setRightPanelTab,
+    togglePreviewOverlay,
+    openPreviewOverlay,
+    closePreviewOverlay,
+    toggleStepsPanel,
     clearError,
     reset,
   }
