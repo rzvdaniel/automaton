@@ -24,6 +24,7 @@ import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
+import StatusBar from '../components/StatusBar.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
@@ -505,6 +506,9 @@ function saveAppName() {
           <AiAssistant />
         </div>
       </div>
+
+      <!-- Status Bar -->
+      <StatusBar />
 
       <!-- Full-screen Preview Overlay -->
       <PreviewOverlay v-if="editorStore.showPreviewOverlay" />
