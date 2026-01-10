@@ -6,6 +6,37 @@
 
 ---
 
+## ⚠️ Important: Streaming Architecture Clarification
+
+### Blazor Implementation (Client-Side)
+The current Blazor app uses **client-side AI streaming**:
+- AI SDKs (OpenAI.NET, Anthropic.SDK) run **in Blazor WASM** (browser)
+- API keys fetched from backend but **used in browser**
+- No server-side streaming endpoint
+- Direct calls from browser to OpenAI/Anthropic APIs
+
+### Vue.js Decision: Server-Side Streaming (SSE) ✅
+
+**Why not client-side like Blazor?**
+- ❌ **Security Risk**: API keys exposed in browser (visible in DevTools, localStorage)
+- ❌ **Enterprise Requirements**: SOC2/HIPAA require server-side key management
+- ❌ **CORS Limitations**: Anthropic may not support custom domains
+
+**Why server-side?**
+- ✅ **API keys stay secure** (encrypted in database, never sent to browser)
+- ✅ **Enterprise-ready** (audit logging, rate limiting, compliance)
+- ✅ **Better control** (caching, quotas, monitoring)
+- ✅ **Acceptable latency** (~50-100ms extra hop for security)
+
+**Implementation:**
+1. Port AI provider code from Blazor Services to ASP.NET API
+2. Create SSE endpoint: `POST /api/ai/stream`
+3. System prompts built client-side (TypeScript) - no backend call
+4. Frontend uses EventSource to consume stream
+5. JWT authentication (not API keys in browser)
+
+---
+
 ## What We're Building
 
 Port proven AI functionality from Blazor to Vue.js with enhanced architecture:

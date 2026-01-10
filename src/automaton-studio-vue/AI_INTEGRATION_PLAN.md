@@ -21,16 +21,80 @@ This document outlines the architecture for integrating AI models into the Vue.j
 
 ---
 
+## ⚠️ Important Architectural Decision: Streaming Implementation
+
+### Blazor Implementation Analysis
+
+The current Blazor implementation uses **client-side AI streaming**:
+- AI provider SDKs (OpenAI.NET, Anthropic.SDK) run **in the Blazor WASM app** (client-side)
+- API keys are fetched from backend but **used directly in the browser**
+- Streaming happens via C# events in the client
+- **No server-side streaming endpoint exists**
+
+### Vue.js Options Considered
+
+#### Option 1: Client-Side Streaming (Same as Blazor)
+Use official JavaScript SDKs (`openai`, `@anthropic-ai/sdk`) directly in browser.
+
+**Pros:**
+- ✅ Same architecture as Blazor (easier port)
+- ✅ Lower server load
+- ✅ Direct streaming to UI
+- ✅ Both SDKs fully support browser + streaming + tool calling
+
+**Cons:**
+- ❌ **CRITICAL SECURITY RISK: API keys exposed in browser**
+  - Keys visible in network tab, localStorage, memory
+  - Cannot be fully secured client-side
+  - Violates enterprise security requirements
+- ❌ **CORS limitations** (Anthropic may not support all origins)
+- ❌ **No centralized rate limiting or caching**
+- ❌ **API key rotation complexity**
+
+#### Option 2: Server-Side Streaming (SSE) - ✅ RECOMMENDED
+
+Port AI provider code to backend and stream via Server-Sent Events (SSE).
+
+**Pros:**
+- ✅ **API keys stay secure on server** (encrypted, never exposed)
+- ✅ **Enterprise-ready security** (SOC2, HIPAA compliant)
+- ✅ **Better rate limiting & caching** (centralized control)
+- ✅ **No CORS issues** (server-to-server calls)
+- ✅ **Consistent with existing API architecture**
+- ✅ **Better monitoring, logging, error handling**
+
+**Cons:**
+- ❌ Server load (all AI calls through backend)
+- ❌ Slightly higher latency (extra hop ~50-100ms)
+- ❌ Need to implement SSE endpoint
+- ❌ Need to port C# provider code to backend API
+
+### Final Decision: Server-Side Streaming (SSE)
+
+**For production multi-tenant SaaS, API keys MUST NOT be exposed to browsers.**
+
+The architecture will:
+1. **Port** AI provider code from Blazor to ASP.NET backend API
+2. **Create** new SSE endpoint: `POST /api/ai/stream`
+3. **Keep** API keys on server (encrypted in database)
+4. **Use** EventSource in Vue.js to consume SSE stream
+5. **Build** system prompts client-side in TypeScript (no server call needed)
+
+This ensures security while maintaining streaming UX.
+
+---
+
 ## Table of Contents
 
 1. [Current Blazor Architecture](#current-blazor-architecture)
-2. [Vue.js Architecture Design](#vuejs-architecture-design)
-3. [Shared AI Services](#shared-ai-services)
-4. [Feature-Specific Integration](#feature-specific-integration)
-5. [API Endpoints](#api-endpoints)
-6. [Implementation Phases](#implementation-phases)
-7. [Security Considerations](#security-considerations)
-8. [Testing Strategy](#testing-strategy)
+2. [Streaming Architecture Decision](#streaming-architecture-decision)
+3. [Vue.js Architecture Design](#vuejs-architecture-design)
+4. [Shared AI Services](#shared-ai-services)
+5. [Feature-Specific Integration](#feature-specific-integration)
+6. [API Endpoints](#api-endpoints)
+7. [Implementation Phases](#implementation-phases)
+8. [Security Considerations](#security-considerations)
+9. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -92,6 +156,413 @@ User Input → AiChatPanel → AiApiKeyService (get key)
            ↓
            AiChatHistoryService (save) → Display to User
 ```
+
+---
+
+## Streaming Architecture Decision
+
+### Current Blazor Implementation (Client-Side)
+
+The Blazor app implements AI streaming **entirely in the client (WASM)**:
+
+**Architecture:**
+```
+Browser (Blazor WASM)
+├── AiChatPanel.razor
+├── McpClient (subscribes to ConversationUpdated event)
+└── AI Providers (run in browser)
+    ├── OpenAiProvider.cs
+    │   └── Uses OpenAI.NET SDK directly
+    │   └── API key: fetched from backend, used in browser
+    │   └── Streaming: C# async enumerables
+    └── AnthropicProvider.cs
+        └── Uses Anthropic.SDK directly
+        └── API key: fetched from backend, used in browser
+        └── Streaming: C# async enumerables
+
+Flow:
+User Input → Blazor Component → AI Provider (in WASM) → Stream Response → Update UI
+                                      ↓
+                             OpenAI/Anthropic API (direct from browser)
+```
+
+**Key Characteristics:**
+- AI SDK code runs **in the browser** (Blazor WASM)
+- API keys stored in browser memory during conversation
+- Direct HTTP calls from browser to OpenAI/Anthropic APIs
+- No backend API endpoint for AI streaming
+- Events emitted to UI components via C# events
+
+### Vue.js Implementation Options
+
+#### Option 1: Client-Side (JavaScript SDKs in Browser)
+
+**Implementation:**
+```typescript
+// Use official SDKs directly in browser
+import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+
+// In Vue component
+const openai = new OpenAI({
+  apiKey: await fetchApiKeyFromBackend(),
+  dangerouslyAllowBrowser: true  // ⚠️ Security warning!
+})
+
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [...],
+  stream: true
+})
+
+for await (const chunk of stream) {
+  // Update UI with chunk
+  responseText.value += chunk.choices[0]?.delta?.content || ''
+}
+```
+
+**Pros:**
+- ✅ Exact same architecture as Blazor
+- ✅ No server-side changes needed
+- ✅ Lower server load
+- ✅ Faster responses (no server hop)
+- ✅ Both SDKs fully support:
+  - Browser environments
+  - Streaming via async iterators
+  - Function/tool calling
+  - Full TypeScript support
+
+**Cons:**
+- ❌ **CRITICAL SECURITY RISK: API keys in browser**
+  - Keys visible in DevTools Network tab
+  - Keys stored in localStorage/memory
+  - Cannot be encrypted client-side
+  - User can extract and misuse keys
+  - Violates enterprise security (SOC2, HIPAA)
+  
+- ❌ **CORS requirements**
+  - OpenAI: CORS enabled for whitelisted origins
+  - Anthropic: May not support custom domains
+  - Requires verification with each provider
+  
+- ❌ **No centralized control**
+  - Rate limiting per browser (not per user/tenant)
+  - No response caching possible
+  - Harder to implement usage quotas
+  - No audit logging of AI calls
+  
+- ❌ **API key management complexity**
+  - Need secure key exchange mechanism
+  - User-specific keys harder to manage
+  - Key rotation requires browser refresh
+
+**Security Analysis:**
+```
+API Key Exposure Risk:
+
+1. Network Tab:
+   Authorization: Bearer sk-proj-xxx... ← Visible in DevTools
+
+2. JavaScript Memory:
+   const apiKey = 'sk-proj-xxx...' ← Extractable via debugger
+
+3. localStorage (if cached):
+   localStorage.getItem('ai_api_key') → 'sk-proj-xxx...'
+
+4. Source Maps:
+   Even minified code can be reverse-engineered
+
+⚠️ UNACCEPTABLE for production multi-tenant SaaS
+```
+
+#### Option 2: Server-Side Streaming (SSE) - ✅ RECOMMENDED
+
+**Implementation:**
+
+**Backend (NEW - Port from Blazor):**
+```csharp
+// src/Automaton.Studio.Server/Controllers/AiController.cs
+
+[ApiController]
+[Route("api/ai")]
+[Authorize]  // JWT required
+public class AiController : ControllerBase
+{
+    private readonly IAiProviderRegistry _providerRegistry;
+    private readonly IAiApiKeyService _apiKeyService;
+    
+    [HttpPost("stream")]
+    public async Task StreamConversation([FromBody] StreamConversationRequest request)
+    {
+        // Set SSE headers
+        Response.ContentType = "text/event-stream";
+        Response.Headers.Add("Cache-Control", "no-cache");
+        Response.Headers.Add("Connection", "keep-alive");
+        
+        // Get API key from database (NEVER from client request)
+        var apiKey = await _apiKeyService.GetDecryptedKeyAsync(
+            User.GetUserId(), 
+            request.ProviderId
+        );
+        
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            await WriteErrorEvent("No API key configured for this provider");
+            return;
+        }
+        
+        // Get provider (reuse existing code from Blazor)
+        var provider = _providerRegistry.GetProvider(request.ProviderName);
+        
+        // Build conversation request
+        var conversationRequest = new ConversationRequest
+        {
+            ConversationId = request.ConversationId,
+            Model = request.Model,
+            SystemPrompt = request.SystemPrompt,  // Built client-side, sent in request
+            InitialMessage = request.Message,
+            ConversationHistory = request.History,
+            ApiKey = apiKey  // From server, secure
+        };
+        
+        // Stream response using existing provider code
+        provider.ConversationUpdated += async (sender, e) =>
+        {
+            var eventData = JsonSerializer.Serialize(e);
+            await Response.WriteAsync($"data: {eventData}\n\n");
+            await Response.Body.FlushAsync();
+        };
+        
+        try
+        {
+            await provider.CallAsync(
+                conversationRequest,
+                await GetToolsForContext(request.ResourceType),
+                async (toolId, toolName, args) => await ExecuteToolAsync(toolId, toolName, args),
+                HttpContext.RequestAborted
+            );
+            
+            // Send completion event
+            await Response.WriteAsync("event: done\ndata: {}\n\n");
+            await Response.Body.FlushAsync();
+        }
+        catch (Exception ex)
+        {
+            await WriteErrorEvent(ex.Message);
+        }
+    }
+    
+    private async Task WriteErrorEvent(string message)
+    {
+        var errorData = JsonSerializer.Serialize(new { error = message });
+        await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
+        await Response.Body.FlushAsync();
+    }
+}
+```
+
+**Frontend (Vue.js):**
+```typescript
+// src/shared/services/ai/ai-client.ts
+
+export class AiClient {
+  async startConversation(
+    request: ConversationRequest,
+    onChunk: (chunk: StreamChunk) => void,
+    onComplete: () => void,
+    onError: (error: Error) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Create SSE connection to backend
+      const eventSource = new EventSourcePolyfill('/api/ai/stream', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,  // JWT, not API key!
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      })
+      
+      // Handle streaming chunks
+      eventSource.onmessage = (event) => {
+        const chunk: StreamChunk = JSON.parse(event.data)
+        onChunk(chunk)
+      }
+      
+      // Handle completion
+      eventSource.addEventListener('done', () => {
+        onComplete()
+        eventSource.close()
+      })
+      
+      // Handle errors
+      eventSource.addEventListener('error', (event: any) => {
+        const error = JSON.parse(event.data)
+        onError(new Error(error.message))
+        eventSource.close()
+      })
+      
+      eventSource.onerror = () => {
+        onError(new Error('Streaming connection failed'))
+        eventSource.close()
+      }
+      
+      // Handle abort
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          eventSource.close()
+        })
+      }
+    } catch (error) {
+      onError(error as Error)
+    }
+  }
+}
+```
+
+**Pros:**
+- ✅ **API keys stay secure on server**
+  - Encrypted in database
+  - Never sent to browser
+  - Proper secret management
+  
+- ✅ **Enterprise-ready security**
+  - SOC2 compliant
+  - HIPAA compliant
+  - Audit logging of all AI calls
+  - Centralized access control
+  
+- ✅ **Better rate limiting & quotas**
+  - Per-user/tenant limits
+  - Centralized enforcement
+  - Response caching possible
+  - Cost tracking per user
+  
+- ✅ **No CORS issues**
+  - Backend → AI provider (server-to-server)
+  - SSE from own backend (no CORS)
+  
+- ✅ **Consistent architecture**
+  - All API calls use JWT authentication
+  - Same error handling patterns
+  - Better monitoring and logging
+  
+- ✅ **Code reuse**
+  - Port existing C# provider code to API
+  - Same system prompts (copy to TypeScript)
+  - Same tool providers
+
+**Cons:**
+- ❌ Server load increases (all AI calls through backend)
+- ❌ Slightly higher latency (~50-100ms extra hop)
+- ❌ Need to implement SSE endpoint
+- ❌ Need to port provider code from Blazor Services to API Controllers
+
+**Latency Comparison:**
+```
+Client-Side:
+User → AI Provider API
+Latency: 200-500ms (network + AI processing)
+
+Server-Side:
+User → Backend → AI Provider API → Backend → User
+Latency: 250-600ms (2x network hops + AI processing)
+
+Additional latency: ~50-100ms
+Trade-off: Acceptable for enterprise security requirements
+```
+
+### System Prompts: Client-Side Building
+
+**Question:** Can prompt builder logic be replicated in UI?
+
+**Answer:** YES, and it SHOULD be (no backend call needed):
+
+**Current (Blazor):**
+```csharp
+// StepSystemPromptBuilder.cs (in Blazor Services)
+public class StepSystemPromptBuilder
+{
+    public string BuildSystemPrompt(string language)
+    {
+        return $@"Generate {language} code for automation workflow steps.
+        
+        ## WORKFLOW
+        1. For modifications: Call get_current_code first
+        2. Check variables: Call get_step_variables
+        ...";
+    }
+}
+```
+
+**New (Vue.js):**
+```typescript
+// src/shared/services/ai/prompts/step-prompt-builder.ts
+
+export class StepSystemPromptBuilder {
+  buildSystemPrompt(language: string): string {
+    return `
+      Generate ${language} code for automation workflow steps.
+      
+      ## WORKFLOW
+      1. For modifications: Call get_current_code first
+      2. Check variables: Call get_step_variables
+      ...
+    `.trim()
+  }
+}
+
+// Usage in composable
+import { StepSystemPromptBuilder } from '@/shared/services/ai/prompts'
+
+const promptBuilder = new StepSystemPromptBuilder()
+const systemPrompt = promptBuilder.buildSystemPrompt(language.value)
+
+// Send to backend in request
+await aiClient.startConversation({
+  ...request,
+  systemPrompt,  // Built client-side, sent as part of request
+  message: userMessage
+})
+```
+
+**Benefits:**
+- ✅ No server roundtrip for prompt generation
+- ✅ Prompts can be dynamic based on UI state
+- ✅ Easier to customize per user/context
+- ✅ Faster iteration during development
+- ✅ Same prompts as Blazor (copy & paste)
+
+**Implementation:**
+1. Copy C# prompt builders to TypeScript
+2. Keep exact same prompts (already tested and optimized)
+3. Add to `shared/services/ai/prompts/`
+4. System prompts sent in API request body (not built on server)
+
+### Final Architecture Decision
+
+**✅ Use Server-Side Streaming (SSE) with Client-Side Prompt Building**
+
+**Rationale:**
+1. **Security is non-negotiable** for multi-tenant SaaS
+2. **API keys must never be exposed** to browser
+3. **Enterprise requirements** (compliance, audit logging)
+4. **Consistent with existing architecture** (all APIs use JWT)
+5. **Better monitoring, rate limiting, caching**
+6. **Acceptable latency trade-off** (~50-100ms for enterprise security)
+
+**Implementation Path:**
+1. Port AI provider code from `Automaton.Studio/Services/Mcp/Clients/Providers/` to `Automaton.Studio.Server/Controllers/`
+2. Create new `AiController` with SSE endpoint
+3. Keep existing provider code (OpenAiProvider.cs, AnthropicProvider.cs) - minimal changes
+4. Copy system prompt builders to TypeScript (exact same prompts)
+5. Frontend uses EventSource to consume SSE stream
+6. API keys stay on server (encrypted in database)
+
+This ensures **production-ready security** while maintaining **streaming UX**.
 
 ---
 
