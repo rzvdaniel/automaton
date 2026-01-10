@@ -78,13 +78,30 @@ function savePanelSizes(sizes: number[]) {
   }
 }
 
-const panelSizes = ref<number[]>(loadPanelSizes())
+// Normalize sizes to always add up to 100%
+function normalizeSizes(sizes: number[]): number[] {
+  if (!Array.isArray(sizes) || sizes.length !== 3) {
+    return defaultSizes
+  }
+  
+  const total = sizes.reduce((sum, size) => sum + size, 0)
+  if (total === 0) {
+    return defaultSizes
+  }
+  
+  // Normalize to 100% and round to avoid floating point precision issues
+  return sizes.map((size) => Math.round((size / total) * 10000) / 100)
+}
+
+const panelSizes = ref<number[]>(normalizeSizes(loadPanelSizes()))
 
 // Handle splitter resize
 function handleSplitterResize(event: any) {
   if (event && event.sizes && Array.isArray(event.sizes)) {
-    panelSizes.value = event.sizes
-    savePanelSizes(event.sizes)
+    // Normalize sizes to ensure they always add up to 100%
+    const normalized = normalizeSizes(event.sizes)
+    panelSizes.value = normalized
+    savePanelSizes(normalized)
   }
 }
 
