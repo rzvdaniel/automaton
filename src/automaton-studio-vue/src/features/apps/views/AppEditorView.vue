@@ -544,11 +544,18 @@ function saveAppName() {
 </template>
 
 <style scoped>
+/* Override parent .app-main padding and scrolling for this full-screen editor */
+:global(.app-main) {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 .app-editor-view {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 64px);
   background-color: var(--p-surface-ground);
+  overflow: hidden;
 }
 
 .loading-container,
