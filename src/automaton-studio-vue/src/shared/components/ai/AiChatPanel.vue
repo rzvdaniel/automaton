@@ -2,20 +2,20 @@
 /**
  * AiChatPanel.vue
  * Enhanced AI Chat component with streaming, tool execution, and code generation
- * Replaces the simpler AiChat component with full functionality
+ * Includes provider/model selection based on user's configured API keys
  */
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import Button from 'primevue/button'
 import Textarea from 'primevue/textarea'
+import Select from 'primevue/select'
 import AiMessage from './messages/AiMessage.vue'
-import type {
-  AiChatMessage,
-  AiChatConfig,
-  AiMessageType,
-  StreamChunk,
-  CodeBlock,
-} from '@/shared/types/ai-chat.types'
+import type { AiChatMessage, AiChatConfig, StreamChunk, CodeBlock } from '@/shared/types/ai-chat.types'
 import { aiStreamingService } from '@/shared/services/ai/ai-streaming.service'
+import {
+  aiProvidersService,
+  type AiProviderInfo,
+  getModelDisplayName,
+} from '@/shared/services/ai/ai-providers.service'
 
 interface Props {
   config: AiChatConfig
@@ -24,7 +24,14 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// State
+// Provider/Model State
+const providers = ref<AiProviderInfo[]>([])
+const selectedProvider = ref<AiProviderInfo | null>(null)
+const selectedModel = ref<string | null>(null)
+const isLoadingProviders = ref(false)
+const providerError = ref<string | null>(null)
+
+// Chat State
 const messages = ref<AiChatMessage[]>([])
 const userInput = ref('')
 const isLoading = ref(false)
@@ -35,8 +42,26 @@ const conversationId = ref(crypto.randomUUID())
 // Current streaming message (for real-time updates)
 const streamingMessage = ref<AiChatMessage | null>(null)
 
-// Suggestions from config
+// Computed
 const suggestions = computed(() => props.config.suggestions || [])
+
+const availableProviders = computed(() =>
+  providers.value.filter((p) => p.hasStoredKeys || p.hasEnvironmentKey),
+)
+
+const availableModels = computed(() => {
+  if (!selectedProvider.value) return []
+  return selectedProvider.value.supportedModels.map((modelId) => ({
+    id: modelId,
+    name: getModelDisplayName(modelId),
+  }))
+})
+
+const hasConfiguredProvider = computed(() => availableProviders.value.length > 0)
+
+const isReadyToChat = computed(
+  () => hasConfiguredProvider.value && selectedProvider.value && selectedModel.value,
+)
 
 // Watch for new messages and scroll to bottom
 watch(
@@ -47,7 +72,6 @@ watch(
   },
 )
 
-// Also scroll when streaming message updates
 watch(
   () => streamingMessage.value?.content,
   async () => {
@@ -55,6 +79,39 @@ watch(
     scrollToBottom()
   },
 )
+
+// Watch provider selection to auto-select first model
+watch(selectedProvider, (provider) => {
+  if (provider && provider.supportedModels.length > 0) {
+    selectedModel.value = provider.supportedModels[0]
+  } else {
+    selectedModel.value = null
+  }
+})
+
+// Load providers on mount
+onMounted(async () => {
+  await loadProviders()
+})
+
+async function loadProviders() {
+  isLoadingProviders.value = true
+  providerError.value = null
+
+  try {
+    providers.value = await aiProvidersService.getAvailableProviders(true)
+
+    // Auto-select first available provider
+    if (availableProviders.value.length > 0) {
+      selectedProvider.value = availableProviders.value[0]
+    }
+  } catch (error) {
+    console.error('Failed to load AI providers:', error)
+    providerError.value = 'Failed to load AI providers. Using simulation mode.'
+  } finally {
+    isLoadingProviders.value = false
+  }
+}
 
 function scrollToBottom() {
   if (messagesContainer.value) {
@@ -94,30 +151,46 @@ async function sendMessage() {
     // Build conversation history
     const history = messages.value
       .filter((m) => m.role !== 'system')
-      .slice(-10) // Keep last 10 messages for context
+      .slice(-10)
       .map((m) => ({
         role: m.role,
         content: m.content,
       }))
 
-    // Use simulation for now (backend may not be available)
-    // In production, this would call streamConversation
-    currentAbortController.value = await aiStreamingService.simulateStreaming(
-      {
-        conversationId: conversationId.value,
-        resourceType: props.config.resourceType || 'app',
-        resourceId: props.config.resourceId,
-        language: props.config.language,
-        message: messageText,
-        history: history.slice(0, -1), // Exclude the message we just added
-        context: props.config.context,
-      },
-      {
-        onChunk: handleStreamChunk,
-        onComplete: handleStreamComplete,
-        onError: handleStreamError,
-      },
-    )
+    const requestParams = {
+      conversationId: conversationId.value,
+      resourceType: props.config.resourceType || 'app',
+      resourceId: props.config.resourceId,
+      language: props.config.language,
+      message: messageText,
+      history: history.slice(0, -1),
+      context: props.config.context,
+      providerName: selectedProvider.value?.providerName,
+      model: selectedModel.value || undefined,
+      apiKeyId: selectedProvider.value
+        ? aiProvidersService.getFirstApiKeyId(selectedProvider.value)
+        : undefined,
+    }
+
+    const callbacks = {
+      onChunk: handleStreamChunk,
+      onComplete: handleStreamComplete,
+      onError: handleStreamError,
+    }
+
+    // Use real streaming if we have a configured provider, otherwise simulate
+    if (isReadyToChat.value) {
+      currentAbortController.value = await aiStreamingService.streamConversation(
+        requestParams,
+        callbacks,
+      )
+    } else {
+      // Fallback to simulation
+      currentAbortController.value = await aiStreamingService.simulateStreaming(
+        requestParams,
+        callbacks,
+      )
+    }
   } catch (error) {
     handleStreamError(error as Error)
   }
@@ -128,13 +201,11 @@ function handleStreamChunk(chunk: StreamChunk) {
 
   switch (chunk.type) {
     case 'text':
-      // Update or create text message
       streamingMessage.value.type = 'text'
       streamingMessage.value.content = chunk.content || ''
       break
 
     case 'reasoning':
-      // Add as separate reasoning message
       const reasoningMsg: AiChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -148,7 +219,6 @@ function handleStreamChunk(chunk: StreamChunk) {
 
     case 'tool_call':
       if (chunk.toolCall) {
-        // Add tool execution message
         const toolCallMsg: AiChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -164,7 +234,6 @@ function handleStreamChunk(chunk: StreamChunk) {
 
     case 'tool_result':
       if (chunk.toolResult) {
-        // Find and update the tool call message
         const toolMsg = messages.value.find(
           (m) =>
             m.type === 'tool_execution' &&
@@ -185,7 +254,6 @@ function handleStreamChunk(chunk: StreamChunk) {
       break
 
     case 'code_generated':
-      // Add code message
       const codeBlock: CodeBlock = {
         id: chunk.codeId || crypto.randomUUID(),
         language: chunk.language || 'text',
@@ -211,14 +279,12 @@ function handleStreamChunk(chunk: StreamChunk) {
       break
 
     case 'complete':
-      // Handled in onComplete
       break
   }
 }
 
 function handleStreamComplete() {
   if (streamingMessage.value) {
-    // Only add the streaming message if it has meaningful content
     if (
       streamingMessage.value.type !== 'generating' &&
       streamingMessage.value.content &&
@@ -243,7 +309,6 @@ function handleStreamError(error: Error) {
     messages.value.push({ ...streamingMessage.value })
     streamingMessage.value = null
   } else {
-    // Add error message
     messages.value.push({
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -288,12 +353,10 @@ function cancelRequest() {
   }
 }
 
-// Cleanup on unmount
 onUnmounted(() => {
   cancelRequest()
 })
 
-// Combined messages for display (including streaming message)
 const displayMessages = computed(() => {
   const msgs = [...messages.value]
   if (streamingMessage.value) {
@@ -305,7 +368,7 @@ const displayMessages = computed(() => {
 
 <template>
   <div class="ai-chat-panel">
-    <!-- Header -->
+    <!-- Header with Provider/Model Selection -->
     <div class="chat-header">
       <div class="header-left">
         <i class="pi pi-sparkles header-icon"></i>
@@ -322,6 +385,52 @@ const displayMessages = computed(() => {
           @click="clearMessages"
           v-tooltip.left="'Clear conversation'"
         />
+      </div>
+    </div>
+
+    <!-- Provider/Model Selector -->
+    <div class="model-selector">
+      <div class="selector-row">
+        <Select
+          v-model="selectedProvider"
+          :options="availableProviders"
+          optionLabel="displayName"
+          placeholder="Select Provider"
+          :loading="isLoadingProviders"
+          :disabled="isLoading"
+          class="provider-select"
+          size="small"
+        >
+          <template #value="slotProps">
+            <div v-if="slotProps.value" class="provider-option">
+              <span>{{ slotProps.value.displayName }}</span>
+            </div>
+            <span v-else>{{ slotProps.placeholder }}</span>
+          </template>
+          <template #option="slotProps">
+            <div class="provider-option">
+              <span>{{ slotProps.option.displayName }}</span>
+              <span v-if="slotProps.option.hasEnvironmentKey" class="env-badge">ENV</span>
+            </div>
+          </template>
+        </Select>
+
+        <Select
+          v-model="selectedModel"
+          :options="availableModels"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Select Model"
+          :disabled="!selectedProvider || isLoading"
+          class="model-select"
+          size="small"
+        />
+      </div>
+
+      <!-- No provider warning -->
+      <div v-if="!isLoadingProviders && !hasConfiguredProvider" class="no-provider-warning">
+        <i class="pi pi-info-circle"></i>
+        <span>No AI providers configured. <a href="/settings/ai">Add API keys</a> or using demo mode.</span>
       </div>
     </div>
 
@@ -390,7 +499,10 @@ const displayMessages = computed(() => {
         </div>
       </div>
       <div class="input-hint">
-        <span>Press Enter to send, Shift+Enter for new line</span>
+        <span v-if="isReadyToChat">
+          Using {{ selectedProvider?.displayName }} / {{ getModelDisplayName(selectedModel || '') }}
+        </span>
+        <span v-else>Demo mode - responses are simulated</span>
       </div>
     </div>
   </div>
@@ -427,6 +539,57 @@ const displayMessages = computed(() => {
 .header-title {
   font-weight: 600;
   font-size: 0.95rem;
+}
+
+.model-selector {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+.selector-row {
+  display: flex;
+  gap: 8px;
+}
+
+.provider-select {
+  flex: 1;
+}
+
+.model-select {
+  flex: 1;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.env-badge {
+  font-size: 0.65rem;
+  background: var(--p-green-100);
+  color: var(--p-green-700);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.no-provider-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--p-amber-50);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--p-amber-700);
+}
+
+.no-provider-warning a {
+  color: var(--p-primary-500);
+  text-decoration: underline;
 }
 
 .messages-area {
@@ -512,11 +675,25 @@ const displayMessages = computed(() => {
   border-color: var(--p-surface-700);
 }
 
+:global(.app-dark) .model-selector {
+  border-color: var(--p-surface-700);
+}
+
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .empty-icon {
   color: var(--p-surface-600);
+}
+
+:global(.app-dark) .env-badge {
+  background: var(--p-green-900);
+  color: var(--p-green-300);
+}
+
+:global(.app-dark) .no-provider-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--p-amber-400);
 }
 </style>
