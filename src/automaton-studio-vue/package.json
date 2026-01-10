@@ -12,9 +12,11 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.7.0",
     "@primevue/themes": "^4.5.4",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
+    "monaco-editor": "^0.55.1",
     "pinia": "^3.0.4",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",
