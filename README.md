@@ -1,63 +1,138 @@
 # Automaton
 
-Automaton is a lightweight, cross-platform automation platform designed to streamline and orchestrate software tasks. It provides a visual interface for creating and managing task flows, while supporting extensibility through Python scripting and modular logic components.
+Automaton is an AI-first, cross-platform workflow automation platform. Describe what you want to automate in natural language, generate flows with reusable/custom steps, build web apps that call those flows, and execute them securely via distributed runners.
 
-## 🚧 Project Status
-As of July 11, 2025
-Automaton is currently in early development, approaching its first alpha release. A demo website will soon be available to showcase the core features and interface.
+## Overview
 
-## 🔧 Key Features (Planned & In Progress)
+**Architecture**
+- **Frontend**: Vue 3 + TypeScript + Vite + PrimeVue (src/automaton-studio-vue)
+- **Backend**: ASP.NET Core 9.0 REST API + SignalR (src/Automaton.Studio.Server)
+- **Runners**: Cross-platform console app for distributed execution (src/Automaton.Runner)
+- **Core Libraries**: Automaton.Core, Automaton.Steps, Automaton.Core.Scripting, Automaton.Mcp
 
-🧩 Flow Builder – Design automation pipelines using a clean, intuitive interface
+**Key Capabilities**
+- AI Flow Generation (natural language → flow + steps)
+- Web Apps Platform (Monaco editor, live preview, PWA, publish)
+- Custom Steps (Python/PowerShell/Batch) with inline testing
+- Projects (organize flows/apps/steps with shared settings and roles)
+- Secure, distributed execution via runner nodes with real-time telemetry
+- API Keys and role-based access
 
-🐍 Python Integration – Create and embed custom steps using Python code
+See the detailed guide in [AGENTS.md](AGENTS.md) and the frontend redesign spec in [src/automaton-studio-vue/REDESIGN_PLAN.md](src/automaton-studio-vue/REDESIGN_PLAN.md).
 
-🌐 Remote Execution – Run flows on any connected system with a compatible runner
+## Requirements
 
-🔁 Logic Blocks – Use conditionals, loops, and HTTP request steps (with more being added)
+- Node.js 18+ and npm/pnpm (Frontend)
+- .NET 9.0 SDK (Backend & Runner)
+- MySQL 5.7+ or MariaDB 10.2+ (Database)
 
-📦 Self-Hosted – Deploy on any web server supporting .NET 7 and Blazor
+## Quickstart
 
-💾 Persistent Storage – Built-in support for MySQL-backed state and flow management
+### Frontend (Vue.js)
 
-## 🚀 Getting Started
+```bash
+cd src/automaton-studio-vue
+npm install
+npm run dev        # http://localhost:5173 with HMR
 
-### Development Environment Setup
+# Optional
+npm run type-check # TypeScript checks
+npm run lint       # ESLint
+npm run format     # Prettier
+```
 
-For new developers joining the team, we provide a Docker-based MySQL setup for easy onboarding:
+### Backend (ASP.NET Core)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rzvdaniel/automaton.git
-   cd automaton
-   ```
+```bash
+cd src/Automaton.Studio.Server
+dotnet run                    # https://localhost:7091
+```
 
-2. **Set up the database**
-   ```bash
-   # Copy environment variables
-   cp .env.example .env
-   
-   # Start MySQL container
-   docker compose -f docker-compose.dev.yml up -d mysql
-   ```
+### Database (Docker Compose)
 
-3. **Configure connection string**
-   ```bash
-   cd src/Automaton.Studio.Server
-   dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
-   ```
+Use the provided compose for local MySQL:
 
-4. **Start the server** (migrations apply automatically on first run)
-   ```bash
-   dotnet run
-   ```
+```bash
+# From repo root
+docker compose -f docker-compose.dev.yml up -d mysql
 
-For detailed instructions, see the [Docker Setup Guide](docker/README.md).
+# Configure connection string (example)
+cd src/Automaton.Studio.Server
+dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
 
-## 📸 Screenshots
+# Apply EF Core migrations
+dotnet tool install --global dotnet-ef
+dotnet ef database update
+```
 
-![Screenshot 01](/screenshots/Screenshot-2024-01-22-231011.png?raw=true "Studio Flow")
+### Type Generation (Frontend)
 
-## 📜 License
+Generate TypeScript types from the backend OpenAPI spec:
+
+```bash
+cd src/automaton-studio-vue
+npm run generate:types
+```
+
+### Runner (Docker Compose – preferred)
+
+Use the provided Compose file for production-like runner deployment:
+
+```bash
+# From repo root
+cp .env.example .env
+
+# Configure environment in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+# Start runner
+docker compose -f docker-compose.runner.yml up -d
+
+# Tail logs
+docker compose -f docker-compose.runner.yml logs -f runner
+
+# Stop/remove
+docker compose -f docker-compose.runner.yml down
+```
+
+Alternative (manual, for local debugging only):
+
+```bash
+cd src/Automaton.Runner
+dotnet build -c Release
+dotnet publish -c Release --self-contained false
+AUTOMATON_API_KEY=ak_runner_xxx automaton-runner
+```
+
+See detailed guidance in docs/runners/docker-runner.md.
+
+## Build & Production
+
+### Frontend
+
+```bash
+cd src/automaton-studio-vue
+npm run build      # Outputs to dist/
+npm run preview    # Preview production build locally
+```
+
+### Backend
+
+```bash
+cd src/Automaton.Studio.Server
+dotnet publish -c Release
+```
+
+## API Documentation
+
+- Swagger UI: https://localhost:7091/swagger/index.html
+- OpenAPI JSON: https://localhost:7091/swagger/v1/swagger.json
+
+## Screenshots
+
+![Studio Flow](screenshots/Screenshot-2024-01-22-231011.png?raw=true "Studio Flow")
+
+## License
 
 Licensed under the Apache License 2.0.

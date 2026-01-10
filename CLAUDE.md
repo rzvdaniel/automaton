@@ -4,105 +4,102 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Automaton is a cross-platform workflow automation platform built on .NET 9.0 with Blazor. It provides a visual workflow designer, integrated web app builder, remote execution runners, and custom step authoring capabilities with Python/PowerShell/Batch support.
+Automaton is a cross-platform workflow automation platform with an AI-first approach to workflow design. It combines a Vue.js/TypeScript web frontend with a .NET 9.0 backend, providing natural language flow generation, integrated web app building, remote execution runners, and custom step authoring with Python/PowerShell/Batch support.
 
-**Core Architecture:**
-- **Automaton.Web**: Static marketing website (HTML/CSS/JS)
-- **Automaton.Studio**: Blazor WebAssembly UI application
-  - Uses AntDesign component library for UI
-  - BlazorMonaco for code editing in custom steps and web apps
-  - Blazored.LocalStorage for client-side storage
-  - References: Automaton.Core, Automaton.Steps, Automaton.Core.Scripting, Automaton.Mcp, Automaton.Studio.Auth
-- **Automaton.Studio.Server**: ASP.NET Core Web API backend
-  - 25 REST API controllers for all features
-  - Entity Framework Core 9.0 with Pomelo MySQL provider
-  - SignalR hubs for real-time communication
+**Core Components:**
+
+- **Frontend (`src/automaton-studio-vue/`)**: Vue 3 + TypeScript + Vite
+  - Modern, feature-based architecture with composables, stores, and services
+  - PrimeVue for enterprise-grade UI components
+  - Monaco Editor for code editing (flows, apps, custom steps)
+  - Pinia for state management
+  - Natural language flow generation interface (AI-first)
+
+- **Backend (`src/Automaton.Studio.Server/`)**: ASP.NET Core 9.0 Web API
+  - 25+ REST API controllers for flows, apps, runners, steps, projects
+  - Entity Framework Core 9.0 with MySQL/MariaDB persistence
+  - SignalR hubs for real-time runner communication and execution updates
   - Hangfire for background job scheduling
   - ASP.NET Core Identity with JWT Bearer authentication
-  - Serilog logging with MariaDB sink
-  - Swashbuckle/Swagger for API documentation
-- **Automaton.Studio.Auth**: Shared authentication library
-  - JWT Bearer token handling
-  - Blazored.LocalStorage integration for token persistence
-  - ASP.NET Core Components Authorization
-  - Used by both Studio and external integrations
-- **Automaton.Runner**: Cross-platform console runner
-  - Standalone executable (can be published as single-file)
-  - SignalR client for server communication
+  - Serilog structured logging
+  - Swagger/OpenAPI documentation
+
+- **Runner (`src/Automaton.Runner/`)**: Cross-platform console application
+  - Standalone executable (single-file or framework-dependent)
+  - SignalR client for server communication and flow execution dispatch
   - Polly for resilience and retry policies
-  - Serilog logging to console and file
-  - System.CommandLine for CLI interface
-  - Executes flows remotely on behalf of server
-- **Automaton.Core**: Workflow execution engine
-  - MediatR for CQRS pattern implementation
-  - System.Linq.Dynamic.Core for dynamic expressions
-  - Serilog HTTP sink for remote logging
-  - Inspired by Workflow Core architecture
-- **Automaton.Steps**: Built-in automation steps library
-  - HTTP client steps for API calls
-  - References Core and Core.Scripting
-  - System.Linq.Dynamic.Core for dynamic filtering
-- **Automaton.Core.Scripting**: Python integration layer
+  - Executes flows on remote machines via runner nodes
+
+- **Core Engine (`src/Automaton.Core/`)**: Workflow execution engine
+  - MediatR for CQRS pattern
+  - Variable mapping and step orchestration
+  - Dynamic expression evaluation
+  - Pluggable step architecture
+
+- **Built-in Steps (`src/Automaton.Steps/`)**: Step library
+  - HTTP, email, database, file operations
+  - References Core engine and Scripting layer
+
+- **Python Integration (`src/Automaton.Core.Scripting/`)**: 
   - pythonnet 3.0.5 for CPython interop
   - Custom step execution with variable injection
-  - MediatR integration for step lifecycle
-- **Automaton.Mcp**: Model Context Protocol integration
-  - OpenAI SDK integration for AI-powered code generation
-  - Custom AI providers abstraction layer
-  - SYSTEM_PROMPT_DOCUMENTATION.md for prompt engineering
-  - Used for AI-assisted custom step and web app development
-- **Automaton.ContainerAgent**: Docker/container orchestration agent (in development)
-  - Located at src/Automaton.ContainerAgent/ but not yet fully implemented
+
+- **AI Integration (`src/Automaton.Mcp/`)**: 
+  - Model Context Protocol (MCP) for AI-powered flow/step generation
+  - Multi-provider support (OpenAI, Anthropic, Google, Azure)
+  - Step testing and refinement workflow
+
+- **Marketing Site (`src/Automaton.Web/`)**: Static HTML/CSS/JS website
 
 ## Common Commands
 
-### Build
+### Frontend (Vue.js)
+
+```bash
+# Install dependencies
+cd src/automaton-studio-vue
+npm install
+
+# Development server with HMR
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm run test
+
+# Type checking
+npm run type-check
+
+# Lint and format
+npm run lint
+npm run format
+```
+
+### Backend (.NET)
 
 ```bash
 # Build all projects
 dotnet build
 
 # Build specific project
-dotnet build src/Automaton.Studio
+dotnet build src/Automaton.Studio.Server
 dotnet build src/Automaton.Runner
 
 # Build in Release mode
 dotnet build -c Release
-```
 
-### Run
+# Run the API server
+dotnet run --project src/Automaton.Studio.Server
 
-```bash
-# Run the web application (from solution root)
-dotnet run --project src/Automaton.Studio
+# Runner is managed via Docker Compose (see Runner Deployment)
 
-# Run the runner console
-dotnet run --project src/Automaton.Runner
-
-# Or after building
-cd src/Automaton.Studio
-dotnet run
-```
-
-### Testing
-
-```bash
 # Run all tests
 dotnet test
 
-# Run tests for specific project
+# Run specific test project
 dotnet test src/UnitTests/Automaton.Core.Tests
-dotnet test src/UnitTests/Automaton.Studio.Server.Tests
-dotnet test src/UnitTests/Automaton.Runner.Tests
-
-# Run with detailed output
-dotnet test --verbosity normal
-
-# Run a specific test class
-dotnet test --filter FullyQualifiedName~Automaton.Core.Tests.FlowExecuteServiceTests
-
-# Run tests in parallel
-dotnet test --parallel
 ```
 
 ### Database Migrations
@@ -111,231 +108,383 @@ dotnet test --parallel
 # Ensure dotnet-ef is installed
 dotnet tool install --global dotnet-ef
 
-# Navigate to the server project
+# Navigate to server project
 cd src/Automaton.Studio.Server
 
 # Add a new migration
 dotnet ef migrations add MigrationName
 
-# Update database to latest migration
+# Update database
 dotnet ef database update
 
-# View migration SQL without applying
+# View migration SQL
 dotnet ef migrations script
 
-# Remove last migration (if not applied)
+# Remove last migration
 dotnet ef migrations remove
 
 # List all migrations
 dotnet ef migrations list
 ```
 
-### Runner Deployment
+### Runner Deployment (Docker Compose – Preferred)
+
+Use the provided Docker Compose file for deploying and managing the runner.
 
 ```bash
-# Publish runner (framework-dependent)
-cd src/Automaton.Runner
-dotnet publish -c Release --self-contained false
+# From repo root
+cp .env.example .env
 
-# Publish runner (self-contained for specific OS)
-dotnet publish -c Release --self-contained true -r win-x64
-dotnet publish -c Release --self-contained true -r linux-x64
-dotnet publish -c Release --self-contained true -r osx-x64
+# Configure environment in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+# Start the runner
+docker compose -f docker-compose.runner.yml up -d
+
+# View logs
+docker compose -f docker-compose.runner.yml logs -f runner
+
+# Stop/remove
+docker compose -f docker-compose.runner.yml down
 ```
+
+Manual execution of the runner is deprecated; use Docker Compose for production and staging environments. For local debugging only, see README for a minimal fallback.
 
 ## Architecture Notes
 
-### Multi-Layered Structure
+### Multi-Layered Design
 
-**Presentation → API → Services → Data**
+**Frontend → REST API → Services → Data Persistence**
 
-1. **UI Layer** (`Automaton.Studio`): Blazor components under `Pages/` organized by feature:
-   - `Account/` - User account management and profile settings
-   - `AiApiKeys/` - AI provider API key configuration (OpenAI, Anthropic, Google, Azure)
-   - `ApiKeys/` - API key management for runners, webhooks, and integrations
-   - `Apps/` - Web app builder with Monaco editor integration
-   - `Authentication/` - Login, registration, email confirmation pages
-   - `Dashboard/` - Main dashboard with recent activities and statistics
-   - `Downloads/` - Runner downloads page for different platforms
-   - `Flows/` - Flow management and visual workflow designer
-   - `Install/` - Initial installation and setup wizard
-   - `Projects/` - **NEW**: Project/organization multi-tenancy feature
-   - `Runners/` - Runner registration and management
-   - `Settings/` - Application settings and configuration
-   - `StepDesigner/` - Custom step designer (Python/PowerShell/Batch)
-   - `Steps/` - Individual step component definitions
+#### Frontend Architecture (Vue.js + TypeScript)
 
-2. **API Layer** (`Automaton.Studio.Server/Controllers`): 25 REST controllers:
-   - **Core Features:**
-     - `FlowsController` - Flow CRUD operations and execution triggers
-     - `FlowExecutionsController` - Flow execution history and logs
-     - `AppsController` - Web app management and publishing
-     - `PublicWebAppsController` - Public endpoints for published web apps
-     - `AppsFlowExecutionController` - Execute flows from web apps
-     - `AppsStepExecutionController` - Execute individual steps from web apps
-     - `RunnersController` - Runner registration and management
-     - `CustomStepsController` - Custom step authoring and management
-   - **Project Management (NEW):**
-     - `ProjectsController` - Project/organization CRUD
-     - `ProjectMembersController` - Team member management
-     - `ProjectResourcesController` - Link flows/apps/runners to projects
-     - `InvitationsController` - Team invitation workflow
-   - **Security & Configuration:**
-     - `ApiKeysController` - API key generation and management
-     - `AiApiKeysController` - AI provider API key configuration
-     - `AccountController` - User account management
-     - `TokenController` - JWT token generation and refresh
-     - `UserController` - User profile and settings
-   - **System:**
-     - `DashboardController` - Dashboard statistics and metrics
-     - `RecentActivitiesController` - Activity feed
-     - `SchedulesController` - Flow scheduling (Hangfire integration)
-     - `SensitiveVariablesController` - Encrypted variable storage
-     - `SettingsController` - Application configuration
-     - `InstallController` - Initial setup wizard
-     - `ClientLogsController` - Client-side error logging
+**Feature-Based Structure** (`src/automaton-studio-vue/src/features/`):
 
-3. **Business Logic** (`Automaton.Studio.Server/Services`, `Automaton.Core`):
-   - **Core Services:**
-     - `FlowsService` - Flow management and CRUD operations
-     - `FlowExecutionHistoryService` - Execution tracking and history
-     - `FlowExecutionLogService` - Real-time log streaming
-     - `AppsService` - Web app publishing and management
-     - `AppsStepExecutionService` - Execute steps from web apps
-     - `AppStepsService` - Manage app-embedded workflow steps
-     - `CustomStepsService` - Custom step creation and validation
-   - **Security & Configuration:**
-     - `ApiKeyService` - API key generation and validation
-     - `AiApiKeyService` - AI provider key management with encryption
-     - `ConfigurationService` - Application settings
-     - `SensitiveVariablesService` - Encrypted variable storage (not shown but likely exists)
-   - **System Services:**
-     - `DashboardStatsService` - Dashboard metrics calculation
-     - `EmailService` / `NoOpEmailService` - Email sending abstraction
-     - `InstallService` - Initial setup wizard logic
-     - `InvitationTokenService` - Team invitation token management
-   - **AI Integration:**
-     - `AiProviders/` directory - OpenAI, Anthropic, Google, Azure integrations
-   - **Architecture Patterns:**
-     - MediatR for CQRS commands/queries
-     - SignalR hubs for real-time runner communication
-     - Service interfaces in `Interfaces/` directory
+Each feature (auth, flows, apps, steps, etc.) is self-contained with:
+- **components/** - Vue components specific to the feature
+- **composables/** - Reusable Composition API functions
+- **services/** - API calls and business logic
+- **stores/** - Pinia state management
+- **types/** - TypeScript interfaces and types
+- **views/** - Page-level components
+- **routes.ts** - Feature routes (aggregated in main router)
 
-4. **Data Layer** (`Automaton.Studio.Server/Data`, `/Entities`):
-   - Entity Framework Core 9.0 with MySQL/MariaDB
-   - ASP.NET Core Identity for authentication
-   - See `ApplicationDbContext` for entity configuration
+Key features:
+- **auth/** - Authentication, login, registration
+- **dashboard/** - Home page, statistics, recent activity
+- **flows/** - Flow management and AI-first generation interface
+- **apps/** - Web app builder with Monaco editor
+- **steps/** - Custom step library and designer
+- **runners/** - Runner registration and management
+- **projects/** - Project/organization management
+- **settings/** - User and application settings
+
+Benefits of this structure:
+- Colocation of related code
+- Easy feature isolation and testing
+- Lazy loading of entire features
+- Clear separation of concerns
+
+#### Backend Architecture (ASP.NET Core)
+
+**Layered Structure:**
+
+1. **API Layer** (`Automaton.Studio.Server/Controllers/`): 25+ REST endpoints
+   - FlowsController, AppsController, RunnersController, etc.
+   - Handles HTTP requests/responses and basic validation
+
+2. **Service Layer** (`Automaton.Studio.Server/Services/`): Business logic
+   - FlowsService, AppsService, FlowGenerationService, etc.
+   - Handles workflows, validation, and orchestration
+
+3. **Data Layer** (`Automaton.Studio.Server/Data/Entities/`): EF Core
+   - ApplicationDbContext, Entities, Migrations
+
+4. **Core Engine** (`Automaton.Core/`): Execution logic
+   - Flow execution, step orchestration, variable mapping
 
 ### Key Execution Flow
 
 **Flow Execution Path:**
-1. User triggers flow in Studio UI
-2. `FlowsController.Execute()` called
-3. `FlowExecuteService` creates `FlowExecution` record
-4. SignalR hub sends execution command to registered runner(s)
-5. Runner executes steps via `Automaton.Core` workflow engine
-6. Runner reports progress/logs back to server via SignalR
-7. Studio UI shows real-time logs via SignalR subscription
+1. User submits flow execution request via REST API
+2. `FlowsController` → `FlowsService` creates execution record
+3. SignalR hub sends command to registered runner(s)
+4. Runner executes steps via `Automaton.Core` workflow engine
+5. Runner reports progress/logs back to server via SignalR
+6. Frontend receives real-time updates via SignalR subscription
+
+**Flow Generation Path (AI-First):**
+1. User enters natural language description in frontend
+2. Frontend calls `POST /api/flows/generate` via REST
+3. `FlowGenerationService` searches for reusable existing steps
+4. Calls AI provider (OpenAI/Anthropic/etc) with context
+5. AI generates flow structure with steps and connections
+6. Service creates custom steps (if needed) and flow definition
+7. Flow saved to database in draft state
+8. Frontend displays generated flow for review/refinement
+
+### Frontend-Backend Communication
+
+- **REST API**: All data operations (flows, apps, steps, projects)
+- **Axios interceptors**: Automatic JWT token injection, error handling
+- **OpenAPI codegen**: Auto-generated TypeScript types from C# API
 
 ### Authentication & Authorization
 
-**Multi-Mode Authentication:**
-- **JWT Bearer**: User authentication for Studio web UI
-- **API Keys**: Scoped keys for runners, web apps, and integrations
-  - Format: `ak_<scope>_<random>` (e.g., `ak_runner_xxx`, `ak_execute_xxx`)
+**Multi-Mode:**
+- **JWT Bearer**: Web UI authentication (OAuth, standard bearer token)
+- **API Keys**: Runner authentication and integrations
+  - Format: `ak_<scope>_<random>` (e.g., `ak_runner_xxx`)
   - Scopes: Runner, Execute, ReadOnly, WebApp
-  - See `docs/apikeys/` for detailed scope documentation
-
-**Project-Based Authorization** (NEW):
-- 4 roles: `ProjectAdmin`, `Developer`, `AppUser`, `Viewer`
-- Policy-based authorization in `Authorization/` folder
+  
+**Project-Based Authorization** (Role-based access):
+- Roles: `ProjectAdmin`, `Developer`, `AppUser`, `Viewer`
 - Resource scopes: Personal, Project, Public
-- See `docs/projects/` for multi-tenancy architecture
 
-### SignalR Communication
+### SignalR Real-Time Hubs
 
-**Real-time Hubs:**
-- **RunnerHub** (`Hubs/RunnerHub.cs`): Runner registration, heartbeat, execution dispatch
-- **FlowExecutionHub**: Real-time execution logs and status updates
-- Runners authenticate via API keys, maintain persistent WebSocket connections
-- Reconnection logic with exponential backoff in runner console
+**RunnerHub**: Runner registration and heartbeat
+- Runners authenticate via API keys
+- Maintain persistent WebSocket connections
+- Receive execution commands from server
 
-### Python Integration
-
-**Automaton.Core.Scripting:**
-- Uses `pythonnet 3.0.5` library for CPython interop
-- Custom steps execute Python code in isolated contexts
-- Variable injection and output capture
-- Error handling and timeout support
-- MediatR integration for step execution lifecycle
-
-### Model Context Protocol (MCP) Integration
-
-**Automaton.Mcp:**
-- OpenAI SDK integration for AI-powered code generation
-- Custom AI provider abstraction supporting multiple LLM providers
-- Used for AI-assisted custom step and web app development
-- System prompt engineering documented in `SYSTEM_PROMPT_DOCUMENTATION.md`
-- Key features:
-  - Automatic code generation with context awareness
-  - Multi-turn conversations for iterative development
-  - Tool execution for testing generated code
-  - Support for OpenAI, Anthropic, Google, and Azure AI providers
-
-**MCP Tool Providers (January 2026 Updates):**
-- **StepMcpToolProvider**: Custom step designer with code execution testing
-- **AppMcpToolProvider**: Full-stack app generation (frontend + backend)
-  - Auto-linking: Backend steps automatically linked to apps on creation
-  - Testing capability: `execute_backend_step_code` tool validates steps before deployment
-  - Shared execution service ensures consistency with Runner execution
-- **Recent Improvements**:
-  - Steps created via `create_backend_step` are automatically linked (atomic operation)
-  - AI must test backend steps with `execute_backend_step_code` before finalizing apps
-  - Detailed error reporting with line numbers, stack traces, and recommendations
-  - System prompts enforce test-fix-retest workflow for quality assurance
-- See `docs/mcp/BACKEND_STEP_TESTING.md` for testing workflow documentation
-
-## Important Implementation Patterns
-
-### Service Registration
-
-The server uses ASP.NET Core's dependency injection extensively. Services are registered in `Program.cs`:
-- Scoped services for per-request operations (DbContext, user-specific services)
-- Singleton services for shared state (SignalR connection tracking, background services)
-- Hangfire for scheduled job execution
+**FlowExecutionHub**: Execution progress and logs
+- Stream real-time execution logs to frontend
+- Update execution status as steps complete
 
 ### Variable System
 
-Flows use a variable mapping system (`VariableParser` in `Automaton.Core`):
-- Variables defined as `${variableName}` in step configurations
-- Input/output variables mapped between steps
-- Global flow inputs/outputs
-- Type conversion and validation
+Flows use placeholder-based variable mapping:
+- Variables defined as `${variableName}` in configurations
+- Step inputs/outputs automatically mapped between steps
+- Type validation and conversion at execution time
 
 ### Step Architecture
 
-All steps inherit from `BaseStep` in `Automaton.Steps`:
+All steps inherit from `BaseStep` in `Automaton.Core`:
 ```csharp
-public class CustomStep : BaseStep
+public abstract class BaseStep
 {
-    public override Task<ExecutionResult> ExecuteAsync(IStepExecutionContext context)
+    public abstract Task<ExecutionResult> ExecuteAsync(IStepExecutionContext context);
+}
+```
+
+Custom steps (Python/PowerShell/Batch) are defined with:
+- Name, display name, description
+- Input variable schemas (name, type, required)
+- Output variable schemas
+- Execution code
+
+### Web App Integration
+
+Published web apps call backend flows via `window.automatonApi` helper:
+```javascript
+// Frontend code in published web app
+await window.automatonApi.executeFlow(flowId, { 
+  inputs: {...} 
+});
+```
+
+See AGENTS.md (Apps section) and `src/Automaton.Studio.Web/wwwroot/automatonApi.js` for details.
+
+## Important Implementation Patterns
+
+### Frontend: Feature-Based Organization
+
+Each feature folder (`src/automaton-studio-vue/src/features/`) follows this pattern:
+
+```
+feature-name/
+├── components/          # Feature-specific Vue components
+├── composables/         # Composition API functions
+├── services/            # API service calls
+├── stores/              # Pinia store(s)
+├── types/               # TypeScript interfaces
+├── views/               # Top-level page components
+└── routes.ts            # Feature routes
+```
+
+Example: `flows/` feature
+- Components: FlowCard, FlowTimeline, FlowGenerationPanel
+- Composables: useFlows(), useFlowGeneration()
+- Services: flowsService.ts (REST calls to /api/flows)
+- Store: flowsStore.ts (Pinia for flow state)
+- Views: FlowsListView, FlowGeneratorView
+
+### Backend: Service Registration & Dependency Injection
+
+Services registered in `Program.cs`:
+- **Scoped**: Per-request services (DbContext, user-specific services)
+- **Singleton**: Shared state (SignalR connection tracking, cache)
+- **Transient**: Stateless utilities
+
+Example:
+```csharp
+builder.Services.AddScoped<FlowsService>();
+builder.Services.AddScoped<FlowGenerationService>();
+builder.Services.AddSingleton<ConnectionManager>();
+```
+
+### API Endpoints
+
+New flow generation endpoints (in `FlowsController` or new `FlowGenerationController`):
+
+```csharp
+[HttpPost("generate")]
+public async Task<ActionResult<GenerateFlowResponse>> GenerateFlow(
+    GenerateFlowRequest request)
+{
+    var response = await _flowGenerationService.GenerateFlowAsync(
+        request, 
+        User.FindFirst("sub")?.Value);
+    return Ok(response);
+}
+
+[HttpPost("generate/refine/{flowId}")]
+public async Task<ActionResult<GeneratedFlow>> RefineFlow(
+    Guid flowId,
+    RefineFlowRequest request)
+{
+    // Implementation
+}
+
+[HttpGet("generate/search-steps")]
+public async Task<ActionResult<StepSearchResponse>> SearchSteps(
+    [FromQuery] string query)
+{
+    // Implementation
+}
+```
+
+### Frontend: HTTP Client with Axios
+
+```typescript
+// src/shared/services/api/axios-instance.ts
+import axios from 'axios';
+import { useAuthStore } from '@/features/auth/stores/auth.store';
+
+const instance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  timeout: 10000,
+});
+
+// Inject JWT token
+instance.interceptors.request.use((config) => {
+  const auth = useAuthStore();
+  if (auth.token) {
+    config.headers.Authorization = `Bearer ${auth.token}`;
+  }
+  return config;
+});
+
+export default instance;
+```
+
+### Frontend: Pinia State Management
+
+```typescript
+// src/features/flows/stores/flows.store.ts
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+
+export const useFlowsStore = defineStore('flows', () => {
+  const flows = ref<Flow[]>([]);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+
+  const fetchFlows = async () => {
+    loading.value = true;
+    try {
+      const response = await flowsService.getFlows();
+      flows.value = response.data;
+    } catch (e) {
+      error.value = (e as Error).message;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const flowCount = computed(() => flows.value.length);
+
+  return {
+    flows,
+    loading,
+    error,
+    flowCount,
+    fetchFlows,
+  };
+});
+```
+
+### Backend: Custom Step Execution
+
+Custom steps inherit from `BaseStep` and implement:
+```csharp
+public class ValidateEmailStep : BaseStep
+{
+    public override async Task<ExecutionResult> ExecuteAsync(
+        IStepExecutionContext context)
     {
-        // Step implementation
+        var email = context.GetInputVariable<string>("email");
+        var isValid = /* validation logic */;
+        
+        context.SetOutputVariable("isValid", isValid);
+        return ExecutionResult.Success();
     }
 }
 ```
 
-Steps are registered in the flow designer and serialized to JSON for execution.
+### Web App API Calls
 
-### Web App Integration
+Web apps call backend flows using `window.automatonApi` helper:
 
-Published web apps (`/web/{publicUrl}`) use `window.automatonApi` client helper:
 ```javascript
-// Executes a flow from web app frontend
-await window.automatonApi.executeFlow(flowId, { inputs: {...} });
+// Published web app frontend code
+const result = await window.automatonApi.executeFlow(flowId, {
+  inputs: {
+    orderId: '12345',
+    customerId: 'cust_999'
+  }
+});
+
+console.log(result.outputVariables);
 ```
 
-See `src/Automaton.Studio.Web/wwwroot/automatonApi.js` and `AGENTS.md` (Apps section) for details.
+### SignalR Real-Time Communication
+
+**Runner registration and command dispatch:**
+```csharp
+// Automaton.Studio.Server/Hubs/RunnerHub.cs
+public class RunnerHub : Hub
+{
+    public async Task RegisterRunner(string runnerId, string version)
+    {
+        // Runner connects and identifies itself
+        await Clients.All.SendAsync("RunnerOnline", runnerId);
+    }
+
+    public async Task ExecuteFlow(Guid flowId, object inputs)
+    {
+        // Server dispatches flow execution to runner
+        await Clients.Group(runnerId).SendAsync("ExecuteFlow", flowId, inputs);
+    }
+}
+```
+
+**Frontend receives execution updates:**
+```typescript
+// src/shared/services/signalr/signalr-client.ts
+const connection = new HubConnectionBuilder()
+  .withUrl('/hubs/flow-execution')
+  .withAutomaticReconnect()
+  .build();
+
+connection.on('ExecutionProgress', (stepName, status, logs) => {
+  // Update execution timeline in real-time
+  executionStore.addLog(stepName, status, logs);
+});
+```
 
 ## Current Development Context
 
@@ -360,140 +509,274 @@ See `docs/projects/` for comprehensive documentation including:
 
 ## Configuration Requirements
 
-**Required Environment Setup:**
+### Frontend (Vue.js)
 
-1. **MySQL/MariaDB Database:**
-   - Connection string in `appsettings.json` or `appsettings.Development.json`
-   - Run migrations before first use: `dotnet ef database update`
+**Environment Variables** (`.env.development`, `.env.production`):
 
-2. **JWT Settings:**
-   - Set `JwtOptions:Issuer` and `AuthenticationSettings:HMacSettings:SecretKey`
-   - Or configure RSA keys for `RsaSettings`
+```env
+VITE_API_URL=http://localhost:7091
+VITE_SIGNALR_URL=http://localhost:7091/hubs
+VITE_APP_TITLE=Automaton Studio
+```
 
-3. **AI Providers (Optional):**
-   - Configure API keys in Studio UI (`/ai-keys` page)
-   - Or set in `AiProviders` section of appsettings
-   - Supports OpenAI, Anthropic, Google, Azure
+### Backend (ASP.NET Core)
 
-4. **Email Configuration (Optional):**
-   - Set `EmailConfig:EmailApiKey` for user registration emails
+**Required Settings** (`appsettings.json` or `appsettings.Development.json`):
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Database=automaton;User Id=root;Password=..."
+  },
+  "JwtOptions": {
+    "Issuer": "Automaton.Studio",
+    "Audience": "Automaton.User",
+    "HMacSettings": {
+      "SecretKey": "..."
+    }
+  },
+  "AiProviders": {
+    "OpenAI": {
+      "ApiKey": "sk_..."
+    }
+  }
+}
+```
+
+### Database
+
+**MySQL/MariaDB Setup:**
+- Create database: `CREATE DATABASE automaton;`
+- Run migrations: `dotnet ef database update`
+- Supports: MySQL 5.7+, MariaDB 10.2+
+
+### AI Provider Configuration
+
+**Optional AI Keys** (configured in Studio UI or appsettings):
+- OpenAI API key
+- Anthropic API key
+- Google Vertex AI credentials
+- Azure OpenAI endpoint
 
 ## Testing Strategy
 
-**Unit Tests Structure** (Located in `src/UnitTests/`):
-- `Automaton.Core.Tests/` - Core workflow engine and execution tests
-- `Automaton.Studio.Server.Tests/` - API controller and service tests
-- `Automaton.Runner.Tests/` - Runner SignalR client and execution tests
-- `Automaton.Studio.Tests/` - Blazor UI component tests
+### Frontend (Vue.js)
 
-**Key Test Patterns:**
-- Use `InMemoryDatabase` for EF Core tests
-- Mock SignalR hub contexts for real-time communication tests
-- Integration tests use `WebApplicationFactory<Program>`
+```bash
+# Run all tests
+npm run test
 
-**Test Commands:**
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Structure** (Vitest + Vue Test Utils):
+- **Unit Tests**: Components, composables, services, stores
+- **Integration Tests**: Feature workflows with mocked API
+- **E2E Tests** (Playwright): Critical user flows
+
+**Test File Naming**: `ComponentName.spec.ts` or `functionName.spec.ts`
+
+Example test:
+```typescript
+// src/features/flows/components/__tests__/FlowCard.spec.ts
+import { describe, it, expect } from 'vitest';
+import { mount } from '@vue/test-utils';
+import FlowCard from '../FlowCard.vue';
+
+describe('FlowCard', () => {
+  it('renders flow name and status', () => {
+    const flow = { id: '1', name: 'Test Flow', status: 'active' };
+    const wrapper = mount(FlowCard, { props: { flow } });
+    expect(wrapper.text()).toContain('Test Flow');
+  });
+});
+```
+
+### Backend (.NET)
+
 ```bash
 # Run all tests
 dotnet test
 
 # Run specific test project
 dotnet test src/UnitTests/Automaton.Core.Tests
-dotnet test src/UnitTests/Automaton.Studio.Server.Tests
-dotnet test src/UnitTests/Automaton.Runner.Tests
-dotnet test src/UnitTests/Automaton.Studio.Tests
 
 # Run with coverage
-dotnet test --collect:"XPlat Code Coverage"
+dotnet test /p:CollectCoverage=true
+
+# Run specific test class
+dotnet test --filter FullyQualifiedName~Automaton.Core.Tests.FlowExecuteServiceTests
 ```
 
+**Test Projects:**
+- `Automaton.Core.Tests` - Workflow engine and step execution
+- `Automaton.Studio.Server.Tests` - API controllers and services
+- `Automaton.Runner.Tests` - Runner SignalR client and flow execution
+
+**Test Patterns:**
+- Use `InMemoryDatabase` for EF Core tests
+- Mock SignalR hub contexts for real-time tests
+- `WebApplicationFactory<Program>` for integration tests
+- Arrange-Act-Assert pattern
+
+**Target Coverage:** 80%+ for business logic, 60%+ overall
+
 ## Troubleshooting
+
+### Frontend (Vue.js)
+
+**Common Issues:**
+
+1. **HMR (Hot Module Reload) Not Working:**
+   - Ensure Vite dev server is running on correct port (default: 5173)
+   - Check firewall isn't blocking localhost connections
+   - Clear browser cache: Cmd+Shift+Delete (Chrome/Edge)
+
+2. **API Calls Failing:**
+   - Verify `VITE_API_URL` points to correct backend
+   - Check backend server is running (`npm run dev:backend` or `dotnet run`)
+   - Review browser DevTools Network tab for 401 (auth) or 404 (endpoint) errors
+
+3. **TypeScript Errors:**
+   - Run `npm run type-check` to validate types
+   - Regenerate types: `npm run generate:types`
+   - Clear node_modules: `rm -r node_modules && npm install`
+
+### Backend (.NET)
 
 **Common Issues:**
 
 1. **Migration Errors:**
-   - Ensure you're in `src/Automaton.Studio.Server` directory
-   - Check connection string is valid
-   - Verify MySQL server is running
+   - Ensure database connection is valid
+   - Navigate to `src/Automaton.Studio.Server`
+   - Run: `dotnet ef database update`
 
 2. **Runner Connection Issues:**
-   - Verify API key is valid and has `Runner` scope
-   - Check SignalR endpoint URL in runner configuration
+   - Verify API key has `Runner` scope
+   - Check SignalR URL matches server configuration
    - Review runner logs for connection errors
 
 3. **Python Step Failures:**
-   - Ensure Python runtime is installed and accessible
-   - Check `pythonnet` package compatibility
-   - Verify custom step code syntax
+   - Ensure Python is installed and in PATH
+   - Verify `pythonnet` compatibility: `pip install pythonnet==3.0.5`
+   - Check custom step code syntax
 
 4. **Build Errors:**
-   - Clean solution: `dotnet clean && dotnet build`
-   - Restore packages: `dotnet restore`
-   - Check .NET SDK version: `dotnet --version` (requires .NET 9.0)
+   - Clean: `dotnet clean && dotnet build`
+   - Restore: `dotnet restore`
+   - Verify .NET SDK: `dotnet --version` (requires 9.0)
 
 ## Key Technologies & Libraries
 
-**Backend (.NET 9.0):**
-- Entity Framework Core 9.0 with Pomelo.EntityFrameworkCore.MySql 9.0
-- ASP.NET Core Identity for authentication
-- SignalR for real-time communication
-- Hangfire 1.8.16 for background jobs (with MySQL storage)
-- MediatR 12.4.1 for CQRS pattern
-- Serilog 4.1.0 for structured logging
-- FluentValidation for request validation
-- Swashbuckle (Swagger) for API documentation
-- MailKit/MimeKit for email sending
-- OpenAI SDK 2.5.0 for AI integration
-- System.Linq.Dynamic.Core 1.6.7 for dynamic queries
-- pythonnet 3.0.5 for Python interop
+### Frontend (Vue.js 3 + TypeScript)
 
-**Frontend (Blazor WebAssembly):**
-- AntDesign 1.4.3 - Component library
-- BlazorMonaco 3.4.0 - Code editor (Monaco Editor)
-- Blazored.LocalStorage 4.5.0 - Browser storage
-- Blazored.FluentValidation 2.2.0 - Client-side validation
-- Markdig 0.38.0 - Markdown rendering
-- Cronos 0.8.4 - Cron expression parsing
-- CronExpressionDescriptor 2.36.0 - Human-readable cron descriptions
+| Technology | Purpose |
+|-----------|---------|
+| **Vue 3** | Progressive reactive framework |
+| **TypeScript 5.0+** | Type-safe JavaScript |
+| **Vite 5.0+** | Fast build tool with HMR |
+| **PrimeVue 4.0+** | Enterprise-grade UI component library (90+ components) |
+| **Pinia 2.1+** | State management (Vue 3 official) |
+| **Vue Router 4.0+** | Client-side routing |
+| **Axios 1.6+** | HTTP client with request interceptors |
+| **Monaco Editor** | Code editor (direct integration, no wrappers) |
+| **openapi-typescript** | Auto-generate TypeScript types from C# API |
 
-**Runner Console:**
-- Microsoft.AspNetCore.SignalR.Client 9.0 for server connection
-- Polly 8.5.0 for resilience and retry policies
-- System.CommandLine 2.0.0-beta4 for CLI interface
-- Serilog with Console and File sinks
+### Backend (.NET 9.0)
 
-**Testing:**
-- xUnit (implied from test project structure)
-- WebApplicationFactory for integration tests
-- In-memory database for EF Core tests
+| Technology | Purpose |
+|-----------|---------|
+| **ASP.NET Core 9.0** | Web API framework |
+| **Entity Framework Core 9.0** | ORM for MySQL/MariaDB |
+| **Pomelo.EntityFrameworkCore.MySql 9.0** | MySQL provider |
+| **SignalR** | Real-time communication with runners |
+| **Hangfire 1.8.16** | Background job scheduling |
+| **MediatR 12.4.1** | CQRS pattern implementation |
+| **Serilog 4.1.0** | Structured logging |
+| **FluentValidation** | Request validation |
+| **Swashbuckle** | Swagger/OpenAPI documentation |
+| **ASP.NET Core Identity** | Authentication and authorization |
+| **System.Linq.Dynamic.Core** | Dynamic LINQ expressions |
+
+### Runner Console
+
+| Technology | Purpose |
+|-----------|---------|
+| **SignalR Client** | Connect to server and receive execution commands |
+| **Polly 8.5.0** | Resilience policies and retry logic |
+| **System.CommandLine 2.0.0-beta4** | CLI argument parsing |
+| **Serilog** | Structured logging |
+
+### Scripting & AI
+
+| Technology | Purpose |
+|-----------|---------|
+| **pythonnet 3.0.5** | CPython interop for custom steps |
+| **OpenAI SDK 2.5.0** | AI-powered flow and step generation |
+| **Anthropic SDK** | Alternative AI provider |
+| **Google Vertex AI SDK** | Alternative AI provider |
 
 ## Project Structure Summary
 
 ```
 src/
-├── Automaton.Web/                    # Static marketing website
-├── Automaton.Studio/                 # Blazor WebAssembly UI
-│   ├── Pages/                        # Blazor pages organized by feature
-│   ├── Services/                     # Client-side services
-│   └── wwwroot/                      # Static assets
-├── Automaton.Studio.Server/          # ASP.NET Core API
-│   ├── Controllers/                  # 25 REST API controllers
-│   ├── Services/                     # Business logic services
-│   ├── Data/                         # EF Core DbContext
-│   ├── Entities/                     # Database entities
-│   ├── Hubs/                         # SignalR hubs
-│   └── Migrations/                   # EF Core migrations
-├── Automaton.Studio.Auth/            # Shared auth library
-├── Automaton.Runner/                 # Console runner application
-├── Automaton.Core/                   # Workflow execution engine
-├── Automaton.Steps/                  # Built-in automation steps
-├── Automaton.Core.Scripting/         # Python integration
-├── Automaton.Mcp/                    # Model Context Protocol client
-├── Automaton.ContainerAgent/         # Container orchestration (WIP)
-└── UnitTests/
+├── Automaton.Web/                          # Static marketing website
+│
+├── automaton-studio-vue/                   # NEW: Vue.js frontend (replacing Blazor)
+│   ├── src/
+│   │   ├── features/                       # Feature-based modules
+│   │   │   ├── auth/                       # Authentication (login, register)
+│   │   │   ├── dashboard/                  # Dashboard and home page
+│   │   │   ├── flows/                      # Flow management & AI generation
+│   │   │   ├── apps/                       # Web app builder
+│   │   │   ├── steps/                      # Custom step library
+│   │   │   ├── runners/                    # Runner management
+│   │   │   ├── projects/                   # Project organization
+│   │   │   └── settings/                   # User/app settings
+│   │   ├── shared/                         # Shared components, utils, services
+│   │   │   ├── components/                 # Reusable UI components
+│   │   │   ├── services/                   # HTTP client, SignalR
+│   │   │   ├── composables/                # Shared composition API functions
+│   │   │   ├── types/                      # Common TypeScript types
+│   │   │   └── utils/                      # Helper functions
+│   │   ├── router/                         # Vue Router configuration
+│   │   ├── App.vue                         # Root component
+│   │   └── main.ts                         # Entry point
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   └── README.md
+│
+├── Automaton.Studio.Server/                # ASP.NET Core API
+│   ├── Controllers/                        # 25+ REST API controllers
+│   ├── Services/                           # Business logic services
+│   ├── Data/                               # EF Core DbContext
+│   ├── Entities/                           # Database entities
+│   ├── Hubs/                               # SignalR hubs
+│   ├── Migrations/                         # EF Core migrations
+│   └── Program.cs                          # Startup configuration
+│
+├── Automaton.Core/                         # Workflow execution engine
+│   ├── Workflow/                           # Core workflow logic
+│   ├── Steps/                              # Step interfaces
+│   └── Models/                             # Data models
+│
+├── Automaton.Steps/                        # Built-in steps library
+│
+├── Automaton.Core.Scripting/               # Python integration
+│
+├── Automaton.Mcp/                          # AI integration & flow generation
+│
+├── Automaton.Runner/                       # Console runner application
+│
+└── UnitTests/                              # Test projects
     ├── Automaton.Core.Tests/
     ├── Automaton.Studio.Server.Tests/
-    ├── Automaton.Runner.Tests/
-    └── Automaton.Studio.Tests/
+    └── Automaton.Runner.Tests/
 ```
 
 ## Additional Documentation
@@ -501,10 +784,49 @@ src/
 For comprehensive documentation, see:
 - `AGENTS.md` - Detailed project documentation and feature reference
 - `README.md` - Project overview and quick start
+- `src/automaton-studio-vue/REDESIGN_PLAN.md` - Complete Vue.js redesign specification
 - `docs/` - Feature-specific technical documentation:
   - `docs/projects/` - Multi-tenancy implementation
   - `docs/flows/` - Flow architecture
-  - `docs/webapps/` - Web apps feature
+  - `docs/apps/` - Web apps platform
   - `docs/runners/` - Runner deployment guides
   - `docs/apikeys/` - API key scopes and security
   - `docs/mcp/` - Model Context Protocol integration
+
+## Current Development Context
+
+Automaton is transitioning from Blazor WebAssembly to a modern Vue.js + TypeScript frontend (January 2026).
+
+**Transition Status:**
+- ✅ Architecture and design complete
+- ✅ Technology stack finalized (Vue 3 + TypeScript + PrimeVue)
+- 🔄 Frontend development underway (`src/automaton-studio-vue/`)
+- ✅ Backend APIs stable and unchanged
+
+**Key Features in Development:**
+- AI-first natural language flow generation
+- Feature-based Vue.js module architecture
+- Real-time execution updates via SignalR
+- Enhanced app builder with direct Monaco editor integration
+
+**Why This Change:**
+- Blazor WASM had stability issues (tabs, trees)
+- Modern frontend development experience with Vue.js
+- Better browser DevTools integration
+- Access to mature Vue ecosystem
+
+**What Stays the Same:**
+- All .NET backend code unchanged
+- API contracts preserved
+- Database schema stable
+- Runner architecture untouched
+
+## API Documentation
+
+### OpenAPI/Swagger
+
+Access auto-generated API documentation:
+- **Swagger UI**: `https://localhost:7091/swagger/index.html`
+- **OpenAPI JSON**: `https://localhost:7091/swagger/v1/swagger.json`
+
+The backend exports OpenAPI 3.0 specs. The frontend uses `openapi-typescript` to auto-generate TypeScript types from these specs.
