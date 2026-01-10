@@ -53,9 +53,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Preview overlay visibility (full-screen preview)
   const showPreviewOverlay = ref(false)
 
-  // Backend steps panel expanded in AI sidebar
-  const isStepsPanelExpanded = ref(false)
-
   // ============================================
   // Computed
   // ============================================
@@ -195,6 +192,76 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Open a backend step file in the editor
+   */
+  async function openBackendStep(step: LinkedStepInfo): Promise<void> {
+    // Create a virtual path for the step
+    const virtualPath = `backend/${step.name}.${getStepExtension(step.language)}`
+
+    // Check if already open
+    const existing = openFiles.value.find((f) => f.path === virtualPath)
+    if (existing) {
+      activeFilePath.value = virtualPath
+      return
+    }
+
+    try {
+      // Load step code
+      const { code, language } = await appsService.getStepCode(step.id)
+
+      // Create open file entry for backend step
+      const openFile: OpenFile = {
+        path: virtualPath,
+        content: code,
+        language: getEditorLanguage(language),
+        isDirty: false,
+        originalContent: code,
+        isBackendStep: true,
+        stepId: step.id,
+        stepName: step.displayName || step.name,
+      }
+
+      openFiles.value.push(openFile)
+      activeFilePath.value = virtualPath
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err)
+      throw err
+    }
+  }
+
+  /**
+   * Get file extension for step language
+   */
+  function getStepExtension(language: string): string {
+    switch (language?.toLowerCase()) {
+      case 'python':
+        return 'py'
+      case 'powershell':
+        return 'ps1'
+      case 'batch':
+        return 'bat'
+      default:
+        return 'py'
+    }
+  }
+
+  /**
+   * Get Monaco editor language for step language
+   */
+  function getEditorLanguage(language: string): string {
+    switch (language?.toLowerCase()) {
+      case 'python':
+        return 'python'
+      case 'powershell':
+        return 'powershell'
+      case 'batch':
+        return 'bat'
+      default:
+        return 'python'
+    }
+  }
+
+  /**
    * Close a file tab
    */
   function closeFile(filePath: string, force = false): boolean {
@@ -240,7 +307,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!file) return
 
     try {
-      await appsService.writeFile(currentApp.value.id, filePath, file.content)
+      if (file.isBackendStep && file.stepId) {
+        // Save backend step code
+        await appsService.updateStepCode(file.stepId, file.content)
+      } else {
+        // Save regular app file
+        await appsService.writeFile(currentApp.value.id, filePath, file.content)
+      }
+
       file.isDirty = false
       file.originalContent = file.content
 
@@ -463,13 +537,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Toggle steps panel in AI sidebar
-   */
-  function toggleStepsPanel(): void {
-    isStepsPanelExpanded.value = !isStepsPanelExpanded.value
-  }
-
-  /**
    * Clear error
    */
   function clearError(): void {
@@ -492,7 +559,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingPreview.value = false
     error.value = null
     showPreviewOverlay.value = false
-    isStepsPanelExpanded.value = false
   }
 
   /**
@@ -528,7 +594,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingPreview,
     error,
     showPreviewOverlay,
-    isStepsPanelExpanded,
 
     // Computed
     activeFile,
@@ -541,6 +606,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     // Actions
     loadApp,
     openFile,
+    openBackendStep,
     closeFile,
     updateFileContent,
     saveFile,
@@ -557,7 +623,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     togglePreviewOverlay,
     openPreviewOverlay,
     closePreviewOverlay,
-    toggleStepsPanel,
     clearError,
     reset,
   }

@@ -241,6 +241,45 @@ class AppsService {
   }
 
   /**
+   * Get step code for editing
+   * GET /api/customsteps/{stepId}
+   */
+  async getStepCode(stepId: string): Promise<{ code: string; language: string }> {
+    const { data } = await apiClient.get<{ definition: { code: string }; language: string }>(
+      `/api/customsteps/${stepId}`,
+    )
+    return {
+      code: data.definition?.code || '',
+      language: data.language || 'python',
+    }
+  }
+
+  /**
+   * Update step code
+   * PUT /api/customsteps/{stepId}
+   */
+  async updateStepCode(stepId: string, code: string): Promise<void> {
+    // First get the step to preserve other fields
+    const { data: step } = await apiClient.get<{
+      id: string
+      name: string
+      displayName: string
+      description: string
+      language: string
+      definition: { code: string }
+    }>(`/api/customsteps/${stepId}`)
+
+    // Update only the code
+    await apiClient.put(`/api/customsteps/${stepId}`, {
+      ...step,
+      definition: {
+        ...step.definition,
+        code,
+      },
+    })
+  }
+
+  /**
    * Get preview HTML for an app (with automatonApi.js injected)
    * Returns the app HTML with the Automaton API script injected
    */

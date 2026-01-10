@@ -447,6 +447,7 @@ function saveAppName() {
           <FileTree
             @create-file="showCreateFileDialog = true"
             @delete-file="handleDeleteFile"
+            @create-step="showCreateStepDialog = true"
           />
         </div>
 
@@ -462,7 +463,8 @@ function saveAppName() {
               @click="editorStore.activeFilePath = file.path"
             >
               <span class="tab-name">
-                {{ file.path }}
+                <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
+                {{ file.isBackendStep ? file.stepName : file.path }}
                 <span v-if="file.isDirty" class="dirty-indicator">*</span>
               </span>
               <Button
@@ -500,7 +502,7 @@ function saveAppName() {
 
         <!-- Right Panel: AI Assistant (always visible) -->
         <div class="ai-sidebar">
-          <AiAssistant @create-step="showCreateStepDialog = true" />
+          <AiAssistant />
         </div>
       </div>
 

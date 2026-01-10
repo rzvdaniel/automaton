@@ -97,6 +97,7 @@ export interface LinkedStepInfo {
   description: string
   language: string
   isLinked: boolean
+  code?: string // Step code for editing in the IDE
 }
 
 /**
@@ -144,6 +145,9 @@ export interface OpenFile {
   language: string // 'html', 'css', 'javascript', 'json', etc.
   isDirty: boolean // Has unsaved changes
   originalContent: string // For detecting changes
+  isBackendStep?: boolean // True if this is a backend step file
+  stepId?: string // Backend step ID if isBackendStep is true
+  stepName?: string // Backend step name for display
 }
 
 /**

@@ -2,7 +2,7 @@
 /**
  * AiAssistant.vue
  * AI Assistant sidebar component for the App Editor
- * Includes chat interface and collapsible Backend Steps section
+ * Provides chat interface for AI-assisted app development
  *
  * NOTE: AI chat is a placeholder implementation.
  * Full AI integration requires:
@@ -11,25 +11,9 @@
  * - Tool execution feedback
  * - Code update synchronization with editor
  */
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Panel from 'primevue/panel'
-import Tag from 'primevue/tag'
-import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
-import { useAppEditorStore } from '../stores/app-editor.store'
-import type { LinkedStepInfo } from '../types/apps.types'
-
-const emit = defineEmits<{
-  createStep: []
-}>()
-
-const router = useRouter()
-const confirm = useConfirm()
-const toast = useToast()
-const editorStore = useAppEditorStore()
 
 interface Message {
   id: string
@@ -105,90 +89,6 @@ function handleKeyPress(event: KeyboardEvent) {
 function clearMessages() {
   messages.value = []
 }
-
-// Backend Steps functions
-function getLanguageIcon(language: string): string {
-  switch (language?.toLowerCase()) {
-    case 'python':
-      return 'pi pi-code'
-    case 'powershell':
-      return 'pi pi-terminal'
-    case 'batch':
-      return 'pi pi-desktop'
-    default:
-      return 'pi pi-file'
-  }
-}
-
-function getLanguageColor(language: string): 'info' | 'success' | 'warn' | 'danger' | undefined {
-  switch (language?.toLowerCase()) {
-    case 'python':
-      return 'info'
-    case 'powershell':
-      return 'warn'
-    case 'batch':
-      return 'success'
-    default:
-      return undefined
-  }
-}
-
-function handleEditStep(stepId: string) {
-  router.push(`/steps/${stepId}/edit`)
-}
-
-function handleUnlinkStep(step: LinkedStepInfo) {
-  confirm.require({
-    message: `Unlink step "${step.displayName || step.name}" from this app?`,
-    header: 'Confirm Unlink',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Unlink',
-    rejectLabel: 'Cancel',
-    accept: async () => {
-      try {
-        await editorStore.unlinkStep(step.id)
-        toast.add({
-          severity: 'success',
-          summary: 'Unlinked',
-          detail: 'Step unlinked from app',
-          life: 3000,
-        })
-      } catch (err: unknown) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: err instanceof Error ? err.message : 'Failed to unlink step',
-          life: 5000,
-        })
-      }
-    },
-  })
-}
-
-function generateUsageCode(step: LinkedStepInfo): string {
-  return `await automatonApi.executeStep('${step.name}', { inputs: {} });`
-}
-
-async function copyCode(step: LinkedStepInfo) {
-  try {
-    await navigator.clipboard.writeText(generateUsageCode(step))
-    toast.add({
-      severity: 'success',
-      summary: 'Copied',
-      detail: 'Code copied to clipboard',
-      life: 2000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to copy code',
-      life: 3000,
-    })
-  }
-}
-
-const stepsCount = computed(() => editorStore.linkedSteps.length)
 </script>
 
 <template>
@@ -280,94 +180,6 @@ const stepsCount = computed(() => editorStore.linkedSteps.length)
         />
       </div>
     </div>
-
-    <!-- Backend Steps Panel -->
-    <Panel
-      :collapsed="!editorStore.isStepsPanelExpanded"
-      toggleable
-      class="steps-panel"
-      @update:collapsed="editorStore.toggleStepsPanel()"
-    >
-      <template #header>
-        <div class="flex align-items-center gap-2">
-          <i class="pi pi-puzzle-piece"></i>
-          <span>Backend Steps</span>
-          <Tag v-if="stepsCount > 0" :value="String(stepsCount)" severity="secondary" rounded />
-        </div>
-      </template>
-
-      <template #icons>
-        <Button
-          icon="pi pi-plus"
-          text
-          rounded
-          size="small"
-          severity="secondary"
-          @click.stop="emit('createStep')"
-          v-tooltip.left="'New Step'"
-        />
-      </template>
-
-      <div class="steps-content">
-        <!-- Empty state -->
-        <div v-if="editorStore.linkedSteps.length === 0" class="steps-empty">
-          <p class="text-color-secondary text-sm mb-2">No backend steps</p>
-          <Button
-            label="Create Step"
-            icon="pi pi-plus"
-            size="small"
-            outlined
-            @click="emit('createStep')"
-          />
-        </div>
-
-        <!-- Steps list -->
-        <div v-else class="steps-list">
-          <div
-            v-for="step in editorStore.linkedSteps"
-            :key="step.id"
-            class="step-item"
-          >
-            <div class="step-info">
-              <div class="flex align-items-center gap-2 mb-1">
-                <i :class="getLanguageIcon(step.language)" class="text-color-secondary"></i>
-                <span class="step-name">{{ step.displayName || step.name }}</span>
-              </div>
-              <Tag :value="step.language" :severity="getLanguageColor(step.language)" size="small" />
-            </div>
-            <div class="step-actions">
-              <Button
-                icon="pi pi-pencil"
-                text
-                rounded
-                size="small"
-                severity="secondary"
-                @click="handleEditStep(step.id)"
-                v-tooltip.top="'Edit'"
-              />
-              <Button
-                icon="pi pi-copy"
-                text
-                rounded
-                size="small"
-                severity="secondary"
-                @click="copyCode(step)"
-                v-tooltip.top="'Copy code'"
-              />
-              <Button
-                icon="pi pi-times"
-                text
-                rounded
-                size="small"
-                severity="danger"
-                @click="handleUnlinkStep(step)"
-                v-tooltip.top="'Unlink'"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </Panel>
   </div>
 </template>
 
@@ -389,7 +201,6 @@ const stepsCount = computed(() => editorStore.linkedSteps.length)
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  min-height: 200px;
 }
 
 .empty-state {
@@ -469,71 +280,6 @@ const stepsCount = computed(() => editorStore.linkedSteps.length)
   flex-shrink: 0;
 }
 
-/* Steps Panel */
-.steps-panel {
-  flex-shrink: 0;
-  border-top: 1px solid var(--p-surface-200);
-}
-
-.steps-panel :deep(.p-panel-header) {
-  padding: 0.5rem 0.75rem;
-  background-color: var(--p-surface-50);
-}
-
-.steps-panel :deep(.p-panel-content) {
-  padding: 0;
-}
-
-.steps-content {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.steps-empty {
-  padding: 1rem;
-  text-align: center;
-}
-
-.steps-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.step-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--p-surface-100);
-}
-
-.step-item:last-child {
-  border-bottom: none;
-}
-
-.step-item:hover {
-  background-color: var(--p-surface-50);
-}
-
-.step-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.step-name {
-  font-size: 0.8rem;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.step-actions {
-  display: flex;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
-
 /* Dark mode */
 :global(.app-dark) .ai-assistant {
   background-color: var(--p-surface-800);
@@ -553,21 +299,5 @@ const stepsCount = computed(() => editorStore.linkedSteps.length)
 
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .steps-panel {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .steps-panel :deep(.p-panel-header) {
-  background-color: var(--p-surface-900);
-}
-
-:global(.app-dark) .step-item {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .step-item:hover {
-  background-color: var(--p-surface-700);
 }
 </style>
