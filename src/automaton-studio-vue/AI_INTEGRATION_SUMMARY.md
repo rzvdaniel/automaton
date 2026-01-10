@@ -6,7 +6,7 @@
 
 ---
 
-## ⚠️ Important: Streaming Architecture Clarification
+## ⚠️ Important: Streaming Architecture - FINAL DECISION
 
 ### Blazor Implementation (Client-Side)
 The current Blazor app uses **client-side AI streaming**:
@@ -15,25 +15,119 @@ The current Blazor app uses **client-side AI streaming**:
 - No server-side streaming endpoint
 - Direct calls from browser to OpenAI/Anthropic APIs
 
-### Vue.js Decision: Server-Side Streaming (SSE) ✅
+### Vue.js Decision: Full Server-Side Architecture ✅
 
-**Why not client-side like Blazor?**
-- ❌ **Security Risk**: API keys exposed in browser (visible in DevTools, localStorage)
-- ❌ **Enterprise Requirements**: SOC2/HIPAA require server-side key management
-- ❌ **CORS Limitations**: Anthropic may not support custom domains
+**Everything on server: Streaming + Prompts + Tool Execution**
 
-**Why server-side?**
-- ✅ **API keys stay secure** (encrypted in database, never sent to browser)
-- ✅ **Enterprise-ready** (audit logging, rate limiting, compliance)
-- ✅ **Better control** (caching, quotas, monitoring)
-- ✅ **Acceptable latency** (~50-100ms extra hop for security)
+**Why server-side for everything?**
+- ✅ **Security**: API keys stay encrypted on server (never exposed to browser)
+- ✅ **Simplicity**: Frontend just sends user message, renders responses
+- ✅ **No duplication**: System prompts stay in proven C# code (no TypeScript conversion)
+- ✅ **Enterprise-ready**: Audit logging, rate limiting, compliance (SOC2/HIPAA)
+- ✅ **Better control**: Caching, quotas, monitoring, A/B testing
+- ✅ **Acceptable latency**: ~50-100ms extra hop for security + simplicity
 
 **Implementation:**
-1. Port AI provider code from Blazor Services to ASP.NET API
-2. Create SSE endpoint: `POST /api/ai/stream`
-3. System prompts built client-side (TypeScript) - no backend call
-4. Frontend uses EventSource to consume stream
-5. JWT authentication (not API keys in browser)
+1. Port AI providers from Blazor Services to ASP.NET API
+2. Port system prompt builders to API (keep in C#, no TypeScript)
+3. Port tool providers to API
+4. Create SSE endpoint: `POST /api/ai/stream`
+5. Frontend uses EventSource to consume stream
+6. Frontend renders different message types with Vue components (port from Blazor)
+
+**Frontend sends:**
+```json
+{
+  "resourceType": "Step",
+  "resourceId": "step-123",
+  "language": "Python",
+  "message": "Generate code to fetch weather data"
+}
+```
+
+**Backend responds (SSE stream):**
+```
+data: {"type":"reasoning","content":"I'll create a Python function..."}
+data: {"type":"tool_call","toolName":"save_code",...}
+data: {"type":"tool_result","isSuccess":true,...}
+data: {"type":"text","content":"Code generated successfully!"}
+event: done
+```
+
+---
+
+## UI Component Architecture
+
+### Message Types to Render
+
+1. **TextMessage** - Plain AI responses (markdown)
+2. **ReasoningMessage** - Collapsible AI thinking
+3. **ToolExecutionMessage** - Tool call status (executing/completed/failed)
+4. **CodeSuccessMessage** - Generated code with "Apply" button
+5. **CodeErrorMessage** - Error messages
+6. **GeneratingMessage** - Loading indicator
+7. **SystemMessage** - Welcome/system messages
+
+### Component Structure (Port from Blazor)
+
+```
+src/shared/components/ai/
+├── AiChatPanel.vue                 # Main container
+├── AiMessageList.vue               # Message list
+├── AiMessage.vue                   # Message wrapper (routing to specific component)
+├── message-components/
+│   ├── TextMessage.vue             # Port from TextMessageComponent.razor
+│   ├── ReasoningMessage.vue        # Port from ReasoningMessageComponent.razor
+│   ├── ToolExecutionMessage.vue    # Port from ToolExecutionMessageComponent.razor
+│   ├── CodeSuccessMessage.vue      # Port from CodeSuccessMessageComponent.razor
+│   ├── CodeErrorMessage.vue        # Port from CodeErrorMessageComponent.razor
+│   ├── GeneratingMessage.vue       # Port from GeneratingMessageComponent.razor
+│   └── SystemMessage.vue           # Port from SystemMessageComponent.razor
+└── tool-result-displays/
+    ├── SaveCodeResultDisplay.vue   # Port from SaveCodeResultDisplay.razor
+    ├── ExecuteCodeResultDisplay.vue # Port from Blazor tool results
+    ├── VariablesResultDisplay.vue  # Port from VariablesResultDisplay.razor
+    └── GenericResultDisplay.vue    # Port from GenericResultDisplay.razor
+```
+
+### Example: Rendering Streamed Messages
+
+```vue
+<!-- AiMessage.vue -->
+<template>
+  <div :class="['chat-message', alignment]">
+    <!-- User message bubble -->
+    <div v-if="isUser" class="user-bubble">
+      {{ message.content }}
+    </div>
+    
+    <!-- AI message with dynamic component -->
+    <div v-else class="ai-bubble">
+      <component 
+        :is="getComponent(message.type)"
+        v-bind="message"
+        @apply-code="$emit('apply-code', $event)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import TextMessage from './message-components/TextMessage.vue'
+import ReasoningMessage from './message-components/ReasoningMessage.vue'
+// ... other imports
+
+function getComponent(type) {
+  return {
+    text: TextMessage,
+    reasoning: ReasoningMessage,
+    toolExecution: ToolExecutionMessage,
+    codeSuccess: CodeSuccessMessage,
+    // ...
+  }[type] || TextMessage
+}
+</script>
+```
 
 ---
 

@@ -475,11 +475,11 @@ Additional latency: ~50-100ms
 Trade-off: Acceptable for enterprise security requirements
 ```
 
-### System Prompts: Client-Side Building
+### System Prompts: Server-Side Building
 
 **Question:** Can prompt builder logic be replicated in UI?
 
-**Answer:** YES, and it SHOULD be (no backend call needed):
+**Answer:** While technically possible, **system prompts should stay on the server** for simplicity and consistency.
 
 **Current (Blazor):**
 ```csharp
@@ -498,71 +498,119 @@ public class StepSystemPromptBuilder
 }
 ```
 
-**New (Vue.js):**
-```typescript
-// src/shared/services/ai/prompts/step-prompt-builder.ts
+**New (Server-Side - Keep in ASP.NET API):**
+```csharp
+// src/Automaton.Studio.Server/Services/Ai/StepSystemPromptBuilder.cs
+// (Port from Blazor Services - same code, different location)
 
-export class StepSystemPromptBuilder {
-  buildSystemPrompt(language: string): string {
-    return `
-      Generate ${language} code for automation workflow steps.
-      
-      ## WORKFLOW
-      1. For modifications: Call get_current_code first
-      2. Check variables: Call get_step_variables
-      ...
-    `.trim()
-  }
+public class StepSystemPromptBuilder : IStepSystemPromptBuilder
+{
+    public string BuildSystemPrompt(string language)
+    {
+        // EXACT same prompts as Blazor - proven and tested
+        return $@"Generate {language} code for automation workflow steps.
+        
+        ## WORKFLOW
+        1. For modifications: Call get_current_code first
+        2. Check variables: Call get_step_variables
+        ...";
+    }
 }
 
-// Usage in composable
-import { StepSystemPromptBuilder } from '@/shared/services/ai/prompts'
-
-const promptBuilder = new StepSystemPromptBuilder()
-const systemPrompt = promptBuilder.buildSystemPrompt(language.value)
-
-// Send to backend in request
-await aiClient.startConversation({
-  ...request,
-  systemPrompt,  // Built client-side, sent as part of request
-  message: userMessage
-})
+// Used in AiController
+[HttpPost("stream")]
+public async Task StreamConversation([FromBody] StreamConversationRequest request)
+{
+    // Build system prompt on server based on resource type
+    var systemPrompt = request.ResourceType switch
+    {
+        "Step" => _stepPromptBuilder.BuildSystemPrompt(request.Language),
+        "App" => _appPromptBuilder.BuildSystemPrompt(),
+        "Flow" => _flowPromptBuilder.BuildSystemPrompt(),
+        _ => throw new ArgumentException($"Unknown resource type: {request.ResourceType}")
+    };
+    
+    var conversationRequest = new ConversationRequest
+    {
+        SystemPrompt = systemPrompt,  // Built on server
+        InitialMessage = request.Message,
+        // ... other fields
+    };
+    
+    // Stream response
+    await provider.CallAsync(conversationRequest, ...);
+}
 ```
 
-**Benefits:**
-- ✅ No server roundtrip for prompt generation
-- ✅ Prompts can be dynamic based on UI state
-- ✅ Easier to customize per user/context
-- ✅ Faster iteration during development
-- ✅ Same prompts as Blazor (copy & paste)
+**Vue.js Frontend (Simplified):**
+```typescript
+// src/shared/services/ai/ai-client.ts
+
+// Frontend just sends user message + context info
+await aiClient.startConversation({
+  conversationId: uuid(),
+  resourceType: 'Step',  // 'Step', 'App', or 'Flow'
+  resourceId: stepId,
+  language: 'Python',  // For Step context
+  message: userPrompt,  // User's actual message
+  history: previousMessages
+})
+
+// Server builds appropriate system prompt based on resourceType
+// No prompt building logic in frontend
+```
+
+**Benefits of Server-Side Prompts:**
+- ✅ **Simpler architecture** - Single source of truth for prompts
+- ✅ **No TypeScript conversion** - Keep proven C# code as-is
+- ✅ **Consistent behavior** - Same prompts in all contexts
+- ✅ **Easier updates** - Change prompts once, affects all clients
+- ✅ **Version control** - Prompts versioned with backend code
+- ✅ **A/B testing** - Can test different prompts server-side
 
 **Implementation:**
-1. Copy C# prompt builders to TypeScript
-2. Keep exact same prompts (already tested and optimized)
-3. Add to `shared/services/ai/prompts/`
-4. System prompts sent in API request body (not built on server)
+1. Keep prompt builders in ASP.NET API (port from Blazor Services)
+2. Backend selects appropriate builder based on `resourceType`
+3. Frontend sends minimal context: `resourceType`, `language`, `message`
+4. No prompt building code needed in Vue.js
 
 ### Final Architecture Decision
 
-**✅ Use Server-Side Streaming (SSE) with Client-Side Prompt Building**
+**✅ Use Server-Side Everything: Streaming, Prompt Building, Tool Execution**
 
 **Rationale:**
 1. **Security is non-negotiable** for multi-tenant SaaS
 2. **API keys must never be exposed** to browser
-3. **Enterprise requirements** (compliance, audit logging)
-4. **Consistent with existing architecture** (all APIs use JWT)
-5. **Better monitoring, rate limiting, caching**
-6. **Acceptable latency trade-off** (~50-100ms for enterprise security)
+3. **Simpler frontend** - Just send user message, render responses
+4. **System prompts stay centralized** - No duplication in TypeScript
+5. **Enterprise requirements** (compliance, audit logging)
+6. **Consistent with existing architecture** (all APIs use JWT)
+7. **Better monitoring, rate limiting, caching**
+8. **Acceptable latency trade-off** (~50-100ms for enterprise security)
 
 **Implementation Path:**
-1. Port AI provider code from `Automaton.Studio/Services/Mcp/Clients/Providers/` to `Automaton.Studio.Server/Controllers/`
-2. Create new `AiController` with SSE endpoint
-3. Keep existing provider code (OpenAiProvider.cs, AnthropicProvider.cs) - minimal changes
-4. Copy system prompt builders to TypeScript (exact same prompts)
+1. Port AI provider code from `Automaton.Studio/Services/Mcp/Clients/Providers/` to `Automaton.Studio.Server/Services/Ai/`
+2. Port system prompt builders from `Automaton.Studio/Services/Mcp/SystemPrompts/` to `Automaton.Studio.Server/Services/Ai/`
+3. Port tool providers from `Automaton.Studio/Services/Mcp/ToolProviders/` to `Automaton.Studio.Server/Services/Ai/`
+4. Create new `AiController` with SSE endpoint
 5. Frontend uses EventSource to consume SSE stream
 6. API keys stay on server (encrypted in database)
 
-This ensures **production-ready security** while maintaining **streaming UX**.
+**Vue.js Frontend Responsibilities:**
+- Send user messages to backend API
+- Render streamed responses (text, tool calls, code, reasoning)
+- Handle UI interactions (collapse reasoning, apply code)
+- Display loading states and errors
+
+**Backend API Responsibilities:**
+- Build system prompts based on context
+- Execute AI provider calls (OpenAI, Anthropic)
+- Execute MCP tools (read code, save code, test, etc.)
+- Stream responses to frontend via SSE
+- Manage API keys securely
+- Log all interactions for audit
+
+This ensures **production-ready security** and **simpler architecture**.
 
 ---
 
@@ -586,18 +634,726 @@ src/automaton-studio-vue/src/
 │   ├── services/
 │   │   └── ai/
 │   │       ├── ai-client.ts                    # Core AI client (HTTP + SSE)
-│   │       ├── providers/
-│   │       │   ├── provider-registry.ts        # Dynamic provider discovery
-│   │       │   ├── openai-provider.ts          # OpenAI integration
-│   │       │   └── anthropic-provider.ts       # Anthropic integration
-│   │       ├── mcp/
-│   │       │   ├── mcp-client.ts               # Base MCP client
-│   │       │   ├── step-mcp-client.ts          # Step context
-│   │       │   └── app-mcp-client.ts           # App context
-│   │       ├── api-keys-service.ts             # API key CRUD
+│   │       ├── api-keys-service.ts             # API key CRUD (admin UI only)
 │   │       └── chat-history-service.ts         # Conversation persistence
 │   │
 │   ├── composables/
+│   │   ├── useAiChat.ts                        # Main AI chat composable
+│   │   ├── useAiStreaming.ts                   # Streaming response handler
+│   │   └── useChatHistory.ts                   # History management
+│   │
+│   ├── components/
+│   │   └── ai/
+│   │       ├── AiChatPanel.vue                 # Reusable chat UI
+│   │       ├── AiMessageList.vue               # Message list container
+│   │       ├── AiMessage.vue                   # Single message wrapper
+│   │       ├── message-components/
+│   │       │   ├── TextMessage.vue             # Plain text messages
+│   │       │   ├── ReasoningMessage.vue        # Collapsible reasoning
+│   │       │   ├── ToolExecutionMessage.vue    # Tool call status
+│   │       │   ├── CodeSuccessMessage.vue      # Generated code (with Apply button)
+│   │       │   ├── CodeErrorMessage.vue        # Error messages
+│   │       │   ├── GeneratingMessage.vue       # "AI is generating..." indicator
+│   │       │   └── SystemMessage.vue           # System/welcome messages
+│   │       ├── tool-result-displays/
+│   │       │   ├── SaveCodeResultDisplay.vue   # Save code tool result
+│   │       │   ├── ExecuteCodeResultDisplay.vue # Test execution result
+│   │       │   ├── VariablesResultDisplay.vue  # Step variables display
+│   │       │   └── GenericResultDisplay.vue    # Fallback for other tools
+│   │       ├── AiProviderSelector.vue          # Provider dropdown (admin UI)
+│   │       └── AiStreamingIndicator.vue        # Loading/streaming state
+│   │
+│   ├── stores/
+│   │   └── ai.store.ts                         # Global AI state (history, providers)
+│   │
+│   └── types/
+│       └── ai.types.ts                         # AI-specific types
+│
+├── features/
+│   ├── steps/
+│   │   ├── components/
+│   │   │   └── StepAiAssistant.vue             # Step AI panel wrapper
+│   │   ├── composables/
+│   │   │   └── useStepAiContext.ts             # Step-specific AI context
+│   │   └── views/
+│   │       └── StepEditorView.vue              # Includes StepAiAssistant
+│   │
+│   ├── apps/
+│   │   ├── components/
+│   │   │   └── AppAiAssistant.vue              # App AI panel wrapper
+│   │   ├── composables/
+│   │   │   └── useAppAiContext.ts              # App-specific AI context
+│   │   └── views/
+│   │       └── AppEditorView.vue               # Includes AppAiAssistant
+│   │
+│   └── flows/
+│       ├── components/
+│       │   └── FlowAiAssistant.vue             # NEW: Flow AI panel
+│       ├── composables/
+│       │   └── useFlowAiContext.ts             # NEW: Flow-specific context
+│       └── views/
+│           └── FlowGenerationView.vue          # Includes FlowAiAssistant
+```
+
+**Key Changes from Original Plan:**
+- ❌ **Removed**: Client-side prompt builders (stay on server)
+- ❌ **Removed**: `mcp/` client folder (no client-side MCP)
+- ❌ **Removed**: Provider implementations (OpenAI/Anthropic SDKs on server only)
+- ✅ **Added**: Comprehensive message component structure (port from Blazor)
+- ✅ **Added**: Tool result display components (render server tool execution results)
+- ✅ **Simplified**: Frontend only handles SSE streaming and UI rendering
+
+---
+
+## UI Component Architecture: Rendering AI Responses
+
+### Overview
+
+The Vue.js frontend needs to render different types of messages streamed from the backend. We'll port and enhance the proven Blazor message component architecture.
+
+### Message Types
+
+Based on the Blazor implementation, we support these message types:
+
+1. **Text** - Plain AI responses (markdown-formatted)
+2. **Reasoning** - Collapsible AI thinking/explanation
+3. **ToolExecution** - Tool call status (executing, completed, failed)
+4. **CodeSuccess** - Generated code with "Apply" button
+5. **CodeError** - Error messages from code generation
+6. **Generating** - "AI is generating..." indicator
+7. **System** - System/welcome messages
+
+### Component Structure
+
+**Main Container:**
+```vue
+<!-- src/shared/components/ai/AiChatPanel.vue -->
+<template>
+  <div class="ai-chat-panel">
+    <!-- Header with provider selector (admin only) -->
+    <div class="chat-header">
+      <h3>AI Assistant</h3>
+    </div>
+    
+    <!-- Message list -->
+    <AiMessageList 
+      :messages="messages"
+      :is-generating="isGenerating"
+      :language="language"
+      @apply-code="handleApplyCode"
+    />
+    
+    <!-- Input area -->
+    <div class="chat-input">
+      <textarea 
+        v-model="userInput"
+        placeholder="Ask AI to generate code..."
+        @keydown.enter.ctrl="sendMessage"
+      />
+      <button @click="sendMessage" :disabled="isGenerating">
+        Send
+      </button>
+    </div>
+  </div>
+</template>
+```
+
+**Message Renderer:**
+```vue
+<!-- src/shared/components/ai/AiMessage.vue -->
+<template>
+  <div :class="['chat-message', messageAlignment]">
+    <div v-if="isUserMessage" class="message-bubble user-bubble">
+      <div class="bubble-content">{{ message.content }}</div>
+      <div class="bubble-timestamp">{{ formatTime(message.timestamp) }}</div>
+    </div>
+    
+    <div v-else class="message-bubble ai-bubble">
+      <!-- Dynamic component based on message type -->
+      <component 
+        :is="getMessageComponent(message.type)"
+        v-bind="getMessageProps(message)"
+        @apply-code="$emit('apply-code', $event)"
+      />
+    </div>
+    
+    <!-- Thinking indicator for last message -->
+    <div v-if="showThinkingDots" class="thinking-indicator">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import TextMessage from './message-components/TextMessage.vue'
+import ReasoningMessage from './message-components/ReasoningMessage.vue'
+import ToolExecutionMessage from './message-components/ToolExecutionMessage.vue'
+import CodeSuccessMessage from './message-components/CodeSuccessMessage.vue'
+import CodeErrorMessage from './message-components/CodeErrorMessage.vue'
+import GeneratingMessage from './message-components/GeneratingMessage.vue'
+import SystemMessage from './message-components/SystemMessage.vue'
+
+interface Props {
+  message: ChatMessage
+  language?: string
+  isLast?: boolean
+  isGenerating?: boolean
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<{
+  'apply-code': [code: string]
+}>()
+
+const isUserMessage = computed(() => 
+  props.message.role?.toLowerCase() === 'user'
+)
+
+const messageAlignment = computed(() => 
+  isUserMessage.value ? 'right' : 'left'
+)
+
+const showThinkingDots = computed(() => {
+  if (isUserMessage.value) return false
+  if (!props.isLast) return false
+  if (!props.isGenerating) return false
+  
+  // Don't show if message has its own indicator
+  const hasOwnIndicator = 
+    props.message.type === 'generating' || 
+    props.message.toolStatus === 'executing'
+  
+  return !hasOwnIndicator
+})
+
+function getMessageComponent(type: string) {
+  const components = {
+    text: TextMessage,
+    reasoning: ReasoningMessage,
+    toolExecution: ToolExecutionMessage,
+    codeSuccess: CodeSuccessMessage,
+    codeError: CodeErrorMessage,
+    generating: GeneratingMessage,
+    system: SystemMessage
+  }
+  return components[type] || TextMessage
+}
+
+function getMessageProps(message: ChatMessage) {
+  // Map message data to component props
+  return {
+    content: message.content,
+    timestamp: message.timestamp,
+    language: props.language,
+    toolStatus: message.toolStatus,
+    toolResult: message.toolResult,
+    generatedCode: message.generatedCode,
+    codeId: message.codeId,
+    errorMessage: message.error
+  }
+}
+</script>
+```
+
+**Individual Message Components (Port from Blazor):**
+
+```vue
+<!-- src/shared/components/ai/message-components/TextMessage.vue -->
+<template>
+  <div class="text-message markdown-content" v-html="formattedContent"></div>
+  <div class="message-footer">
+    <span class="timestamp">{{ formatTime(timestamp) }}</span>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { marked } from 'marked'  // Markdown parser
+import DOMPurify from 'dompurify'  // XSS protection
+
+interface Props {
+  content: string
+  timestamp: Date
+}
+
+const props = defineProps<Props>()
+
+const formattedContent = computed(() => {
+  const html = marked.parse(props.content)
+  return DOMPurify.sanitize(html)
+})
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+</script>
+
+<style scoped>
+.text-message {
+  line-height: 1.6;
+}
+
+.markdown-content :deep(code) {
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', monospace;
+}
+
+.markdown-content :deep(pre) {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+}
+/* More markdown styles... */
+</style>
+```
+
+```vue
+<!-- src/shared/components/ai/message-components/ReasoningMessage.vue -->
+<template>
+  <div class="reasoning-content">
+    <div class="reasoning-header" @click="toggleCollapsed">
+      <span class="reasoning-title">Reasoning</span>
+      <span v-if="summary" class="reasoning-preview">{{ summary }}</span>
+      <span :class="['toggle-icon', { expanded: !isCollapsed }]">›</span>
+    </div>
+    
+    <div v-if="!isCollapsed" class="reasoning-body markdown-content" v-html="formattedContent"></div>
+  </div>
+  <div class="message-footer">
+    <span class="timestamp">{{ formatTime(timestamp) }}</span>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+interface Props {
+  content: string
+  timestamp: Date
+  initiallyCollapsed?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  initiallyCollapsed: false
+})
+
+const isCollapsed = ref(props.initiallyCollapsed)
+
+const summary = computed(() => {
+  const firstLine = props.content.split('\n')[0]?.trim() || ''
+  return firstLine.length > 50 
+    ? firstLine.substring(0, 47) + '...' 
+    : firstLine
+})
+
+const formattedContent = computed(() => {
+  const html = marked.parse(props.content)
+  return DOMPurify.sanitize(html)
+})
+
+function toggleCollapsed() {
+  isCollapsed.value = !isCollapsed.value
+}
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+</script>
+
+<style scoped>
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.reasoning-header:hover {
+  opacity: 0.8;
+}
+
+.reasoning-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #475569;
+}
+
+.toggle-icon {
+  transition: transform 0.2s ease;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+/* More styles... */
+</style>
+```
+
+```vue
+<!-- src/shared/components/ai/message-components/ToolExecutionMessage.vue -->
+<template>
+  <div class="tool-message">
+    <!-- Executing state -->
+    <div v-if="toolStatus === 'executing'" class="tool-inline">
+      <div class="pulse-dot"></div>
+      <span class="tool-text">{{ description }}</span>
+    </div>
+    
+    <!-- Completed with result -->
+    <div v-else-if="toolResult" class="tool-result">
+      <ToolResultDisplay 
+        :result="toolResult"
+        :tool-name="toolName"
+        :timestamp="timestamp"
+      />
+    </div>
+    
+    <!-- Error state -->
+    <div v-else-if="toolStatus === 'error'" class="tool-inline">
+      <span class="tool-text">{{ description }}</span>
+      <span v-if="errorMessage" class="error-hint">{{ errorMessage }}</span>
+    </div>
+    
+    <!-- Completed (no result display) -->
+    <div v-else class="tool-inline">
+      <span class="tool-text">{{ description }}</span>
+    </div>
+    
+    <div class="message-footer">
+      <span class="timestamp">{{ formatTime(timestamp) }}</span>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import ToolResultDisplay from '../tool-result-displays/ToolResultDisplay.vue'
+
+interface Props {
+  description: string
+  toolStatus: 'executing' | 'completed' | 'error'
+  toolName?: string
+  toolResult?: any
+  errorMessage?: string
+  timestamp: Date
+}
+
+defineProps<Props>()
+</script>
+
+<style scoped>
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #94a3b8;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+/* More styles... */
+</style>
+```
+
+```vue
+<!-- src/shared/components/ai/message-components/CodeSuccessMessage.vue -->
+<template>
+  <div class="code-success">
+    <div class="code-header">
+      <span class="success-icon">✓</span>
+      <span class="success-text">Code generated successfully</span>
+      <button 
+        class="apply-button"
+        @click="$emit('apply-code', generatedCode)"
+        :disabled="isApplyDisabled"
+      >
+        Apply Code
+      </button>
+    </div>
+    
+    <div class="code-preview">
+      <pre><code :class="`language-${language?.toLowerCase()}`">{{ generatedCode }}</code></pre>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+interface Props {
+  generatedCode: string
+  language?: string
+  codeId?: string
+  isApplyDisabled?: boolean
+}
+
+defineProps<Props>()
+defineEmits<{
+  'apply-code': [code: string]
+}>()
+</script>
+
+<style scoped>
+.code-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.success-icon {
+  color: #10b981;
+  font-size: 18px;
+}
+
+.apply-button {
+  margin-left: auto;
+  padding: 6px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.apply-button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.apply-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.code-preview pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+}
+</style>
+```
+
+### Tool Result Display Components
+
+For displaying results of MCP tool executions:
+
+```vue
+<!-- src/shared/components/ai/tool-result-displays/ToolResultDisplay.vue -->
+<template>
+  <component 
+    :is="getDisplayComponent(toolName)"
+    v-bind="result"
+  />
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import SaveCodeResultDisplay from './SaveCodeResultDisplay.vue'
+import ExecuteCodeResultDisplay from './ExecuteCodeResultDisplay.vue'
+import VariablesResultDisplay from './VariablesResultDisplay.vue'
+import GenericResultDisplay from './GenericResultDisplay.vue'
+
+interface Props {
+  result: any
+  toolName: string
+  timestamp: Date
+}
+
+const props = defineProps<Props>()
+
+function getDisplayComponent(toolName: string) {
+  const displays = {
+    save_code: SaveCodeResultDisplay,
+    execute_code: ExecuteCodeResultDisplay,
+    execute_backend_step_code: ExecuteCodeResultDisplay,
+    get_step_variables: VariablesResultDisplay,
+    suggest_variables: VariablesResultDisplay
+  }
+  return displays[toolName] || GenericResultDisplay
+}
+</script>
+```
+
+### Streaming Integration
+
+```typescript
+// src/shared/composables/useAiChat.ts
+
+export function useAiChat(resourceType: string, resourceId: string) {
+  const messages = ref<ChatMessage[]>([])
+  const isGenerating = ref(false)
+  const aiClient = new AiClient()
+  
+  async function sendMessage(userMessage: string, language?: string) {
+    // Add user message
+    messages.value.push({
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date()
+    })
+    
+    isGenerating.value = true
+    
+    try {
+      await aiClient.startConversation(
+        {
+          resourceType,
+          resourceId,
+          language,
+          message: userMessage,
+          history: messages.value
+        },
+        // On chunk received
+        (chunk) => {
+          handleStreamChunk(chunk)
+        },
+        // On complete
+        () => {
+          isGenerating.value = false
+        },
+        // On error
+        (error) => {
+          messages.value.push({
+            role: 'assistant',
+            type: 'codeError',
+            content: error.message,
+            timestamp: new Date()
+          })
+          isGenerating.value = false
+        }
+      )
+    } catch (error) {
+      isGenerating.value = false
+      console.error('Chat error:', error)
+    }
+  }
+  
+  function handleStreamChunk(chunk: StreamChunk) {
+    // Handle different chunk types
+    switch (chunk.type) {
+      case 'text':
+        // Update or create text message
+        updateOrCreateMessage({
+          role: 'assistant',
+          type: 'text',
+          content: chunk.content,
+          timestamp: new Date()
+        })
+        break
+        
+      case 'reasoning':
+        // Update or create reasoning message
+        updateOrCreateMessage({
+          role: 'assistant',
+          type: 'reasoning',
+          content: chunk.content,
+          timestamp: new Date()
+        })
+        break
+        
+      case 'tool_call':
+        // Add tool execution message
+        messages.value.push({
+          role: 'assistant',
+          type: 'toolExecution',
+          content: chunk.toolCall.description,
+          toolName: chunk.toolCall.name,
+          toolStatus: 'executing',
+          timestamp: new Date()
+        })
+        break
+        
+      case 'tool_result':
+        // Update tool execution message with result
+        const toolMsg = messages.value.findLast(m => 
+          m.type === 'toolExecution' && 
+          m.toolName === chunk.toolResult.toolName
+        )
+        if (toolMsg) {
+          toolMsg.toolStatus = chunk.toolResult.isSuccess ? 'completed' : 'error'
+          toolMsg.toolResult = chunk.toolResult.data
+          toolMsg.errorMessage = chunk.toolResult.error
+        }
+        break
+        
+      case 'code_generated':
+        // Add code success message
+        messages.value.push({
+          role: 'assistant',
+          type: 'codeSuccess',
+          generatedCode: chunk.code,
+          language: chunk.language,
+          codeId: chunk.codeId,
+          timestamp: new Date()
+        })
+        break
+    }
+  }
+  
+  function updateOrCreateMessage(newMessage: ChatMessage) {
+    // Find last message of same type (for streaming updates)
+    const lastMsg = messages.value.findLast(m => 
+      m.role === newMessage.role && 
+      m.type === newMessage.type
+    )
+    
+    if (lastMsg && lastMsg.isStreaming) {
+      // Update existing streaming message
+      lastMsg.content = newMessage.content
+    } else {
+      // Create new message
+      newMessage.isStreaming = true
+      messages.value.push(newMessage)
+    }
+  }
+  
+  return {
+    messages,
+    isGenerating,
+    sendMessage
+  }
+}
+```
+
+### Summary
+
+**Frontend Responsibilities:**
+- ✅ Send user messages to backend (just the prompt)
+- ✅ Render streamed responses with appropriate components
+- ✅ Handle UI interactions (collapse reasoning, apply code)
+- ✅ Display loading states and errors
+- ✅ Manage conversation history
+
+**Backend Responsibilities:**
+- ✅ Build system prompts based on context
+- ✅ Execute AI provider calls (OpenAI, Anthropic)
+- ✅ Execute MCP tools (read code, save code, test, etc.)
+- ✅ Stream responses to frontend via SSE
+- ✅ Manage API keys securely
+
+This architecture is simpler, more secure, and leverages proven Blazor UI components ported to Vue.js.
+
+---
+
+## Shared AI Services
 │   │   ├── useAiChat.ts                        # Main AI chat composable
 │   │   ├── useAiStreaming.ts                   # Streaming response handler
 │   │   ├── useAiProviders.ts                   # Provider management
