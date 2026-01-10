@@ -56,9 +56,10 @@ dotnet build
 cd src/Automaton.Studio.Web
 dotnet build
 
-# Console Runner
-cd src/Automaton.Runner.Console  
-dotnet build
+# Runner (built via Docker Compose; console is for debugging only)
+# Preferred: docker compose -f docker-compose.runner.yml up -d
+# Debug inside container:
+# docker compose -f docker-compose.runner.yml exec runner automaton-runner
 ```
 
 ## Running the Application

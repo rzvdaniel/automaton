@@ -52,18 +52,29 @@ A **Runner** is a lightweight agent that connects to your Automaton platform and
 
 | Method | Recommended For | Time to Deploy |
 |--------|-----------------|----------------|
-| **🐳 Docker** (Recommended) | Production, Cloud, CI/CD | ~1 minute |
-| **📦 Native Executable** | Local development, Bare metal | ~5 minutes |
+| **🐳 Docker Compose** (Recommended) | Production, Cloud, CI/CD | ~1 minute |
+| **📦 Native Executable** | Fallback when containers unavailable | ~5 minutes |
 
-### Docker Deployment (Recommended)
+### Docker Compose Deployment (Recommended)
 
-The fastest way to get a runner up and running:
+Use the provided `docker-compose.runner.yml` for managed deployment with restart policy and persisted config/logs:
 
 ```bash
-docker run -d \
-  --name automaton-runner \
-  -e AUTOMATON_API_KEY=ak_your_api_key_here \
-  rzvdaniel/automaton-runner:latest
+# From repo root
+cp .env.example .env
+
+# Set required vars in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+# Start runner
+docker compose -f docker-compose.runner.yml up -d
+
+# View logs
+docker compose -f docker-compose.runner.yml logs -f runner
+
+# Stop/remove
+docker compose -f docker-compose.runner.yml down
 ```
 
 The Docker image includes:

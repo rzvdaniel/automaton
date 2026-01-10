@@ -58,12 +58,17 @@ For a native desktop experience on Windows:
 #### Automaton Runner
 Runners execute your automation flows. To set up your first runner:
 
-**🐳 Docker (Recommended):**
+**🐳 Docker Compose (Recommended):**
 ```bash
-docker run -d \
-  --name automaton-runner \
-  -e AUTOMATON_API_KEY=ak_your_api_key_here \
-  rzvdaniel/automaton-runner:latest
+# From repo root
+cp .env.example .env
+
+# Set required vars in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+docker compose -f docker-compose.runner.yml up -d
+docker compose -f docker-compose.runner.yml logs -f runner
 ```
 
 The Docker image includes Python 3.13 and common packages pre-installed.

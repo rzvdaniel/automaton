@@ -110,53 +110,25 @@ Configure in `appsettings.Production.json`:
 
 ## Runner Deployment
 
-After installing Automaton Studio, you'll need to deploy at least one runner to execute workflows.
+After installing Automaton Studio, deploy runners via Docker Compose (preferred).
 
-### Quick Runner Setup
-
-1. **Get an API Key** from Automaton Studio:
-   - Navigate to **Settings → API Keys**
-   - Create a new key with "Runner" scope
-   - Copy the generated key (starts with `ak_`)
-
-2. **Install the Console Runner**:
-
-   **Windows (PowerShell as Administrator):**
-   ```powershell
-   iwr -useb https://your-server.com/downloads/install.ps1 | iex
-   ```
-
-   **Linux/macOS:**
-   ```bash
-   curl -sSL https://your-server.com/downloads/install.sh | bash
-   ```
-
-3. **Run Interactive Setup**:
-   ```bash
-   automaton-runner
-   ```
-   
-   The runner will guide you through authentication and registration.
-
-4. **For Production - Install as Service**:
-   ```bash
-   automaton-runner service install --name "Production-Runner"
-   ```
-
-### Advanced Runner Configuration
-
-For production deployments with automation and CI/CD:
+### Quick Runner Setup (Preferred)
 
 ```bash
-# Set environment variables
-export AUTOMATON_API_KEY="ak_runner_1234567890abcdef"
-export AppConfig__BaseUrl="https://automaton.company.com"
+# From repo root
+cp .env.example .env
 
-# Start runner (no prompts)
-automaton-runner
+# Set required vars in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+docker compose -f docker-compose.runner.yml up -d
+docker compose -f docker-compose.runner.yml logs -f runner
 ```
 
-For complete runner setup documentation, see the [Runner Setup Guide](../user-guide/runner-setup.md).
+### Fallback: Native Console Runner
+
+Use only when containers are not possible. Install the console runner, then run interactive setup inside the host or via `docker compose exec runner automaton-runner` for debugging. See the [Runner Setup Guide](../user-guide/runner-setup.md) for details.
 
 ## Next Steps
 

@@ -5,7 +5,7 @@
     <div class="doc-hero-icon">🏃</div>
     <h1>Runner Deployment</h1>
     <p class="hero-subtitle">
-      Complete guide to deploying and running Automaton Runners using Docker or native executables
+      Complete guide to deploying and running Automaton Runners using Docker Compose (preferred) or native fallbacks
     </p>
     <div class="doc-hero-stats">
       <div class="doc-hero-stat">
@@ -37,7 +37,7 @@ The **Automaton Runner** is a cross-platform application that executes automatio
 
 - ✅ **Docker Ready**: Pre-built image with Python 3.13 and common packages
 - ✅ **Cross-platform**: Works on Windows, Linux, and macOS
-- ✅ **One-Command Setup**: Single `docker run` command to get started
+- ✅ **One-Command Setup**: Single `docker compose up` command to get started
 - ✅ **API Key Authentication**: Secure, automation-friendly authentication
 - ✅ **Auto-reconnection**: Handles network interruptions gracefully
 - ✅ **Python Packages Included**: requests, pandas, numpy, boto3, beautifulsoup4, and more
@@ -75,18 +75,39 @@ Docker is the **fastest and easiest** way to deploy a runner. The official Docke
 - **Python 3.13** - For Python-based custom steps
 - **Pre-installed Python packages**: requests, pandas, numpy, beautifulsoup4, boto3, lxml, pyyaml, openpyxl, xlrd, pillow, pyodbc, psycopg2-binary, sqlalchemy, and more
 
-#### Quick Start: Docker CLI
+#### Quick Start: Docker Compose (Preferred)
 
-Run this single command to start a runner:
+Use the provided `docker-compose.runner.yml` for a managed runner with restart policy and persisted config/logs:
+
+```bash
+# From repo root
+cp .env.example .env
+
+# Set required variables in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+# Start runner
+docker compose -f docker-compose.runner.yml up -d
+
+# View logs
+docker compose -f docker-compose.runner.yml logs -f runner
+
+# Stop/remove
+docker compose -f docker-compose.runner.yml down
+```
+
+That's it! Your runner will automatically connect to Automaton Studio.
+
+Optional ad-hoc run (not recommended for production):
 
 ```bash
 docker run -d \
   --name automaton-runner \
+  --restart unless-stopped \
   -e AUTOMATON_API_KEY=ak_your_api_key_here \
   rzvdaniel/automaton-runner:latest
 ```
-
-That's it! Your runner will automatically connect to Automaton Studio.
 
 #### Environment Variables
 
@@ -122,36 +143,24 @@ If you're using Docker Desktop (Windows/macOS):
    - **Environment variables**: Add your `AUTOMATON_API_KEY`
 6. Click **Run** to start
 
-#### Docker Compose
+#### Docker Compose (custom scenarios)
 
-For more complex setups or multiple runners, use Docker Compose:
+You can also embed the runner in custom Compose stacks. Minimal service example:
 
 ```yaml
-version: '3.8'
 services:
   automaton-runner:
     image: rzvdaniel/automaton-runner:latest
     container_name: automaton-runner
     restart: unless-stopped
+    env_file: .env
     environment:
       - AUTOMATON_API_KEY=${AUTOMATON_API_KEY}
+      - AUTOMATON_SERVER_URL=${AUTOMATON_SERVER_URL}
       - AUTOMATON_RUNNER_NAME=docker-runner-01
-      # Uncomment for self-hosted server:
-      # - AUTOMATON_SERVER_URL=https://your-server.com
 ```
 
-Save as `docker-compose.yml`, then run:
-
-```bash
-# Set your API key
-export AUTOMATON_API_KEY=ak_your_api_key_here
-
-# Start the runner
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-```
+Launch with `docker compose up -d automaton-runner` and manage via `docker compose logs -f automaton-runner`.
 
 #### Managing Docker Runners
 
@@ -178,9 +187,9 @@ docker run -d --name automaton-runner \
 
 ---
 
-### 📦 Native Executable Installation
+### 📦 Native Executable Installation (Fallback)
 
-If you prefer to run the runner as a native executable (without Docker), use these methods:
+Prefer Docker Compose. Use native installs only when containerization is not possible.
 
 #### Option 1: Quick Install Scripts
 
@@ -278,15 +287,12 @@ ak_runner_1234567890abcdef
 
 Keys starting with `ak_` and at least 10 characters long are valid.
 
-## First Run - Interactive Setup
+### First Run - Interactive Setup (Debugging)
 
-The easiest way to configure your runner is through the interactive setup wizard.
+For production, rely on Docker Compose. If you need to debug, you can run the console inside the container:
 
-### Start the Runner
-
-Simply run:
 ```bash
-automaton-runner
+docker compose -f docker-compose.runner.yml exec runner automaton-runner
 ```
 
 ### What Happens Next
