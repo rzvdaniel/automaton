@@ -4,6 +4,8 @@ import { createPinia } from 'pinia'
 // PrimeVue imports - MUST be in this order
 import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
+import ToastService from 'primevue/toastservice'
+import ConfirmationService from 'primevue/confirmationservice'
 import 'primeicons/primeicons.css'
 import 'primeflex/primeflex.css'
 
@@ -29,6 +31,10 @@ app.use(PrimeVue, {
     },
   },
 })
+
+// PrimeVue services
+app.use(ToastService)
+app.use(ConfirmationService)
 
 // Router
 app.use(router)

@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { useTheme } from '@/shared/composables/useTheme'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
+import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 
 // Initialize theme on app mount
 const { isDark } = useTheme()
@@ -19,6 +21,10 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- Global PrimeVue components -->
+  <Toast />
+  <ConfirmDialog />
+
   <!-- Auth layout: full-screen without sidebar/toolbar -->
   <div v-if="isAuthLayout" class="auth-layout">
     <RouterView />

@@ -6,6 +6,8 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
 import SelectButton from 'primevue/selectbutton'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 
 const aiDescription = ref('')
 const viewMode = ref('grid')
@@ -119,10 +121,10 @@ const getStatusIcon = (status: string) => {
         <Tag :value="`${flows.length} flows`" severity="secondary" />
       </div>
       <div class="flex align-items-center gap-3">
-        <span class="p-input-icon-left">
-          <i class="pi pi-search" />
+        <IconField>
+          <InputIcon class="pi pi-search" />
           <InputText placeholder="Search flows..." />
-        </span>
+        </IconField>
         <SelectButton v-model="viewMode" :options="viewOptions" option-value="value">
           <template #option="{ option }">
             <i :class="option.icon"></i>
