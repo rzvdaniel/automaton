@@ -44,6 +44,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
     <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
+    <ProjectReference Include="..\Automaton.Mcp\Automaton.Mcp.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Resources\Errors.Designer.cs">
