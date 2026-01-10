@@ -250,6 +250,7 @@ services.AddTransient<ScheduleService>();
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
+services.AddScoped<AiStreamingService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();

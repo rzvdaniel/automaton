@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
+    <ProjectReference Include="..\Automaton.Mcp\Automaton.Mcp.csproj" />
     <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
   </ItemGroup>
   <ItemGroup>
