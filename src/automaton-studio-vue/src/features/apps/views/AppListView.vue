@@ -97,6 +97,16 @@ const handleGenerateApp = () => {
   })
 }
 
+const handleViewExamples = () => {
+  // TODO: Navigate to examples page or open modal with templates
+  toast.add({
+    severity: 'info',
+    summary: 'Coming Soon',
+    detail: 'Example apps will be available soon',
+    life: 3000,
+  })
+}
+
 const handleCreateApp = async () => {
   if (!newAppName.value.trim()) {
     toast.add({
@@ -367,6 +377,49 @@ const handleRetry = async () => {
           </div>
         </template>
       </Card>
+
+      <!-- Quick Start Section (shown when no apps) -->
+      <Card v-if="!appsStore.hasApps" class="mt-4 quick-start-card">
+        <template #content>
+          <div class="flex align-items-start gap-3">
+            <div
+              class="flex align-items-center justify-content-center border-round flex-shrink-0"
+              style="
+                width: 48px;
+                height: 48px;
+                background-color: var(--p-yellow-100);
+                color: var(--p-yellow-600);
+              "
+            >
+              <i class="pi pi-lightbulb text-xl"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold mb-2">Quick Start</div>
+              <p class="text-color-secondary mt-0 mb-3">
+                New to apps? Create your first web app with AI:
+              </p>
+              <ul class="text-color-secondary m-0 mb-4 pl-4">
+                <li class="mb-1">Simple data entry form</li>
+                <li class="mb-1">Dashboard with charts</li>
+                <li>Customer feedback portal</li>
+              </ul>
+              <div class="flex gap-2">
+                <Button
+                  label="Create with AI"
+                  icon="pi pi-sparkles"
+                  @click="handleGenerateApp"
+                />
+                <Button
+                  label="View Examples"
+                  outlined
+                  severity="secondary"
+                  @click="handleViewExamples"
+                />
+              </div>
+            </div>
+          </div>
+        </template>
+      </Card>
     </template>
 
     <!-- Create App Dialog -->
@@ -477,5 +530,9 @@ const handleRetry = async () => {
 .apps-view {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.quick-start-card {
+  max-width: 600px;
 }
 </style>
