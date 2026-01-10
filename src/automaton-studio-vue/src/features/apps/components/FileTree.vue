@@ -356,7 +356,6 @@ function isBackendStep(node: any): boolean {
               'tree-node-backend': isBackendStep(node),
             }"
           >
-            <i :class="node.icon" class="mr-2"></i>
             <span>{{ node.label }}</span>
             <span v-if="isDirty(node.data?.path)" class="dirty-indicator">*</span>
             <span v-if="isBackendStep(node)" class="backend-badge">step</span>
@@ -402,7 +401,16 @@ function isBackendStep(node: any): boolean {
 
 .file-tree-content {
   flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.file-tree-component {
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
   padding: 0.5rem;
 }
 
@@ -410,6 +418,11 @@ function isBackendStep(node: any): boolean {
   background: transparent;
   border: none;
   padding: 0;
+  margin: 0;
+}
+
+.file-tree-component :deep(.p-tree-root) {
+  overflow: visible !important;
 }
 
 .file-tree-component :deep(.p-tree-node-content) {

@@ -21,7 +21,7 @@ import { useToast } from 'primevue/usetoast'
 // Import components
 import FileTree from '../components/FileTree.vue'
 import CodeEditor from '../components/CodeEditor.vue'
-import AiAssistant from '../components/AiAssistant.vue'
+import AppAiAssistant from '../components/AppAiAssistant.vue'
 import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateStepDialog from '../components/CreateStepDialog.vue'
@@ -571,7 +571,7 @@ function saveAppName() {
         <!-- Right Panel: AI Assistant -->
         <SplitterPanel :size="panelSizes[2]" :minSize="15" class="splitter-panel">
           <div class="ai-sidebar">
-            <AiAssistant />
+            <AppAiAssistant />
           </div>
         </SplitterPanel>
       </Splitter>
