@@ -2,23 +2,34 @@
 
 This guide explains how to run the Automaton Runner as a Docker container.
 
-## Quick Start (Production)
+## Quick Start (Production – Preferred)
 
-The easiest way to deploy a runner that connects to **https://automaton.monster**:
+Use Docker Compose for reproducible, managed deployment:
 
 ```bash
-docker run -d \
-  --name automaton-runner \
-  --restart unless-stopped \
-  -e AUTOMATON_API_KEY=ak_your_key_here \
-  -e AUTOMATON_RUNNER_NAME=My-Runner \
-  rzvdaniel/automaton-runner:latest
+# From repo root
+cp .env.example .env
+
+# Configure environment in .env
+# AUTOMATON_SERVER_URL=https://your-server-url
+# AUTOMATON_API_KEY=ak_runner_xxx
+
+# Start runner
+docker compose -f docker-compose.runner.yml up -d
+
+# View logs
+docker compose -f docker-compose.runner.yml logs -f runner
+
+# Stop/remove
+docker compose -f docker-compose.runner.yml down
 ```
 
-That's it! The runner will:
-1. Connect to the Automaton production server automatically
-2. Register with the name you specified
+The runner will:
+1. Connect to your configured server automatically
+2. Register using the container hostname (or configured name)
 3. Wait for workflow executions
+
+Optional: You can still run with `docker run` for ad-hoc testing, but Compose is recommended for production.
 
 ### Get an API Key
 

@@ -1,5 +1,7 @@
 # Automaton Runner - Resilience & Logging Guide
 
+Preferred deployment: Docker Compose (`docker-compose.runner.yml`). Manual console execution is not recommended for production; use containerized runners managed via Compose. References to console commands in this guide describe internal behavior and can be executed inside a container using `docker compose exec runner ...` when debugging.
+
 ## ?? Table of Contents
 
 1. [Overview](#overview)
@@ -503,14 +505,14 @@ FROM Logs;
 ```
 ? Connection failed: Server connection refused
 ?? Connection refused - this usually means:
-   • The Automaton server is not running
-   • The server URL is incorrect
-   • A firewall is blocking the connection
+   ï¿½ The Automaton server is not running
+   ï¿½ The server URL is incorrect
+   ï¿½ A firewall is blocking the connection
 
 ?? Troubleshooting steps:
-   • Check if the server is running at: https://localhost:7091
-   • Verify the server URL is correct
-   • Check network connectivity and firewall settings
+   ï¿½ Check if the server is running at: https://localhost:7091
+   ï¿½ Verify the server URL is correct
+   ï¿½ Check network connectivity and firewall settings
 
 ?? The runner will continue trying to connect automatically...
    Press 'q' to quit or wait for connection to be established.

@@ -1,5 +1,7 @@
 # Running Automaton Runner as a System Service
 
+Important: The preferred deployment method for Automaton Runner is Docker Compose using `docker-compose.runner.yml`. Native system services (NSSM/systemd/launchd) should be used only when containerization is not possible. If you can use containers, follow the Compose guide instead.
+
 This guide shows you how to configure Automaton Runner to run as a system service on Windows, Linux, and macOS. Running as a service provides automatic startup, resilience, and better resource management for production deployments.
 
 ## The `service` Command
@@ -53,7 +55,7 @@ The `service` command does **one thing**: run the runner in headless mode (no pr
 
 **Docker containers:** You do NOT install the runner as a service inside the container. Docker itself is the service manager. The container runs `automaton-runner service` as its main process (PID 1), and Docker handles restarts via the `restart` policy in docker-compose.
 
-**Native installations (Windows/Linux/macOS):** Users install the runner as a system service using platform-specific tools (NSSM, systemd, launchd). These tools wrap `automaton-runner service` and manage its lifecycle.
+**Native installations (Windows/Linux/macOS):** Use only when containers are not feasible. Install the runner as a system service using platform-specific tools (NSSM, systemd, launchd). These tools wrap `automaton-runner service` and manage its lifecycle.
 
 > **See also:** [Running Runner in Docker](docker-runner.md) for container-based deployments.
 

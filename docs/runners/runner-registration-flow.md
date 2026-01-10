@@ -4,6 +4,8 @@
 
 This document describes how the Automaton Runner Console handles registration, re-registration, and cleanup of runner instances.
 
+Note: Runner deployment is preferred via Docker Compose using `docker-compose.runner.yml`. Manual console execution is deprecated for production; use containerized runner and manage it with Compose. Console commands shown here are for understanding the runner internals and for rare debugging scenarios (e.g., `docker compose exec runner automaton-runner ...`).
+
 ## Key Concepts
 
 ### Runner Identity
@@ -85,12 +87,13 @@ Each runner has a unique GUID identifier that is:
 
 ```bash
 # Initial registration
-$ automaton-runner register
+# Preferred: manage runner via Docker Compose; for debugging inside container:
+$ docker compose exec runner automaton-runner register
 Enter runner name: My-Runner
 ✓ Runner 'My-Runner' registered successfully!
 
 # Later, rename it
-$ automaton-runner register
+$ docker compose exec runner automaton-runner register
 ? Runner already registered: My-Runner (ID: abc-123)
 Do you want to register with a different name? (y/N): y
 Enter runner name: Production-Runner
@@ -101,11 +104,11 @@ Enter runner name: Production-Runner
 
 ```bash
 # Clear local settings
-$ automaton-runner cleanup
+$ docker compose exec runner automaton-runner cleanup
 ✓ Cleanup completed successfully!
 
 # Re-register (will reuse the same ID if available)
-$ automaton-runner register
+$ docker compose exec runner automaton-runner register
 Enter runner name: New-Runner-Name
 ✓ Runner updated successfully!
 ```
