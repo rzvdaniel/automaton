@@ -13,6 +13,8 @@ import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
+import Splitter from 'primevue/splitter'
+import SplitterPanel from 'primevue/splitterpanel'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 
@@ -46,6 +48,45 @@ const showCreateFileDialog = ref(false)
 // App name editing
 const isEditingName = ref(false)
 const editingName = ref('')
+
+// Panel sizes (in percentages) - localStorage keys
+const STORAGE_KEY = 'app-editor-panel-sizes'
+const defaultSizes = [15, 60, 25] // 15% tree, 60% editor, 25% AI
+
+// Load sizes from localStorage or use defaults
+function loadPanelSizes(): number[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const sizes = JSON.parse(stored)
+      if (Array.isArray(sizes) && sizes.length === 3 && sizes.every((s) => typeof s === 'number')) {
+        return sizes
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load panel sizes from localStorage')
+  }
+  return defaultSizes
+}
+
+// Save sizes to localStorage
+function savePanelSizes(sizes: number[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sizes))
+  } catch (e) {
+    console.warn('Failed to save panel sizes to localStorage')
+  }
+}
+
+const panelSizes = ref<number[]>(loadPanelSizes())
+
+// Handle splitter resize
+function handleSplitterResize(event: any) {
+  if (event && event.sizes && Array.isArray(event.sizes)) {
+    panelSizes.value = event.sizes
+    savePanelSizes(event.sizes)
+  }
+}
 
 // Active tab in editor
 const activeTabIndex = ref(0)
@@ -441,71 +482,82 @@ function saveAppName() {
         </div>
       </div>
 
-      <!-- Main editor layout -->
-      <div class="editor-layout">
+      <!-- Main editor layout with resizable splitters -->
+      <Splitter
+        class="editor-layout"
+        layout="horizontal"
+        :gutterSize="8"
+        @resizeend="handleSplitterResize"
+      >
         <!-- Left Panel: File Tree -->
-        <div class="file-panel">
-          <FileTree
-            @create-file="showCreateFileDialog = true"
-            @delete-file="handleDeleteFile"
-            @create-step="showCreateStepDialog = true"
-          />
-        </div>
+        <SplitterPanel :size="panelSizes[0]" :minSize="10" class="splitter-panel">
+          <div class="file-panel">
+            <FileTree
+              @create-file="showCreateFileDialog = true"
+              @delete-file="handleDeleteFile"
+              @create-step="showCreateStepDialog = true"
+            />
+          </div>
+        </SplitterPanel>
 
         <!-- Center Panel: Code Editor -->
-        <div class="editor-panel">
-          <!-- File Tabs -->
-          <div class="editor-tabs-container">
-            <div
-              v-for="file in editorStore.openFiles"
-              :key="file.path"
-              class="editor-tab"
-              :class="{ active: editorStore.activeFilePath === file.path }"
-              @click="editorStore.activeFilePath = file.path"
-            >
-              <span class="tab-name">
-                <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
-                {{ file.isBackendStep ? file.stepName : file.path }}
-                <span v-if="file.isDirty" class="dirty-indicator">*</span>
-              </span>
-              <Button
-                icon="pi pi-times"
-                text
-                rounded
-                size="small"
-                class="tab-close"
-                @click="(e: Event) => handleCloseTab(e, file.path)"
+        <SplitterPanel :size="panelSizes[1]" :minSize="30" class="splitter-panel">
+          <div class="editor-panel">
+            <!-- File Tabs -->
+            <div class="editor-tabs-container">
+              <div
+                v-for="file in editorStore.openFiles"
+                :key="file.path"
+                class="editor-tab"
+                :class="{ active: editorStore.activeFilePath === file.path }"
+                @click="editorStore.activeFilePath = file.path"
+              >
+                <span class="tab-name">
+                  <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
+                  {{ file.isBackendStep ? file.stepName : file.path }}
+                  <span v-if="file.isDirty" class="dirty-indicator">*</span>
+                </span>
+                <Button
+                  icon="pi pi-times"
+                  text
+                  rounded
+                  size="small"
+                  class="tab-close"
+                  @click="(e: Event) => handleCloseTab(e, file.path)"
+                />
+              </div>
+            </div>
+
+            <!-- Editor Content -->
+            <div class="editor-content">
+              <CodeEditor
+                v-if="editorStore.activeFilePath"
+                :key="editorStore.activeFilePath"
+                :file-path="editorStore.activeFilePath"
+                @save="handleSaveFile"
               />
+              <div v-else class="no-file-selected">
+                <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
+                <p>Select a file to edit</p>
+                <Button
+                  label="Create File"
+                  icon="pi pi-plus"
+                  size="small"
+                  outlined
+                  @click="showCreateFileDialog = true"
+                />
+              </div>
             </div>
           </div>
+        </SplitterPanel>
 
-          <!-- Editor Content -->
-          <div class="editor-content">
-            <CodeEditor
-              v-if="editorStore.activeFilePath"
-              :key="editorStore.activeFilePath"
-              :file-path="editorStore.activeFilePath"
-              @save="handleSaveFile"
-            />
-            <div v-else class="no-file-selected">
-              <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
-              <p>Select a file to edit</p>
-              <Button
-                label="Create File"
-                icon="pi pi-plus"
-                size="small"
-                outlined
-                @click="showCreateFileDialog = true"
-              />
-            </div>
+        <!-- Right Panel: AI Assistant -->
+        <SplitterPanel :size="panelSizes[2]" :minSize="15" class="splitter-panel">
+          <div class="ai-sidebar">
+            <AiAssistant />
           </div>
-        </div>
-
-        <!-- Right Panel: AI Assistant (always visible) -->
-        <div class="ai-sidebar">
-          <AiAssistant />
-        </div>
-      </div>
+        </SplitterPanel>
+      </Splitter>
 
       <!-- Status Bar -->
       <StatusBar />
@@ -622,15 +674,26 @@ function saveAppName() {
   overflow: hidden;
 }
 
+/* Splitter panel styles */
+.splitter-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
 .file-panel {
-  width: 200px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--p-surface-200);
   background-color: var(--p-surface-0);
 }
 
 .editor-panel {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -699,8 +762,8 @@ function saveAppName() {
 }
 
 .ai-sidebar {
-  width: 380px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--p-surface-200);
@@ -739,5 +802,23 @@ function saveAppName() {
 :global(.app-dark) .ai-sidebar {
   background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
+}
+
+/* Splitter gutter styling */
+:global(.p-splitter-gutter) {
+  background-color: var(--p-surface-200);
+  transition: background-color 0.2s ease;
+}
+
+:global(.p-splitter-gutter:hover) {
+  background-color: var(--p-primary-300);
+}
+
+:global(.app-dark) .p-splitter-gutter {
+  background-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .p-splitter-gutter:hover {
+  background-color: var(--p-primary-600);
 }
 </style>
