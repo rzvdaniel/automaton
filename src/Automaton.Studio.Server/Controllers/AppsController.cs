@@ -168,6 +168,14 @@ public class AppsController : BaseController
         return NoContent();
     }
 
+    [HttpPut("{id}/runner")]
+    public async Task<IActionResult> UpdateRunner(Guid id, [FromBody] UpdateRunnerRequest request)
+    {
+        await appsService.UpdateRunner(id, request.ExecutionRunnerId);
+
+        return NoContent();
+    }
+
     [HttpPost("{id}/upload-background")]
     public async Task<IActionResult> UploadBackgroundImage(Guid id, [FromForm] IFormFile file)
     {
@@ -848,4 +856,9 @@ public class LinkMultipleStepsRequest
 public class CreateAppStepRequest
 {
     public string Name { get; set; } = string.Empty;
+}
+
+public class UpdateRunnerRequest
+{
+    public Guid? ExecutionRunnerId { get; set; }
 }

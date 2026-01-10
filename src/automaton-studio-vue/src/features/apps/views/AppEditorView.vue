@@ -21,12 +21,13 @@ import { useToast } from 'primevue/usetoast'
 // Import components
 import FileTree from '../components/FileTree.vue'
 import CodeEditor from '../components/CodeEditor.vue'
-import AppAiAssistant from '../components/AppAiAssistant.vue'
+import AiAssistant from '../components/AiAssistant.vue'
 import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
+import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
@@ -48,6 +49,9 @@ const showCreateFileDialog = ref(false)
 // App name editing
 const isEditingName = ref(false)
 const editingName = ref('')
+
+// Runner selection for AI tool execution
+const selectedRunnerId = ref<string | null>(null)
 
 // Panel sizes (in percentages) - localStorage keys
 const STORAGE_KEY = 'app-editor-panel-sizes'
@@ -156,6 +160,10 @@ onMounted(async () => {
   if (appId.value) {
     try {
       await editorStore.loadApp(appId.value)
+      // Load the execution runner ID from the app
+      if (editorStore.currentApp?.executionRunnerId) {
+        selectedRunnerId.value = editorStore.currentApp.executionRunnerId
+      }
     } catch (err: unknown) {
       toast.add({
         severity: 'error',
@@ -164,6 +172,33 @@ onMounted(async () => {
         life: 5000,
       })
       router.push('/apps')
+    }
+  }
+})
+
+// Watch for runner selection changes and save to backend
+watch(selectedRunnerId, async (newRunnerId) => {
+  if (editorStore.currentApp && newRunnerId !== editorStore.currentApp.executionRunnerId) {
+    try {
+      // Update the app's execution runner ID
+      await editorStore.updateAppRunner(newRunnerId)
+      toast.add({
+        severity: 'success',
+        summary: 'Runner Updated',
+        detail: 'Execution runner has been updated',
+        life: 3000,
+      })
+    } catch (err: unknown) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: err instanceof Error ? err.message : 'Failed to update runner',
+        life: 5000,
+      })
+      // Revert on error
+      if (editorStore.currentApp?.executionRunnerId) {
+        selectedRunnerId.value = editorStore.currentApp.executionRunnerId
+      }
     }
   }
 })
@@ -467,6 +502,15 @@ function saveAppName() {
         </div>
 
         <div class="header-right">
+          <!-- Runner Selector -->
+          <div class="flex align-items-center gap-2">
+            <label class="text-sm text-color-secondary">Runner:</label>
+            <RunnerSelector
+              v-model="selectedRunnerId"
+              :disabled="editorStore.isSaving"
+            />
+          </div>
+          
           <Button
             icon="pi pi-eye"
             label="Preview"
@@ -571,7 +615,7 @@ function saveAppName() {
         <!-- Right Panel: AI Assistant -->
         <SplitterPanel :size="panelSizes[2]" :minSize="15" class="splitter-panel">
           <div class="ai-sidebar">
-            <AppAiAssistant />
+            <AiAssistant :app-id="appId" :runner-id="selectedRunnerId" />
           </div>
         </SplitterPanel>
       </Splitter>

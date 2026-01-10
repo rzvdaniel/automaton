@@ -428,6 +428,32 @@ public class AppsService
     }
 
     /// <summary>
+    /// Update the execution runner for an app
+    /// </summary>
+    public async Task UpdateRunner(Guid id, Guid? executionRunnerId)
+    {
+        // Check if user can update this app
+        if (!await authorizationService.CanUpdateAppAsync(id))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update app {id}");
+        }
+
+        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
+
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"App {id} not found");
+        }
+
+        entity.ExecutionRunnerId = executionRunnerId;
+        entity.Updated = DateTime.UtcNow;
+
+        dataContext.SaveChanges();
+
+        logger.Information("App {AppId} runner updated to {RunnerId}", id, executionRunnerId);
+    }
+
+    /// <summary>
     /// Generate a unique URL slug from display name
     /// </summary>
     public string GenerateUniqueSlug(string displayName)
