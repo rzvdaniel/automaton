@@ -26,6 +26,8 @@ using System.Transactions;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
+using Automaton.Mcp.Client;
+using Automaton.Mcp.Client.Extensions;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -250,6 +252,16 @@ services.AddTransient<ScheduleService>();
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
+
+// MCP Tool Providers for AI Chat
+services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();
+services.AddScoped<Automaton.Studio.Server.Services.Mcp.AppMcpToolProvider>();
+
+// MCP Client
+services.AddAutomatonMcpClient();
+
+// AI Chat History Service
+services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();
