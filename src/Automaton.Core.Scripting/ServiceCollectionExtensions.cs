@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         });
         
         services.AddScoped<ScriptEngineHost>();
+        services.AddScoped<IScriptEngineHost>(provider => provider.GetRequiredService<ScriptEngineHost>());
         services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<ScriptEngineHost>();
+        services.AddScoped<IScriptEngineHost>(provider => provider.GetRequiredService<ScriptEngineHost>());
         services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
@@ -38,6 +40,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<ScriptEngineConfiguration>(_ => new ScriptEngineConfiguration());
         services.AddScoped<ScriptEngineHost>();
+        services.AddScoped<IScriptEngineHost>(provider => provider.GetRequiredService<ScriptEngineHost>());
         services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
@@ -55,6 +58,7 @@ public static class ServiceCollectionExtensions
         });
       
         services.AddScoped<ScriptEngineHost>();
+        services.AddScoped<IScriptEngineHost>(provider => provider.GetRequiredService<ScriptEngineHost>());
         services.AddSingleton<IScriptLanguageProvider, DefaultScriptLanguageProvider>();
     }
 
