@@ -1034,6 +1034,329 @@ builder.Services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
 
 ---
 
+### Phase 5: Vue.js Integration (Complete Session Persistence) 🎨
+
+**Goal:** Add chat history persistence to existing Vue SSE implementation
+
+**Current Status:** ✅ **~60% Complete**
+- ✅ SSE client exists (`ai-conversation-client.ts`)
+- ✅ `useAiChat` composable with full streaming support
+- ✅ Tool call and result visualization
+- ✅ Generic `AiChat` component
+- ✅ Feature wrappers (`AppAiAssistant`, `StepAiAssistant`, `FlowAiAssistant`)
+- ❌ Missing: Session persistence (chat history database integration)
+
+**What's Left:** Only session/history persistence layer
+
+#### 5.1 Add Chat History Service
+
+```typescript
+// src/automaton-studio-vue/src/shared/services/api/ai-chat-history.service.ts
+
+import axiosInstance from './axios-instance'
+import type { 
+  ChatSession, 
+  ChatMessage, 
+  CreateChatSessionRequest, 
+  SaveChatMessageRequest 
+} from '@/shared/types/ai.types'
+
+export const aiChatHistoryService = {
+  /**
+   * Get all sessions for a resource
+   */
+  async getSessions(resourceType: string, resourceId: string): Promise<ChatSession[]> {
+    const response = await axiosInstance.get('/api/AiChatHistory/sessions', {
+      params: { resourceType, resourceId }
+    })
+    return response.data
+  },
+
+  /**
+   * Get messages for a session
+   */
+  async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    const response = await axiosInstance.get(`/api/AiChatHistory/sessions/${sessionId}/messages`)
+    return response.data
+  },
+
+  /**
+   * Get or create active session for resource
+   */
+  async getOrCreateActiveSession(
+    resourceType: string,
+    resourceId: string
+  ): Promise<ChatSession> {
+    const response = await axiosInstance.get('/api/AiChatHistory/sessions/active', {
+      params: { resourceType, resourceId }
+    })
+    return response.data
+  },
+
+  /**
+   * Create new session
+   */
+  async createSession(request: CreateChatSessionRequest): Promise<ChatSession> {
+    const response = await axiosInstance.post('/api/AiChatHistory/sessions', request)
+    return response.data
+  },
+
+  /**
+   * Activate a session
+   */
+  async activateSession(sessionId: string): Promise<void> {
+    await axiosInstance.put(`/api/AiChatHistory/sessions/${sessionId}/activate`)
+  },
+
+  /**
+   * Update session title
+   */
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    await axiosInstance.put(`/api/AiChatHistory/sessions/${sessionId}/title`, { title })
+  },
+
+  /**
+   * Delete session
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    await axiosInstance.delete(`/api/AiChatHistory/sessions/${sessionId}`)
+  },
+
+  /**
+   * Save a message (for manual persistence if needed)
+   */
+  async saveMessage(request: SaveChatMessageRequest): Promise<void> {
+    await axiosInstance.post('/api/AiChatHistory/messages', request)
+  },
+
+  /**
+   * Clear session messages
+   */
+  async clearSessionMessages(sessionId: string): Promise<void> {
+    await axiosInstance.delete(`/api/AiChatHistory/sessions/${sessionId}/messages`)
+  }
+}
+```
+
+#### 5.2 Enhance Existing `useAiChat` with Session Management
+
+```typescript
+// src/automaton-studio-vue/src/shared/composables/useAiChat.ts
+// ADD these new methods to the existing composable:
+
+import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
+
+export function useAiChat(resourceType: string, resourceId: string) {
+  // ... existing state ...
+  const sessions = ref<ChatSession[]>([])
+  const activeSession = ref<ChatSession | null>(null)
+  const isLoadingSessions = ref(false)
+
+  /**
+   * Load all sessions for this resource
+   */
+  async function loadSessions() {
+    isLoadingSessions.value = true
+    try {
+      sessions.value = await aiChatHistoryService.getSessions(resourceType, resourceId)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load sessions'
+      console.error('Error loading sessions:', err)
+    } finally {
+      isLoadingSessions.value = false
+    }
+  }
+
+  /**
+   * Get or create active session
+   */
+  async function getOrCreateActiveSession() {
+    try {
+      activeSession.value = await aiChatHistoryService.getOrCreateActiveSession(
+        resourceType,
+        resourceId
+      )
+      // Load messages from server
+      await loadSessionMessages(activeSession.value.id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to get active session'
+      console.error('Error getting active session:', err)
+    }
+  }
+
+  /**
+   * Load messages for a session
+   */
+  async function loadSessionMessages(sessionId: string) {
+    try {
+      const serverMessages = await aiChatHistoryService.getSessionMessages(sessionId)
+      // Replace in-memory messages with server messages
+      messages.value = serverMessages.map(m => ({
+        ...m,
+        timestamp: new Date(m.timestamp)
+      }))
+    } catch (err) {
+      console.error('Error loading messages:', err)
+    }
+  }
+
+  /**
+   * Create a new session
+   */
+  async function createSession(title?: string) {
+    try {
+      const session = await aiChatHistoryService.createSession({
+        resourceType,
+        resourceId,
+        title: title || `Chat ${new Date().toLocaleString()}`
+      })
+      sessions.value.push(session)
+      await activateSession(session.id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to create session'
+      console.error('Error creating session:', err)
+    }
+  }
+
+  /**
+   * Activate a different session
+   */
+  async function activateSession(sessionId: string) {
+    try {
+      await aiChatHistoryService.activateSession(sessionId)
+      activeSession.value = sessions.value.find(s => s.id === sessionId) || null
+      if (activeSession.value) {
+        await loadSessionMessages(sessionId)
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to activate session'
+      console.error('Error activating session:', err)
+    }
+  }
+
+  /**
+   * Delete a session
+   */
+  async function deleteSession(sessionId: string) {
+    try {
+      await aiChatHistoryService.deleteSession(sessionId)
+      sessions.value = sessions.value.filter(s => s.id !== sessionId)
+      
+      // If deleted session was active, create new one
+      if (activeSession.value?.id === sessionId) {
+        await getOrCreateActiveSession()
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to delete session'
+      console.error('Error deleting session:', err)
+    }
+  }
+
+  // Update sendMessage to use session
+  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>) {
+    // Ensure we have an active session
+    if (!activeSession.value) {
+      await getOrCreateActiveSession()
+    }
+
+    // ... rest of existing sendMessage code ...
+    
+    const request: StreamConversationRequest = {
+      conversationId: conversationId.value || undefined,
+      provider: selectedProvider.value,
+      model: selectedModel.value || undefined,
+      message: userMessage,
+      systemPrompt,
+      history: history.slice(0, -1),
+      context: {
+        resourceType,
+        resourceId,
+        ...context,
+      },
+      sessionId: activeSession.value?.id, // Add session ID
+    }
+    
+    // ... continue with existing streaming code ...
+  }
+
+  return {
+    // ... existing returns ...
+    
+    // NEW: Session management
+    sessions,
+    activeSession,
+    isLoadingSessions,
+    loadSessions,
+    getOrCreateActiveSession,
+    createSession,
+    activateSession,
+    deleteSession,
+  }
+}
+```
+
+#### 5.3 Add Session-Related Types to `ai.types.ts`
+
+```typescript
+// src/automaton-studio-vue/src/shared/types/ai.types.ts
+// ADD these interfaces to the existing file:
+
+export interface ChatSession {
+  id: string
+  resourceType: string
+  resourceId: string
+  title: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateChatSessionRequest {
+  resourceType: string
+  resourceId: string
+  title: string
+}
+
+export interface SaveChatMessageRequest {
+  sessionId: string
+  role: string
+  content: string
+  messageType?: 'Text' | 'ToolExecution' | 'ToolResult'
+  metadata?: string
+}
+```
+
+#### 5.4 Update Feature Wrappers to Load Sessions
+
+```typescript
+// Example: src/automaton-studio-vue/src/features/apps/components/AppAiAssistant.vue
+// MODIFY the existing component:
+
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { useAiChat } from '@/shared/composables/useAiChat'
+
+const props = defineProps<{
+  appId: string
+}>()
+
+const {
+  // ... existing destructured properties ...
+  loadSessions,
+  getOrCreateActiveSession,
+} = useAiChat('WebApp', props.appId)
+
+// Load sessions on mount
+onMounted(async () => {
+  await loadProviders()
+  await getOrCreateActiveSession()  // This loads messages from DB
+  await loadSessions()               // Load all sessions for switcher
+})
+</script>
+```
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -1068,20 +1391,29 @@ builder.Services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
 
 ### Manual Testing
 
-1. **Vue.js Frontend Integration:**
-   - EventSource connection
-   - Real-time message updates
-   - Tool execution visualization
-   - Session management UI
+1. **Vue.js Session Persistence (New Work):**
+   - Load existing sessions on mount
+   - Create new session
+   - Activate different sessions
+   - Messages persist across page reloads
+   - Session switcher UI
+   
+2. **End-to-End Scenarios (Existing SSE + New Backend):**
+   - **Step Editor:** Generate Python code → Execute via tool → View results → Save
+   - **App Editor:** Request new feature → AI creates backend step → Updates frontend files
+   - **Multi-turn Conversations:** Tool calls triggering more tool calls
+   - **Session Persistence:** Reload page → Continue previous conversation from database
 
 ---
 
 ## Timeline
 
-- **Week 1:** Phase 1 - Tool Providers
-- **Week 2:** Phase 2 & 3 - Enhanced Controller & MCP Client
-- **Week 3:** Phase 4 - DI Registration, Unit Tests
-- **Week 4:** Integration Tests, Vue.js Integration
+- **Week 1:** Phase 1 - Backend Tool Providers (StepMcpToolProvider, AppMcpToolProvider)
+- **Week 2:** Phase 2 & 3 - Enhanced Controller & MCP Client Tool Integration
+- **Week 3:** Phase 4 & 5 - DI Registration + Vue Session Persistence (chat history service)
+- **Week 4:** Integration Testing & Bug Fixes
+
+**Note:** Phase 5 is ~60% complete. Only need to add session persistence, not rebuild SSE client.
 
 ---
 
@@ -1089,17 +1421,13 @@ builder.Services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
 
 ### Already Implemented ✅
 
-- Chat history endpoints (full CRUD)
-- Basic SSE streaming
-- API key management
-- Database schema
+- **Backend:** Chat history endpoints (full CRUD), Basic SSE streaming, API key management, Database schema
+- **Frontend (Vue):** SSE client with POST support, `useAiChat` composable, Tool visualization, Generic `AiChat` component, Feature wrappers
 
 ### Net New Implementation 🚀
 
-- Tool providers (backend versions)
-- Tool execution in MCP client
-- Context-aware system prompts
-- Auto-save during streaming
+- **Backend:** Tool providers (server versions), Tool execution in MCP client, Context-aware system prompts, Auto-save during streaming
+- **Frontend (Vue):** Chat history service integration, Session management in `useAiChat`, Session persistence types
 
 ### No Changes Needed ✅
 
@@ -1107,13 +1435,340 @@ builder.Services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
 - AI providers (already portable)
 - Database entities
 - AiApiKeyService
+- Vue SSE streaming infrastructure
 
 ---
 
-## Next Steps
+## Next Steps - Complete Implementation Roadmap
 
-1. Review this plan with team
-2. Start Phase 1: Implement `StepMcpToolProvider`
-3. Test tool execution with real Step
-4. Continue with remaining phases
+### Phase 1: Backend Tool Providers (Week 1)
 
+**Step 1.1: Create IMcpToolProvider Interface**
+- File: `src/Automaton.Studio.Server/Services/Mcp/IMcpToolProvider.cs`
+- Create interface with `GetAvailableTools()` and `ExecuteToolAsync()` methods
+- Create supporting classes: `ToolDefinition`, `ToolResult`
+- ✅ Exit Criteria: Interface compiles, no errors
+
+**Step 1.2: Implement StepMcpToolProvider**
+- File: `src/Automaton.Studio.Server/Services/Mcp/StepMcpToolProvider.cs`
+- Port from: `src/Automaton.Studio/Services/Mcp/ToolProviders/StepMcpToolProvider.cs`
+- Inject dependencies: `StepsService`, `IPythonExecutionService`, `IPowerShellExecutionService`
+- Implement 4 tools:
+  - `get_current_code` - Calls `StepsService.GetStepAsync()`
+  - `execute_code` - Calls execution services based on language
+  - `save_code` - Calls `StepsService.UpdateStepCodeAsync()`
+  - `get_step_variables` - Returns step inputs/outputs as JSON
+- ✅ Exit Criteria: All tools implemented, builds successfully
+
+**Step 1.3: Implement AppMcpToolProvider**
+- File: `src/Automaton.Studio.Server/Services/Mcp/AppMcpToolProvider.cs`
+- Port from: `src/Automaton.Studio/Services/Mcp/ToolProviders/AppMcpToolProvider.cs`
+- Inject dependencies: `AppsService`, `StepsService`
+- Implement 6 tools:
+  - `get_file_tree` - Calls `AppsService.GetFileTreeAsync()`
+  - `read_file` - Calls `AppsService.ReadFileAsync()`
+  - `write_file` - Calls `AppsService.WriteFileAsync()`
+  - `delete_file` - Calls `AppsService.DeleteFileAsync()`
+  - `create_backend_step` - Creates step + links to app
+  - `list_backend_steps` - Calls `AppsService.GetLinkedStepsAsync()`
+- ✅ Exit Criteria: All tools implemented, builds successfully
+
+**Step 1.4: Unit Test Tool Providers**
+- Create `StepMcpToolProviderTests.cs`
+- Create `AppMcpToolProviderTests.cs`
+- Mock all service dependencies
+- Test each tool individually (success and error cases)
+- ✅ Exit Criteria: All tests pass
+
+---
+
+### Phase 2: Enhanced AiConversationController (Week 2, Part 1)
+
+**Step 2.1: Update StreamConversationRequest DTO**
+- File: `src/Automaton.Studio.Server/Controllers/AiConversationController.cs`
+- Add new properties: `SessionId`, `ResourceType`, `ResourceId`, `Language`
+- ✅ Exit Criteria: DTO compiles, no breaking changes to existing API
+
+**Step 2.2: Inject System Prompt Builders**
+- File: `src/Automaton.Studio.Server/Controllers/AiConversationController.cs`
+- Add constructor parameters:
+  - `IStepSystemPromptBuilder`
+  - `IAppSystemPromptBuilder`
+- ✅ Exit Criteria: Controller builds with new dependencies
+
+**Step 2.3: Inject Tool Providers**
+- File: `src/Automaton.Studio.Server/Controllers/AiConversationController.cs`
+- Add constructor parameters:
+  - `StepMcpToolProvider`
+  - `AppMcpToolProvider`
+- ✅ Exit Criteria: Controller builds with tool providers
+
+**Step 2.4: Implement BuildSystemPromptAsync() Method**
+- Switch on `ResourceType` to select appropriate prompt builder
+- Return context-aware system prompt
+- ✅ Exit Criteria: Method compiles, returns correct prompts for Step/App
+
+**Step 2.5: Implement GetToolProvider() Method**
+- Switch on `ResourceType` to select appropriate tool provider
+- Return `StepMcpToolProvider` or `AppMcpToolProvider`
+- ✅ Exit Criteria: Method returns correct provider based on resource type
+
+**Step 2.6: Implement SaveConversationUpdateAsync() Method**
+- Save messages via `IAiChatHistoryService.SaveMessageAsync()`
+- Save tool calls with metadata
+- Handle errors gracefully (don't break streaming)
+- ✅ Exit Criteria: Messages save to database during streaming
+
+**Step 2.7: Enhance StreamConversation() Endpoint**
+- Add calls to:
+  - `BuildSystemPromptAsync()`
+  - `GetToolProvider()`
+  - `_mcpClient.SetToolProvider()`
+  - `SaveConversationUpdateAsync()` in event handler
+- Add `SessionId` to request context
+- ✅ Exit Criteria: Endpoint compiles, uses tool providers
+
+---
+
+### Phase 3: AutomatonMcpClient Tool Integration (Week 2, Part 2)
+
+**Step 3.1: Update IAutomatonMcpClient Interface**
+- File: `src/Automaton.Mcp/IAutomatonMcpClient.cs`
+- Add method: `void SetToolProvider(IMcpToolProvider? toolProvider)`
+- ✅ Exit Criteria: Interface compiles
+
+**Step 3.2: Port IMcpToolProvider to Automaton.Mcp**
+- File: `src/Automaton.Mcp/IMcpToolProvider.cs`
+- Copy interface from `Automaton.Studio.Server` (make it shared)
+- OR: Add project reference from `Automaton.Mcp` → `Automaton.Studio.Server`
+- ✅ Exit Criteria: Interface available in MCP project
+
+**Step 3.3: Implement SetToolProvider() in AutomatonMcpClient**
+- File: `src/Automaton.Mcp/AutomatonMcpClient.cs`
+- Add private field: `IMcpToolProvider? _toolProvider`
+- Implement setter method
+- ✅ Exit Criteria: Can inject tool provider
+
+**Step 3.4: Integrate Tool Execution in OpenAI Provider**
+- File: `src/Automaton.Mcp/AutomatonMcpClient.cs` (or provider-specific file)
+- When AI returns function call:
+  - Extract tool name and arguments
+  - Call `_toolProvider.ExecuteToolAsync()`
+  - Send result back to AI
+  - Raise `ConversationUpdated` event with tool call + result
+- ✅ Exit Criteria: Tools execute during AI conversations
+
+**Step 3.5: Integrate Tool Execution in Anthropic Provider**
+- Same as Step 3.4 but for Anthropic's tool format
+- ✅ Exit Criteria: Tools execute for Anthropic provider
+
+**Step 3.6: Test Tool Execution Flow**
+- Create integration test with mock tool provider
+- Verify tool calls are executed
+- Verify results are sent back to AI
+- Verify events are raised
+- ✅ Exit Criteria: Integration test passes
+
+---
+
+### Phase 4: DI Registration (Week 3, Part 1)
+
+**Step 4.1: Register System Prompt Builders**
+- File: `src/Automaton.Studio.Server/Program.cs`
+- Add:
+  ```csharp
+  builder.Services.AddScoped<IStepSystemPromptBuilder, StepSystemPromptBuilder>();
+  builder.Services.AddScoped<IAppSystemPromptBuilder, AppSystemPromptBuilder>();
+  ```
+- ✅ Exit Criteria: Application starts without DI errors
+
+**Step 4.2: Register Tool Providers**
+- File: `src/Automaton.Studio.Server/Program.cs`
+- Add:
+  ```csharp
+  builder.Services.AddScoped<StepMcpToolProvider>();
+  builder.Services.AddScoped<AppMcpToolProvider>();
+  ```
+- ✅ Exit Criteria: Application starts, providers can be injected
+
+**Step 4.3: Verify AutomatonMcpClient Registration**
+- Ensure `IAutomatonMcpClient` is registered as scoped
+- ✅ Exit Criteria: Client available for injection
+
+**Step 4.4: Test End-to-End DI**
+- Start application
+- Make request to `/api/ai/conversation/stream`
+- Verify no DI errors
+- ✅ Exit Criteria: Full dependency graph resolves
+
+---
+
+### Phase 5: Vue.js Session Persistence (Week 3, Part 2)
+
+**Step 5.1: Create AI Chat History Service**
+- File: `src/automaton-studio-vue/src/shared/services/api/ai-chat-history.service.ts`
+- Implement methods calling existing backend API:
+  - `getSessions()`
+  - `getSessionMessages()`
+  - `getOrCreateActiveSession()`
+  - `createSession()`
+  - `activateSession()`
+  - `updateSessionTitle()`
+  - `deleteSession()`
+  - `saveMessage()`
+  - `clearSessionMessages()`
+- ✅ Exit Criteria: Service compiles, all methods implemented
+
+**Step 5.2: Add Session Types to ai.types.ts**
+- File: `src/automaton-studio-vue/src/shared/types/ai.types.ts`
+- Add interfaces:
+  - `ChatSession`
+  - `CreateChatSessionRequest`
+  - `SaveChatMessageRequest`
+- ✅ Exit Criteria: Types compile, no TypeScript errors
+
+**Step 5.3: Enhance useAiChat Composable**
+- File: `src/automaton-studio-vue/src/shared/composables/useAiChat.ts`
+- Add state: `sessions`, `activeSession`, `isLoadingSessions`
+- Add methods:
+  - `loadSessions()`
+  - `getOrCreateActiveSession()`
+  - `loadSessionMessages()`
+  - `createSession()`
+  - `activateSession()`
+  - `deleteSession()`
+- Update `sendMessage()` to include `sessionId` in request
+- ✅ Exit Criteria: Composable compiles, exports new methods
+
+**Step 5.4: Update Feature Wrappers**
+- Files:
+  - `src/automaton-studio-vue/src/features/apps/components/AppAiAssistant.vue`
+  - `src/automaton-studio-vue/src/features/steps/components/StepAiAssistant.vue`
+  - `src/automaton-studio-vue/src/features/flows/components/FlowAiAssistant.vue`
+- Add `onMounted` hook to call:
+  - `loadProviders()`
+  - `getOrCreateActiveSession()`
+  - `loadSessions()`
+- ✅ Exit Criteria: Components load sessions on mount
+
+**Step 5.5: Test Session Persistence**
+- Open app/step editor
+- Send message
+- Reload page
+- Verify conversation history loads
+- ✅ Exit Criteria: Messages persist across page reloads
+
+---
+
+### Phase 6: End-to-End Testing & Validation (Week 4)
+
+**Step 6.1: Manual Testing - Step Editor**
+- Open custom step in Vue editor
+- Ask AI to "generate a Python script that fetches weather data"
+- Verify:
+  - AI calls `get_current_code` tool
+  - AI generates code
+  - AI calls `execute_code` tool
+  - Execution result shows in chat
+  - AI calls `save_code` tool
+  - Code is saved to database
+- ✅ Exit Criteria: Full tool chain works for steps
+
+**Step 6.2: Manual Testing - App Editor**
+- Open web app in Vue editor
+- Ask AI to "add a contact form to index.html"
+- Verify:
+  - AI calls `get_file_tree` tool
+  - AI calls `read_file` for index.html
+  - AI calls `write_file` with updated HTML
+  - File is updated in database
+  - Preview shows new form
+- ✅ Exit Criteria: Full tool chain works for apps
+
+**Step 6.3: Manual Testing - Multi-turn Conversation**
+- Ask AI to "create a backend step for the contact form"
+- Verify:
+  - AI calls `create_backend_step` tool
+  - New step is created and linked
+  - AI can reference the step in subsequent messages
+- ✅ Exit Criteria: Multi-turn tool conversations work
+
+**Step 6.4: Manual Testing - Session Management**
+- Create multiple chat sessions
+- Switch between sessions
+- Verify conversation history loads correctly
+- Delete a session
+- Verify it's removed from UI and database
+- ✅ Exit Criteria: Session CRUD operations work
+
+**Step 6.5: Performance Testing**
+- Test with large conversation history (50+ messages)
+- Verify streaming performance
+- Verify tool execution doesn't block UI
+- ✅ Exit Criteria: No performance regressions
+
+**Step 6.6: Error Handling Testing**
+- Test with invalid API key
+- Test with network errors
+- Test with tool execution failures
+- Verify errors are displayed gracefully
+- ✅ Exit Criteria: All error cases handled
+
+**Step 6.7: Browser Compatibility**
+- Test in Chrome, Firefox, Edge
+- Verify SSE streaming works in all browsers
+- ✅ Exit Criteria: Works in all major browsers
+
+---
+
+## Implementation Checklist Summary
+
+### Backend (C#)
+- [ ] Phase 1.1: Create `IMcpToolProvider` interface
+- [ ] Phase 1.2: Implement `StepMcpToolProvider`
+- [ ] Phase 1.3: Implement `AppMcpToolProvider`
+- [ ] Phase 1.4: Unit test tool providers
+- [ ] Phase 2.1: Update `StreamConversationRequest` DTO
+- [ ] Phase 2.2-2.3: Inject prompt builders and tool providers
+- [ ] Phase 2.4-2.5: Implement prompt/provider selection methods
+- [ ] Phase 2.6: Implement auto-save logic
+- [ ] Phase 2.7: Enhance streaming endpoint
+- [ ] Phase 3.1-3.2: Update MCP client interface
+- [ ] Phase 3.3-3.5: Integrate tool execution
+- [ ] Phase 3.6: Integration testing
+- [ ] Phase 4.1-4.4: DI registration and validation
+
+### Frontend (Vue.js/TypeScript)
+- [ ] Phase 5.1: Create `ai-chat-history.service.ts`
+- [ ] Phase 5.2: Add session types
+- [ ] Phase 5.3: Enhance `useAiChat` composable
+- [ ] Phase 5.4: Update feature wrappers
+- [ ] Phase 5.5: Test session persistence
+
+### Testing & Validation
+- [ ] Phase 6.1: Step editor end-to-end test
+- [ ] Phase 6.2: App editor end-to-end test
+- [ ] Phase 6.3: Multi-turn conversation test
+- [ ] Phase 6.4: Session management test
+- [ ] Phase 6.5: Performance testing
+- [ ] Phase 6.6: Error handling validation
+- [ ] Phase 6.7: Browser compatibility
+
+---
+
+## Dependencies Between Phases
+
+- **Phase 2** depends on **Phase 1** (needs tool providers)
+- **Phase 3** depends on **Phase 1** (needs `IMcpToolProvider` interface)
+- **Phase 4** depends on **Phases 1-3** (registers all components)
+- **Phase 5** is independent (can be done in parallel with Phase 1-3)
+- **Phase 6** depends on **all previous phases**
+
+## Recommended Implementation Order
+
+1. Start with **Phase 1** (tool providers) - foundation for everything
+2. Do **Phase 5** next (quick win, enables session persistence)
+3. Then **Phase 2** (enhanced controller)
+4. Then **Phase 3** (MCP client integration)
+5. Then **Phase 4** (DI registration)
+6. Finally **Phase 6** (testing and validation)
