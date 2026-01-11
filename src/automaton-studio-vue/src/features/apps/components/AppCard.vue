@@ -97,6 +97,7 @@ const handleDuplicate = async () => {
   try {
     const newApp = await appsStore.createApp({
       name: `${props.app.name} (Copy)`,
+      executionRunnerId: props.app.executionRunnerId || undefined,
     })
     toast.add({
       severity: 'success',
