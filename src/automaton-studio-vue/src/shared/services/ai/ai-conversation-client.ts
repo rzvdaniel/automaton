@@ -60,47 +60,49 @@ export class AiConversationClient {
       })
 
       // Handle update events
-      this.eventSource.addEventListener('update', (event: MessageEvent) => {
-        try {
-          const data: SseConversationUpdate = JSON.parse(event.data)
-          handlers.onUpdate?.(data)
-        } catch (error) {
-          console.error('Error parsing update event:', error)
-        }
-      })
+      if (this.eventSource) {
+        this.eventSource.addEventListener('update', (event: MessageEvent) => {
+          try {
+            const data: SseConversationUpdate = JSON.parse(event.data)
+            handlers.onUpdate?.(data)
+          } catch (error) {
+            console.error('Error parsing update event:', error)
+          }
+        })
 
-      // Handle done events
-      this.eventSource.addEventListener('done', (event: MessageEvent) => {
-        try {
-          const data: SseDoneEvent = JSON.parse(event.data)
-          handlers.onDone?.(data)
+        // Handle done events
+        this.eventSource.addEventListener('done', (event: MessageEvent) => {
+          try {
+            const data: SseDoneEvent = JSON.parse(event.data)
+            handlers.onDone?.(data)
+            this.close()
+          } catch (error) {
+            console.error('Error parsing done event:', error)
+          }
+        })
+
+        // Handle error events
+        this.eventSource.addEventListener('error', (event: MessageEvent) => {
+          try {
+            const data: SseErrorEvent = JSON.parse(event.data)
+            handlers.onError?.(data)
+            this.close()
+          } catch (error) {
+            console.error('Error parsing error event:', error)
+          }
+        })
+
+        // Handle cancelled events
+        this.eventSource.addEventListener('cancelled', () => {
+          handlers.onCancelled?.()
           this.close()
-        } catch (error) {
-          console.error('Error parsing done event:', error)
-        }
-      })
+        })
 
-      // Handle error events
-      this.eventSource.addEventListener('error', (event: MessageEvent) => {
-        try {
-          const data: SseErrorEvent = JSON.parse(event.data)
-          handlers.onError?.(data)
+        // Handle generic errors (connection issues)
+        this.eventSource.onerror = () => {
+          handlers.onError?.({ error: 'Connection to AI server lost' })
           this.close()
-        } catch (error) {
-          console.error('Error parsing error event:', error)
         }
-      })
-
-      // Handle cancelled events
-      this.eventSource.addEventListener('cancelled', () => {
-        handlers.onCancelled?.()
-        this.close()
-      })
-
-      // Handle generic errors (connection issues)
-      this.eventSource.onerror = () => {
-        handlers.onError?.({ error: 'Connection to AI server lost' })
-        this.close()
       }
 
       // Handle abort signal
