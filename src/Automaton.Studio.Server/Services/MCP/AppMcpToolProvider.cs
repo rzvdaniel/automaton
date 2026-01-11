@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
-using Automaton.Studio.Server.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
@@ -84,38 +83,6 @@ public class AppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = "create_backend_step",
-                Description = "Create a new backend step and link it to this app",
-                InputSchema = JsonDocument.Parse(@"{
-                    ""type"": ""object"",
-                    ""properties"": {
-                        ""name"": {
-                            ""type"": ""string"",
-                            ""description"": ""Name of the step (alphanumeric, no spaces)""
-                        },
-                        ""displayName"": {
-                            ""type"": ""string"",
-                            ""description"": ""Display name of the step""
-                        },
-                        ""description"": {
-                            ""type"": ""string"",
-                            ""description"": ""Description of what the step does""
-                        },
-                        ""language"": {
-                            ""type"": ""string"",
-                            ""enum"": [""Python"", ""PowerShell"", ""Batch""],
-                            ""description"": ""Programming language for the step""
-                        },
-                        ""code"": {
-                            ""type"": ""string"",
-                            ""description"": ""Code for the step""
-                        }
-                    },
-                    ""required"": [""name"", ""displayName"", ""language"", ""code""]
-                }")
-            },
-            new McpTool
-            {
                 Name = "execute_backend_step",
                 Description = "Execute a backend step on the app's configured runner to test it. Requires a runner to be assigned to the app.",
                 InputSchema = JsonDocument.Parse(@"{
@@ -123,7 +90,7 @@ public class AppMcpToolProvider : IMcpToolProvider
                     ""properties"": {
                         ""stepId"": {
                             ""type"": ""string"",
-                            ""description"": ""ID of the step to execute""
+                            ""description"": ""ID or name of the step to execute""
                         },
                         ""inputs"": {
                             ""type"": ""object"",
@@ -147,7 +114,7 @@ public class AppMcpToolProvider : IMcpToolProvider
         try
         {
             var appId = contextId ?? _appId;
-            if (string.IsNullOrEmpty(appId) && toolName != "list_app_files")
+            if (string.IsNullOrEmpty(appId))
             {
                 return new McpToolResult
                 {
@@ -156,14 +123,25 @@ public class AppMcpToolProvider : IMcpToolProvider
                 };
             }
 
+            if (!Guid.TryParse(appId, out var appGuid))
+            {
+                return new McpToolResult { Success = false, Error = "Invalid app ID format" };
+            }
+
+            // Get userId from context
+            var userIdStr = _context?.GetValueOrDefault("userId")?.ToString();
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            {
+                return new McpToolResult { Success = false, Error = "User ID is required in context" };
+            }
+
             return toolName switch
             {
-                "get_app_file" => await GetAppFile(appId!, arguments),
-                "save_app_file" => await SaveAppFile(appId!, arguments),
-                "list_app_files" => await ListAppFiles(appId!),
-                "get_linked_steps" => await GetLinkedSteps(appId!),
-                "create_backend_step" => await CreateBackendStep(appId!, arguments),
-                "execute_backend_step" => await ExecuteBackendStep(appId!, arguments),
+                "get_app_file" => await GetAppFile(userId, appGuid, arguments),
+                "save_app_file" => await SaveAppFile(userId, appGuid, arguments),
+                "list_app_files" => await ListAppFiles(userId, appGuid),
+                "get_linked_steps" => await GetLinkedSteps(appGuid),
+                "execute_backend_step" => await ExecuteBackendStep(appGuid, arguments),
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }
@@ -177,19 +155,18 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> GetAppFile(string appId, JsonElement arguments)
+    private async Task<McpToolResult> GetAppFile(Guid userId, Guid appId, JsonElement arguments)
     {
         var filePath = arguments.GetProperty("filePath").GetString();
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return new McpToolResult { Success = false, Error = "filePath is required" };
+        }
 
         using var scope = _serviceProvider.CreateScope();
         var fileStorage = scope.ServiceProvider.GetRequiredService<AppFileStorageService>();
 
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
-        }
-
-        var content = await fileStorage.ReadFileContentAsync(appGuid, filePath!);
+        var content = await fileStorage.ReadAppFileAsync(userId, appId, filePath);
 
         return new McpToolResult
         {
@@ -198,20 +175,20 @@ public class AppMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> SaveAppFile(string appId, JsonElement arguments)
+    private async Task<McpToolResult> SaveAppFile(Guid userId, Guid appId, JsonElement arguments)
     {
         var filePath = arguments.GetProperty("filePath").GetString();
         var content = arguments.GetProperty("content").GetString();
 
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return new McpToolResult { Success = false, Error = "filePath is required" };
+        }
+
         using var scope = _serviceProvider.CreateScope();
         var fileStorage = scope.ServiceProvider.GetRequiredService<AppFileStorageService>();
 
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
-        }
-
-        await fileStorage.WriteFileContentAsync(appGuid, filePath!, content!);
+        await fileStorage.WriteAppFileAsync(userId, appId, filePath, content ?? "");
 
         return new McpToolResult
         {
@@ -220,17 +197,12 @@ public class AppMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> ListAppFiles(string appId)
+    private async Task<McpToolResult> ListAppFiles(Guid userId, Guid appId)
     {
         using var scope = _serviceProvider.CreateScope();
         var fileStorage = scope.ServiceProvider.GetRequiredService<AppFileStorageService>();
 
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
-        }
-
-        var files = await fileStorage.ListFilesAsync(appGuid);
+        var files = await fileStorage.GetAppFilesAsync(userId, appId);
         var fileList = string.Join("\n", files.Select(f => $"- {f}"));
 
         return new McpToolResult
@@ -240,17 +212,12 @@ public class AppMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> GetLinkedSteps(string appId)
+    private async Task<McpToolResult> GetLinkedSteps(Guid appId)
     {
         using var scope = _serviceProvider.CreateScope();
-        var appStepsService = scope.ServiceProvider.GetRequiredService<AppStepsService>();
+        var stepExecutionService = scope.ServiceProvider.GetRequiredService<AppsStepExecutionService>();
 
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
-        }
-
-        var steps = await appStepsService.GetAppStepsAsync(appGuid);
+        var steps = await stepExecutionService.GetLinkedStepsAsync(appId);
         if (!steps.Any())
         {
             return new McpToolResult
@@ -270,82 +237,35 @@ public class AppMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> CreateBackendStep(string appId, JsonElement arguments)
+    private async Task<McpToolResult> ExecuteBackendStep(Guid appId, JsonElement arguments)
     {
-        var name = arguments.GetProperty("name").GetString();
-        var displayName = arguments.GetProperty("displayName").GetString();
-        var language = arguments.GetProperty("language").GetString();
-        var code = arguments.GetProperty("code").GetString();
-        var description = arguments.TryGetProperty("description", out var descProp)
-            ? descProp.GetString()
-            : null;
-
-        using var scope = _serviceProvider.CreateScope();
-        var appStepsService = scope.ServiceProvider.GetRequiredService<AppStepsService>();
-
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
-        }
-
-        // Get userId from context if available
-        var userId = _context?.GetValueOrDefault("userId")?.ToString();
-        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
-        {
-            return new McpToolResult { Success = false, Error = "User ID is required" };
-        }
-
-        var step = await appStepsService.CreateAppStepAsync(
-            appGuid,
-            name!,
-            displayName!,
-            language!,
-            code!,
-            description,
-            userGuid);
-
-        return new McpToolResult
-        {
-            Success = true,
-            Content = $"Created backend step '{displayName}' (ID: {step.Id}) and linked to app"
-        };
-    }
-
-    private async Task<McpToolResult> ExecuteBackendStep(string appId, JsonElement arguments)
-    {
-        var stepIdStr = arguments.GetProperty("stepId").GetString();
+        var stepIdentifier = arguments.GetProperty("stepId").GetString();
         var inputs = arguments.TryGetProperty("inputs", out var inputsProp)
             ? inputsProp.Deserialize<Dictionary<string, string>>()
             : new Dictionary<string, string>();
 
-        if (!Guid.TryParse(stepIdStr, out var stepId))
+        if (string.IsNullOrEmpty(stepIdentifier))
         {
-            return new McpToolResult { Success = false, Error = "Invalid step ID" };
-        }
-
-        if (!Guid.TryParse(appId, out var appGuid))
-        {
-            return new McpToolResult { Success = false, Error = "Invalid app ID" };
+            return new McpToolResult { Success = false, Error = "stepId is required" };
         }
 
         using var scope = _serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
+        var appsService = scope.ServiceProvider.GetRequiredService<AppsService>();
         var stepExecutionService = scope.ServiceProvider.GetRequiredService<AppsStepExecutionService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
 
         try
         {
-            // Get the app to check for ExecutionRunnerId
-            var app = await dbContext.WebApps
-                .Include(a => a.WebAppUsers)
-                .FirstOrDefaultAsync(a => a.Id == appGuid);
+            // Get app info using the service method that returns PublishedAppInfo
+            var appInfo = await appsService.GetAppInfoByIdAsync(appId);
 
-            if (app == null)
+            if (appInfo == null)
             {
                 return new McpToolResult { Success = false, Error = "App not found" };
             }
 
             // Check if app has a runner configured
-            if (!app.ExecutionRunnerId.HasValue)
+            if (!appInfo.ExecutionRunnerId.HasValue)
             {
                 return new McpToolResult
                 {
@@ -356,7 +276,7 @@ public class AppMcpToolProvider : IMcpToolProvider
 
             // Check if the runner is online
             var runner = await dbContext.Runners
-                .FirstOrDefaultAsync(r => r.Id == app.ExecutionRunnerId.Value);
+                .FirstOrDefaultAsync(r => r.Id == appInfo.ExecutionRunnerId.Value);
 
             if (runner == null)
             {
@@ -376,21 +296,10 @@ public class AppMcpToolProvider : IMcpToolProvider
                 };
             }
 
-            // Create PublishedAppInfo for execution
-            var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
-            var appInfo = new Models.PublishedAppInfo
-            {
-                Id = app.Id,
-                Name = app.Name,
-                DisplayName = app.DisplayName,
-                OwnerId = ownerId,
-                ExecutionRunnerId = app.ExecutionRunnerId
-            };
-
             // Execute the step on the runner
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 appInfo,
-                stepIdStr!,
+                stepIdentifier,
                 inputs ?? new Dictionary<string, string>(),
                 null, // Use app's configured runner
                 CancellationToken.None);
