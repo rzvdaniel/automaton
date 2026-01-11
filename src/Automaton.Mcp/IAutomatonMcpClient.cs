@@ -1,4 +1,5 @@
 using Automaton.Mcp.Models;
+using Automaton.Mcp.Services;
 
 namespace Automaton.Mcp.Client;
 
@@ -21,6 +22,11 @@ public interface IAutomatonMcpClient
     /// End a conversation
     /// </summary>
     Task<bool> EndConversationAsync(string conversationId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Set the tool provider for executing MCP tools (allows dynamic tool provider selection)
+    /// </summary>
+    void SetToolProvider(IMcpToolProvider? toolProvider);
     
     /// <summary>
     /// Event fired when conversation is updated with new messages or tool results

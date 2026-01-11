@@ -14,17 +14,27 @@ namespace Automaton.Mcp.Client;
 public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 {
     private readonly ILogger<AutomatonMcpClient> _logger;
-    private readonly IMcpToolProvider _toolProvider;
+    private IMcpToolProvider? _toolProvider;
     private readonly ConcurrentDictionary<string, ConversationContext> _conversations = new();
     
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     public AutomatonMcpClient(
         ILogger<AutomatonMcpClient> logger,
-        IMcpToolProvider toolProvider)
+        IMcpToolProvider? toolProvider = null)
     {
         _logger = logger;
         _toolProvider = toolProvider;
+    }
+
+    /// <summary>
+    /// Set the tool provider for executing MCP tools (allows dynamic tool provider selection)
+    /// </summary>
+    public void SetToolProvider(IMcpToolProvider? toolProvider)
+    {
+        _toolProvider = toolProvider;
+        _logger.LogInformation("Tool provider set: {ToolProviderType}", 
+            toolProvider?.GetType().Name ?? "null");
     }
 
     public async Task<ConversationResult> StartConversationAsync(ConversationRequest request, CancellationToken cancellationToken = default)
@@ -510,6 +520,12 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     /// </summary>
     private async Task<List<ChatTool>> CreateMcpToolsAsync()
     {
+        if (_toolProvider == null)
+        {
+            _logger.LogWarning("No tool provider configured, returning empty tool list");
+            return new List<ChatTool>();
+        }
+
         var studioTools = await _toolProvider.GetToolsAsync();
         var chatTools = new List<ChatTool>();
 
@@ -533,6 +549,12 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     {
         try
         {
+            if (_toolProvider == null)
+            {
+                _logger.LogWarning("No tool provider configured, cannot execute tool {ToolName}", toolCall.FunctionName);
+                return $"Error: No tool provider configured for executing {toolCall.FunctionName}";
+            }
+
             var arguments = JsonDocument.Parse(toolCall.FunctionArguments?.ToString() ?? "{}");
             
             // Extract context ID from request - could be stepId, appId, or any other context identifier

@@ -92,10 +92,12 @@ public class AiConversationController : BaseController
             var history = await LoadConversationHistoryAsync(request.SessionId, userId);
 
             // 4. Get tool provider based on resource type
-            // Note: Tool provider integration will be added in Phase 3
             var toolProvider = GetToolProvider(request.ResourceType);
 
-            // 5. Subscribe to conversation updates for auto-save
+            // 5. Setup AutomatonMcpClient with tool provider
+            _mcpClient.SetToolProvider(toolProvider);
+
+            // 6. Subscribe to conversation updates for auto-save
             _mcpClient.ConversationUpdated += async (sender, e) =>
             {
                 await WriteConversationEvent(e);
