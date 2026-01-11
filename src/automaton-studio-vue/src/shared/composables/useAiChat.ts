@@ -327,11 +327,18 @@ export function useAiChat(resourceType: string, resourceId: string) {
         onDone: (data) => {
           conversationId.value = data.conversationId
           isGenerating.value = false
+
+          // Mark all streaming messages as complete
+          messages.value.forEach((m) => {
+            if (m.isStreaming) {
+              m.isStreaming = false
+            }
+          })
         },
         onError: (data) => {
           error.value = data.error
           isGenerating.value = false
-          
+
           // Add error message to chat
           messages.value.push({
             id: crypto.randomUUID(),

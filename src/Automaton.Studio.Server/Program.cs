@@ -61,6 +61,33 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+// Configure cookie authentication to not redirect API requests
+services.ConfigureApplicationCookie(options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // For API requests (including SSE), return 401 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        // For API requests, return 403 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
+
 
 
 services.AddMvc();
@@ -307,7 +334,8 @@ if (corsOrigins != null && corsOrigins.Length > 0)
         builder
             .WithOrigins(corsOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader();
+            .AllowAnyHeader()
+            .AllowCredentials(); // Required for Authorization header in SSE requests
     }));
 }
 

@@ -138,13 +138,24 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             }
             
             // Add conversation messages
-            conversationHistory.Add(new ConversationMessage("user", request.InitialMessage));
-            conversationHistory.Add(new ConversationMessage("assistant", responseText));
-            
-            // NOTE: Do NOT emit ConversationUpdated event here - messages are already emitted
-            // in real-time during the conversation inside CallOpenAiAsync (for OpenAI) or
-            // will be processed by the UI from the returned ConversationResult.
-            // Emitting here would cause duplicate messages in the UI.
+            var userMessage = new ConversationMessage("user", request.InitialMessage);
+            var assistantMessage = new ConversationMessage("assistant", responseText);
+            conversationHistory.Add(userMessage);
+            conversationHistory.Add(assistantMessage);
+
+            // Emit ConversationUpdated event for non-OpenAI providers (Anthropic, etc.)
+            // OpenAI emits events in real-time during CallOpenAiAsync, but FallbackAiCallAsync does not
+            if (providerName != "openai")
+            {
+                ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+                {
+                    ConversationId = request.ConversationId,
+                    Messages = new List<ConversationMessage> { userMessage, assistantMessage },
+                    ToolCalls = new List<ToolCall>(),
+                    ToolResults = new List<ToolResult>(),
+                    Timestamp = DateTime.UtcNow
+                });
+            }
             
             return new ConversationResult
             {
