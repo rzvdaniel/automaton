@@ -78,6 +78,14 @@ class AppsService {
   }
 
   /**
+   * Update the execution runner for an app
+   * PUT /api/apps/{id}/runner
+   */
+  async updateRunner(id: string, runnerId: string | null): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/runner`, { executionRunnerId: runnerId })
+  }
+
+  /**
    * Get linked steps for an app
    * GET /api/apps/{id}/steps
    */

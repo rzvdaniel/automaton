@@ -15,6 +15,7 @@ import SelectButton from 'primevue/selectbutton'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import AppCard from '../components/AppCard.vue'
+import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
 import type { App } from '../types/apps.types'
 
@@ -45,6 +46,7 @@ const statusOptions = ref([
 // Create dialog state
 const showCreateDialog = ref(false)
 const newAppName = ref('')
+const selectedRunnerId = ref<string | null>(null)
 const isCreating = ref(false)
 
 // Publish dialog state
@@ -120,7 +122,10 @@ const handleCreateApp = async () => {
 
   isCreating.value = true
   try {
-    const app = await appsStore.createApp({ name: newAppName.value.trim() })
+    const app = await appsStore.createApp({
+      name: newAppName.value.trim(),
+      executionRunnerId: selectedRunnerId.value || undefined,
+    })
     toast.add({
       severity: 'success',
       summary: 'Created',
@@ -129,6 +134,7 @@ const handleCreateApp = async () => {
     })
     showCreateDialog.value = false
     newAppName.value = ''
+    selectedRunnerId.value = null
     router.push(`/apps/${app.id}`)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to create app'
@@ -145,6 +151,7 @@ const handleCreateApp = async () => {
 
 const openCreateDialog = () => {
   newAppName.value = ''
+  selectedRunnerId.value = null
   showCreateDialog.value = true
 }
 
@@ -443,6 +450,18 @@ const handleRetry = async () => {
             autofocus
             @keyup.enter="handleCreateApp"
           />
+        </div>
+        
+        <div class="flex flex-column gap-2">
+          <label for="runner-select" class="font-semibold">Default Runner (optional)</label>
+          <RunnerSelector
+            id="runner-select"
+            v-model="selectedRunnerId"
+            :disabled="isCreating"
+          />
+          <small class="text-color-secondary">
+            Optional: select a default runner to use for preview and initial execution.
+          </small>
         </div>
       </div>
       <template #footer>

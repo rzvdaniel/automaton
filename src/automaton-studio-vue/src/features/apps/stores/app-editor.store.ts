@@ -472,6 +472,28 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Update the execution runner for the current app
+   */
+  async function updateAppRunner(runnerId: string | null): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      await appsService.updateRunner(currentApp.value.id, runnerId)
+
+      // Update local state - executionRunnerId can be undefined according to the type
+      if (currentApp.value) {
+        currentApp.value = {
+          ...currentApp.value,
+          executionRunnerId: runnerId || undefined
+        }
+      }
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err)
+      throw err
+    }
+  }
+
+  /**
    * Create a new backend step and link it to the app
    */
   async function createBackendStep(request: CreateAppStepRequest): Promise<LinkedStepInfo> {
@@ -617,6 +639,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewMode,
     publishApp,
     unpublishApp,
+    updateAppRunner,
     createBackendStep,
     unlinkStep,
     refreshLinkedSteps,

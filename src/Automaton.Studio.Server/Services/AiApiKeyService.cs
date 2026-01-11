@@ -116,6 +116,45 @@ public class AiApiKeyService
         }
     }
 
+    /// <summary>
+    /// Get decrypted API key for a specific provider (returns first active key found)
+    /// Used by AI conversation streaming
+    /// </summary>
+    public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
+    {
+        // Get environment key first (desktop scenarios)
+        var envKeys = GetEnvironmentApiKeys();
+        if (envKeys.TryGetValue(providerName, out var envKey) && !string.IsNullOrEmpty(envKey))
+        {
+            logger.LogInformation("Using environment API key for provider {ProviderName}", providerName);
+            return envKey;
+        }
+
+        // Get user's stored keys for this provider
+        var keys = await GetAiApiKeysByProviderAsync(userId, providerName);
+        var firstActiveKey = keys.FirstOrDefault(k => k.IsActive);
+
+        if (firstActiveKey == null)
+        {
+            logger.LogWarning("No active API key found for user {UserId} and provider {ProviderName}", userId, providerName);
+            return null;
+        }
+
+        try
+        {
+            // Update last used timestamp
+            firstActiveKey.LastUsedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+
+            return DecryptApiKey(firstActiveKey.EncryptedApiKey);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to decrypt API key for provider {ProviderName}", providerName);
+            return null;
+        }
+    }
+
     public async Task<bool> UpdateAiApiKeyAsync(Guid id, Guid userId, string? name = null, string? description = null, bool? isActive = null)
     {
         // Check if user can update this AI API key

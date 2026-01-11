@@ -1,0 +1,202 @@
+/**
+ * AI integration type definitions
+ * Matches backend DTOs and MCP models
+ */
+
+// ============================================
+// AI Providers and Models
+// ============================================
+
+export interface AiProvider {
+  providerName: string
+  displayName: string
+  description?: string
+  iconName?: string
+  apiKeyHelpUrl?: string
+  hasStoredKeys: boolean
+  storedKeyCount: number
+  hasEnvironmentKey: boolean
+  supportedModels: string[]
+  storedKeys?: AiApiKey[]
+}
+
+export interface AiApiKey {
+  id: string
+  name: string
+  providerName: string
+  description?: string
+  createdAt: string
+  lastUsedAt?: string
+  isActive: boolean
+}
+
+export interface AiModel {
+  id: string
+  name: string
+  displayName?: string
+  provider: string
+  contextWindow?: number
+  supportsStreaming?: boolean
+}
+
+// ============================================
+// Conversation Request/Response
+// ============================================
+
+export interface ConversationMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string
+  toolCallId?: string
+  toolName?: string
+}
+
+export interface StreamConversationRequest {
+  conversationId?: string
+  provider: string
+  model?: string
+  message: string
+  systemPrompt?: string
+  history?: ConversationMessage[]
+  context?: Record<string, any>
+}
+
+// ============================================
+// SSE Event Types
+// ============================================
+
+export type SseEventType = 'update' | 'done' | 'error' | 'cancelled'
+
+export interface SseConversationUpdate {
+  conversationId: string
+  messages: ConversationMessage[]
+  toolCalls: ToolCall[]
+  toolResults: ToolResult[]
+  timestamp: string
+}
+
+export interface SseDoneEvent {
+  conversationId: string
+  success: boolean
+}
+
+export interface SseErrorEvent {
+  error: string
+}
+
+// ============================================
+// Tool Calling
+// ============================================
+
+export interface ToolCall {
+  id: string
+  type: string
+  function?: {
+    name: string
+    arguments: string | Record<string, any>
+  }
+}
+
+export interface ToolResult {
+  toolCallId: string
+  content: string
+  isError?: boolean
+}
+
+// ============================================
+// Chat UI Types
+// ============================================
+
+export type ChatMessageRole = 'user' | 'assistant' | 'system'
+export type ChatMessageType =
+  | 'text'
+  | 'reasoning'
+  | 'toolExecution'
+  | 'codeSuccess'
+  | 'codeError'
+  | 'generating'
+  | 'system'
+
+export interface ChatMessage {
+  id: string
+  role: ChatMessageRole
+  content: string
+  type?: ChatMessageType
+  timestamp: Date
+  
+  // For tool execution messages
+  toolName?: string
+  toolStatus?: 'executing' | 'completed' | 'error'
+  toolResult?: any
+  
+  // For code generation messages
+  generatedCode?: string
+  language?: string
+  codeId?: string
+  
+  // For error messages
+  error?: string
+  
+  // For streaming messages
+  isStreaming?: boolean
+}
+
+// ============================================
+// Chat History (from backend)
+// ============================================
+
+export interface ChatSession {
+  id: string
+  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  resourceId: string
+  title: string
+  isActive: boolean
+  provider?: string
+  model?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatSessionWithMessages extends ChatSession {
+  messages: ChatMessage[]
+}
+
+export interface CreateChatSessionRequest {
+  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  resourceId: string
+  title: string
+  provider?: string
+  model?: string
+}
+
+export interface SaveChatMessageRequest {
+  sessionId: string
+  role: ChatMessageRole
+  content: string
+}
+
+// ============================================
+// AI Chat Configuration
+// ============================================
+
+export interface AiChatConfig {
+  /** Resource type for context */
+  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  
+  /** Resource ID */
+  resourceId: string
+  
+  /** Additional context to pass to AI */
+  context?: Record<string, any>
+  
+  /** Default provider */
+  defaultProvider?: string
+  
+  /** Default model */
+  defaultModel?: string
+  
+  /** Enable model selector */
+  showModelSelector?: boolean
+  
+  /** Enable chat history */
+  enableHistory?: boolean
+}
