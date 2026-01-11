@@ -34,7 +34,7 @@ const toast = useToast()
 // Computed
 const selectedRunnerId = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
+  set: (value) => emit('update:modelValue', value || null),
 })
 
 const runnerOptions = computed(() => {

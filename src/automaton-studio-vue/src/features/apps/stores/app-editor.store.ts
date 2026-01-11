@@ -480,8 +480,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     try {
       await appsService.updateRunner(currentApp.value.id, runnerId)
 
-      // Update local state
-      currentApp.value.executionRunnerId = runnerId
+      // Update local state - executionRunnerId can be undefined according to the type
+      if (currentApp.value) {
+        currentApp.value = {
+          ...currentApp.value,
+          executionRunnerId: runnerId || undefined
+        }
+      }
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err

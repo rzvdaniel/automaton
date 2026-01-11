@@ -47,7 +47,7 @@ export function useAiChat(resourceType: string, resourceId: string) {
         selectedProvider.value = providerWithKey.providerName
         // Select first model
         if (providerWithKey.supportedModels.length > 0) {
-          selectedModel.value = providerWithKey.supportedModels[0]
+          selectedModel.value = providerWithKey.supportedModels[0] || ''
         }
       }
     } catch (err) {
