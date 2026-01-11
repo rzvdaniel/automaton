@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
+using Automaton.Studio.Server.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -115,7 +117,7 @@ public class AppMcpToolProvider : IMcpToolProvider
             new McpTool
             {
                 Name = "execute_backend_step",
-                Description = "Execute a backend step to test it",
+                Description = "Execute a backend step on the app's configured runner to test it. Requires a runner to be assigned to the app.",
                 InputSchema = JsonDocument.Parse(@"{
                     ""type"": ""object"",
                     ""properties"": {
@@ -161,7 +163,7 @@ public class AppMcpToolProvider : IMcpToolProvider
                 "list_app_files" => await ListAppFiles(appId!),
                 "get_linked_steps" => await GetLinkedSteps(appId!),
                 "create_backend_step" => await CreateBackendStep(appId!, arguments),
-                "execute_backend_step" => await ExecuteBackendStep(arguments),
+                "execute_backend_step" => await ExecuteBackendStep(appId!, arguments),
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }
@@ -180,7 +182,6 @@ public class AppMcpToolProvider : IMcpToolProvider
         var filePath = arguments.GetProperty("filePath").GetString();
 
         using var scope = _serviceProvider.CreateScope();
-        var appsService = scope.ServiceProvider.GetRequiredService<AppsService>();
         var fileStorage = scope.ServiceProvider.GetRequiredService<AppFileStorageService>();
 
         if (!Guid.TryParse(appId, out var appGuid))
@@ -310,29 +311,119 @@ public class AppMcpToolProvider : IMcpToolProvider
         };
     }
 
-    private async Task<McpToolResult> ExecuteBackendStep(JsonElement arguments)
+    private async Task<McpToolResult> ExecuteBackendStep(string appId, JsonElement arguments)
     {
         var stepIdStr = arguments.GetProperty("stepId").GetString();
         var inputs = arguments.TryGetProperty("inputs", out var inputsProp)
-            ? inputsProp.Deserialize<Dictionary<string, object>>()
-            : new Dictionary<string, object>();
+            ? inputsProp.Deserialize<Dictionary<string, string>>()
+            : new Dictionary<string, string>();
 
         if (!Guid.TryParse(stepIdStr, out var stepId))
         {
             return new McpToolResult { Success = false, Error = "Invalid step ID" };
         }
 
+        if (!Guid.TryParse(appId, out var appGuid))
+        {
+            return new McpToolResult { Success = false, Error = "Invalid app ID" };
+        }
+
         using var scope = _serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<Data.ApplicationDbContext>();
         var stepExecutionService = scope.ServiceProvider.GetRequiredService<AppsStepExecutionService>();
 
         try
         {
-            var result = await stepExecutionService.ExecuteStepAsync(stepId, inputs!);
-            return new McpToolResult
+            // Get the app to check for ExecutionRunnerId
+            var app = await dbContext.WebApps
+                .Include(a => a.WebAppUsers)
+                .FirstOrDefaultAsync(a => a.Id == appGuid);
+
+            if (app == null)
             {
-                Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                return new McpToolResult { Success = false, Error = "App not found" };
+            }
+
+            // Check if app has a runner configured
+            if (!app.ExecutionRunnerId.HasValue)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = "No runner assigned to this app. Please assign a runner in the app settings to enable step execution."
+                };
+            }
+
+            // Check if the runner is online
+            var runner = await dbContext.Runners
+                .FirstOrDefaultAsync(r => r.Id == app.ExecutionRunnerId.Value);
+
+            if (runner == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = "Configured runner not found. Please check the app settings."
+                };
+            }
+
+            if (string.IsNullOrEmpty(runner.ConnectionId))
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Runner '{runner.Name}' is offline. Please ensure the runner is connected before testing steps."
+                };
+            }
+
+            // Create PublishedAppInfo for execution
+            var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
+            var appInfo = new Models.PublishedAppInfo
+            {
+                Id = app.Id,
+                Name = app.Name,
+                DisplayName = app.DisplayName,
+                OwnerId = ownerId,
+                ExecutionRunnerId = app.ExecutionRunnerId
             };
+
+            // Execute the step on the runner
+            var result = await stepExecutionService.ExecuteStepForAppAsync(
+                appInfo,
+                stepIdStr!,
+                inputs ?? new Dictionary<string, string>(),
+                null, // Use app's configured runner
+                CancellationToken.None);
+
+            if (result.Success)
+            {
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = JsonSerializer.Serialize(new
+                    {
+                        success = true,
+                        message = $"Step executed successfully on runner '{runner.Name}'",
+                        executionTime = $"{(result.CompletedAt - result.ExecutedAt).TotalMilliseconds:F0}ms",
+                        outputVariables = result.OutputVariables,
+                        logs = result.Logs?.Take(10) // Limit logs for token efficiency
+                    }, new JsonSerializerOptions { WriteIndented = true })
+                };
+            }
+            else
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Content = JsonSerializer.Serialize(new
+                    {
+                        success = false,
+                        error = result.Error,
+                        logs = result.Logs
+                    }, new JsonSerializerOptions { WriteIndented = true }),
+                    Error = result.Error
+                };
+            }
         }
         catch (Exception ex)
         {
