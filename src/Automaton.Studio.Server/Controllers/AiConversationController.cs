@@ -71,7 +71,7 @@ public class AiConversationController : BaseController
 
             // 1. Get API key (secure - server-only)
             var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(
-                userId, 
+                userId,
                 request.Provider
             );
 
