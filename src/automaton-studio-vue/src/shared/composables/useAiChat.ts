@@ -1,12 +1,14 @@
 /**
  * useAiChat Composable
- * Manages AI chat state and streaming conversations
+ * Manages AI chat state and streaming conversations with session persistence
  */
 import { ref, computed } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
+import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
 import type {
   ChatMessage,
+  ChatSession,
   AiProvider,
   StreamConversationRequest,
   SseConversationUpdate,
@@ -24,6 +26,12 @@ export function useAiChat(resourceType: string, resourceId: string) {
   const availableProviders = ref<AiProvider[]>([])
   const error = ref<string | null>(null)
   const conversationId = ref<string | null>(null)
+
+  // Session state
+  const sessions = ref<ChatSession[]>([])
+  const activeSession = ref<ChatSession | null>(null)
+  const isLoadingSessions = ref(false)
+  const isLoadingMessages = ref(false)
 
   // Computed
   const hasMessages = computed(() => messages.value.length > 0)
@@ -57,6 +65,210 @@ export function useAiChat(resourceType: string, resourceId: string) {
   }
 
   /**
+   * Load all sessions for this resource
+   */
+  async function loadSessions() {
+    isLoadingSessions.value = true
+    try {
+      sessions.value = await aiChatHistoryService.getSessions(resourceType, resourceId)
+      
+      // Set active session if one exists
+      const active = sessions.value.find((s) => s.isActive)
+      if (active) {
+        activeSession.value = active
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load sessions'
+      console.error('Error loading sessions:', err)
+    } finally {
+      isLoadingSessions.value = false
+    }
+  }
+
+  /**
+   * Get or create active session
+   */
+  async function getOrCreateActiveSession() {
+    try {
+      activeSession.value = await aiChatHistoryService.getOrCreateActiveSession(
+        resourceType,
+        resourceId,
+        selectedProvider.value || undefined,
+        selectedModel.value || undefined,
+      )
+      
+      // Load messages from server
+      if (activeSession.value) {
+        await loadSessionMessages(activeSession.value.id)
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to get active session'
+      console.error('Error getting active session:', err)
+    }
+  }
+
+  /**
+   * Load messages for a session
+   */
+  async function loadSessionMessages(sessionId: string) {
+    isLoadingMessages.value = true
+    try {
+      const serverMessages = await aiChatHistoryService.getSessionMessages(sessionId)
+      
+      // Convert server messages to chat messages
+      messages.value = serverMessages.map((m: any) => ({
+        id: m.id || crypto.randomUUID(),
+        role: m.role,
+        content: m.content,
+        type: mapMessageType(m.messageType),
+        timestamp: new Date(m.createdAt || Date.now()),
+        toolName: m.metadata ? parseToolMetadata(m.metadata)?.toolName : undefined,
+        toolStatus: m.messageType === 'ToolExecution' ? 'completed' : undefined,
+      }))
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load messages'
+      console.error('Error loading messages:', err)
+    } finally {
+      isLoadingMessages.value = false
+    }
+  }
+
+  /**
+   * Map backend message type to frontend message type
+   */
+  function mapMessageType(messageType: string): ChatMessage['type'] {
+    switch (messageType) {
+      case 'ToolExecution':
+        return 'toolExecution'
+      case 'CodeSuccess':
+        return 'codeSuccess'
+      case 'CodeError':
+        return 'codeError'
+      case 'Generating':
+        return 'generating'
+      case 'System':
+        return 'system'
+      case 'Reasoning':
+        return 'reasoning'
+      default:
+        return 'text'
+    }
+  }
+
+  /**
+   * Parse tool metadata
+   */
+  function parseToolMetadata(metadata: string): any {
+    try {
+      return JSON.parse(metadata)
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Create a new session
+   */
+  async function createSession(title?: string) {
+    try {
+      const session = await aiChatHistoryService.createSession({
+        resourceType: resourceType as any,
+        resourceId,
+        title: title || `Chat ${new Date().toLocaleString()}`,
+        provider: selectedProvider.value || undefined,
+        model: selectedModel.value || undefined,
+      })
+      
+      sessions.value.push(session)
+      await activateSession(session.id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to create session'
+      console.error('Error creating session:', err)
+    }
+  }
+
+  /**
+   * Activate a different session
+   */
+  async function activateSession(sessionId: string) {
+    try {
+      await aiChatHistoryService.activateSession(sessionId)
+      
+      // Update local state
+      activeSession.value = sessions.value.find((s) => s.id === sessionId) || null
+      
+      // Update isActive flag in sessions list
+      sessions.value.forEach((s) => {
+        s.isActive = s.id === sessionId
+      })
+      
+      if (activeSession.value) {
+        await loadSessionMessages(sessionId)
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to activate session'
+      console.error('Error activating session:', err)
+    }
+  }
+
+  /**
+   * Delete a session
+   */
+  async function deleteSession(sessionId: string) {
+    try {
+      await aiChatHistoryService.deleteSession(sessionId)
+      sessions.value = sessions.value.filter((s) => s.id !== sessionId)
+
+      // If deleted session was active, create or get another one
+      if (activeSession.value?.id === sessionId) {
+        activeSession.value = null
+        messages.value = []
+        await getOrCreateActiveSession()
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to delete session'
+      console.error('Error deleting session:', err)
+    }
+  }
+
+  /**
+   * Update session title
+   */
+  async function updateSessionTitle(sessionId: string, title: string) {
+    try {
+      await aiChatHistoryService.updateSessionTitle(sessionId, title)
+      
+      // Update local state
+      const session = sessions.value.find((s) => s.id === sessionId)
+      if (session) {
+        session.title = title
+      }
+      if (activeSession.value?.id === sessionId) {
+        activeSession.value.title = title
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to update session title'
+      console.error('Error updating session title:', err)
+    }
+  }
+
+  /**
+   * Clear session messages
+   */
+  async function clearSessionMessages() {
+    if (!activeSession.value) return
+    
+    try {
+      await aiChatHistoryService.clearSessionMessages(activeSession.value.id)
+      messages.value = []
+      conversationId.value = null
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to clear messages'
+      console.error('Error clearing messages:', err)
+    }
+  }
+
+  /**
    * Send a message to the AI
    */
   async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>) {
@@ -64,6 +276,11 @@ export function useAiChat(resourceType: string, resourceId: string) {
     if (!selectedProvider.value) {
       error.value = 'Please select an AI provider'
       return
+    }
+
+    // Ensure we have an active session
+    if (!activeSession.value) {
+      await getOrCreateActiveSession()
     }
 
     // Add user message to chat
@@ -87,7 +304,7 @@ export function useAiChat(resourceType: string, resourceId: string) {
         content: m.content,
       }))
 
-    // Build request
+    // Build request with session ID
     const request: StreamConversationRequest = {
       conversationId: conversationId.value || undefined,
       provider: selectedProvider.value,
@@ -98,6 +315,8 @@ export function useAiChat(resourceType: string, resourceId: string) {
       context: {
         resourceType,
         resourceId,
+        sessionId: activeSession.value?.id,
+        language: context?.language,
         ...context,
       },
     }
@@ -213,7 +432,7 @@ export function useAiChat(resourceType: string, resourceId: string) {
   }
 
   /**
-   * Clear all messages
+   * Clear all messages (legacy method - use clearSessionMessages instead)
    */
   function clearMessages() {
     messages.value = []
@@ -241,10 +460,26 @@ export function useAiChat(resourceType: string, resourceId: string) {
     hasMessages,
     currentProvider,
 
+    // Session state
+    sessions,
+    activeSession,
+    isLoadingSessions,
+    isLoadingMessages,
+
     // Methods
     loadProviders,
     sendMessage,
     clearMessages,
     cancelGeneration,
+
+    // Session methods
+    loadSessions,
+    getOrCreateActiveSession,
+    createSession,
+    activateSession,
+    deleteSession,
+    updateSessionTitle,
+    clearSessionMessages,
+    loadSessionMessages,
   }
 }
