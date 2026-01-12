@@ -32,7 +32,6 @@ export class AiConversationClient {
 
   /**
    * Start a streaming conversation with AI using native fetch + ReadableStream
-   * Replaces event-source-polyfill which had compatibility issues
    */
   async startConversation(
     request: StreamConversationRequest,
