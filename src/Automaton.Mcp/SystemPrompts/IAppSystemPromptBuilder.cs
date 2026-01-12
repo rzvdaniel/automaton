@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services.Mcp.SystemPrompts;
+namespace Automaton.Mcp.SystemPrompts;
 
 /// <summary>
 /// Interface for unified app system prompt builder

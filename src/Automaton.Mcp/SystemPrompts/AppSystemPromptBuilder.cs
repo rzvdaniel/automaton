@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services.Mcp.SystemPrompts;
+namespace Automaton.Mcp.SystemPrompts;
 
 /// <summary>
 /// Service for building unified AI system prompts that generate both frontend and backend code

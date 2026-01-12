@@ -281,8 +281,8 @@ services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
 
 // System Prompt Builders for AI Chat
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Studio.Server.Services.Mcp.SystemPrompts.StepSystemPromptBuilder>();
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Studio.Server.Services.Mcp.SystemPrompts.AppSystemPromptBuilder>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
 // MCP Tool Providers for AI Chat
 services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();

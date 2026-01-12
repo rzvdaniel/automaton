@@ -1,10 +1,10 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
+using Automaton.Mcp.SystemPrompts;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Services.Mcp;
-using Automaton.Studio.Server.Services.Mcp.SystemPrompts;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
