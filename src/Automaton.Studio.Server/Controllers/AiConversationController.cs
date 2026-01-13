@@ -85,11 +85,11 @@ public class AiConversationController : BaseController
                 "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}",
                 userId, request.Provider, request.Model, request.ResourceType);
 
-            // 2. Build context-aware system prompt
-            var systemPrompt = await BuildSystemPromptAsync(request, userId);
-
-            // 3. Load conversation history from database if SessionId is provided
+            // 2. Load conversation history from database if SessionId is provided
             var history = await LoadConversationHistoryAsync(request.SessionId, userId);
+
+            // 3. Build context-aware system prompt (with continuation context if needed)
+            var systemPrompt = await BuildSystemPromptAsync(request, userId, history);
 
             // 4. Get tool provider based on resource type
             var toolProvider = GetToolProvider(request.ResourceType);
@@ -157,19 +157,30 @@ public class AiConversationController : BaseController
     /// <summary>
     /// Build context-aware system prompt based on resource type
     /// </summary>
-    private async Task<string> BuildSystemPromptAsync(StreamConversationRequest request, Guid userId)
+    private async Task<string> BuildSystemPromptAsync(StreamConversationRequest request, Guid userId, List<ConversationMessage>? conversationHistory)
     {
-        // Client can override with custom prompt
-        if (!string.IsNullOrEmpty(request.SystemPrompt))
-            return request.SystemPrompt;
-
-        // Build context-aware prompt based on resource type
-        return request.ResourceType?.ToLowerInvariant() switch
+        // Build base system prompt based on resource type
+        var baseSystemPrompt = request.ResourceType?.ToLowerInvariant() switch
         {
             "customstep" => _stepPromptBuilder.BuildSystemPrompt(request.Language ?? "Python"),
             "webapp" => _appPromptBuilder.BuildSystemPrompt(),
             _ => "You are a helpful AI assistant for the Automaton platform."
         };
+
+        // Add continuation context if this is a restored session with history
+        // This prevents the AI from being overly cautious in ongoing conversations
+        var isRestoredSession = conversationHistory != null && conversationHistory.Count > 0;
+        
+        if (isRestoredSession)
+        {
+            _logger.LogInformation(
+                "Adding continuation prompt for session {SessionId} with {MessageCount} historical messages",
+                request.SessionId, conversationHistory!.Count);
+            
+            return $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+        }
+
+        return baseSystemPrompt;
     }
 
     /// <summary>
@@ -216,6 +227,10 @@ public class AiConversationController : BaseController
     private Dictionary<string, object> BuildContextDictionary(StreamConversationRequest request, Guid userId)
     {
         var context = request.Context ?? new Dictionary<string, object>();
+
+        // Add contextId (resource ID formatted as string)
+        if (request.ResourceId.HasValue)
+            context["contextId"] = request.ResourceId.Value.ToString();
 
         // Add essential context for tool execution
         if (request.ResourceType != null)
@@ -381,11 +396,6 @@ public class StreamConversationRequest
     /// User's message
     /// </summary>
     public string Message { get; set; } = string.Empty;
-
-    /// <summary>
-    /// System prompt (optional, built server-side if not provided based on ResourceType)
-    /// </summary>
-    public string? SystemPrompt { get; set; }
 
     /// <summary>
     /// Conversation history (for continuing conversations)
