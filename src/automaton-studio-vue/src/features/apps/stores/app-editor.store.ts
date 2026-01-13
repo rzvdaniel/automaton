@@ -525,6 +525,19 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Refresh linked steps from the server
+   */
+  async function refreshLinkedSteps(): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      linkedSteps.value = await appsService.getLinkedSteps(currentApp.value.id)
+    } catch (err: unknown) {
+      console.error('Failed to refresh linked steps:', err)
+    }
+  }
+
+  /**
    * Refresh the file tree without closing open files
    */
   async function refreshFileTree(): Promise<void> {
