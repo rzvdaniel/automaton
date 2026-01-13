@@ -19,9 +19,10 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   (e: 'codeGenerated', code: string): void
+  (e: 'toolExecuted', toolName: string, args: any, result?: any): void
 }>()
 
-// AI Chat composable
+// AI Chat composable with tool execution callback
 const {
   messages,
   isGenerating,
@@ -33,8 +34,14 @@ const {
   hasMessages,
   loadProviders,
   sendMessage: sendAiMessage,
+  getOrCreateActiveSession,
   clearMessages,
-} = useAiChat('WebApp', props.appId)
+} = useAiChat('WebApp', props.appId, {
+  // Callback when AI tools are executed
+  onToolExecuted: (toolName, args, result) => {
+    emit('toolExecuted', toolName, args, result)
+  },
+})
 
 // UI state
 const userInput = ref('')
@@ -47,9 +54,10 @@ const suggestions = [
   'Create a data table',
 ]
 
-// Load providers on mount
+// Load providers and session on mount
 onMounted(async () => {
   await loadProviders()
+  await getOrCreateActiveSession()
 })
 
 // Watch for code generation in messages

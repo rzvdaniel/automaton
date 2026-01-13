@@ -451,6 +451,52 @@ function saveAppName() {
   // TODO: Implement app name update
   isEditingName.value = false
 }
+
+// Handle AI tool execution for real-time file updates
+async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
+  // File modification tools that should trigger refresh
+  const fileModificationTools = [
+    'write_file',
+    'save_app_code',
+    'delete_file',
+    'create_backend_step',
+    'save_step_code',
+  ]
+
+  if (fileModificationTools.includes(toolName)) {
+    console.log(`AI tool "${toolName}" executed, refreshing files...`, args)
+
+    // Determine which files were affected
+    const affectedFiles: string[] = []
+
+    if (toolName === 'write_file' && args.path) {
+      affectedFiles.push(args.path)
+    } else if (toolName === 'save_app_code') {
+      affectedFiles.push('index.html')
+    } else if (toolName === 'delete_file' && args.path) {
+      // File was deleted, just refresh tree
+      await editorStore.refreshFileTree()
+      return
+    } else if (toolName === 'create_backend_step' || toolName === 'save_step_code') {
+      // Backend step created/updated, refresh linked steps
+      await editorStore.refreshLinkedSteps()
+      return
+    }
+
+    // Refresh files after AI update
+    await editorStore.refreshFilesAfterAiUpdate(affectedFiles)
+
+    // Show toast notification
+    if (affectedFiles.length > 0) {
+      toast.add({
+        severity: 'info',
+        summary: 'Files Updated',
+        detail: `AI updated: ${affectedFiles.join(', ')}`,
+        life: 3000,
+      })
+    }
+  }
+}
 </script>
 
 <template>
@@ -615,7 +661,11 @@ function saveAppName() {
         <!-- Right Panel: AI Assistant -->
         <SplitterPanel :size="panelSizes[2]" :minSize="15" class="splitter-panel">
           <div class="ai-sidebar">
-            <AiAssistant :app-id="appId" :runner-id="selectedRunnerId" />
+            <AiAssistant
+              :app-id="appId"
+              :runner-id="selectedRunnerId"
+              @tool-executed="handleAiToolExecuted"
+            />
           </div>
         </SplitterPanel>
       </Splitter>

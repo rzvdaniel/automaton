@@ -525,15 +525,81 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Refresh linked steps
+   * Refresh the file tree without closing open files
    */
-  async function refreshLinkedSteps(): Promise<void> {
+  async function refreshFileTree(): Promise<void> {
     if (!currentApp.value) return
 
     try {
-      linkedSteps.value = await appsService.getLinkedSteps(currentApp.value.id)
+      fileTree.value = await appsService.getFileTree(currentApp.value.id)
     } catch (err: unknown) {
-      console.error('Failed to refresh linked steps:', err)
+      console.error('Failed to refresh file tree:', err)
+    }
+  }
+
+  /**
+   * Reload a specific file from the server (updates content if file is open)
+   */
+  async function reloadFile(filePath: string): Promise<void> {
+    if (!currentApp.value) return
+
+    const openFile = openFiles.value.find((f) => f.path === filePath)
+    if (!openFile) return
+
+    try {
+      const response = await appsService.readFile(currentApp.value.id, filePath)
+
+      if (response.success && response.content !== undefined) {
+        // Update the file content
+        openFile.content = response.content
+        openFile.originalContent = response.content
+        openFile.isDirty = false
+      }
+    } catch (err: unknown) {
+      console.error(`Failed to reload file ${filePath}:`, err)
+    }
+  }
+
+  /**
+   * Reload the currently active file
+   */
+  async function reloadActiveFile(): Promise<void> {
+    if (activeFilePath.value) {
+      await reloadFile(activeFilePath.value)
+    }
+  }
+
+  /**
+   * Refresh files after AI tool execution
+   * @param affectedFiles - List of file paths that were modified
+   */
+  async function refreshFilesAfterAiUpdate(affectedFiles?: string[]): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      // Always refresh the file tree
+      await refreshFileTree()
+
+      // If specific files were affected, reload them if open
+      if (affectedFiles && affectedFiles.length > 0) {
+        for (const filePath of affectedFiles) {
+          await reloadFile(filePath)
+        }
+      } else {
+        // If no specific files mentioned, reload all open files
+        for (const file of openFiles.value) {
+          if (!file.isBackendStep && !file.isDirty) {
+            await reloadFile(file.path)
+          }
+        }
+      }
+
+      // Refresh preview if index.html was affected
+      if (!affectedFiles || affectedFiles.includes('index.html')) {
+        await refreshPreview()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to refresh files after AI update:', err)
     }
   }
 
@@ -643,6 +709,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     createBackendStep,
     unlinkStep,
     refreshLinkedSteps,
+    refreshFileTree,
+    reloadFile,
+    reloadActiveFile,
+    refreshFilesAfterAiUpdate,
     togglePreviewOverlay,
     openPreviewOverlay,
     closePreviewOverlay,

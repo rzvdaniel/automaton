@@ -17,7 +17,17 @@ import type {
   ToolResult,
 } from '../types/ai.types'
 
-export function useAiChat(resourceType: string, resourceId: string) {
+export interface UseAiChatOptions {
+  /**
+   * Callback when a tool is executed
+   * @param toolName - Name of the MCP tool that was called
+   * @param args - Arguments passed to the tool
+   * @param result - Result returned from the tool (if available)
+   */
+  onToolExecuted?: (toolName: string, args: any, result?: any) => void | Promise<void>
+}
+
+export function useAiChat(resourceType: string, resourceId: string, options?: UseAiChatOptions) {
   // State
   const messages = ref<ChatMessage[]>([])
   const isGenerating = ref(false)
@@ -409,6 +419,7 @@ export function useAiChat(resourceType: string, resourceId: string) {
    */
   function handleToolCall(toolCall: ToolCall) {
     const toolName = toolCall.function?.name || 'unknown'
+    const toolArgs = toolCall.function?.arguments ? JSON.parse(toolCall.function.arguments) : {}
     
     messages.value.push({
       id: toolCall.id,
@@ -419,6 +430,15 @@ export function useAiChat(resourceType: string, resourceId: string) {
       toolStatus: 'executing',
       timestamp: new Date(),
     })
+
+    // Notify tool execution callback
+    if (options?.onToolExecuted) {
+      try {
+        options.onToolExecuted(toolName, toolArgs)
+      } catch (err) {
+        console.error('Error in onToolExecuted callback:', err)
+      }
+    }
   }
 
   /**
@@ -434,6 +454,23 @@ export function useAiChat(resourceType: string, resourceId: string) {
       toolMessage.toolResult = toolResult.content
       if (toolResult.isError) {
         toolMessage.error = toolResult.content
+      }
+
+      // Notify tool execution callback with result
+      if (options?.onToolExecuted && toolMessage.toolName) {
+        try {
+          // Parse result content if it's JSON
+          let resultData: any = toolResult.content
+          try {
+            resultData = JSON.parse(toolResult.content)
+          } catch {
+            // Not JSON, use as-is
+          }
+
+          options.onToolExecuted(toolMessage.toolName, {}, resultData)
+        } catch (err) {
+          console.error('Error in onToolExecuted callback:', err)
+        }
       }
     }
   }
