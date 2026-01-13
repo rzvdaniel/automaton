@@ -314,7 +314,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         content: m.content,
       }))
 
-    // Build request with session ID
+    // Build request with session ID and resource context
     const request: StreamConversationRequest = {
       conversationId: conversationId.value || undefined,
       provider: selectedProvider.value,
@@ -322,12 +322,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       message: userMessage,
       systemPrompt,
       history: history.slice(0, -1), // Exclude the message we just added
+      sessionId: activeSession.value?.id,
+      resourceType: resourceType, // Top-level property for backend
+      resourceId: resourceId, // Top-level property for backend
+      language: context?.language,
       context: {
-        resourceType,
-        resourceId,
-        sessionId: activeSession.value?.id,
-        language: context?.language,
-        ...context,
+        ...context, // Additional context (e.g., runnerId, appId)
       },
     }
 

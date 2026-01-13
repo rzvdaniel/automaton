@@ -58,6 +58,10 @@ export interface StreamConversationRequest {
   systemPrompt?: string
   history?: ConversationMessage[]
   context?: Record<string, any>
+  sessionId?: string
+  resourceType?: string
+  resourceId?: string
+  language?: string
 }
 
 // ============================================
