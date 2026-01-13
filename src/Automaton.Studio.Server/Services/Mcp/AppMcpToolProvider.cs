@@ -3,11 +3,15 @@ using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
 using Automaton.Studio.Server.Models;
+using Automaton.Core.Scripting.Step;
+using Automaton.Core.Scripting.Engines;
+using Automaton.Core.Models;
+using Automaton.Steps.Enums;
 
 namespace Automaton.Studio.Server.Services.Mcp;
 
 /// <summary>
-/// Server-side implementation of MCP tools for Web App editing
+/// Server-side implementation of MCP tools for Web App editing with backend Custom Steps support
 /// </summary>
 public class AppMcpToolProvider : IMcpToolProvider
 {
@@ -17,6 +21,10 @@ public class AppMcpToolProvider : IMcpToolProvider
     private readonly AppStepsService _appStepsService;
     private readonly CustomStepsService _customStepsService;
     private readonly UserContextService _userContextService;
+    private readonly IScriptEngineHost _scriptHost;
+
+    public const string SaveAppCodeToolName = "save_app_code";
+    public const string SaveStepCodeToolName = "save_step_code";
 
     public AppMcpToolProvider(
         ILogger<AppMcpToolProvider> logger,
@@ -24,7 +32,8 @@ public class AppMcpToolProvider : IMcpToolProvider
         AppFileStorageService appFileStorageService,
         AppStepsService appStepsService,
         CustomStepsService customStepsService,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        IScriptEngineHost scriptHost)
     {
         _logger = logger;
         _appsService = appsService;
@@ -32,12 +41,17 @@ public class AppMcpToolProvider : IMcpToolProvider
         _appStepsService = appStepsService;
         _customStepsService = customStepsService;
         _userContextService = userContextService;
+        _scriptHost = scriptHost;
     }
 
     public Task<IEnumerable<McpTool>> GetToolsAsync()
     {
+        // Supported languages for custom steps
+        var supportedLanguages = "\"Python\", \"PowerShell\", \"Batch\", \"JavaScript\"";
+
         var tools = new List<McpTool>
         {
+            // Frontend tools
             new McpTool
             {
                 Name = "get_current_code",
@@ -48,128 +62,201 @@ public class AppMcpToolProvider : IMcpToolProvider
                     "properties": {
                         "appId": {
                             "type": "string",
-                            "description": "The ID of the app"
+                            "description": "The ID of the app (optional, uses context if not provided)"
                         }
-                    },
-                    "required": ["appId"]
+                    }
                 }
                 """)
             },
             new McpTool
             {
-                Name = "read_file",
-                Description = "Read a specific file from the app",
+                Name = SaveAppCodeToolName,
+                Description = "Save HTML/CSS/JavaScript code to the app",
                 InputSchema = JsonDocument.Parse("""
                 {
                     "type": "object",
                     "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "The HTML/CSS/JavaScript code to save"
+                        },
                         "appId": {
                             "type": "string",
-                            "description": "The ID of the app"
-                        },
-                        "filePath": {
-                            "type": "string",
-                            "description": "Path to the file (e.g., 'index.html', 'css/styles.css')"
+                            "description": "The ID of the app (optional, uses context if not provided)"
                         }
                     },
-                    "required": ["appId", "filePath"]
+                    "required": ["code"]
                 }
                 """)
             },
-            new McpTool
-            {
-                Name = "write_file",
-                Description = "Write or update a file in the app",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app"
-                        },
-                        "filePath": {
-                            "type": "string",
-                            "description": "Path to the file"
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "File content"
-                        }
-                    },
-                    "required": ["appId", "filePath", "content"]
-                }
-                """)
-            },
-            new McpTool
-            {
-                Name = "delete_file",
-                Description = "Delete a file from the app",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app"
-                        },
-                        "filePath": {
-                            "type": "string",
-                            "description": "Path to the file"
-                        }
-                    },
-                    "required": ["appId", "filePath"]
-                }
-                """)
-            },
+
+            // Backend step tools
             new McpTool
             {
                 Name = "create_backend_step",
-                Description = "Create a new backend custom step and link it to the app",
-                InputSchema = JsonDocument.Parse("""
+                Description = "Create a new Custom Step for backend logic and automatically link it to the current app. The step will execute on a Runner. No need to call link_step_to_app after creation.",
+                InputSchema = JsonDocument.Parse($$"""
                 {
                     "type": "object",
                     "properties": {
-                        "appId": {
+                        "name": {
                             "type": "string",
-                            "description": "The ID of the app"
-                        },
-                        "stepName": {
-                            "type": "string",
-                            "description": "Name of the step"
+                            "description": "Step name in PascalCase (e.g., SendEmailStep)"
                         },
                         "language": {
                             "type": "string",
-                            "enum": ["Python", "PowerShell", "JavaScript"],
-                            "description": "Programming language"
-                        },
-                        "code": {
-                            "type": "string",
-                            "description": "Initial code for the step"
+                            "enum": [{{supportedLanguages}}],
+                            "description": "Programming language for the step (Python recommended for most use cases)"
                         },
                         "description": {
                             "type": "string",
-                            "description": "Description of the step"
+                            "description": "Description of what the step does"
+                        },
+                        "appId": {
+                            "type": "string",
+                            "description": "The ID of the app (optional, uses context if not provided)"
                         }
                     },
-                    "required": ["appId", "stepName", "language"]
+                    "required": ["name", "language"]
                 }
                 """)
             },
             new McpTool
             {
-                Name = "list_backend_steps",
-                Description = "List all backend steps linked to the app",
+                Name = "get_step_code",
+                Description = "Get the current code from a backend step",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the step to read"
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = SaveStepCodeToolName,
+                Description = "Save code to a backend step",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the step to save to"
+                        },
+                        "code": {
+                            "type": "string",
+                            "description": "The code to save"
+                        }
+                    },
+                    "required": ["step_name", "code"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "suggest_step_variables",
+                Description = "Define input and output variables for a step. Variables store data passed to/from the step code.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the step"
+                        },
+                        "input_variables": {
+                            "type": "array",
+                            "description": "Array of input variables that the step code will receive",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": { "type": "string", "description": "Variable name (e.g., 'api_key', 'user_input')" },
+                                    "description": { "type": "string", "description": "What this variable is used for" },
+                                    "is_sensitive": { "type": "boolean", "description": "True for secrets like API keys or passwords (will be encrypted)" }
+                                },
+                                "required": ["name", "description"]
+                            }
+                        },
+                        "output_variables": {
+                            "type": "array",
+                            "description": "Array of output variables that the step code will produce",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": { "type": "string", "description": "Variable name (e.g., 'result', 'status')" },
+                                    "description": { "type": "string", "description": "What this variable contains" }
+                                },
+                                "required": ["name", "description"]
+                            }
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "execute_backend_step_code",
+                Description = "Execute and test a backend step's code with input variables. CRITICAL: Always use this to test the step after creating it and before finalizing the app. This verifies the step works correctly and catches errors early.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the step to execute"
+                        },
+                        "input_variables": {
+                            "type": "object",
+                            "description": "Test input variables as key-value pairs (optional)",
+                            "additionalProperties": true
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "link_step_to_app",
+                Description = "Link an EXISTING step (created outside this app context) to the current app. Note: Steps created with create_backend_step are already automatically linked - this is only for reusing existing steps across multiple apps.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the existing step to link"
+                        },
+                        "appId": {
+                            "type": "string",
+                            "description": "The ID of the app (optional, uses context if not provided)"
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "get_linked_steps",
+                Description = "Get list of steps already linked to this app",
                 InputSchema = JsonDocument.Parse("""
                 {
                     "type": "object",
                     "properties": {
                         "appId": {
                             "type": "string",
-                            "description": "The ID of the app"
+                            "description": "The ID of the app (optional, uses context if not provided)"
                         }
-                    },
-                    "required": ["appId"]
+                    }
                 }
                 """)
             }
@@ -188,17 +275,20 @@ public class AppMcpToolProvider : IMcpToolProvider
         {
             return toolName switch
             {
-                "get_current_code" => await GetCurrentCodeAsync(arguments, contextId),
-                "read_file" => await ReadFileAsync(arguments, contextId),
-                "write_file" => await WriteFileAsync(arguments, contextId),
-                "delete_file" => await DeleteFileAsync(arguments, contextId),
-                "create_backend_step" => await CreateBackendStepAsync(arguments, contextId),
-                "list_backend_steps" => await ListBackendStepsAsync(arguments, contextId),
-                _ => new McpToolResult
-                {
-                    Success = false,
-                    Error = $"Unknown tool: {toolName}"
-                }
+                // Frontend tools
+                "get_current_code" => await HandleGetCurrentCode(arguments, context),
+                SaveAppCodeToolName => await HandleSaveAppCode(arguments, context),
+
+                // Backend tools
+                "create_backend_step" => await HandleCreateBackendStep(arguments, context),
+                "get_step_code" => await HandleGetStepCode(arguments),
+                SaveStepCodeToolName => await HandleSaveStepCode(arguments),
+                "suggest_step_variables" => await HandleSuggestStepVariables(arguments),
+                "execute_backend_step_code" => await HandleExecuteBackendStepCode(arguments),
+                "link_step_to_app" => await HandleLinkStepToApp(arguments, context),
+                "get_linked_steps" => await HandleGetLinkedSteps(arguments, context),
+
+                _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
         }
         catch (Exception ex)
@@ -207,16 +297,18 @@ public class AppMcpToolProvider : IMcpToolProvider
             return new McpToolResult
             {
                 Success = false,
-                Error = $"Error executing {toolName}: {ex.Message}"
+                Error = $"Tool execution failed: {ex.Message}"
             };
         }
     }
 
-    private async Task<McpToolResult> GetCurrentCodeAsync(JsonElement arguments, string? contextId)
+    #region Frontend Tool Handlers
+
+    private async Task<McpToolResult> HandleGetCurrentCode(JsonElement arguments, Dictionary<string, object>? context)
     {
         try
         {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
+            var appId = ExtractAppId(arguments, context);
             var userId = _userContextService.GetUserId();
 
             // Read index.html (main app file)
@@ -226,16 +318,16 @@ public class AppMcpToolProvider : IMcpToolProvider
             {
                 return new McpToolResult
                 {
-                    Success = false,
-                    Error = "App file not found"
+                    Success = true,
+                    Content = "<!-- No code found. Start with a new HTML template -->\n<!DOCTYPE html>\n<html>\n<head>\n    <title>New App</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body>\n    <!-- Add your content here -->\n</body>\n</html>"
                 };
             }
 
             var result = new
             {
-                appId = appId.ToString(),
                 code = content,
-                message = "Current app code retrieved successfully"
+                linesOfCode = content.Split('\n').Length,
+                message = "Current HTML code retrieved successfully"
             };
 
             return new McpToolResult
@@ -255,132 +347,77 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> ReadFileAsync(JsonElement arguments, string? contextId)
+    private async Task<McpToolResult> HandleSaveAppCode(JsonElement arguments, Dictionary<string, object>? context)
     {
         try
         {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
-            var filePath = arguments.GetProperty("filePath").GetString()!;
+            var code = arguments.GetProperty("code").GetString()!;
+            var appId = ExtractAppId(arguments, context);
             var userId = _userContextService.GetUserId();
 
-            var content = await _appFileStorageService.ReadAppFileAsync(userId, appId, filePath);
+            // Save to index.html
+            await _appFileStorageService.WriteAppFileAsync(userId, appId, "index.html", code);
 
-            if (content == null)
+            var result = new
             {
-                return new McpToolResult
-                {
-                    Success = false,
-                    Error = $"File '{filePath}' not found"
-                };
-            }
+                success = true,
+                appId = appId.ToString(),
+                linesOfCode = code.Split('\n').Length,
+                message = "App code saved successfully"
+            };
 
             return new McpToolResult
             {
                 Success = true,
-                Content = content
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reading file");
+            _logger.LogError(ex, "Error saving app code");
             return new McpToolResult
             {
                 Success = false,
-                Error = $"Failed to read file: {ex.Message}"
+                Error = $"Failed to save app code: {ex.Message}"
             };
         }
     }
 
-    private async Task<McpToolResult> WriteFileAsync(JsonElement arguments, string? contextId)
+    #endregion
+
+    #region Backend Step Tool Handlers
+
+    private async Task<McpToolResult> HandleCreateBackendStep(JsonElement arguments, Dictionary<string, object>? context)
     {
         try
         {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
-            var filePath = arguments.GetProperty("filePath").GetString()!;
-            var content = arguments.GetProperty("content").GetString()!;
-            var userId = _userContextService.GetUserId();
-
-            await _appFileStorageService.WriteAppFileAsync(userId, appId, filePath, content);
-
-            return new McpToolResult
-            {
-                Success = true,
-                Content = $"File '{filePath}' written successfully"
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error writing file");
-            return new McpToolResult
-            {
-                Success = false,
-                Error = $"Failed to write file: {ex.Message}"
-            };
-        }
-    }
-
-    private async Task<McpToolResult> DeleteFileAsync(JsonElement arguments, string? contextId)
-    {
-        try
-        {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
-            var filePath = arguments.GetProperty("filePath").GetString()!;
-            var userId = _userContextService.GetUserId();
-
-            await _appFileStorageService.DeleteAppFileAsync(userId, appId, filePath);
-
-            return new McpToolResult
-            {
-                Success = true,
-                Content = $"File '{filePath}' deleted successfully"
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting file");
-            return new McpToolResult
-            {
-                Success = false,
-                Error = $"Failed to delete file: {ex.Message}"
-            };
-        }
-    }
-
-    private async Task<McpToolResult> CreateBackendStepAsync(JsonElement arguments, string? contextId)
-    {
-        try
-        {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
-            var stepName = arguments.GetProperty("stepName").GetString()!;
+            var name = arguments.GetProperty("name").GetString()!;
             var language = arguments.GetProperty("language").GetString()!;
-            var code = arguments.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : null;
-            var description = arguments.TryGetProperty("description", out var descProp) ? descProp.GetString() : string.Empty;
+            var description = arguments.TryGetProperty("description", out var descProp) ? descProp.GetString() : $"Backend step: {name}";
+            var appId = ExtractAppId(arguments, context);
 
-            // Create and link the step
-            var linkedStep = await _appStepsService.CreateStepForAppAsync(appId, stepName);
+            // Create and link the step using AppStepsService
+            var linkedStep = await _appStepsService.CreateStepForAppAsync(appId, name);
 
-            // Update the step with code and other properties if provided
-            if (!string.IsNullOrEmpty(code) || !string.IsNullOrEmpty(description) || !string.IsNullOrEmpty(language))
+            // Update language if different from default
+            if (language != "Python")
             {
-                var step = _customStepsService.Get(linkedStep.Id);
-                if (step != null)
+                var step = await _customStepsService.GetForEditingAsync(linkedStep.Id);
+                step.Definition.Language = language;
+                if (!string.IsNullOrEmpty(description))
                 {
-                    if (!string.IsNullOrEmpty(code))
-                        step.Definition.Code = code;
-                    if (!string.IsNullOrEmpty(description))
-                        step.Description = description;
-                    if (!string.IsNullOrEmpty(language))
-                        step.Definition.Language = language;
-
-                    await _customStepsService.Update(linkedStep.Id, step);
+                    step.Description = description;
                 }
+                await _customStepsService.Update(step.Id, step);
             }
 
             var result = new
             {
-                stepId = linkedStep.Id,
-                stepName = linkedStep.Name,
-                message = $"Backend step '{stepName}' created and linked successfully"
+                success = true,
+                stepId = linkedStep.Id.ToString(),
+                name = name,
+                language = language,
+                message = $"Backend step '{name}' created and linked to app successfully"
             };
 
             return new McpToolResult
@@ -400,21 +437,30 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> ListBackendStepsAsync(JsonElement arguments, string? contextId)
+    private async Task<McpToolResult> HandleGetStepCode(JsonElement arguments)
     {
         try
         {
-            var appId = Guid.Parse(arguments.GetProperty("appId").GetString()!);
+            var stepName = arguments.GetProperty("step_name").GetString()!;
 
-            var steps = await _appStepsService.GetLinkedStepsAsync(appId);
-
-            var result = steps.Select(s => new
+            var step = await _customStepsService.GetByNameForExecutionAsync(stepName);
+            if (step == null)
             {
-                id = s.Id,
-                name = s.Name,
-                language = s.Language,
-                description = s.Description
-            });
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Step '{stepName}' not found"
+                };
+            }
+
+            var result = new
+            {
+                stepId = step.Id.ToString(),
+                name = step.Name,
+                language = step.Definition.Language,
+                code = step.Definition.Code ?? "",
+                message = $"Code for step '{stepName}' retrieved successfully"
+            };
 
             return new McpToolResult
             {
@@ -424,12 +470,351 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error listing backend steps");
+            _logger.LogError(ex, "Error getting step code");
             return new McpToolResult
             {
                 Success = false,
-                Error = $"Failed to list backend steps: {ex.Message}"
+                Error = $"Failed to get step code: {ex.Message}"
             };
         }
     }
+
+    private async Task<McpToolResult> HandleSaveStepCode(JsonElement arguments)
+    {
+        try
+        {
+            var stepName = arguments.GetProperty("step_name").GetString()!;
+            var code = arguments.GetProperty("code").GetString()!;
+
+            var step = await _customStepsService.GetByNameForExecutionAsync(stepName);
+            if (step == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Step '{stepName}' not found"
+                };
+            }
+
+            // Update the step code
+            step.Definition.Code = code;
+            await _customStepsService.Update(step.Id, step);
+
+            var result = new
+            {
+                success = true,
+                stepId = step.Id.ToString(),
+                name = stepName,
+                linesOfCode = code.Split('\n').Length,
+                message = $"Code for step '{stepName}' saved successfully"
+            };
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving step code");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to save step code: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<McpToolResult> HandleSuggestStepVariables(JsonElement arguments)
+    {
+        try
+        {
+            var stepName = arguments.GetProperty("step_name").GetString()!;
+
+            var step = await _customStepsService.GetByNameForExecutionAsync(stepName);
+            if (step == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Step '{stepName}' not found"
+                };
+            }
+
+            // Parse input and output variables from arguments
+            var inputVars = new List<StepVariable>();
+            var outputVars = new List<StepVariable>();
+
+            if (arguments.TryGetProperty("input_variables", out var inputArray))
+            {
+                foreach (var varElement in inputArray.EnumerateArray())
+                {
+                    var varName = varElement.GetProperty("name").GetString()!;
+                    var varDesc = varElement.GetProperty("description").GetString()!;
+                    var isSensitive = varElement.TryGetProperty("is_sensitive", out var sensProp) && sensProp.GetBoolean();
+
+                    inputVars.Add(new StepVariable
+                    {
+                        Name = varName,
+                        Description = varDesc,
+                        IsSensitive = isSensitive
+                    });
+                }
+            }
+
+            if (arguments.TryGetProperty("output_variables", out var outputArray))
+            {
+                foreach (var varElement in outputArray.EnumerateArray())
+                {
+                    var varName = varElement.GetProperty("name").GetString()!;
+                    var varDesc = varElement.GetProperty("description").GetString()!;
+
+                    outputVars.Add(new StepVariable
+                    {
+                        Name = varName,
+                        Description = varDesc
+                    });
+                }
+            }
+
+            // Update the step definition with new variables
+            step.Definition.CodeInputVariables = inputVars;
+            step.Definition.CodeOutputVariables = outputVars;
+            await _customStepsService.Update(step.Id, step);
+
+            var result = new
+            {
+                success = true,
+                stepId = step.Id.ToString(),
+                name = stepName,
+                inputCount = inputVars.Count,
+                outputCount = outputVars.Count,
+                message = $"Variables for step '{stepName}' defined successfully"
+            };
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error suggesting step variables");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to suggest step variables: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<McpToolResult> HandleExecuteBackendStepCode(JsonElement arguments)
+    {
+        try
+        {
+            var stepName = arguments.GetProperty("step_name").GetString()!;
+
+            var step = await _customStepsService.GetByNameForExecutionAsync(stepName);
+            if (step == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Step '{stepName}' not found"
+                };
+            }
+
+            // Parse input variables
+            var inputVariables = new Dictionary<string, string>();
+            if (arguments.TryGetProperty("input_variables", out var inputObj))
+            {
+                foreach (var prop in inputObj.EnumerateObject())
+                {
+                    inputVariables[prop.Name] = prop.Value.ToString();
+                }
+            }
+
+            // Execute the step using CustomStepExecutor
+            var executor = new CustomStepExecutor(_scriptHost);
+            var outputVarNames = step.Definition.CodeOutputVariables?.Select(v => v.Name) ?? Enumerable.Empty<string>();
+            var executionResult = executor.Execute(
+                step.Definition.Code ?? "",
+                step.Definition.Language,
+                inputVariables,
+                outputVarNames
+            );
+
+            if (executionResult.Success)
+            {
+                var result = new
+                {
+                    success = true,
+                    stepName = stepName,
+                    executionTimeMs = executionResult.ExecutionTimeMs,
+                    outputVariables = executionResult.OutputVariables,
+                    message = $"Step '{stepName}' executed successfully"
+                };
+
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                };
+            }
+            else
+            {
+                var errorResult = new
+                {
+                    success = false,
+                    stepName = stepName,
+                    error = executionResult.Error,
+                    executionTimeMs = executionResult.ExecutionTimeMs,
+                    message = $"Step '{stepName}' execution failed"
+                };
+
+                return new McpToolResult
+                {
+                    Success = false,
+                    Content = JsonSerializer.Serialize(errorResult, new JsonSerializerOptions { WriteIndented = true }),
+                    Error = executionResult.Error
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing backend step code");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to execute backend step code: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<McpToolResult> HandleLinkStepToApp(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        try
+        {
+            var stepName = arguments.GetProperty("step_name").GetString()!;
+            var appId = ExtractAppId(arguments, context);
+
+            var step = await _customStepsService.GetByNameForExecutionAsync(stepName);
+            if (step == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"Step '{stepName}' not found"
+                };
+            }
+
+            // Link step to app
+            await _appStepsService.LinkStepAsync(appId, step.Id);
+
+            var result = new
+            {
+                success = true,
+                stepId = step.Id.ToString(),
+                stepName = stepName,
+                appId = appId.ToString(),
+                message = $"Step '{stepName}' linked to app successfully"
+            };
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error linking step to app");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to link step to app: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<McpToolResult> HandleGetLinkedSteps(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        try
+        {
+            var appId = ExtractAppId(arguments, context);
+
+            // Get linked steps for the app
+            var linkedSteps = await _appStepsService.GetLinkedStepsAsync(appId);
+
+            var steps = linkedSteps.Select(step => new
+            {
+                stepId = step.Id.ToString(),
+                name = step.Name,
+                language = step.Language,
+                description = step.Description,
+                inputCount = step.InputCount,
+                outputCount = step.OutputCount
+            }).ToList();
+
+            var result = new
+            {
+                success = true,
+                appId = appId.ToString(),
+                count = steps.Count,
+                steps = steps,
+                message = $"Found {steps.Count} step(s) linked to app"
+            };
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting linked steps");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to get linked steps: {ex.Message}"
+            };
+        }
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private Guid ExtractAppId(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        // Try to get appId from arguments first
+        if (arguments.TryGetProperty("appId", out var appIdProp))
+        {
+            var appIdStr = appIdProp.GetString();
+            if (!string.IsNullOrEmpty(appIdStr) && Guid.TryParse(appIdStr, out var appId))
+            {
+                return appId;
+            }
+        }
+
+        // Fall back to context (resourceId)
+        if (context != null && context.TryGetValue("resourceId", out var resourceIdObj))
+        {
+            if (resourceIdObj is Guid resourceGuid)
+            {
+                return resourceGuid;
+            }
+            if (resourceIdObj is string resourceStr && Guid.TryParse(resourceStr, out var resourceId))
+            {
+                return resourceId;
+            }
+        }
+
+        throw new InvalidOperationException("No valid appId provided in arguments or context");
+    }
+
+    #endregion
 }
