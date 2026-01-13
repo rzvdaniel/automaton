@@ -131,12 +131,18 @@ Call these tools in order:
 3. **save_step_code** - Write the Python implementation
 4. **execute_backend_step_code** - ? CRITICAL: TEST the step with sample inputs
 5. **Fix and re-test** - If errors found, fix code and test again until successful
-6. **save_app_code** - Save HTML/JS that calls automatonApi.executeStep()
+6. **save_app_code** (simple apps) OR **write_file** (multi-file apps) - Save frontend code that calls automatonApi.executeStep()
 
 ## TOOL SEQUENCE FOR FRONTEND-ONLY APPS:
 
-Just call:
-1. **save_app_code** - Save the HTML/CSS/JavaScript";
+**Simple single-file app:**
+1. **save_app_code** - Save the HTML/CSS/JavaScript
+
+**Complex multi-file app:**
+1. **write_file** - Save index.html (path: ""index.html"")
+2. **write_file** - Save CSS file (path: ""styles/main.css"")
+3. **write_file** - Save JS file (path: ""js/app.js"")
+4. (etc. for additional files)";
     }
 
     private static string GetBackendOutputRules()
@@ -196,9 +202,28 @@ if (result.success) {
 5. **get_step_code** - Read existing step code
 6. **get_linked_steps** - View all steps linked to app
 
-**Frontend Development:**
-- **get_current_code** - Get current app HTML/CSS/JS
-- **save_app_code** - Save app HTML/CSS/JS
+**Frontend Development (choose based on app complexity):**
+
+*For simple single-file apps (all code in one HTML file):*
+- **get_current_code** - Get current app HTML/CSS/JS (reads index.html)
+- **save_app_code** - Save app HTML/CSS/JS (saves to index.html)
+
+*For complex multi-file apps (separate CSS, JS, or component files):*
+- **list_files** - List all files in app directory
+- **read_file** - Read specific file (e.g., 'styles/main.css', 'js/utils.js')
+- **write_file** - Write specific file (creates directories as needed)
+- **delete_file** - Delete specific file (cannot delete index.html)
+
+**When to use multi-file approach:**
+- Apps with separate CSS files (`styles/main.css`, `styles/theme.css`)
+- Apps with modular JavaScript (`js/api.js`, `js/components.js`)
+- Apps with multiple HTML pages or components
+- Apps following standard web project structure
+
+**When to use single-file approach:**
+- Simple apps where all HTML/CSS/JS fits in one file
+- Prototypes or demos
+- Apps using inline styles and scripts
 
 **Reusing Existing Steps (advanced):**
 - **link_step_to_app** - Link pre-existing step to current app
@@ -207,6 +232,7 @@ if (result.success) {
 
 - Step names: PascalCase with ""Step"" suffix (GetSystemMetricsStep)
 - Variables: snake_case (cpu_percent, error_message)
+- File paths: Use forward slashes (styles/main.css, not styles\main.css)
 - Always include success (boolean) and error_message (string) as outputs
 
 ## STANDARD OUTPUT VARIABLES:
