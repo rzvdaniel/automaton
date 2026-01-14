@@ -556,17 +556,28 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   async function reloadFile(filePath: string): Promise<void> {
     if (!currentApp.value) return
 
-    const openFile = openFiles.value.find((f) => f.path === filePath)
-    if (!openFile) return
+    const fileIndex = openFiles.value.findIndex((f) => f.path === filePath)
+    if (fileIndex === -1) return
+
+    const openFile = openFiles.value[fileIndex]
+
+    // Don't reload if file has unsaved changes (user is editing)
+    if (openFile.isDirty) {
+      console.log(`Skipping reload of ${filePath} - file has unsaved changes`)
+      return
+    }
 
     try {
       const response = await appsService.readFile(currentApp.value.id, filePath)
 
       if (response.success && response.content !== undefined) {
-        // Update the file content
-        openFile.content = response.content
-        openFile.originalContent = response.content
-        openFile.isDirty = false
+        // Create a new file object to trigger reactivity
+        openFiles.value[fileIndex] = {
+          ...openFile,
+          content: response.content,
+          originalContent: response.content,
+          isDirty: false,
+        }
       }
     } catch (err: unknown) {
       console.error(`Failed to reload file ${filePath}:`, err)
