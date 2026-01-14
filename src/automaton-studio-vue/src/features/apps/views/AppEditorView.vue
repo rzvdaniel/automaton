@@ -454,6 +454,8 @@ function saveAppName() {
 
 // Handle AI tool execution for real-time file updates
 async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
+  console.log('[AppEditor] AI tool executed:', { toolName, args, result })
+
   // File modification tools that should trigger refresh
   const fileModificationTools = [
     'write_file',
@@ -464,14 +466,16 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   ]
 
   if (fileModificationTools.includes(toolName)) {
-    console.log(`AI tool "${toolName}" executed, refreshing files...`, args)
+    console.log(`[AppEditor] File modification tool "${toolName}" detected, refreshing files...`)
 
     // Determine which files were affected
     const affectedFiles: string[] = []
 
     if (toolName === 'write_file' && args.path) {
+      console.log(`[AppEditor] write_file detected for path: ${args.path}`)
       affectedFiles.push(args.path)
     } else if (toolName === 'save_app_code') {
+      console.log('[AppEditor] save_app_code detected, affecting index.html')
       affectedFiles.push('index.html')
     } else if (toolName === 'delete_file' && args.path) {
       // File was deleted, just refresh tree

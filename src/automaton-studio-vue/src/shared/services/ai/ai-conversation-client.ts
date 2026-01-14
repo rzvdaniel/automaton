@@ -25,6 +25,7 @@ export class AiConversationClient {
   private eventSource: EventSource | null = null
   private abortController: AbortController | null = null
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  private isClosing: boolean = false
 
   constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || '') {
     this.baseUrl = baseUrl
@@ -154,17 +155,29 @@ export class AiConversationClient {
         }
       }
 
-      // Clean up after stream ends
+      // Clean up after stream ends (normal completion)
+      this.isClosing = true
       this.close()
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      // Check if this is an expected AbortError from normal closure
+      if (error instanceof Error && error.name === 'AbortError' && this.isClosing) {
+        // Expected abort from normal closure - not an error
+        console.log('[SSE Client] Stream closed normally')
+      } else if (error instanceof Error && error.name === 'AbortError') {
+        // Unexpected abort - user cancelled
         handlers.onCancelled?.()
       } else {
+        // Real error
         const errorMessage = error instanceof Error ? error.message : 'Failed to start conversation'
         handlers.onError?.({ error: errorMessage })
         console.error('[SSE Client] Connection error:', error)
       }
-      this.close()
+
+      if (!this.isClosing) {
+        this.close()
+      }
+    } finally {
+      this.isClosing = false
     }
   }
 
@@ -172,6 +185,7 @@ export class AiConversationClient {
    * Close the SSE connection
    */
   close(): void {
+    this.isClosing = true
     if (this.eventSource) {
       this.eventSource.close()
       this.eventSource = null

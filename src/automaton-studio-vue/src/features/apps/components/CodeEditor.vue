@@ -5,6 +5,8 @@
  * Provides syntax highlighting, auto-completion, and code editing features
  */
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+// Import Monaco config BEFORE monaco-editor to prevent worker errors
+import '../config/monaco.config'
 import * as monaco from 'monaco-editor'
 import { useAppEditorStore } from '../stores/app-editor.store'
 
@@ -35,15 +37,6 @@ const isDarkMode = computed(() => {
 onMounted(() => {
   if (!editorContainer.value || !file.value) return
 
-  // Configure Monaco environment for web workers
-  self.MonacoEnvironment = {
-    getWorker(_moduleId: string, label: string) {
-      // Use basic editor without web workers for simplicity
-      // This avoids CORS issues and complex worker setup
-      return null as any
-    },
-  }
-
   // Create editor instance
   editorInstance = monaco.editor.create(editorContainer.value, {
     value: file.value.content,
@@ -59,8 +52,8 @@ onMounted(() => {
     scrollBeyondLastLine: false,
     folding: true,
     autoIndent: 'full',
-    formatOnPaste: true,
-    formatOnType: true,
+    formatOnPaste: false, // Requires worker
+    formatOnType: false, // Requires worker
     suggestOnTriggerCharacters: true,
     quickSuggestions: true,
     bracketPairColorization: { enabled: true },
@@ -68,6 +61,10 @@ onMounted(() => {
       bracketPairs: true,
       indentation: true,
     },
+    // Disable features that require web workers to prevent errors
+    colorDecorators: false,
+    links: false,
+    occurrencesHighlight: 'off',
   })
 
   // Listen for content changes
@@ -94,11 +91,27 @@ onUnmounted(() => {
 watch(
   () => file.value?.content,
   (newContent, oldContent) => {
-    if (!editorInstance || !newContent) return
+    if (!editorInstance || !newContent) {
+      console.log('[CodeEditor] Watch triggered but editor or content missing', {
+        hasEditor: !!editorInstance,
+        newContent: newContent?.substring(0, 50),
+      })
+      return
+    }
 
     // Only update if content changed externally (not from editor)
     const currentValue = editorInstance.getValue()
+    console.log('[CodeEditor] Content watch triggered', {
+      filePath: props.filePath,
+      currentLength: currentValue.length,
+      newLength: newContent.length,
+      oldLength: oldContent?.length,
+      contentChanged: currentValue !== newContent,
+      externalChange: newContent !== oldContent,
+    })
+
     if (currentValue !== newContent && newContent !== oldContent) {
+      console.log(`[CodeEditor] Updating editor content for ${props.filePath}`)
       // Preserve cursor position
       const position = editorInstance.getPosition()
 
@@ -108,8 +121,11 @@ watch(
       if (position) {
         editorInstance.setPosition(position)
       }
+    } else {
+      console.log(`[CodeEditor] Skipping update - no external change detected`)
     }
   },
+  { deep: true }
 )
 
 // Watch for theme changes

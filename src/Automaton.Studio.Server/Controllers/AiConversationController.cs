@@ -85,31 +85,81 @@ public class AiConversationController : BaseController
                 "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}",
                 userId, request.Provider, request.Model, request.ResourceType);
 
-            // 2. Load conversation history from database if SessionId is provided
-            var history = await LoadConversationHistoryAsync(request.SessionId, userId);
+            // 2. Get or create session for chat history
+            Guid sessionId;
+            if (request.SessionId.HasValue)
+            {
+                sessionId = request.SessionId.Value;
+            }
+            else if (!string.IsNullOrEmpty(request.ResourceType) && request.ResourceId.HasValue)
+            {
+                // Parse ResourceType string to enum
+                if (Enum.TryParse<ChatResourceType>(request.ResourceType, ignoreCase: true, out var resourceTypeEnum))
+                {
+                    // Auto-create session if resource context is provided
+                    var session = await _chatHistoryService.GetOrCreateActiveSessionAsync(
+                        resourceTypeEnum,
+                        request.ResourceId.Value,
+                        userId,
+                        request.Provider,
+                        request.Model);
+                    sessionId = session.Id;
+                    _logger.LogInformation("Auto-created session {SessionId} for resource {ResourceType}/{ResourceId}",
+                        sessionId, request.ResourceType, request.ResourceId);
+                }
+                else
+                {
+                    // Invalid ResourceType, create general session
+                    var session = await _chatHistoryService.CreateSessionAsync(new CreateChatSessionRequest
+                    {
+                        ResourceType = ChatResourceType.General,
+                        ResourceId = Guid.Empty,
+                        Title = "New Chat",
+                        Provider = request.Provider,
+                        Model = request.Model
+                    }, userId);
+                    sessionId = session.Id;
+                    _logger.LogWarning("Invalid ResourceType '{ResourceType}', created general session {SessionId}",
+                        request.ResourceType, sessionId);
+                }
+            }
+            else
+            {
+                // No session and no resource context - create anonymous session
+                var session = await _chatHistoryService.CreateSessionAsync(new CreateChatSessionRequest
+                {
+                    ResourceType = ChatResourceType.General,
+                    ResourceId = Guid.Empty,
+                    Title = "New Chat",
+                    Provider = request.Provider,
+                    Model = request.Model
+                }, userId);
+                sessionId = session.Id;
+                _logger.LogInformation("Created general session {SessionId}", sessionId);
+            }
 
-            // 3. Build context-aware system prompt (with continuation context if needed)
+            // 3. Load conversation history from database
+            var history = await LoadConversationHistoryAsync(sessionId, userId);
+
+            // 4. Build context-aware system prompt (with continuation context if needed)
             var systemPrompt = await BuildSystemPromptAsync(request, userId, history);
 
-            // 4. Get tool provider based on resource type
+            // 5. Get tool provider based on resource type
             var toolProvider = GetToolProvider(request.ResourceType);
 
-            // 5. Setup AutomatonMcpClient with tool provider
+            // 6. Setup AutomatonMcpClient with tool provider
             _mcpClient.SetToolProvider(toolProvider);
 
-            // 6. Subscribe to conversation updates for auto-save
+            // 7. Subscribe to conversation updates for auto-save
             _mcpClient.ConversationUpdated += async (sender, e) =>
             {
                 await WriteConversationEvent(e);
 
-                // Auto-save messages during streaming
-                if (request.SessionId.HasValue)
-                {
-                    await SaveConversationUpdateAsync(e, request.SessionId.Value, userId);
-                }
+                // Auto-save messages during streaming (now always have a valid sessionId)
+                await SaveConversationUpdateAsync(e, sessionId, userId);
             };
 
-            // 7. Build conversation request with enhanced context
+            // 8. Build conversation request with enhanced context
             var conversationRequest = new ConversationRequest
             {
                 ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
@@ -122,18 +172,19 @@ public class AiConversationController : BaseController
                 Context = BuildContextDictionary(request, userId)
             };
 
-            // 8. Start streaming conversation
+            // 9. Start streaming conversation
             var result = await _mcpClient.StartConversationAsync(
-                conversationRequest, 
+                conversationRequest,
                 cancellationToken
             );
 
-            // 9. Write completion event
+            // 10. Write completion event
             if (result.IsSuccess)
             {
                 await WriteEvent("done", new
                 {
                     conversationId = result.ConversationId,
+                    sessionId = sessionId,
                     success = true
                 });
             }

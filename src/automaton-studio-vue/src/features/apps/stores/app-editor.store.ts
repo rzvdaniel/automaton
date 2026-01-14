@@ -557,9 +557,16 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) return
 
     const fileIndex = openFiles.value.findIndex((f) => f.path === filePath)
-    if (fileIndex === -1) return
+    if (fileIndex === -1) {
+      console.log(`File ${filePath} not open, skipping reload`)
+      return
+    }
 
     const openFile = openFiles.value[fileIndex]
+    if (!openFile) {
+      console.log(`File ${filePath} not found in open files`)
+      return
+    }
 
     // Don't reload if file has unsaved changes (user is editing)
     if (openFile.isDirty) {
@@ -568,16 +575,29 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
 
     try {
+      console.log(`Reloading file ${filePath} from server...`)
       const response = await appsService.readFile(currentApp.value.id, filePath)
 
       if (response.success && response.content !== undefined) {
-        // Create a new file object to trigger reactivity
-        openFiles.value[fileIndex] = {
-          ...openFile,
+        console.log(`File ${filePath} reloaded successfully, updating content (${response.content.length} chars)`)
+
+        // Force reactivity by creating a completely new array with new object
+        const newOpenFiles = [...openFiles.value]
+        newOpenFiles[fileIndex] = {
+          path: openFile.path,
           content: response.content,
-          originalContent: response.content,
+          language: openFile.language,
           isDirty: false,
+          originalContent: response.content,
+          isBackendStep: openFile.isBackendStep,
+          stepId: openFile.stepId,
+          stepName: openFile.stepName,
         }
+        openFiles.value = newOpenFiles
+
+        console.log(`File ${filePath} state updated in store`)
+      } else {
+        console.warn(`File ${filePath} reload response invalid:`, response)
       }
     } catch (err: unknown) {
       console.error(`Failed to reload file ${filePath}:`, err)

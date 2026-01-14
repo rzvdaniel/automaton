@@ -338,6 +338,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           conversationId.value = data.conversationId
           isGenerating.value = false
 
+          // Update active session ID if backend created a new session
+          if (data.sessionId && activeSession.value) {
+            activeSession.value.id = data.sessionId
+          }
+
           // Mark all streaming messages as complete
           messages.value.forEach((m) => {
             if (m.isStreaming) {
@@ -418,15 +423,22 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
    * Handle tool call execution
    */
   function handleToolCall(toolCall: ToolCall) {
-    const toolName = toolCall.function?.name || 'unknown'
-    const toolArgs = toolCall.function?.arguments ? JSON.parse(toolCall.function.arguments) : {}
-    
+    console.log('[useAiChat] handleToolCall received:', toolCall)
+
+    // Backend sends normalized format for all AI providers (OpenAI, Anthropic, Google, etc.)
+    // Properties are capitalized (Name, Arguments) due to C# naming conventions
+    const toolName = (toolCall as any).Name || toolCall.name || 'unknown'
+    const toolArgs = (toolCall as any).Arguments || toolCall.arguments || {}
+
+    console.log('[useAiChat] Parsed tool:', { toolName, toolArgs })
+
     messages.value.push({
       id: toolCall.id,
       role: 'assistant',
       type: 'toolExecution',
       content: `Executing ${toolName}...`,
       toolName,
+      toolArgs, // Store args for later use
       toolStatus: 'executing',
       timestamp: new Date(),
     })
@@ -467,7 +479,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             // Not JSON, use as-is
           }
 
-          options.onToolExecuted(toolMessage.toolName, {}, resultData)
+          // Use stored args from tool call
+          options.onToolExecuted(toolMessage.toolName, toolMessage.toolArgs || {}, resultData)
         } catch (err) {
           console.error('Error in onToolExecuted callback:', err)
         }
