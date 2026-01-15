@@ -122,14 +122,6 @@ public class AiApiKeyService
     /// </summary>
     public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
     {
-        // Get environment key first (desktop scenarios)
-        var envKeys = GetEnvironmentApiKeys();
-        if (envKeys.TryGetValue(providerName, out var envKey) && !string.IsNullOrEmpty(envKey))
-        {
-            logger.LogInformation("Using environment API key for provider {ProviderName}", providerName);
-            return envKey;
-        }
-
         // Get user's stored keys for this provider
         var keys = await GetAiApiKeysByProviderAsync(userId, providerName);
         var firstActiveKey = keys.FirstOrDefault(k => k.IsActive);
@@ -146,7 +138,9 @@ public class AiApiKeyService
             firstActiveKey.LastUsedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync();
 
-            return DecryptApiKey(firstActiveKey.EncryptedApiKey);
+            var decryptedKey = DecryptApiKey(firstActiveKey.EncryptedApiKey);
+
+            return decryptedKey;
         }
         catch (Exception ex)
         {

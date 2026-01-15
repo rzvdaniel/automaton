@@ -16,7 +16,6 @@
     "@primevue/themes": "^4.5.4",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
-    "event-source-polyfill": "^1.0.31",
     "monaco-editor": "^0.55.1",
     "pinia": "^3.0.4",
     "primeflex": "^4.0.0",

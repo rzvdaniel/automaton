@@ -6,12 +6,17 @@ namespace Automaton.Studio.Server.Enums;
 public enum ChatResourceType
 {
     /// <summary>
+    /// General chat session (not associated with any specific resource)
+    /// </summary>
+    General = 0,
+
+    /// <summary>
     /// Chat session associated with a Custom Step
     /// </summary>
-    CustomStep = 0,
+    CustomStep = 1,
 
     /// <summary>
     /// Chat session associated with a Web App
     /// </summary>
-    WebApp = 1
+    WebApp = 2
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Automaton.Mcp.Client.Providers;
 
 namespace Automaton.Mcp.Client.Extensions;
 
@@ -13,7 +14,24 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddAutomatonMcpClient(this IServiceCollection services)
     {
-        // Register the MCP client (requires IStudioMcpToolProvider to be registered separately)
+        // Register the provider registry
+        services.AddSingleton<IAiProviderRegistry>(sp =>
+        {
+            var registry = new AiProviderRegistry();
+            var logger = sp.GetRequiredService<ILoggerFactory>();
+            
+            // Register OpenAI provider
+            var openAiProvider = new OpenAiProvider(logger.CreateLogger("OpenAiProvider"));
+            registry.Register(openAiProvider);
+            
+            // Register Anthropic provider
+            var anthropicProvider = new AnthropicProvider(logger.CreateLogger("AnthropicProvider"));
+            registry.Register(anthropicProvider);
+            
+            return registry;
+        });
+        
+        // Register the MCP client (tool provider is set dynamically via SetToolProvider)
         services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();
         
         return services;

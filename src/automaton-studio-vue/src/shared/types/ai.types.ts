@@ -58,6 +58,10 @@ export interface StreamConversationRequest {
   systemPrompt?: string
   history?: ConversationMessage[]
   context?: Record<string, any>
+  sessionId?: string
+  resourceType?: string
+  resourceId?: string
+  language?: string
 }
 
 // ============================================
@@ -76,6 +80,7 @@ export interface SseConversationUpdate {
 
 export interface SseDoneEvent {
   conversationId: string
+  sessionId?: string
   success: boolean
 }
 
@@ -89,11 +94,8 @@ export interface SseErrorEvent {
 
 export interface ToolCall {
   id: string
-  type: string
-  function?: {
-    name: string
-    arguments: string | Record<string, any>
-  }
+  name: string // Backend normalized format (works for all AI providers)
+  arguments: Record<string, any> // Backend normalized format
 }
 
 export interface ToolResult {
@@ -125,6 +127,7 @@ export interface ChatMessage {
   
   // For tool execution messages
   toolName?: string
+  toolArgs?: any
   toolStatus?: 'executing' | 'completed' | 'error'
   toolResult?: any
   

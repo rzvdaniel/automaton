@@ -1222,6 +1222,36 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserGitHubToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EncryptedToken")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("GitHubUsername")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastValidatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserGitHubTokens");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
                 {
                     b.Property<Guid>("Id")

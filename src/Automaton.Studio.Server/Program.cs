@@ -26,6 +26,8 @@ using System.Transactions;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
+using Automaton.Mcp.Client;
+using Automaton.Mcp.Client.Extensions;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -58,6 +60,33 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
+
+// Configure cookie authentication to not redirect API requests
+services.ConfigureApplicationCookie(options =>
+{
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // For API requests (including SSE), return 401 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        // For API requests, return 403 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
 
 
 
@@ -155,40 +184,61 @@ services.AddHttpContextAccessor();
 
 Serilog.Debugging.SelfLog.Enable(Console.Out);
 
+
 applicationBuilder.Host.UseSerilog((context, services, config) =>
-    config.Destructure.UsingAttributes()
-          .Destructure.JsonNetTypes()
-          .Enrich.With<EventTypeEnricher>()
-          .Enrich.With(services.GetService<UserNameEnricher>())
-          .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-          .WriteTo.MariaDB(
-              connectionString: configurationManager.GetConnectionString("MySqlConnection"),
-              tableName: "Logs",
-              autoCreateTable: false,
-              useBulkInsert: true,
-              restrictedToMinimumLevel: LogEventLevel.Information,
-              batchPostingLimit: 1000,
-              period: TimeSpan.FromSeconds(30),
-              options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
-              {
-                  PropertiesToColumnsMapping = new Dictionary<string, string>
-                  {
-                      { "Exception", "Exception" },
-                      { "Level", "Level" },
-                      { "Message", "Message" },
-                      { "MessageTemplate", "MessageTemplate" },
-                      { "Properties", "Properties" },
-                      { "Timestamp", "Timestamp" },
-                      { "EventType", "EventType" },
-                      { "UserName", "UserName" }
-                  },
-                  TimestampInUtc = true,
-                  ExcludePropertiesWithDedicatedColumn = false,
-                  EnumsAsInts = false,
-                  LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
-                  LogRecordsExpiration = TimeSpan.FromDays(31)
-              })
-);
+{
+    var logConfig = config
+        .Destructure.UsingAttributes()
+        .Destructure.JsonNetTypes()
+        .Enrich.With<EventTypeEnricher>()
+        .Enrich.With(services.GetService<UserNameEnricher>())
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning);
+
+    // Console logging - environment-specific
+    if (applicationBuilder.Environment.IsDevelopment())
+    {
+        // Development: detailed output for debugging
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Debug);
+    }
+    else
+    {
+        // Production: compact, secure output
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Information);
+    }
+
+    // Database sink (same for both environments)
+    logConfig.WriteTo.MariaDB(
+        connectionString: configurationManager.GetConnectionString("MySqlConnection"),
+        tableName: "Logs",
+        autoCreateTable: false,
+        useBulkInsert: true,
+        restrictedToMinimumLevel: LogEventLevel.Information,
+        batchPostingLimit: 1000,
+        period: TimeSpan.FromSeconds(30),
+        options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
+        {
+            PropertiesToColumnsMapping = new Dictionary<string, string>
+            {
+                { "Exception", "Exception" },
+                { "Level", "Level" },
+                { "Message", "Message" },
+                { "MessageTemplate", "MessageTemplate" },
+                { "Properties", "Properties" },
+                { "Timestamp", "Timestamp" },
+                { "EventType", "EventType" },
+                { "UserName", "UserName" }
+            },
+            TimestampInUtc = true,
+            ExcludePropertiesWithDedicatedColumn = false,
+            EnumsAsInts = false,
+            LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
+            LogRecordsExpiration = TimeSpan.FromDays(31)
+        });
+});
 
 services.AddHangfire(x =>
 {
@@ -251,6 +301,20 @@ services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
 
+// System Prompt Builders for AI Chat
+services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
+
+// MCP Tool Providers for AI Chat
+services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();
+services.AddScoped<Automaton.Studio.Server.Services.Mcp.AppMcpToolProvider>();
+
+// MCP Client
+services.AddAutomatonMcpClient();
+
+// AI Chat History Service
+services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
+
 // Project/Organization services
 services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
@@ -291,7 +355,8 @@ if (corsOrigins != null && corsOrigins.Length > 0)
         builder
             .WithOrigins(corsOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader();
+            .AllowAnyHeader()
+            .AllowCredentials(); // Required for Authorization header in SSE requests
     }));
 }
 

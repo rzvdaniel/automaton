@@ -8,6 +8,7 @@ import type {
   SseDoneEvent,
   SseErrorEvent,
 } from '@/shared/types/ai.types'
+import { tokenStorage } from '../api/axios-instance'
 
 export type SseEventHandler = {
   onUpdate?: (data: SseConversationUpdate) => void
@@ -22,13 +23,16 @@ export type SseEventHandler = {
 export class AiConversationClient {
   private baseUrl: string
   private eventSource: EventSource | null = null
+  private abortController: AbortController | null = null
+  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  private isClosing: boolean = false
 
   constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || '') {
     this.baseUrl = baseUrl
   }
 
   /**
-   * Start a streaming conversation with AI
+   * Start a streaming conversation with AI using native fetch + ReadableStream
    */
   async startConversation(
     request: StreamConversationRequest,
@@ -39,83 +43,137 @@ export class AiConversationClient {
     this.close()
 
     try {
-      // Get auth token
-      const token = localStorage.getItem('auth_token')
+      if (!this.baseUrl) {
+        throw new Error('API base URL is not configured (VITE_API_BASE_URL).')
+      }
+
+      // Get auth token (use shared token storage to match axios config)
+      const token = tokenStorage.getAccessToken() || localStorage.getItem('auth_token')
       if (!token) {
         throw new Error('No authentication token found')
       }
 
       const url = `${this.baseUrl}/api/ai/conversation/stream`
 
-      // Use event-source-polyfill for POST support
-      const EventSourcePolyfill = await this.getEventSourcePolyfill()
+      // Create abort controller for cancellation
+      this.abortController = new AbortController()
 
-      this.eventSource = new EventSourcePolyfill(url, {
+      // Link external abort signal if provided
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', () => {
+          this.abortController?.abort()
+        })
+      }
+
+      // Use native fetch with ReadableStream
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
         },
         body: JSON.stringify(request),
+        credentials: 'include',
+        signal: this.abortController.signal,
       })
 
-      // Handle update events
-      if (this.eventSource) {
-        this.eventSource.addEventListener('update', (event: MessageEvent) => {
-          try {
-            const data: SseConversationUpdate = JSON.parse(event.data)
-            handlers.onUpdate?.(data)
-          } catch (error) {
-            console.error('Error parsing update event:', error)
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      if (!response.body) {
+        throw new Error('Response body is null')
+      }
+
+      // Process SSE stream
+      this.reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let shouldStop = false
+
+      while (!shouldStop) {
+        const { done, value } = await this.reader.read()
+
+        if (done) {
+          break
+        }
+
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE messages (separated by \n\n)
+        const messages = buffer.split('\n\n')
+        buffer = messages.pop() || '' // Keep incomplete message in buffer
+
+        for (const message of messages) {
+          if (!message.trim()) continue
+
+          // Parse SSE format: "event: <type>\ndata: <json>"
+          const lines = message.split('\n')
+          let eventType = 'message'
+          let eventData = ''
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.substring(6).trim()
+            } else if (line.startsWith('data:')) {
+              eventData = line.substring(5).trim()
+            }
           }
-        })
 
-        // Handle done events
-        this.eventSource.addEventListener('done', (event: MessageEvent) => {
+          // Handle different event types
           try {
-            const data: SseDoneEvent = JSON.parse(event.data)
-            handlers.onDone?.(data)
-            this.close()
-          } catch (error) {
-            console.error('Error parsing done event:', error)
+            if (eventType === 'update') {
+              const data = this.parseJson<SseConversationUpdate>(eventData)
+              if (data) {
+                handlers.onUpdate?.(data)
+              }
+            } else if (eventType === 'done') {
+              const data = this.parseJson<SseDoneEvent>(eventData)
+              if (data) {
+                handlers.onDone?.(data)
+              }
+              shouldStop = true
+              break
+            } else if (eventType === 'error') {
+              const data = this.parseJson<SseErrorEvent>(eventData)
+              if (data) {
+                handlers.onError?.(data)
+              }
+              shouldStop = true
+              break
+            } else if (eventType === 'cancelled') {
+              handlers.onCancelled?.()
+              shouldStop = true
+              break
+            }
+          } catch (err) {
+            console.error('[SSE Client] Error parsing event:', err)
           }
-        })
-
-        // Handle error events
-        this.eventSource.addEventListener('error', (event: MessageEvent) => {
-          try {
-            const data: SseErrorEvent = JSON.parse(event.data)
-            handlers.onError?.(data)
-            this.close()
-          } catch (error) {
-            console.error('Error parsing error event:', error)
-          }
-        })
-
-        // Handle cancelled events
-        this.eventSource.addEventListener('cancelled', () => {
-          handlers.onCancelled?.()
-          this.close()
-        })
-
-        // Handle generic errors (connection issues)
-        this.eventSource.onerror = () => {
-          handlers.onError?.({ error: 'Connection to AI server lost' })
-          this.close()
         }
       }
 
-      // Handle abort signal
-      if (abortSignal) {
-        abortSignal.addEventListener('abort', () => {
-          this.close()
-        })
-      }
+      // Stream completed successfully
+      console.log('[SSE Client] Stream completed successfully')
     } catch (error) {
-      handlers.onError?.({
-        error: error instanceof Error ? error.message : 'Failed to start conversation',
-      })
-      throw error
+      // Handle errors during streaming
+      if (error instanceof Error && error.name === 'AbortError') {
+        // AbortError means stream was cancelled (expected on close)
+        console.log('[SSE Client] Stream cancelled')
+        handlers.onCancelled?.()
+      } else {
+        // Real error
+        const errorMessage = error instanceof Error ? error.message : 'Failed to start conversation'
+        handlers.onError?.({ error: errorMessage })
+        console.error('[SSE Client] Connection error:', error)
+      }
+    } finally {
+      // Always clean up connections in finally block
+      this.isClosing = true
+      this.close()
+      this.isClosing = false
     }
   }
 
@@ -123,22 +181,43 @@ export class AiConversationClient {
    * Close the SSE connection
    */
   close(): void {
-    if (this.eventSource) {
-      this.eventSource.close()
-      this.eventSource = null
+    this.isClosing = true
+
+    try {
+      if (this.eventSource) {
+        this.eventSource.close()
+        this.eventSource = null
+      }
+    } catch (err) {
+      // Ignore errors during cleanup
+    }
+
+    try {
+      if (this.abortController) {
+        this.abortController.abort()
+        this.abortController = null
+      }
+    } catch (err) {
+      // Ignore abort errors during cleanup
+    }
+
+    if (this.reader) {
+      // reader.cancel() returns a Promise, catch rejections
+      this.reader.cancel().catch(() => {
+        // Ignore cancellation errors
+      })
+      this.reader = null
     }
   }
 
-  /**
-   * Get EventSource polyfill for POST support
-   */
-  private async getEventSourcePolyfill(): Promise<any> {
+  private parseJson<T>(raw: unknown): T | null {
+    if (!raw || typeof raw !== 'string') {
+      return null
+    }
     try {
-      const module = await import('event-source-polyfill')
-      return module.EventSourcePolyfill
-    } catch (error) {
-      console.warn('event-source-polyfill not available, falling back to native EventSource')
-      return EventSource
+      return JSON.parse(raw) as T
+    } catch {
+      return null
     }
   }
 }

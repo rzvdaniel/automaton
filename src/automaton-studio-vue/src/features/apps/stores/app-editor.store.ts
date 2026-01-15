@@ -525,7 +525,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Refresh linked steps
+   * Refresh linked steps from the server
    */
   async function refreshLinkedSteps(): Promise<void> {
     if (!currentApp.value) return
@@ -534,6 +534,116 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       linkedSteps.value = await appsService.getLinkedSteps(currentApp.value.id)
     } catch (err: unknown) {
       console.error('Failed to refresh linked steps:', err)
+    }
+  }
+
+  /**
+   * Refresh the file tree without closing open files
+   */
+  async function refreshFileTree(): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      fileTree.value = await appsService.getFileTree(currentApp.value.id)
+    } catch (err: unknown) {
+      console.error('Failed to refresh file tree:', err)
+    }
+  }
+
+  /**
+   * Reload a specific file from the server (updates content if file is open)
+   */
+  async function reloadFile(filePath: string): Promise<void> {
+    if (!currentApp.value) return
+
+    const fileIndex = openFiles.value.findIndex((f) => f.path === filePath)
+    if (fileIndex === -1) {
+      console.log(`File ${filePath} not open, skipping reload`)
+      return
+    }
+
+    const openFile = openFiles.value[fileIndex]
+    if (!openFile) {
+      console.log(`File ${filePath} not found in open files`)
+      return
+    }
+
+    // Don't reload if file has unsaved changes (user is editing)
+    if (openFile.isDirty) {
+      console.log(`Skipping reload of ${filePath} - file has unsaved changes`)
+      return
+    }
+
+    try {
+      console.log(`Reloading file ${filePath} from server...`)
+      const response = await appsService.readFile(currentApp.value.id, filePath)
+
+      if (response.success && response.content !== undefined) {
+        console.log(`File ${filePath} reloaded successfully, updating content (${response.content.length} chars)`)
+
+        // Force reactivity by creating a completely new array with new object
+        const newOpenFiles = [...openFiles.value]
+        newOpenFiles[fileIndex] = {
+          path: openFile.path,
+          content: response.content,
+          language: openFile.language,
+          isDirty: false,
+          originalContent: response.content,
+          isBackendStep: openFile.isBackendStep,
+          stepId: openFile.stepId,
+          stepName: openFile.stepName,
+        }
+        openFiles.value = newOpenFiles
+
+        console.log(`File ${filePath} state updated in store`)
+      } else {
+        console.warn(`File ${filePath} reload response invalid:`, response)
+      }
+    } catch (err: unknown) {
+      console.error(`Failed to reload file ${filePath}:`, err)
+    }
+  }
+
+  /**
+   * Reload the currently active file
+   */
+  async function reloadActiveFile(): Promise<void> {
+    if (activeFilePath.value) {
+      await reloadFile(activeFilePath.value)
+    }
+  }
+
+  /**
+   * Refresh files after AI tool execution
+   * @param affectedFiles - List of file paths that were modified
+   */
+  async function refreshFilesAfterAiUpdate(affectedFiles?: string[]): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      // Always refresh the file tree
+      await refreshFileTree()
+
+      // If specific files were affected, reload them if open
+      if (affectedFiles && affectedFiles.length > 0) {
+        for (const filePath of affectedFiles) {
+          await reloadFile(filePath)
+        }
+      } else {
+        // If no specific files mentioned, reload all open files
+        for (const file of openFiles.value) {
+          if (!file.isBackendStep && !file.isDirty) {
+            await reloadFile(file.path)
+          }
+        }
+      }
+
+      // Refresh preview if index.html was affected
+      if (!affectedFiles || affectedFiles.includes('index.html')) {
+        await refreshPreview()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to refresh files after AI update:', err)
     }
   }
 
@@ -643,6 +753,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     createBackendStep,
     unlinkStep,
     refreshLinkedSteps,
+    refreshFileTree,
+    reloadFile,
+    reloadActiveFile,
+    refreshFilesAfterAiUpdate,
     togglePreviewOverlay,
     openPreviewOverlay,
     closePreviewOverlay,
