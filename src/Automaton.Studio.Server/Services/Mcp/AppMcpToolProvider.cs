@@ -1,12 +1,9 @@
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
-using Automaton.Studio.Server.Models;
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Models;
-using Automaton.Steps.Enums;
 
 namespace Automaton.Studio.Server.Services.Mcp;
 
@@ -22,9 +19,6 @@ public class AppMcpToolProvider : IMcpToolProvider
     private readonly CustomStepsService _customStepsService;
     private readonly UserContextService _userContextService;
     private readonly IScriptEngineHost _scriptHost;
-
-    public const string SaveAppCodeToolName = "save_app_code";
-    public const string SaveStepCodeToolName = "save_step_code";
 
     public AppMcpToolProvider(
         ILogger<AppMcpToolProvider> logger,
@@ -70,7 +64,7 @@ public class AppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = SaveAppCodeToolName,
+                Name = "save_app_code",
                 Description = "Save HTML/CSS/JavaScript code to the app",
                 InputSchema = JsonDocument.Parse("""
                 {
@@ -140,7 +134,7 @@ public class AppMcpToolProvider : IMcpToolProvider
             },
             new McpTool
             {
-                Name = SaveStepCodeToolName,
+                Name = "save_step_code",
                 Description = "Save code to a backend step",
                 InputSchema = JsonDocument.Parse("""
                 {
@@ -362,7 +356,7 @@ public class AppMcpToolProvider : IMcpToolProvider
             {
                 // Frontend tools
                 "get_current_code" => await HandleGetCurrentCode(arguments, context),
-                SaveAppCodeToolName => await HandleSaveAppCode(arguments, context),
+                "save_app_code" => await HandleSaveAppCode(arguments, context),
                 
                 // File-level tools (for multi-file apps)
                 "read_file" => await HandleReadFile(arguments, context),
@@ -373,7 +367,7 @@ public class AppMcpToolProvider : IMcpToolProvider
                 // Backend tools
                 "create_backend_step" => await HandleCreateBackendStep(arguments, context),
                 "get_step_code" => await HandleGetStepCode(arguments),
-                SaveStepCodeToolName => await HandleSaveStepCode(arguments),
+                "save_step_code" => await HandleSaveStepCode(arguments),
                 "suggest_step_variables" => await HandleSuggestStepVariables(arguments),
                 "execute_backend_step_code" => await HandleExecuteBackendStepCode(arguments),
                 "link_step_to_app" => await HandleLinkStepToApp(arguments, context),

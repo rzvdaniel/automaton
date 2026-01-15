@@ -177,47 +177,53 @@ function handleKeyPress(event: KeyboardEvent) {
         </div>
       </div>
 
-      <!-- Messages -->
-      <div v-else class="messages">
-        <div
-          v-for="message in messages"
-          :key="message.id"
-          class="message"
-          :class="[message.role, message.type]"
-        >
-          <div class="message-header">
-            <span class="message-role">
-              {{ message.role === 'user' ? 'You' : 'AI' }}
-              <span v-if="message.toolName" class="tool-badge">
-                <i class="pi pi-cog"></i> {{ message.toolName }}
-              </span>
-            </span>
-            <span class="message-time">
-              {{ message.timestamp.toLocaleTimeString() }}
-            </span>
+      <!-- Messages: User in bubbles, AI in timeline -->
+      <div v-else class="messages-container">
+        <!-- User messages as bubbles, AI messages as timeline -->
+        <template v-for="(message, index) in messages" :key="message.id">
+          <!-- User message - Chat bubble -->
+          <div v-if="message.role === 'user'" class="user-message">
+            <div class="message-bubble">{{ message.content }}</div>
           </div>
-          
-          <div class="message-content">
-            {{ message.content }}
-            
-            <!-- Tool execution status -->
-            <div v-if="message.toolStatus" class="tool-status" :class="message.toolStatus">
-              <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner"></i>
-              <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check"></i>
-              <i v-else-if="message.toolStatus === 'error'" class="pi pi-times"></i>
-              {{ message.toolStatus }}
+
+          <!-- AI message - Timeline -->
+          <div v-else class="timeline">
+            <div
+              class="timeline-item"
+              :class="[
+                { 'is-last': index === messages.length - 1 && !isGenerating },
+                message.toolName ? 'has-tool' : 'regular'
+              ]"
+            >
+              <!-- Simple bullet point -->
+              <div class="timeline-bullet" :class="[message.toolName ? 'tool' : 'regular']">•</div>
+
+              <!-- Connector line (visible if more messages follow) -->
+              <div v-if="index < messages.length - 1 || isGenerating" class="timeline-connector"></div>
+
+              <!-- Message content -->
+              <div class="timeline-content">
+                <div class="message-text">{{ message.content }}</div>
+                
+                <!-- Tool execution status -->
+                <div v-if="message.toolStatus" class="tool-status" :class="message.toolStatus">
+                  <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner"></i>
+                  <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check"></i>
+                  <i v-else-if="message.toolStatus === 'error'" class="pi pi-times"></i>
+                  <span>{{ message.toolStatus }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </template>
 
         <!-- Generating indicator -->
-        <div v-if="isGenerating" class="message assistant generating">
-          <div class="message-header">
-            <span class="message-role">AI</span>
-          </div>
-          <div class="message-content">
-            <i class="pi pi-spin pi-spinner mr-2"></i>
-            Thinking...
+        <div v-if="isGenerating" class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-bullet">•</div>
+            <div class="timeline-content">
+              <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Processing your request...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -309,52 +315,114 @@ function handleKeyPress(event: KeyboardEvent) {
   font-size: 0.75rem;
 }
 
-.messages {
+/* Messages Container */
+.messages-container {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
-.message {
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--p-border-radius);
-  max-width: 90%;
+/* User Message Bubble */
+.user-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 1rem;
 }
 
-.message.user {
-  background-color: var(--p-primary-100);
-  align-self: flex-end;
-  margin-left: 10%;
-}
-
-.message.assistant {
-  background-color: var(--p-surface-100);
+.user-message .message-label {
   align-self: flex-start;
-  margin-right: 10%;
+  margin-bottom: 0.35rem;
 }
 
-.message.generating {
-  opacity: 0.7;
+.message-bubble {
+  max-width: 85%;
+  padding: 0.625rem 0.875rem;
+  background-color: var(--p-primary-500);
+  color: white;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.message.toolExecution {
-  background-color: var(--p-blue-50);
-  border-left: 3px solid var(--p-blue-500);
-}
-
-.message-header {
+/* Timeline Styles */
+.timeline {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  margin-left: 0.5rem;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 1rem;
+  position: relative;
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Simple bullet */
+.timeline-bullet {
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--p-surface-400);
+  flex-shrink: 0;
+  z-index: 2;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  transform: translateX(-0.35rem);
+}
+
+.timeline-bullet.tool {
+  color: var(--p-green-500);
+}
+
+.timeline-bullet.regular {
+  color: var(--p-surface-400);
+}
+
+/* Connecting line */
+.timeline-connector {
+  position: absolute;
+  left: -0.5px;
+  top: 1.75rem;
+  width: 1px;
+  height: calc(100% + 0.5rem);
+  background-color: var(--p-surface-300);
+}
+
+.timeline-item.is-last .timeline-connector {
+  display: none;
+}
+
+/* Content */
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.125rem;
+}
+
+.message-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.25rem;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.message-role {
+.role-name {
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  color: var(--p-text-color);
 }
 
 .tool-badge {
@@ -366,26 +434,34 @@ function handleKeyPress(event: KeyboardEvent) {
   color: var(--p-blue-900);
   border-radius: 0.25rem;
   font-size: 0.65rem;
+  white-space: nowrap;
 }
 
 .message-time {
   color: var(--p-text-secondary);
+  font-size: 0.7rem;
+  margin-left: auto;
 }
 
-.message-content {
-  font-size: 0.8rem;
-  line-height: 1.4;
+.message-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--p-text-color);
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .tool-status {
   margin-top: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  margin-left: -1.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.375rem;
+  font-weight: 500;
 }
 
 .tool-status.executing {
@@ -424,17 +500,13 @@ function handleKeyPress(event: KeyboardEvent) {
   border-color: var(--p-red-800);
 }
 
-:global(.app-dark) .message.user {
-  background-color: var(--p-primary-900);
+:global(.app-dark) .message-bubble {
+  background-color: var(--p-primary-600);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-:global(.app-dark) .message.assistant {
-  background-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .message.toolExecution {
-  background-color: var(--p-blue-900);
-  border-left-color: var(--p-blue-400);
+:global(.app-dark) .timeline-connector {
+  background-color: var(--p-surface-600);
 }
 
 :global(.app-dark) .input-area {
