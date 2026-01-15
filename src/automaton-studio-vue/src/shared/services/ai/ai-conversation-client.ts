@@ -155,16 +155,13 @@ export class AiConversationClient {
         }
       }
 
-      // Clean up after stream ends (normal completion)
-      this.isClosing = true
-      this.close()
+      // Stream completed successfully
+      console.log('[SSE Client] Stream completed successfully')
     } catch (error) {
-      // Check if this is an expected AbortError from normal closure
-      if (error instanceof Error && error.name === 'AbortError' && this.isClosing) {
-        // Expected abort from normal closure - not an error
-        console.log('[SSE Client] Stream closed normally')
-      } else if (error instanceof Error && error.name === 'AbortError') {
-        // Unexpected abort - user cancelled
+      // Handle errors during streaming
+      if (error instanceof Error && error.name === 'AbortError') {
+        // AbortError means stream was cancelled (expected on close)
+        console.log('[SSE Client] Stream cancelled')
         handlers.onCancelled?.()
       } else {
         // Real error
@@ -172,11 +169,10 @@ export class AiConversationClient {
         handlers.onError?.({ error: errorMessage })
         console.error('[SSE Client] Connection error:', error)
       }
-
-      if (!this.isClosing) {
-        this.close()
-      }
     } finally {
+      // Always clean up connections in finally block
+      this.isClosing = true
+      this.close()
       this.isClosing = false
     }
   }
@@ -186,16 +182,30 @@ export class AiConversationClient {
    */
   close(): void {
     this.isClosing = true
-    if (this.eventSource) {
-      this.eventSource.close()
-      this.eventSource = null
+
+    try {
+      if (this.eventSource) {
+        this.eventSource.close()
+        this.eventSource = null
+      }
+    } catch (err) {
+      // Ignore errors during cleanup
     }
-    if (this.abortController) {
-      this.abortController.abort()
-      this.abortController = null
+
+    try {
+      if (this.abortController) {
+        this.abortController.abort()
+        this.abortController = null
+      }
+    } catch (err) {
+      // Ignore abort errors during cleanup
     }
+
     if (this.reader) {
-      this.reader.cancel()
+      // reader.cancel() returns a Promise, catch rejections
+      this.reader.cancel().catch(() => {
+        // Ignore cancellation errors
+      })
       this.reader = null
     }
   }

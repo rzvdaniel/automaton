@@ -388,8 +388,29 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           )
 
           if (existingMessage) {
-            // Update existing streaming message
-            existingMessage.content = message.content
+            // Check if this is a completely different message (not just streaming continuation)
+            // Detect if the new content doesn't START with the existing content
+            const isNewMessage = existingMessage.content.length > 50 &&
+                                !message.content.startsWith(existingMessage.content.substring(0, 30))
+
+            if (isNewMessage) {
+              console.log('[useAiChat] Detected new message (not streaming continuation), preserving existing message')
+
+              // Mark existing message as complete
+              existingMessage.isStreaming = false
+
+              // Add new message for the summary (will appear after tool messages)
+              messages.value.push({
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: message.content,
+                timestamp: new Date(),
+                isStreaming: true,
+              })
+            } else {
+              // Streaming continuation - update existing message
+              existingMessage.content = message.content
+            }
           } else {
             // Add new assistant message
             messages.value.push({
@@ -425,6 +446,15 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   function handleToolCall(toolCall: ToolCall) {
     console.log('[useAiChat] handleToolCall received:', toolCall)
 
+    // Check if we've already added this tool call (backend may send duplicates)
+    const existingMessage = messages.value.find(
+      (m) => m.id === toolCall.id && m.type === 'toolExecution'
+    )
+    if (existingMessage) {
+      console.log('[useAiChat] Tool call already exists, skipping:', toolCall.id)
+      return
+    }
+
     // Backend sends normalized format for all AI providers (OpenAI, Anthropic, Google, etc.)
     // Properties are capitalized (Name, Arguments) due to C# naming conventions
     const toolName = (toolCall as any).Name || toolCall.name || 'unknown'
@@ -443,14 +473,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       timestamp: new Date(),
     })
 
-    // Notify tool execution callback
-    if (options?.onToolExecuted) {
-      try {
-        options.onToolExecuted(toolName, toolArgs)
-      } catch (err) {
-        console.error('Error in onToolExecuted callback:', err)
-      }
-    }
+    // Note: We don't call onToolExecuted here - only when the result is received
+    // This prevents duplicate calls and ensures we have the result data
   }
 
   /**

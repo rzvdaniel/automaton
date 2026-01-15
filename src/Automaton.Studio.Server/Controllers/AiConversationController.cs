@@ -9,6 +9,7 @@ using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 
@@ -150,16 +151,52 @@ public class AiConversationController : BaseController
             // 6. Setup AutomatonMcpClient with tool provider
             _mcpClient.SetToolProvider(toolProvider);
 
-            // 7. Subscribe to conversation updates for auto-save
+            // 7. Save the user's message BEFORE starting the conversation
+            await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+            {
+                SessionId = sessionId,
+                Role = "user",
+                Content = request.Message,
+                MessageType = ChatMessageType.Text,
+                Metadata = "{}"
+            }, userId);
+            _logger.LogInformation("Saved user message to session {SessionId}", sessionId);
+
+            // 8. Collect pending updates for saving after conversation completes
+            var pendingUpdates = new List<ConversationUpdatedEvent>();
+
+            // 9. Subscribe to conversation updates - stream to client immediately, queue for persistence
             _mcpClient.ConversationUpdated += async (sender, e) =>
             {
+                // Stream to client immediately (SSE)
                 await WriteConversationEvent(e);
 
-                // Auto-save messages during streaming (now always have a valid sessionId)
-                await SaveConversationUpdateAsync(e, sessionId, userId);
+                // Save tool calls and results immediately (they don't have the disposal issue)
+                // But queue complete text messages for saving after the conversation
+                if (e.ToolCalls.Any() || e.ToolResults.Any())
+                {
+                    await SaveToolUpdatesAsync(e, sessionId, userId);
+                }
+
+                // Queue complete messages for saving after conversation ends
+                var completeMessages = e.Messages.Where(m => !m.IsStreaming).ToList();
+                if (completeMessages.Any())
+                {
+                    lock (pendingUpdates)
+                    {
+                        pendingUpdates.Add(new ConversationUpdatedEvent
+                        {
+                            ConversationId = e.ConversationId,
+                            Messages = completeMessages,
+                            ToolCalls = new List<ToolCall>(),
+                            ToolResults = new List<ToolResult>(),
+                            Timestamp = e.Timestamp
+                        });
+                    }
+                }
             };
 
-            // 8. Build conversation request with enhanced context
+            // 10. Build conversation request with enhanced context
             var conversationRequest = new ConversationRequest
             {
                 ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
@@ -172,13 +209,19 @@ public class AiConversationController : BaseController
                 Context = BuildContextDictionary(request, userId)
             };
 
-            // 9. Start streaming conversation
+            // 11. Start streaming conversation
             var result = await _mcpClient.StartConversationAsync(
                 conversationRequest,
                 cancellationToken
             );
 
-            // 10. Write completion event
+            // 12. Save any pending complete messages BEFORE request ends (DbContext still valid)
+            foreach (var update in pendingUpdates)
+            {
+                await SaveTextMessagesAsync(update, sessionId, userId);
+            }
+
+            // 13. Write completion event
             if (result.IsSuccess)
             {
                 await WriteEvent("done", new
@@ -306,17 +349,34 @@ public class AiConversationController : BaseController
     {
         try
         {
-            // Save regular messages
+            // Save regular messages - only save complete messages (not streaming partial content)
             foreach (var message in update.Messages)
             {
+                _logger.LogInformation(
+                    "Processing message: Role={Role}, IsStreaming={IsStreaming}, ContentLength={ContentLength}, ContentPreview={Preview}",
+                    message.Role,
+                    message.IsStreaming,
+                    message.Content?.Length ?? 0,
+                    message.Content?.Length > 50 ? message.Content.Substring(0, 50) + "..." : message.Content);
+
+                // Skip streaming (partial) messages - only persist complete messages
+                if (message.IsStreaming)
+                {
+                    _logger.LogDebug("Skipping streaming message (partial content), will save when complete");
+                    continue;
+                }
+
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
                 {
                     SessionId = sessionId,
                     Role = message.Role,
                     Content = message.Content,
                     MessageType = ChatMessageType.Text,
-                    Metadata = string.Empty
+                    Metadata = "{}"
                 }, userId);
+
+                _logger.LogInformation("Saved complete {Role} message to session {SessionId}",
+                    message.Role, sessionId);
             }
 
             // Save tool calls as special messages
@@ -362,6 +422,104 @@ public class AiConversationController : BaseController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error saving conversation update for session {SessionId}", sessionId);
+            // Don't throw - history saving shouldn't break streaming
+        }
+    }
+
+    /// <summary>
+    /// Save only tool calls and results (can be saved during streaming)
+    /// </summary>
+    private async Task SaveToolUpdatesAsync(
+        ConversationUpdatedEvent update,
+        Guid sessionId,
+        Guid userId)
+    {
+        try
+        {
+            // Save tool calls as special messages
+            foreach (var toolCall in update.ToolCalls)
+            {
+                var metadata = JsonSerializer.Serialize(new
+                {
+                    toolCallId = toolCall.Id,
+                    toolName = toolCall.Name,
+                    arguments = toolCall.Arguments
+                });
+
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId = sessionId,
+                    Role = "assistant",
+                    Content = $"Executing tool: {toolCall.Name}",
+                    MessageType = ChatMessageType.ToolExecution,
+                    Metadata = metadata
+                }, userId);
+
+                _logger.LogInformation("Saved tool call {ToolName} to session {SessionId}", toolCall.Name, sessionId);
+            }
+
+            // Save tool results
+            foreach (var toolResult in update.ToolResults)
+            {
+                var metadata = JsonSerializer.Serialize(new
+                {
+                    toolCallId = toolResult.ToolCallId,
+                    success = toolResult.IsSuccess,
+                    error = toolResult.ErrorMessage
+                });
+
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId = sessionId,
+                    Role = "tool",
+                    Content = toolResult.Result ?? string.Empty,
+                    MessageType = toolResult.IsSuccess ? ChatMessageType.OperationComplete : ChatMessageType.CodeError,
+                    Metadata = metadata
+                }, userId);
+
+                _logger.LogInformation("Saved tool result for {ToolCallId} to session {SessionId}", toolResult.ToolCallId, sessionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving tool updates for session {SessionId}", sessionId);
+            // Don't throw - history saving shouldn't break streaming
+        }
+    }
+
+    /// <summary>
+    /// Save complete text messages (called after conversation ends while DbContext is still valid)
+    /// </summary>
+    private async Task SaveTextMessagesAsync(
+        ConversationUpdatedEvent update,
+        Guid sessionId,
+        Guid userId)
+    {
+        try
+        {
+            foreach (var message in update.Messages)
+            {
+                _logger.LogInformation(
+                    "Saving complete message: Role={Role}, ContentLength={ContentLength}, ContentPreview={Preview}",
+                    message.Role,
+                    message.Content?.Length ?? 0,
+                    message.Content?.Length > 50 ? message.Content.Substring(0, 50) + "..." : message.Content);
+
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId = sessionId,
+                    Role = message.Role,
+                    Content = message.Content,
+                    MessageType = ChatMessageType.Text,
+                    Metadata = "{}"
+                }, userId);
+
+                _logger.LogInformation("Saved complete {Role} message to session {SessionId}", message.Role, sessionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving text messages for session {SessionId}", sessionId);
             // Don't throw - history saving shouldn't break streaming
         }
     }

@@ -184,40 +184,61 @@ services.AddHttpContextAccessor();
 
 Serilog.Debugging.SelfLog.Enable(Console.Out);
 
+
 applicationBuilder.Host.UseSerilog((context, services, config) =>
-    config.Destructure.UsingAttributes()
-          .Destructure.JsonNetTypes()
-          .Enrich.With<EventTypeEnricher>()
-          .Enrich.With(services.GetService<UserNameEnricher>())
-          .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-          .WriteTo.MariaDB(
-              connectionString: configurationManager.GetConnectionString("MySqlConnection"),
-              tableName: "Logs",
-              autoCreateTable: false,
-              useBulkInsert: true,
-              restrictedToMinimumLevel: LogEventLevel.Information,
-              batchPostingLimit: 1000,
-              period: TimeSpan.FromSeconds(30),
-              options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
-              {
-                  PropertiesToColumnsMapping = new Dictionary<string, string>
-                  {
-                      { "Exception", "Exception" },
-                      { "Level", "Level" },
-                      { "Message", "Message" },
-                      { "MessageTemplate", "MessageTemplate" },
-                      { "Properties", "Properties" },
-                      { "Timestamp", "Timestamp" },
-                      { "EventType", "EventType" },
-                      { "UserName", "UserName" }
-                  },
-                  TimestampInUtc = true,
-                  ExcludePropertiesWithDedicatedColumn = false,
-                  EnumsAsInts = false,
-                  LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
-                  LogRecordsExpiration = TimeSpan.FromDays(31)
-              })
-);
+{
+    var logConfig = config
+        .Destructure.UsingAttributes()
+        .Destructure.JsonNetTypes()
+        .Enrich.With<EventTypeEnricher>()
+        .Enrich.With(services.GetService<UserNameEnricher>())
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning);
+
+    // Console logging - environment-specific
+    if (applicationBuilder.Environment.IsDevelopment())
+    {
+        // Development: detailed output for debugging
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Debug);
+    }
+    else
+    {
+        // Production: compact, secure output
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Information);
+    }
+
+    // Database sink (same for both environments)
+    logConfig.WriteTo.MariaDB(
+        connectionString: configurationManager.GetConnectionString("MySqlConnection"),
+        tableName: "Logs",
+        autoCreateTable: false,
+        useBulkInsert: true,
+        restrictedToMinimumLevel: LogEventLevel.Information,
+        batchPostingLimit: 1000,
+        period: TimeSpan.FromSeconds(30),
+        options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
+        {
+            PropertiesToColumnsMapping = new Dictionary<string, string>
+            {
+                { "Exception", "Exception" },
+                { "Level", "Level" },
+                { "Message", "Message" },
+                { "MessageTemplate", "MessageTemplate" },
+                { "Properties", "Properties" },
+                { "Timestamp", "Timestamp" },
+                { "EventType", "EventType" },
+                { "UserName", "UserName" }
+            },
+            TimestampInUtc = true,
+            ExcludePropertiesWithDedicatedColumn = false,
+            EnumsAsInts = false,
+            LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
+            LogRecordsExpiration = TimeSpan.FromDays(31)
+        });
+});
 
 services.AddHangfire(x =>
 {
