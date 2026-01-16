@@ -2,6 +2,18 @@ namespace Automaton.Studio.Server.Config;
 
 public class AiProvidersConfig
 {
+    /// <summary>
+    /// Maximum number of tool call iterations before stopping.
+    /// Default: 20
+    /// </summary>
+    public int MaxIterations { get; set; } = 20;
+
+    /// <summary>
+    /// Maximum consecutive failures allowed for the same tool before stopping.
+    /// Default: 3
+    /// </summary>
+    public int MaxConsecutiveFailures { get; set; } = 3;
+
     public Dictionary<string, AiProviderConfig> Providers { get; set; } = new();
 }
 

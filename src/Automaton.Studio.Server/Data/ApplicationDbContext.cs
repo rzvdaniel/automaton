@@ -62,6 +62,9 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<AiChatMessage> AiChatMessages { get; set; }
         public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
 
+        // User Settings
+        public virtual DbSet<UserSetting> UserSettings { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // No-op, configuration is handled by DI
@@ -662,6 +665,21 @@ namespace Automaton.Studio.Server.Data
                     .WithMany()
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // User Settings
+            modelBuilder.Entity<UserSetting>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.SettingKey).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.SettingValue).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Unique constraint: one setting per user per key
+                entity.HasIndex(e => new { e.UserId, e.SettingKey }).IsUnique();
+                entity.HasIndex(e => e.UserId);
             });
         }
 

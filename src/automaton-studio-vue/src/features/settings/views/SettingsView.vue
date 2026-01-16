@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
 import DataTable from 'primevue/datatable'
@@ -10,13 +11,16 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
+import { useToast } from 'primevue/usetoast'
 import { useTheme } from '@/shared/composables/useTheme'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
+import { userSettingsService } from '../services/userSettingsService'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 
 const { isDark, toggleDarkMode } = useTheme()
 const authStore = useAuthStore()
+const toast = useToast()
 
 const activeSection = ref('account')
 
@@ -39,6 +43,57 @@ const themeOptions = ref([
   { label: 'System', value: 'system', icon: 'pi pi-desktop' },
 ])
 const selectedTheme = ref(isDark.value ? 'dark' : 'light')
+
+// Editor settings
+const editorFontSize = ref(14)
+const editorSettingsLoading = ref(false)
+const editorSettingsSaving = ref(false)
+
+// Load editor settings when appearance section is active
+watch(activeSection, async (section) => {
+  if (section === 'appearance') {
+    await loadEditorSettings()
+  }
+})
+
+async function loadEditorSettings() {
+  editorSettingsLoading.value = true
+  try {
+    const settings = await userSettingsService.getEditorSettings()
+    editorFontSize.value = settings.fontSize
+  } catch (err) {
+    console.error('Failed to load editor settings:', err)
+    // Use default
+    editorFontSize.value = 14
+  } finally {
+    editorSettingsLoading.value = false
+  }
+}
+
+async function saveEditorSettings() {
+  editorSettingsSaving.value = true
+  try {
+    await userSettingsService.updateEditorSettings({
+      fontSize: editorFontSize.value,
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Settings Saved',
+      detail: 'Editor settings have been updated.',
+      life: 3000,
+    })
+  } catch (err) {
+    console.error('Failed to save editor settings:', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: 'Could not save editor settings.',
+      life: 5000,
+    })
+  } finally {
+    editorSettingsSaving.value = false
+  }
+}
 
 // API Keys mock data
 const apiKeys = ref([
@@ -341,7 +396,8 @@ function clearPasswordError() {
         <Card v-if="activeSection === 'appearance'">
           <template #title>Appearance</template>
           <template #content>
-            <div class="flex flex-column gap-4">
+            <div class="flex flex-column gap-5">
+              <!-- Theme -->
               <div>
                 <label class="font-medium block mb-3">Theme</label>
                 <SelectButton
@@ -356,6 +412,47 @@ function clearPasswordError() {
                     <span>{{ option.label }}</span>
                   </template>
                 </SelectButton>
+              </div>
+
+              <!-- Editor Font Size -->
+              <div class="flex flex-column gap-2">
+                <label for="editorFontSize" class="font-medium">Editor Font Size</label>
+                <div class="flex align-items-center gap-3">
+                  <InputNumber
+                    id="editorFontSize"
+                    v-model="editorFontSize"
+                    :min="10"
+                    :max="24"
+                    show-buttons
+                    button-layout="horizontal"
+                    suffix=" px"
+                    :step="1"
+                    class="w-10rem"
+                    :disabled="editorSettingsSaving || editorSettingsLoading"
+                  >
+                    <template #incrementbuttonicon>
+                      <i class="pi pi-plus" />
+                    </template>
+                    <template #decrementbuttonicon>
+                      <i class="pi pi-minus" />
+                    </template>
+                  </InputNumber>
+                  <span class="text-color-secondary text-sm">(10-24 px)</span>
+                </div>
+                <small class="text-color-secondary">
+                  Font size used in code editors for flows, steps, and apps.
+                </small>
+              </div>
+
+              <!-- Save Button -->
+              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
+                <Button
+                  label="Save Changes"
+                  icon="pi pi-check"
+                  :loading="editorSettingsSaving"
+                  :disabled="editorSettingsSaving || editorSettingsLoading"
+                  @click="saveEditorSettings"
+                />
               </div>
             </div>
           </template>

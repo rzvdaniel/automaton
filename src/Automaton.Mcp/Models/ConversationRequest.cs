@@ -18,4 +18,18 @@ public class ConversationRequest
     public string? Model { get; set; }
     public List<ConversationMessage>? ConversationHistory { get; set; }
     public Dictionary<string, object>? Context { get; set; }
+
+    /// <summary>
+    /// Maximum number of tool call iterations before stopping.
+    /// Prevents infinite loops in AI tool execution.
+    /// Default: 20
+    /// </summary>
+    public int MaxIterations { get; set; } = 20;
+
+    /// <summary>
+    /// Maximum consecutive failures allowed for the same tool before stopping.
+    /// Prevents repeated failing tool calls.
+    /// Default: 3
+    /// </summary>
+    public int MaxConsecutiveFailures { get; set; } = 3;
 }

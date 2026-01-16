@@ -2,6 +2,7 @@ using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Services.Mcp;
@@ -9,6 +10,7 @@ using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +28,7 @@ public class AiConversationController : BaseController
     private readonly IAutomatonMcpClient _mcpClient;
     private readonly AiApiKeyService _aiApiKeyService;
     private readonly IAiChatHistoryService _chatHistoryService;
+    private readonly AiProvidersConfig _aiProvidersConfig;
     private readonly StepMcpToolProvider _stepToolProvider;
     private readonly AppMcpToolProvider _appToolProvider;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
@@ -36,6 +39,7 @@ public class AiConversationController : BaseController
         IAutomatonMcpClient mcpClient,
         AiApiKeyService aiApiKeyService,
         IAiChatHistoryService chatHistoryService,
+        IOptions<AiProvidersConfig> aiProvidersConfig,
         StepMcpToolProvider stepToolProvider,
         AppMcpToolProvider appToolProvider,
         IStepSystemPromptBuilder stepPromptBuilder,
@@ -45,6 +49,7 @@ public class AiConversationController : BaseController
         _mcpClient = mcpClient;
         _aiApiKeyService = aiApiKeyService;
         _chatHistoryService = chatHistoryService;
+        _aiProvidersConfig = aiProvidersConfig.Value;
         _stepToolProvider = stepToolProvider;
         _appToolProvider = appToolProvider;
         _stepPromptBuilder = stepPromptBuilder;
@@ -162,39 +167,25 @@ public class AiConversationController : BaseController
             }, userId);
             _logger.LogInformation("Saved user message to session {SessionId}", sessionId);
 
-            // 8. Collect pending updates for saving after conversation completes
+            // 8. Collect updates for saving after conversation completes
+            // We stream to client immediately, but only save to database AFTER conversation ends
+            // This avoids DbContext threading issues (tool execution and chat history both use DbContext)
             var pendingUpdates = new List<ConversationUpdatedEvent>();
 
-            // 9. Subscribe to conversation updates - stream to client immediately, queue for persistence
-            _mcpClient.ConversationUpdated += async (sender, e) =>
+            // 9. Subscribe to conversation updates - stream to client in real-time
+            EventHandler<ConversationUpdatedEvent> eventHandler = (sender, e) =>
             {
-                // Stream to client immediately (SSE)
-                await WriteConversationEvent(e);
+                // Stream to client immediately (SSE write doesn't use DbContext)
+                // Fire-and-forget is OK here since Response.Body.WriteAsync is thread-safe
+                _ = WriteConversationEvent(e);
 
-                // Save tool calls and results immediately (they don't have the disposal issue)
-                // But queue complete text messages for saving after the conversation
-                if (e.ToolCalls.Any() || e.ToolResults.Any())
+                // Queue for database persistence after conversation ends
+                lock (pendingUpdates)
                 {
-                    await SaveToolUpdatesAsync(e, sessionId, userId);
-                }
-
-                // Queue complete messages for saving after conversation ends
-                var completeMessages = e.Messages.Where(m => !m.IsStreaming).ToList();
-                if (completeMessages.Any())
-                {
-                    lock (pendingUpdates)
-                    {
-                        pendingUpdates.Add(new ConversationUpdatedEvent
-                        {
-                            ConversationId = e.ConversationId,
-                            Messages = completeMessages,
-                            ToolCalls = new List<ToolCall>(),
-                            ToolResults = new List<ToolResult>(),
-                            Timestamp = e.Timestamp
-                        });
-                    }
+                    pendingUpdates.Add(e);
                 }
             };
+            _mcpClient.ConversationUpdated += eventHandler;
 
             // 10. Build conversation request with enhanced context
             var conversationRequest = new ConversationRequest
@@ -206,22 +197,28 @@ public class AiConversationController : BaseController
                 Model = request.Model,
                 ApiKey = apiKey,
                 ConversationHistory = history,
-                Context = BuildContextDictionary(request, userId)
+                Context = BuildContextDictionary(request, userId),
+                MaxIterations = _aiProvidersConfig.MaxIterations,
+                MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures
             };
 
-            // 11. Start streaming conversation
+            // 11. Start conversation - this runs synchronously within the provider's loop
             var result = await _mcpClient.StartConversationAsync(
                 conversationRequest,
                 cancellationToken
             );
 
-            // 12. Save any pending complete messages BEFORE request ends (DbContext still valid)
+            // 12. Unsubscribe from events
+            _mcpClient.ConversationUpdated -= eventHandler;
+
+            // 13. Now that conversation is complete, save all updates to database
+            // This happens sequentially - no concurrency issues with DbContext
             foreach (var update in pendingUpdates)
             {
-                await SaveTextMessagesAsync(update, sessionId, userId);
+                await SaveConversationUpdateAsync(update, sessionId, userId);
             }
 
-            // 13. Write completion event
+            // 14. Write completion event
             if (result.IsSuccess)
             {
                 await WriteEvent("done", new

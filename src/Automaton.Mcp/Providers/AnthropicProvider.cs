@@ -54,8 +54,22 @@ public class AnthropicProvider : IAiProvider
             // Handle iterative conversation with tool calls
             var responseBuilder = new StringBuilder();
 
+            // Safety limits to prevent infinite loops (from user settings or defaults)
+            var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
+            var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
+            var iterationCount = 0;
+            var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
+
             while (true)
             {
+                // Check iteration limit
+                iterationCount++;
+                if (iterationCount > maxIterations)
+                {
+                    _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
+                    responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
+                    break;
+                }
                 // Create the message parameters
                 var messageParams = new MessageParameters
                 {
@@ -110,6 +124,8 @@ public class AnthropicProvider : IAiProvider
 
                 // Execute each tool and collect results
                 var toolResults = new List<ContentBase>();
+                var shouldStopDueToFailures = false;
+
                 foreach (var toolUse in streamResult.ToolUseBlocks)
                 {
                     var argsJson = toolUse.Input != null ? JsonSerializer.Serialize(toolUse.Input) : "{}";
@@ -120,6 +136,33 @@ public class AnthropicProvider : IAiProvider
                     // Execute the tool
                     var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
 
+                    // Track consecutive failures per tool
+                    var isFailure = toolResult.StartsWith("Tool execution failed:") ||
+                                   toolResult.StartsWith("Error executing tool") ||
+                                   toolResult.Contains("A second operation was started");
+
+                    if (isFailure)
+                    {
+                        consecutiveFailures.TryGetValue(toolUse.Name, out var currentFailures);
+                        consecutiveFailures[toolUse.Name] = currentFailures + 1;
+
+                        if (consecutiveFailures[toolUse.Name] >= maxConsecutiveFailures)
+                        {
+                            _logger.LogWarning(
+                                "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
+                                toolUse.Name, consecutiveFailures[toolUse.Name]);
+
+                            toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolUse.Name]} times consecutively. " +
+                                         "Please stop calling this tool and inform the user about the issue.]";
+                            shouldStopDueToFailures = true;
+                        }
+                    }
+                    else
+                    {
+                        // Reset failure count on success
+                        consecutiveFailures[toolUse.Name] = 0;
+                    }
+
                     // Emit tool execution completed
                     EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
 
@@ -129,6 +172,19 @@ public class AnthropicProvider : IAiProvider
                         ToolUseId = toolUse.Id,
                         Content = new List<ContentBase> { new TextContent { Text = toolResult } }
                     });
+                }
+
+                // If we hit max failures, add a message and break
+                if (shouldStopDueToFailures)
+                {
+                    responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
+                    // Still add the tool results so the AI sees the final error
+                    messages.Add(new Message
+                    {
+                        Role = RoleType.User,
+                        Content = toolResults
+                    });
+                    break;
                 }
 
                 // Add user message with tool results

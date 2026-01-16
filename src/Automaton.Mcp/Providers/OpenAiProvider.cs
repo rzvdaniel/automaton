@@ -97,9 +97,24 @@ public class OpenAiProvider : IAiProvider
             var responseBuilder = new StringBuilder();
             var allConversationMessages = new List<ConversationMessage>();
 
+            // Safety limits to prevent infinite loops (from user settings or defaults)
+            var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
+            var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
+            var iterationCount = 0;
+            var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
+
             do
             {
                 requiresAction = false;
+
+                // Check iteration limit
+                iterationCount++;
+                if (iterationCount > maxIterations)
+                {
+                    _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
+                    responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
+                    break;
+                }
 
                 // Use streaming for text responses
                 var streamingResult = await StreamResponseAsync(
@@ -116,6 +131,8 @@ public class OpenAiProvider : IAiProvider
                     messages.Add(assistantMessage);
 
                     // Execute each tool call
+                    var shouldStopDueToFailures = false;
+
                     foreach (var toolCallInfo in streamingResult.ToolCalls)
                     {
                         var argsJson = string.IsNullOrEmpty(toolCallInfo.ArgumentsJson) ? "{}" : toolCallInfo.ArgumentsJson;
@@ -126,11 +143,45 @@ public class OpenAiProvider : IAiProvider
                         // Execute the tool
                         var toolResult = await executeToolAsync(toolCallInfo.Id, toolCallInfo.Name, argsJson);
 
+                        // Track consecutive failures per tool
+                        var isFailure = toolResult.StartsWith("Tool execution failed:") ||
+                                       toolResult.StartsWith("Error executing tool") ||
+                                       toolResult.Contains("A second operation was started");
+
+                        if (isFailure)
+                        {
+                            consecutiveFailures.TryGetValue(toolCallInfo.Name, out var currentFailures);
+                            consecutiveFailures[toolCallInfo.Name] = currentFailures + 1;
+
+                            if (consecutiveFailures[toolCallInfo.Name] >= maxConsecutiveFailures)
+                            {
+                                _logger.LogWarning(
+                                    "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
+                                    toolCallInfo.Name, consecutiveFailures[toolCallInfo.Name]);
+
+                                toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolCallInfo.Name]} times consecutively. " +
+                                             "Please stop calling this tool and inform the user about the issue.]";
+                                shouldStopDueToFailures = true;
+                            }
+                        }
+                        else
+                        {
+                            // Reset failure count on success
+                            consecutiveFailures[toolCallInfo.Name] = 0;
+                        }
+
                         // Emit tool execution completed
                         EmitToolCallCompleted(request.ConversationId, toolCallInfo.Id, toolCallInfo.Name, argsJson, toolResult);
 
                         // Add tool message to conversation
                         messages.Add(ChatMessage.CreateToolMessage(toolCallInfo.Id, toolResult));
+                    }
+
+                    // If we hit max failures, stop the loop
+                    if (shouldStopDueToFailures)
+                    {
+                        responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
+                        requiresAction = false; // Force exit from do-while loop
                     }
                 }
 
