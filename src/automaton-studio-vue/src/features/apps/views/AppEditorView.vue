@@ -743,7 +743,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  background-color: var(--p-surface-0);
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
 }
@@ -796,7 +795,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex-direction: column !important;
   min-width: 0 !important;
   overflow: hidden !important;
-  background-color: var(--p-surface-0);
 }
 
 .file-panel {
@@ -886,7 +884,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-0);
 }
 
 /* Dark mode */
@@ -895,7 +892,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 :global(.app-dark) .editor-header {
-  background-color: var(--p-surface-900);
   border-color: var(--p-surface-700);
 }
 
@@ -904,9 +900,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   border-color: var(--p-surface-700);
 }
 
-:global(.app-dark) .splitter-panel {
-  background-color: var(--p-surface-900);
-}
 
 :global(.app-dark) .editor-panel {
   background-color: var(--p-surface-900);
@@ -935,7 +928,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 :global(.app-dark) .ai-sidebar {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 

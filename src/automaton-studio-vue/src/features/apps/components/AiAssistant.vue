@@ -264,7 +264,6 @@ function handleKeyPress(event: KeyboardEvent) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--p-surface-0);
 }
 
 .ai-header {
@@ -486,16 +485,8 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 /* Dark mode */
-:global(.app-dark) .ai-assistant {
-  background-color: var(--p-surface-800);
-}
-
 :global(.app-dark) .ai-header {
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .messages-area {
-  background-color: var(--p-surface-800);
 }
 
 :global(.app-dark) .error-banner {
