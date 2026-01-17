@@ -98,8 +98,12 @@ const sidebarClass = computed(() => ({
 <style scoped>
 /* Base sidebar styles - dark mode handled in main.css */
 .app-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
   height: 100vh;
   overflow: hidden;
+  z-index: 1000;
 }
 
 .sidebar-content {
