@@ -795,6 +795,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex-direction: column !important;
   min-width: 0 !important;
   overflow: hidden !important;
+  background-color: var(--p-surface-0);
 }
 
 .file-panel {
@@ -812,6 +813,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background-color: var(--p-surface-0);
 }
 
 .editor-tabs-container {
@@ -899,6 +901,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 :global(.app-dark) .file-panel {
   background-color: var(--p-surface-900);
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .splitter-panel {
+  background-color: var(--p-surface-900);
+}
+
+:global(.app-dark) .editor-panel {
+  background-color: var(--p-surface-900);
 }
 
 :global(.app-dark) .editor-tabs-container {
