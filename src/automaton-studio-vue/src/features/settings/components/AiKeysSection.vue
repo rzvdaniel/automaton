@@ -52,6 +52,11 @@ const selectedProvider = computed(() => {
   return providers.value.find((p) => p.providerName === createForm.value.providerName)
 })
 
+// Get label for selected provider value
+const selectedProviderLabel = computed(() => {
+  return providerOptions.value.find(p => p.value === createForm.value.providerName)?.label ?? ''
+})
+
 // Load AI keys and providers
 async function loadData() {
   loading.value = true
@@ -77,9 +82,10 @@ async function loadData() {
 
 // Open create dialog
 function openCreateDialog() {
+  const defaultProvider = providers.value[0]?.providerName ?? ''
   createForm.value = {
     name: '',
-    providerName: providers.value.length > 0 && providers.value[0] ? providers.value[0].providerName : '',
+    providerName: defaultProvider,
     apiKey: '',
     description: '',
   }
@@ -286,7 +292,7 @@ onMounted(() => {
           <template #value="slotProps">
             <div v-if="slotProps.value" class="flex align-items-center gap-2">
               <i :class="getProviderIcon(slotProps.value)" :style="{ color: getProviderColor(slotProps.value) }"></i>
-              <span>{{ providerOptions.find(p => p.value === slotProps.value)?.label ?? '' }}</span>
+              <span>{{ selectedProviderLabel }}</span>
             </div>
             <span v-else>{{ slotProps.placeholder }}</span>
           </template>
