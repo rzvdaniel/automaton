@@ -290,28 +290,76 @@ class AppsService {
   /**
    * Get preview HTML for an app (with automatonApi.js injected)
    * Returns the app HTML with the Automaton API script injected
+   * The preview makes direct fetch calls to the backend with the auth token
    */
   async getPreviewHtml(id: string): Promise<string> {
     const app = await this.get(id)
     const html = app.definition?.htmlContent || this.getDefaultHtml()
 
-    // Inject a simple preview stub for now
-    // Full API injection will happen when the app is published
+    // Get current auth token and base URL for injection
+    const token = localStorage.getItem('automaton_access_token') || ''
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+
+    // Inject preview API that makes direct fetch calls
     const previewScript = `
 <script>
-  // Preview stub for automatonApi
+(function(window, APP_ID, BASE_URL, AUTH_TOKEN) {
+  'use strict';
+
+  console.log('[AutomatonAPI] Preview mode initialized for app:', APP_ID);
+
+  async function apiCall(path, method, body) {
+    const url = BASE_URL + path;
+    console.log('[AutomatonAPI] ' + method + ' ' + url);
+
+    const options = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + AUTH_TOKEN
+      }
+    };
+
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      const error = new Error(data.error || data.message || 'Request failed');
+      error.response = data;
+      throw error;
+    }
+
+    return data;
+  }
+
+  async function executeFlow(flowIdentifier, options) {
+    options = options || {};
+    const path = '/api/web-apps/preview/' + APP_ID + '/flows/' + encodeURIComponent(flowIdentifier) + '/execute';
+    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
+    return apiCall(path, 'POST', body);
+  }
+
+  async function executeStep(stepIdentifier, options) {
+    options = options || {};
+    const path = '/api/web-apps/preview/' + APP_ID + '/steps/' + encodeURIComponent(stepIdentifier) + '/execute';
+    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
+    return apiCall(path, 'POST', body);
+  }
+
   window.automatonApi = {
-    executeStep: async function(stepName, options) {
-      console.log('[Preview] executeStep called:', stepName, options);
-      return { success: true, outputVariables: {}, logs: ['[Preview Mode]'] };
-    },
-    executeFlow: async function(flowName, options) {
-      console.log('[Preview] executeFlow called:', flowName, options);
-      return { success: true, outputVariables: {}, logs: ['[Preview Mode]'] };
-    },
+    executeFlow: executeFlow,
+    executeStep: executeStep,
+    getAppId: function() { return APP_ID; },
     getAppSlug: function() { return null; }
   };
-  console.log('[AutomatonAPI] Preview mode - app ID: ${id}');
+
+  console.log('[AutomatonAPI] Ready!');
+
+})(window, '${id}', '${baseUrl}', '${token}');
 </script>`
 
     // Inject script at the start of <head> if exists, otherwise prepend
