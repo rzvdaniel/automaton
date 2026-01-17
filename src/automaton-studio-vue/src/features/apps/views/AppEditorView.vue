@@ -216,13 +216,17 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
-// Add beforeunload listener
+// Add beforeunload listener and fullscreen class
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  // Add class to app-main for fullscreen editor mode
+  document.querySelector('.app-main')?.classList.add('app-main--fullscreen')
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  // Remove fullscreen class
+  document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
 })
 
 // Handle back navigation
@@ -715,11 +719,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 </template>
 
 <style scoped>
-/* Override parent .app-main padding and scrolling for this full-screen editor */
-:global(.app-main) {
-  padding: 0 !important;
-  overflow: hidden !important;
-}
 
 .app-editor-view {
   display: flex;

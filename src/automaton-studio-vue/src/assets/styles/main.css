@@ -96,6 +96,12 @@ pre {
   padding: 1.5rem;
 }
 
+/* Fullscreen mode for editors - removes padding */
+.app-main--fullscreen {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* Sidebar navigation divider dark mode */
 .app-dark .nav-divider {
   background-color: var(--p-surface-700);
