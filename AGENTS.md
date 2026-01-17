@@ -183,6 +183,163 @@ npm run generate:types  # Generates src/shared/types/api/ from OpenAPI
 
 **Component Testing:** Vitest + Vue Test Utils with colocated `*.spec.ts` files.
 
+### Implementing a New Feature in Vue.js
+
+When adding a new feature to the Vue.js frontend, follow this systematic approach:
+
+**1. Create Feature Directory Structure:**
+```
+src/features/your-feature/
+├── components/          # Feature-specific components (e.g., YourFeatureSection.vue)
+├── services/            # API service calls (e.g., yourFeature.service.ts)
+├── types/               # TypeScript interfaces (e.g., yourFeature.types.ts)
+├── views/               # Page-level components (if needed)
+└── routes.ts            # Feature routes (if needed)
+```
+
+**2. Define TypeScript Types:**
+- Match backend C# DTOs exactly
+- Use const objects instead of enums for compatibility: `export const MyEnum = { Value1: 1, Value2: 2 } as const`
+- Add helper functions for UI display (e.g., `getSeverity()`, `getIcon()`, `formatDate()`)
+- Example pattern:
+```typescript
+// types/yourFeature.types.ts
+export interface YourModel {
+  id: string
+  name: string
+  createdAt: string  // ISO date string
+}
+
+export interface CreateRequest {
+  name: string
+  description?: string
+}
+
+// Helper functions
+export function getSeverity(status: string): 'success' | 'warn' | 'danger' {
+  // ... implementation
+}
+```
+
+**3. Create API Service:**
+- Use `apiClient` from `@/shared/services/api/axios-instance` 
+- All requests are automatically authenticated with JWT tokens
+- Handle errors with try/catch and toast notifications
+- Example pattern:
+```typescript
+// services/yourFeature.service.ts
+import apiClient from '@/shared/services/api/axios-instance'
+import type { YourModel, CreateRequest } from '../types/yourFeature.types'
+
+class YourFeatureService {
+  async list(projectId?: string): Promise<YourModel[]> {
+    const params = projectId ? { projectId } : {}
+    const { data } = await apiClient.get<YourModel[]>('/api/yourfeature', { params })
+    return data
+  }
+
+  async create(request: CreateRequest): Promise<YourModel> {
+    const { data } = await apiClient.post<YourModel>('/api/yourfeature', request)
+    return data
+  }
+
+  async delete(id: string): Promise<void> {
+    await apiClient.delete(`/api/yourfeature/${id}`)
+  }
+}
+
+export const yourFeatureService = new YourFeatureService()
+```
+
+**4. Create Vue Components:**
+- Use PrimeVue components (Card, DataTable, Dialog, Button, etc.)
+- Implement loading states, error handling, and user feedback with toasts
+- Keep components focused and single-purpose
+- Example pattern:
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useToast } from 'primevue/usetoast'
+import { yourFeatureService } from '../services/yourFeature.service'
+import type { YourModel } from '../types/yourFeature.types'
+
+const toast = useToast()
+const loading = ref(true)
+const items = ref<YourModel[]>([])
+
+async function loadItems() {
+  loading.value = true
+  try {
+    items.value = await yourFeatureService.list()
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to load items',
+      life: 5000,
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadItems()
+})
+</script>
+
+<template>
+  <Card>
+    <template #content>
+      <DataTable :value="items" :loading="loading">
+        <!-- columns -->
+      </DataTable>
+    </template>
+  </Card>
+</template>
+```
+
+**5. Connect to Backend Controllers:**
+- Backend controllers are in `src/Automaton.Studio.Server/Controllers/`
+- Controller endpoints follow pattern: `/api/controllername`
+- DTOs are defined in controller files or separate models
+- Ensure TypeScript types match C# DTOs exactly
+- Common endpoints:
+  - `GET /api/resource` - List all
+  - `GET /api/resource/{id}` - Get single
+  - `POST /api/resource` - Create
+  - `PUT /api/resource/{id}` - Update
+  - `DELETE /api/resource/{id}` - Delete
+
+**6. Best Practices:**
+- ✅ Always show loading states during async operations
+- ✅ Use toast notifications for user feedback (success, error, warning)
+- ✅ Add empty states with helpful messages when no data exists
+- ✅ Implement confirmation dialogs for destructive actions (delete, revoke)
+- ✅ Use computed properties to optimize template expressions
+- ✅ Handle errors gracefully with try/catch blocks
+- ✅ Format dates consistently using helper functions
+- ✅ Use PrimeVue severity types for consistent styling
+- ✅ Keep services stateless and focused on API calls
+- ✅ Colocate feature code (types, services, components together)
+
+**Example: API Keys Feature Implementation**
+
+See `src/automaton-studio-vue/src/features/settings/` for a complete example:
+- `types/apikeys.types.ts` - TypeScript interfaces matching C# DTOs
+- `services/apikeys.service.ts` - Service calling `/api/apikeys` endpoints
+- `components/ApiKeysSection.vue` - Complete UI with CRUD operations
+
+This feature demonstrates:
+- Type matching with backend (ApiKeyScope enum → const object)
+- Service integration with ApiKeysController.cs
+- DataTable with sorting, pagination, empty states
+- Create dialog with validation
+- One-time display of sensitive data (API key)
+- Copy-to-clipboard functionality
+- Revoke with confirmation
+- Toast notifications for all operations
+
 ### API Key Scopes
 
 API keys authenticate runners, web apps, and integrations. Format: `ak_<scope>_<random>`.
