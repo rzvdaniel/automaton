@@ -89,12 +89,11 @@ const statusText = computed(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.375rem 0.75rem;
-  background-color: var(--p-surface-100);
   border-top: 1px solid var(--p-surface-200);
   height: 28px;
   flex-shrink: 0;
   font-size: 0.75rem;
-  color: var(--p-text-secondary);
+  color: var(--p-text-muted-color);
 }
 
 .status-section {
@@ -122,7 +121,7 @@ const statusText = computed(() => {
 
 .status-text {
   font-size: 0.75rem;
-  color: var(--p-text-secondary);
+  color: var(--p-text-muted-color);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -130,16 +129,10 @@ const statusText = computed(() => {
 
 .status-item i {
   line-height: 1;
-  color: var(--p-text-secondary);
 }
 
 /* Dark mode */
 :global(.app-dark) .status-bar {
-  background-color: var(--p-surface-800);
   border-top-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .status-text {
-  color: var(--p-text-secondary);
 }
 </style>

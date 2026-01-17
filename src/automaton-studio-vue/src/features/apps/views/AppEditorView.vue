@@ -743,7 +743,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  background-color: var(--p-surface-0);
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
 }
@@ -764,6 +763,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
+  color: var(--p-text-color);
 }
 
 .app-name:hover {
@@ -803,7 +803,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-0);
 }
 
 .editor-panel {
@@ -817,7 +816,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 .editor-tabs-container {
   display: flex;
   align-items: center;
-  background-color: var(--p-surface-100);
   border-bottom: 1px solid var(--p-surface-200);
   overflow-x: auto;
   flex-shrink: 0;
@@ -828,7 +826,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   align-items: center;
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
-  background-color: var(--p-surface-100);
   border-right: 1px solid var(--p-surface-200);
   cursor: pointer;
   white-space: nowrap;
@@ -836,11 +833,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 .editor-tab:hover {
-  background-color: var(--p-surface-200);
+  background-color: var(--p-surface-hover);
 }
 
 .editor-tab.active {
-  background-color: var(--p-surface-0);
   border-bottom: 2px solid var(--p-primary-500);
 }
 
@@ -882,40 +878,30 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-0);
 }
 
 /* Dark mode */
-:global(.app-dark) .editor-header {
+:global(.app-dark) .app-editor-view {
   background-color: var(--p-surface-900);
+}
+
+:global(.app-dark) .editor-header {
   border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .file-panel {
-  background-color: var(--p-surface-900);
   border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .editor-tabs-container {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .editor-tab {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 
-:global(.app-dark) .editor-tab:hover {
-  background-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .editor-tab.active {
-  background-color: var(--p-surface-900);
-}
-
 :global(.app-dark) .ai-sidebar {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 
