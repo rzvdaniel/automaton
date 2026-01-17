@@ -5,6 +5,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '../services/auth.service'
+import { useTheme } from '@/shared/composables/useTheme'
+import { useEditorSettings } from '@/shared/composables/useEditorSettings'
 import type { User, LoginRequest, RegisterRequest } from '../types/auth.types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -34,6 +36,11 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Fetch user profile after login
       await fetchUserProfile()
+
+      // Initialize user settings from server after successful login
+      const { initializeTheme } = useTheme()
+      const { initializeSettings: initializeEditorSettings } = useEditorSettings()
+      await Promise.all([initializeTheme(), initializeEditorSettings()])
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       error.value = errorMessage
@@ -81,6 +88,11 @@ export const useAuthStore = defineStore('auth', () => {
       // Try to fetch user profile to validate token
       try {
         await fetchUserProfile()
+
+        // Initialize user settings from server after successful auth check
+        const { initializeTheme } = useTheme()
+        const { initializeSettings: initializeEditorSettings } = useEditorSettings()
+        await Promise.all([initializeTheme(), initializeEditorSettings()])
       } catch {
         // Token might be invalid, clear it
         logout()
@@ -96,6 +108,12 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null
     refreshToken.value = null
     error.value = null
+
+    // Reset user settings to defaults on logout
+    const { resetTheme } = useTheme()
+    const { resetSettings: resetEditorSettings } = useEditorSettings()
+    resetTheme()
+    resetEditorSettings()
   }
 
   function clearError(): void {

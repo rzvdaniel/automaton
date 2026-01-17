@@ -13,12 +13,18 @@ import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { useTheme } from '@/shared/composables/useTheme'
+import { useEditorSettings } from '@/shared/composables/useEditorSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
-import { userSettingsService } from '../services/userSettingsService'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 
-const { isDark, toggleDarkMode } = useTheme()
+const { themePreference, setTheme, isSaving: themeSaving } = useTheme()
+const {
+  settings: editorSettings,
+  isLoading: editorSettingsLoading,
+  isSaving: editorSettingsSaving,
+  setFontSize,
+} = useEditorSettings()
 const authStore = useAuthStore()
 const toast = useToast()
 
@@ -28,13 +34,26 @@ const activeSection = ref('account')
 const displayName = ref('')
 const email = ref('')
 
+// Local editor font size for input binding (synced from cached settings)
+const editorFontSize = ref(14)
+
 onMounted(() => {
   // Load user data from store
   if (authStore.user) {
     displayName.value = authStore.user.name || ''
     email.value = authStore.user.email || ''
   }
+  // Sync local value from cached settings
+  editorFontSize.value = editorSettings.value.fontSize
 })
+
+// Keep local value in sync with cached settings
+watch(
+  () => editorSettings.value.fontSize,
+  (newSize) => {
+    editorFontSize.value = newSize
+  }
+)
 
 // Theme settings
 const themeOptions = ref([
@@ -42,40 +61,10 @@ const themeOptions = ref([
   { label: 'Dark', value: 'dark', icon: 'pi pi-moon' },
   { label: 'System', value: 'system', icon: 'pi pi-desktop' },
 ])
-const selectedTheme = ref(isDark.value ? 'dark' : 'light')
-
-// Editor settings
-const editorFontSize = ref(14)
-const editorSettingsLoading = ref(false)
-const editorSettingsSaving = ref(false)
-
-// Load editor settings when appearance section is active
-watch(activeSection, async (section) => {
-  if (section === 'appearance') {
-    await loadEditorSettings()
-  }
-})
-
-async function loadEditorSettings() {
-  editorSettingsLoading.value = true
-  try {
-    const settings = await userSettingsService.getEditorSettings()
-    editorFontSize.value = settings.fontSize
-  } catch (err) {
-    console.error('Failed to load editor settings:', err)
-    // Use default
-    editorFontSize.value = 14
-  } finally {
-    editorSettingsLoading.value = false
-  }
-}
 
 async function saveEditorSettings() {
-  editorSettingsSaving.value = true
   try {
-    await userSettingsService.updateEditorSettings({
-      fontSize: editorFontSize.value,
-    })
+    await setFontSize(editorFontSize.value)
     toast.add({
       severity: 'success',
       summary: 'Settings Saved',
@@ -90,8 +79,6 @@ async function saveEditorSettings() {
       detail: 'Could not save editor settings.',
       life: 5000,
     })
-  } finally {
-    editorSettingsSaving.value = false
   }
 }
 
@@ -120,10 +107,8 @@ const passwordError = ref<string | null>(null)
 const passwordSuccess = ref(false)
 
 const handleThemeChange = (value: string) => {
-  if (value === 'dark' && !isDark.value) {
-    toggleDarkMode()
-  } else if (value === 'light' && isDark.value) {
-    toggleDarkMode()
+  if (value === 'light' || value === 'dark' || value === 'system') {
+    setTheme(value)
   }
 }
 
@@ -236,24 +221,24 @@ function clearPasswordError() {
               <Button
                 label="Account"
                 icon="pi pi-user"
-                :text="activeSection !== 'account'"
-                :class="{ 'surface-ground': activeSection === 'account' }"
+                text
+                :class="{ 'surface-hover': activeSection === 'account' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'account'"
               />
               <Button
                 label="API Keys"
                 icon="pi pi-key"
-                :text="activeSection !== 'apikeys'"
-                :class="{ 'surface-ground': activeSection === 'apikeys' }"
+                text
+                :class="{ 'surface-hover': activeSection === 'apikeys' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'apikeys'"
               />
               <Button
                 label="AI Keys"
                 icon="pi pi-sparkles"
-                :text="activeSection !== 'aikeys'"
-                :class="{ 'surface-ground': activeSection === 'aikeys' }"
+                text
+                :class="{ 'surface-hover': activeSection === 'aikeys' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'aikeys'"
               />
@@ -262,16 +247,16 @@ function clearPasswordError() {
               <Button
                 label="Appearance"
                 icon="pi pi-palette"
-                :text="activeSection !== 'appearance'"
-                :class="{ 'surface-ground': activeSection === 'appearance' }"
+                text
+                :class="{ 'surface-hover': activeSection === 'appearance' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
               />
               <Button
                 label="Notifications"
                 icon="pi pi-bell"
-                :text="activeSection !== 'notifications'"
-                :class="{ 'surface-ground': activeSection === 'notifications' }"
+                text
+                :class="{ 'surface-hover': activeSection === 'notifications' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'notifications'"
               />
@@ -401,17 +386,21 @@ function clearPasswordError() {
               <div>
                 <label class="font-medium block mb-3">Theme</label>
                 <SelectButton
-                  v-model="selectedTheme"
+                  :model-value="themePreference"
                   :options="themeOptions"
                   option-label="label"
                   option-value="value"
-                  @change="handleThemeChange(selectedTheme)"
+                  :disabled="themeSaving"
+                  @update:model-value="handleThemeChange"
                 >
                   <template #option="{ option }">
                     <i :class="option.icon" class="mr-2"></i>
                     <span>{{ option.label }}</span>
                   </template>
                 </SelectButton>
+                <small class="text-color-secondary block mt-2">
+                  Choose your preferred color scheme. "System" follows your device settings.
+                </small>
               </div>
 
               <!-- Editor Font Size -->

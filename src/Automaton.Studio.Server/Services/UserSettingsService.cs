@@ -23,12 +23,14 @@ public class UserSettingsService
     public static class Keys
     {
         public const string EditorFontSize = "editor.fontSize";
+        public const string AppearanceTheme = "appearance.theme";
     }
 
     // Default values
     public static class Defaults
     {
         public const int EditorFontSize = 14;
+        public const string Theme = "system";
     }
 
     public UserSettingsService(
@@ -153,11 +155,36 @@ public class UserSettingsService
     }
 
     /// <summary>
+    /// Get appearance settings for a user (convenience method)
+    /// </summary>
+    public async Task<AppearanceSettings> GetAppearanceSettingsAsync(Guid userId)
+    {
+        var theme = await GetSettingAsync(
+            userId,
+            Keys.AppearanceTheme,
+            Defaults.Theme);
+
+        return new AppearanceSettings
+        {
+            Theme = theme
+        };
+    }
+
+    /// <summary>
+    /// Update appearance settings for a user (convenience method)
+    /// </summary>
+    public async Task UpdateAppearanceSettingsAsync(Guid userId, UpdateAppearanceSettingsRequest request)
+    {
+        await SetSettingAsync(userId, Keys.AppearanceTheme, request.Theme);
+    }
+
+    /// <summary>
     /// Invalidate cached settings for a user
     /// </summary>
     public void InvalidateCache(Guid userId)
     {
         _cache.Remove(GetCacheKey(userId, Keys.EditorFontSize));
+        _cache.Remove(GetCacheKey(userId, Keys.AppearanceTheme));
     }
 
     private static string GetCacheKey(Guid userId, string key) => $"user_settings:{userId}:{key}";

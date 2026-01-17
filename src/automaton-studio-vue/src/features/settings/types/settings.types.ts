@@ -15,3 +15,26 @@ export interface EditorSettings {
 export interface UpdateEditorSettingsRequest {
   fontSize: number
 }
+
+/**
+ * Theme preference options
+ */
+export type ThemeMode = 'light' | 'dark' | 'system'
+
+/**
+ * User appearance settings
+ */
+export interface AppearanceSettings {
+  /**
+   * Theme preference: light, dark, or system
+   * Default: 'system'
+   */
+  theme: ThemeMode
+}
+
+/**
+ * Request model for updating appearance settings
+ */
+export interface UpdateAppearanceSettingsRequest {
+  theme: ThemeMode
+}
