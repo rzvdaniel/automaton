@@ -865,6 +865,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background-color: var(--p-surface-0);
 }
 
 .no-file-selected {
@@ -911,6 +912,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 :global(.app-dark) .editor-tab.active {
+  background-color: var(--p-surface-900);
+}
+
+:global(.app-dark) .editor-content {
   background-color: var(--p-surface-900);
 }
 
