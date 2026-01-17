@@ -179,6 +179,41 @@ public class UserSettingsService
     }
 
     /// <summary>
+    /// Get all user settings (unified endpoint)
+    /// </summary>
+    public async Task<UserSettingsDto> GetAllSettingsAsync(Guid userId)
+    {
+        var theme = await GetSettingAsync(userId, Keys.AppearanceTheme, Defaults.Theme);
+        var fontSize = await GetSettingAsync(userId, Keys.EditorFontSize, Defaults.EditorFontSize);
+
+        return new UserSettingsDto
+        {
+            Theme = theme,
+            FontSize = fontSize
+        };
+    }
+
+    /// <summary>
+    /// Update user settings (partial update - only provided fields are updated)
+    /// </summary>
+    public async Task<UserSettingsDto> UpdateSettingsAsync(Guid userId, UpdateUserSettingsRequest request)
+    {
+        // Only update fields that are provided
+        if (request.Theme != null)
+        {
+            await SetSettingAsync(userId, Keys.AppearanceTheme, request.Theme);
+        }
+
+        if (request.FontSize.HasValue)
+        {
+            await SetSettingAsync(userId, Keys.EditorFontSize, request.FontSize.Value);
+        }
+
+        // Return the full updated settings
+        return await GetAllSettingsAsync(userId);
+    }
+
+    /// <summary>
     /// Invalidate cached settings for a user
     /// </summary>
     public void InvalidateCache(Guid userId)

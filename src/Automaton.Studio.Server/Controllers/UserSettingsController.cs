@@ -25,24 +25,24 @@ public class UserSettingsController : BaseController
     }
 
     /// <summary>
-    /// Get editor settings for the current user
+    /// Get all user settings
     /// </summary>
-    [HttpGet("editor")]
-    [ProducesResponseType(typeof(EditorSettings), StatusCodes.Status200OK)]
-    public async Task<ActionResult<EditorSettings>> GetEditorSettings()
+    [HttpGet]
+    [ProducesResponseType(typeof(UserSettingsDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UserSettingsDto>> GetSettings()
     {
         var userId = GetUserId();
-        var settings = await _userSettingsService.GetEditorSettingsAsync(userId);
+        var settings = await _userSettingsService.GetAllSettingsAsync(userId);
         return Ok(settings);
     }
 
     /// <summary>
-    /// Update editor settings for the current user
+    /// Update user settings (partial update - only provided fields are updated)
     /// </summary>
-    [HttpPut("editor")]
-    [ProducesResponseType(typeof(EditorSettings), StatusCodes.Status200OK)]
+    [HttpPut]
+    [ProducesResponseType(typeof(UserSettingsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<EditorSettings>> UpdateEditorSettings([FromBody] UpdateEditorSettingsRequest request)
+    public async Task<ActionResult<UserSettingsDto>> UpdateSettings([FromBody] UpdateUserSettingsRequest request)
     {
         if (!ModelState.IsValid)
         {
@@ -52,51 +52,11 @@ public class UserSettingsController : BaseController
         var userId = GetUserId();
 
         _logger.LogInformation(
-            "Updating editor settings for user {UserId}: FontSize={FontSize}",
-            userId, request.FontSize);
+            "Updating user settings for {UserId}: Theme={Theme}, FontSize={FontSize}",
+            userId, request.Theme, request.FontSize);
 
-        await _userSettingsService.UpdateEditorSettingsAsync(userId, request);
-
-        // Return the updated settings
-        var updatedSettings = await _userSettingsService.GetEditorSettingsAsync(userId);
+        var updatedSettings = await _userSettingsService.UpdateSettingsAsync(userId, request);
         return Ok(updatedSettings);
     }
 
-    /// <summary>
-    /// Get appearance settings for the current user
-    /// </summary>
-    [HttpGet("appearance")]
-    [ProducesResponseType(typeof(AppearanceSettings), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AppearanceSettings>> GetAppearanceSettings()
-    {
-        var userId = GetUserId();
-        var settings = await _userSettingsService.GetAppearanceSettingsAsync(userId);
-        return Ok(settings);
-    }
-
-    /// <summary>
-    /// Update appearance settings for the current user
-    /// </summary>
-    [HttpPut("appearance")]
-    [ProducesResponseType(typeof(AppearanceSettings), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<AppearanceSettings>> UpdateAppearanceSettings([FromBody] UpdateAppearanceSettingsRequest request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        var userId = GetUserId();
-
-        _logger.LogInformation(
-            "Updating appearance settings for user {UserId}: Theme={Theme}",
-            userId, request.Theme);
-
-        await _userSettingsService.UpdateAppearanceSettingsAsync(userId, request);
-
-        // Return the updated settings
-        var updatedSettings = await _userSettingsService.GetAppearanceSettingsAsync(userId);
-        return Ok(updatedSettings);
-    }
 }

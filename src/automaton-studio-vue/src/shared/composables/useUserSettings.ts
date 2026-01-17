@@ -1,0 +1,217 @@
+import { ref, readonly, computed, watch } from 'vue'
+import { userSettingsService } from '@/features/settings/services/userSettingsService'
+import type { ThemeMode, UserSettingsDto } from '@/features/settings/types/settings.types'
+
+// Default values
+const DEFAULTS: UserSettingsDto = {
+  theme: 'system',
+  fontSize: 14,
+}
+
+const STORAGE_KEY = 'user-settings'
+
+// Global state - shared across all components using this composable
+const settings = ref<UserSettingsDto>({ ...DEFAULTS })
+const isInitialized = ref(false)
+const isLoading = ref(false)
+const isSaving = ref(false)
+
+// System preference detection
+const systemPrefersDark = ref(false)
+
+// Listen to system preference changes
+if (typeof window !== 'undefined' && window.matchMedia) {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  systemPrefersDark.value = mediaQuery.matches
+
+  mediaQuery.addEventListener('change', (e) => {
+    systemPrefersDark.value = e.matches
+  })
+}
+
+// Computed: actual dark mode based on preference and system
+const isDark = computed(() => {
+  if (settings.value.theme === 'system') {
+    return systemPrefersDark.value
+  }
+  return settings.value.theme === 'dark'
+})
+
+// Apply theme to DOM
+function applyTheme(dark: boolean) {
+  if (dark) {
+    document.documentElement.classList.add('app-dark')
+  } else {
+    document.documentElement.classList.remove('app-dark')
+  }
+}
+
+// Watch for theme changes and apply to DOM
+watch(isDark, (newValue) => {
+  applyTheme(newValue)
+}, { immediate: true })
+
+// Load from localStorage (sync, for immediate use)
+function loadFromStorage(): UserSettingsDto {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<UserSettingsDto>
+      return {
+        theme: parsed.theme && ['light', 'dark', 'system'].includes(parsed.theme)
+          ? parsed.theme
+          : DEFAULTS.theme,
+        fontSize: parsed.fontSize ?? DEFAULTS.fontSize,
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load user settings from storage:', err)
+  }
+  return { ...DEFAULTS }
+}
+
+// Save to localStorage
+function saveToStorage(value: UserSettingsDto) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+  } catch (err) {
+    console.warn('Failed to save user settings to storage:', err)
+  }
+}
+
+// Initialize from storage immediately (before server fetch)
+settings.value = loadFromStorage()
+
+export function useUserSettings() {
+  /**
+   * Initialize settings from server (call once after user is authenticated)
+   * Fetches all settings in one call and syncs to local state and storage
+   */
+  async function initializeSettings() {
+    if (isInitialized.value || isLoading.value) return
+
+    isLoading.value = true
+    try {
+      // Fetch all settings in one call
+      const serverSettings = await userSettingsService.getSettings()
+
+      settings.value = {
+        theme: serverSettings.theme,
+        fontSize: serverSettings.fontSize,
+      }
+      saveToStorage(settings.value)
+      isInitialized.value = true
+    } catch (err) {
+      console.error('Failed to load user settings from server:', err)
+      // Keep localStorage/default values
+      isInitialized.value = true
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Set theme preference and persist to server
+   */
+  async function setTheme(theme: ThemeMode) {
+    const previousSettings = { ...settings.value }
+
+    // Optimistic update
+    settings.value = { ...settings.value, theme }
+    saveToStorage(settings.value)
+
+    // Persist to server (partial update)
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({ theme })
+      } catch (err) {
+        console.error('Failed to save theme setting:', err)
+        // Revert on failure
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
+  /**
+   * Toggle between light and dark (ignores system)
+   */
+  function toggleDarkMode() {
+    const newTheme = isDark.value ? 'light' : 'dark'
+    setTheme(newTheme)
+  }
+
+  /**
+   * Set dark mode directly (for compatibility)
+   */
+  function setDarkMode(value: boolean) {
+    setTheme(value ? 'dark' : 'light')
+  }
+
+  /**
+   * Set font size and persist to server
+   */
+  async function setFontSize(fontSize: number) {
+    // Validate range
+    const validSize = Math.min(24, Math.max(10, fontSize))
+    const previousSettings = { ...settings.value }
+
+    // Optimistic update
+    settings.value = { ...settings.value, fontSize: validSize }
+    saveToStorage(settings.value)
+
+    // Persist to server (partial update)
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({ fontSize: validSize })
+      } catch (err) {
+        console.error('Failed to save font size setting:', err)
+        // Revert on failure
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
+  /**
+   * Reset settings state (call on logout)
+   */
+  function resetSettings() {
+    isInitialized.value = false
+    settings.value = { ...DEFAULTS }
+    localStorage.removeItem(STORAGE_KEY)
+  }
+
+  // Computed convenience accessors
+  const theme = computed(() => settings.value.theme)
+  const fontSize = computed(() => settings.value.fontSize)
+
+  return {
+    // Read-only reactive settings object
+    settings: readonly(settings),
+
+    // Computed convenience accessors
+    theme,
+    fontSize,
+    isDark,
+
+    // State
+    isInitialized: readonly(isInitialized),
+    isLoading: readonly(isLoading),
+    isSaving: readonly(isSaving),
+
+    // Actions
+    initializeSettings,
+    setTheme,
+    setFontSize,
+    toggleDarkMode,
+    setDarkMode,
+    resetSettings,
+  }
+}

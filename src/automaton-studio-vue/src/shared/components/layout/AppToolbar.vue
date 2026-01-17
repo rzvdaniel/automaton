@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from '@/shared/composables/useTheme'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 
-const { isDark, toggleDarkMode } = useTheme()
+const { isDark, toggleDarkMode } = useUserSettings()
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()

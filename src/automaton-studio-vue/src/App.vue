@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useTheme } from '@/shared/composables/useTheme'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 
-// Initialize theme on app mount
-const { isDark } = useTheme()
+// Initialize settings on app mount
+const { isDark } = useUserSettings()
 const route = useRoute()
 
 // Check if current route uses auth layout (login, register, install, etc.)
 const isAuthLayout = computed(() => route.meta.layout === 'auth')
 
 onMounted(() => {
-  // Theme is initialized in useTheme composable
+  // Settings are initialized in useUserSettings composable
   console.log('App mounted, dark mode:', isDark.value)
 })
 </script>

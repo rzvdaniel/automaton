@@ -12,19 +12,19 @@ import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
-import { useTheme } from '@/shared/composables/useTheme'
-import { useEditorSettings } from '@/shared/composables/useEditorSettings'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 
-const { themePreference, setTheme, isSaving: themeSaving } = useTheme()
 const {
-  settings: editorSettings,
-  isLoading: editorSettingsLoading,
-  isSaving: editorSettingsSaving,
+  theme: themePreference,
+  fontSize,
+  isLoading: settingsLoading,
+  isSaving: settingsSaving,
+  setTheme,
   setFontSize,
-} = useEditorSettings()
+} = useUserSettings()
 const authStore = useAuthStore()
 const toast = useToast()
 
@@ -44,16 +44,13 @@ onMounted(() => {
     email.value = authStore.user.email || ''
   }
   // Sync local value from cached settings
-  editorFontSize.value = editorSettings.value.fontSize
+  editorFontSize.value = fontSize.value
 })
 
 // Keep local value in sync with cached settings
-watch(
-  () => editorSettings.value.fontSize,
-  (newSize) => {
-    editorFontSize.value = newSize
-  }
-)
+watch(fontSize, (newSize) => {
+  editorFontSize.value = newSize
+})
 
 // Theme settings
 const themeOptions = ref([
@@ -390,7 +387,7 @@ function clearPasswordError() {
                   :options="themeOptions"
                   option-label="label"
                   option-value="value"
-                  :disabled="themeSaving"
+                  :disabled="settingsSaving"
                   @update:model-value="handleThemeChange"
                 >
                   <template #option="{ option }">
@@ -417,7 +414,7 @@ function clearPasswordError() {
                     suffix=" px"
                     :step="1"
                     class="w-10rem"
-                    :disabled="editorSettingsSaving || editorSettingsLoading"
+                    :disabled="settingsSaving || settingsLoading"
                   >
                     <template #incrementbuttonicon>
                       <i class="pi pi-plus" />
@@ -438,8 +435,8 @@ function clearPasswordError() {
                 <Button
                   label="Save Changes"
                   icon="pi pi-check"
-                  :loading="editorSettingsSaving"
-                  :disabled="editorSettingsSaving || editorSettingsLoading"
+                  :loading="settingsSaving"
+                  :disabled="settingsSaving || settingsLoading"
                   @click="saveEditorSettings"
                 />
               </div>
