@@ -887,6 +887,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 /* Dark mode */
+:global(.app-dark) .app-editor-view {
+  background-color: var(--p-surface-900);
+}
+
 :global(.app-dark) .editor-header {
   background-color: var(--p-surface-900);
   border-color: var(--p-surface-700);
