@@ -241,337 +241,78 @@ Benefits of this structure:
 6. Service returns typed data to component
 7. Component updates UI and shows feedback (toast, loading state)
 
-**Example End-to-End Flow:**
+**Type Safety:**
+- TypeScript interfaces must match C# DTOs exactly (property names, types, optionality)
+- **Critical:** Use const objects instead of enums in TypeScript
+- Example: `export const MyEnum = { Value1: 1 } as const`
 
-```typescript
-// 1. Frontend: User clicks "Create API Key"
-// Component: ApiKeysSection.vue
-async function createApiKey() {
-  createLoading.value = true
-  try {
-    const response = await apiKeysService.create(createForm.value)
-    // Success handling
-  } catch (err) {
-    // Error handling with toast
-  } finally {
-    createLoading.value = false
-  }
-}
+**Common HTTP Patterns:**
+- **List:** `GET /api/resource` (optional query params)
+- **Get Single:** `GET /api/resource/{id}`
+- **Create:** `POST /api/resource` (body: CreateRequest)
+- **Update:** `PUT /api/resource/{id}` (body: UpdateRequest)
+- **Delete:** `DELETE /api/resource/{id}`
 
-// 2. Service: Makes HTTP call
-// Service: apikeys.service.ts
-async create(request: CreateApiKeyRequest): Promise<CreateApiKeyResponse> {
-  const { data } = await apiClient.post<CreateApiKeyResponse>('/api/apikeys', request)
-  return data
-}
-
-// 3. Backend: Controller receives request
-// Controller: ApiKeysController.cs
-[HttpPost]
-public async Task<IActionResult> CreateApiKey([FromBody] CreateApiKeyRequest request)
-{
-    var userId = userContextService.GetUserId();
-    var (apiKey, entity) = await apiKeyService.CreateApiKeyAsync(
-        userId, request.Name, request.Description, request.ExpiresAt, request.Scope);
-    
-    return Ok(new CreateApiKeyResponse { ... });
-}
-```
-
-**Type Safety Across Stack:**
-
-TypeScript types must match C# DTOs exactly:
-
-```csharp
-// Backend: ApiKeysController.cs
-public class CreateApiKeyRequest
-{
-    public required string Name { get; set; }
-    public string? Description { get; set; }
-    public DateTime? ExpiresAt { get; set; }
-    public ApiKeyScope Scope { get; set; } = ApiKeyScope.FullAccess;
-}
-
-public enum ApiKeyScope
-{
-    ReadOnly = 1,
-    Execute = 2,
-    Runner = 3,
-    FullAccess = 4,
-    WebApp = 5
-}
-```
-
-```typescript
-// Frontend: apikeys.types.ts
-export interface CreateApiKeyRequest {
-  name: string
-  description?: string
-  expiresAt?: string  // ISO date string
-  scope: ApiKeyScope
-}
-
-// Use const object instead of enum for TypeScript compatibility
-export const ApiKeyScope = {
-  ReadOnly: 1,
-  Execute: 2,
-  Runner: 3,
-  FullAccess: 4,
-  WebApp: 5,
-} as const
-
-export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
-```
-
-**Common Patterns:**
-
-1. **List Resources:**
-```typescript
-// Frontend
-const items = await service.list(projectId)
-
-// Backend
-[HttpGet]
-public async Task<IActionResult> GetItems([FromQuery] Guid? projectId = null)
-```
-
-2. **Create Resource:**
-```typescript
-// Frontend
-const created = await service.create(request)
-
-// Backend
-[HttpPost]
-public async Task<IActionResult> Create([FromBody] CreateRequest request)
-```
-
-3. **Delete Resource:**
-```typescript
-// Frontend
-await service.delete(id)
-
-// Backend
-[HttpDelete("{id}")]
-public async Task<IActionResult> Delete(Guid id)
-```
-
-**Error Handling:**
-
-Backend returns standard HTTP status codes:
-- 200 OK - Success
-- 201 Created - Resource created
-- 204 No Content - Success with no response body
+**HTTP Status Codes:**
+- 200 OK, 201 Created, 204 No Content - Success
 - 400 Bad Request - Validation error
 - 401 Unauthorized - Auth required
 - 403 Forbidden - Insufficient permissions
 - 404 Not Found - Resource not found
 - 500 Internal Server Error - Server error
 
-Frontend catches errors and shows appropriate feedback:
-```typescript
-try {
-  await service.operation()
-  toast.add({ severity: 'success', summary: 'Success', ... })
-} catch (err: unknown) {
-  console.error('Operation failed:', err)
-  toast.add({ severity: 'error', summary: 'Error', detail: 'Operation failed', ... })
-}
-```
+**Error Handling Pattern:**
+- Use try/catch in service calls
+- Show toast notifications for user feedback
+- Log errors to console for debugging
 
 ### Implementing a New Feature
 
-**Step-by-Step Guide:**
+**Step-by-Step Implementation Guide:**
 
-**1. Backend First (ASP.NET Core):**
-
-Create controller in `src/Automaton.Studio.Server/Controllers/YourFeatureController.cs`:
-```csharp
-[Route("api/[controller]")]
-[ApiController]
-[Authorize]  // Require authentication
-public class YourFeatureController : ControllerBase
-{
-    private readonly YourFeatureService _service;
-    
-    public YourFeatureController(YourFeatureService service)
-    {
-        _service = service;
-    }
-    
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<YourModel>>> GetAll()
-    {
-        var items = await _service.GetAllAsync();
-        return Ok(items);
-    }
-    
-    [HttpPost]
-    public async Task<ActionResult<YourModel>> Create([FromBody] CreateRequest request)
-    {
-        var created = await _service.CreateAsync(request);
-        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
-    }
-}
-```
-
-Define DTOs in the same file or separate model file:
-```csharp
-public class YourModel
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-}
-
-public class CreateRequest
-{
-    public required string Name { get; set; }
-    public string? Description { get; set; }
-}
-```
+**1. Backend (ASP.NET Core):**
+- Create controller in `src/Automaton.Studio.Server/Controllers/YourFeatureController.cs`
+- Add `[Route("api/[controller]")]`, `[ApiController]`, `[Authorize]` attributes
+- Define DTOs (models) in controller file or separate models file
+- Implement HTTP endpoints: GET (list/single), POST (create), PUT (update), DELETE (delete)
 
 **2. Frontend Feature Structure:**
-
-Create feature directory in `src/automaton-studio-vue/src/features/your-feature/`:
-
 ```
-your-feature/
-├── components/
-│   └── YourFeatureSection.vue
-├── services/
-│   └── yourFeature.service.ts
-├── types/
-│   └── yourFeature.types.ts
-└── views/ (optional)
-    └── YourFeatureView.vue
+src/automaton-studio-vue/src/features/your-feature/
+├── components/       # YourFeatureSection.vue
+├── services/         # yourFeature.service.ts
+├── types/            # yourFeature.types.ts
+└── views/            # YourFeatureView.vue (optional)
 ```
 
 **3. TypeScript Types:**
-
-Create `types/yourFeature.types.ts` matching backend DTOs:
-```typescript
-export interface YourModel {
-  id: string
-  name: string
-  createdAt: string  // ISO date string
-}
-
-export interface CreateRequest {
-  name: string
-  description?: string
-}
-```
+- Create interfaces matching backend DTOs exactly
+- Property names, types, and optionality must match C# models
+- Add helper functions (getSeverity, getIcon, formatDate)
 
 **4. API Service:**
-
-Create `services/yourFeature.service.ts`:
-```typescript
-import apiClient from '@/shared/services/api/axios-instance'
-import type { YourModel, CreateRequest } from '../types/yourFeature.types'
-
-class YourFeatureService {
-  async list(): Promise<YourModel[]> {
-    const { data } = await apiClient.get<YourModel[]>('/api/yourfeature')
-    return data
-  }
-
-  async create(request: CreateRequest): Promise<YourModel> {
-    const { data } = await apiClient.post<YourModel>('/api/yourfeature', request)
-    return data
-  }
-}
-
-export const yourFeatureService = new YourFeatureService()
-```
+- Import `apiClient` from `@/shared/services/api/axios-instance`
+- Create service class with async methods (list, create, update, delete)
+- Export singleton instance: `export const yourFeatureService = new YourFeatureService()`
 
 **5. Vue Component:**
+- Use PrimeVue components (Card, DataTable, Dialog, Button)
+- Implement loading states with `ref(true/false)`
+- Use `useToast()` for user feedback
+- Handle errors with try/catch
+- Call service methods in component functions
 
-Create `components/YourFeatureSection.vue`:
-```vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import Card from 'primevue/card'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import { useToast } from 'primevue/usetoast'
-import { yourFeatureService } from '../services/yourFeature.service'
-import type { YourModel } from '../types/yourFeature.types'
-
-const toast = useToast()
-const loading = ref(true)
-const items = ref<YourModel[]>([])
-
-async function loadItems() {
-  loading.value = true
-  try {
-    items.value = await yourFeatureService.list()
-  } catch (err) {
-    console.error('Failed to load items:', err)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to load items',
-      life: 5000,
-    })
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadItems()
-})
-</script>
-
-<template>
-  <Card>
-    <template #title>Your Feature</template>
-    <template #content>
-      <DataTable :value="items" :loading="loading">
-        <Column field="name" header="Name"></Column>
-        <Column field="createdAt" header="Created"></Column>
-      </DataTable>
-    </template>
-  </Card>
-</template>
-```
-
-**6. Integration:**
-
-Import and use component in parent view:
-```vue
-<script setup lang="ts">
-import YourFeatureSection from '@/features/your-feature/components/YourFeatureSection.vue'
-</script>
-
-<template>
-  <YourFeatureSection />
-</template>
-```
-
-**Best Practices Checklist:**
-
+**Best Practices:**
 - ✅ Match TypeScript types to C# DTOs exactly
-- ✅ Use const objects instead of enums for TypeScript compatibility
-- ✅ Add loading states for all async operations
-- ✅ Show toast notifications for success/error feedback
-- ✅ Implement empty states with helpful messages
-- ✅ Add confirmation dialogs for destructive actions
-- ✅ Handle errors with try/catch and user-friendly messages
-- ✅ Use PrimeVue components for consistency
-- ✅ Keep services focused on API calls only
+- ✅ Use const objects instead of enums
+- ✅ Add loading states for async operations
+- ✅ Show toast notifications for feedback
+- ✅ Implement empty states and confirmations
+- ✅ Handle errors gracefully
+- ✅ Keep services focused on API calls
 - ✅ Colocate related code in feature folders
-- ✅ Add helper functions for common UI operations (formatting, colors, etc.)
 
-**Real-World Example:**
-
-See the API Keys implementation in `src/automaton-studio-vue/src/features/settings/`:
-- Backend: `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
-- Frontend Types: `src/features/settings/types/apikeys.types.ts`
-- Frontend Service: `src/features/settings/services/apikeys.service.ts`
-- Frontend Component: `src/features/settings/components/ApiKeysSection.vue`
-
-This demonstrates complete CRUD operations, type safety, error handling, and UX best practices.
+**Reference:** See API Keys implementation in `src/automaton-studio-vue/src/features/settings/` for complete example.
 
 ### Authentication & Authorization
 
@@ -605,13 +346,7 @@ Flows use placeholder-based variable mapping:
 
 ### Step Architecture
 
-All steps inherit from `BaseStep` in `Automaton.Core`:
-```csharp
-public abstract class BaseStep
-{
-    public abstract Task<ExecutionResult> ExecuteAsync(IStepExecutionContext context);
-}
-```
+All steps inherit from `BaseStep` in `Automaton.Core` with single method: `ExecuteAsync(IStepExecutionContext context)`
 
 Custom steps (Python/PowerShell/Batch) are defined with:
 - Name, display name, description
@@ -621,13 +356,7 @@ Custom steps (Python/PowerShell/Batch) are defined with:
 
 ### Web App Integration
 
-Published web apps call backend flows via `window.automatonApi` helper:
-```javascript
-// Frontend code in published web app
-await window.automatonApi.executeFlow(flowId, { 
-  inputs: {...} 
-});
-```
+Published web apps call backend flows via `window.automatonApi.executeFlow(flowId, { inputs: {...} })`
 
 See AGENTS.md (Apps section) and `src/Automaton.Studio.Web/wwwroot/automatonApi.js` for details.
 
@@ -662,121 +391,28 @@ Services registered in `Program.cs`:
 - **Singleton**: Shared state (SignalR connection tracking, cache)
 - **Transient**: Stateless utilities
 
-Example:
-```csharp
-builder.Services.AddScoped<FlowsService>();
-builder.Services.AddScoped<FlowGenerationService>();
-builder.Services.AddSingleton<ConnectionManager>();
-```
-
-### API Endpoints
-
-New flow generation endpoints (in `FlowsController` or new `FlowGenerationController`):
-
-```csharp
-[HttpPost("generate")]
-public async Task<ActionResult<GenerateFlowResponse>> GenerateFlow(
-    GenerateFlowRequest request)
-{
-    var response = await _flowGenerationService.GenerateFlowAsync(
-        request, 
-        User.FindFirst("sub")?.Value);
-    return Ok(response);
-}
-
-[HttpPost("generate/refine/{flowId}")]
-public async Task<ActionResult<GeneratedFlow>> RefineFlow(
-    Guid flowId,
-    RefineFlowRequest request)
-{
-    // Implementation
-}
-
-[HttpGet("generate/search-steps")]
-public async Task<ActionResult<StepSearchResponse>> SearchSteps(
-    [FromQuery] string query)
-{
-    // Implementation
-}
-```
-
 ### Frontend: HTTP Client with Axios
 
-```typescript
-// src/shared/services/api/axios-instance.ts
-import axios from 'axios';
-import { useAuthStore } from '@/features/auth/stores/auth.store';
-
-const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  timeout: 10000,
-});
-
-// Inject JWT token
-instance.interceptors.request.use((config) => {
-  const auth = useAuthStore();
-  if (auth.token) {
-    config.headers.Authorization = `Bearer ${auth.token}`;
-  }
-  return config;
-});
-
-export default instance;
-```
+Axios instance at `src/shared/services/api/axios-instance.ts`:
+- Base URL from environment variable `VITE_API_URL`
+- Request interceptors automatically inject JWT token
+- Import via: `import apiClient from '@/shared/services/api/axios-instance'`
 
 ### Frontend: Pinia State Management
 
-```typescript
-// src/features/flows/stores/flows.store.ts
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-
-export const useFlowsStore = defineStore('flows', () => {
-  const flows = ref<Flow[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  const fetchFlows = async () => {
-    loading.value = true;
-    try {
-      const response = await flowsService.getFlows();
-      flows.value = response.data;
-    } catch (e) {
-      error.value = (e as Error).message;
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  const flowCount = computed(() => flows.value.length);
-
-  return {
-    flows,
-    loading,
-    error,
-    flowCount,
-    fetchFlows,
-  };
-});
-```
+Store pattern using Composition API:
+- Define store with `defineStore('name', () => { ... })`
+- Use `ref()` for reactive state
+- Use `computed()` for derived values
+- Return object with state and functions
+- Access in components via `useXxxStore()`
 
 ### Backend: Custom Step Execution
 
-Custom steps inherit from `BaseStep` and implement:
-```csharp
-public class ValidateEmailStep : BaseStep
-{
-    public override async Task<ExecutionResult> ExecuteAsync(
-        IStepExecutionContext context)
-    {
-        var email = context.GetInputVariable<string>("email");
-        var isValid = /* validation logic */;
-        
-        context.SetOutputVariable("isValid", isValid);
-        return ExecutionResult.Success();
-    }
-}
-```
+Custom steps inherit from `BaseStep` in `Automaton.Core` and implement `ExecuteAsync`:
+- Get input variables via `context.GetInputVariable<T>("name")`
+- Set output variables via `context.SetOutputVariable("name", value)`
+- Return `ExecutionResult.Success()` or `ExecutionResult.Failure(message)`
 
 ### Web App API Calls
 
