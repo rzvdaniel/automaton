@@ -79,7 +79,7 @@ async function loadData() {
 function openCreateDialog() {
   createForm.value = {
     name: '',
-    providerName: providers.value.length > 0 ? providers.value[0].providerName : '',
+    providerName: providers.value.length > 0 && providers.value[0] ? providers.value[0].providerName : '',
     apiKey: '',
     description: '',
   }
@@ -175,13 +175,6 @@ function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Never'
   const date = new Date(dateStr)
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
-}
-
-// Open provider help URL
-function openProviderHelp() {
-  if (selectedProvider.value?.apiKeyHelpUrl) {
-    window.open(selectedProvider.value.apiKeyHelpUrl, '_blank')
-  }
 }
 
 onMounted(() => {
@@ -293,7 +286,7 @@ onMounted(() => {
           <template #value="slotProps">
             <div v-if="slotProps.value" class="flex align-items-center gap-2">
               <i :class="getProviderIcon(slotProps.value)" :style="{ color: getProviderColor(slotProps.value) }"></i>
-              <span>{{ providerOptions.find(p => p.value === slotProps.value)?.label }}</span>
+              <span>{{ providerOptions.find(p => p.value === slotProps.value)?.label ?? '' }}</span>
             </div>
             <span v-else>{{ slotProps.placeholder }}</span>
           </template>

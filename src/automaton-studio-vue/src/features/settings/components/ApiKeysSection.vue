@@ -314,9 +314,9 @@ onMounted(() => {
             style="font-family: monospace"
           />
           <Button
+            v-tooltip.top="'Copy to clipboard'"
             icon="pi pi-copy"
             @click="copyToClipboard(newApiKeyData.apiKey)"
-            v-tooltip.top="'Copy to clipboard'"
           />
         </div>
       </div>

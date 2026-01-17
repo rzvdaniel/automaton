@@ -119,12 +119,12 @@ function handleKeyPress(event: KeyboardEvent) {
         </div>
         
         <!-- Model Selector -->
-        <div class="flex align-items-center gap-2" v-if="availableProviders.length > 0">
+        <div v-if="availableProviders.length > 0" class="flex align-items-center gap-2">
           <Select
             v-model="selectedProvider"
             :options="availableProviders"
-            optionLabel="displayName"
-            optionValue="providerName"
+            option-label="displayName"
+            option-value="providerName"
             placeholder="Provider"
             size="small"
             class="model-select"
@@ -240,19 +240,19 @@ function handleKeyPress(event: KeyboardEvent) {
           @keypress="handleKeyPress"
         />
         <Button
+          v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
           icon="pi pi-send"
           :disabled="!userInput.trim() || isGenerating || !selectedProvider"
           :loading="isGenerating"
           @click="sendMessage"
-          v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
         />
         <Button
           v-if="hasMessages"
+          v-tooltip.top="'Clear conversation'"
           icon="pi pi-trash"
           severity="secondary"
           text
           @click="clearMessages"
-          v-tooltip.top="'Clear conversation'"
         />
       </div>
     </div>

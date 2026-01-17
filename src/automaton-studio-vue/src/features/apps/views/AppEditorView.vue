@@ -517,12 +517,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       <div class="editor-header">
         <div class="header-left">
           <Button
+            v-tooltip.bottom="'Back to Apps'"
             icon="pi pi-arrow-left"
             text
             rounded
             severity="secondary"
             @click="handleBack"
-            v-tooltip.bottom="'Back to Apps'"
           />
           <div class="app-info">
             <div class="flex align-items-center gap-2">
@@ -562,12 +562,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           </div>
           
           <Button
+            v-tooltip.bottom="'Open full-screen preview'"
             icon="pi pi-eye"
             label="Preview"
             outlined
             severity="secondary"
             @click="editorStore.openPreviewOverlay()"
-            v-tooltip.bottom="'Open full-screen preview'"
           />
           <Button
             v-if="editorStore.hasUnsavedChanges"
@@ -597,11 +597,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       <Splitter
         class="editor-layout"
         layout="horizontal"
-        :gutterSize="8"
+        :gutter-size="8"
         @resizeend="handleSplitterResize"
       >
         <!-- Left Panel: File Tree -->
-        <SplitterPanel :size="panelSizes[0]" :minSize="10" class="splitter-panel">
+        <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
           <div class="file-panel">
             <FileTree
               @create-file="showCreateFileDialog = true"
@@ -612,7 +612,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </SplitterPanel>
 
         <!-- Center Panel: Code Editor -->
-        <SplitterPanel :size="panelSizes[1]" :minSize="30" class="splitter-panel">
+        <SplitterPanel :size="panelSizes[1]" :min-size="30" class="splitter-panel">
           <div class="editor-panel">
             <!-- File Tabs -->
             <div class="editor-tabs-container">
@@ -663,7 +663,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </SplitterPanel>
 
         <!-- Right Panel: AI Assistant -->
-        <SplitterPanel :size="panelSizes[2]" :minSize="15" class="splitter-panel">
+        <SplitterPanel :size="panelSizes[2]" :min-size="15" class="splitter-panel">
           <div class="ai-sidebar">
             <AiAssistant
               :app-id="appId"

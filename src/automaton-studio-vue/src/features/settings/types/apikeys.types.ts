@@ -6,13 +6,15 @@
 /**
  * API Key scope enum - matches Automaton.Core.Enums.ApiKeyScope
  */
-export enum ApiKeyScope {
-  ReadOnly = 1,
-  Execute = 2,
-  Runner = 3,
-  FullAccess = 4,
-  WebApp = 5,
-}
+export const ApiKeyScope = {
+  ReadOnly: 1,
+  Execute: 2,
+  Runner: 3,
+  FullAccess: 4,
+  WebApp: 5,
+} as const
+
+export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
 
 /**
  * API Key response from server

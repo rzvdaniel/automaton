@@ -165,11 +165,11 @@ function clearMessages() {
         />
         <Button
           v-if="messages.length > 0"
+          v-tooltip.top="'Clear'"
           icon="pi pi-trash"
           severity="secondary"
           text
           @click="clearMessages"
-          v-tooltip.top="'Clear'"
         />
       </div>
     </div>

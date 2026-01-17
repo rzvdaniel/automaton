@@ -97,12 +97,12 @@ onUnmounted(() => {
       <div class="preview-overlay-header">
         <div class="header-left">
           <Button
+            v-tooltip.bottom="'Back to Editor (Esc)'"
             icon="pi pi-arrow-left"
             text
             rounded
             severity="secondary"
             @click="handleClose"
-            v-tooltip.bottom="'Back to Editor (Esc)'"
           />
           <span class="app-name">{{ editorStore.currentApp?.name }}</span>
           <span class="preview-badge">Preview</span>
