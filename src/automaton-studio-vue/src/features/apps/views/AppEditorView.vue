@@ -803,7 +803,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-0);
 }
 
 .editor-panel {
@@ -812,13 +811,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background-color: var(--p-surface-0);
 }
 
 .editor-tabs-container {
   display: flex;
   align-items: center;
-  background-color: var(--p-surface-100);
   border-bottom: 1px solid var(--p-surface-200);
   overflow-x: auto;
   flex-shrink: 0;
@@ -829,7 +826,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   align-items: center;
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
-  background-color: var(--p-surface-100);
   border-right: 1px solid var(--p-surface-200);
   cursor: pointer;
   white-space: nowrap;
@@ -837,11 +833,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 .editor-tab:hover {
-  background-color: var(--p-surface-200);
+  background-color: var(--p-surface-hover);
 }
 
 .editor-tab.active {
-  background-color: var(--p-surface-0);
   border-bottom: 2px solid var(--p-primary-500);
 }
 
@@ -866,7 +861,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background-color: var(--p-surface-0);
 }
 
 .no-file-selected {
@@ -896,35 +890,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 :global(.app-dark) .file-panel {
-  background-color: var(--p-surface-900);
   border-color: var(--p-surface-700);
 }
 
-
-:global(.app-dark) .editor-panel {
-  background-color: var(--p-surface-900);
-}
-
 :global(.app-dark) .editor-tabs-container {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
 
 :global(.app-dark) .editor-tab {
-  background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .editor-tab:hover {
-  background-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .editor-tab.active {
-  background-color: var(--p-surface-900);
-}
-
-:global(.app-dark) .editor-content {
-  background-color: var(--p-surface-900);
 }
 
 :global(.app-dark) .ai-sidebar {
