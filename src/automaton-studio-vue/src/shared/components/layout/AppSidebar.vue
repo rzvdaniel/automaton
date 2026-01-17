@@ -98,7 +98,7 @@ const sidebarClass = computed(() => ({
 <style scoped>
 /* Base sidebar styles - dark mode handled in main.css */
 .app-sidebar {
-  min-height: 100vh;
+  height: 100vh;
   overflow: hidden;
 }
 
