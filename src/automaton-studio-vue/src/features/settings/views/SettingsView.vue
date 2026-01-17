@@ -495,7 +495,7 @@ function clearPasswordError() {
 
 <style scoped>
 .settings-view {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 </style>
