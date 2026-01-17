@@ -72,16 +72,22 @@ pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  margin-left: 72px; /* Account for fixed sidebar width */
 }
 
 .app-toolbar {
+  position: sticky;
+  top: 0;
   height: 64px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--p-surface-200);
+  background-color: var(--p-surface-0);
+  z-index: 999;
 }
 
 .app-dark .app-toolbar {
   border-bottom-color: var(--p-surface-700);
+  background-color: var(--p-surface-900);
 }
 
 .app-main {

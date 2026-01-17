@@ -387,7 +387,6 @@ function isBackendStep(node: any): boolean {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--p-surface-0);
 }
 
 .file-tree-header {
@@ -479,10 +478,6 @@ function isBackendStep(node: any): boolean {
 }
 
 /* Dark mode */
-:global(.app-dark) .file-tree {
-  background-color: var(--p-surface-900);
-}
-
 :global(.app-dark) .file-tree-header {
   border-color: var(--p-surface-700);
 }

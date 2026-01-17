@@ -214,13 +214,47 @@ src/features/your-feature/
 - Use `useToast()` for user feedback (success, error, warning)
 - Keep components focused and single-purpose
 
-**5. Backend Integration:**
+**5. Theme-Aware Styling (CRITICAL):**
+
+The app supports light/dark themes. **Never hardcode background colors** - they break theme switching.
+
+```css
+/* ❌ WRONG - breaks dark mode */
+.my-panel {
+  background-color: var(--p-surface-0);   /* Always white */
+  background-color: var(--p-surface-100); /* Always light */
+  background-color: white;
+}
+
+/* ✅ CORRECT - inherit from parent (preferred) */
+.my-panel {
+  /* No background - inherits from themed parent */
+  border: 1px solid var(--p-surface-200);
+}
+
+/* ✅ CORRECT - use adaptive variables */
+.my-panel {
+  background-color: var(--p-surface-ground); /* Adapts */
+  color: var(--p-text-color);                /* Adapts */
+}
+
+/* Dark mode - only adjust borders, not backgrounds */
+:global(.app-dark) .my-panel {
+  border-color: var(--p-surface-700);
+}
+```
+
+**Safe CSS variables:** `--p-surface-ground`, `--p-text-color`, `--p-text-muted-color`, `--p-surface-hover`
+
+**Unsafe (don't use for backgrounds):** `--p-surface-0` through `--p-surface-400`, `--p-surface-800`, `--p-surface-900`
+
+**6. Backend Integration:**
 - Controllers in `src/Automaton.Studio.Server/Controllers/`
 - Endpoints: `/api/controllername`
 - Common patterns: GET (list/get), POST (create), PUT (update), DELETE (delete)
 - Ensure TypeScript interfaces match C# DTOs exactly
 
-**6. Best Practices:**
+**7. Best Practices:**
 - ✅ Show loading states during async operations
 - ✅ Use toast notifications for all user feedback
 - ✅ Add empty states with helpful messages
@@ -230,6 +264,7 @@ src/features/your-feature/
 - ✅ Format dates consistently using helper functions
 - ✅ Keep services stateless and focused on API calls
 - ✅ Colocate feature code (types, services, components together)
+- ✅ **Never hardcode backgrounds** - omit background-color or use `--p-surface-ground`
 
 **Reference Implementation:**
 
