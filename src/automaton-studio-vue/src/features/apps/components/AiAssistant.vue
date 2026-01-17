@@ -494,6 +494,10 @@ function handleKeyPress(event: KeyboardEvent) {
   border-color: var(--p-surface-700);
 }
 
+:global(.app-dark) .messages-area {
+  background-color: var(--p-surface-800);
+}
+
 :global(.app-dark) .error-banner {
   background-color: var(--p-red-900);
   color: var(--p-red-100);

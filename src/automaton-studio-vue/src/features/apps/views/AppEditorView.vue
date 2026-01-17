@@ -764,6 +764,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
+  color: var(--p-text-color);
 }
 
 .app-name:hover {
