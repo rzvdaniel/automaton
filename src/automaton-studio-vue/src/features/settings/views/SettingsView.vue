@@ -6,9 +6,6 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
@@ -16,6 +13,8 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
+import ApiKeysSection from '../components/ApiKeysSection.vue'
+import AiKeysSection from '../components/AiKeysSection.vue'
 
 const {
   theme: themePreference,
@@ -78,19 +77,6 @@ async function saveEditorSettings() {
     })
   }
 }
-
-// API Keys mock data
-const apiKeys = ref([
-  { id: 1, name: 'Production API Key', key: 'ak_prod_****', scope: 'Execute', created: '2024-01-15', lastUsed: '5 min ago' },
-  { id: 2, name: 'Runner Key', key: 'ak_runner_****', scope: 'Runner', created: '2024-01-10', lastUsed: '2 hours ago' },
-])
-
-// AI Keys mock data
-const aiKeys = ref([
-  { id: 1, provider: 'OpenAI', model: 'gpt-4', configured: true },
-  { id: 2, provider: 'Anthropic', model: 'claude-3', configured: false },
-  { id: 3, provider: 'Google', model: 'gemini-pro', configured: false },
-])
 
 // Change password dialog state
 const showPasswordDialog = ref(false)
@@ -297,82 +283,10 @@ function clearPasswordError() {
         </Card>
 
         <!-- API Keys Section -->
-        <Card v-if="activeSection === 'apikeys'">
-          <template #title>
-            <div class="flex align-items-center justify-content-between">
-              <span>API Keys</span>
-              <Button label="Generate New Key" icon="pi pi-plus" size="small" />
-            </div>
-          </template>
-          <template #subtitle>
-            Manage API keys for runners, webhooks, and integrations
-          </template>
-          <template #content>
-            <DataTable :value="apiKeys" class="p-datatable-sm">
-              <Column field="name" header="Name"></Column>
-              <Column field="key" header="Key">
-                <template #body="{ data }">
-                  <code class="surface-ground p-1 border-round">{{ data.key }}</code>
-                </template>
-              </Column>
-              <Column field="scope" header="Scope">
-                <template #body="{ data }">
-                  <Tag :value="data.scope" severity="secondary" />
-                </template>
-              </Column>
-              <Column field="lastUsed" header="Last Used"></Column>
-              <Column header="Actions">
-                <template #body>
-                  <div class="flex gap-1">
-                    <Button icon="pi pi-copy" text rounded size="small" severity="secondary" />
-                    <Button icon="pi pi-trash" text rounded size="small" severity="danger" />
-                  </div>
-                </template>
-              </Column>
-            </DataTable>
-          </template>
-        </Card>
+        <ApiKeysSection v-if="activeSection === 'apikeys'" />
 
         <!-- AI Keys Section -->
-        <Card v-if="activeSection === 'aikeys'">
-          <template #title>AI Provider Keys</template>
-          <template #subtitle>
-            Configure API keys for AI-powered features
-          </template>
-          <template #content>
-            <div class="flex flex-column gap-4">
-              <div
-                v-for="provider in aiKeys"
-                :key="provider.id"
-                class="flex align-items-center justify-content-between p-3 surface-ground border-round"
-              >
-                <div class="flex align-items-center gap-3">
-                  <div
-                    class="flex align-items-center justify-content-center border-round-lg"
-                    style="width: 40px; height: 40px; background-color: var(--p-primary-100)"
-                  >
-                    <i class="pi pi-sparkles" style="color: var(--p-primary-600)"></i>
-                  </div>
-                  <div>
-                    <div class="font-semibold">{{ provider.provider }}</div>
-                    <div class="text-color-secondary text-sm">{{ provider.model }}</div>
-                  </div>
-                </div>
-                <div class="flex align-items-center gap-3">
-                  <Tag
-                    :value="provider.configured ? 'Configured' : 'Not Configured'"
-                    :severity="provider.configured ? 'success' : 'secondary'"
-                  />
-                  <Button
-                    :label="provider.configured ? 'Update' : 'Configure'"
-                    size="small"
-                    :outlined="provider.configured"
-                  />
-                </div>
-              </div>
-            </div>
-          </template>
-        </Card>
+        <AiKeysSection v-if="activeSection === 'aikeys'" />
 
         <!-- Appearance Section -->
         <Card v-if="activeSection === 'appearance'">
