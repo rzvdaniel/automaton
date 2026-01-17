@@ -168,8 +168,8 @@ function getJsonTemplate(_name: string): string {
           id="fileType"
           v-model="fileType"
           :options="fileTypeOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           class="w-full"
         />
       </div>

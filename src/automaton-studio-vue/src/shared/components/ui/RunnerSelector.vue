@@ -74,8 +74,8 @@ onMounted(() => {
   <Select
     v-model="selectedRunnerId"
     :options="runnerOptions"
-    optionLabel="label"
-    optionValue="value"
+    option-label="label"
+    option-value="value"
     placeholder="Select runner"
     :loading="isLoading"
     :disabled="disabled || isLoading"

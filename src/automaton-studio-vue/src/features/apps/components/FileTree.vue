@@ -327,22 +327,22 @@ function isBackendStep(node: any): boolean {
     <div class="file-tree-header">
       <span class="font-semibold">Files</span>
       <Button
+        v-tooltip.bottom="'New File'"
         icon="pi pi-plus"
         text
         rounded
         size="small"
         severity="secondary"
         @click="emit('createFile')"
-        v-tooltip.bottom="'New File'"
       />
     </div>
 
     <!-- Tree -->
     <div class="file-tree-content">
       <Tree
-        v-model:selectionKeys="selectedKey"
+        v-model:selection-keys="selectedKey"
         :value="treeNodes"
-        selectionMode="single"
+        selection-mode="single"
         class="w-full border-none p-0 file-tree-component"
         @node-select="onNodeSelect"
         @node-context-menu="onNodeContextMenu"

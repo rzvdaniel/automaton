@@ -183,6 +183,58 @@ npm run generate:types  # Generates src/shared/types/api/ from OpenAPI
 
 **Component Testing:** Vitest + Vue Test Utils with colocated `*.spec.ts` files.
 
+### Implementing a New Feature in Vue.js
+
+When adding a new feature to the Vue.js frontend, follow this systematic approach:
+
+**1. Feature Directory Structure:**
+```
+src/features/your-feature/
+├── components/          # Feature-specific Vue components
+├── services/            # API service calls
+├── types/               # TypeScript interfaces
+├── views/               # Page-level components (optional)
+└── routes.ts            # Feature routes (optional)
+```
+
+**2. TypeScript Types:**
+- Match backend C# DTOs exactly (property names, types, optionality)
+- **Important:** Use const objects instead of enums: `export const MyEnum = { Value1: 1 } as const`
+- Add helper functions for UI display (getSeverity, getIcon, formatDate)
+
+**3. API Service:**
+- Import and use `apiClient` from `@/shared/services/api/axios-instance`
+- JWT tokens are automatically injected by interceptors
+- Handle errors with try/catch and toast notifications
+- Service class pattern: `export const yourFeatureService = new YourFeatureService()`
+
+**4. Vue Components:**
+- Use PrimeVue components (Card, DataTable, Dialog, Button, etc.)
+- Implement loading states with `ref(true/false)`
+- Use `useToast()` for user feedback (success, error, warning)
+- Keep components focused and single-purpose
+
+**5. Backend Integration:**
+- Controllers in `src/Automaton.Studio.Server/Controllers/`
+- Endpoints: `/api/controllername`
+- Common patterns: GET (list/get), POST (create), PUT (update), DELETE (delete)
+- Ensure TypeScript interfaces match C# DTOs exactly
+
+**6. Best Practices:**
+- ✅ Show loading states during async operations
+- ✅ Use toast notifications for all user feedback
+- ✅ Add empty states with helpful messages
+- ✅ Implement confirmation dialogs for destructive actions
+- ✅ Use computed properties to optimize template expressions
+- ✅ Handle errors gracefully with try/catch
+- ✅ Format dates consistently using helper functions
+- ✅ Keep services stateless and focused on API calls
+- ✅ Colocate feature code (types, services, components together)
+
+**Reference Implementation:**
+
+See API Keys feature in `src/automaton-studio-vue/src/features/settings/` for complete example demonstrating all patterns above.
+
 ### API Key Scopes
 
 API keys authenticate runners, web apps, and integrations. Format: `ak_<scope>_<random>`.

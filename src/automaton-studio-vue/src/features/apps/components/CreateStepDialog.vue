@@ -127,8 +127,8 @@ function close() {
           id="language"
           v-model="language"
           :options="languageOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           class="w-full"
         />
         <small class="text-color-secondary block mt-1">
