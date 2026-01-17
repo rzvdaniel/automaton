@@ -222,6 +222,15 @@ onMounted(() => {
           </template>
         </Column>
 
+        <Column field="isActive" header="Status" :sortable="true">
+          <template #body="{ data }">
+            <Tag
+              :value="data.isActive ? 'Active' : 'Revoked'"
+              :severity="data.isActive ? 'success' : 'danger'"
+            />
+          </template>
+        </Column>
+
         <Column header="Actions">
           <template #body="{ data }">
             <div class="flex gap-1">
