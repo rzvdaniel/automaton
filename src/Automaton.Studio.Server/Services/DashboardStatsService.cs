@@ -62,7 +62,47 @@ namespace Automaton.Studio.Server.Services
                 var totalApps = await dbContext.WebApps
                     .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
                     .CountAsync(cancellationToken);
-                
+
+                // Apps-focused metrics
+                var publishedApps = await dbContext.WebApps
+                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId) && a.IsPublished)
+                    .CountAsync(cancellationToken);
+
+                var totalAppViews = await dbContext.WebApps
+                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
+                    .SumAsync(a => a.ViewCount, cancellationToken);
+
+                var recentApps = await dbContext.WebApps
+                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId))
+                    .OrderByDescending(a => a.Updated)
+                    .Take(5)
+                    .Select(a => new Models.RecentAppMetric
+                    {
+                        Id = a.Id,
+                        Name = a.Name,
+                        DisplayName = a.DisplayName,
+                        IsPublished = a.IsPublished,
+                        PublicUrl = a.PublicUrl,
+                        ViewCount = a.ViewCount,
+                        Updated = a.Updated
+                    })
+                    .ToListAsync(cancellationToken);
+
+                var publishedAppsList = await dbContext.WebApps
+                    .Where(a => a.WebAppUsers.Any(u => u.UserId == userId) && a.IsPublished)
+                    .OrderByDescending(a => a.ViewCount)
+                    .Take(5)
+                    .Select(a => new Models.PublishedAppMetric
+                    {
+                        Id = a.Id,
+                        Name = a.Name,
+                        DisplayName = a.DisplayName,
+                        PublicUrl = a.PublicUrl!,
+                        ViewCount = a.ViewCount,
+                        PublishedAt = a.PublishedAt
+                    })
+                    .ToListAsync(cancellationToken);
+
                 var totalCustomSteps = await dbContext.CustomSteps
                     .Where(cs => cs.CustomStepUsers.Any(u => u.UserId == userId))
                     .CountAsync(cancellationToken);
@@ -140,7 +180,12 @@ namespace Automaton.Studio.Server.Services
                     ExecutionsThisWeek = executionsThisWeek,
                     ExecutionsThisMonth = executionsThisMonth,
                     ExecutionTrends = executionTrends,
-                    TopFlows = topFlows
+                    TopFlows = topFlows,
+                    // Apps-focused metrics
+                    PublishedApps = publishedApps,
+                    TotalAppViews = totalAppViews,
+                    RecentApps = recentApps,
+                    PublishedAppsList = publishedAppsList
                 };
             }
             catch (Exception ex)

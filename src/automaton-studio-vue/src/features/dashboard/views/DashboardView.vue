@@ -3,15 +3,15 @@ import { onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
+import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
-import ExecutionTrendChart from '../components/ExecutionTrendChart.vue'
+import WelcomeSection from '../components/WelcomeSection.vue'
 
 const router = useRouter()
+const toast = useToast()
 const dashboardStore = useDashboardStore()
 
 // Fetch dashboard data on mount
@@ -27,24 +27,21 @@ onUnmounted(() => {
 })
 
 // Navigation handlers
-const handleCreateFlow = () => {
-  router.push('/flows/generate')
-}
-
 const handleCreateApp = () => {
   router.push('/apps')
 }
 
-const handleNewStep = () => {
-  router.push('/steps')
+const handleGenerateWithAI = () => {
+  // Navigate to apps with AI generation dialog open
+  router.push('/apps?action=generate')
 }
 
-const handleViewAllExecutions = () => {
-  router.push('/executions')
+const handleViewAllApps = () => {
+  router.push('/apps')
 }
 
-const handleFlowClick = (flowId: string) => {
-  router.push(`/flows/${flowId}`)
+const handleAppClick = (appId: string) => {
+  router.push(`/apps/${appId}`)
 }
 
 // Format time ago helper
@@ -62,57 +59,37 @@ const formatTimeAgo = (dateString: string): string => {
   return `${diffDays}d ago`
 }
 
-// Execution time display (for running items, show "Running")
-const getExecutionTime = (execution: { status: string; started: string }): string => {
-  if (execution.status === 'Running' || execution.status === 'Pending') {
-    return 'Running'
-  }
-  return formatTimeAgo(execution.started)
-}
-
-// Status badge styling
-const getStatusSeverity = (
-  status: string,
-): 'success' | 'danger' | 'info' | 'warn' | 'secondary' | undefined => {
-  switch (status?.toLowerCase()) {
-    case 'success':
-      return 'success'
-    case 'error':
-      return 'danger'
-    case 'running':
-    case 'pending':
-      return 'info'
-    default:
-      return 'secondary'
+// Copy URL to clipboard
+const copyPublicUrl = async (url: string) => {
+  try {
+    const fullUrl = `${window.location.origin}/web/${url}`
+    await navigator.clipboard.writeText(fullUrl)
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'URL copied to clipboard',
+      life: 2000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to copy URL',
+      life: 3000,
+    })
   }
 }
 
-// Format status for display
-const formatStatus = (status: string): string => {
-  if (!status) return 'Unknown'
-  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+// Open published app in new tab
+const openPublishedApp = (url: string) => {
+  window.open(`/web/${url}`, '_blank')
 }
 
-// Computed for formatted recent executions
-const recentExecutions = computed(() => {
-  return dashboardStore.recentExecutions.map((execution) => ({
-    ...execution,
-    time: getExecutionTime(execution),
-    displayStatus: formatStatus(execution.status),
-  }))
-})
-
-// Success rate change (mock for now, could be computed from historical data)
-const successRateChange = computed(() => {
-  // This would ideally come from comparing with previous period
-  return dashboardStore.successRate > 90 ? '+1.2' : '-0.5'
-})
-
-// Flows this week change
-const flowsChange = computed(() => {
-  const total = dashboardStore.activeFlowsCount
-  // Mock calculation - in real app would compare with previous week
-  return total > 0 ? `${total} total` : 'No flows yet'
+// Apps display text
+const appsCountText = computed(() => {
+  const total = dashboardStore.totalApps
+  if (total === 0) return 'No apps yet'
+  return `${total} total`
 })
 
 // Retry fetch on error
@@ -120,17 +97,22 @@ const handleRetry = () => {
   dashboardStore.clearError()
   dashboardStore.fetchDashboard()
 }
+
+// Dismiss welcome section
+const handleDismissWelcome = () => {
+  dashboardStore.dismissWelcome()
+}
 </script>
 
 <template>
   <div class="dashboard-view">
     <!-- Page Header -->
-    <div class="flex align-items-center justify-content-between mb-5">
+    <div class="flex align-items-center justify-content-between mb-4">
       <div>
         <h1 class="text-3xl font-bold m-0">Dashboard</h1>
-        <p class="text-color-secondary mt-1 mb-0">Welcome back! Here's what's happening.</p>
+        <p class="text-color-secondary mt-1 mb-0">Build and manage your web applications</p>
       </div>
-      <Button label="Create Flow" icon="pi pi-plus" @click="handleCreateFlow" />
+      <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
     </div>
 
     <!-- Error State -->
@@ -141,51 +123,16 @@ const handleRetry = () => {
       </div>
     </Message>
 
-    <!-- Loading State - Stats Cards -->
-    <div v-if="dashboardStore.isLoading && !dashboardStore.hasData" class="grid mb-5">
-      <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full">
-          <template #content>
-            <div class="flex align-items-center gap-3">
-              <Skeleton shape="circle" size="48px" />
-              <div class="flex-1">
-                <Skeleton width="60%" height="14px" class="mb-2" />
-                <Skeleton width="40%" height="24px" class="mb-2" />
-                <Skeleton width="80%" height="12px" />
-              </div>
-            </div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full">
-          <template #content>
-            <div class="flex align-items-center gap-3">
-              <Skeleton shape="circle" size="48px" />
-              <div class="flex-1">
-                <Skeleton width="60%" height="14px" class="mb-2" />
-                <Skeleton width="40%" height="24px" class="mb-2" />
-                <Skeleton width="80%" height="12px" />
-              </div>
-            </div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full">
-          <template #content>
-            <div class="flex align-items-center gap-3">
-              <Skeleton shape="circle" size="48px" />
-              <div class="flex-1">
-                <Skeleton width="60%" height="14px" class="mb-2" />
-                <Skeleton width="40%" height="24px" class="mb-2" />
-                <Skeleton width="80%" height="12px" />
-              </div>
-            </div>
-          </template>
-        </Card>
-      </div>
-      <div class="col-12 md:col-6 lg:col-3">
+    <!-- Welcome Section (dismissible) -->
+    <WelcomeSection
+      v-if="!dashboardStore.isWelcomeDismissed"
+      :sample-apps="dashboardStore.sampleApps"
+      @dismiss="handleDismissWelcome"
+    />
+
+    <!-- Stats Cards -->
+    <div v-if="dashboardStore.isLoading && !dashboardStore.hasData" class="grid mb-4">
+      <div v-for="i in 4" :key="i" class="col-12 md:col-6 lg:col-3">
         <Card class="h-full">
           <template #content>
             <div class="flex align-items-center gap-3">
@@ -201,85 +148,55 @@ const handleRetry = () => {
       </div>
     </div>
 
-    <!-- Stats Cards - Real Data -->
-    <div v-else class="grid mb-5">
-      <!-- Active Flows -->
+    <div v-else class="grid mb-4">
+      <!-- My Apps -->
       <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full stat-card">
+        <Card class="h-full stat-card" @click="handleViewAllApps">
           <template #content>
             <div class="flex align-items-center gap-3">
-              <div
-                class="flex align-items-center justify-content-center border-round"
-                style="
-                  width: 48px;
-                  height: 48px;
-                  background-color: var(--p-primary-100);
-                  color: var(--p-primary-600);
-                "
-              >
-                <i class="pi pi-bolt text-xl"></i>
+              <div class="stat-icon stat-icon-primary">
+                <i class="pi pi-globe text-xl"></i>
               </div>
               <div>
-                <div class="text-color-secondary text-sm">Active Flows</div>
-                <div class="text-2xl font-bold">{{ dashboardStore.activeFlowsCount }}</div>
-                <div class="text-color-secondary text-xs">{{ flowsChange }}</div>
+                <div class="text-color-secondary text-sm">My Apps</div>
+                <div class="text-2xl font-bold">{{ dashboardStore.totalApps }}</div>
+                <div class="text-color-secondary text-xs">{{ appsCountText }}</div>
               </div>
             </div>
           </template>
         </Card>
       </div>
 
-      <!-- Executions Today -->
+      <!-- Published Apps -->
       <div class="col-12 md:col-6 lg:col-3">
         <Card class="h-full stat-card">
           <template #content>
             <div class="flex align-items-center gap-3">
-              <div
-                class="flex align-items-center justify-content-center border-round"
-                style="
-                  width: 48px;
-                  height: 48px;
-                  background-color: var(--p-green-100);
-                  color: var(--p-green-600);
-                "
-              >
-                <i class="pi pi-play text-xl"></i>
-              </div>
-              <div>
-                <div class="text-color-secondary text-sm">Executions</div>
-                <div class="text-2xl font-bold">{{ dashboardStore.executionsLast24h }}</div>
-                <div class="text-color-secondary text-xs">Today</div>
-              </div>
-            </div>
-          </template>
-        </Card>
-      </div>
-
-      <!-- Success Rate -->
-      <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full stat-card">
-          <template #content>
-            <div class="flex align-items-center gap-3">
-              <div
-                class="flex align-items-center justify-content-center border-round"
-                style="
-                  width: 48px;
-                  height: 48px;
-                  background-color: var(--p-teal-100);
-                  color: var(--p-teal-600);
-                "
-              >
+              <div class="stat-icon stat-icon-green">
                 <i class="pi pi-check-circle text-xl"></i>
               </div>
               <div>
-                <div class="text-color-secondary text-sm">Success Rate</div>
-                <div class="text-2xl font-bold">{{ dashboardStore.successRate.toFixed(1) }}%</div>
-                <div class="text-color-secondary text-xs">
-                  <span :class="successRateChange.startsWith('+') ? 'text-green-500' : 'text-red-500'">
-                    {{ successRateChange }}%
-                  </span>
-                  from last week
-                </div>
+                <div class="text-color-secondary text-sm">Published</div>
+                <div class="text-2xl font-bold">{{ dashboardStore.publishedApps }}</div>
+                <div class="text-color-secondary text-xs">Live apps</div>
+              </div>
+            </div>
+          </template>
+        </Card>
+      </div>
+
+      <!-- Total Views -->
+      <div class="col-12 md:col-6 lg:col-3">
+        <Card class="h-full stat-card">
+          <template #content>
+            <div class="flex align-items-center gap-3">
+              <div class="stat-icon stat-icon-teal">
+                <i class="pi pi-eye text-xl"></i>
+              </div>
+              <div>
+                <div class="text-color-secondary text-sm">Total Views</div>
+                <div class="text-2xl font-bold">{{ dashboardStore.totalAppViews }}</div>
+                <div class="text-color-secondary text-xs">All time</div>
               </div>
             </div>
           </template>
@@ -291,15 +208,7 @@ const handleRetry = () => {
         <Card class="h-full stat-card">
           <template #content>
             <div class="flex align-items-center gap-3">
-              <div
-                class="flex align-items-center justify-content-center border-round"
-                style="
-                  width: 48px;
-                  height: 48px;
-                  background-color: var(--p-blue-100);
-                  color: var(--p-blue-600);
-                "
-              >
+              <div class="stat-icon stat-icon-blue">
                 <i class="pi pi-desktop text-xl"></i>
               </div>
               <div>
@@ -317,126 +226,103 @@ const handleRetry = () => {
 
     <!-- Main Content Grid -->
     <div class="grid">
-      <!-- Recent Executions -->
+      <!-- Recent Apps -->
       <div class="col-12 lg:col-8">
-        <!-- Loading state for executions -->
-        <Card v-if="dashboardStore.isLoading && !dashboardStore.hasData">
+        <Card>
           <template #title>
             <div class="flex align-items-center justify-content-between">
-              <span>Recent Executions</span>
-              <Button label="View All" link size="small" disabled />
+              <span>My Recent Apps</span>
+              <Button label="View All" link size="small" @click="handleViewAllApps" />
             </div>
           </template>
           <template #content>
-            <div class="flex flex-column gap-3">
-              <Skeleton height="40px" />
-              <Skeleton height="40px" />
-              <Skeleton height="40px" />
-              <Skeleton height="40px" />
-              <Skeleton height="40px" />
+            <!-- Loading state -->
+            <div v-if="dashboardStore.isLoading && !dashboardStore.hasData" class="grid">
+              <div v-for="i in 3" :key="i" class="col-12 md:col-6 lg:col-4">
+                <Skeleton height="120px" class="border-round" />
+              </div>
             </div>
-          </template>
-        </Card>
 
-        <!-- Empty state for executions -->
-        <Card v-else-if="recentExecutions.length === 0">
-          <template #title>
-            <div class="flex align-items-center justify-content-between">
-              <span>Recent Executions</span>
-              <Button label="View All" link size="small" @click="handleViewAllExecutions" />
-            </div>
-          </template>
-          <template #content>
-            <div class="flex flex-column align-items-center justify-content-center py-5">
-              <i class="pi pi-inbox text-color-secondary" style="font-size: 3rem"></i>
-              <p class="text-color-secondary mt-3 mb-2">No recent executions</p>
-              <p class="text-color-secondary text-sm m-0">
-                Run a flow to see execution history here
-              </p>
+            <!-- Empty state -->
+            <div
+              v-else-if="dashboardStore.recentApps.length === 0"
+              class="flex flex-column align-items-center justify-content-center py-5"
+            >
+              <i class="pi pi-globe text-color-secondary" style="font-size: 3rem"></i>
+              <p class="text-color-secondary mt-3 mb-2">No apps yet</p>
+              <p class="text-color-secondary text-sm m-0">Create your first app to get started</p>
               <Button
-                label="Create Your First Flow"
+                label="Create Your First App"
                 icon="pi pi-plus"
                 class="mt-4"
-                @click="handleCreateFlow"
+                @click="handleCreateApp"
               />
             </div>
-          </template>
-        </Card>
 
-        <!-- Real data for executions -->
-        <Card v-else>
-          <template #title>
-            <div class="flex align-items-center justify-content-between">
-              <span>Recent Executions</span>
-              <Button label="View All" link size="small" @click="handleViewAllExecutions" />
+            <!-- Recent apps grid -->
+            <div v-else class="grid">
+              <div
+                v-for="app in dashboardStore.recentApps"
+                :key="app.id"
+                class="col-12 md:col-6 lg:col-4"
+              >
+                <div class="recent-app-card" @click="handleAppClick(app.id)">
+                  <div class="recent-app-header">
+                    <div class="recent-app-icon">
+                      <i class="pi pi-globe"></i>
+                    </div>
+                    <Tag
+                      :value="app.isPublished ? 'Published' : 'Draft'"
+                      :severity="app.isPublished ? 'success' : 'secondary'"
+                      class="text-xs"
+                    />
+                  </div>
+                  <div class="recent-app-name">{{ app.displayName || app.name }}</div>
+                  <div class="recent-app-meta">
+                    <span v-if="app.viewCount > 0">
+                      <i class="pi pi-eye"></i> {{ app.viewCount }} views
+                    </span>
+                    <span>Updated {{ formatTimeAgo(app.updated) }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </template>
-          <template #content>
-            <DataTable :value="recentExecutions" :rows="5" class="p-datatable-sm">
-              <Column field="flowId" header="Flow">
-                <template #body="{ data }">
-                  <span class="font-medium">{{ data.application || 'Flow' }}</span>
-                </template>
-              </Column>
-              <Column field="displayStatus" header="Status">
-                <template #body="{ data }">
-                  <Tag :value="data.displayStatus" :severity="getStatusSeverity(data.status)" />
-                </template>
-              </Column>
-              <Column field="time" header="Time"></Column>
-            </DataTable>
-          </template>
-        </Card>
-
-        <!-- Execution Trend Chart -->
-        <Card class="mt-4">
-          <template #title>Execution Trend (Last 7 Days)</template>
-          <template #content>
-            <div v-if="dashboardStore.isLoading && !dashboardStore.hasData">
-              <Skeleton height="200px" />
-            </div>
-            <ExecutionTrendChart v-else :data="dashboardStore.executionTrends" />
           </template>
         </Card>
       </div>
 
-      <!-- Quick Actions & Recent Flows -->
+      <!-- Quick Actions & Published Apps -->
       <div class="col-12 lg:col-4">
         <Card class="mb-4">
           <template #title>Quick Actions</template>
           <template #content>
             <div class="flex flex-column gap-3">
               <Button
-                label="Generate Flow with AI"
-                icon="pi pi-sparkles"
-                class="w-full"
-                @click="handleCreateFlow"
-              />
-              <Button
-                label="Create App"
-                icon="pi pi-globe"
-                severity="secondary"
-                outlined
+                label="Create New App"
+                icon="pi pi-plus"
                 class="w-full"
                 @click="handleCreateApp"
               />
               <Button
-                label="New Step"
-                icon="pi pi-puzzle-piece"
+                label="Generate with AI"
+                icon="pi pi-sparkles"
                 severity="secondary"
                 outlined
                 class="w-full"
-                @click="handleNewStep"
+                @click="handleGenerateWithAI"
               />
             </div>
           </template>
         </Card>
 
         <Card>
-          <template #title>Top Flows</template>
+          <template #title>Published Apps</template>
           <template #content>
             <!-- Loading state -->
-            <div v-if="dashboardStore.isLoading && !dashboardStore.hasData" class="flex flex-column gap-3">
+            <div
+              v-if="dashboardStore.isLoading && !dashboardStore.hasData"
+              class="flex flex-column gap-3"
+            >
               <Skeleton height="48px" />
               <Skeleton height="48px" />
               <Skeleton height="48px" />
@@ -444,32 +330,46 @@ const handleRetry = () => {
 
             <!-- Empty state -->
             <div
-              v-else-if="dashboardStore.topFlows.length === 0"
+              v-else-if="dashboardStore.publishedAppsList.length === 0"
               class="flex flex-column align-items-center py-4"
             >
-              <i class="pi pi-folder-open text-color-secondary" style="font-size: 2rem"></i>
-              <p class="text-color-secondary mt-2 mb-0 text-sm">No flows yet</p>
+              <i class="pi pi-globe text-color-secondary" style="font-size: 2rem"></i>
+              <p class="text-color-secondary mt-2 mb-0 text-sm">No published apps yet</p>
             </div>
 
-            <!-- Real data -->
-            <div v-else class="flex flex-column gap-3">
+            <!-- Published apps list -->
+            <div v-else class="flex flex-column gap-2">
               <div
-                v-for="flow in dashboardStore.topFlows"
-                :key="flow.flowId"
-                class="flex align-items-center justify-content-between p-2 border-round hover:surface-hover cursor-pointer"
-                @click="handleFlowClick(flow.flowId)"
+                v-for="app in dashboardStore.publishedAppsList"
+                :key="app.id"
+                class="published-app-item"
               >
-                <div class="flex align-items-center gap-2">
-                  <i class="pi pi-bolt text-color-secondary"></i>
-                  <span>{{ flow.flowName }}</span>
+                <div class="published-app-info" @click="openPublishedApp(app.publicUrl)">
+                  <span class="published-app-name">{{ app.displayName || app.name }}</span>
+                  <span class="published-app-url">/web/{{ app.publicUrl }}</span>
                 </div>
-                <div class="flex align-items-center gap-2">
-                  <Tag
-                    :value="`${flow.successRate.toFixed(0)}%`"
-                    :severity="flow.successRate >= 90 ? 'success' : flow.successRate >= 70 ? 'warn' : 'danger'"
-                    class="text-xs"
+                <div class="published-app-actions">
+                  <span v-if="app.viewCount > 0" class="published-app-views">
+                    {{ app.viewCount }}
+                  </span>
+                  <Button
+                    icon="pi pi-copy"
+                    text
+                    rounded
+                    size="small"
+                    severity="secondary"
+                    aria-label="Copy URL"
+                    @click.stop="copyPublicUrl(app.publicUrl)"
                   />
-                  <span class="text-color-secondary text-sm">{{ formatTimeAgo(flow.lastExecuted) }}</span>
+                  <Button
+                    icon="pi pi-external-link"
+                    text
+                    rounded
+                    size="small"
+                    severity="secondary"
+                    aria-label="Open app"
+                    @click.stop="openPublishedApp(app.publicUrl)"
+                  />
                 </div>
               </div>
             </div>
@@ -488,10 +388,179 @@ const handleRetry = () => {
 
 .stat-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--p-card-shadow);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon-primary {
+  background-color: var(--p-primary-100);
+  color: var(--p-primary-600);
+}
+
+.stat-icon-green {
+  background-color: var(--p-green-100);
+  color: var(--p-green-600);
+}
+
+.stat-icon-teal {
+  background-color: var(--p-teal-100);
+  color: var(--p-teal-600);
+}
+
+.stat-icon-blue {
+  background-color: var(--p-blue-100);
+  color: var(--p-blue-600);
+}
+
+:global(.app-dark) .stat-icon-primary {
+  background-color: var(--p-primary-900);
+  color: var(--p-primary-400);
+}
+
+:global(.app-dark) .stat-icon-green {
+  background-color: var(--p-green-900);
+  color: var(--p-green-400);
+}
+
+:global(.app-dark) .stat-icon-teal {
+  background-color: var(--p-teal-900);
+  color: var(--p-teal-400);
+}
+
+:global(.app-dark) .stat-icon-blue {
+  background-color: var(--p-blue-900);
+  color: var(--p-blue-400);
+}
+
+/* Recent app cards */
+.recent-app-card {
+  border: 1px solid var(--p-surface-200);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recent-app-card:hover {
+  border-color: var(--p-primary-500);
+  transform: translateY(-2px);
+}
+
+:global(.app-dark) .recent-app-card {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .recent-app-card:hover {
+  border-color: var(--p-primary-500);
+}
+
+.recent-app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.recent-app-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--p-primary-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:global(.app-dark) .recent-app-icon {
+  background: var(--p-primary-900);
+}
+
+.recent-app-icon i {
+  font-size: 1.125rem;
+  color: var(--p-primary-500);
+}
+
+.recent-app-name {
+  font-weight: 600;
+  color: var(--p-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
+}
+
+.recent-app-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+
+.recent-app-meta i {
+  font-size: 0.75rem;
+  margin-right: 0.25rem;
+}
+
+/* Published apps list */
+.published-app-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.published-app-item:hover {
+  background-color: var(--p-surface-hover);
+}
+
+.published-app-info {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  min-width: 0;
+  flex: 1;
+}
+
+.published-app-name {
+  font-weight: 500;
+  color: var(--p-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.published-app-url {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.published-app-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.published-app-views {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  margin-right: 0.25rem;
 }
 </style>

@@ -14,6 +14,14 @@ public class AppModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
+
+    // Analytics
+    public int ViewCount { get; set; }
+    public DateTime? LastViewedAt { get; set; }
+
+    // Sample/Featured flags
+    public bool IsSample { get; set; }
+    public bool IsFeatured { get; set; }
     
     // Appearance configuration stored as JSON
     public AppAppearance Appearance { get; set; } = new AppAppearance();

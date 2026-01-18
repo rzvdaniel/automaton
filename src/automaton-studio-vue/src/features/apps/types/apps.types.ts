@@ -60,6 +60,12 @@ export interface App {
   executionRunnerId?: string
   appearance: AppAppearance
   definition: AppDefinition
+  // Analytics
+  viewCount: number
+  lastViewedAt?: string // ISO date string
+  // Sample/Featured flags
+  isSample: boolean
+  isFeatured: boolean
 }
 
 /**

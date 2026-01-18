@@ -25,9 +25,35 @@ export interface FlowHealthMetric {
 }
 
 /**
+ * Recent app metric for dashboard
+ */
+export interface RecentAppMetric {
+  id: string
+  name: string
+  displayName: string
+  isPublished: boolean
+  publicUrl?: string
+  viewCount: number
+  updated: string // ISO date string
+}
+
+/**
+ * Published app metric for dashboard
+ */
+export interface PublishedAppMetric {
+  id: string
+  name: string
+  displayName: string
+  publicUrl: string
+  viewCount: number
+  publishedAt?: string // ISO date string
+}
+
+/**
  * Dashboard statistics from API
  */
 export interface DashboardStats {
+  // Legacy fields (flows-focused)
   totalFlows: number
   totalRunners: number
   onlineRunners: number
@@ -41,6 +67,11 @@ export interface DashboardStats {
   executionsThisMonth: number
   executionTrends: DailyExecutionTrend[]
   topFlows: FlowHealthMetric[]
+  // Apps-focused metrics
+  publishedApps: number
+  totalAppViews: number
+  recentApps: RecentAppMetric[]
+  publishedAppsList: PublishedAppMetric[]
 }
 
 /**

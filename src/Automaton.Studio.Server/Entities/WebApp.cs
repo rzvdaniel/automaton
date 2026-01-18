@@ -35,7 +35,15 @@ public class WebApp
 
     // Appearance settings stored as JSON
     public string Appearance { get; set; } = "{}";
-    
+
+    // Analytics
+    public int ViewCount { get; set; } = 0;
+    public DateTime? LastViewedAt { get; set; }
+
+    // Sample/Featured flags (admin-managed)
+    public bool IsSample { get; set; } = false;
+    public bool IsFeatured { get; set; } = false;
+
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 

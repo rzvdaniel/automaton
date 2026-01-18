@@ -10,15 +10,23 @@ import type {
   RecentExecution,
   RecentActivity,
 } from '../types/dashboard.types'
+import type { App } from '@/features/apps/types/apps.types'
+
+// localStorage key for welcome section dismissal
+const WELCOME_DISMISSED_KEY = 'dashboard-welcome-dismissed'
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // State
   const stats = ref<DashboardStats | null>(null)
   const recentExecutions = ref<RecentExecution[]>([])
   const recentActivities = ref<RecentActivity[]>([])
+  const sampleApps = ref<App[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const lastRefreshed = ref<Date | null>(null)
+
+  // Welcome section dismissal (persisted to localStorage)
+  const isWelcomeDismissed = ref(localStorage.getItem(WELCOME_DISMISSED_KEY) === 'true')
 
   // Auto-refresh interval ID
   let refreshIntervalId: ReturnType<typeof setInterval> | null = null
@@ -26,19 +34,23 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // Computed
   const hasData = computed(() => stats.value !== null)
 
+  // Legacy flow metrics (kept for backwards compatibility)
   const activeFlowsCount = computed(() => stats.value?.totalFlows ?? 0)
-
   const executionsLast24h = computed(() => stats.value?.executionsToday ?? 0)
-
   const successRate = computed(() => stats.value?.successRate ?? 0)
+  const executionTrends = computed(() => stats.value?.executionTrends ?? [])
+  const topFlows = computed(() => stats.value?.topFlows ?? [])
 
+  // Runners (still needed for apps)
   const runnersOnline = computed(() => stats.value?.onlineRunners ?? 0)
-
   const runnersTotal = computed(() => stats.value?.totalRunners ?? 0)
 
-  const executionTrends = computed(() => stats.value?.executionTrends ?? [])
-
-  const topFlows = computed(() => stats.value?.topFlows ?? [])
+  // Apps-focused computed properties
+  const totalApps = computed(() => stats.value?.totalApps ?? 0)
+  const publishedApps = computed(() => stats.value?.publishedApps ?? 0)
+  const totalAppViews = computed(() => stats.value?.totalAppViews ?? 0)
+  const recentApps = computed(() => stats.value?.recentApps ?? [])
+  const publishedAppsList = computed(() => stats.value?.publishedAppsList ?? [])
 
   // Actions
   async function fetchDashboard(): Promise<void> {
@@ -47,15 +59,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     try {
       // Fetch all dashboard data in parallel
-      const [statsData, executionsData, activitiesData] = await Promise.all([
+      const [statsData, executionsData, activitiesData, sampleAppsData] = await Promise.all([
         dashboardService.getStats(),
         dashboardService.getRecentExecutions(5),
         dashboardService.getRecentActivities(10),
+        dashboardService.getSampleApps().catch(() => [] as App[]), // Don't fail if samples unavailable
       ])
 
       stats.value = statsData
       recentExecutions.value = executionsData
       recentActivities.value = activitiesData
+      sampleApps.value = sampleAppsData
       lastRefreshed.value = new Date()
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
@@ -64,6 +78,24 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } finally {
       isLoading.value = false
     }
+  }
+
+  async function fetchSampleApps(): Promise<void> {
+    try {
+      sampleApps.value = await dashboardService.getSampleApps()
+    } catch (err) {
+      console.error('Failed to fetch sample apps:', err)
+    }
+  }
+
+  function dismissWelcome(): void {
+    isWelcomeDismissed.value = true
+    localStorage.setItem(WELCOME_DISMISSED_KEY, 'true')
+  }
+
+  function showWelcome(): void {
+    isWelcomeDismissed.value = false
+    localStorage.removeItem(WELCOME_DISMISSED_KEY)
   }
 
   async function refreshStats(): Promise<void> {
@@ -106,6 +138,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     stats.value = null
     recentExecutions.value = []
     recentActivities.value = []
+    sampleApps.value = []
     isLoading.value = false
     error.value = null
     lastRefreshed.value = null
@@ -148,24 +181,36 @@ export const useDashboardStore = defineStore('dashboard', () => {
     stats,
     recentExecutions,
     recentActivities,
+    sampleApps,
     isLoading,
     error,
     lastRefreshed,
-    // Computed
+    isWelcomeDismissed,
+    // Computed - Legacy (flows)
     hasData,
     activeFlowsCount,
     executionsLast24h,
     successRate,
-    runnersOnline,
-    runnersTotal,
     executionTrends,
     topFlows,
+    // Computed - Runners
+    runnersOnline,
+    runnersTotal,
+    // Computed - Apps
+    totalApps,
+    publishedApps,
+    totalAppViews,
+    recentApps,
+    publishedAppsList,
     // Actions
     fetchDashboard,
+    fetchSampleApps,
     refreshStats,
     startAutoRefresh,
     stopAutoRefresh,
     clearError,
     reset,
+    dismissWelcome,
+    showWelcome,
   }
 })

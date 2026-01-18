@@ -8,6 +8,7 @@ import type {
   RecentExecution,
   RecentActivity,
 } from '../types/dashboard.types'
+import type { App } from '@/features/apps/types/apps.types'
 
 class DashboardService {
   /**
@@ -38,6 +39,15 @@ class DashboardService {
     const { data } = await apiClient.get<RecentActivity[]>('/api/recentactivities', {
       params: { count },
     })
+    return data
+  }
+
+  /**
+   * Get sample apps for onboarding/dashboard
+   * GET /api/apps/samples
+   */
+  async getSampleApps(): Promise<App[]> {
+    const { data } = await apiClient.get<App[]>('/api/apps/samples')
     return data
   }
 }

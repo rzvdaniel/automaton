@@ -158,6 +158,17 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => new { e.Id });
                 entity.HasIndex(e => e.PublicUrl).IsUnique();
+
+                // Analytics fields
+                entity.Property(e => e.ViewCount).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.LastViewedAt).IsRequired(false);
+
+                // Sample/Featured flags
+                entity.Property(e => e.IsSample).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.IsFeatured).IsRequired().HasDefaultValue(false);
+
+                // Index for sample apps queries
+                entity.HasIndex(e => new { e.IsSample, e.IsPublished });
             });
 
             modelBuilder.Entity<Entities.WebAppUser>(entity =>

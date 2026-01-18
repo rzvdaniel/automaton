@@ -21,15 +21,18 @@ public class PublicWebAppsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly AppFileStorageService _fileStorageService;
+    private readonly AppsService _appsService;
     private readonly ILogger<PublicWebAppsController> _logger;
 
     public PublicWebAppsController(
         ApplicationDbContext context,
         AppFileStorageService fileStorageService,
+        AppsService appsService,
         ILogger<PublicWebAppsController> logger)
     {
         _context = context;
         _fileStorageService = fileStorageService;
+        _appsService = appsService;
         _logger = logger;
     }
 
@@ -87,6 +90,9 @@ public class PublicWebAppsController : ControllerBase
                 _logger.LogInformation("Public access to app '{AppName}' (slug: {Slug}) - Auth: {IsAuth}",
                     app.Name, slug, isAuthenticated);
             }
+
+            // Increment view count (fire-and-forget, don't block response)
+            _ = _appsService.IncrementViewCountAsync(app.Id);
 
             // Read index.html from file system
             string htmlContent;

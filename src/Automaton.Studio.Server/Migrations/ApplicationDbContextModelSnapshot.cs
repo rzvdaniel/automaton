@@ -1317,8 +1317,21 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("ExecutionRunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<bool>("IsFeatured")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsSample")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastViewedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1345,10 +1358,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("Version")
                         .HasColumnType("int");
 
+                    b.Property<int>("ViewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.HasKey("Id");
 
                     b.HasIndex("PublicUrl")
                         .IsUnique();
+
+                    b.HasIndex("IsSample", "IsPublished");
 
                     b.ToTable("WebApps");
                 });

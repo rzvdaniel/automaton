@@ -515,7 +515,62 @@ public class AppsService
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
             Appearance = appearance,
-            Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition()
+            Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
+            // Analytics
+            ViewCount = entity.ViewCount,
+            LastViewedAt = entity.LastViewedAt,
+            // Sample/Featured
+            IsSample = entity.IsSample,
+            IsFeatured = entity.IsFeatured
         };
+    }
+
+    /// <summary>
+    /// Increment view count for an app (called when public app is accessed)
+    /// </summary>
+    public async Task IncrementViewCountAsync(Guid appId)
+    {
+        var entity = await dataContext.WebApps.FindAsync(appId);
+        if (entity != null)
+        {
+            entity.ViewCount++;
+            entity.LastViewedAt = DateTime.UtcNow;
+            await dataContext.SaveChangesAsync();
+            logger.Debug("Incremented view count for app {AppId} to {ViewCount}", appId, entity.ViewCount);
+        }
+    }
+
+    /// <summary>
+    /// Get all sample apps (publicly accessible)
+    /// </summary>
+    public async Task<IEnumerable<Models.AppModel>> GetSampleAppsAsync()
+    {
+        var entities = await dataContext.WebApps
+            .Where(x => x.IsSample && x.IsPublished)
+            .OrderByDescending(x => x.IsFeatured)
+            .ThenByDescending(x => x.ViewCount)
+            .Take(10)
+            .ToListAsync();
+
+        return entities.Select(e => MapToModel(e, null));
+    }
+
+    /// <summary>
+    /// Set sample status for an app (admin only)
+    /// </summary>
+    public async Task SetSampleStatusAsync(Guid appId, bool isSample, bool isFeatured = false)
+    {
+        var entity = await dataContext.WebApps.FindAsync(appId);
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"App {appId} not found");
+        }
+
+        entity.IsSample = isSample;
+        entity.IsFeatured = isFeatured;
+        entity.Updated = DateTime.UtcNow;
+
+        await dataContext.SaveChangesAsync();
+        logger.Information("Set sample status for app {AppId}: IsSample={IsSample}, IsFeatured={IsFeatured}", appId, isSample, isFeatured);
     }
 }

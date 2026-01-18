@@ -55,6 +55,48 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Get sample apps for dashboard/onboarding (publicly accessible)
+    /// </summary>
+    [HttpGet("samples")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IEnumerable<Models.AppModel>>> GetSampleApps()
+    {
+        try
+        {
+            var samples = await appsService.GetSampleAppsAsync();
+            return Ok(samples);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error getting sample apps");
+            return StatusCode(500, new { message = "Failed to get sample apps" });
+        }
+    }
+
+    /// <summary>
+    /// Set sample status for an app (admin only)
+    /// </summary>
+    [HttpPut("{id}/sample")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> SetSampleStatus(Guid id, [FromBody] SetSampleStatusRequest request)
+    {
+        try
+        {
+            await appsService.SetSampleStatusAsync(id, request.IsSample, request.IsFeatured);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error setting sample status for app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to set sample status" });
+        }
+    }
+
+    /// <summary>
     /// Get published app by public URL slug.
     /// Used by WebAppViewer to load apps accessed via /web/{slug} URLs.
     /// Validates authentication requirements and loads app as the owner.
@@ -861,4 +903,10 @@ public class CreateAppStepRequest
 public class UpdateRunnerRequest
 {
     public Guid? ExecutionRunnerId { get; set; }
+}
+
+public class SetSampleStatusRequest
+{
+    public bool IsSample { get; set; }
+    public bool IsFeatured { get; set; }
 }
