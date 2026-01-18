@@ -27,6 +27,7 @@ import PublishDialog from '../components/PublishDialog.vue'
 import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
+import AppSettings from '../components/AppSettings.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -52,6 +53,9 @@ const editingName = ref('')
 
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
+
+// Active view tab (code or settings)
+const activeTab = ref<'code' | 'settings'>('code')
 
 // Panel sizes (in percentages) - localStorage keys
 const STORAGE_KEY = 'app-editor-panel-sizes'
@@ -549,37 +553,55 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               />
               <Tag v-else value="Draft" severity="warn" />
             </div>
-            <div class="app-description text-sm text-color-secondary">
-              {{ editorStore.currentApp.description || 'No description' }}
+            <!-- Tab buttons for Code/Settings -->
+            <div class="view-tabs">
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'code' }"
+                @click="activeTab = 'code'"
+              >
+                <i class="pi pi-code"></i>
+                Code
+              </button>
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'settings' }"
+                @click="activeTab = 'settings'"
+              >
+                <i class="pi pi-cog"></i>
+                Settings
+              </button>
             </div>
           </div>
         </div>
 
         <div class="header-right">
-          <!-- Runner Selector -->
-          <div class="flex align-items-center gap-2">
-            <label class="text-sm text-color-secondary">Runner:</label>
-            <RunnerSelector
-              v-model="selectedRunnerId"
-              :disabled="editorStore.isSaving"
+          <!-- Runner Selector (only in code view) -->
+          <template v-if="activeTab === 'code'">
+            <div class="flex align-items-center gap-2">
+              <label class="text-sm text-color-secondary">Runner:</label>
+              <RunnerSelector
+                v-model="selectedRunnerId"
+                :disabled="editorStore.isSaving"
+              />
+            </div>
+
+            <Button
+              v-tooltip.bottom="'Open full-screen preview'"
+              icon="pi pi-eye"
+              label="Preview"
+              outlined
+              severity="secondary"
+              @click="editorStore.openPreviewOverlay()"
             />
-          </div>
-          
-          <Button
-            v-tooltip.bottom="'Open full-screen preview'"
-            icon="pi pi-eye"
-            label="Preview"
-            outlined
-            severity="secondary"
-            @click="editorStore.openPreviewOverlay()"
-          />
-          <Button
-            v-if="editorStore.hasUnsavedChanges"
-            label="Save All"
-            icon="pi pi-save"
-            :loading="editorStore.isSaving"
-            @click="handleSaveAll"
-          />
+            <Button
+              v-if="editorStore.hasUnsavedChanges"
+              label="Save All"
+              icon="pi pi-save"
+              :loading="editorStore.isSaving"
+              @click="handleSaveAll"
+            />
+          </template>
           <Button
             v-if="editorStore.isPublished"
             label="Unpublish"
@@ -597,8 +619,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </div>
       </div>
 
-      <!-- Main editor layout with resizable splitters -->
+      <!-- Settings View -->
+      <div v-if="activeTab === 'settings'" class="settings-view">
+        <AppSettings />
+      </div>
+
+      <!-- Code Editor View - Main editor layout with resizable splitters -->
       <Splitter
+        v-if="activeTab === 'code'"
         class="editor-layout"
         layout="horizontal"
         :gutter-size="8"
@@ -755,7 +783,48 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 .app-info {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* View tabs (Code/Settings) */
+.view-tabs {
+  display: flex;
   gap: 0.25rem;
+}
+
+.view-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--p-border-radius);
+  transition: all 0.15s ease;
+}
+
+.view-tab:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.view-tab.active {
+  background: var(--p-primary-100);
+  color: var(--p-primary-600);
+}
+
+.view-tab i {
+  font-size: 0.75rem;
+}
+
+/* Settings view container */
+.settings-view {
+  flex: 1;
+  overflow: hidden;
 }
 
 .app-name {
@@ -902,6 +971,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 
 :global(.app-dark) .ai-sidebar {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .view-tab:hover {
+  background: var(--p-surface-700);
+}
+
+:global(.app-dark) .view-tab.active {
+  background: var(--p-primary-900);
+  color: var(--p-primary-300);
 }
 
 /* Splitter gutter styling */

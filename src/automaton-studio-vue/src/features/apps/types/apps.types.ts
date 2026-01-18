@@ -22,12 +22,14 @@ export interface GitHubSettings {
 }
 
 /**
- * App appearance configuration
+ * App appearance configuration for card display
+ * Matches backend AppAppearance.cs
  */
 export interface AppAppearance {
   backgroundColor?: string
   backgroundImageUrl?: string
-  showBackgroundImage: boolean
+  backgroundImageOpacity?: number
+  titleFontColor?: string
 }
 
 /**

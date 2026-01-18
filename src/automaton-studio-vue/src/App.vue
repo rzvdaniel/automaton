@@ -14,6 +14,9 @@ const route = useRoute()
 // Check if current route uses auth layout (login, register, install, etc.)
 const isAuthLayout = computed(() => route.meta.layout === 'auth')
 
+// Check if current route uses no layout (full screen apps, etc.)
+const isNoLayout = computed(() => route.meta.layout === 'none')
+
 onMounted(() => {
   // Settings are initialized in useUserSettings composable
   console.log('App mounted, dark mode:', isDark.value)
@@ -25,8 +28,13 @@ onMounted(() => {
   <Toast />
   <ConfirmDialog />
 
+  <!-- No layout: full-screen for published apps -->
+  <template v-if="isNoLayout">
+    <RouterView />
+  </template>
+
   <!-- Auth layout: full-screen without sidebar/toolbar -->
-  <div v-if="isAuthLayout" class="auth-layout">
+  <div v-else-if="isAuthLayout" class="auth-layout">
     <RouterView />
   </div>
 

@@ -16,6 +16,9 @@ interface Props {
 
 const props = defineProps<Props>()
 
+// Check if app has a thumbnail image
+const hasThumbnail = computed(() => !!props.app.appearance?.backgroundImageUrl)
+
 const emit = defineEmits<{
   publish: [app: App]
 }>()
@@ -177,18 +180,39 @@ const menuItems = computed(() => {
 </script>
 
 <template>
-  <Card class="app-card h-full">
+  <Card class="app-card h-full" :class="{ 'has-thumbnail': hasThumbnail }">
+    <!-- Thumbnail Image -->
+    <template v-if="hasThumbnail" #header>
+      <div class="app-thumbnail">
+        <img :src="app.appearance?.backgroundImageUrl" :alt="app.name" />
+        <!-- Overlay with menu button -->
+        <div class="thumbnail-overlay">
+          <Button
+            icon="pi pi-ellipsis-v"
+            text
+            rounded
+            severity="secondary"
+            size="small"
+            class="menu-button"
+            aria-haspopup="true"
+            @click="toggleMenu"
+          />
+        </div>
+      </div>
+    </template>
+
     <template #content>
       <div class="flex flex-column h-full">
-        <!-- Header -->
+        <!-- Header (without thumbnail: show menu button here) -->
         <div class="flex align-items-center justify-content-between mb-2">
-          <div class="flex align-items-center gap-2">
-            <i class="pi pi-globe" style="color: var(--p-primary-500)"></i>
+          <div class="flex align-items-center gap-2 min-w-0 flex-1">
+            <i class="pi pi-globe flex-shrink-0" style="color: var(--p-primary-500)"></i>
             <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
-              {{ app.name }}
+              {{ app.displayName || app.name }}
             </span>
           </div>
           <Button
+            v-if="!hasThumbnail"
             icon="pi pi-ellipsis-v"
             text
             rounded
@@ -267,11 +291,68 @@ const menuItems = computed(() => {
   transform: translateY(-2px);
 }
 
+/* Thumbnail styles */
+.app-thumbnail {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  overflow: hidden;
+  border-radius: var(--p-card-border-radius) var(--p-card-border-radius) 0 0;
+}
+
+.app-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.app-card:hover .app-thumbnail img {
+  transform: scale(1.05);
+}
+
+.thumbnail-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.app-card:hover .thumbnail-overlay {
+  opacity: 1;
+}
+
+.thumbnail-overlay .menu-button {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+}
+
+.thumbnail-overlay .menu-button:hover {
+  background: white;
+}
+
+/* Card with thumbnail has different padding */
+.has-thumbnail :deep(.p-card-body) {
+  padding-top: 0.75rem;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-height: 2.5rem;
+}
+
+/* Dark mode */
+:global(.app-dark) .thumbnail-overlay .menu-button {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+}
+
+:global(.app-dark) .thumbnail-overlay .menu-button:hover {
+  background: rgba(0, 0, 0, 0.85);
 }
 </style>

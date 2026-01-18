@@ -283,10 +283,12 @@ public class AppsService
         entity.Description = app.Description;
         entity.IsPublished = app.IsPublished;
         entity.PublicUrl = app.PublicUrl;
+        entity.RequiresAuthentication = app.RequiresAuthentication;
+        entity.ExecutionRunnerId = app.ExecutionRunnerId;
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
         entity.Definition = "{}";
-        
+
         // Persist appearance configuration as JSON
         entity.Appearance = JsonSerializer.Serialize(app.Appearance);
 

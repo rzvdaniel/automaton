@@ -86,6 +86,90 @@ class AppsService {
   }
 
   /**
+   * Update app settings (name, description, publicUrl, etc.)
+   * Uses the general PUT /api/apps/{id} endpoint
+   */
+  async updateSettings(
+    id: string,
+    settings: {
+      name?: string
+      displayName?: string
+      description?: string
+      publicUrl?: string
+      requiresAuthentication?: boolean
+      executionRunnerId?: string
+    },
+  ): Promise<void> {
+    // Get current app and build update payload with only backend-expected fields
+    const app = await this.get(id)
+    const updatePayload = {
+      id: app.id,
+      name: settings.name ?? app.name,
+      displayName: settings.displayName ?? app.displayName,
+      description: settings.description ?? app.description,
+      isPublished: app.isPublished,
+      publicUrl: settings.publicUrl ?? app.publicUrl,
+      publishedAt: app.publishedAt,
+      version: app.version,
+      requiresAuthentication: settings.requiresAuthentication ?? app.requiresAuthentication,
+      created: app.created,
+      updated: app.updated,
+      executionRunnerId: settings.executionRunnerId ?? app.executionRunnerId,
+      appearance: app.appearance,
+      definition: app.definition,
+    }
+    await this.update(id, updatePayload)
+  }
+
+  /**
+   * Upload app thumbnail/background image
+   * POST /api/apps/{id}/upload-background
+   */
+  async uploadThumbnail(id: string, file: File): Promise<string> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await apiClient.post<{ imageUrl: string }>(
+      `/api/apps/${id}/upload-background`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    )
+    return data.imageUrl
+  }
+
+  /**
+   * Remove app thumbnail image by clearing the appearance
+   * Uses the general PUT /api/apps/{id} endpoint
+   */
+  async removeThumbnail(id: string): Promise<void> {
+    const app = await this.get(id)
+    const updatePayload = {
+      id: app.id,
+      name: app.name,
+      displayName: app.displayName,
+      description: app.description,
+      isPublished: app.isPublished,
+      publicUrl: app.publicUrl,
+      publishedAt: app.publishedAt,
+      version: app.version,
+      requiresAuthentication: app.requiresAuthentication,
+      created: app.created,
+      updated: app.updated,
+      executionRunnerId: app.executionRunnerId,
+      appearance: {
+        ...app.appearance,
+        backgroundImageUrl: null,
+      },
+      definition: app.definition,
+    }
+    await this.update(id, updatePayload)
+  }
+
+  /**
    * Get linked steps for an app
    * GET /api/apps/{id}/steps
    */
