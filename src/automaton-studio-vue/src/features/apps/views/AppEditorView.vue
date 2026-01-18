@@ -653,18 +653,18 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       </div>
 
       <!-- Settings View -->
-      <div v-if="activeTab === 'settings'" class="settings-view">
+      <div v-show="activeTab === 'settings'" class="settings-view">
         <AppSettings />
       </div>
 
       <!-- Console View -->
-      <div v-if="activeTab === 'console'" class="console-view">
+      <div v-show="activeTab === 'console'" class="console-view">
         <ConsolePanel />
       </div>
 
       <!-- Code Editor View - Main editor layout with resizable splitters -->
       <Splitter
-        v-if="activeTab === 'code'"
+        v-show="activeTab === 'code'"
         class="editor-layout"
         layout="horizontal"
         :gutter-size="8"
