@@ -91,8 +91,15 @@ public class PublicWebAppsController : ControllerBase
                     app.Name, slug, isAuthenticated);
             }
 
-            // Increment view count (fire-and-forget, don't block response)
-            _ = _appsService.IncrementViewCountAsync(app.Id);
+            // Increment view count
+            try
+            {
+                await _appsService.IncrementViewCountAsync(app.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to increment view count for app {AppId}", app.Id);
+            }
 
             // Read index.html from file system
             string htmlContent;
