@@ -4,7 +4,7 @@
  * Settings panel for app configuration
  * Includes: Basic info, Publishing, Runner, Appearance
  */
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -14,7 +14,6 @@ import Button from 'primevue/button'
 import FileUpload from 'primevue/fileupload'
 import Image from 'primevue/image'
 import Message from 'primevue/message'
-import Divider from 'primevue/divider'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { appsService } from '../services/apps.service'
