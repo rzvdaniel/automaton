@@ -19,6 +19,7 @@ public class AppMcpToolProvider : IMcpToolProvider
     private readonly CustomStepsService _customStepsService;
     private readonly UserContextService _userContextService;
     private readonly IScriptEngineHost _scriptHost;
+    private readonly AppsStepExecutionService _appsStepExecutionService;
 
     public AppMcpToolProvider(
         ILogger<AppMcpToolProvider> logger,
@@ -27,7 +28,8 @@ public class AppMcpToolProvider : IMcpToolProvider
         AppStepsService appStepsService,
         CustomStepsService customStepsService,
         UserContextService userContextService,
-        IScriptEngineHost scriptHost)
+        IScriptEngineHost scriptHost,
+        AppsStepExecutionService appsStepExecutionService)
     {
         _logger = logger;
         _appsService = appsService;
@@ -36,6 +38,7 @@ public class AppMcpToolProvider : IMcpToolProvider
         _customStepsService = customStepsService;
         _userContextService = userContextService;
         _scriptHost = scriptHost;
+        _appsStepExecutionService = appsStepExecutionService;
     }
 
     public Task<IEnumerable<McpTool>> GetToolsAsync()
@@ -198,7 +201,7 @@ public class AppMcpToolProvider : IMcpToolProvider
             new McpTool
             {
                 Name = "execute_backend_step_code",
-                Description = "Execute and test a backend step's code with input variables. CRITICAL: Always use this to test the step after creating it and before finalizing the app. This verifies the step works correctly and catches errors early.",
+                Description = "Execute and test a backend step's code LOCALLY with input variables. Use this for quick local testing during development.",
                 InputSchema = JsonDocument.Parse("""
                 {
                     "type": "object",
@@ -211,6 +214,32 @@ public class AppMcpToolProvider : IMcpToolProvider
                             "type": "object",
                             "description": "Test input variables as key-value pairs (optional)",
                             "additionalProperties": true
+                        }
+                    },
+                    "required": ["step_name"]
+                }
+                """)
+            },
+            new McpTool
+            {
+                Name = "test_app_step",
+                Description = "Execute a backend step on a Runner to verify it works correctly. CRITICAL: Always use this after creating or modifying steps to ensure they work before telling the user the app is complete. This tests the step the same way it will run in production - on an actual Runner. If the test fails, analyze the error and fix the step code, then test again until successful.",
+                InputSchema = JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "step_name": {
+                            "type": "string",
+                            "description": "Name of the step to test"
+                        },
+                        "inputs": {
+                            "type": "object",
+                            "description": "Test input variables as key-value pairs (optional)",
+                            "additionalProperties": { "type": "string" }
+                        },
+                        "appId": {
+                            "type": "string",
+                            "description": "The ID of the app (optional, uses context if not provided)"
                         }
                     },
                     "required": ["step_name"]
@@ -370,6 +399,7 @@ public class AppMcpToolProvider : IMcpToolProvider
                 "save_step_code" => await HandleSaveStepCode(arguments),
                 "suggest_step_variables" => await HandleSuggestStepVariables(arguments),
                 "execute_backend_step_code" => await HandleExecuteBackendStepCode(arguments),
+                "test_app_step" => await HandleTestAppStep(arguments, context),
                 "link_step_to_app" => await HandleLinkStepToApp(arguments, context),
                 "get_linked_steps" => await HandleGetLinkedSteps(arguments, context),
 
@@ -933,6 +963,105 @@ public class AppMcpToolProvider : IMcpToolProvider
             {
                 Success = false,
                 Error = $"Failed to execute backend step code: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<McpToolResult> HandleTestAppStep(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        try
+        {
+            var stepName = arguments.GetProperty("step_name").GetString()!;
+            var appId = ExtractAppId(arguments, context);
+
+            // Parse input variables
+            var inputs = new Dictionary<string, string>();
+            if (arguments.TryGetProperty("inputs", out var inputsObj))
+            {
+                foreach (var prop in inputsObj.EnumerateObject())
+                {
+                    inputs[prop.Name] = prop.Value.GetString() ?? prop.Value.ToString();
+                }
+            }
+
+            // Get app info to create PublishedAppInfo
+            var app = _appsService.Get(appId);
+            if (app == null)
+            {
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"App with ID '{appId}' not found"
+                };
+            }
+
+            // Create PublishedAppInfo for execution service
+            var appInfo = new Models.PublishedAppInfo
+            {
+                Id = app.Id,
+                Name = app.Name,
+                PublicUrl = app.PublicUrl ?? "",
+                RequiresAuthentication = app.RequiresAuthentication,
+                OwnerId = _userContextService.GetUserId(),
+                ExecutionRunnerId = app.ExecutionRunnerId
+            };
+
+            // Execute the step on the runner
+            var executionResult = await _appsStepExecutionService.ExecuteStepForAppAsync(
+                appInfo,
+                stepName,
+                inputs,
+                null, // Use app's configured runner
+                CancellationToken.None);
+
+            if (executionResult.Success)
+            {
+                var result = new
+                {
+                    success = true,
+                    stepName = executionResult.StepName ?? stepName,
+                    status = executionResult.Status,
+                    outputVariables = executionResult.OutputVariables,
+                    logs = executionResult.Logs,
+                    runnerCount = executionResult.RunnerCount,
+                    executedAt = executionResult.ExecutedAt,
+                    completedAt = executionResult.CompletedAt,
+                    message = $"Step '{stepName}' executed successfully on runner"
+                };
+
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                };
+            }
+            else
+            {
+                var errorResult = new
+                {
+                    success = false,
+                    stepName = executionResult.StepName ?? stepName,
+                    status = executionResult.Status,
+                    error = executionResult.Error,
+                    logs = executionResult.Logs,
+                    message = $"Step '{stepName}' execution failed: {executionResult.Error}"
+                };
+
+                return new McpToolResult
+                {
+                    Success = false,
+                    Content = JsonSerializer.Serialize(errorResult, new JsonSerializerOptions { WriteIndented = true }),
+                    Error = executionResult.Error
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error testing app step");
+            return new McpToolResult
+            {
+                Success = false,
+                Error = $"Failed to test app step: {ex.Message}"
             };
         }
     }

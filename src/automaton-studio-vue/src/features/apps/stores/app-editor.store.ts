@@ -15,6 +15,7 @@ import type {
   PublishAppRequest,
 } from '../types/apps.types'
 import { getLanguageFromExtension } from '../types/apps.types'
+import type { ConsoleEntry } from '../types/console.types'
 
 export const useAppEditorStore = defineStore('appEditor', () => {
   // ============================================
@@ -52,6 +53,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Preview overlay visibility (full-screen preview)
   const showPreviewOverlay = ref(false)
+
+  // Console entries for step execution results
+  const consoleEntries = ref<ConsoleEntry[]>([])
 
   // ============================================
   // Computed
@@ -669,6 +673,24 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Add a console entry for step execution result
+   */
+  function addConsoleEntry(entry: ConsoleEntry): void {
+    consoleEntries.value.unshift(entry)
+    // Keep last 100 entries
+    if (consoleEntries.value.length > 100) {
+      consoleEntries.value = consoleEntries.value.slice(0, 100)
+    }
+  }
+
+  /**
+   * Clear all console entries
+   */
+  function clearConsole(): void {
+    consoleEntries.value = []
+  }
+
+  /**
    * Clear error
    */
   function clearError(): void {
@@ -691,6 +713,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingPreview.value = false
     error.value = null
     showPreviewOverlay.value = false
+    consoleEntries.value = []
   }
 
   /**
@@ -726,6 +749,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingPreview,
     error,
     showPreviewOverlay,
+    consoleEntries,
 
     // Computed
     activeFile,
@@ -760,6 +784,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     togglePreviewOverlay,
     openPreviewOverlay,
     closePreviewOverlay,
+    addConsoleEntry,
+    clearConsole,
     clearError,
     reset,
   }

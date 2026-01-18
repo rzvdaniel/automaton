@@ -28,10 +28,12 @@ import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
+import ConsolePanel from '../components/ConsolePanel.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
+import type { StepResultMessage } from '../types/console.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,8 +56,8 @@ const editingName = ref('')
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
 
-// Active view tab (code or settings)
-const activeTab = ref<'code' | 'settings'>('code')
+// Active view tab (code, settings, or console)
+const activeTab = ref<'code' | 'settings' | 'console'>('code')
 
 // Panel sizes (in percentages) - localStorage keys
 const STORAGE_KEY = 'app-editor-panel-sizes'
@@ -220,15 +222,35 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
-// Add beforeunload listener and fullscreen class
+// Handle preview iframe postMessage for console logging
+function handlePreviewMessage(event: MessageEvent) {
+  // Check if this is a step result message from our preview iframe
+  if (event.data?.type === 'automatonStepResult') {
+    const message = event.data as StepResultMessage
+    editorStore.addConsoleEntry({
+      id: crypto.randomUUID(),
+      timestamp: new Date(message.data.timestamp),
+      type: 'step-execution',
+      stepName: message.data.stepName,
+      inputs: message.data.inputs,
+      result: message.data.result,
+      duration: message.data.duration,
+      source: message.data.source,
+    })
+  }
+}
+
+// Add beforeunload listener, fullscreen class, and message listener
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('message', handlePreviewMessage)
   // Add class to app-main for fullscreen editor mode
   document.querySelector('.app-main')?.classList.add('app-main--fullscreen')
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('message', handlePreviewMessage)
   // Remove fullscreen class
   document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
 })
@@ -553,7 +575,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               />
               <Tag v-else value="Draft" severity="warn" />
             </div>
-            <!-- Tab buttons for Code/Settings -->
+            <!-- Tab buttons for Code/Console/Settings -->
             <div class="view-tabs">
               <button
                 class="view-tab"
@@ -562,6 +584,17 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               >
                 <i class="pi pi-code"></i>
                 Code
+              </button>
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'console' }"
+                @click="activeTab = 'console'"
+              >
+                <i class="pi pi-terminal"></i>
+                Console
+                <span v-if="editorStore.consoleEntries?.length > 0" class="console-badge">
+                  {{ editorStore.consoleEntries.length }}
+                </span>
               </button>
               <button
                 class="view-tab"
@@ -622,6 +655,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       <!-- Settings View -->
       <div v-if="activeTab === 'settings'" class="settings-view">
         <AppSettings />
+      </div>
+
+      <!-- Console View -->
+      <div v-if="activeTab === 'console'" class="console-view">
+        <ConsolePanel />
       </div>
 
       <!-- Code Editor View - Main editor layout with resizable splitters -->
@@ -825,6 +863,28 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 .settings-view {
   flex: 1;
   overflow: hidden;
+}
+
+/* Console view container */
+.console-view {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Console badge in tab */
+.console-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.375rem;
+  margin-left: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: var(--p-primary-500);
+  color: white;
+  border-radius: 0.625rem;
 }
 
 .app-name {

@@ -422,16 +422,54 @@ class AppsService {
 
   async function executeFlow(flowIdentifier, options) {
     options = options || {};
-    const path = '/api/web-apps/preview/' + APP_ID + '/flows/' + encodeURIComponent(flowIdentifier) + '/execute';
-    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
-    return apiCall(path, 'POST', body);
+    var inputs = options.inputs || {};
+    var startTime = Date.now();
+    var path = '/api/web-apps/preview/' + APP_ID + '/flows/' + encodeURIComponent(flowIdentifier) + '/execute';
+    var body = { inputs: inputs, runnerNames: options.runnerNames || null };
+
+    try {
+      var result = await apiCall(path, 'POST', body);
+      sendResultToConsole('flow', flowIdentifier, inputs, result, Date.now() - startTime, true);
+      return result;
+    } catch (error) {
+      sendResultToConsole('flow', flowIdentifier, inputs, { success: false, status: 'Error', error: error.message }, Date.now() - startTime, false);
+      throw error;
+    }
   }
 
   async function executeStep(stepIdentifier, options) {
     options = options || {};
-    const path = '/api/web-apps/preview/' + APP_ID + '/steps/' + encodeURIComponent(stepIdentifier) + '/execute';
-    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
-    return apiCall(path, 'POST', body);
+    var inputs = options.inputs || {};
+    var startTime = Date.now();
+    var path = '/api/web-apps/preview/' + APP_ID + '/steps/' + encodeURIComponent(stepIdentifier) + '/execute';
+    var body = { inputs: inputs, runnerNames: options.runnerNames || null };
+
+    try {
+      var result = await apiCall(path, 'POST', body);
+      sendResultToConsole('step', stepIdentifier, inputs, result, Date.now() - startTime, true);
+      return result;
+    } catch (error) {
+      sendResultToConsole('step', stepIdentifier, inputs, { success: false, status: 'Error', error: error.message }, Date.now() - startTime, false);
+      throw error;
+    }
+  }
+
+  function sendResultToConsole(type, name, inputs, result, duration, success) {
+    try {
+      window.parent.postMessage({
+        type: 'automatonStepResult',
+        data: {
+          stepName: name,
+          inputs: inputs,
+          result: result,
+          duration: duration,
+          timestamp: new Date().toISOString(),
+          source: 'preview'
+        }
+      }, '*');
+    } catch (e) {
+      console.warn('[AutomatonAPI] Failed to send result to console:', e);
+    }
   }
 
   window.automatonApi = {
