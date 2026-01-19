@@ -89,14 +89,36 @@ onUnmounted(() => {
 })
 
 // Handlers
-const handleGenerateApp = () => {
-  // TODO: Navigate to AI app generation page with description
-  toast.add({
-    severity: 'info',
-    summary: 'Coming Soon',
-    detail: 'AI-powered app generation will be available soon',
-    life: 3000,
-  })
+const handleGenerateApp = async () => {
+  if (!aiDescription.value.trim()) return
+
+  // Generate app name from description (first few words, max 30 chars)
+  const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
+  const appName = words.length > 30 ? words.substring(0, 30) + '...' : words
+
+  isCreating.value = true
+  try {
+    const app = await appsStore.createApp({
+      name: appName,
+    })
+
+    // Navigate to editor with the prompt as query param
+    const prompt = encodeURIComponent(aiDescription.value.trim())
+    router.push(`/apps/${app.id}?prompt=${prompt}`)
+
+    // Clear the description
+    aiDescription.value = ''
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to create app'
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+      life: 5000,
+    })
+  } finally {
+    isCreating.value = false
+  }
 }
 
 const handleViewExamples = () => {
@@ -267,7 +289,8 @@ const handleRetry = async () => {
               <Button
                 label="Generate App"
                 icon="pi pi-sparkles"
-                :disabled="!aiDescription"
+                :disabled="!aiDescription || isCreating"
+                :loading="isCreating"
                 @click="handleGenerateApp"
               />
             </div>

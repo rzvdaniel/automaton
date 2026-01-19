@@ -44,6 +44,9 @@ const editorStore = useAppEditorStore()
 // Get app ID from route
 const appId = computed(() => route.params.id as string)
 
+// Get initial prompt from query param (from "Generate App" flow)
+const initialPrompt = computed(() => route.query.prompt as string | undefined)
+
 // Dialog visibility
 const showPublishDialog = ref(false)
 const showCreateStepDialog = ref(false)
@@ -738,6 +741,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             <AiAssistant
               :app-id="appId"
               :runner-id="selectedRunnerId"
+              :initial-prompt="initialPrompt"
               @tool-executed="handleAiToolExecuted"
             />
           </div>

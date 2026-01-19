@@ -14,6 +14,7 @@ import { useAiChat } from '@/shared/composables/useAiChat'
 const props = defineProps<{
   appId: string
   runnerId?: string | null
+  initialPrompt?: string
 }>()
 
 // Emits
@@ -54,10 +55,19 @@ const suggestions = [
   'Create a data table',
 ]
 
-// Load providers and session on mount
+// Load providers and session on mount, auto-send initial prompt if provided
 onMounted(async () => {
   await loadProviders()
   await getOrCreateActiveSession()
+
+  // Auto-send initial prompt if provided (e.g., from "Generate App" button)
+  if (props.initialPrompt) {
+    userInput.value = props.initialPrompt
+    // Small delay to ensure UI is ready
+    setTimeout(() => {
+      sendMessage()
+    }, 100)
+  }
 })
 
 // Watch for code generation in messages
