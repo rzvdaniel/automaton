@@ -77,6 +77,23 @@ watch(
   { immediate: true },
 )
 
+// Format last viewed date
+function formatLastViewed(date: string | null | undefined): string {
+  if (!date) return 'Never'
+  const d = new Date(date)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return d.toLocaleDateString()
+}
+
 // Generate URL slug from name
 function generateSlug() {
   if (!name.value) return
@@ -354,10 +371,28 @@ async function removeImage() {
               </div>
             </Message>
 
+            <!-- Analytics (shown when published) -->
+            <div v-if="isPublished" class="analytics-section mb-4">
+              <div class="flex align-items-center gap-2 mb-3">
+                <i class="pi pi-chart-bar text-color-secondary"></i>
+                <span class="font-medium">Analytics</span>
+              </div>
+              <div class="flex gap-4">
+                <div class="analytics-stat">
+                  <div class="stat-value">{{ app?.viewCount ?? 0 }}</div>
+                  <div class="stat-label">Total Views</div>
+                </div>
+                <div class="analytics-stat">
+                  <div class="stat-value">{{ formatLastViewed(app?.lastViewedAt) }}</div>
+                  <div class="stat-label">Last Viewed</div>
+                </div>
+              </div>
+            </div>
+
             <div class="flex flex-column gap-4">
               <div class="flex flex-column gap-2">
                 <label for="public-url" class="font-medium">Public URL Slug</label>
-                <div class="p-inputgroup">
+                <div class="p-inputgroup url-inputgroup">
                   <span class="p-inputgroup-addon">/web/</span>
                   <InputText
                     id="public-url"
@@ -379,8 +414,8 @@ async function removeImage() {
 
               <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
                 <label class="font-medium">Full URL</label>
-                <div class="p-inputgroup">
-                  <InputText :model-value="fullPublicUrl" readonly class="url-display" />
+                <div class="p-inputgroup url-inputgroup">
+                  <InputText :model-value="fullPublicUrl" readonly />
                   <Button
                     v-tooltip="'Copy URL'"
                     icon="pi pi-copy"
@@ -536,6 +571,10 @@ async function removeImage() {
   font-size: 0.875rem;
 }
 
+.url-inputgroup :deep(.p-button) {
+  margin-left: 0.5rem;
+}
+
 .image-preview {
   max-width: 300px;
 }
@@ -553,8 +592,35 @@ async function removeImage() {
   max-width: 200px;
 }
 
+.analytics-section {
+  padding: 1rem;
+  border-radius: var(--p-border-radius);
+  border: 1px solid var(--p-surface-200);
+}
+
+.analytics-stat {
+  text-align: center;
+  padding: 0.5rem 1.5rem;
+}
+
+.analytics-stat .stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--p-primary-500);
+}
+
+.analytics-stat .stat-label {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.25rem;
+}
+
 /* Dark mode */
 :global(.app-dark) .image-preview :deep(.preview-image) {
+  border-color: var(--p-surface-600);
+}
+
+:global(.app-dark) .analytics-section {
   border-color: var(--p-surface-600);
 }
 </style>
