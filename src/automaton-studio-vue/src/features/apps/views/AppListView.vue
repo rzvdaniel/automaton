@@ -17,6 +17,7 @@ import InputIcon from 'primevue/inputicon'
 import AppCard from '../components/AppCard.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
+import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { App } from '../types/apps.types'
 
 const router = useRouter()
@@ -92,12 +93,18 @@ onUnmounted(() => {
 const handleGenerateApp = async () => {
   if (!aiDescription.value.trim()) return
 
-  // Generate app name from description (first few words, max 30 chars)
-  const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
-  const appName = words.length > 30 ? words.substring(0, 30) + '...' : words
-
   isCreating.value = true
   try {
+    // Generate app name using AI (falls back to simple extraction if AI unavailable)
+    let appName: string
+    try {
+      appName = await aiUtilityService.generateAppName(aiDescription.value.trim())
+    } catch {
+      // Fallback: extract first few words from description
+      const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
+      appName = words.length > 30 ? words.substring(0, 30) + '...' : words
+    }
+
     const app = await appsStore.createApp({
       name: appName,
     })

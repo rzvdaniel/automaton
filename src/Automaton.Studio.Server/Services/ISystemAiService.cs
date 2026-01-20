@@ -1,0 +1,31 @@
+namespace Automaton.Studio.Server.Services;
+
+/// <summary>
+/// System-level AI service that uses Automaton's API key to provide
+/// AI capabilities to all users. Used for utility tasks like app name
+/// generation, suggestions, etc.
+/// </summary>
+public interface ISystemAiService
+{
+    /// <summary>
+    /// Generate a short, catchy app name from a user description.
+    /// </summary>
+    /// <param name="description">The user's description of the app</param>
+    /// <param name="userId">Optional user ID for rate limiting and tracking</param>
+    /// <returns>A generated app name (2-4 words)</returns>
+    Task<string> GenerateAppNameAsync(string description, string? userId = null);
+
+    /// <summary>
+    /// General-purpose AI completion for utility tasks.
+    /// </summary>
+    /// <param name="prompt">The prompt to send to the AI</param>
+    /// <param name="systemPrompt">Optional system prompt for context</param>
+    /// <param name="userId">Optional user ID for rate limiting and tracking</param>
+    /// <returns>The AI's response</returns>
+    Task<string> CompleteAsync(string prompt, string? systemPrompt = null, string? userId = null);
+
+    /// <summary>
+    /// Check if the system AI service is available and configured.
+    /// </summary>
+    bool IsAvailable { get; }
+}

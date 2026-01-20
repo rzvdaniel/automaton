@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Areas.Identity;
 using Automaton.Studio.Server.Authentication;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Extensions;
@@ -49,6 +50,10 @@ services.AddDatabaseDeveloperPageExceptionFilter();
 
 // Register AI Providers Configuration
 services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
+
+// Register System AI Configuration and Service
+services.Configure<SystemAiConfig>(applicationBuilder.Configuration.GetSection("SystemAi"));
+services.AddScoped<ISystemAiService, SystemAiService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {
