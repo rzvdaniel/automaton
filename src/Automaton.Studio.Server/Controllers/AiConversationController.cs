@@ -29,6 +29,8 @@ public class AiConversationController : BaseController
     private readonly AiApiKeyService _aiApiKeyService;
     private readonly IAiChatHistoryService _chatHistoryService;
     private readonly AiProvidersConfig _aiProvidersConfig;
+    private readonly SystemAiConfig _systemAiConfig;
+    private readonly ISystemAiRateLimitService _rateLimitService;
     private readonly StepMcpToolProvider _stepToolProvider;
     private readonly AppMcpToolProvider _appToolProvider;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
@@ -40,6 +42,8 @@ public class AiConversationController : BaseController
         AiApiKeyService aiApiKeyService,
         IAiChatHistoryService chatHistoryService,
         IOptions<AiProvidersConfig> aiProvidersConfig,
+        IOptions<SystemAiConfig> systemAiConfig,
+        ISystemAiRateLimitService rateLimitService,
         StepMcpToolProvider stepToolProvider,
         AppMcpToolProvider appToolProvider,
         IStepSystemPromptBuilder stepPromptBuilder,
@@ -50,6 +54,8 @@ public class AiConversationController : BaseController
         _aiApiKeyService = aiApiKeyService;
         _chatHistoryService = chatHistoryService;
         _aiProvidersConfig = aiProvidersConfig.Value;
+        _systemAiConfig = systemAiConfig.Value;
+        _rateLimitService = rateLimitService;
         _stepToolProvider = stepToolProvider;
         _appToolProvider = appToolProvider;
         _stepPromptBuilder = stepPromptBuilder;
@@ -75,21 +81,56 @@ public class AiConversationController : BaseController
         {
             var userId = GetUserId();
 
-            // 1. Get API key (secure - server-only)
-            var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(
+            // 1. Determine API key source - user's own key or system provider
+            // Backend decides based on whether user has configured their own key for this provider
+            var userApiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(
                 userId,
                 request.Provider
             );
 
-            if (string.IsNullOrEmpty(apiKey))
+            string apiKey;
+            string provider;
+            string? model;
+            bool usingSystemProvider = false;
+
+            if (!string.IsNullOrEmpty(userApiKey))
             {
-                await WriteErrorEvent("No API key configured for this provider");
+                // User has their own API key - use it (no rate limiting)
+                apiKey = userApiKey;
+                provider = request.Provider;
+                model = request.Model;
+                _logger.LogInformation(
+                    "Using user's API key for provider {Provider}",
+                    provider);
+            }
+            else if (_systemAiConfig.Enabled && !string.IsNullOrEmpty(_systemAiConfig.ApiKey))
+            {
+                // No user key - use system provider with rate limiting
+                usingSystemProvider = true;
+
+                // Check rate limit before proceeding
+                if (!_rateLimitService.CheckAndRecordRequest(userId.ToString()))
+                {
+                    await WriteErrorEvent("Rate limit exceeded. Please try again later.");
+                    return;
+                }
+
+                apiKey = _systemAiConfig.ApiKey;
+                provider = _systemAiConfig.DefaultProvider;
+                model = _systemAiConfig.DefaultModel;
+                _logger.LogInformation(
+                    "Using system AI provider for user {UserId}: Provider={Provider}, Model={Model}",
+                    userId, provider, model);
+            }
+            else
+            {
+                await WriteErrorEvent("No API key configured. Please add your own API key or contact support.");
                 return;
             }
 
             _logger.LogInformation(
-                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}",
-                userId, request.Provider, request.Model, request.ResourceType);
+                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}, usingSystemProvider {UsingSystem}",
+                userId, provider, model, request.ResourceType, usingSystemProvider);
 
             // 2. Get or create session for chat history
             Guid sessionId;
@@ -107,8 +148,8 @@ public class AiConversationController : BaseController
                         resourceTypeEnum,
                         request.ResourceId.Value,
                         userId,
-                        request.Provider,
-                        request.Model);
+                        provider,
+                        model);
                     sessionId = session.Id;
                     _logger.LogInformation("Auto-created session {SessionId} for resource {ResourceType}/{ResourceId}",
                         sessionId, request.ResourceType, request.ResourceId);
@@ -121,8 +162,8 @@ public class AiConversationController : BaseController
                         ResourceType = ChatResourceType.General,
                         ResourceId = Guid.Empty,
                         Title = "New Chat",
-                        Provider = request.Provider,
-                        Model = request.Model
+                        Provider = provider,
+                        Model = model
                     }, userId);
                     sessionId = session.Id;
                     _logger.LogWarning("Invalid ResourceType '{ResourceType}', created general session {SessionId}",
@@ -137,8 +178,8 @@ public class AiConversationController : BaseController
                     ResourceType = ChatResourceType.General,
                     ResourceId = Guid.Empty,
                     Title = "New Chat",
-                    Provider = request.Provider,
-                    Model = request.Model
+                    Provider = provider,
+                    Model = model
                 }, userId);
                 sessionId = session.Id;
                 _logger.LogInformation("Created general session {SessionId}", sessionId);
@@ -193,8 +234,8 @@ public class AiConversationController : BaseController
                 ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
                 InitialMessage = request.Message,
                 SystemPrompt = systemPrompt,
-                Provider = request.Provider,
-                Model = request.Model,
+                Provider = provider,
+                Model = model,
                 ApiKey = apiKey,
                 ConversationHistory = history,
                 Context = BuildContextDictionary(request, userId),

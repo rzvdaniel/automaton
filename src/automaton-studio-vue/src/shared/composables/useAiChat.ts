@@ -6,6 +6,7 @@ import { ref, computed } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
 import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
+import { aiUtilityService } from '../services/ai-utility.service'
 import type {
   ChatMessage,
   ChatSession,
@@ -16,6 +17,9 @@ import type {
   ToolCall,
   ToolResult,
 } from '../types/ai.types'
+
+// Special provider name for Automaton's system AI
+const AUTOMATON_AI_PROVIDER = 'AutomatonAI'
 
 export interface UseAiChatOptions {
   /**
@@ -52,20 +56,48 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
   /**
    * Load available AI providers
+   * Includes "Automaton AI" as first option if system AI is available
    */
   async function loadProviders() {
     try {
-      availableProviders.value = await getAvailableProviders(true)
+      // Load user's providers
+      const userProviders = await getAvailableProviders(true)
 
-      // Auto-select first provider with API key
-      const providerWithKey = availableProviders.value.find(
-        (p) => p.hasStoredKeys || p.hasEnvironmentKey,
-      )
-      if (providerWithKey) {
-        selectedProvider.value = providerWithKey.providerName
-        // Select first model
-        if (providerWithKey.supportedModels.length > 0) {
-          selectedModel.value = providerWithKey.supportedModels[0] || ''
+      // Check if system AI is available
+      const systemStatus = await aiUtilityService.getStatus()
+
+      // Build providers list - Automaton AI first if available
+      const providers: AiProvider[] = []
+
+      if (systemStatus.isAvailable) {
+        providers.push({
+          providerName: AUTOMATON_AI_PROVIDER,
+          displayName: 'Automaton AI',
+          description: 'Free AI powered by Automaton (rate limited)',
+          hasStoredKeys: true, // Mark as having keys so it's selectable
+          storedKeyCount: 1,
+          hasEnvironmentKey: false,
+          supportedModels: [systemStatus.model || 'default'],
+        })
+      }
+
+      // Add user's providers
+      providers.push(...userProviders)
+      availableProviders.value = providers
+
+      // Auto-select Automaton AI if available, otherwise first provider with key
+      if (systemStatus.isAvailable) {
+        selectedProvider.value = AUTOMATON_AI_PROVIDER
+        selectedModel.value = systemStatus.model || 'default'
+      } else {
+        const providerWithKey = userProviders.find(
+          (p) => p.hasStoredKeys || p.hasEnvironmentKey,
+        )
+        if (providerWithKey) {
+          selectedProvider.value = providerWithKey.providerName
+          if (providerWithKey.supportedModels.length > 0) {
+            selectedModel.value = providerWithKey.supportedModels[0] || ''
+          }
         }
       }
     } catch (err) {

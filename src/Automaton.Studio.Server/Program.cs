@@ -53,6 +53,7 @@ services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSectio
 
 // Register System AI Configuration and Service
 services.Configure<SystemAiConfig>(applicationBuilder.Configuration.GetSection("SystemAi"));
+services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

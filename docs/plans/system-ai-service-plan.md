@@ -201,6 +201,70 @@ public interface IAiProvider
 2. `src/Automaton.Mcp/Providers/OpenAiProvider.cs` - Implement CompleteAsync
 3. `src/Automaton.Mcp/Providers/AnthropicProvider.cs` - Implement CompleteAsync
 
+## System AI Provider for Chat (Phase 2)
+
+### Overview
+
+Allow users to use the system AI provider in the AI Chat Panel (App Editor), not just for utility tasks like app name generation. This provides a zero-friction AI experience.
+
+### User Experience
+
+**AI Chat Panel provider dropdown:**
+1. "Automaton AI" (system) - Always available, first option
+2. User's own API keys (if configured)
+
+### Backend Logic (Security)
+
+**Never trust frontend flags.** Backend determines which key to use:
+
+```csharp
+// In AiConversationController.StreamConversation
+if (string.IsNullOrEmpty(request.ApiKeyId))
+{
+    // No user key provided → use system provider
+    // 1. Check rate limit
+    if (!_rateLimitService.CheckRateLimit(userId))
+        return StatusCode(429, "Rate limit exceeded");
+
+    // 2. Use system API key
+    apiKey = _systemAiConfig.ApiKey;
+    provider = _systemAiConfig.DefaultProvider;
+    model = _systemAiConfig.DefaultModel;
+}
+else
+{
+    // User provided their own key ID
+    // 1. Verify key belongs to user
+    // 2. No rate limiting (their cost)
+    apiKey = await _aiApiKeyService.GetDecryptedApiKeyAsync(userId, request.ApiKeyId);
+}
+```
+
+### Rate Limiting for Chat
+
+**Same pool as utility requests** (simpler approach for now):
+- All system AI requests share the same rate limit pool
+- 10 requests/minute per user (utility + chat combined)
+- Future: Consider separate limits if needed (chat uses more tokens)
+
+**Why same pool:**
+- Simpler to implement and understand
+- Prevents gaming (spam utility requests, then switch to chat)
+- Can split later if usage patterns require it
+
+### Frontend Changes
+
+**AiAssistant.vue:**
+- Add "Automaton AI" as first provider option
+- When selected, don't send `apiKeyId` in request
+- Show user's keys below (if any configured)
+
+### Files to Modify
+
+1. `AiConversationController.cs` - Add system provider support with rate limiting
+2. `AiAssistant.vue` - Add "Automaton AI" option to provider dropdown
+3. `useAiChat.ts` - Handle system provider selection
+
 ## Rate Limiting
 
 ### Current: Per-User Rate Limiting (Implemented)
@@ -213,6 +277,7 @@ public interface IAiProvider
 - Prevents single user from spamming the system
 - Uses sliding window algorithm with in-memory cache
 - Returns 429 (Too Many Requests) when exceeded
+- **Shared pool**: Utility requests (app name) + Chat requests use same limit
 
 ### Future: Global Rate Limiting (Not Yet Needed)
 

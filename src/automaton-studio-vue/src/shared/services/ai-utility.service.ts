@@ -1,6 +1,15 @@
 import apiClient from './api/axios-instance'
 
 /**
+ * System AI status response
+ */
+export interface SystemAiStatus {
+  isAvailable: boolean
+  provider?: string
+  model?: string
+}
+
+/**
  * Service for AI utility endpoints that use the system AI service.
  * These endpoints use Automaton's API key, not the user's.
  */
@@ -18,15 +27,15 @@ class AiUtilityService {
   }
 
   /**
-   * Check if the system AI service is available.
-   * @returns Whether the service is available
+   * Check if the system AI service is available and get its config.
+   * @returns System AI status including provider and model info
    */
-  async checkStatus(): Promise<boolean> {
+  async getStatus(): Promise<SystemAiStatus> {
     try {
-      const response = await apiClient.get<{ isAvailable: boolean }>('/api/aiutility/status')
-      return response.data.isAvailable
+      const response = await apiClient.get<SystemAiStatus>('/api/aiutility/status')
+      return response.data
     } catch {
-      return false
+      return { isAvailable: false }
     }
   }
 }
