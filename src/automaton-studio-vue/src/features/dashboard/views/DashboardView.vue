@@ -31,11 +31,6 @@ const handleCreateApp = () => {
   router.push('/apps')
 }
 
-const handleGenerateWithAI = () => {
-  // Navigate to apps with AI generation dialog open
-  router.push('/apps?action=generate')
-}
-
 const handleViewAllApps = () => {
   router.push('/apps')
 }
@@ -291,30 +286,8 @@ const handleDismissWelcome = () => {
         </Card>
       </div>
 
-      <!-- Quick Actions & Published Apps -->
+      <!-- Published Apps -->
       <div class="col-12 lg:col-4">
-        <Card class="mb-4">
-          <template #title>Quick Actions</template>
-          <template #content>
-            <div class="flex flex-column gap-3">
-              <Button
-                label="Create New App"
-                icon="pi pi-plus"
-                class="w-full"
-                @click="handleCreateApp"
-              />
-              <Button
-                label="Generate with AI"
-                icon="pi pi-sparkles"
-                severity="secondary"
-                outlined
-                class="w-full"
-                @click="handleGenerateWithAI"
-              />
-            </div>
-          </template>
-        </Card>
-
         <Card>
           <template #title>Published Apps</template>
           <template #content>
