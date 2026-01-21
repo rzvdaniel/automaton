@@ -10,7 +10,6 @@ import Message from 'primevue/message'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
-import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '../services/runners.service'
@@ -135,8 +134,6 @@ onMounted(() => {
 
 <template>
   <div class="runners-view">
-    <ConfirmDialog />
-
     <!-- Page Header -->
     <div class="flex align-items-center justify-content-between mb-5">
       <div>
