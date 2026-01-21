@@ -264,7 +264,7 @@ onMounted(() => {
               rounded
               size="small"
               severity="danger"
-              @click="confirmDelete(runner)"
+              @click.stop="confirmDelete(runner)"
             />
           </div>
 
@@ -325,7 +325,7 @@ onMounted(() => {
                   rounded
                   size="small"
                   severity="danger"
-                  @click="confirmDelete(data)"
+                  @click.stop="confirmDelete(data)"
                 />
               </div>
             </template>
