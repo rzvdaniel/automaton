@@ -65,6 +65,27 @@ async function loadRunners() {
 }
 
 // Delete runner
+async function deleteRunner(runner: Runner) {
+  try {
+    await runnersService.delete(runner.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Runner deleted successfully',
+      life: 3000,
+    })
+    await loadRunners()
+  } catch (err: unknown) {
+    console.error('Failed to delete runner:', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to delete runner',
+      life: 5000,
+    })
+  }
+}
+
 function confirmDelete(runner: Runner) {
   confirm.require({
     message: `Are you sure you want to delete the runner "${runner.name}"?`,
@@ -73,25 +94,8 @@ function confirmDelete(runner: Runner) {
     rejectLabel: 'Cancel',
     acceptLabel: 'Delete',
     acceptClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        await runnersService.delete(runner.id)
-        toast.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Runner deleted successfully',
-          life: 3000,
-        })
-        await loadRunners()
-      } catch (err: unknown) {
-        console.error('Failed to delete runner:', err)
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to delete runner',
-          life: 5000,
-        })
-      }
+    accept: () => {
+      deleteRunner(runner)
     },
   })
 }
