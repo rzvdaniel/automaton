@@ -44,6 +44,22 @@ public class WebApp
     public bool IsSample { get; set; } = false;
     public bool IsFeatured { get; set; } = false;
 
+    // Public profile display
+    /// <summary>
+    /// URL to app thumbnail image for card display
+    /// </summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>
+    /// App category for organization (e.g., "Business", "Productivity", "Entertainment")
+    /// </summary>
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Comma-separated tags for search/filtering
+    /// </summary>
+    public string? Tags { get; set; }
+
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 

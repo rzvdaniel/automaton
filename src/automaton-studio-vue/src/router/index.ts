@@ -11,6 +11,7 @@ import { runnersRoutes } from '@/features/runners/routes'
 import { projectsRoutes } from '@/features/projects/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { installRoutes } from '@/features/install/routes'
+import { publicRoutes } from '@/features/public/routes'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,6 +32,9 @@ const router = createRouter({
     ...runnersRoutes,
     ...projectsRoutes,
     ...settingsRoutes,
+
+    // Public pages (no auth required, self-contained layout)
+    ...publicRoutes,
 
     // Catch-all redirect to dashboard
     {

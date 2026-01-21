@@ -272,6 +272,7 @@ services.AddHangfireServer();
 
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
+services.AddScoped<PublicAppsService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));

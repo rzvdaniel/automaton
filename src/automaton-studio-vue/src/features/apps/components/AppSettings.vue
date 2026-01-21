@@ -371,6 +371,19 @@ async function removeImage() {
               </div>
             </Message>
 
+            <!-- Public Profile Link (shown when published and public) -->
+            <Message v-if="isPublished && !requiresAuthentication" severity="info" :closable="false" class="mb-4">
+              <div class="flex flex-column gap-2">
+                <div class="flex align-items-center gap-2">
+                  <i class="pi pi-users"></i>
+                  <span>This app is visible on your public apps page</span>
+                </div>
+                <small class="text-color-secondary">
+                  Anyone can discover this app on your profile at <code>/username/apps</code>
+                </small>
+              </div>
+            </Message>
+
             <!-- Analytics (shown when published) -->
             <div v-if="isPublished" class="analytics-section mb-4">
               <div class="flex align-items-center gap-2 mb-3">
