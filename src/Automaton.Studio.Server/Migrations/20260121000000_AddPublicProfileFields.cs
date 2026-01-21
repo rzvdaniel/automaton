@@ -59,11 +59,24 @@ namespace Automaton.Studio.Server.Migrations
                 name: "IX_WebApps_IsPublished",
                 table: "WebApps",
                 column: "IsPublished");
+
+            // Remove deprecated Appearance JSON column (replaced by ThumbnailUrl)
+            migrationBuilder.DropColumn(
+                name: "Appearance",
+                table: "WebApps");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Restore Appearance column
+            migrationBuilder.AddColumn<string>(
+                name: "Appearance",
+                table: "WebApps",
+                type: "longtext",
+                nullable: false,
+                defaultValue: "{}");
+
             migrationBuilder.DropIndex(
                 name: "IX_WebApps_IsPublished",
                 table: "WebApps");

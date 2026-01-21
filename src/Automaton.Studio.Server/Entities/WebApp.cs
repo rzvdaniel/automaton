@@ -33,9 +33,6 @@ public class WebApp
     /// </summary>
     public Guid? ProjectId { get; set; }
 
-    // Appearance settings stored as JSON
-    public string Appearance { get; set; } = "{}";
-
     // Analytics
     public int ViewCount { get; set; } = 0;
     public DateTime? LastViewedAt { get; set; }
