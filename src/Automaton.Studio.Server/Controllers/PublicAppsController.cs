@@ -134,10 +134,11 @@ public class PublicAppsController : ControllerBase
 
     /// <summary>
     /// Validate username format to prevent injection attacks
+    /// Allows alphanumeric, underscore, hyphen, period, and @ symbol (for email-based usernames)
     /// </summary>
     private static bool IsValidUsername(string username)
     {
-        // Allow alphanumeric, underscore, hyphen, and period
-        return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-\.]+$");
+        // Allow alphanumeric, underscore, hyphen, period, and @ symbol
+        return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-\.@]+$");
     }
 }
