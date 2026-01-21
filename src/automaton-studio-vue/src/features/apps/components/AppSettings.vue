@@ -31,7 +31,7 @@ const description = ref('')
 const publicUrl = ref('')
 const requiresAuthentication = ref(false)
 const executionRunnerId = ref<string | null>(null)
-const backgroundImageUrl = ref<string | undefined>(undefined)
+const thumbnailUrl = ref<string | undefined>(undefined)
 
 // Loading states
 const isSaving = ref(false)
@@ -50,7 +50,7 @@ const hasChanges = computed(() => {
     publicUrl.value !== (app.value.publicUrl || '') ||
     requiresAuthentication.value !== app.value.requiresAuthentication ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
-    backgroundImageUrl.value !== app.value.appearance?.backgroundImageUrl
+    thumbnailUrl.value !== (app.value.thumbnailUrl || undefined)
   )
 })
 
@@ -71,7 +71,7 @@ watch(
       publicUrl.value = newApp.publicUrl || ''
       requiresAuthentication.value = newApp.requiresAuthentication || false
       executionRunnerId.value = newApp.executionRunnerId || null
-      backgroundImageUrl.value = newApp.appearance?.backgroundImageUrl
+      thumbnailUrl.value = newApp.thumbnailUrl
     }
   },
   { immediate: true },
@@ -205,7 +205,7 @@ async function handleImageUpload(event: { files: File[] }) {
   isUploadingImage.value = true
   try {
     const imageUrl = await appsService.uploadThumbnail(app.value.id, file)
-    backgroundImageUrl.value = imageUrl
+    thumbnailUrl.value = imageUrl
 
     // Reload app to get updated appearance
     await editorStore.loadApp(app.value.id)
@@ -235,7 +235,7 @@ async function removeImage() {
   isRemovingImage.value = true
   try {
     await appsService.removeThumbnail(app.value.id)
-    backgroundImageUrl.value = undefined
+    thumbnailUrl.value = undefined
 
     // Reload app to get updated appearance
     await editorStore.loadApp(app.value.id)
@@ -519,9 +519,9 @@ async function removeImage() {
                 <label class="font-medium">App Thumbnail</label>
 
                 <!-- Current image preview -->
-                <div v-if="backgroundImageUrl" class="image-preview mb-3">
+                <div v-if="thumbnailUrl" class="image-preview mb-3">
                   <Image
-                    :src="backgroundImageUrl"
+                    :src="thumbnailUrl"
                     alt="App thumbnail"
                     preview
                     image-class="preview-image"

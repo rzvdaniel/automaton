@@ -17,7 +17,7 @@ interface Props {
 const props = defineProps<Props>()
 
 // Check if app has a thumbnail image
-const hasThumbnail = computed(() => !!props.app.appearance?.backgroundImageUrl)
+const hasThumbnail = computed(() => !!props.app.thumbnailUrl)
 
 const emit = defineEmits<{
   publish: [app: App]
@@ -184,7 +184,7 @@ const menuItems = computed(() => {
     <!-- Thumbnail Image -->
     <template v-if="hasThumbnail" #header>
       <div class="app-thumbnail">
-        <img :src="app.appearance?.backgroundImageUrl" :alt="app.name" />
+        <img :src="app.thumbnailUrl" :alt="app.name" />
         <!-- Overlay with menu button -->
         <div class="thumbnail-overlay">
           <Button

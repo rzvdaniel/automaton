@@ -22,9 +22,11 @@ public class AppModel
     // Sample/Featured flags
     public bool IsSample { get; set; }
     public bool IsFeatured { get; set; }
-    
-    // Appearance configuration stored as JSON
-    public AppAppearance Appearance { get; set; } = new AppAppearance();
-    
+
+    // Public profile display
+    public string? ThumbnailUrl { get; set; }
+    public string? Category { get; set; }
+    public string? Tags { get; set; }
+
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }

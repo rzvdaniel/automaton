@@ -22,17 +22,6 @@ export interface GitHubSettings {
 }
 
 /**
- * App appearance configuration for card display
- * Matches backend AppAppearance.cs
- */
-export interface AppAppearance {
-  backgroundColor?: string
-  backgroundImageUrl?: string
-  backgroundImageOpacity?: number
-  titleFontColor?: string
-}
-
-/**
  * App definition containing the content
  */
 export interface AppDefinition {
@@ -58,7 +47,6 @@ export interface App {
   created: string // ISO date string
   updated: string // ISO date string
   executionRunnerId?: string
-  appearance: AppAppearance
   definition: AppDefinition
   // Analytics
   viewCount: number
@@ -66,6 +54,10 @@ export interface App {
   // Sample/Featured flags
   isSample: boolean
   isFeatured: boolean
+  // Public profile display
+  thumbnailUrl?: string
+  category?: string
+  tags?: string
 }
 
 /**

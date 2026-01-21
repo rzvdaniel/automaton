@@ -115,8 +115,10 @@ class AppsService {
       created: app.created,
       updated: app.updated,
       executionRunnerId: settings.executionRunnerId ?? app.executionRunnerId,
-      appearance: app.appearance,
       definition: app.definition,
+      thumbnailUrl: app.thumbnailUrl,
+      category: app.category,
+      tags: app.tags,
     }
     await this.update(id, updatePayload)
   }
@@ -142,7 +144,7 @@ class AppsService {
   }
 
   /**
-   * Remove app thumbnail image by clearing the appearance
+   * Remove app thumbnail image by clearing the thumbnailUrl
    * Uses the general PUT /api/apps/{id} endpoint
    */
   async removeThumbnail(id: string): Promise<void> {
@@ -160,11 +162,10 @@ class AppsService {
       created: app.created,
       updated: app.updated,
       executionRunnerId: app.executionRunnerId,
-      appearance: {
-        ...app.appearance,
-        backgroundImageUrl: null,
-      },
       definition: app.definition,
+      thumbnailUrl: null,
+      category: app.category,
+      tags: app.tags,
     }
     await this.update(id, updatePayload)
   }

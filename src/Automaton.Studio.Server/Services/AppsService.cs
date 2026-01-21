@@ -289,8 +289,10 @@ public class AppsService
         // Definition is now empty - content in file system
         entity.Definition = "{}";
 
-        // Persist appearance configuration as JSON
-        entity.Appearance = JsonSerializer.Serialize(app.Appearance);
+        // Public profile display fields
+        entity.ThumbnailUrl = app.ThumbnailUrl;
+        entity.Category = app.Category;
+        entity.Tags = app.Tags;
 
         dataContext.SaveChanges();
 
@@ -496,10 +498,6 @@ public class AppsService
     {
         if (entity == null) return null;
 
-        var appearance = string.IsNullOrEmpty(entity.Appearance)
-            ? new Models.AppAppearance()
-            : JsonSerializer.Deserialize<Models.AppAppearance>(entity.Appearance) ?? new Models.AppAppearance();
-
         return new Models.AppModel
         {
             Id = entity.Id,
@@ -514,14 +512,17 @@ public class AppsService
             Created = entity.Created,
             Updated = entity.Updated,
             ExecutionRunnerId = entity.ExecutionRunnerId,
-            Appearance = appearance,
             Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
             // Analytics
             ViewCount = entity.ViewCount,
             LastViewedAt = entity.LastViewedAt,
             // Sample/Featured
             IsSample = entity.IsSample,
-            IsFeatured = entity.IsFeatured
+            IsFeatured = entity.IsFeatured,
+            // Public profile display
+            ThumbnailUrl = entity.ThumbnailUrl,
+            Category = entity.Category,
+            Tags = entity.Tags
         };
     }
 
@@ -572,5 +573,23 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
         logger.Information("Set sample status for app {AppId}: IsSample={IsSample}, IsFeatured={IsFeatured}", appId, isSample, isFeatured);
+    }
+
+    /// <summary>
+    /// Update the thumbnail URL for an app
+    /// </summary>
+    public async Task UpdateThumbnailUrlAsync(Guid appId, string? thumbnailUrl)
+    {
+        var entity = await dataContext.WebApps.FindAsync(appId);
+        if (entity == null)
+        {
+            throw new InvalidOperationException($"App {appId} not found");
+        }
+
+        entity.ThumbnailUrl = thumbnailUrl;
+        entity.Updated = DateTime.UtcNow;
+
+        await dataContext.SaveChangesAsync();
+        logger.Information("Updated thumbnail URL for app {AppId}: {ThumbnailUrl}", appId, thumbnailUrl);
     }
 }

@@ -310,10 +310,11 @@ public class AppsController : BaseController
                 }
             }
 
-            // Return the relative URL
+            // Save the thumbnail URL to database
             var imageUrl = $"/app-thumbnails/{id}/{fileName}";
+            await appsService.UpdateThumbnailUrlAsync(id, imageUrl);
 
-            logger.LogInformation("[AppsController] Background image uploaded for app {AppId}: {FileName} by user {User}", 
+            logger.LogInformation("[AppsController] Thumbnail uploaded for app {AppId}: {FileName} by user {User}",
                 id, fileName, User.Identity?.Name);
 
             return Ok(new { imageUrl = imageUrl });
