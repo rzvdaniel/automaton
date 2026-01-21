@@ -445,12 +445,21 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("AvatarUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Bio")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("longtext");
 
                     b.Property<Guid?>("CurrentProjectId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -1295,8 +1304,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("AllowedRoles")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Appearance")
-                        .IsRequired()
+                    b.Property<string>("Category")
                         .HasColumnType("longtext");
 
                     b.Property<DateTime>("Created")
@@ -1351,6 +1359,12 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
