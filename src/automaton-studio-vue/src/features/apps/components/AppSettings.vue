@@ -41,6 +41,18 @@ const isRemovingImage = ref(false)
 // Computed
 const app = computed(() => editorStore.currentApp)
 const isPublished = computed(() => app.value?.isPublished ?? false)
+
+// Full thumbnail URL with API base URL
+const fullThumbnailUrl = computed(() => {
+  if (!thumbnailUrl.value) return ''
+  // If already a full URL, use as-is; otherwise prepend API base URL
+  if (thumbnailUrl.value.startsWith('http')) {
+    return thumbnailUrl.value
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return `${baseUrl}${thumbnailUrl.value}`
+})
+
 const hasChanges = computed(() => {
   if (!app.value) return false
   return (
@@ -521,7 +533,7 @@ async function removeImage() {
                 <!-- Current image preview -->
                 <div v-if="thumbnailUrl" class="image-preview mb-3">
                   <Image
-                    :src="thumbnailUrl"
+                    :src="fullThumbnailUrl"
                     alt="App thumbnail"
                     preview
                     image-class="preview-image"

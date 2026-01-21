@@ -19,6 +19,17 @@ const props = defineProps<Props>()
 // Check if app has a thumbnail image
 const hasThumbnail = computed(() => !!props.app.thumbnailUrl)
 
+// Full thumbnail URL with API base URL
+const fullThumbnailUrl = computed(() => {
+  if (!props.app.thumbnailUrl) return ''
+  // If already a full URL, use as-is; otherwise prepend API base URL
+  if (props.app.thumbnailUrl.startsWith('http')) {
+    return props.app.thumbnailUrl
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return `${baseUrl}${props.app.thumbnailUrl}`
+})
+
 const emit = defineEmits<{
   publish: [app: App]
 }>()
@@ -184,7 +195,7 @@ const menuItems = computed(() => {
     <!-- Thumbnail Image -->
     <template v-if="hasThumbnail" #header>
       <div class="app-thumbnail">
-        <img :src="app.thumbnailUrl" :alt="app.name" />
+        <img :src="fullThumbnailUrl" :alt="app.name" />
         <!-- Overlay with menu button -->
         <div class="thumbnail-overlay">
           <Button

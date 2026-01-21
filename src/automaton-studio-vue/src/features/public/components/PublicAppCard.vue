@@ -18,6 +18,17 @@ const emit = defineEmits<{
 const displayName = computed(() => props.app.displayName || props.app.name)
 const formattedDate = computed(() => formatPublishedDate(props.app.publishedAt))
 
+// Full thumbnail URL with API base URL
+const fullThumbnailUrl = computed(() => {
+  if (!props.app.thumbnailUrl) return ''
+  // If already a full URL, use as-is; otherwise prepend API base URL
+  if (props.app.thumbnailUrl.startsWith('http')) {
+    return props.app.thumbnailUrl
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return `${baseUrl}${props.app.thumbnailUrl}`
+})
+
 function openApp() {
   emit('open', props.app)
 }
@@ -34,7 +45,7 @@ function showDetails() {
       <div class="card-thumbnail">
         <img
           v-if="app.thumbnailUrl"
-          :src="app.thumbnailUrl"
+          :src="fullThumbnailUrl"
           :alt="displayName"
           class="thumbnail-image"
         />

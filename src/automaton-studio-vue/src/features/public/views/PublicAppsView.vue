@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -22,6 +22,17 @@ const apps = ref<AppCardType[]>([])
 // Details dialog
 const showDetailsDialog = ref(false)
 const selectedApp = ref<AppCardType | null>(null)
+
+// Full thumbnail URL with API base URL
+const fullThumbnailUrl = computed(() => {
+  if (!selectedApp.value?.thumbnailUrl) return ''
+  // If already a full URL, use as-is; otherwise prepend API base URL
+  if (selectedApp.value.thumbnailUrl.startsWith('http')) {
+    return selectedApp.value.thumbnailUrl
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return `${baseUrl}${selectedApp.value.thumbnailUrl}`
+})
 
 // Load data
 async function loadUserApps() {
@@ -158,7 +169,7 @@ onMounted(() => {
       <div v-if="selectedApp" class="app-details">
         <!-- Thumbnail -->
         <div v-if="selectedApp.thumbnailUrl" class="details-thumbnail">
-          <img :src="selectedApp.thumbnailUrl" :alt="selectedApp.name" />
+          <img :src="fullThumbnailUrl" :alt="selectedApp.name" />
         </div>
 
         <!-- Description -->
