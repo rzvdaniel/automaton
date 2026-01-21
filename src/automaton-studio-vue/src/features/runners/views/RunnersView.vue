@@ -9,6 +9,7 @@ import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
+import SelectButton from 'primevue/selectbutton'
 import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -27,11 +28,23 @@ const confirm = useConfirm()
 const loading = ref(true)
 const runners = ref<Runner[]>([])
 const showDeployDialog = ref(false)
+const viewMode = ref<'grid' | 'list'>('grid')
+
+// View toggle options
+const viewOptions = [
+  { icon: 'pi pi-th-large', value: 'grid' },
+  { icon: 'pi pi-list', value: 'list' },
+]
 
 // Computed stats
 const onlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Online).length)
 const offlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Offline).length)
 const totalCount = computed(() => runners.value.length)
+
+// Get status color for grid view indicator
+function getStatusColor(status: RunnerStatus): string {
+  return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'
+}
 
 // Load runners
 async function loadRunners() {
@@ -178,9 +191,90 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Runners Table -->
-    <Card>
-      <template #title>Registered Runners</template>
+    <!-- Runners Section Header with View Toggle -->
+    <div class="flex align-items-center justify-content-between mb-4">
+      <h2 class="text-xl font-semibold m-0">Registered Runners</h2>
+      <SelectButton
+        v-model="viewMode"
+        :options="viewOptions"
+        option-value="value"
+        :allow-empty="false"
+        class="view-toggle"
+      >
+        <template #option="{ option }">
+          <i :class="option.icon"></i>
+        </template>
+      </SelectButton>
+    </div>
+
+    <!-- Empty State -->
+    <Card v-if="!loading && runners.length === 0">
+      <template #content>
+        <div class="text-center py-6">
+          <i class="pi pi-server text-5xl text-color-secondary mb-3" style="display: block"></i>
+          <h3 class="mt-0 mb-2">No runners registered</h3>
+          <p class="text-color-secondary mt-0 mb-4">
+            Deploy a runner to start executing your workflows remotely.
+          </p>
+          <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+        </div>
+      </template>
+    </Card>
+
+    <!-- Loading State -->
+    <div v-else-if="loading" class="text-center py-6">
+      <i class="pi pi-spin pi-spinner text-4xl text-color-secondary"></i>
+      <p class="text-color-secondary mt-3">Loading runners...</p>
+    </div>
+
+    <!-- Grid View -->
+    <div v-else-if="viewMode === 'grid'" class="runners-grid">
+      <Card v-for="runner in runners" :key="runner.id" class="runner-card">
+        <template #content>
+          <div class="flex align-items-start justify-content-between">
+            <div class="flex align-items-center gap-3">
+              <!-- Status Indicator -->
+              <div
+                class="status-indicator"
+                :style="{ backgroundColor: getStatusColor(runner.status) }"
+              ></div>
+
+              <!-- Runner Info -->
+              <div>
+                <div class="flex align-items-center gap-2 mb-1">
+                  <span class="font-semibold text-lg">{{ runner.name }}</span>
+                </div>
+                <Tag
+                  :value="getStatusDisplayName(runner.status)"
+                  :severity="getStatusSeverity(runner.status)"
+                  class="mt-1"
+                />
+              </div>
+            </div>
+
+            <!-- Actions Menu -->
+            <Button
+              v-tooltip.top="'Delete runner'"
+              icon="pi pi-trash"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              @click="confirmDelete(runner)"
+            />
+          </div>
+
+          <!-- Connection ID -->
+          <div v-if="runner.connectionId" class="mt-3 pt-3 border-top-1 surface-border">
+            <div class="text-color-secondary text-sm mb-1">Connection ID</div>
+            <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
+          </div>
+        </template>
+      </Card>
+    </div>
+
+    <!-- List View -->
+    <Card v-else>
       <template #content>
         <DataTable
           :value="runners"
@@ -190,17 +284,6 @@ onMounted(() => {
           :rows="10"
           striped-rows
         >
-          <template #empty>
-            <div class="text-center py-6">
-              <i class="pi pi-server text-5xl text-color-secondary mb-3" style="display: block"></i>
-              <h3 class="mt-0 mb-2">No runners registered</h3>
-              <p class="text-color-secondary mt-0 mb-4">
-                Deploy a runner to start executing your workflows remotely.
-              </p>
-              <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
-            </div>
-          </template>
-
           <Column field="name" header="Name" :sortable="true">
             <template #body="{ data }">
               <div class="flex align-items-center gap-2">
@@ -396,6 +479,38 @@ onMounted(() => {
 
 :global(.app-dark) .stat-icon-info {
   background-color: color-mix(in srgb, var(--p-blue-500) 20%, transparent);
+}
+
+/* View Toggle */
+.view-toggle {
+  flex-shrink: 0;
+}
+
+/* Grid View */
+.runners-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.runner-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.runner-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+:global(.app-dark) .runner-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .connection-id {
