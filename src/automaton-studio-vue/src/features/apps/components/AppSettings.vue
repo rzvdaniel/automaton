@@ -336,14 +336,14 @@ async function removeImage() {
               </div>
 
               <div class="flex flex-column gap-2">
-                <label for="app-display-name" class="font-medium">Display Name</label>
+                <label for="app-display-name" class="font-medium">Summary</label>
                 <InputText
                   id="app-display-name"
                   v-model="displayName"
-                  placeholder="Enter display name"
+                  placeholder="Brief summary of the app"
                   class="w-full"
                 />
-                <small class="text-color-secondary">Shown on app cards and headers</small>
+                <small class="text-color-secondary">Brief description shown on app cards (recommended)</small>
               </div>
 
               <div class="flex flex-column gap-2">
@@ -352,11 +352,11 @@ async function removeImage() {
                   id="app-description"
                   v-model="description"
                   rows="3"
-                  placeholder="Describe what this app does..."
+                  placeholder="Full description of what this app does..."
                   class="w-full"
                   :maxlength="500"
                 />
-                <small class="text-color-secondary">{{ description.length }}/500 characters</small>
+                <small class="text-color-secondary">Full description shown in app details • {{ description.length }}/500 characters</small>
               </div>
 
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">

@@ -20,7 +20,7 @@ export interface PublicUserProfile {
 export interface PublicAppCard {
   id: string
   name: string
-  displayName?: string
+  summary?: string
   description?: string
   thumbnailUrl?: string
   category?: string

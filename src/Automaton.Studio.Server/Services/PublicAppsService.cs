@@ -73,7 +73,7 @@ public class PublicAppsService
             {
                 Id = w.Id,
                 Name = w.Name,
-                DisplayName = w.DisplayName,
+                Summary = w.DisplayName,
                 Description = w.Description,
                 ThumbnailUrl = w.ThumbnailUrl,
                 Category = w.Category,
@@ -109,7 +109,7 @@ public class PublicAppsService
             {
                 Id = w.Id,
                 Name = w.Name,
-                DisplayName = w.DisplayName,
+                Summary = w.DisplayName,
                 Description = w.Description,
                 ThumbnailUrl = w.ThumbnailUrl,
                 Category = w.Category,
@@ -150,7 +150,7 @@ public class PublicAppCard
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string? DisplayName { get; set; }
+    public string? Summary { get; set; }
     public string? Description { get; set; }
     public string? ThumbnailUrl { get; set; }
     public string? Category { get; set; }

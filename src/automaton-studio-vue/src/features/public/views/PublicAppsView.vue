@@ -5,13 +5,17 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
+import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
+import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
 import PublicUserHeader from '../components/PublicUserHeader.vue'
 import PublicAppCard from '../components/PublicAppCard.vue'
 import { publicAppsService } from '../services/publicApps.service'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { PublicUserProfile, PublicAppCard as AppCardType } from '../types/publicApps.types'
 import { formatPublishedDate, parseTags } from '../types/publicApps.types'
 
 const route = useRoute()
+const authStore = useAuthStore()
 
 // State
 const loading = ref(true)
@@ -81,8 +85,8 @@ onMounted(() => {
 
 <template>
   <div class="public-apps-view">
-    <!-- Public Header (Minimal) -->
-    <header class="public-header">
+    <!-- Public Header (Hidden when authenticated) -->
+    <header v-if="!authStore.isAuthenticated" class="public-header">
       <div class="header-inner">
         <router-link to="/" class="logo">
           <span class="logo-text">Automaton</span>
@@ -159,63 +163,71 @@ onMounted(() => {
       </div>
     </footer>
 
-    <!-- App Details Dialog -->
+    <!-- App Details Dialog - Netflix Style -->
     <Dialog
       v-model:visible="showDetailsDialog"
-      :header="selectedApp?.displayName || selectedApp?.name || 'App Details'"
       modal
-      :style="{ width: '500px' }"
+      :style="{ width: '90vw', maxWidth: '900px' }"
+      :closable="true"
+      :header="null"
+      class="netflix-dialog"
     >
-      <div v-if="selectedApp" class="app-details">
-        <!-- Thumbnail -->
-        <div v-if="selectedApp.thumbnailUrl" class="details-thumbnail">
-          <img :src="fullThumbnailUrl" :alt="selectedApp.name" />
-        </div>
+      <template #container="{ closeCallback }">
+        <div class="netflix-modal-content">
+          <button class="modal-close-btn" @click="closeCallback">
+            <i class="pi pi-times"></i>
+          </button>
 
-        <!-- Description -->
-        <div class="details-section">
-          <h4>Description</h4>
-          <p v-if="selectedApp.description">{{ selectedApp.description }}</p>
-          <p v-else class="text-muted">No description provided</p>
-        </div>
+          <div v-if="selectedApp" class="modal-body">
+            <!-- Thumbnail -->
+            <div v-if="selectedApp.thumbnailUrl" class="modal-thumbnail">
+              <img :src="fullThumbnailUrl" :alt="selectedApp.name" />
+            </div>
 
-        <!-- Category & Tags -->
-        <div v-if="selectedApp.category || (selectedApp as any).tags" class="details-section">
-          <h4>Category & Tags</h4>
-          <div class="tags-row">
-            <Tag v-if="selectedApp.category" :value="selectedApp.category" severity="info" />
-            <Tag
-              v-for="tag in parseTags((selectedApp as any).tags)"
-              :key="tag"
-              :value="tag"
-              severity="secondary"
-            />
+            <!-- Content -->
+            <div class="modal-content">
+              <!-- Title & Actions -->
+              <div class="modal-header">
+                <div>
+                  <h2 class="modal-title">{{ selectedApp.name }}</h2>
+                  <div class="modal-meta">
+                    <span v-if="selectedApp.category" class="meta-category">
+                      {{ selectedApp.category }}
+                    </span>
+                    <span class="meta-views">
+                      <i class="pi pi-eye"></i>
+                      {{ selectedApp.viewCount }} views
+                    </span>
+                    <span v-if="selectedApp.publishedAt" class="meta-date">
+                      <i class="pi pi-calendar"></i>
+                      {{ formatPublishedDate(selectedApp.publishedAt) }}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  icon="pi pi-play"
+                  class="modal-play-btn"
+                  @click="selectedApp && openApp(selectedApp)"
+                />
+              </div>
+
+              <!-- Description -->
+              <div v-if="selectedApp.description" class="modal-description">
+                <p>{{ selectedApp.description }}</p>
+              </div>
+
+              <!-- Tags -->
+              <div v-if="(selectedApp as any).tags" class="modal-tags">
+                <Tag
+                  v-for="tag in parseTags((selectedApp as any).tags)"
+                  :key="tag"
+                  :value="tag"
+                  severity="secondary"
+                />
+              </div>
+            </div>
           </div>
         </div>
-
-        <!-- Stats -->
-        <div class="details-section">
-          <h4>Statistics</h4>
-          <div class="stats-row">
-            <div class="stat-item">
-              <i class="pi pi-eye"></i>
-              <span>{{ selectedApp.viewCount }} views</span>
-            </div>
-            <div v-if="selectedApp.publishedAt" class="stat-item">
-              <i class="pi pi-calendar"></i>
-              <span>Published {{ formatPublishedDate(selectedApp.publishedAt) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <Button label="Close" text @click="showDetailsDialog = false" />
-        <Button
-          label="Open App"
-          icon="pi pi-external-link"
-          @click="selectedApp && openApp(selectedApp)"
-        />
       </template>
     </Dialog>
   </div>
@@ -315,7 +327,7 @@ onMounted(() => {
 
 /* Apps Section */
 .apps-section {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 1.5rem;
 }
@@ -353,11 +365,12 @@ onMounted(() => {
   margin: 0;
 }
 
-/* Apps Grid */
+/* Apps Grid - Netflix Style */
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
+  gap: 1.5rem 1rem;
+  padding-bottom: 1rem;
 }
 
 /* Footer */
@@ -393,71 +406,177 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* App Details Dialog */
-.app-details {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+/* Netflix Modal Dialog */
+:global(.netflix-dialog .p-dialog) {
+  border-radius: 8px;
 }
 
-.details-thumbnail {
+:global(.netflix-dialog .p-dialog-mask) {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.netflix-modal-content {
+  position: relative;
+  background: var(--p-surface-card);
   border-radius: 8px;
   overflow: hidden;
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
-.details-thumbnail img {
+:global(.app-dark) .netflix-modal-content {
+  background: var(--p-surface-800);
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.modal-thumbnail {
   width: 100%;
-  height: 200px;
+  height: 300px;
+  overflow: hidden;
+  background: var(--p-surface-700);
+}
+
+.modal-thumbnail img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
-.details-section h4 {
+.modal-content {
+  padding: 2rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.modal-title {
   margin: 0 0 0.5rem 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.details-section p {
-  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
   color: var(--p-text-color);
-  line-height: 1.5;
+  line-height: 1.2;
 }
 
-.text-muted {
-  color: var(--p-text-muted-color);
-  font-style: italic;
-}
-
-.tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.stats-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-}
-
-.stat-item {
+.modal-meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--p-text-muted-color);
+  gap: 1.5rem;
   font-size: 0.9rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.stat-item i {
-  color: var(--p-primary-500);
+.meta-category {
+  background: var(--p-primary-500);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.meta-views,
+.meta-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.modal-play-btn {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.modal-description {
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  color: var(--p-text-color);
+}
+
+.modal-description p {
+  margin: 0;
+}
+
+.modal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .apps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  :global(.netflix-dialog .p-dialog) {
+    width: 95vw !important;
+  }
+
+  .modal-header {
+    flex-direction: column;
+  }
+
+  .modal-thumbnail {
+    height: 200px;
+  }
+
+  .modal-content {
+    padding: 1.5rem;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+  }
 }
 
 @media (max-width: 600px) {
   .apps-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem 0.75rem;
+  }
+
+  .modal-meta {
+    gap: 0.75rem;
+    font-size: 0.8rem;
   }
 }
 </style>

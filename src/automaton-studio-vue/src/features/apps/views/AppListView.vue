@@ -186,9 +186,9 @@ const openCreateDialog = () => {
   showCreateDialog.value = true
 }
 
-const goToPublicProfile = () => {
+const viewPublicApps = () => {
   if (authStore.publicUsername) {
-    router.push(`/${authStore.publicUsername}`)
+    window.open(`/${authStore.publicUsername}`, '_blank')
   } else {
     toast.add({
       severity: 'warn',
@@ -282,7 +282,7 @@ const handleRetry = async () => {
           label="View Public Apps"
           icon="pi pi-external-link"
           outlined
-          @click="goToPublicProfile"
+          @click="viewPublicApps"
         />
         <Button label="New App" icon="pi pi-plus" @click="openCreateDialog" />
       </div>
