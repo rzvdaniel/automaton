@@ -16,19 +16,22 @@ public class InvitationsController : ControllerBase
     private readonly UserManager<ApplicationUser> userManager;
     private readonly SignInManager<ApplicationUser> signInManager;
     private readonly UserContextService userContextService;
+    private readonly UsersService usersService;
 
     public InvitationsController(
         InvitationTokenService invitationService,
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        UsersService usersService)
     {
         this.invitationService = invitationService;
         this.db = db;
         this.userManager = userManager;
         this.signInManager = signInManager;
         this.userContextService = userContextService;
+        this.usersService = usersService;
     }
 
     [HttpGet("validate/{token}")]
@@ -124,11 +127,15 @@ public class InvitationsController : ControllerBase
 
         if (user == null)
         {
+            var displayName = string.IsNullOrWhiteSpace(request.Name) ? invite.Email : request.Name;
+            var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(displayName);
+
             user = new ApplicationUser
             {
                 UserName = invite.Email,
                 Email = invite.Email,
-                Name = string.IsNullOrWhiteSpace(request.Name) ? invite.Email : request.Name,
+                Name = displayName,
+                PublicUsername = publicUsername,
                 EmailConfirmed = true,
                 IsEnterpriseEnabled = true
             };

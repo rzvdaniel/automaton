@@ -21,12 +21,12 @@ public class PublicAppsService
     }
 
     /// <summary>
-    /// Get public profile for a user by username
+    /// Get public profile for a user by public username
     /// </summary>
-    public async Task<PublicUserProfile?> GetPublicProfileAsync(string username)
+    public async Task<PublicUserProfile?> GetPublicProfileAsync(string publicUsername)
     {
         var user = await dataContext.Users
-            .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower() == username.ToLower());
+            .FirstOrDefaultAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
 
         if (user == null)
         {
@@ -42,7 +42,7 @@ public class PublicAppsService
 
         return new PublicUserProfile
         {
-            Username = user.UserName ?? string.Empty,
+            Username = user.PublicUsername ?? string.Empty,
             DisplayName = !string.IsNullOrEmpty(user.DisplayName) ? user.DisplayName : user.Name,
             AvatarUrl = user.AvatarUrl,
             Bio = user.Bio,
@@ -51,12 +51,12 @@ public class PublicAppsService
     }
 
     /// <summary>
-    /// Get all public (published) apps for a user by username
+    /// Get all public (published) apps for a user by public username
     /// </summary>
-    public async Task<List<PublicAppCard>> GetPublicAppsAsync(string username)
+    public async Task<List<PublicAppCard>> GetPublicAppsAsync(string publicUsername)
     {
         var user = await dataContext.Users
-            .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower() == username.ToLower());
+            .FirstOrDefaultAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
 
         if (user == null)
         {
@@ -91,10 +91,10 @@ public class PublicAppsService
     /// <summary>
     /// Get details of a specific public app
     /// </summary>
-    public async Task<PublicAppDetails?> GetPublicAppDetailsAsync(string username, Guid appId)
+    public async Task<PublicAppDetails?> GetPublicAppDetailsAsync(string publicUsername, Guid appId)
     {
         var user = await dataContext.Users
-            .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower() == username.ToLower());
+            .FirstOrDefaultAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
 
         if (user == null)
         {

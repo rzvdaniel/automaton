@@ -22,6 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userName = computed(() => user.value?.name ?? '')
   const userEmail = computed(() => user.value?.email ?? '')
   const userId = computed(() => user.value?.id ?? '')
+  const publicUsername = computed(() => user.value?.publicUsername ?? '')
 
   // Actions
   async function login(request: LoginRequest): Promise<void> {
@@ -115,6 +116,12 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  function setPublicUsername(newPublicUsername: string): void {
+    if (user.value) {
+      user.value.publicUsername = newPublicUsername
+    }
+  }
+
   // Helper to extract error message
   function getErrorMessage(err: unknown): string {
     if (err && typeof err === 'object') {
@@ -156,6 +163,7 @@ export const useAuthStore = defineStore('auth', () => {
     userName,
     userEmail,
     userId,
+    publicUsername,
     // Actions
     login,
     register,
@@ -163,5 +171,6 @@ export const useAuthStore = defineStore('auth', () => {
     initialize,
     fetchUserProfile,
     clearError,
+    setPublicUsername,
   }
 })

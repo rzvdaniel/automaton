@@ -2,6 +2,7 @@
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -63,6 +64,22 @@ public class UsersService
         if (!result.Succeeded)
         {
             throw new Exception("Error in updating Profile!");
+        }
+    }
+
+    /// <summary>
+    /// Update user's public username
+    /// </summary>
+    public async Task UpdatePublicUsernameAsync(Guid userId, string newPublicUsername)
+    {
+        var user = await GetUserById(userId);
+        user.PublicUsername = newPublicUsername;
+
+        var result = await _userManager.UpdateAsync(user);
+
+        if (!result.Succeeded)
+        {
+            throw new Exception("Error in updating public username!");
         }
     }
 
@@ -192,5 +209,95 @@ public class UsersService
         {
             throw new Exception("Error in Removing Role!");
         }
+    }
+
+    /// <summary>
+    /// Generate a unique public username from user's display name
+    /// </summary>
+    public async Task<string> GenerateUniquePublicUsernameAsync(string displayName)
+    {
+        // Convert display name to URL-safe slug
+        var slug = ConvertToSlug(displayName);
+        
+        // Check if slug is unique, if not append numbers
+        var publicUsername = slug;
+        var counter = 1;
+        
+        while (await _userManager.Users.AnyAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower()))
+        {
+            publicUsername = $"{slug}{counter}";
+            counter++;
+        }
+        
+        return publicUsername;
+    }
+
+    /// <summary>
+    /// Check if a public username is available (not already taken)
+    /// </summary>
+    public async Task<bool> IsPublicUsernameAvailableAsync(string publicUsername)
+    {
+        if (string.IsNullOrWhiteSpace(publicUsername))
+            return false;
+
+        // Validate format
+        if (!IsValidPublicUsername(publicUsername))
+            return false;
+
+        // Check if already in use
+        return !await _userManager.Users.AnyAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
+    }
+
+    /// <summary>
+    /// Validate public username format
+    /// </summary>
+    public bool IsValidPublicUsername(string publicUsername)
+    {
+        if (string.IsNullOrWhiteSpace(publicUsername))
+            return false;
+
+        if (publicUsername.Length < 3 || publicUsername.Length > 32)
+            return false;
+
+        // Must match pattern: alphanumeric, hyphens, underscores only
+        return Regex.IsMatch(publicUsername, @"^[a-zA-Z0-9_\-]+$");
+    }
+
+    /// <summary>
+    /// Convert display name to URL-safe slug
+    /// </summary>
+    private string ConvertToSlug(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return "user";
+
+        // Convert to lowercase
+        var slug = input.ToLowerInvariant();
+
+        // Remove accents
+        var bytes = System.Text.Encoding.GetEncoding("Cyrillic").GetBytes(slug);
+        slug = System.Text.Encoding.ASCII.GetString(bytes);
+
+        // Remove invalid characters
+        slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "");
+
+        // Replace spaces with hyphens
+        slug = Regex.Replace(slug, @"\s+", "-");
+
+        // Remove multiple consecutive hyphens
+        slug = Regex.Replace(slug, @"-+", "-");
+
+        // Trim hyphens from start and end
+        slug = slug.Trim('-', '_');
+
+        // Ensure it's not empty
+        if (string.IsNullOrWhiteSpace(slug))
+            slug = "user";
+
+        // Limit to 32 characters for URL safety
+        if (slug.Length > 32)
+            slug = slug.Substring(0, 32).TrimEnd('-', '_');
+
+        return slug;
     }
 }

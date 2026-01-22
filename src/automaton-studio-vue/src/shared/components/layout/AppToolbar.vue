@@ -41,29 +41,44 @@ const pageTitle = computed(() => {
 const userDisplayName = computed(() => authStore.userName || authStore.userEmail || 'User')
 
 // User menu items
-const userMenuItems = computed<MenuItem[]>(() => [
-  {
-    label: userDisplayName.value,
-    disabled: true,
-    class: 'font-bold',
-  },
-  {
-    separator: true,
-  },
-  {
-    label: 'Settings',
-    icon: 'pi pi-cog',
-    command: () => router.push('/settings'),
-  },
-  {
-    separator: true,
-  },
-  {
-    label: 'Logout',
-    icon: 'pi pi-sign-out',
-    command: handleLogout,
-  },
-])
+const userMenuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = [
+    {
+      label: userDisplayName.value,
+      disabled: true,
+      class: 'font-bold',
+    },
+    {
+      separator: true,
+    },
+    {
+      label: 'View Profile',
+      icon: 'pi pi-external-link',
+      command: () => {
+        if (authStore.publicUsername) {
+          router.push(`/${authStore.publicUsername}`)
+        } else {
+          router.push('/settings')
+        }
+      },
+    },
+    {
+      label: 'Settings',
+      icon: 'pi pi-cog',
+      command: () => router.push('/settings'),
+    },
+    {
+      separator: true,
+    },
+    {
+      label: 'Logout',
+      icon: 'pi pi-sign-out',
+      command: handleLogout,
+    },
+  ]
+
+  return items
+})
 
 // Toggle user menu
 function toggleUserMenu(event: Event) {

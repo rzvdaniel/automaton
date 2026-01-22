@@ -23,6 +23,7 @@ public class ProjectMemberService
     private readonly Serilog.ILogger logger;
     private readonly InvitationTokenService invitationService;
     private readonly ConfigurationService configurationService;
+    private readonly UsersService usersService;
 
     private Guid UserId => userContextService.GetUserId();
 
@@ -32,7 +33,8 @@ public class ProjectMemberService
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         InvitationTokenService invitationService,
-        ConfigurationService configurationService)
+        ConfigurationService configurationService,
+        UsersService usersService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
@@ -40,6 +42,7 @@ public class ProjectMemberService
         this.emailService = emailService;
         this.invitationService = invitationService;
         this.configurationService = configurationService;
+        this.usersService = usersService;
         this.logger = Serilog.Log.ForContext<ProjectMemberService>();
     }
 
@@ -114,11 +117,15 @@ public class ProjectMemberService
                 throw new InvalidOperationException($"User with email '{request.Email}' does not exist and account creation is disabled");
             }
 
+            // Generate unique public username from email
+            var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(request.Email);
+
             // Create new user account
             user = new ApplicationUser
             {
                 UserName = request.Email,
                 Email = request.Email,
+                PublicUsername = publicUsername,
                 EmailConfirmed = false,
                 IsEnterpriseEnabled = true // Enable enterprise features for invited users
             };

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -7,7 +7,9 @@ import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
+import Tag from 'primevue/tag'
 import { useAuth } from '../composables/useAuth'
+import { authService } from '../services/auth.service'
 import type { RegisterFormErrors } from '../types/auth.types'
 
 const { register, isLoading, error, clearError } = useAuth()
@@ -18,9 +20,63 @@ const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const publicUsername = ref('')
 const agreeTerms = ref(false)
 const formErrors = ref<RegisterFormErrors>({})
 const submitted = ref(false)
+const checkingUsername = ref(false)
+const usernameAvailable = ref<boolean | null>(null)
+
+// Auto-generate public username from display name
+function generatePublicUsername(displayName: string): string {
+  // Convert to lowercase
+  let slug = displayName.toLowerCase()
+  // Remove accents and special chars
+  slug = slug.replace(/[^\w\s-]/g, '')
+  // Replace spaces with hyphens
+  slug = slug.replace(/\s+/g, '-')
+  // Remove multiple hyphens
+  slug = slug.replace(/-+/g, '-')
+  // Trim hyphens
+  slug = slug.replace(/^-+|-+$/g, '')
+  // Limit length
+  if (slug.length > 32) slug = slug.substring(0, 32)
+  return slug || 'user'
+}
+
+// Check username availability
+async function checkUsernameAvailability() {
+  if (!publicUsername.value || publicUsername.value.length < 3) {
+    usernameAvailable.value = null
+    return
+  }
+
+  checkingUsername.value = true
+  try {
+    usernameAvailable.value = await authService.checkPublicUsernameAvailable(publicUsername.value)
+  } catch {
+    usernameAvailable.value = null
+  } finally {
+    checkingUsername.value = false
+  }
+}
+
+// Computed for username availability status
+const usernameStatus = computed(() => {
+  if (!publicUsername.value) return null
+  if (checkingUsername.value) return 'checking'
+  return usernameAvailable.value ? 'available' : 'taken'
+})
+
+// Handle name input - auto-generate username
+function handleNameInput() {
+  if (!submitted.value || !publicUsername.value) {
+    // Auto-generate if not yet submitted or user hasn't set custom username
+    const suggested = generatePublicUsername(name.value)
+    publicUsername.value = suggested
+    checkUsernameAvailability()
+  }
+}
 
 // Form validation
 function validateForm(): boolean {
@@ -66,6 +122,21 @@ function validateForm(): boolean {
     isValid = false
   }
 
+  // Public username validation
+  if (!publicUsername.value) {
+    formErrors.value.publicUsername = 'Public username is required'
+    isValid = false
+  } else if (publicUsername.value.length < 3 || publicUsername.value.length > 32) {
+    formErrors.value.publicUsername = 'Public username must be 3-32 characters'
+    isValid = false
+  } else if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
+    formErrors.value.publicUsername = 'Public username can only contain letters, numbers, hyphens, and underscores'
+    isValid = false
+  } else if (!usernameAvailable.value) {
+    formErrors.value.publicUsername = 'This public username is already taken'
+    isValid = false
+  }
+
   // Terms validation
   if (!agreeTerms.value) {
     formErrors.value.terms = 'You must agree to the Terms of Service'
@@ -88,6 +159,7 @@ async function handleSubmit() {
     name: name.value,
     email: email.value,
     password: password.value,
+    publicUsername: publicUsername.value,
   })
 
   if (success) {
@@ -100,6 +172,7 @@ async function handleSubmit() {
 function hasError(field: keyof RegisterFormErrors): boolean {
   return submitted.value && !!formErrors.value[field]
 }
+
 </script>
 
 <template>
@@ -129,7 +202,8 @@ function hasError(field: keyof RegisterFormErrors): boolean {
               class="w-full"
               :invalid="hasError('name')"
               :disabled="isLoading"
-              @input="clearError"
+              @input="handleNameInput"
+              @blur="clearError"
             />
             <small v-if="hasError('name')" class="text-red-500">
               {{ formErrors.name }}
@@ -150,6 +224,46 @@ function hasError(field: keyof RegisterFormErrors): boolean {
             />
             <small v-if="hasError('email')" class="text-red-500">
               {{ formErrors.email }}
+            </small>
+          </div>
+
+          <div class="flex flex-column gap-2">
+            <div class="flex align-items-center justify-content-between">
+              <label for="publicUsername" class="font-medium">Public Username</label>
+              <Tag 
+                v-if="usernameStatus === 'available'" 
+                severity="success" 
+                value="Available" 
+                class="text-xs"
+              />
+              <Tag 
+                v-else-if="usernameStatus === 'taken'" 
+                severity="danger" 
+                value="Taken" 
+                class="text-xs"
+              />
+              <Tag 
+                v-else-if="usernameStatus === 'checking'" 
+                severity="info" 
+                value="Checking..." 
+                class="text-xs"
+              />
+            </div>
+            <InputText
+              id="publicUsername"
+              v-model="publicUsername"
+              placeholder="Your public profile URL"
+              class="w-full"
+              :invalid="hasError('publicUsername')"
+              :disabled="isLoading"
+              @input="checkUsernameAvailability"
+              @blur="checkUsernameAvailability"
+            />
+            <small class="text-color-secondary text-xs">
+              3-32 characters. Letters, numbers, hyphens, and underscores only.
+            </small>
+            <small v-if="hasError('publicUsername')" class="text-red-500">
+              {{ formErrors.publicUsername }}
             </small>
           </div>
 

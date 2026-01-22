@@ -15,7 +15,8 @@ public class InstallService
     IEmailService emailService,
     ConfigurationService configurationService,
     ApplicationDbContext dbContext,
-    ILogger<InstallService> logger
+    ILogger<InstallService> logger,
+    UsersService usersService
 )
 {    
     public async Task Install(InstallCommand systemAdminConfig, CancellationToken cancellationToken)
@@ -92,11 +93,13 @@ public class InstallService
             throw new Exception($"User with email address {systemAdminConfig.Email} already registered");
         }
 
+        var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(systemAdminConfig.Name);
         var newUser = new ApplicationUser
         {
             UserName = systemAdminConfig.Email,
             Email = systemAdminConfig.Email,
             Name = systemAdminConfig.Name,
+            PublicUsername = publicUsername
         };
 
         var result = await userManager.CreateAsync(newUser, systemAdminConfig.Password);

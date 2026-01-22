@@ -7,4 +7,6 @@ public class UserDetails
     public string Name { get; set; }
 
     public string Email { get; set; }
+
+    public string? PublicUsername { get; set; }
 }

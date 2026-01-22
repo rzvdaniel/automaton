@@ -26,30 +26,30 @@ public class PublicAppsController : ControllerBase
 
     /// <summary>
     /// Get public profile and apps for a user.
-    /// Route: GET /api/public/{username}/apps
+    /// Route: GET /api/public/{publicUsername}/apps
     /// </summary>
-    [HttpGet("{username}/apps")]
-    public async Task<ActionResult<PublicAppsResponse>> GetUserPublicApps(string username)
+    [HttpGet("{publicUsername}/apps")]
+    public async Task<ActionResult<PublicAppsResponse>> GetUserPublicApps(string publicUsername)
     {
         try
         {
-            logger.LogInformation("[PublicAppsController] Fetching public apps for user: {Username}", username);
+            logger.LogInformation("[PublicAppsController] Fetching public apps for user: {PublicUsername}", publicUsername);
 
             // Validate username format (prevent injection)
-            if (string.IsNullOrWhiteSpace(username) || username.Length > 50 || !IsValidUsername(username))
+            if (string.IsNullOrWhiteSpace(publicUsername) || publicUsername.Length > 50 || !IsValidUsername(publicUsername))
             {
                 return BadRequest(new { message = "Invalid username format" });
             }
 
-            var profile = await publicAppsService.GetPublicProfileAsync(username);
+            var profile = await publicAppsService.GetPublicProfileAsync(publicUsername);
 
             if (profile == null)
             {
-                logger.LogWarning("[PublicAppsController] User not found: {Username}", username);
+                logger.LogWarning("[PublicAppsController] User not found: {PublicUsername}", publicUsername);
                 return NotFound(new { message = "User not found" });
             }
 
-            var apps = await publicAppsService.GetPublicAppsAsync(username);
+            var apps = await publicAppsService.GetPublicAppsAsync(publicUsername);
 
             var response = new PublicAppsResponse
             {
@@ -57,34 +57,34 @@ public class PublicAppsController : ControllerBase
                 Apps = apps
             };
 
-            logger.LogInformation("[PublicAppsController] Returning {AppCount} public apps for user: {Username}",
-                apps.Count, username);
+            logger.LogInformation("[PublicAppsController] Returning {AppCount} public apps for user: {PublicUsername}",
+                apps.Count, publicUsername);
 
             return Ok(response);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[PublicAppsController] Error fetching public apps for user: {Username}", username);
+            logger.LogError(ex, "[PublicAppsController] Error fetching public apps for user: {PublicUsername}", publicUsername);
             return StatusCode(500, new { message = "An error occurred while fetching apps" });
         }
     }
 
     /// <summary>
     /// Get public profile for a user.
-    /// Route: GET /api/public/{username}/profile
+    /// Route: GET /api/public/{publicUsername}/profile
     /// </summary>
-    [HttpGet("{username}/profile")]
-    public async Task<ActionResult<PublicUserProfile>> GetUserProfile(string username)
+    [HttpGet("{publicUsername}/profile")]
+    public async Task<ActionResult<PublicUserProfile>> GetUserProfile(string publicUsername)
     {
         try
         {
             // Validate username format
-            if (string.IsNullOrWhiteSpace(username) || username.Length > 50 || !IsValidUsername(username))
+            if (string.IsNullOrWhiteSpace(publicUsername) || publicUsername.Length > 50 || !IsValidUsername(publicUsername))
             {
                 return BadRequest(new { message = "Invalid username format" });
             }
 
-            var profile = await publicAppsService.GetPublicProfileAsync(username);
+            var profile = await publicAppsService.GetPublicProfileAsync(publicUsername);
 
             if (profile == null)
             {
@@ -95,27 +95,27 @@ public class PublicAppsController : ControllerBase
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[PublicAppsController] Error fetching profile for user: {Username}", username);
+            logger.LogError(ex, "[PublicAppsController] Error fetching profile for user: {PublicUsername}", publicUsername);
             return StatusCode(500, new { message = "An error occurred while fetching profile" });
         }
     }
 
     /// <summary>
     /// Get details of a specific public app.
-    /// Route: GET /api/public/{username}/apps/{appId}
+    /// Route: GET /api/public/{publicUsername}/apps/{appId}
     /// </summary>
-    [HttpGet("{username}/apps/{appId:guid}")]
-    public async Task<ActionResult<PublicAppDetails>> GetPublicAppDetails(string username, Guid appId)
+    [HttpGet("{publicUsername}/apps/{appId:guid}")]
+    public async Task<ActionResult<PublicAppDetails>> GetPublicAppDetails(string publicUsername, Guid appId)
     {
         try
         {
             // Validate username format
-            if (string.IsNullOrWhiteSpace(username) || username.Length > 50 || !IsValidUsername(username))
+            if (string.IsNullOrWhiteSpace(publicUsername) || publicUsername.Length > 50 || !IsValidUsername(publicUsername))
             {
                 return BadRequest(new { message = "Invalid username format" });
             }
 
-            var app = await publicAppsService.GetPublicAppDetailsAsync(username, appId);
+            var app = await publicAppsService.GetPublicAppDetailsAsync(publicUsername, appId);
 
             if (app == null)
             {
@@ -126,19 +126,19 @@ public class PublicAppsController : ControllerBase
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[PublicAppsController] Error fetching app details: {AppId} for user: {Username}",
-                appId, username);
+            logger.LogError(ex, "[PublicAppsController] Error fetching app details: {AppId} for user: {PublicUsername}",
+                appId, publicUsername);
             return StatusCode(500, new { message = "An error occurred while fetching app details" });
         }
     }
 
     /// <summary>
-    /// Validate username format to prevent injection attacks
-    /// Allows alphanumeric, underscore, hyphen, period, and @ symbol (for email-based usernames)
+    /// Validate public username format to prevent injection attacks
+    /// Allows alphanumeric, hyphens, and underscores only (URL-safe)
     /// </summary>
     private static bool IsValidUsername(string username)
     {
-        // Allow alphanumeric, underscore, hyphen, period, and @ symbol
-        return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-\.@]+$");
+        // Allow alphanumeric, underscore, and hyphen (no @ symbol needed)
+        return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-]+$");
     }
 }

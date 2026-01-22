@@ -17,6 +17,7 @@ export interface RegisterRequest {
   name: string
   email: string
   password: string
+  publicUsername?: string
 }
 
 export interface RefreshTokenRequest {
@@ -35,6 +36,7 @@ export interface User {
   id: string
   name: string
   email: string
+  publicUsername: string
 }
 
 // Auth state
@@ -59,6 +61,7 @@ export interface RegisterFormErrors {
   email?: string
   password?: string
   confirmPassword?: string
+  publicUsername?: string
   terms?: string
 }
 

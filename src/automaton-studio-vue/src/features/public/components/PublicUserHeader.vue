@@ -1,11 +1,32 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Avatar from 'primevue/avatar'
+import Button from 'primevue/button'
 import type { PublicUserProfile } from '../types/publicApps.types'
 import { getInitials } from '../types/publicApps.types'
 
-defineProps<{
+const router = useRouter()
+const authStore = useAuthStore()
+
+const { profile } = defineProps<{
   profile: PublicUserProfile
 }>()
+
+// Check if authenticated user is viewing their own profile
+const isOwnProfile = () => {
+  return authStore.isAuthenticated && authStore.publicUsername === profile.username
+}
+
+// Navigate to dashboard
+const goToDashboard = () => {
+  router.push('/apps')
+}
+
+// Navigate to settings
+const goToSettings = () => {
+  router.push('/settings')
+}
 </script>
 
 <template>
@@ -27,14 +48,34 @@ defineProps<{
 
       <!-- User Info -->
       <div class="user-info">
-        <h1 class="user-name">{{ profile.displayName || profile.username }}</h1>
-        <p v-if="profile.displayName" class="user-username">@{{ profile.username }}</p>
-        <p v-if="profile.bio" class="user-bio">{{ profile.bio }}</p>
-        <div class="user-stats">
-          <span class="stat">
-            <i class="pi pi-box"></i>
-            <strong>{{ profile.publicAppCount }}</strong> public {{ profile.publicAppCount === 1 ? 'app' : 'apps' }}
-          </span>
+        <div class="user-info-top">
+          <div>
+            <h1 class="user-name">{{ profile.displayName || profile.username }}</h1>
+            <p v-if="profile.displayName" class="user-username">@{{ profile.username }}</p>
+            <p v-if="profile.bio" class="user-bio">{{ profile.bio }}</p>
+            <div class="user-stats">
+              <span class="stat">
+                <i class="pi pi-box"></i>
+                <strong>{{ profile.publicAppCount }}</strong> public {{ profile.publicAppCount === 1 ? 'app' : 'apps' }}
+              </span>
+            </div>
+          </div>
+          <!-- Action buttons for authenticated users viewing their own profile -->
+          <div v-if="isOwnProfile()" class="profile-actions">
+            <Button
+              size="small"
+              outlined
+              icon="pi pi-pencil"
+              @click="goToSettings"
+              title="Edit profile settings"
+            />
+            <Button
+              size="small"
+              icon="pi pi-home"
+              @click="goToDashboard"
+              title="Go to dashboard"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -80,6 +121,19 @@ defineProps<{
 .user-info {
   flex: 1;
   min-width: 0;
+}
+
+.user-info-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .user-name {

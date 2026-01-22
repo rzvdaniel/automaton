@@ -17,12 +17,14 @@ import InputIcon from 'primevue/inputicon'
 import AppCard from '../components/AppCard.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { App } from '../types/apps.types'
 
 const router = useRouter()
 const toast = useToast()
 const appsStore = useAppsStore()
+const authStore = useAuthStore()
 
 // AI generation state
 const aiDescription = ref('')
@@ -184,6 +186,20 @@ const openCreateDialog = () => {
   showCreateDialog.value = true
 }
 
+const goToPublicProfile = () => {
+  if (authStore.publicUsername) {
+    router.push(`/${authStore.publicUsername}`)
+  } else {
+    toast.add({
+      severity: 'warn',
+      summary: 'Profile not set',
+      detail: 'Set your public username in Settings to view your public apps.',
+      life: 4000,
+    })
+    router.push('/settings')
+  }
+}
+
 const openPublishDialog = (app: App) => {
   publishingApp.value = app
   publicUrl.value = app.publicUrl || generateSlug(app.name)
@@ -261,7 +277,15 @@ const handleRetry = async () => {
         <h1 class="text-3xl font-bold m-0">Apps</h1>
         <p class="text-color-secondary mt-1 mb-0">Build and publish web applications</p>
       </div>
-      <Button label="New App" icon="pi pi-plus" @click="openCreateDialog" />
+      <div class="flex gap-2">
+        <Button
+          label="View Public Apps"
+          icon="pi pi-external-link"
+          outlined
+          @click="goToPublicProfile"
+        />
+        <Button label="New App" icon="pi pi-plus" @click="openCreateDialog" />
+      </div>
     </div>
 
     <!-- AI Generation Input -->

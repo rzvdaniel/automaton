@@ -36,10 +36,10 @@ const fullThumbnailUrl = computed(() => {
 
 // Load data
 async function loadUserApps() {
-  const username = route.params.username as string
+  const publicUsername = route.params.publicUsername as string
 
-  if (!username) {
-    error.value = 'Invalid username'
+  if (!publicUsername) {
+    error.value = 'Invalid public username'
     loading.value = false
     return
   }
@@ -48,7 +48,7 @@ async function loadUserApps() {
   error.value = null
 
   try {
-    const response = await publicAppsService.getUserApps(username)
+    const response = await publicAppsService.getUserApps(publicUsername)
     profile.value = response.profile
     apps.value = response.apps
   } catch (err: unknown) {

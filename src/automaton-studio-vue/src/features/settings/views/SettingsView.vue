@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -8,6 +9,7 @@ import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
+import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -25,6 +27,7 @@ const {
   setFontSize,
 } = useUserSettings()
 const authStore = useAuthStore()
+const router = useRouter()
 const toast = useToast()
 
 const activeSection = ref('account')
@@ -32,15 +35,28 @@ const activeSection = ref('account')
 // Account settings - use actual user data
 const displayName = ref('')
 const email = ref('')
+const publicUsername = ref('')
+const originalPublicUsername = ref('')
+
+// Public username management
+const checkingUsername = ref(false)
+const usernameAvailable = ref<boolean | null>(null)
+const accountSaving = ref(false)
+const accountError = ref<string | null>(null)
+const accountSuccess = ref(false)
 
 // Local editor font size for input binding (synced from cached settings)
 const editorFontSize = ref(14)
 
-onMounted(() => {
+onMounted(async () => {
   // Load user data from store
   if (authStore.user) {
     displayName.value = authStore.user.name || ''
     email.value = authStore.user.email || ''
+    if (authStore.user.publicUsername) {
+      publicUsername.value = authStore.user.publicUsername
+      originalPublicUsername.value = authStore.user.publicUsername
+    }
   }
   // Sync local value from cached settings
   editorFontSize.value = fontSize.value
@@ -50,6 +66,107 @@ onMounted(() => {
 watch(fontSize, (newSize) => {
   editorFontSize.value = newSize
 })
+
+// Check username availability
+async function checkUsernameAvailability() {
+  if (publicUsername.value === originalPublicUsername.value || !publicUsername.value) {
+    usernameAvailable.value = null
+    return
+  }
+
+  if (publicUsername.value.length < 3) {
+    usernameAvailable.value = null
+    return
+  }
+
+  checkingUsername.value = true
+  try {
+    usernameAvailable.value = await authService.checkPublicUsernameAvailable(publicUsername.value)
+  } catch {
+    usernameAvailable.value = null
+  } finally {
+    checkingUsername.value = false
+  }
+}
+
+// Save account settings
+async function saveAccountSettings() {
+  accountError.value = null
+  accountSuccess.value = false
+
+  try {
+    // Validate public username if changed
+    if (publicUsername.value !== originalPublicUsername.value) {
+      if (!publicUsername.value || publicUsername.value.length < 3 || publicUsername.value.length > 32) {
+        accountError.value = 'Public username must be 3-32 characters'
+        return
+      }
+
+      if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
+        accountError.value = 'Public username can only contain letters, numbers, hyphens, and underscores'
+        return
+      }
+
+      if (!usernameAvailable.value) {
+        accountError.value = 'This public username is already taken'
+        return
+      }
+
+      // Update public username
+      accountSaving.value = true
+      await authService.updatePublicUsername(publicUsername.value)
+      authStore.setPublicUsername(publicUsername.value)
+      await authStore.fetchUserProfile()
+      originalPublicUsername.value = publicUsername.value
+    }
+
+    accountSuccess.value = true
+    toast.add({
+      severity: 'success',
+      summary: 'Settings Saved',
+      detail: 'Your account settings have been updated.',
+      life: 3000,
+    })
+  } catch (err: any) {
+    console.error('Failed to save account settings:', err)
+    // Try to extract ModelState errors from backend
+    let errorMsg = 'Failed to save account settings. Please try again.'
+    const response = err?.response?.data
+    if (response) {
+      // ASP.NET ModelState returns errors as { errors: { Field: [msg] } }
+      if (response.errors) {
+        // Prefer NewPublicUsername errors if present
+        if (response.errors.NewPublicUsername && response.errors.NewPublicUsername.length > 0) {
+          errorMsg = response.errors.NewPublicUsername[0]
+        } else {
+          // Fallback: first error message
+          const firstKey = Object.keys(response.errors)[0]
+          if (firstKey && response.errors[firstKey].length > 0) {
+            errorMsg = response.errors[firstKey][0]
+          }
+        }
+      } else if (response.message) {
+        errorMsg = response.message
+      }
+    }
+    accountError.value = errorMsg
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: errorMsg,
+      life: 5000,
+    })
+  } finally {
+    accountSaving.value = false
+  }
+}
+
+// Navigate to public profile
+function goToPublicProfile() {
+  if (publicUsername.value) {
+    router.push(`/${publicUsername.value}`)
+  }
+}
 
 // Theme settings
 const themeOptions = ref([
@@ -83,107 +200,91 @@ const showPasswordDialog = ref(false)
 const oldPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
-const passwordFormErrors = ref<ChangePasswordFormErrors>({})
-const passwordSubmitted = ref(false)
-const passwordLoading = ref(false)
-const passwordError = ref<string | null>(null)
+const passwordSaving = ref(false)
+const passwordError = ref<ChangePasswordFormErrors | null>(null)
 const passwordSuccess = ref(false)
-
-const handleThemeChange = (value: string) => {
-  if (value === 'light' || value === 'dark' || value === 'system') {
-    setTheme(value)
-  }
-}
-
-// Open password change dialog
-function openPasswordDialog() {
-  // Reset form state
-  oldPassword.value = ''
-  newPassword.value = ''
-  confirmPassword.value = ''
-  passwordFormErrors.value = {}
-  passwordSubmitted.value = false
-  passwordError.value = null
-  passwordSuccess.value = false
-  showPasswordDialog.value = true
-}
-
-// Validate password form
-function validatePasswordForm(): boolean {
-  passwordFormErrors.value = {}
-  let isValid = true
-
-  if (!oldPassword.value) {
-    passwordFormErrors.value.oldPassword = 'Current password is required'
-    isValid = false
-  }
-
-  if (!newPassword.value) {
-    passwordFormErrors.value.newPassword = 'New password is required'
-    isValid = false
-  } else if (newPassword.value.length < 6) {
-    passwordFormErrors.value.newPassword = 'Password must be at least 6 characters'
-    isValid = false
-  } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword.value)) {
-    passwordFormErrors.value.newPassword = 'Password must contain uppercase, lowercase, and number'
-    isValid = false
-  }
-
-  if (!confirmPassword.value) {
-    passwordFormErrors.value.confirmPassword = 'Please confirm your password'
-    isValid = false
-  } else if (newPassword.value !== confirmPassword.value) {
-    passwordFormErrors.value.confirmPassword = 'Passwords do not match'
-    isValid = false
-  }
-
-  return isValid
-}
-
-// Submit password change
-async function handlePasswordSubmit() {
-  passwordSubmitted.value = true
-  passwordError.value = null
-
-  if (!validatePasswordForm()) {
-    return
-  }
-
-  passwordLoading.value = true
-
-  try {
-    await authService.changePassword({
-      oldPassword: oldPassword.value,
-      newPassword: newPassword.value,
-    })
-    passwordSuccess.value = true
-    // Close dialog after 2 seconds
-    setTimeout(() => {
-      showPasswordDialog.value = false
-    }, 2000)
-  } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
-    if (axiosError.response?.status === 400 || axiosError.response?.status === 401) {
-      passwordError.value = 'Current password is incorrect'
-    } else if (axiosError.response?.data?.message) {
-      passwordError.value = axiosError.response.data.message
-    } else {
-      passwordError.value = 'Failed to change password. Please try again.'
-    }
-  } finally {
-    passwordLoading.value = false
-  }
-}
-
-// Check if field has error
-function hasPasswordError(field: keyof ChangePasswordFormErrors): boolean {
-  return passwordSubmitted.value && !!passwordFormErrors.value[field]
-}
 
 // Clear password error
 function clearPasswordError() {
   passwordError.value = null
 }
+
+// Open password change dialog
+function openPasswordDialog() {
+  showPasswordDialog.value = true
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordError.value = null
+  passwordSuccess.value = false
+}
+
+// Handle theme change
+async function handleThemeChange(newTheme: string) {
+  await setTheme(newTheme as 'light' | 'dark' | 'system')
+}
+
+// Handle password submission
+async function handlePasswordSubmit() {
+  passwordError.value = null
+  passwordSuccess.value = false
+
+  // Validate fields
+  const errors: ChangePasswordFormErrors = {}
+  if (!oldPassword.value) {
+    errors.oldPassword = 'Current password is required'
+  }
+  if (!newPassword.value || newPassword.value.length < 8) {
+    errors.newPassword = 'New password must be at least 8 characters'
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    errors.confirmPassword = 'Passwords do not match'
+  }
+
+  if (Object.keys(errors).length > 0) {
+    passwordError.value = errors
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await authService.changePassword({
+      oldPassword: oldPassword.value,
+      newPassword: newPassword.value,
+    })
+
+    passwordSuccess.value = true
+    toast.add({
+      severity: 'success',
+      summary: 'Password Changed',
+      detail: 'Your password has been updated successfully.',
+      life: 3000,
+    })
+
+    setTimeout(() => {
+      showPasswordDialog.value = false
+    }, 1500)
+  } catch (err: any) {
+    const response = err?.response?.data
+    if (response?.errors) {
+      passwordError.value = response.errors
+    } else {
+      passwordError.value = { oldPassword: response?.message || 'Failed to change password' }
+    }
+  } finally {
+    passwordSaving.value = false
+  }
+}
+
+// Check if password field has error
+function hasPasswordError(field: keyof ChangePasswordFormErrors): boolean {
+  return !!(passwordError.value && passwordError.value[field])
+}
+
+// Computed for password form errors (for template access)
+const passwordFormErrors = computed(() => passwordError.value || {})
+const passwordLoading = computed(() => passwordSaving.value)
+
 </script>
 
 <template>
@@ -255,6 +356,19 @@ function clearPasswordError() {
           <template #title>Account Settings</template>
           <template #content>
             <div class="flex flex-column gap-4">
+              <Message
+                v-if="accountError"
+                severity="error"
+                :closable="false"
+                class="mb-2"
+              >
+                {{ accountError }}
+              </Message>
+
+              <Message v-if="accountSuccess" severity="success" :closable="true" class="mb-2">
+                Settings saved successfully!
+              </Message>
+
               <div class="flex flex-column gap-2">
                 <label for="email" class="font-medium">Email</label>
                 <InputText id="email" v-model="email" class="w-full" disabled />
@@ -262,7 +376,55 @@ function clearPasswordError() {
 
               <div class="flex flex-column gap-2">
                 <label for="displayName" class="font-medium">Display Name</label>
-                <InputText id="displayName" v-model="displayName" class="w-full" />
+                <InputText id="displayName" v-model="displayName" class="w-full" disabled />
+                <small class="text-color-secondary">Contact support to change your display name</small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <div class="flex align-items-center justify-content-between">
+                  <label for="publicUsername" class="font-medium">Public Username</label>
+                  <Tag
+                    v-if="publicUsername !== originalPublicUsername && publicUsername.length >= 3 && usernameAvailable"
+                    severity="success"
+                    value="Available"
+                    class="text-xs"
+                  />
+                  <Tag
+                    v-else-if="publicUsername !== originalPublicUsername && publicUsername.length >= 3 && usernameAvailable === false"
+                    severity="danger"
+                    value="Taken"
+                    class="text-xs"
+                  />
+                  <Tag
+                    v-else-if="publicUsername !== originalPublicUsername && publicUsername.length >= 3 && checkingUsername"
+                    severity="info"
+                    value="Checking..."
+                    class="text-xs"
+                  />
+                </div>
+                <InputText
+                  id="publicUsername"
+                  v-model="publicUsername"
+                  placeholder="Your public profile URL"
+                  class="w-full"
+                  :disabled="accountSaving"
+                  @input="checkUsernameAvailability"
+                  @blur="checkUsernameAvailability"
+                />
+                <small class="text-color-secondary text-xs">
+                  Your public profile: https://automaton.monster/{{ publicUsername }}
+                </small>
+                <small v-if="publicUsername.length < 3 && publicUsername" class="text-orange-500 text-xs">
+                  At least 3 characters required
+                </small>
+                <Button
+                  v-if="publicUsername === originalPublicUsername"
+                  label="View Profile"
+                  text
+                  icon="pi pi-external-link"
+                  class="w-auto align-self-start p-0"
+                  @click="goToPublicProfile"
+                />
               </div>
 
               <div class="flex flex-column gap-2">
@@ -271,12 +433,18 @@ function clearPasswordError() {
                   label="Change Password"
                   outlined
                   class="w-auto align-self-start"
+                  :disabled="accountSaving"
                   @click="openPasswordDialog"
                 />
               </div>
 
-              <div class="flex justify-content-end">
-                <Button label="Save Changes" />
+              <div class="flex justify-content-end gap-2">
+                <Button
+                  label="Save Changes"
+                  :loading="accountSaving"
+                  :disabled="publicUsername === originalPublicUsername || accountSaving || (publicUsername !== originalPublicUsername && !usernameAvailable)"
+                  @click="saveAccountSettings"
+                />
               </div>
             </div>
           </template>

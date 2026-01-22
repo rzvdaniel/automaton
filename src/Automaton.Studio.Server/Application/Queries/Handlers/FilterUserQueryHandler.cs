@@ -25,7 +25,8 @@ namespace AuthServer.Application.Queries.Handlers
             {
                 Id = user.Id,
                 Name = user.Name,
-                Email = user.Email
+                Email = user.Email,
+                PublicUsername = user.PublicUsername
             });
         }
     }

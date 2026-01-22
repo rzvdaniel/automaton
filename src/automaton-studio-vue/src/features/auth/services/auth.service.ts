@@ -90,6 +90,25 @@ class AuthService {
   }
 
   /**
+   * Check if a public username is available
+   * GET /api/Account/IsPublicUsernameAvailable/{publicUsername}
+   */
+  async checkPublicUsernameAvailable(publicUsername: string): Promise<boolean> {
+    const { data } = await apiClient.get<boolean>(`/api/Account/IsPublicUsernameAvailable/${publicUsername}`)
+    return data
+  }
+
+  /**
+   * Update public username
+   * PUT /api/Account/UpdatePublicUsername
+   */
+  async updatePublicUsername(publicUsername: string): Promise<void> {
+    await apiClient.put('/api/Account/UpdatePublicUsername', {
+      newPublicUsername: publicUsername,
+    })
+  }
+
+  /**
    * Request password reset email
    * POST /api/Account/ForgotUserPassword
    */

@@ -16,6 +16,12 @@ namespace Automaton.Studio.Server.Entities
         public string DisplayName { get; set; }
 
         /// <summary>
+        /// Public-facing username for shareable URLs (privacy-safe, no email)
+        /// Required, unique, URL-safe (alphanumeric, hyphens, underscores), 3-32 characters
+        /// </summary>
+        public required string PublicUsername { get; set; }
+
+        /// <summary>
         /// User bio/description for public profile
         /// </summary>
         public string Bio { get; set; }
