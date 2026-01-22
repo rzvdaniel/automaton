@@ -15,8 +15,14 @@ const emit = defineEmits<{
 }>()
 
 const isHovering = ref(false)
+const summaryExpanded = ref(false)
 
 const formattedDate = computed(() => formatPublishedDate(props.app.publishedAt))
+
+// Check if summary is long enough to need expansion
+const isSummaryLong = computed(() => {
+  return (props.app.summary?.length ?? 0) > 80
+})
 
 // Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
@@ -34,6 +40,11 @@ function openApp() {
 
 function showDetails() {
   emit('details', props.app)
+}
+
+function toggleSummary(e: Event) {
+  e.stopPropagation()
+  summaryExpanded.value = !summaryExpanded.value
 }
 </script>
 
@@ -53,6 +64,12 @@ function showDetails() {
 
       <!-- Featured Badge -->
       <Tag v-if="app.isFeatured" value="Featured" severity="warning" class="featured-badge" />
+
+      <!-- Views Pill (always visible, including on hover) -->
+      <div v-if="app.viewCount > 0" class="views-pill">
+        <i class="pi pi-eye"></i>
+        <span>{{ app.viewCount }}</span>
+      </div>
 
       <!-- Hover Overlay -->
       <transition name="fade">
@@ -74,26 +91,24 @@ function showDetails() {
               v-tooltip.top="'View details'"
             />
           </div>
-
-          <!-- Quick Info on Hover -->
-          <div class="quick-info">
-            <h4 class="quick-title">{{ app.name }}</h4>
-            <div class="quick-meta">
-              <span v-if="app.category" class="meta-tag">{{ app.category }}</span>
-              <span class="meta-views">
-                <i class="pi pi-eye"></i>
-                {{ app.viewCount }}
-              </span>
-            </div>
-          </div>
         </div>
       </transition>
     </div>
 
-    <!-- Title (Always Visible) -->
-    <div class="card-title">
-      <h4 class="title-text">{{ app.name }}</h4>
-      <p v-if="app.summary" class="title-summary">{{ app.summary }}</p>
+    <!-- Combined Title + Summary as one paragraph -->
+    <div class="card-text">
+      <p :class="['text-line', { 'expanded': summaryExpanded }]">
+        <span class="text-title">{{ app.name }}</span>
+        <span v-if="app.summary" class="text-summary">{{ app.summary }}</span>
+      </p>
+      <button 
+        v-if="isSummaryLong"
+        class="summary-toggle"
+        @click="toggleSummary"
+      >
+        {{ summaryExpanded ? 'Show less' : 'Show more' }}
+        <i :class="summaryExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"></i>
+      </button>
     </div>
   </div>
 </template>
@@ -159,7 +174,7 @@ function showDetails() {
 .featured-badge {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   z-index: 10;
 }
 
@@ -174,8 +189,8 @@ function showDetails() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  padding-top: 1rem;
+  justify-content: center;
+  padding-top: 0;
   z-index: 20;
 }
 
@@ -218,81 +233,82 @@ function showDetails() {
   transform: scale(1.1);
 }
 
-/* Quick Info */
-.quick-info {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
-  padding: 1.5rem 1rem 1rem;
-  color: white;
+/* Combined Title + Summary block */
+.card-text {
+  padding: 0.5rem 0 0.5rem 0;
 }
 
-.quick-title {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.quick-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.meta-tag {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-.meta-views {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* Card Title */
-.card-title {
-  padding: 0.75rem 0;
-  min-height: 4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.title-text {
+.text-line {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
   color: var(--p-text-color);
+  line-height: 1.45;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 3; /* allow wrapping across lines */
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.3;
+  transition: all 0.3s ease;
 }
 
-.title-summary {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 400;
+.text-line.expanded {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+.text-title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-right: 0.25rem;
+}
+
+.text-summary {
   color: var(--p-text-muted-color);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
+  font-size: 0.92rem;
+}
+
+.summary-toggle {
+  margin-top: 0.25rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--p-primary-500);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: color 0.2s ease;
+}
+
+.summary-toggle:hover {
+  color: var(--p-primary-600);
+  text-decoration: underline;
+}
+
+.summary-toggle i {
+  font-size: 0.7rem;
+}
+
+/* Views pill */
+.views-pill {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  line-height: 1;
+  z-index: 30; /* above hover overlay */
+  pointer-events: none;
+}
+
+.views-pill i {
+  font-size: 0.75rem;
 }
 
 /* Fade transition */
