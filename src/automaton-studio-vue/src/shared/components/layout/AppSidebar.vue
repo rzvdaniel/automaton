@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
 ]
 
 const bottomNavItems: NavItem[] = [
+  { label: 'Downloads', icon: 'pi pi-download', to: '/downloads' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
   { label: 'Documentation', icon: 'pi pi-book', to: '/docs' },
 ]

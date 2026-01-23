@@ -10,6 +10,7 @@ import { stepsRoutes } from '@/features/steps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
 import { projectsRoutes } from '@/features/projects/routes'
 import { settingsRoutes } from '@/features/settings/routes'
+import { downloadsRoutes } from '@/features/downloads/routes'
 import { installRoutes } from '@/features/install/routes'
 import { publicRoutes } from '@/features/public/routes'
 
@@ -32,6 +33,7 @@ const router = createRouter({
     ...runnersRoutes,
     ...projectsRoutes,
     ...settingsRoutes,
+    ...downloadsRoutes,
 
     // Public pages (no auth required, self-contained layout)
     ...publicRoutes,
