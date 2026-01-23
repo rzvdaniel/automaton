@@ -55,7 +55,7 @@ public class PublicWebAppsController : ControllerBase
                 {
                     w.Id,
                     w.Name,
-                    w.DisplayName,
+                    w.Summary,
                     w.Description,
                     w.PublishedAt,
                     w.RequiresAuthentication,
@@ -118,7 +118,7 @@ public class PublicWebAppsController : ControllerBase
             {
                 app.Id,
                 app.Name,
-                app.DisplayName,
+                app.Summary,
                 app.Description,
                 HtmlContent = htmlContent,
                 app.PublishedAt,

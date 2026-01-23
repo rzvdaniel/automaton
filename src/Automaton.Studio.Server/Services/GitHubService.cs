@@ -304,7 +304,7 @@ public class GitHubService
     private string GenerateReadme(AppModel app)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"# {app.DisplayName ?? app.Name}");
+        sb.AppendLine($"# {app.Summary ?? app.Name}");
         sb.AppendLine();
         sb.AppendLine(app.Description ?? "Web app created with Automaton");
         sb.AppendLine();

@@ -1321,10 +1321,6 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
                     b.Property<Guid?>("ExecutionRunnerId")
                         .HasColumnType("char(36)");
 
@@ -1362,6 +1358,10 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Tags")
                         .HasColumnType("longtext");

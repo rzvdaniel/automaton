@@ -546,7 +546,7 @@ public class CustomStepsService
         if (webAppLookup != null && webAppLookup.TryGetValue(entity.Id, out var webApp))
         {
             webAppId = webApp.Id;
-            webAppName = !string.IsNullOrEmpty(webApp.DisplayName) ? webApp.DisplayName : webApp.Name;
+            webAppName = !string.IsNullOrEmpty(webApp.Summary) ? webApp.Summary : webApp.Name;
         }
 
         return new CustomStep

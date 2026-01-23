@@ -73,7 +73,7 @@ public class PublicAppsService
             {
                 Id = w.Id,
                 Name = w.Name,
-                Summary = w.DisplayName,
+                Summary = w.Summary,
                 Description = w.Description,
                 ThumbnailUrl = w.ThumbnailUrl,
                 Category = w.Category,
@@ -109,7 +109,7 @@ public class PublicAppsService
             {
                 Id = w.Id,
                 Name = w.Name,
-                Summary = w.DisplayName,
+                Summary = w.Summary,
                 Description = w.Description,
                 ThumbnailUrl = w.ThumbnailUrl,
                 Category = w.Category,

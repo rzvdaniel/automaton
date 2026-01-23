@@ -190,7 +190,7 @@ public class AppsService
         {
             Id = Guid.NewGuid(),
             Name = app.Name,
-            DisplayName = string.Empty,
+            Summary = string.Empty,
             Description = string.Empty,
             IsPublished = false,
             PublicUrl = null,
@@ -279,7 +279,7 @@ public class AppsService
         var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
 
         entity.Name = app.Name;
-        entity.DisplayName = app.DisplayName;
+        entity.Summary = app.Summary;
         entity.Description = app.Description;
         entity.IsPublished = app.IsPublished;
         entity.PublicUrl = app.PublicUrl;
@@ -502,7 +502,7 @@ public class AppsService
         {
             Id = entity.Id,
             Name = entity.Name,
-            DisplayName = entity.DisplayName,
+            Summary = entity.Summary,
             Description = entity.Description,
             IsPublished = entity.IsPublished,
             PublicUrl = entity.PublicUrl,

@@ -30,7 +30,7 @@ namespace Automaton.Studio.Server.Models
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
-        public string DisplayName { get; set; }
+        public string Summary { get; set; }
         public bool IsPublished { get; set; }
         public string? PublicUrl { get; set; }
         public int ViewCount { get; set; }
@@ -41,7 +41,7 @@ namespace Automaton.Studio.Server.Models
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
-        public string DisplayName { get; set; }
+        public string Summary { get; set; }
         public string PublicUrl { get; set; }
         public int ViewCount { get; set; }
         public DateTime? PublishedAt { get; set; }

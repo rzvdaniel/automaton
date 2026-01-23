@@ -80,7 +80,7 @@ namespace Automaton.Studio.Server.Services
                     {
                         Id = a.Id,
                         Name = a.Name,
-                        DisplayName = a.DisplayName,
+                        Summary = a.Summary,
                         IsPublished = a.IsPublished,
                         PublicUrl = a.PublicUrl,
                         ViewCount = a.ViewCount,
@@ -96,7 +96,7 @@ namespace Automaton.Studio.Server.Services
                     {
                         Id = a.Id,
                         Name = a.Name,
-                        DisplayName = a.DisplayName,
+                        Summary = a.Summary,
                         PublicUrl = a.PublicUrl!,
                         ViewCount = a.ViewCount,
                         PublishedAt = a.PublishedAt
