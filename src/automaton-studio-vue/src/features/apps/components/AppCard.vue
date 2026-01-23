@@ -219,7 +219,7 @@ const menuItems = computed(() => {
           <div class="flex align-items-center gap-2 min-w-0 flex-1">
             <i class="pi pi-globe flex-shrink-0" style="color: var(--p-primary-500)"></i>
             <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
-              {{ app.displayName || app.name }}
+              {{ app.name }}
             </span>
           </div>
           <Button
@@ -235,9 +235,9 @@ const menuItems = computed(() => {
           <Menu ref="menu" :model="menuItems" popup />
         </div>
 
-        <!-- Description -->
+        <!-- Description (or Summary if no description) -->
         <p class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-          {{ app.description || 'No description' }}
+          {{ app.description || app.displayName || 'No description' }}
         </p>
 
         <!-- Status Badge -->
