@@ -17,8 +17,6 @@ const emit = defineEmits<{
 const isHovering = ref(false)
 const summaryExpanded = ref(false)
 
-const formattedDate = computed(() => formatPublishedDate(props.app.publishedAt))
-
 // Check if summary is long enough to need expansion
 const isSummaryLong = computed(() => {
   return (props.app.summary?.length ?? 0) > 80

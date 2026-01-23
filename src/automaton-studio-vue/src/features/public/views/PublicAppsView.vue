@@ -180,8 +180,12 @@ onMounted(() => {
 
           <div v-if="selectedApp" class="modal-body">
             <!-- Thumbnail -->
-            <div v-if="selectedApp.thumbnailUrl" class="modal-thumbnail">
-              <img :src="fullThumbnailUrl" :alt="selectedApp.name" />
+            <div class="modal-thumbnail">
+              <img v-if="selectedApp.thumbnailUrl" :src="fullThumbnailUrl" :alt="selectedApp.name" />
+              <div v-else class="modal-thumbnail-placeholder">
+                <i class="pi pi-image"></i>
+                <p>No image available</p>
+              </div>
             </div>
 
             <!-- Content -->
@@ -211,9 +215,9 @@ onMounted(() => {
                 />
               </div>
 
-              <!-- Description -->
-              <div v-if="selectedApp.description" class="modal-description">
-                <p>{{ selectedApp.description }}</p>
+              <!-- Description (or Summary if no description) -->
+              <div v-if="selectedApp.description || selectedApp.summary" class="modal-description">
+                <p>{{ selectedApp.description || selectedApp.summary }}</p>
               </div>
 
               <!-- Tags -->
@@ -464,12 +468,37 @@ onMounted(() => {
   height: 300px;
   overflow: hidden;
   background: var(--p-surface-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.modal-thumbnail-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--p-surface-600) 0%, var(--p-surface-800) 100%);
+  color: var(--p-text-muted-color);
+  gap: 1rem;
+}
+
+.modal-thumbnail-placeholder i {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.modal-thumbnail-placeholder p {
+  margin: 0;
+  font-size: 0.95rem;
 }
 
 .modal-content {
