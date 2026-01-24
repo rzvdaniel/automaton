@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import ProjectSwitcher from '@/features/projects/components/ProjectSwitcher.vue'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
@@ -100,9 +101,13 @@ function goToSettings() {
 <template>
   <Toolbar class="app-toolbar border-noround">
     <template #start>
-      <div class="flex items-center gap-2">
-        <i class="pi pi-bolt text-xl" style="color: var(--p-primary-500)"></i>
-        <span class="font-bold text-xl">Automaton Studio</span>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-bolt text-xl" style="color: var(--p-primary-500)"></i>
+          <span class="font-bold text-xl">Automaton Studio</span>
+        </div>
+        <div class="border-right" style="height: 1.5rem"></div>
+        <ProjectSwitcher />
       </div>
     </template>
 

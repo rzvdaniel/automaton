@@ -1,175 +1,278 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import Card from 'primevue/card'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useProjectsStore } from '@/features/projects/stores/projectsStore'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import Card from 'primevue/card'
 import Tag from 'primevue/tag'
+import EmptyState from '@/shared/components/EmptyState.vue'
+import type { CreateProjectRequest } from '@/features/projects/types'
+import { ProjectRole } from '@/features/projects/types'
 
-const searchQuery = ref('')
+const store = useProjectsStore()
+const router = useRouter()
+const toast = useToast()
+const confirm = useConfirm()
 
-// Mock projects data
-const myProjects = ref([
-  {
-    id: 1,
-    name: 'Acme Corp',
-    icon: '🏢',
-    role: 'Admin',
-    members: 5,
-    flows: 12,
-    apps: 3,
-    isPersonal: false,
-  },
-  {
-    id: 2,
-    name: 'Personal Workspace',
-    icon: '👤',
-    role: 'Owner',
-    members: 1,
-    flows: 8,
-    apps: 2,
-    isPersonal: true,
-  },
-])
+// Dialog and form states
+const showCreateDialog = ref(false)
+const createForm = ref<CreateProjectRequest>({
+  name: '',
+  displayName: '',
+  description: '',
+})
 
-const sharedProjects = ref([
-  {
-    id: 3,
-    name: 'Client Project X',
-    icon: '🏢',
-    role: 'Developer',
-    owner: 'john@acme.com',
-    flows: 5,
-    apps: 1,
-  },
-])
+// Load projects on mount
+onMounted(async () => {
+  await store.loadProjects()
+})
+
+// Role badge severity map
+const getRoleSeverity = (role: string) => {
+  const severityMap: Record<string, string> = {
+    [ProjectRole.ProjectAdmin]: 'danger',
+    [ProjectRole.Developer]: 'warning',
+    [ProjectRole.AppUser]: 'info',
+    [ProjectRole.Viewer]: 'secondary',
+  }
+  return severityMap[role] || 'secondary'
+}
+
+// Format date for display
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+// Handle create project
+async function handleCreateProject() {
+  if (!createForm.value.name || !createForm.value.displayName) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'Name and Display Name are required',
+      life: 3000,
+    })
+    return
+  }
+
+  try {
+    await store.createProject(createForm.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Project created successfully',
+      life: 3000,
+    })
+    showCreateDialog.value = false
+    resetCreateForm()
+  } catch (error) {
+    // Error toast is already shown by service
+  }
+}
+
+// Handle delete project
+function handleDeleteProject(projectId: string, projectName: string) {
+  confirm.require({
+    message: `Are you sure you want to delete "${projectName}"? This will deactivate the project.`,
+    header: 'Delete Project',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await store.deleteProject(projectId)
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Project deleted successfully',
+          life: 3000,
+        })
+      } catch (error) {
+        // Error toast is already shown by service
+      }
+    },
+  })
+}
+
+// Navigate to project settings
+function handleOpenSettings(projectId: string) {
+  router.push(`/projects/${projectId}/settings`)
+}
+
+// Reset create form
+function resetCreateForm() {
+  createForm.value = {
+    name: '',
+    displayName: '',
+    description: '',
+  }
+}
+
+// Close dialog and reset form
+function closeCreateDialog() {
+  showCreateDialog.value = false
+  resetCreateForm()
+}
 </script>
 
 <template>
-  <div class="projects-view">
-    <!-- Page Header -->
-    <div class="flex align-items-center justify-content-between mb-5">
+  <div class="projects-list-view">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-3xl font-bold m-0">Projects</h1>
-        <p class="text-color-secondary mt-1 mb-0">Manage your projects and team collaboration</p>
+        <h1 class="text-3xl font-bold">Projects</h1>
+        <p class="text-color-secondary mt-1">Manage and organize your projects</p>
       </div>
-      <Button label="Create Project" icon="pi pi-plus" />
+      <Button
+        icon="pi pi-plus"
+        label="Create Project"
+        @click="showCreateDialog = true"
+      />
     </div>
 
-    <!-- Search -->
-    <div class="mb-5">
-      <span class="p-input-icon-left" style="max-width: 400px">
-        <i class="pi pi-search" />
-        <InputText v-model="searchQuery" placeholder="Search projects..." class="w-full" />
-      </span>
-    </div>
+    <!-- Projects DataTable -->
+    <Card>
+      <DataTable
+        v-if="store.projects.length > 0"
+        :value="store.projects"
+        :loading="store.loading"
+        paginator
+        :rows="10"
+        responsiveLayout="scroll"
+        class="p-datatable-sm"
+      >
+        <Column field="displayName" header="Name" sortable />
+        <Column field="description" header="Description" />
+        <Column field="role" header="Role" sortable>
+          <template #body="slotProps">
+            <Tag :value="slotProps.data.role" :severity="getRoleSeverity(slotProps.data.role)" />
+          </template>
+        </Column>
+        <Column field="memberCount" header="Members" sortable />
+        <Column field="updatedAt" header="Updated" sortable>
+          <template #body="slotProps">
+            {{ formatDate(slotProps.data.updatedAt) }}
+          </template>
+        </Column>
+        <Column header="Actions" style="width: 150px">
+          <template #body="slotProps">
+            <div class="flex gap-2">
+              <Button
+                icon="pi pi-cog"
+                severity="secondary"
+                text
+                rounded
+                @click="handleOpenSettings(slotProps.data.id)"
+              />
+              <Button
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                rounded
+                @click="handleDeleteProject(slotProps.data.id, slotProps.data.displayName)"
+              />
+            </div>
+          </template>
+        </Column>
+      </DataTable>
 
-    <!-- Your Projects -->
-    <div class="mb-5">
-      <div class="flex align-items-center gap-3 mb-4">
-        <span class="font-semibold">Your Projects</span>
-        <Tag :value="`${myProjects.length} projects`" severity="secondary" />
-      </div>
+      <!-- Empty State -->
+      <EmptyState
+        v-else
+        icon="pi pi-inbox"
+        title="No Projects"
+        message="You haven't created any projects yet. Create one to get started."
+      >
+        <Button
+          icon="pi pi-plus"
+          label="Create Project"
+          @click="showCreateDialog = true"
+        />
+      </EmptyState>
+    </Card>
 
-      <div class="grid">
-        <div v-for="project in myProjects" :key="project.id" class="col-12 md:col-6 lg:col-4">
-          <Card class="h-full project-card">
-            <template #content>
-              <div class="flex flex-column h-full">
-                <div class="flex align-items-center justify-content-between mb-3">
-                  <div class="flex align-items-center gap-2">
-                    <span class="text-2xl">{{ project.icon }}</span>
-                    <span class="font-semibold">{{ project.name }}</span>
-                  </div>
-                  <Button icon="pi pi-ellipsis-v" text rounded severity="secondary" size="small" />
-                </div>
+    <!-- Create Project Dialog -->
+    <Dialog
+      v-model:visible="showCreateDialog"
+      header="Create Project"
+      modal
+      :style="{ width: '450px' }"
+      @hide="closeCreateDialog"
+    >
+      <div class="space-y-4">
+        <div>
+          <label for="project-name" class="block text-sm font-medium mb-2">
+            Name <span class="text-red-500">*</span>
+          </label>
+          <InputText
+            id="project-name"
+            v-model="createForm.name"
+            class="w-full"
+            placeholder="e.g., my-project"
+          />
+          <p class="text-xs text-color-secondary mt-1">
+            Used internally, no spaces allowed
+          </p>
+        </div>
 
-                <div class="mb-3">
-                  <Tag :value="`Role: ${project.role}`" severity="info" />
-                </div>
+        <div>
+          <label for="project-display-name" class="block text-sm font-medium mb-2">
+            Display Name <span class="text-red-500">*</span>
+          </label>
+          <InputText
+            id="project-display-name"
+            v-model="createForm.displayName"
+            class="w-full"
+            placeholder="e.g., My Project"
+          />
+        </div>
 
-                <div class="text-color-secondary text-sm mb-4">
-                  <div class="mb-1">Members: {{ project.members }}</div>
-                  <div class="mb-1">Flows: {{ project.flows }}</div>
-                  <div>Apps: {{ project.apps }}</div>
-                </div>
-
-                <div class="flex gap-2 mt-auto">
-                  <Button
-                    label="Open"
-                    icon="pi pi-folder-open"
-                    size="small"
-                    outlined
-                    class="flex-1"
-                  />
-                  <Button
-                    label="Settings"
-                    icon="pi pi-cog"
-                    size="small"
-                    outlined
-                    severity="secondary"
-                    class="flex-1"
-                    @click="$router.push(`/projects/${project.id}/settings`)"
-                  />
-                </div>
-              </div>
-            </template>
-          </Card>
+        <div>
+          <label for="project-description" class="block text-sm font-medium mb-2">
+            Description
+          </label>
+          <Textarea
+            id="project-description"
+            v-model="createForm.description"
+            class="w-full"
+            :auto-resize="true"
+            rows="3"
+            placeholder="Optional project description"
+          />
         </div>
       </div>
-    </div>
 
-    <!-- Shared With You -->
-    <div>
-      <div class="flex align-items-center gap-3 mb-4">
-        <span class="font-semibold">Shared With You</span>
-        <Tag :value="`${sharedProjects.length} projects`" severity="secondary" />
-      </div>
-
-      <div class="grid">
-        <div v-for="project in sharedProjects" :key="project.id" class="col-12 md:col-6 lg:col-4">
-          <Card class="h-full project-card">
-            <template #content>
-              <div class="flex flex-column h-full">
-                <div class="flex align-items-center justify-content-between mb-3">
-                  <div class="flex align-items-center gap-2">
-                    <span class="text-2xl">{{ project.icon }}</span>
-                    <span class="font-semibold">{{ project.name }}</span>
-                  </div>
-                </div>
-
-                <div class="mb-3">
-                  <Tag :value="`Role: ${project.role}`" severity="secondary" />
-                </div>
-
-                <div class="text-color-secondary text-sm mb-4">
-                  <div class="mb-1">Owner: {{ project.owner }}</div>
-                  <div class="mb-1">Flows: {{ project.flows }}</div>
-                  <div>Apps: {{ project.apps }}</div>
-                </div>
-
-                <div class="flex gap-2 mt-auto">
-                  <Button label="Open" icon="pi pi-folder-open" size="small" outlined class="w-full" />
-                </div>
-              </div>
-            </template>
-          </Card>
-        </div>
-      </div>
-    </div>
+      <template #footer>
+        <Button
+          label="Cancel"
+          severity="secondary"
+          @click="closeCreateDialog"
+        />
+        <Button
+          label="Create"
+          @click="handleCreateProject"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
-.projects-view {
-  max-width: 1400px;
-  margin: 0 auto;
+.projects-list-view {
+  padding: 2rem;
 }
 
-.project-card {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.project-card:hover {
-  transform: translateY(-2px);
+.space-y-4 > * + * {
+  margin-top: 1rem;
 }
 </style>
