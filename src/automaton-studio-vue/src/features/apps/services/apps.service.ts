@@ -105,7 +105,7 @@ class AppsService {
     const updatePayload = {
       id: app.id,
       name: settings.name ?? app.name,
-      summary: settings.summary ?? app.summary,
+      summary: settings.summary ?? app.summary ?? '',
       description: settings.description ?? app.description,
       isPublished: app.isPublished,
       publicUrl: settings.publicUrl ?? app.publicUrl,
@@ -152,7 +152,7 @@ class AppsService {
     const updatePayload = {
       id: app.id,
       name: app.name,
-      summary: app.summary,
+      summary: app.summary ?? '',
       description: app.description,
       isPublished: app.isPublished,
       publicUrl: app.publicUrl,
@@ -253,7 +253,7 @@ class AppsService {
       let currentPath = ''
 
       for (let i = 0; i < parts.length; i++) {
-        const part = parts[i]
+        const part = parts[i]!
         currentPath = currentPath ? `${currentPath}/${part}` : part
         const isFile = i === parts.length - 1
 
@@ -299,7 +299,9 @@ class AppsService {
     const response = await this.getFiles(id)
     if (response.success && response.files) {
       // The API returns file paths as strings
-      const filePaths = response.files.map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
+      const filePaths = response.files
+        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
+        .filter((p): p is string => Boolean(p))
       return this.buildFileTree(filePaths)
     }
     return []

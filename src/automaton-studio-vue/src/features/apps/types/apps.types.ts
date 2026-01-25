@@ -55,9 +55,9 @@ export interface App {
   isSample: boolean
   isFeatured: boolean
   // Public profile display
-  thumbnailUrl?: string
-  category?: string
-  tags?: string
+  thumbnailUrl?: string | null
+  category?: string | null
+  tags?: string | null
 }
 
 /**
