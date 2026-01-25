@@ -183,64 +183,13 @@ npm run generate:types  # Generates src/shared/types/api/ from OpenAPI
 
 **Component Testing:** Vitest + Vue Test Utils with colocated `*.spec.ts` files.
 
-### Implementing a New Feature in Vue.js
+### Implementing a New Feature
 
-When adding a new feature to the Vue.js frontend, follow this systematic approach:
+When adding a new feature, use the feature-based structure with components, services, types, and views. Match C# DTOs exactly in TypeScript, use `const` objects instead of enums, and implement loading states with toast notifications.
 
-**1. Feature Directory Structure:**
-```
-src/features/your-feature/
-├── components/          # Feature-specific Vue components
-├── services/            # API service calls
-├── types/               # TypeScript interfaces
-├── views/               # Page-level components (optional)
-└── routes.ts            # Feature routes (optional)
-```
+**For complete step-by-step guide with code examples, see:** [docs/skills/implementing-features/SKILL.md](docs/skills/implementing-features/SKILL.md)
 
-**2. TypeScript Types:**
-- Match backend C# DTOs exactly (property names, types, optionality)
-- **Important:** Use const objects instead of enums: `export const MyEnum = { Value1: 1 } as const`
-- Add helper functions for UI display (getSeverity, getIcon, formatDate)
-
-**3. API Service:**
-- Import and use `apiClient` from `@/shared/services/api/axios-instance`
-- JWT tokens are automatically injected by interceptors
-- Handle errors with try/catch and toast notifications
-- Service class pattern: `export const yourFeatureService = new YourFeatureService()`
-
-**4. Vue Components:**
-- Use PrimeVue components (Card, DataTable, Dialog, Button, etc.)
-- Implement loading states with `ref(true/false)`
-- Use `useToast()` for user feedback (success, error, warning)
-- Keep components focused and single-purpose
-
-**5. Theme-Aware Styling (CRITICAL):**
-
-The app supports light/dark themes. **Never hardcode background colors** - they break theme switching. Prefer inheritance from themed parents or use adaptive variables like `--p-surface-ground`, `--p-text-color`. Avoid `--p-surface-0` through `--p-surface-400`.
-
-**For complete patterns and examples, see:** [docs/skills/theme-aware-styling/SKILL.md](docs/skills/theme-aware-styling/SKILL.md)
-
-**6. Backend Integration:**
-- Controllers in `src/Automaton.Studio.Server/Controllers/`
-- Endpoints: `/api/controllername`
-- Common patterns: GET (list/get), POST (create), PUT (update), DELETE (delete)
-- Ensure TypeScript interfaces match C# DTOs exactly
-
-**7. Best Practices:**
-- ✅ Show loading states during async operations
-- ✅ Use toast notifications for all user feedback
-- ✅ Add empty states with helpful messages
-- ✅ Implement confirmation dialogs for destructive actions
-- ✅ Use computed properties to optimize template expressions
-- ✅ Handle errors gracefully with try/catch
-- ✅ Format dates consistently using helper functions
-- ✅ Keep services stateless and focused on API calls
-- ✅ Colocate feature code (types, services, components together)
-- ✅ **Never hardcode backgrounds** - omit background-color or use `--p-surface-ground`
-
-**Reference Implementation:**
-
-See API Keys feature in `src/automaton-studio-vue/src/features/settings/` for complete example demonstrating all patterns above.
+**Reference Implementation:** API Keys feature in `src/automaton-studio-vue/src/features/settings/`
 
 ### API Key Scopes
 
@@ -268,11 +217,6 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Published apps get a `PublicUrl` (`/web/{publicUrl}`)
 - Public (no login) or Protected (requires Automaton login)
 - Publish/Unpublish flows with clear status badges
-
-**Security:**
-- Use `WebApp`-scoped API keys or short-lived tokens
-- Configure CORS for published app origins
-- Avoid embedding privileged keys in client-side code
 
 **Calling Flows from Published Apps:**
 
@@ -328,18 +272,13 @@ The frontend is composed of self-contained feature modules:
 
 Shared modules (`src/shared/`): components, services (Axios, SignalR), composables, utils, types.
 
-## Documentation
+## Documentation & Resources
 
-**Developer Guides:**
-- See [CLAUDE.md](CLAUDE.md) for comprehensive development guidance
-- See [src/automaton-studio-vue/REDESIGN_PLAN.md](src/automaton-studio-vue/REDESIGN_PLAN.md) for the full Vue.js redesign spec
-
-**API Reference:**
-- Swagger UI: `https://localhost:7091/swagger/index.html`
-- OpenAPI JSON: `https://localhost:7091/swagger/v1/swagger.json`
-
-**Additional Docs:**
-- `docs/` folder contains feature-specific documents and guides
+- **Swagger UI**: `https://localhost:7091/swagger/index.html` (source of truth for API)
+- **Vue.js Redesign**: [src/automaton-studio-vue/REDESIGN_PLAN.md](src/automaton-studio-vue/REDESIGN_PLAN.md)
+- **Feature Docs**: `docs/` folder (flows, apps, runners, projects, etc.)
+- **Agent Skills**: `docs/skills/` for concrete patterns and code examples
+- **Teaching & Learning**: [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md) explains decisions and lessons learned
 
 ## AI Skills
 
