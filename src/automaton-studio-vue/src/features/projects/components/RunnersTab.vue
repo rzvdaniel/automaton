@@ -85,8 +85,6 @@
         </template>
       </Column>
     </DataTable>
-
-    <ConfirmDialog />
   </div>
 </template>
 
@@ -102,7 +100,6 @@ import Column from 'primevue/column';
 import Dropdown from 'primevue/dropdown';
 import Tag from 'primevue/tag';
 import Button from 'primevue/button';
-import ConfirmDialog from 'primevue/confirmdialog';
 
 interface Props {
   projectId: string;

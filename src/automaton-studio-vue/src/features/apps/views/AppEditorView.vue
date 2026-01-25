@@ -11,7 +11,6 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
-import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -783,7 +782,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       @create="handleCreateFile"
     />
 
-    <ConfirmDialog />
     <Toast />
   </div>
 </template>
