@@ -949,5 +949,9 @@ Together, they create a **learning culture** where knowledge compounds and futur
 
 ## Plan Mode
 
-- Make the plan extremely concise. Sacrifice grammar for the sake of concision.
-- At the end of each plan, give me a list of unresolved questions to answer, if any.
+- **Design for AI agents, not human timelines**: Plans should describe *what* to build and implementation *order*, not human work estimates ("7 weeks")
+- **Parallelize work**: Identify independent tasks that can be executed concurrently (database migrations + service layer + UI components can happen in parallel)
+- **Eliminate unnecessary ceremony**: No feature flags, no phased rollouts, no production best practices unless the project is deployed to external users
+- **Focus on completeness**: Agents should build the entire feature end-to-end in one implementation pass
+- **Make plans concise**: Sacrifice grammar for brevity. Avoid fluffy timelines.
+- **End with open questions**: List unresolved decisions that need your input before implementation starts
