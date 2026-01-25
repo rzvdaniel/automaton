@@ -886,6 +886,31 @@ Access auto-generated API documentation:
 
 The backend exports OpenAPI 3.0 specs. The frontend uses `openapi-typescript` to auto-generate TypeScript types from these specs.
 
+## Agent Skills
+
+**Skills** are reusable workflow guides stored in `.github/skills/` that codify best practices and patterns for consistent development across the project.
+
+**When to Create/Update a Skill:**
+- After completing a major feature that could be replicated or extended
+- When you identify a repeatable multi-step development pattern
+- After implementing a best practice that should be shared with future agents
+- When documenting a complex debugging or troubleshooting process
+
+**Examples of Good Skill Candidates:**
+- **post-change-validation**: Run frontend type-check and backend build after code changes (already created)
+- **adding-a-new-feature**: Step-by-step guide for implementing a complete feature (backend controller → service → DTO → frontend service → types → components)
+- **debugging-runner-issues**: Troubleshooting runner registration, connection, and execution problems
+- **managing-database-migrations**: Safe workflow for creating, testing, and deploying EF Core migrations
+- **implementing-authorization**: Checklist for adding authorization checks to new features
+
+**Skill Format:**
+- Location: `.github/skills/skill-name/` (lowercase, hyphens, matches YAML `name` field)
+- File: `SKILL.md` (required exact filename)
+- Structure: YAML frontmatter (name, description, license) + Markdown body with instructions, examples, conventions
+- Optional: Include supporting scripts, examples, or resources in the skill directory
+
+**Reference:** See `.github/skills/post-change-validation/SKILL.md` for complete example following GitHub's agent skills format.
+
 ## Plan Mode
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.

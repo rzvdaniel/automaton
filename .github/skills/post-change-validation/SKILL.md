@@ -1,0 +1,122 @@
+---
+name: post-change-validation
+description: Run frontend type-check and backend build after code changes to catch errors early and ensure consistency. Use this after editing Vue components, TypeScript types, backend DTOs, services, or mappers.
+license: MIT
+---
+
+# Post-Change Validation
+
+After making code changes to the Automaton project, validate your changes by running type checks and build verification to catch errors early.
+
+## When to Use This Skill
+
+- After changing Vue components, TypeScript types, or composables
+- After updating backend DTOs, models, mappers, or services
+- After modifying controllers, hubs, or EF Core entities
+- Before committing or creating a pull request
+- When requested to "validate changes" or "run checks"
+
+## Essential Validation Steps
+
+### 1. Frontend Type-Check (Required)
+
+TypeScript type checking ensures no type regressions in the Vue frontend.
+
+```bash
+cd src/automaton-studio-vue
+npm run type-check
+```
+
+**Expected result:** Passes with no errors (warnings are acceptable).
+
+### 2. Backend Build (Required)
+
+Building the backend ensures DTOs, mappers, services, and controllers compile correctly.
+
+```powershell
+# From repo root
+dotnet build Automaton.Server.sln -c Release
+```
+
+**Expected result:** Build succeeds; compiler warnings are acceptable.
+
+### 3. Optional: Frontend Lint
+
+Check code style and catch minor issues in Vue/TypeScript.
+
+```bash
+cd src/automaton-studio-vue
+npm run lint
+```
+
+### 4. Optional: Frontend Production Build
+
+Verify the frontend compiles to production artifacts.
+
+```bash
+cd src/automaton-studio-vue
+npm run build
+```
+
+### 5. Optional: Backend Unit Tests
+
+Run focused tests in areas you modified.
+
+```powershell
+# From repo root
+dotnet test src/UnitTests/Automaton.Studio.Server.Tests -c Release
+```
+
+## Reporting Results
+
+Summarize concisely in your response:
+
+- **Success case:** "Type-check passed; server build succeeded (0 errors, X warnings noted)."
+- **Failure case:** List the failures and suggest next actions.
+- Offer optional follow-ups (lint, tests) only if user asks or if changes seem complex.
+
+## Examples
+
+### Example 1: After Changing Runner DTOs and UI
+
+```
+Made these changes:
+- Added scope/projectId/projectName to RunnerDetails.cs
+- Updated RunnerMapper to populate scope fields
+- Added AccessScope const and helpers to runners.types.ts
+- Updated RunnersView with project badges and guards
+
+Validation:
+- npm run type-check: ✓ Passed
+- dotnet build: ✓ Succeeded (344 warnings noted, same as baseline)
+
+Changes validated end-to-end.
+```
+
+### Example 2: After Editing an App Component
+
+```
+Modified AppCard.vue to show project badge.
+
+Validation:
+- npm run type-check: ✓ Passed
+- dotnet build: ✓ Succeeded
+
+Optional follow-ups:
+- npm run lint (to check style)
+- npm run build (to verify production bundle)
+```
+
+## Conventions for Agents
+
+- **Batching:** Run type-check and build together when possible; don't run sequentially.
+- **Context:** Include a brief preamble explaining why these steps are important before executing.
+- **Tool usage:** Use `run_in_terminal` for build commands; batch independent commands when safe.
+- **Scope:** Keep validations focused on the changed area; avoid unrelated refactors or cleanup.
+- **Documentation:** After significant work, consider updating or creating skill files (see AGENTS.md and CLAUDE.md for guidance).
+
+## Related Resources
+
+- **AGENTS.md:** Project overview, architecture, feature modules, and coding conventions.
+- **CLAUDE.md:** Comprehensive development guidance for the Automaton project.
+- **docs/projects/Scopes.md:** Documentation on Personal vs. Project access scopes.

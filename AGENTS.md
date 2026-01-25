@@ -401,6 +401,27 @@ Shared modules (`src/shared/`): components, services (Axios, SignalR), composabl
 **Additional Docs:**
 - `docs/` folder contains feature-specific documents and guides
 
+## AI Skills
+
+**Agent skills** codify reusable workflows and best practices for consistent, high-quality development. Store project-specific skills in `.github/skills/`.
+
+**When to Create or Update a Skill:**
+- After implementing a significant feature (e.g., multi-tenancy, runner scoping)
+- When you identify a repeatable development pattern (e.g., post-change validation)
+- When you document best practices for a specific task (e.g., debugging, testing)
+- After completing a task that involved multiple steps and could benefit future agents
+
+**Example Skills:**
+- `post-change-validation` – Run frontend type-check and backend build after edits
+- `debugging-runner-issues` – Troubleshooting runner registration and connection problems
+- `adding-a-feature` – Step-by-step guide for implementing a new feature end-to-end
+
+**Skill File Format:**
+- Directory: `.github/skills/skill-name/` (lowercase, hyphens for spaces)
+- File: `SKILL.md` (exact filename required)
+- Content: YAML frontmatter + Markdown instructions
+- See `.github/skills/post-change-validation/SKILL.md` for reference
+
 ## Plan Mode
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
