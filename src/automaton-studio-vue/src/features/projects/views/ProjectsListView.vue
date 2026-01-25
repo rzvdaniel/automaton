@@ -21,6 +21,9 @@ const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
 
+// Computed
+const hasProjects = computed(() => store.projects.length > 0)
+
 // Dialog and form states
 const showCreateDialog = ref(false)
 const createForm = ref<CreateProjectRequest>({
@@ -31,7 +34,11 @@ const createForm = ref<CreateProjectRequest>({
 
 // Load projects on mount
 onMounted(async () => {
-  await store.loadProjects()
+  try {
+    await store.loadProjects()
+  } catch (error) {
+    // Error is handled by the store/service
+  }
 })
 
 // Role badge severity map
@@ -142,63 +149,65 @@ function closeCreateDialog() {
 
     <!-- Projects DataTable -->
     <Card>
-      <DataTable
-        v-if="store.projects.length > 0"
-        :value="store.projects"
-        :loading="store.loading"
-        paginator
-        :rows="10"
-        responsiveLayout="scroll"
-        class="p-datatable-sm"
-      >
-        <Column field="displayName" header="Name" sortable />
-        <Column field="description" header="Description" />
-        <Column field="role" header="Role" sortable>
-          <template #body="slotProps">
-            <Tag :value="slotProps.data.role" :severity="getRoleSeverity(slotProps.data.role)" />
-          </template>
-        </Column>
-        <Column field="memberCount" header="Members" sortable />
-        <Column field="updatedAt" header="Updated" sortable>
-          <template #body="slotProps">
-            {{ formatDate(slotProps.data.updatedAt) }}
-          </template>
-        </Column>
-        <Column header="Actions" style="width: 150px">
-          <template #body="slotProps">
-            <div class="flex gap-2">
-              <Button
-                icon="pi pi-cog"
-                severity="secondary"
-                text
-                rounded
-                @click="handleOpenSettings(slotProps.data.id)"
-              />
-              <Button
-                icon="pi pi-trash"
-                severity="danger"
-                text
-                rounded
-                @click="handleDeleteProject(slotProps.data.id, slotProps.data.displayName)"
-              />
-            </div>
-          </template>
-        </Column>
-      </DataTable>
+      <template #content>
+        <DataTable
+          v-if="hasProjects"
+          :value="store.projects"
+          :loading="store.loading"
+          paginator
+          :rows="10"
+          responsiveLayout="scroll"
+          class="p-datatable-sm"
+        >
+          <Column field="displayName" header="Name" sortable />
+          <Column field="description" header="Description" />
+          <Column field="role" header="Role" sortable>
+            <template #body="slotProps">
+              <Tag :value="slotProps.data.role" :severity="getRoleSeverity(slotProps.data.role)" />
+            </template>
+          </Column>
+          <Column field="memberCount" header="Members" sortable />
+          <Column field="updatedAt" header="Updated" sortable>
+            <template #body="slotProps">
+              {{ formatDate(slotProps.data.updatedAt) }}
+            </template>
+          </Column>
+          <Column header="Actions" style="width: 150px">
+            <template #body="slotProps">
+              <div class="flex gap-2">
+                <Button
+                  icon="pi pi-cog"
+                  severity="secondary"
+                  text
+                  rounded
+                  @click="handleOpenSettings(slotProps.data.id)"
+                />
+                <Button
+                  icon="pi pi-trash"
+                  severity="danger"
+                  text
+                  rounded
+                  @click="handleDeleteProject(slotProps.data.id, slotProps.data.displayName)"
+                />
+              </div>
+            </template>
+          </Column>
+        </DataTable>
 
-      <!-- Empty State -->
-      <EmptyState
-        v-else
-        icon="pi pi-inbox"
-        title="No Projects"
-        message="You haven't created any projects yet. Create one to get started."
-      >
-        <Button
-          icon="pi pi-plus"
-          label="Create Project"
-          @click="showCreateDialog = true"
-        />
-      </EmptyState>
+        <!-- Empty State -->
+        <EmptyState
+          v-else
+          icon="pi pi-inbox"
+          title="No Projects"
+          message="You haven't created any projects yet. Create one to get started."
+        >
+          <Button
+            icon="pi pi-plus"
+            label="Create Project"
+            @click="showCreateDialog = true"
+          />
+        </EmptyState>
+      </template>
     </Card>
 
     <!-- Create Project Dialog -->

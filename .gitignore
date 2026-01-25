@@ -48,9 +48,6 @@ wwwroot/app-thumbnails/**
 #npm
 node_modules/
 
-#github
-.github/
-
 #volatile
 App_Data/
 *.db

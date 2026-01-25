@@ -137,6 +137,22 @@ export const useProjectsStore = defineStore('projects', () => {
   }
 
   /**
+   * Update a member's role in the project
+   */
+  async function updateMemberRole(projectId: string, userId: string, request: UpdateProjectMemberRequest) {
+    try {
+      const updated = await projectsService.updateMemberRole(projectId, userId, request);
+      const index = members.value.findIndex((m) => m.userId === userId);
+      if (index !== -1) {
+        members.value[index] = updated;
+      }
+      return updated;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Add a runner to the project
    */
   async function addRunner(projectId: string, runnerId: string) {
@@ -210,6 +226,7 @@ export const useProjectsStore = defineStore('projects', () => {
     activeProject,
 
     // Actions
+    initialize,
     loadProjects,
     setActiveProject,
     createProject,
@@ -217,10 +234,10 @@ export const useProjectsStore = defineStore('projects', () => {
     loadProjectDetails,
     addMember,
     removeMember,
+    updateMemberRole,
     addRunner,
     removeRunner,
     addApp,
     removeApp,
-    initialize,
   };
 });
