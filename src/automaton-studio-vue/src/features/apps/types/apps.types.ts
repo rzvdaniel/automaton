@@ -37,7 +37,7 @@ export interface AppDefinition {
 export interface App {
   id: string
   name: string
-  displayName: string
+  summary: string
   description: string
   isPublished: boolean
   publicUrl?: string

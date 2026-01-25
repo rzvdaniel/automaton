@@ -272,7 +272,7 @@ const handleDismissWelcome = () => {
                       class="text-xs"
                     />
                   </div>
-                  <div class="recent-app-name">{{ app.displayName || app.name }}</div>
+                  <div class="recent-app-name">{{ app.name }}</div>
                   <div class="recent-app-meta">
                     <span v-if="app.viewCount > 0">
                       <i class="pi pi-eye"></i> {{ app.viewCount }} views
@@ -318,7 +318,7 @@ const handleDismissWelcome = () => {
                 class="published-app-item"
               >
                 <div class="published-app-info" @click="openPublishedApp(app.publicUrl)">
-                  <span class="published-app-name">{{ app.displayName || app.name }}</span>
+                  <span class="published-app-name">{{ app.name }}</span>
                   <span class="published-app-url">/web/{{ app.publicUrl }}</span>
                 </div>
                 <div class="published-app-actions">

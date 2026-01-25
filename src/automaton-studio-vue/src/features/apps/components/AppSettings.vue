@@ -26,7 +26,7 @@ const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance'>('
 
 // Local form state
 const name = ref('')
-const displayName = ref('')
+const summary = ref('')
 const description = ref('')
 const publicUrl = ref('')
 const requiresAuthentication = ref(false)
@@ -57,7 +57,7 @@ const hasChanges = computed(() => {
   if (!app.value) return false
   return (
     name.value !== app.value.name ||
-    displayName.value !== (app.value.displayName || '') ||
+    summary.value !== (app.value.summary || '') ||
     description.value !== (app.value.description || '') ||
     publicUrl.value !== (app.value.publicUrl || '') ||
     requiresAuthentication.value !== app.value.requiresAuthentication ||
@@ -78,7 +78,7 @@ watch(
   (newApp) => {
     if (newApp) {
       name.value = newApp.name || ''
-      displayName.value = newApp.displayName || ''
+      summary.value = newApp.summary || ''
       description.value = newApp.description || ''
       publicUrl.value = newApp.publicUrl || ''
       requiresAuthentication.value = newApp.requiresAuthentication || false
@@ -151,7 +151,7 @@ async function saveSettings() {
   try {
     await appsService.updateSettings(app.value.id, {
       name: name.value,
-      displayName: displayName.value || undefined,
+      summary: summary.value || undefined,
       description: description.value || undefined,
       publicUrl: publicUrl.value || undefined,
       requiresAuthentication: requiresAuthentication.value,
@@ -161,7 +161,7 @@ async function saveSettings() {
     // Update store's app data directly without full reload
     if (editorStore.currentApp) {
       editorStore.currentApp.name = name.value
-      editorStore.currentApp.displayName = displayName.value
+      editorStore.currentApp.summary = summary.value
       editorStore.currentApp.description = description.value
       editorStore.currentApp.publicUrl = publicUrl.value
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
@@ -339,7 +339,7 @@ async function removeImage() {
                 <label for="app-display-name" class="font-medium">Summary</label>
                 <InputText
                   id="app-display-name"
-                  v-model="displayName"
+                  v-model="summary"
                   placeholder="Brief summary of the app"
                   class="w-full"
                 />

@@ -237,7 +237,7 @@ const menuItems = computed(() => {
 
         <!-- Description (or Summary if no description) -->
         <p class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-          {{ app.description || app.displayName || 'No description' }}
+          {{ app.description || app.summary || 'No description' }}
         </p>
 
         <!-- Status Badge -->

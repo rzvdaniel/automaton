@@ -19,7 +19,7 @@ const htmlContent = ref<string | null>(null)
 const appInfo = ref<{
   id: string
   name: string
-  displayName?: string
+  summary?: string
   requiresAuthentication: boolean
   isUserAuthenticated: boolean
 } | null>(null)
@@ -47,7 +47,7 @@ async function loadApp() {
     appInfo.value = {
       id: data.id,
       name: data.name,
-      displayName: data.displayName,
+      summary: data.summary,
       requiresAuthentication: data.requiresAuthentication,
       isUserAuthenticated: data.isUserAuthenticated
     }
@@ -140,7 +140,7 @@ async function loadApp() {
     htmlContent.value = html
 
     // Update page title
-    document.title = data.displayName || data.name || 'App'
+    document.title = data.summary || data.name || 'App'
 
     // Write to iframe after next tick
     setTimeout(() => {

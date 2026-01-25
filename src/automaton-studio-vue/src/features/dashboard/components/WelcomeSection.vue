@@ -104,7 +104,7 @@ function handleDismiss() {
                 <i class="pi pi-globe"></i>
               </div>
               <div class="sample-app-info">
-                <span class="sample-app-name">{{ app.displayName || app.name }}</span>
+                <span class="sample-app-name">{{ app.summary || app.name }}</span>
                 <span class="sample-app-desc">{{ app.description || 'Sample application' }}</span>
               </div>
               <i class="pi pi-external-link sample-app-link"></i>

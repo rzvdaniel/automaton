@@ -93,7 +93,7 @@ class AppsService {
     id: string,
     settings: {
       name?: string
-      displayName?: string
+      summary?: string
       description?: string
       publicUrl?: string
       requiresAuthentication?: boolean
@@ -105,7 +105,7 @@ class AppsService {
     const updatePayload = {
       id: app.id,
       name: settings.name ?? app.name,
-      displayName: settings.displayName ?? app.displayName,
+      summary: settings.summary ?? app.summary,
       description: settings.description ?? app.description,
       isPublished: app.isPublished,
       publicUrl: settings.publicUrl ?? app.publicUrl,
@@ -152,7 +152,7 @@ class AppsService {
     const updatePayload = {
       id: app.id,
       name: app.name,
-      displayName: app.displayName,
+      summary: app.summary,
       description: app.description,
       isPublished: app.isPublished,
       publicUrl: app.publicUrl,
