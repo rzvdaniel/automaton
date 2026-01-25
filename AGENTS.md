@@ -216,37 +216,9 @@ src/features/your-feature/
 
 **5. Theme-Aware Styling (CRITICAL):**
 
-The app supports light/dark themes. **Never hardcode background colors** - they break theme switching.
+The app supports light/dark themes. **Never hardcode background colors** - they break theme switching. Prefer inheritance from themed parents or use adaptive variables like `--p-surface-ground`, `--p-text-color`. Avoid `--p-surface-0` through `--p-surface-400`.
 
-```css
-/* ❌ WRONG - breaks dark mode */
-.my-panel {
-  background-color: var(--p-surface-0);   /* Always white */
-  background-color: var(--p-surface-100); /* Always light */
-  background-color: white;
-}
-
-/* ✅ CORRECT - inherit from parent (preferred) */
-.my-panel {
-  /* No background - inherits from themed parent */
-  border: 1px solid var(--p-surface-200);
-}
-
-/* ✅ CORRECT - use adaptive variables */
-.my-panel {
-  background-color: var(--p-surface-ground); /* Adapts */
-  color: var(--p-text-color);                /* Adapts */
-}
-
-/* Dark mode - only adjust borders, not backgrounds */
-:global(.app-dark) .my-panel {
-  border-color: var(--p-surface-700);
-}
-```
-
-**Safe CSS variables:** `--p-surface-ground`, `--p-text-color`, `--p-text-muted-color`, `--p-surface-hover`
-
-**Unsafe (don't use for backgrounds):** `--p-surface-0` through `--p-surface-400`, `--p-surface-800`, `--p-surface-900`
+**For complete patterns and examples, see:** [docs/skills/theme-aware-styling/SKILL.md](docs/skills/theme-aware-styling/SKILL.md)
 
 **6. Backend Integration:**
 - Controllers in `src/Automaton.Studio.Server/Controllers/`
@@ -304,10 +276,9 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 
 **Calling Flows from Published Apps:**
 
-Published apps use the `window.automatonApi` helper provided by the platform:
+Published apps use the `window.automatonApi` helper provided by the platform. Basic usage:
 
 ```javascript
-// Basic usage
 const flowId = 'your-flow-id';
 const payload = {
   inputs: { name: 'Alice', email: 'alice@example.com' },
@@ -319,38 +290,7 @@ window.automatonApi.executeFlow(flowId, payload)
   .catch(err => console.error('Execution error', err));
 ```
 
-Example request body:
-```json
-{
-  "inputs": {
-    "name": "Alice",
-    "email": "alice@example.com"
-  },
-  "runnerNames": ["runner-1", "runner-2"]
-}
-```
-
-Example response:
-```json
-{
-  "success": true,
-  "flowId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "status": "Completed",
-  "runnerCount": 2,
-  "executedAt": "2025-11-09T12:34:56Z",
-  "message": "Execution finished successfully",
-  "outputVariables": {
-    "messageId": "msg_123",
-    "summary": "Processed 10 items"
-  },
-  "logs": [
-    "Started execution on runner-1",
-    "Step: FetchData - OK",
-    "Step: ProcessItems - OK",
-    "Execution completed"
-  ]
-}
-```
+**For complete API reference, request/response formats, and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
 
 ## Projects
 

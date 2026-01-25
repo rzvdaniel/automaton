@@ -275,51 +275,14 @@ Benefits of this structure:
 
 ### Implementing a New Feature
 
-**Step-by-Step Implementation Guide:**
+**Step-by-Step Workflow:**
+1. Backend: Create controller with `[Route("api/[controller]")]`, `[ApiController]`, `[Authorize]`
+2. Frontend: Create feature folder with `components/`, `services/`, `types/`, `views/`
+3. TypeScript: Match C# DTOs exactly, use const objects instead of enums
+4. Service: Use `apiClient`, handle errors with try/catch
+5. Component: Use PrimeVue, implement loading states, show toast notifications
 
-**1. Backend (ASP.NET Core):**
-- Create controller in `src/Automaton.Studio.Server/Controllers/YourFeatureController.cs`
-- Add `[Route("api/[controller]")]`, `[ApiController]`, `[Authorize]` attributes
-- Define DTOs (models) in controller file or separate models file
-- Implement HTTP endpoints: GET (list/single), POST (create), PUT (update), DELETE (delete)
-
-**2. Frontend Feature Structure:**
-```
-src/automaton-studio-vue/src/features/your-feature/
-├── components/       # YourFeatureSection.vue
-├── services/         # yourFeature.service.ts
-├── types/            # yourFeature.types.ts
-└── views/            # YourFeatureView.vue (optional)
-```
-
-**3. TypeScript Types:**
-- Create interfaces matching backend DTOs exactly
-- Property names, types, and optionality must match C# models
-- Add helper functions (getSeverity, getIcon, formatDate)
-
-**4. API Service:**
-- Import `apiClient` from `@/shared/services/api/axios-instance`
-- Create service class with async methods (list, create, update, delete)
-- Export singleton instance: `export const yourFeatureService = new YourFeatureService()`
-
-**5. Vue Component:**
-- Use PrimeVue components (Card, DataTable, Dialog, Button)
-- Implement loading states with `ref(true/false)`
-- Use `useToast()` for user feedback
-- Handle errors with try/catch
-- Call service methods in component functions
-
-**Best Practices:**
-- ✅ Match TypeScript types to C# DTOs exactly
-- ✅ Use const objects instead of enums
-- ✅ Add loading states for async operations
-- ✅ Show toast notifications for feedback
-- ✅ Implement empty states and confirmations
-- ✅ Handle errors gracefully
-- ✅ Keep services focused on API calls
-- ✅ Colocate related code in feature folders
-
-**Reference:** See API Keys implementation in `src/automaton-studio-vue/src/features/settings/` for complete example.
+**For complete code examples and patterns, see:** [docs/skills/implementing-features/SKILL.md](docs/skills/implementing-features/SKILL.md)
 
 ### Authentication & Authorization
 
@@ -365,7 +328,7 @@ Custom steps (Python/PowerShell/Batch) are defined with:
 
 Published web apps call backend flows via `window.automatonApi.executeFlow(flowId, { inputs: {...} })`
 
-See AGENTS.md (Apps section) and `src/Automaton.Studio.Web/wwwroot/automatonApi.js` for details.
+**For complete API reference and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
 
 ## Important Implementation Patterns
 
@@ -416,74 +379,15 @@ Store pattern using Composition API:
 
 ### Frontend: Theme-Aware Styling (Light/Dark Mode)
 
-The application supports light and dark themes via PrimeVue. The dark mode is toggled by adding/removing the `app-dark` class on the root element.
+**CRITICAL: Never hardcode background colors.** Components must inherit backgrounds from parents or use theme-adaptive CSS variables.
 
-**CRITICAL: Never use hardcoded background colors.** Components must inherit backgrounds from parents or use theme-adaptive CSS variables.
+The application supports light and dark themes. Key principles:
+- Prefer inheritance over explicit backgrounds
+- Use `--p-surface-ground`, `--p-text-color` for adaptive colors
+- Avoid `--p-surface-0` through `--p-surface-400` (always light)
+- Only adjust borders in dark mode, not backgrounds
 
-**❌ DON'T - Hardcoded backgrounds break dark mode:**
-```css
-.my-component {
-  background-color: var(--p-surface-0);  /* Always white - breaks dark mode */
-  background-color: var(--p-surface-100); /* Always light gray - breaks dark mode */
-  background-color: white;                /* Hardcoded - breaks dark mode */
-  background-color: #ffffff;              /* Hardcoded - breaks dark mode */
-}
-```
-
-**✅ DO - Let components inherit or use adaptive variables:**
-```css
-/* Option 1: No background - inherit from parent (PREFERRED) */
-.my-component {
-  /* No background-color - inherits from themed parent */
-  border: 1px solid var(--p-surface-200);
-}
-
-/* Option 2: Use theme-adaptive variables */
-.my-component {
-  background-color: var(--p-surface-ground); /* Adapts to theme */
-  color: var(--p-text-color);                /* Adapts to theme */
-  color: var(--p-text-muted-color);          /* For secondary text */
-}
-```
-
-**Dark mode border adjustments (only borders, not backgrounds):**
-```css
-/* Base styles - no background */
-.my-header {
-  border-bottom: 1px solid var(--p-surface-200);
-}
-
-/* Dark mode - only adjust border color */
-:global(.app-dark) .my-header {
-  border-color: var(--p-surface-700);
-}
-```
-
-**Theme-adaptive PrimeVue CSS Variables:**
-| Variable | Light Mode | Dark Mode | Use For |
-|----------|-----------|-----------|---------|
-| `--p-surface-ground` | Light bg | Dark bg | Page backgrounds |
-| `--p-text-color` | Dark text | Light text | Primary text |
-| `--p-text-muted-color` | Gray text | Light gray | Secondary/muted text |
-| `--p-surface-hover` | Hover bg | Hover bg | Interactive hover states |
-| `--p-primary-500` | Brand color | Brand color | Accent/brand elements |
-
-**Variables to AVOID (they don't adapt):**
-- `--p-surface-0` (always white)
-- `--p-surface-100` through `--p-surface-400` (always light shades)
-- `--p-surface-800`, `--p-surface-900` (always dark shades)
-
-**Component hierarchy for theme inheritance:**
-```
-.app-dark (root)
-  └── .app-editor-view (background: var(--p-surface-ground) / dark: var(--p-surface-900))
-        └── .splitter-panel (no background - inherits)
-              └── .file-panel (no background - inherits)
-              └── .editor-panel (no background - inherits)
-              └── .ai-sidebar (no background - inherits)
-```
-
-### Backend: Custom Step Execution
+**For complete patterns and examples, see:** [docs/skills/theme-aware-styling/SKILL.md](docs/skills/theme-aware-styling/SKILL.md)
 
 Custom steps inherit from `BaseStep` in `Automaton.Core` and implement `ExecuteAsync`:
 - Get input variables via `context.GetInputVariable<T>("name")`
@@ -508,38 +412,11 @@ console.log(result.outputVariables);
 
 ### SignalR Real-Time Communication
 
-**Runner registration and command dispatch:**
-```csharp
-// Automaton.Studio.Server/Hubs/RunnerHub.cs
-public class RunnerHub : Hub
-{
-    public async Task RegisterRunner(string runnerId, string version)
-    {
-        // Runner connects and identifies itself
-        await Clients.All.SendAsync("RunnerOnline", runnerId);
-    }
+Automaton uses SignalR for bidirectional real-time communication:
+- **RunnerHub**: Runner registration, heartbeat, command dispatch
+- **FlowExecutionHub**: Execution progress and log streaming
 
-    public async Task ExecuteFlow(Guid flowId, object inputs)
-    {
-        // Server dispatches flow execution to runner
-        await Clients.Group(runnerId).SendAsync("ExecuteFlow", flowId, inputs);
-    }
-}
-```
-
-**Frontend receives execution updates:**
-```typescript
-// src/shared/services/signalr/signalr-client.ts
-const connection = new HubConnectionBuilder()
-  .withUrl('/hubs/flow-execution')
-  .withAutomaticReconnect()
-  .build();
-
-connection.on('ExecutionProgress', (stepName, status, logs) => {
-  // Update execution timeline in real-time
-  executionStore.addLog(stepName, status, logs);
-});
-```
+**For complete implementation patterns and examples, see:** [docs/skills/signalr-communication/SKILL.md](docs/skills/signalr-communication/SKILL.md)
 
 ## Current Development Context
 
@@ -617,68 +494,31 @@ VITE_APP_TITLE=Automaton Studio
 
 ### Frontend (Vue.js)
 
+**Test Types:** Unit tests (components, composables, services), Integration tests (feature workflows), E2E tests (Playwright)
+
+**Running Tests:**
 ```bash
-# Run all tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Generate coverage report
-npm run test:coverage
-```
-
-**Test Structure** (Vitest + Vue Test Utils):
-- **Unit Tests**: Components, composables, services, stores
-- **Integration Tests**: Feature workflows with mocked API
-- **E2E Tests** (Playwright): Critical user flows
-
-**Test File Naming**: `ComponentName.spec.ts` or `functionName.spec.ts`
-
-Example test:
-```typescript
-// src/features/flows/components/__tests__/FlowCard.spec.ts
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
-import FlowCard from '../FlowCard.vue';
-
-describe('FlowCard', () => {
-  it('renders flow name and status', () => {
-    const flow = { id: '1', name: 'Test Flow', status: 'active' };
-    const wrapper = mount(FlowCard, { props: { flow } });
-    expect(wrapper.text()).toContain('Test Flow');
-  });
-});
+npm run test              # Run all tests
+npm run test:watch        # Watch mode
+npm run test:coverage     # Coverage report
 ```
 
 ### Backend (.NET)
 
+**Test Projects:** `Automaton.Core.Tests`, `Automaton.Studio.Server.Tests`, `Automaton.Runner.Tests`
+
+**Running Tests:**
 ```bash
-# Run all tests
-dotnet test
-
-# Run specific test project
-dotnet test src/UnitTests/Automaton.Core.Tests
-
-# Run with coverage
-dotnet test /p:CollectCoverage=true
-
-# Run specific test class
-dotnet test --filter FullyQualifiedName~Automaton.Core.Tests.FlowExecuteServiceTests
+dotnet test                                   # Run all tests
+dotnet test src/UnitTests/Automaton.Core.Tests  # Specific project
+dotnet test /p:CollectCoverage=true          # With coverage
 ```
 
-**Test Projects:**
-- `Automaton.Core.Tests` - Workflow engine and step execution
-- `Automaton.Studio.Server.Tests` - API controllers and services
-- `Automaton.Runner.Tests` - Runner SignalR client and flow execution
+**Test Patterns:** InMemoryDatabase for EF Core, Moq for mocking, WebApplicationFactory for integration tests, AAA pattern
 
-**Test Patterns:**
-- Use `InMemoryDatabase` for EF Core tests
-- Mock SignalR hub contexts for real-time tests
-- `WebApplicationFactory<Program>` for integration tests
-- Arrange-Act-Assert pattern
+**Target Coverage:** 80%+ business logic, 60%+ overall
 
-**Target Coverage:** 80%+ for business logic, 60%+ overall
+**For complete examples and patterns, see:** [docs/skills/testing-patterns/SKILL.md](docs/skills/testing-patterns/SKILL.md)
 
 ## Troubleshooting
 
