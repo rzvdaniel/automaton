@@ -15,6 +15,16 @@ export const RunnerStatus = {
 export type RunnerStatus = (typeof RunnerStatus)[keyof typeof RunnerStatus]
 
 /**
+ * Access scope enum for resources (matches Automaton.Studio.Server.Enums.AccessScope)
+ */
+export const AccessScope = {
+  Personal: 0,
+  Project: 1,
+} as const
+
+export type AccessScope = (typeof AccessScope)[keyof typeof AccessScope]
+
+/**
  * Runner details response from server
  * Matches RunnerDetails from RunnersController.cs
  */
@@ -23,6 +33,9 @@ export interface Runner {
   name: string
   connectionId?: string
   status: RunnerStatus
+  scope: AccessScope
+  projectId?: string | null
+  projectName?: string | null
 }
 
 /**
@@ -80,4 +93,11 @@ export function getStatusIcon(status: RunnerStatus): string {
     default:
       return 'pi pi-question-circle'
   }
+}
+
+/**
+ * Helper: whether runner is linked to a project
+ */
+export function isRunnerLinkedToProject(runner: Runner): boolean {
+  return runner.scope === AccessScope.Project && !!runner.projectId
 }

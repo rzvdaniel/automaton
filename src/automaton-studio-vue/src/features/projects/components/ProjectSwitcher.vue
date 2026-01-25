@@ -51,6 +51,7 @@ const displayLabel = computed(() => {
       class="w-full"
       :loading="store.loading"
       @change="store.setActiveProject(store.activeProjectId)"
+      v-tooltip.bottom="'Personal: shows resources you own. Project: shows items in the selected project you can access.'"
     />
   </div>
 </template>

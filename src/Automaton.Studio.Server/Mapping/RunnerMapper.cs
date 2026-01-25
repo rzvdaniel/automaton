@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Automaton.Core.Enums;
+using Automaton.Studio.Server.Enums;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,20 +9,40 @@ namespace Automaton.Studio.Server.Mapping;
 
 public static class RunnerMapper
 {
- public static RunnerDetails ToRunnerDetails(Runner runner, RunnerStatus status = RunnerStatus.None)
+ public static RunnerDetails ToRunnerDetails(
+	 Runner runner,
+	 RunnerStatus status = RunnerStatus.None,
+	 Guid? projectId = null,
+	 string? projectName = null)
  {
- return new RunnerDetails
- {
- Id = runner.Id,
- Name = runner.Name,
- ConnectionId = runner.ConnectionId,
- Status = status
- };
+	var scope = projectId.HasValue ? AccessScope.Project : AccessScope.Personal;
+
+	 return new RunnerDetails
+	 {
+		 Id = runner.Id,
+		 Name = runner.Name,
+		 ConnectionId = runner.ConnectionId,
+		 Status = status,
+		 Scope = scope,
+		 ProjectId = projectId,
+		 ProjectName = projectName,
+	 };
  }
 
- public static IEnumerable<RunnerDetails> ToRunnerDetailsList(IEnumerable<Runner> runners, RunnerStatus status = RunnerStatus.None)
+ public static IEnumerable<RunnerDetails> ToRunnerDetailsList(
+	 IEnumerable<Runner> runners,
+	 RunnerStatus status = RunnerStatus.None,
+	 IDictionary<Guid, (Guid ProjectId, string ProjectName)>? projectLookup = null)
  {
- return runners.Select(r => ToRunnerDetails(r, status));
+	 return runners.Select(r =>
+	 {
+		 if (projectLookup != null && projectLookup.TryGetValue(r.Id, out var link))
+		 {
+			 return ToRunnerDetails(r, status, link.ProjectId, link.ProjectName);
+		 }
+
+		 return ToRunnerDetails(r, status, null, null);
+	 });
  }
 
  public static Runner ToRunner(RunnerDetails details)

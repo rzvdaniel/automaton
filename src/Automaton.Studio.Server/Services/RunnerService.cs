@@ -43,9 +43,15 @@ public class RunnerService
     public async Task<IEnumerable<RunnerDetails>> List(Guid? projectId, CancellationToken cancellationToken)
     {
         // Use authorization service to get runners filtered by project context
-        var runners = authorizationService.GetRunnersQueryByContext(projectId);
+        var runnerQuery = authorizationService.GetRunnersQueryByContext(projectId);
+        var runnerEntities = await runnerQuery.ToListAsync(cancellationToken);
 
-        return await GetRunnersWithUpdatedStatus(runners, cancellationToken);
+        var projectLookup = await BuildRunnerProjectLookup(
+            runnerEntities.Select(r => r.Id),
+            projectId,
+            cancellationToken);
+
+        return await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, cancellationToken);
     }
 
     public Runner Get(Guid id)
@@ -279,9 +285,52 @@ public class RunnerService
         return results;
     }
 
-    private async Task<IEnumerable<RunnerDetails>> GetRunnersWithUpdatedStatus(IEnumerable<Runner> runnerEntities, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, (Guid ProjectId, string ProjectName)>> BuildRunnerProjectLookup(
+        IEnumerable<Guid> runnerIds,
+        Guid? projectId,
+        CancellationToken cancellationToken)
     {
-        var runners = RunnerMapper.ToRunnerDetailsList(runnerEntities).ToList();
+        var ids = runnerIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, (Guid ProjectId, string ProjectName)>();
+        }
+
+        var query = dbContext.ProjectRunners
+            .Include(x => x.Project)
+            .Where(x => ids.Contains(x.RunnerId));
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(x => x.ProjectId == projectId.Value);
+        }
+        else
+        {
+            var userId = UserId;
+            query = query.Where(x => x.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive));
+        }
+
+        var links = await query.ToListAsync(cancellationToken);
+
+        return links
+            .GroupBy(x => x.RunnerId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var first = g.First();
+                    return (first.ProjectId, first.Project.DisplayName);
+                });
+    }
+
+    private async Task<IEnumerable<RunnerDetails>> GetRunnersWithUpdatedStatus(
+        IEnumerable<Runner> runnerEntities,
+        IDictionary<Guid, (Guid ProjectId, string ProjectName)> projectLookup,
+        CancellationToken cancellationToken)
+    {
+        var runners = RunnerMapper
+            .ToRunnerDetailsList(runnerEntities, RunnerStatus.None, projectLookup)
+            .ToList();
 
         foreach (var runner in runners)
         {
@@ -417,6 +466,16 @@ public class RunnerService
         if (runner == null)
         {
             return null;
+        }
+
+        var projectLookup = await BuildRunnerProjectLookup(
+            new[] { runner.Id },
+            null,
+            cancellationToken);
+
+        if (projectLookup.TryGetValue(runner.Id, out var link))
+        {
+            return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, link.ProjectId, link.ProjectName);
         }
 
         return RunnerMapper.ToRunnerDetails(runner);

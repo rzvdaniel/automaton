@@ -19,4 +19,7 @@ public class Runner
     public string? ScriptEngineSettings { get; set; }
 
     public virtual IEnumerable<RunnerUser> RunnerUsers { get; set; }
+
+    // Project linking
+    public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();
 }

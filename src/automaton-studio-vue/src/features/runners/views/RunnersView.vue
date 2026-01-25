@@ -19,6 +19,7 @@ import {
   getStatusDisplayName,
   getStatusSeverity,
   type Runner,
+  isRunnerLinkedToProject,
 } from '../types/runners.types'
 
 const toast = useToast()
@@ -251,6 +252,12 @@ watch(
               <div>
                 <div class="flex align-items-center gap-2 mb-1">
                   <span class="font-semibold text-lg">{{ runner.name }}</span>
+                  <Tag
+                    v-if="isRunnerLinkedToProject(runner)"
+                    :value="`Project: ${runner.projectName}`"
+                    severity="info"
+                    v-tooltip.top="'Linked to a project. Manage under Project settings.'"
+                  />
                 </div>
                 <Tag
                   :value="getStatusDisplayName(runner.status)"
@@ -262,6 +269,7 @@ watch(
 
             <!-- Actions Menu -->
             <Button
+              v-if="!isRunnerLinkedToProject(runner)"
               v-tooltip.top="'Delete runner'"
               icon="pi pi-trash"
               text
@@ -297,6 +305,12 @@ watch(
               <div class="flex align-items-center gap-2">
                 <i class="pi pi-server text-color-secondary"></i>
                 <span class="font-medium">{{ data.name }}</span>
+                <Tag
+                  v-if="isRunnerLinkedToProject(data)"
+                  :value="`Project: ${data.projectName}`"
+                  severity="info"
+                  v-tooltip.top="'Linked to a project. Manage under Project settings.'"
+                />
               </div>
             </template>
           </Column>
@@ -323,6 +337,7 @@ watch(
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button
+                  v-if="!isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Delete runner'"
                   icon="pi pi-trash"
                   text
