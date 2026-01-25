@@ -45,5 +45,9 @@ namespace Automaton.Studio.Server.Entities
         // Navigation properties for project relationships
         public virtual ICollection<Project> OwnedProjects { get; set; }
         public virtual ICollection<ProjectMember> ProjectMemberships { get; set; }
+        
+        // Navigation properties for organization relationships
+        public virtual ICollection<Organization> OwnedOrganizations { get; set; }
+        public virtual ICollection<OrganizationMember> OrganizationMemberships { get; set; }
     }
 }

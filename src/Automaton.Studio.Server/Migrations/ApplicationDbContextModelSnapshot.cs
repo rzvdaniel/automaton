@@ -789,6 +789,207 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Logs");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("AllowPublicSignup")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("PrimaryColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<string>("RequireEmailDomain")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Slug")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "IsActive");
+
+                    b.ToTable("Organizations");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationAppAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("AssignedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppId");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "AppId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationAppAssignments");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("InvitedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsConsumed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("InvitedBy");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "Email", "IsConsumed");
+
+                    b.ToTable("OrganizationInvitations");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("InvitedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvitedBy");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "UserId", "IsActive");
+
+                    b.ToTable("OrganizationMembers");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -817,6 +1018,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("char(36)");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("char(36)");
 
@@ -828,7 +1032,11 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
+                    b.HasIndex("OrganizationId");
+
                     b.HasIndex("OwnerId");
+
+                    b.HasIndex("OrganizationId", "IsActive");
 
                     b.HasIndex("OwnerId", "IsActive");
 
@@ -1009,6 +1217,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("AddedBy")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("RunnerId1")
+                        .HasColumnType("char(36)");
+
                     b.HasKey("ProjectId", "RunnerId");
 
                     b.HasIndex("AddedBy");
@@ -1016,6 +1227,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("ProjectId");
 
                     b.HasIndex("RunnerId");
+
+                    b.HasIndex("RunnerId1");
 
                     b.ToTable("ProjectRunners");
                 });
@@ -1673,13 +1886,110 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
+                        .WithMany("OwnedOrganizations")
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationAppAssignment", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "App")
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Assigner")
+                        .WithMany()
+                        .HasForeignKey("AssignedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                        .WithMany("AppAssignments")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("App");
+
+                    b.Navigation("Assigner");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationInvitation", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                        .WithMany()
+                        .HasForeignKey("InvitedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                        .WithMany("Invitations")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Inviter");
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationMember", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                        .WithMany()
+                        .HasForeignKey("InvitedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                        .WithMany("Members")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany("OrganizationMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Inviter");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
                 {
+                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                        .WithMany("Projects")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
                         .WithMany("OwnedProjects")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Organization");
 
                     b.Navigation("Owner");
                 });
@@ -1859,6 +2169,10 @@ namespace Automaton.Studio.Server.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Automaton.Studio.Server.Entities.Runner", null)
+                        .WithMany("ProjectRunners")
+                        .HasForeignKey("RunnerId1");
+
                     b.Navigation("AddedByUser");
 
                     b.Navigation("Project");
@@ -2008,6 +2322,10 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("OrganizationMemberships");
+
+                    b.Navigation("OwnedOrganizations");
+
                     b.Navigation("OwnedProjects");
 
                     b.Navigation("ProjectMemberships");
@@ -2030,6 +2348,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("FlowExecutionUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+                {
+                    b.Navigation("AppAssignments");
+
+                    b.Navigation("Invitations");
+
+                    b.Navigation("Members");
+
+                    b.Navigation("Projects");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
                 {
                     b.Navigation("Members");
@@ -2049,6 +2378,8 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Runner", b =>
                 {
+                    b.Navigation("ProjectRunners");
+
                     b.Navigation("RunnerUsers");
                 });
 
