@@ -422,6 +422,27 @@ Shared modules (`src/shared/`): components, services (Axios, SignalR), composabl
 - Content: YAML frontmatter + Markdown instructions
 - See `.github/skills/post-change-validation/SKILL.md` for reference
 
+## Teaching & Learning: FOR-DEVELOPERS.md
+
+**Philosophy:** Every project is a lesson. Automaton is a vehicle for learning architecture, design patterns, real-world tradeoffs, and engineering wisdom.
+
+**Purpose:** [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md) explains the *entire* project in engaging, plain language—not as dry technical docs, but as a narrative of decisions, lessons, pitfalls, and how good engineers think.
+
+**What It Covers:**
+- **Architecture Overview** – Why this design? (Use analogies to make it memorable)
+- **Key Technical Decisions** – Vue vs. Blazor, distributed runners, project-based multi-tenancy; the *why*, not just the *how*
+- **Common Pitfalls & Solutions** – Real bugs we hit, how we fixed them, how to avoid them
+- **Lessons Learned** – Testing strategies, performance gotchas, migration challenges, surprises
+- **How We Think** – Philosophy behind best practices (theme-aware styling, feature-based architecture, post-change validation)
+
+**Style:** Engage, don't bore. Use anecdotes, analogies, and context. Make it memorable enough that future developers internalize *why* decisions were made, not just *what* was built.
+
+**When to Update:**
+- After resolving a tricky bug or discovering a pitfall
+- After completing a major architectural feature
+- When adding a new technology or pattern
+- When you realize "I wish I'd known this earlier"—that's a lesson worth documenting
+
 ## Plan Mode
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.

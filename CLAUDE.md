@@ -911,6 +911,42 @@ The backend exports OpenAPI 3.0 specs. The frontend uses `openapi-typescript` to
 
 **Reference:** See `.github/skills/post-change-validation/SKILL.md` for complete example following GitHub's agent skills format.
 
+## Teaching & Learning: FOR-DEVELOPERS.md
+
+**Every project is a lesson in engineering.** This project maintains [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md)—a narrative guide written to teach, not just document.
+
+**Why This Matters:**
+- **Captures Wisdom**: Every architectural decision, bug fix, and lesson learned is knowledge worth preserving
+- **Teaches by Story**: Technical decisions are more memorable and understandable when explained with context and analogies
+- **Prevents Repeated Mistakes**: Future work benefits from documented pitfalls and how we solved them
+- **Shares Engineering Philosophy**: How *good engineers think* about problems, tradeoffs, and solutions
+
+**What's Covered in FOR-DEVELOPERS.md:**
+- **Architecture narrative** – Why we built it this way; what we learned from alternatives
+- **Key decisions with context** – Vue vs. Blazor, distributed runners, project scoping; the reasoning and tradeoffs
+- **Real bugs & solutions** – Concrete examples of what broke, how we fixed it, and how to avoid it
+- **Lessons learned** – Performance insights, testing strategies, migration gotchas, surprises
+- **Our engineering philosophy** – How we approach problems: theme-aware styling, feature-based organization, validation practices, documentation as learning
+
+**When to Contribute:**
+- After fixing a tricky bug—what caused it? What will prevent it next time?
+- After completing a significant feature—what surprised you? What would you tell your past self?
+- When implementing a pattern you see repeated—is there a lesson here?
+- When you learn something that changes how you think about the project
+
+**Style:** Write as if teaching a junior engineer. Use analogies, anecdotes, and context. Make it engaging to read—not a textbook, but a conversation with someone learning the craft.
+
+## Continuous Learning Through Documentation
+
+Automaton is both a product and a **teaching project**. We document not just *what* we build, but *why* we build it, *what we learned*, and *how good engineers think*. This shapes both code quality and team knowledge.
+
+**Three Documentation Layers:**
+1. **AGENTS.md / CLAUDE.md** – Project overview and development reference (live documents, kept current)
+2. **AI Skills** (`.github/skills/`) – Reusable workflows and best practices (task-focused, procedural)
+3. **FOR-DEVELOPERS.md** – Narrative teaching guide explaining architecture, decisions, lessons, philosophy (timeless, engaging)
+
+Together, they create a **learning culture** where knowledge compounds and future engineers benefit from past work.
+
 ## Plan Mode
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
