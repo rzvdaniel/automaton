@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -13,6 +13,7 @@ import SelectButton from 'primevue/selectbutton'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '../services/runners.service'
+import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import {
   RunnerStatus,
   getStatusDisplayName,
@@ -22,6 +23,7 @@ import {
 
 const toast = useToast()
 const confirm = useConfirm()
+const projectsStore = useProjectsStore()
 
 // State
 const loading = ref(true)
@@ -45,11 +47,11 @@ function getStatusColor(status: RunnerStatus): string {
   return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'
 }
 
-// Load runners
-async function loadRunners() {
+// Load runners with optional project filter
+async function loadRunners(projectId?: string | null) {
   loading.value = true
   try {
-    runners.value = await runnersService.list()
+    runners.value = await runnersService.list(projectId ?? undefined)
   } catch (err: unknown) {
     console.error('Failed to load runners:', err)
     toast.add({
@@ -127,9 +129,14 @@ async function copyDockerCommand() {
   }
 }
 
-onMounted(() => {
-  loadRunners()
-})
+// React to active project changes (including initial load)
+watch(
+  () => projectsStore.activeProjectId,
+  async (projectId) => {
+    await loadRunners(projectId)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

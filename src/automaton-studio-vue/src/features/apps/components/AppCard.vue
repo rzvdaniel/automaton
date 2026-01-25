@@ -8,7 +8,9 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Menu from 'primevue/menu'
 import type { App } from '../types/apps.types'
+import { AccessScope } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
+import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 
 interface Props {
   app: App
@@ -38,6 +40,7 @@ const router = useRouter()
 const confirm = useConfirm()
 const toast = useToast()
 const appsStore = useAppsStore()
+const projectsStore = useProjectsStore()
 
 const menu = ref()
 
@@ -46,6 +49,14 @@ const statusBadge = computed(() => ({
   severity: props.app.isPublished ? ('success' as const) : ('secondary' as const),
   icon: props.app.isPublished ? 'pi pi-check-circle' : 'pi pi-file-edit',
 }))
+
+// Project linkage info
+const isLinkedToProject = computed(() => props.app.scope === AccessScope.Project)
+const projectName = computed(() => {
+  if (!props.app.projectId) return 'Project'
+  const p = projectsStore.projects.find((x) => x.id === props.app.projectId)
+  return p?.displayName || 'Project'
+})
 
 const updatedAgo = computed(() => {
   if (!props.app.updated) return 'Never updated'
@@ -180,11 +191,14 @@ const menuItems = computed(() => {
     })
   }
 
-  items.push({
-    label: 'Delete',
-    icon: 'pi pi-trash',
-    command: handleDelete,
-  })
+  // Disable delete when linked to a project
+  if (!isLinkedToProject.value) {
+    items.push({
+      label: 'Delete',
+      icon: 'pi pi-trash',
+      command: handleDelete,
+    })
+  }
 
   return items
 })
@@ -246,6 +260,12 @@ const menuItems = computed(() => {
             <span class="flex align-items-center gap-1">
               <i :class="statusBadge.icon" style="font-size: 0.75rem"></i>
               {{ statusBadge.label }}
+            </span>
+          </Tag>
+          <Tag v-if="isLinkedToProject" severity="info" v-tooltip.top="'Linked to ' + projectName">
+            <span class="flex align-items-center gap-1">
+              <i class="pi pi-users" style="font-size: 0.75rem"></i>
+              Project: {{ projectName }}
             </span>
           </Tag>
         </div>

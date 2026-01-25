@@ -47,6 +47,9 @@ export interface App {
   created: string // ISO date string
   updated: string // ISO date string
   executionRunnerId?: string
+  // Project context
+  scope: AccessScope
+  projectId?: string
   definition: AppDefinition
   // Analytics
   viewCount: number
@@ -86,6 +89,17 @@ export interface AppListFilters {
   status: 'all' | 'published' | 'draft'
   projectId?: string
 }
+
+/**
+ * Access scope enum for resources (matches Automaton.Studio.Server.Enums.AccessScope)
+ */
+export const AccessScope = {
+  Personal: 0,
+  Project: 1,
+  Public: 2,
+} as const
+
+export type AccessScope = (typeof AccessScope)[keyof typeof AccessScope]
 
 /**
  * Linked step info for apps

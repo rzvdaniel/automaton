@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -18,6 +18,7 @@ import AppCard from '../components/AppCard.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { App } from '../types/apps.types'
 
@@ -25,6 +26,7 @@ const router = useRouter()
 const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
+const projectsStore = useProjectsStore()
 
 // AI generation state
 const aiDescription = ref('')
@@ -78,14 +80,18 @@ watch(selectedStatus, (value) => {
   appsStore.setStatusFilter(value)
 })
 
-// Lifecycle
-onMounted(async () => {
-  try {
-    await appsStore.fetchApps()
-  } catch {
-    // Error is handled in the store
-  }
-})
+// React to active project changes (including initial load)
+watch(
+  () => projectsStore.activeProjectId,
+  async (projectId) => {
+    try {
+      await appsStore.fetchApps(projectId ?? undefined)
+    } catch {
+      // Error handled in store
+    }
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   appsStore.clearFilters()

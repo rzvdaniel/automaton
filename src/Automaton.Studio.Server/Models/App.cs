@@ -15,6 +15,10 @@ public class AppModel
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
 
+    // Project context
+    public Enums.AccessScope Scope { get; set; }
+    public Guid? ProjectId { get; set; }
+
     // Analytics
     public int ViewCount { get; set; }
     public DateTime? LastViewedAt { get; set; }

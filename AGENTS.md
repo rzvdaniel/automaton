@@ -366,6 +366,13 @@ Projects organize related Flows, Apps, and Custom Steps with shared settings and
 - `src/features/projects/views/ProjectsListView.vue` – list, create/delete, quick actions
 - `src/features/projects/views/ProjectSettingsView.vue` – manage assets, shared variables, permissions
 
+**Scopes (UI semantics):**
+- **Personal**: Shows resources you own (via `WebAppUsers`/`FlowUsers`/etc.), even if they’re also linked to a project. It means “mine,” not “unassigned.”
+- **Project**: Shows resources in the selected project that you can access via membership (includes items owned by others).
+
+**Personal list badges:**
+- Personal views display a small badge `Project: {name}` on items linked to a project. These items cannot be deleted from Personal; manage them under the project.
+
 ## Feature Modules
 
 The frontend is composed of self-contained feature modules:

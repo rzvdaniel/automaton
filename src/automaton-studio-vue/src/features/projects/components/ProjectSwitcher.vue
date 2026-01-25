@@ -17,8 +17,8 @@ const optionsList = computed(() => {
   return [
     {
       id: null,
-      displayName: 'All projects',
-      displayLabel: 'All projects',
+      displayName: 'Personal',
+      displayLabel: 'Personal',
     },
     ...store.projects.map((p) => ({
       id: p.id,
@@ -31,7 +31,7 @@ const optionsList = computed(() => {
 // Get display label for current selection
 const displayLabel = computed(() => {
   if (!store.activeProjectId) {
-    return 'All projects'
+    return 'Personal'
   }
   const current = store.activeProject
   return current?.displayName || 'Select a project'

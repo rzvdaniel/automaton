@@ -76,6 +76,13 @@ npm run type-check
 npm run lint
 npm run format
 ```
+## Project Scope Semantics (Frontend)
+
+- Use the header Project switcher to scope views:
+  - **Personal**: resources owned by the current user; items linked to a project still appear with a `Project: {name}` badge.
+  - **Project**: resources shared within the selected project via membership.
+- Disable deletion in Personal for items linked to a project; instruct users to manage shared items under the project.
+- Match backend DTOs exactly: when adding scope fields, prefer numeric enums using `const` objects in TypeScript.
 
 ### Backend (.NET)
 
