@@ -1,797 +1,187 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Claude-specific configuration and guidance for working with the Automaton codebase.
 
-## Project Overview
+## Project Context
 
-Automaton is a cross-platform workflow automation platform with an AI-first approach to workflow design. It combines a Vue.js/TypeScript web frontend with a .NET 9.0 backend, providing natural language flow generation, integrated web app building, remote execution runners, and custom step authoring with Python/PowerShell/Batch support.
+**See [AGENTS.md](AGENTS.md) for comprehensive project documentation.**
 
-**Core Components:**
+This file contains Claude-specific extensions and mental models.
 
-- **Frontend (`src/automaton-studio-vue/`)**: Vue 3 + TypeScript + Vite
-  - Modern, feature-based architecture with composables, stores, and services
-  - PrimeVue for enterprise-grade UI components
-  - Monaco Editor for code editing (flows, apps, custom steps)
-  - Pinia for state management
-  - Natural language flow generation interface (AI-first)
+## Claude's Mental Model
 
-- **Backend (`src/Automaton.Studio.Server/`)**: ASP.NET Core 9.0 Web API
-  - 25+ REST API controllers for flows, apps, runners, steps, projects
-  - Entity Framework Core 9.0 with MySQL/MariaDB persistence
-  - SignalR hubs for real-time runner communication and execution updates
-  - Hangfire for background job scheduling
-  - ASP.NET Core Identity with JWT Bearer authentication
-  - Serilog structured logging
-  - Swagger/OpenAPI documentation
+When working on Automaton, adopt this mental framework:
 
-- **Runner (`src/Automaton.Runner/`)**: Cross-platform console application
-  - Standalone executable (single-file or framework-dependent)
-  - SignalR client for server communication and flow execution dispatch
-  - Polly for resilience and retry policies
-  - Executes flows on remote machines via runner nodes
+### 1. **Think in Layers**
+The codebase is strictly layered: Frontend → REST API → Services → Core Engine → Persistence
 
-- **Core Engine (`src/Automaton.Core/`)**: Workflow execution engine
-  - MediatR for CQRS pattern
-  - Variable mapping and step orchestration
-  - Dynamic expression evaluation
-  - Pluggable step architecture
+- **Frontend changes** shouldn't require backend changes (via API contracts)
+- **Backend changes** must maintain API compatibility or version endpoints
+- **Core engine changes** impact runners, always test end-to-end
+- **Database changes** require migrations with rollback safety
 
-- **Built-in Steps (`src/Automaton.Steps/`)**: Step library
-  - HTTP, email, database, file operations
-  - References Core engine and Scripting layer
+**Implication:** When adding a feature, implement each layer independently if possible. Don't create tight coupling between presentation and persistence.
 
-- **Python Integration (`src/Automaton.Core.Scripting/`)**: 
-  - pythonnet 3.0.5 for CPython interop
-  - Custom step execution with variable injection
+### 2. **Real-Time is Critical**
+SignalR isn't optional—it's how runners receive commands and the frontend gets execution updates.
 
-- **AI Integration (`src/Automaton.Mcp/`)**: 
-  - Model Context Protocol (MCP) for AI-powered flow/step generation
-  - Multi-provider support (OpenAI, Anthropic, Google, Azure)
-  - Step testing and refinement workflow
+- Runner connection failures cascade into flow failures
+- Execution logs must stream in real-time (no polling)
+- Frontend must handle reconnection gracefully
+- Always test with runners actually disconnected to verify resilience
 
-- **Marketing Site (`src/Automaton.Web/`)**: Static HTML/CSS/JS website
+**Implication:** When implementing execution features, assume the network will fail. Design for recovery, not prevention.
 
-## Common Commands
+### 3. **Type Safety is Non-Negotiable**
+The system bridges three type systems: C# (backend), TypeScript (frontend), Python (custom steps)
 
-### Frontend (Vue.js)
+- **Critical rule:** TypeScript interfaces must match C# DTOs exactly (property names, types, optionality)
+- **Enums:** Use `const` objects in TypeScript instead of TypeScript enums (enables type narrowing)
+- **Custom steps:** Python code runs in isolated context—validate inputs rigorously
+
+**Implication:** When modifying a DTO, immediately update the TypeScript interface. Generate types from the OpenAPI spec when needed.
+
+### 4. **Projects = Multi-Tenancy Boundary**
+The entire permission and resource model revolves around project membership.
+
+- Resources belong to projects (project = owner)
+- Users access resources via project membership roles
+- "Personal" is a UI concept (user-owned resources), not a database concept
+- Personal items linked to a project can't be deleted from Personal view
+
+**Implication:** When adding a new resource type (flows, apps, steps), it must support project linking. Check existing migrations for the pattern.
+
+### 5. **Theme Inheritance Matters**
+The UI supports light/dark themes. Background colors are inherited, not set.
+
+- Set `background-color` only at the root or major container level
+- Nested components inherit `--p-surface-ground`
+- Borders and text adapt via CSS variables
+- Dark mode is a class toggle (`app-dark`)
+
+**Implication:** Never hardcode backgrounds in nested components. If a component looks wrong, check parent backgrounds first.
+
+### 6. **Testing is Your Safeguard**
+This codebase has good test coverage. Use it.
+
+- Frontend: Vitest + Vue Test Utils (unit/integration)
+- Backend: xUnit + Moq + InMemoryDatabase
+- Run tests after **any** change (not just after completing a feature)
+- Test both success **and** failure paths
+
+**Implication:** Before making a PR, run the full test suite. If tests fail, the change is incomplete.
+
+## When to Use Agent Skills
+
+This project includes reusable Agent Skills in `docs/skills/`:
+
+- **[theme-aware-styling](docs/skills/theme-aware-styling/SKILL.md)** - How to write theme-aware CSS
+- **[implementing-features](docs/skills/implementing-features/SKILL.md)** - Full-stack feature workflow
+- **[web-app-integration](docs/skills/web-app-integration/SKILL.md)** - How published apps call flows
+- **[signalr-communication](docs/skills/signalr-communication/SKILL.md)** - Real-time runner/frontend patterns
+- **[testing-patterns](docs/skills/testing-patterns/SKILL.md)** - Test examples and best practices
+
+Invoke these skills when you need concrete code examples for a specific pattern.
+
+## Critical Constraints
+
+### ❌ Don't
+
+1. **Hardcode CSS backgrounds** - Breaks dark mode
+2. **Use TypeScript enums** - Use `const` objects instead
+3. **Skip migrations** - Database changes require EF Core migrations
+4. **Add dependencies without testing** - The codebase is tightly integrated
+5. **Assume synchronous SignalR** - Always use async/await
+6. **Modify DTOs without updating types** - Causes frontend bugs
+7. **Delete tests when they fail** - Fix the code instead
+
+### ✅ Do
+
+1. **Match TypeScript to C# exactly** - Property names, types, optionality
+2. **Test both success and failure** - Error paths are important
+3. **Use const objects instead of enums** - Better type narrowing
+4. **Implement theme-aware CSS** - Inherit from parents, use `--p-surface-ground`
+5. **Add loading states** - Every async operation needs one
+6. **Show toast notifications** - All user feedback via toast
+7. **Handle errors gracefully** - Try/catch with user-friendly messages
+
+## Common Pitfalls
+
+### "Components look weird in dark mode"
+→ Check parent background colors. Nested components should not set backgrounds.
+
+### "Frontend types don't match backend responses"
+→ Generate types from OpenAPI spec or manually sync DTOs. Use `npm run generate:types`.
+
+### "Tests pass locally but fail in CI"
+→ Database migrations or test data setup issue. Check EF Core migrations in `src/Automaton.Studio.Server/Migrations/`.
+
+### "SignalR messages aren't received"
+→ Verify runners are actually connected (check admin logs). Use groups for targeted messaging.
+
+### "API endpoint returns wrong structure"
+→ Check Swagger UI (`https://localhost:7091/swagger`) for source of truth. Update backend first, then types.
+
+## Architectural Decisions Worth Understanding
+
+**Why SignalR instead of polling?**
+Flows can run for hours. Polling would waste resources. SignalR keeps persistent connections with automatic reconnection.
+
+**Why projects instead of users?**
+Single-user flows are boring. The system is designed for teams sharing automation logic. Projects enable role-based access without hardcoding permissions per resource.
+
+**Why const objects instead of TypeScript enums?**
+Enums create a separate type namespace. Const objects are just values, enabling better type narrowing and compatibility with C#.
+
+**Why feature-based folders instead of by-type?**
+Keeps related code together (types, services, components, stores). Easier to delete/refactor features. Matches how brains organize information.
+
+## Development Velocity Tips
+
+1. **Run type-check frequently** - `npm run type-check` catches issues early
+2. **Use Swagger for the source of truth** - When in doubt, check the API spec
+3. **Start with tests** - Write test cases before implementing features
+4. **Keep services simple** - Just API calls, no business logic
+5. **Use composables for shared logic** - Promotes reuse and testability
+6. **Test in both themes** - Toggle theme switcher to verify styling
+
+## When to Check AGENTS.md
+
+- Building/running the project
+- Finding where code lives
+- Understanding the project structure
+- Learning about specific features
+- Deployment and DevOps
+
+## When to Check a Skill
+
+- Implementing theme-aware CSS
+- Adding a full-stack feature
+- Calling flows from published apps
+- Using SignalR for real-time updates
+- Writing tests
+
+## When to Trust Your Judgment
+
+- Architecture decisions (ask via code review)
+- Refactoring opportunities
+- Performance optimizations
+- Error handling strategies
+- Testing edge cases
+
+## Quick Reference: Post-Change Validation
+
+After any change, run:
 
 ```bash
-# Install dependencies
-cd src/automaton-studio-vue
-npm install
+# Frontend
+npm run type-check  # Catch type mismatches
+npm run lint        # Style consistency
+npm run test        # Verify behavior
 
-# Development server with HMR
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm run test
-
-# Type checking
-npm run type-check
-
-# Lint and format
-npm run lint
-npm run format
-```
-## Project Scope Semantics (Frontend)
-
-- Use the header Project switcher to scope views:
-  - **Personal**: resources owned by the current user; items linked to a project still appear with a `Project: {name}` badge.
-  - **Project**: resources shared within the selected project via membership.
-- Disable deletion in Personal for items linked to a project; instruct users to manage shared items under the project.
-- Match backend DTOs exactly: when adding scope fields, prefer numeric enums using `const` objects in TypeScript.
-
-### Backend (.NET)
-
-```bash
-# Build all projects
-dotnet build
-
-# Build specific project
-dotnet build src/Automaton.Studio.Server
-dotnet build src/Automaton.Runner
-
-# Build in Release mode
-dotnet build -c Release
-
-# Run the API server
-dotnet run --project src/Automaton.Studio.Server
-
-# Runner is managed via Docker Compose (see Runner Deployment)
-
-# Run all tests
-dotnet test
-
-# Run specific test project
-dotnet test src/UnitTests/Automaton.Core.Tests
+# Backend
+dotnet build        # Compilation check
+dotnet test         # Verify behavior
 ```
 
-### Database Migrations
-
-```bash
-# Ensure dotnet-ef is installed
-dotnet tool install --global dotnet-ef
-
-# Navigate to server project
-cd src/Automaton.Studio.Server
-
-# Add a new migration
-dotnet ef migrations add MigrationName
-
-# Update database
-dotnet ef database update
-
-# View migration SQL
-dotnet ef migrations script
-
-# Remove last migration
-dotnet ef migrations remove
-
-# List all migrations
-dotnet ef migrations list
-```
-
-### Runner Deployment (Docker Compose – Preferred)
-
-Use the provided Docker Compose file for deploying and managing the runner.
-
-```bash
-# From repo root
-cp .env.example .env
-
-# Configure environment in .env
-# AUTOMATON_SERVER_URL=https://your-server-url
-# AUTOMATON_API_KEY=ak_runner_xxx
-
-# Start the runner
-docker compose -f docker-compose.runner.yml up -d
-
-# View logs
-docker compose -f docker-compose.runner.yml logs -f runner
-
-# Stop/remove
-docker compose -f docker-compose.runner.yml down
-```
-
-Manual execution of the runner is deprecated; use Docker Compose for production and staging environments. For local debugging only, see README for a minimal fallback.
-
-## Architecture Notes
-
-### Multi-Layered Design
-
-**Frontend → REST API → Services → Data Persistence**
-
-#### Frontend Architecture (Vue.js + TypeScript)
-
-**Feature-Based Structure** (`src/automaton-studio-vue/src/features/`):
-
-Each feature (auth, flows, apps, steps, etc.) is self-contained with:
-- **components/** - Vue components specific to the feature
-- **composables/** - Reusable Composition API functions
-- **services/** - API calls and business logic
-- **stores/** - Pinia state management
-- **types/** - TypeScript interfaces and types
-- **views/** - Page-level components
-- **routes.ts** - Feature routes (aggregated in main router)
-
-Key features:
-- **auth/** - Authentication, login, registration
-- **dashboard/** - Home page, statistics, recent activity
-- **flows/** - Flow management and AI-first generation interface
-- **apps/** - Web app builder with Monaco editor
-- **steps/** - Custom step library and designer
-- **runners/** - Runner registration and management
-- **projects/** - Project/organization management
-- **settings/** - User and application settings
-
-Benefits of this structure:
-- Colocation of related code
-- Easy feature isolation and testing
-- Lazy loading of entire features
-- Clear separation of concerns
-
-#### Backend Architecture (ASP.NET Core)
-
-**Layered Structure:**
-
-1. **API Layer** (`Automaton.Studio.Server/Controllers/`): 25+ REST endpoints
-   - FlowsController, AppsController, RunnersController, etc.
-   - Handles HTTP requests/responses and basic validation
-
-2. **Service Layer** (`Automaton.Studio.Server/Services/`): Business logic
-   - FlowsService, AppsService, FlowGenerationService, etc.
-   - Handles workflows, validation, and orchestration
-
-3. **Data Layer** (`Automaton.Studio.Server/Data/Entities/`): EF Core
-   - ApplicationDbContext, Entities, Migrations
-
-4. **Core Engine** (`Automaton.Core/`): Execution logic
-   - Flow execution, step orchestration, variable mapping
-
-### Key Execution Flow
-
-**Flow Execution Path:**
-1. User submits flow execution request via REST API
-2. `FlowsController` → `FlowsService` creates execution record
-3. SignalR hub sends command to registered runner(s)
-4. Runner executes steps via `Automaton.Core` workflow engine
-5. Runner reports progress/logs back to server via SignalR
-6. Frontend receives real-time updates via SignalR subscription
-
-**Flow Generation Path (AI-First):**
-1. User enters natural language description in frontend
-2. Frontend calls `POST /api/flows/generate` via REST
-3. `FlowGenerationService` searches for reusable existing steps
-4. Calls AI provider (OpenAI/Anthropic/etc) with context
-5. AI generates flow structure with steps and connections
-6. Service creates custom steps (if needed) and flow definition
-7. Flow saved to database in draft state
-8. Frontend displays generated flow for review/refinement
-
-### Frontend-Backend Communication
-
-**REST API Integration:**
-- All data operations use REST endpoints via Axios
-- JWT tokens automatically injected by interceptors
-- Controllers in `src/Automaton.Studio.Server/Controllers/`
-- OpenAPI spec at `https://localhost:7091/swagger/v1/swagger.json`
-
-**Request Flow:**
-1. Vue component calls feature service method
-2. Service makes HTTP request via `apiClient` (Axios instance)
-3. Request interceptor adds JWT token to Authorization header
-4. Backend controller receives request, validates, processes
-5. Controller returns response (200 OK, 400 Bad Request, etc.)
-6. Service returns typed data to component
-7. Component updates UI and shows feedback (toast, loading state)
-
-**Type Safety:**
-- TypeScript interfaces must match C# DTOs exactly (property names, types, optionality)
-- **Critical:** Use const objects instead of enums in TypeScript
-- Example: `export const MyEnum = { Value1: 1 } as const`
-
-**Common HTTP Patterns:**
-- **List:** `GET /api/resource` (optional query params)
-- **Get Single:** `GET /api/resource/{id}`
-- **Create:** `POST /api/resource` (body: CreateRequest)
-- **Update:** `PUT /api/resource/{id}` (body: UpdateRequest)
-- **Delete:** `DELETE /api/resource/{id}`
-
-**HTTP Status Codes:**
-- 200 OK, 201 Created, 204 No Content - Success
-- 400 Bad Request - Validation error
-- 401 Unauthorized - Auth required
-- 403 Forbidden - Insufficient permissions
-- 404 Not Found - Resource not found
-- 500 Internal Server Error - Server error
-
-**Error Handling Pattern:**
-- Use try/catch in service calls
-- Show toast notifications for user feedback
-- Log errors to console for debugging
-
-### Implementing a New Feature
-
-**Step-by-Step Workflow:**
-1. Backend: Create controller with `[Route("api/[controller]")]`, `[ApiController]`, `[Authorize]`
-2. Frontend: Create feature folder with `components/`, `services/`, `types/`, `views/`
-3. TypeScript: Match C# DTOs exactly, use const objects instead of enums
-4. Service: Use `apiClient`, handle errors with try/catch
-5. Component: Use PrimeVue, implement loading states, show toast notifications
-
-**For complete code examples and patterns, see:** [docs/skills/implementing-features/SKILL.md](docs/skills/implementing-features/SKILL.md)
-
-### Authentication & Authorization
-
-**Multi-Mode:**
-- **JWT Bearer**: Web UI authentication (OAuth, standard bearer token)
-- **API Keys**: Runner authentication and integrations
-  - Format: `ak_<scope>_<random>` (e.g., `ak_runner_xxx`)
-  - Scopes: Runner, Execute, ReadOnly, WebApp
-  
-**Project-Based Authorization** (Role-based access):
-- Roles: `ProjectAdmin`, `Developer`, `AppUser`, `Viewer`
-- Resource scopes: Personal, Project, Public
-
-### SignalR Real-Time Hubs
-
-**RunnerHub**: Runner registration and heartbeat
-- Runners authenticate via API keys
-- Maintain persistent WebSocket connections
-- Receive execution commands from server
-
-**FlowExecutionHub**: Execution progress and logs
-- Stream real-time execution logs to frontend
-- Update execution status as steps complete
-
-### Variable System
-
-Flows use placeholder-based variable mapping:
-- Variables defined as `${variableName}` in configurations
-- Step inputs/outputs automatically mapped between steps
-- Type validation and conversion at execution time
-
-### Step Architecture
-
-All steps inherit from `BaseStep` in `Automaton.Core` with single method: `ExecuteAsync(IStepExecutionContext context)`
-
-Custom steps (Python/PowerShell/Batch) are defined with:
-- Name, display name, description
-- Input variable schemas (name, type, required)
-- Output variable schemas
-- Execution code
-
-### Web App Integration
-
-Published web apps call backend flows via `window.automatonApi.executeFlow(flowId, { inputs: {...} })`
-
-**For complete API reference and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
-
-## Important Implementation Patterns
-
-### Frontend: Feature-Based Organization
-
-Each feature folder (`src/automaton-studio-vue/src/features/`) follows this pattern:
-
-```
-feature-name/
-├── components/          # Feature-specific Vue components
-├── composables/         # Composition API functions
-├── services/            # API service calls
-├── stores/              # Pinia store(s)
-├── types/               # TypeScript interfaces
-├── views/               # Top-level page components
-└── routes.ts            # Feature routes
-```
-
-Example: `flows/` feature
-- Components: FlowCard, FlowTimeline, FlowGenerationPanel
-- Composables: useFlows(), useFlowGeneration()
-- Services: flowsService.ts (REST calls to /api/flows)
-- Store: flowsStore.ts (Pinia for flow state)
-- Views: FlowsListView, FlowGeneratorView
-
-### Backend: Service Registration & Dependency Injection
-
-Services registered in `Program.cs`:
-- **Scoped**: Per-request services (DbContext, user-specific services)
-- **Singleton**: Shared state (SignalR connection tracking, cache)
-- **Transient**: Stateless utilities
-
-### Frontend: HTTP Client with Axios
-
-Axios instance at `src/shared/services/api/axios-instance.ts`:
-- Base URL from environment variable `VITE_API_URL`
-- Request interceptors automatically inject JWT token
-- Import via: `import apiClient from '@/shared/services/api/axios-instance'`
-
-### Frontend: Pinia State Management
-
-Store pattern using Composition API:
-- Define store with `defineStore('name', () => { ... })`
-- Use `ref()` for reactive state
-- Use `computed()` for derived values
-- Return object with state and functions
-- Access in components via `useXxxStore()`
-
-### Frontend: Theme-Aware Styling (Light/Dark Mode)
-
-**CRITICAL: Never hardcode background colors.** Components must inherit backgrounds from parents or use theme-adaptive CSS variables.
-
-The application supports light and dark themes. Key principles:
-- Prefer inheritance over explicit backgrounds
-- Use `--p-surface-ground`, `--p-text-color` for adaptive colors
-- Avoid `--p-surface-0` through `--p-surface-400` (always light)
-- Only adjust borders in dark mode, not backgrounds
-
-**For complete patterns and examples, see:** [docs/skills/theme-aware-styling/SKILL.md](docs/skills/theme-aware-styling/SKILL.md)
-
-Custom steps inherit from `BaseStep` in `Automaton.Core` and implement `ExecuteAsync`:
-- Get input variables via `context.GetInputVariable<T>("name")`
-- Set output variables via `context.SetOutputVariable("name", value)`
-- Return `ExecutionResult.Success()` or `ExecutionResult.Failure(message)`
-
-### Web App API Calls
-
-Web apps call backend flows using `window.automatonApi` helper:
-
-```javascript
-// Published web app frontend code
-const result = await window.automatonApi.executeFlow(flowId, {
-  inputs: {
-    orderId: '12345',
-    customerId: 'cust_999'
-  }
-});
-
-console.log(result.outputVariables);
-```
-
-### SignalR Real-Time Communication
-
-Automaton uses SignalR for bidirectional real-time communication:
-- **RunnerHub**: Runner registration, heartbeat, command dispatch
-- **FlowExecutionHub**: Execution progress and log streaming
-
-**For complete implementation patterns and examples, see:** [docs/skills/signalr-communication/SKILL.md](docs/skills/signalr-communication/SKILL.md)
-
-## Current Development Context
-
-**Active Feature: Project/Organization Multi-Tenancy**
-
-The codebase is currently implementing project-based multi-tenancy. Recent commits show:
-- Database migrations for `Projects`, `ProjectMembers`, `ProjectApps`, `ProjectFlows`, `ProjectRunners`, `ProjectCustomSteps`
-- API controllers for project management
-- Blazor UI for project settings and member management
-- Role-based access control with 4 roles
-
-**Implementation Status:**
-- ✅ Phase 1: Database schema and core APIs (completed)
-- ✅ Phase 2: Project management UI pages (in progress)
-- 🔄 Phase 3: Resource linking and sharing (current)
-- ⏳ Phase 4: Role-based dashboards and personalization
-
-See `docs/projects/` for comprehensive documentation including:
-- `project-organization-tad.md` - Technical approach document
-- `implementation-guide.md` - Step-by-step implementation guide
-- `discussion-and-faq.md` - Design decisions and FAQ
-
-## Configuration Requirements
-
-### Frontend (Vue.js)
-
-**Environment Variables** (`.env.development`, `.env.production`):
-
-```env
-VITE_API_URL=http://localhost:7091
-VITE_SIGNALR_URL=http://localhost:7091/hubs
-VITE_APP_TITLE=Automaton Studio
-```
-
-### Backend (ASP.NET Core)
-
-**Required Settings** (`appsettings.json` or `appsettings.Development.json`):
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=automaton;User Id=root;Password=..."
-  },
-  "JwtOptions": {
-    "Issuer": "Automaton.Studio",
-    "Audience": "Automaton.User",
-    "HMacSettings": {
-      "SecretKey": "..."
-    }
-  },
-  "AiProviders": {
-    "OpenAI": {
-      "ApiKey": "sk_..."
-    }
-  }
-}
-```
-
-### Database
-
-**MySQL/MariaDB Setup:**
-- Create database: `CREATE DATABASE automaton;`
-- Run migrations: `dotnet ef database update`
-- Supports: MySQL 5.7+, MariaDB 10.2+
-
-### AI Provider Configuration
-
-**Optional AI Keys** (configured in Studio UI or appsettings):
-- OpenAI API key
-- Anthropic API key
-- Google Vertex AI credentials
-- Azure OpenAI endpoint
-
-## Testing Strategy
-
-### Frontend (Vue.js)
-
-**Test Types:** Unit tests (components, composables, services), Integration tests (feature workflows), E2E tests (Playwright)
-
-**Running Tests:**
-```bash
-npm run test              # Run all tests
-npm run test:watch        # Watch mode
-npm run test:coverage     # Coverage report
-```
-
-### Backend (.NET)
-
-**Test Projects:** `Automaton.Core.Tests`, `Automaton.Studio.Server.Tests`, `Automaton.Runner.Tests`
-
-**Running Tests:**
-```bash
-dotnet test                                   # Run all tests
-dotnet test src/UnitTests/Automaton.Core.Tests  # Specific project
-dotnet test /p:CollectCoverage=true          # With coverage
-```
-
-**Test Patterns:** InMemoryDatabase for EF Core, Moq for mocking, WebApplicationFactory for integration tests, AAA pattern
-
-**Target Coverage:** 80%+ business logic, 60%+ overall
-
-**For complete examples and patterns, see:** [docs/skills/testing-patterns/SKILL.md](docs/skills/testing-patterns/SKILL.md)
-
-## Troubleshooting
-
-### Frontend (Vue.js)
-
-**Common Issues:**
-
-1. **HMR (Hot Module Reload) Not Working:**
-   - Ensure Vite dev server is running on correct port (default: 5173)
-   - Check firewall isn't blocking localhost connections
-   - Clear browser cache: Cmd+Shift+Delete (Chrome/Edge)
-
-2. **API Calls Failing:**
-   - Verify `VITE_API_URL` points to correct backend
-   - Check backend server is running (`npm run dev:backend` or `dotnet run`)
-   - Review browser DevTools Network tab for 401 (auth) or 404 (endpoint) errors
-
-3. **TypeScript Errors:**
-   - Run `npm run type-check` to validate types
-   - Regenerate types: `npm run generate:types`
-   - Clear node_modules: `rm -r node_modules && npm install`
-
-### Backend (.NET)
-
-**Common Issues:**
-
-1. **Migration Errors:**
-   - Ensure database connection is valid
-   - Navigate to `src/Automaton.Studio.Server`
-   - Run: `dotnet ef database update`
-
-2. **Runner Connection Issues:**
-   - Verify API key has `Runner` scope
-   - Check SignalR URL matches server configuration
-   - Review runner logs for connection errors
-
-3. **Python Step Failures:**
-   - Ensure Python is installed and in PATH
-   - Verify `pythonnet` compatibility: `pip install pythonnet==3.0.5`
-   - Check custom step code syntax
-
-4. **Build Errors:**
-   - Clean: `dotnet clean && dotnet build`
-   - Restore: `dotnet restore`
-   - Verify .NET SDK: `dotnet --version` (requires 9.0)
-
-## Key Technologies & Libraries
-
-### Frontend (Vue.js 3 + TypeScript)
-
-| Technology | Purpose |
-|-----------|---------|
-| **Vue 3** | Progressive reactive framework |
-| **TypeScript 5.0+** | Type-safe JavaScript |
-| **Vite 5.0+** | Fast build tool with HMR |
-| **PrimeVue 4.0+** | Enterprise-grade UI component library (90+ components) |
-| **Pinia 2.1+** | State management (Vue 3 official) |
-| **Vue Router 4.0+** | Client-side routing |
-| **Axios 1.6+** | HTTP client with request interceptors |
-| **Monaco Editor** | Code editor (direct integration, no wrappers) |
-| **openapi-typescript** | Auto-generate TypeScript types from C# API |
-
-### Backend (.NET 9.0)
-
-| Technology | Purpose |
-|-----------|---------|
-| **ASP.NET Core 9.0** | Web API framework |
-| **Entity Framework Core 9.0** | ORM for MySQL/MariaDB |
-| **Pomelo.EntityFrameworkCore.MySql 9.0** | MySQL provider |
-| **SignalR** | Real-time communication with runners |
-| **Hangfire 1.8.16** | Background job scheduling |
-| **MediatR 12.4.1** | CQRS pattern implementation |
-| **Serilog 4.1.0** | Structured logging |
-| **FluentValidation** | Request validation |
-| **Swashbuckle** | Swagger/OpenAPI documentation |
-| **ASP.NET Core Identity** | Authentication and authorization |
-| **System.Linq.Dynamic.Core** | Dynamic LINQ expressions |
-
-### Runner Console
-
-| Technology | Purpose |
-|-----------|---------|
-| **SignalR Client** | Connect to server and receive execution commands |
-| **Polly 8.5.0** | Resilience policies and retry logic |
-| **System.CommandLine 2.0.0-beta4** | CLI argument parsing |
-| **Serilog** | Structured logging |
-
-### Scripting & AI
-
-| Technology | Purpose |
-|-----------|---------|
-| **pythonnet 3.0.5** | CPython interop for custom steps |
-| **OpenAI SDK 2.5.0** | AI-powered flow and step generation |
-| **Anthropic SDK** | Alternative AI provider |
-| **Google Vertex AI SDK** | Alternative AI provider |
-
-## Project Structure Summary
-
-```
-src/
-├── Automaton.Web/                          # Static marketing website
-│
-├── automaton-studio-vue/                   # NEW: Vue.js frontend (replacing Blazor)
-│   ├── src/
-│   │   ├── features/                       # Feature-based modules
-│   │   │   ├── auth/                       # Authentication (login, register)
-│   │   │   ├── dashboard/                  # Dashboard and home page
-│   │   │   ├── flows/                      # Flow management & AI generation
-│   │   │   ├── apps/                       # Web app builder
-│   │   │   ├── steps/                      # Custom step library
-│   │   │   ├── runners/                    # Runner management
-│   │   │   ├── projects/                   # Project organization
-│   │   │   └── settings/                   # User/app settings
-│   │   ├── shared/                         # Shared components, utils, services
-│   │   │   ├── components/                 # Reusable UI components
-│   │   │   ├── services/                   # HTTP client, SignalR
-│   │   │   ├── composables/                # Shared composition API functions
-│   │   │   ├── types/                      # Common TypeScript types
-│   │   │   └── utils/                      # Helper functions
-│   │   ├── router/                         # Vue Router configuration
-│   │   ├── App.vue                         # Root component
-│   │   └── main.ts                         # Entry point
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── README.md
-│
-├── Automaton.Studio.Server/                # ASP.NET Core API
-│   ├── Controllers/                        # 25+ REST API controllers
-│   ├── Services/                           # Business logic services
-│   ├── Data/                               # EF Core DbContext
-│   ├── Entities/                           # Database entities
-│   ├── Hubs/                               # SignalR hubs
-│   ├── Migrations/                         # EF Core migrations
-│   └── Program.cs                          # Startup configuration
-│
-├── Automaton.Core/                         # Workflow execution engine
-│   ├── Workflow/                           # Core workflow logic
-│   ├── Steps/                              # Step interfaces
-│   └── Models/                             # Data models
-│
-├── Automaton.Steps/                        # Built-in steps library
-│
-├── Automaton.Core.Scripting/               # Python integration
-│
-├── Automaton.Mcp/                          # AI integration & flow generation
-│
-├── Automaton.Runner/                       # Console runner application
-│
-└── UnitTests/                              # Test projects
-    ├── Automaton.Core.Tests/
-    ├── Automaton.Studio.Server.Tests/
-    └── Automaton.Runner.Tests/
-```
-
-## Additional Documentation
-
-For comprehensive documentation, see:
-- `AGENTS.md` - Detailed project documentation and feature reference
-- `README.md` - Project overview and quick start
-- `src/automaton-studio-vue/REDESIGN_PLAN.md` - Complete Vue.js redesign specification
-- `docs/` - Feature-specific technical documentation:
-  - `docs/projects/` - Multi-tenancy implementation
-  - `docs/flows/` - Flow architecture
-  - `docs/apps/` - Web apps platform
-  - `docs/runners/` - Runner deployment guides
-  - `docs/apikeys/` - API key scopes and security
-  - `docs/mcp/` - Model Context Protocol integration
-
-## Current Development Context
-
-Automaton is transitioning from Blazor WebAssembly to a modern Vue.js + TypeScript frontend (January 2026).
-
-**Transition Status:**
-- ✅ Architecture and design complete
-- ✅ Technology stack finalized (Vue 3 + TypeScript + PrimeVue)
-- 🔄 Frontend development underway (`src/automaton-studio-vue/`)
-- ✅ Backend APIs stable and unchanged
-
-**Key Features in Development:**
-- AI-first natural language flow generation
-- Feature-based Vue.js module architecture
-- Real-time execution updates via SignalR
-- Enhanced app builder with direct Monaco editor integration
-
-**Why This Change:**
-- Blazor WASM had stability issues (tabs, trees)
-- Modern frontend development experience with Vue.js
-- Better browser DevTools integration
-- Access to mature Vue ecosystem
-
-**What Stays the Same:**
-- All .NET backend code unchanged
-- API contracts preserved
-- Database schema stable
-- Runner architecture untouched
-
-## API Documentation
-
-### OpenAPI/Swagger
-
-Access auto-generated API documentation:
-- **Swagger UI**: `https://localhost:7091/swagger/index.html`
-- **OpenAPI JSON**: `https://localhost:7091/swagger/v1/swagger.json`
-
-The backend exports OpenAPI 3.0 specs. The frontend uses `openapi-typescript` to auto-generate TypeScript types from these specs.
-
-## Agent Skills
-
-**Skills** are reusable workflow guides stored in `.github/skills/` that codify best practices and patterns for consistent development across the project.
-
-**When to Create/Update a Skill:**
-- After completing a major feature that could be replicated or extended
-- When you identify a repeatable multi-step development pattern
-- After implementing a best practice that should be shared with future agents
-- When documenting a complex debugging or troubleshooting process
-
-**Examples of Good Skill Candidates:**
-- **post-change-validation**: Run frontend type-check and backend build after code changes (already created)
-- **adding-a-new-feature**: Step-by-step guide for implementing a complete feature (backend controller → service → DTO → frontend service → types → components)
-- **debugging-runner-issues**: Troubleshooting runner registration, connection, and execution problems
-- **managing-database-migrations**: Safe workflow for creating, testing, and deploying EF Core migrations
-- **implementing-authorization**: Checklist for adding authorization checks to new features
-
-**Skill Format:**
-- Location: `.github/skills/skill-name/` (lowercase, hyphens, matches YAML `name` field)
-- File: `SKILL.md` (required exact filename)
-- Structure: YAML frontmatter (name, description, license) + Markdown body with instructions, examples, conventions
-- Optional: Include supporting scripts, examples, or resources in the skill directory
-
-**Reference:** See `.github/skills/post-change-validation/SKILL.md` for complete example following GitHub's agent skills format.
-
-## Teaching & Learning: FOR-DEVELOPERS.md
-
-**Every project is a lesson in engineering.** This project maintains [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md)—a narrative guide written to teach, not just document.
-
-**Why This Matters:**
-- **Captures Wisdom**: Every architectural decision, bug fix, and lesson learned is knowledge worth preserving
-- **Teaches by Story**: Technical decisions are more memorable and understandable when explained with context and analogies
-- **Prevents Repeated Mistakes**: Future work benefits from documented pitfalls and how we solved them
-- **Shares Engineering Philosophy**: How *good engineers think* about problems, tradeoffs, and solutions
-
-**What's Covered in FOR-DEVELOPERS.md:**
-- **Architecture narrative** – Why we built it this way; what we learned from alternatives
-- **Key decisions with context** – Vue vs. Blazor, distributed runners, project scoping; the reasoning and tradeoffs
-- **Real bugs & solutions** – Concrete examples of what broke, how we fixed it, and how to avoid it
-- **Lessons learned** – Performance insights, testing strategies, migration gotchas, surprises
-- **Our engineering philosophy** – How we approach problems: theme-aware styling, feature-based organization, validation practices, documentation as learning
-
-**When to Contribute:**
-- After fixing a tricky bug—what caused it? What will prevent it next time?
-- After completing a significant feature—what surprised you? What would you tell your past self?
-- When implementing a pattern you see repeated—is there a lesson here?
-- When you learn something that changes how you think about the project
-
-**Style:** Write as if teaching a junior engineer. Use analogies, anecdotes, and context. Make it engaging to read—not a textbook, but a conversation with someone learning the craft.
-
-## Continuous Learning Through Documentation
-
-Automaton is both a product and a **teaching project**. We document not just *what* we build, but *why* we build it, *what we learned*, and *how good engineers think*. This shapes both code quality and team knowledge.
-
-**Three Documentation Layers:**
-1. **AGENTS.md / CLAUDE.md** – Project overview and development reference (live documents, kept current)
-2. **AI Skills** (`.github/skills/`) – Reusable workflows and best practices (task-focused, procedural)
-3. **FOR-DEVELOPERS.md** – Narrative teaching guide explaining architecture, decisions, lessons, philosophy (timeless, engaging)
-
-Together, they create a **learning culture** where knowledge compounds and future engineers benefit from past work.
-
-## Plan Mode
-
-- **Design for AI agents, not human timelines**: Plans should describe *what* to build and implementation *order*, not human work estimates ("7 weeks")
-- **Parallelize work**: Identify independent tasks that can be executed concurrently (database migrations + service layer + UI components can happen in parallel)
-- **Eliminate unnecessary ceremony**: No feature flags, no phased rollouts, no production best practices unless the project is deployed to external users
-- **Focus on completeness**: Agents should build the entire feature end-to-end in one implementation pass
-- **Make plans concise**: Sacrifice grammar for brevity. Avoid fluffy timelines.
-- **End with open questions**: List unresolved decisions that need your input before implementation starts
+If all pass, you're good. If any fail, the change is incomplete.
