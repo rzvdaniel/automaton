@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -8,19 +9,45 @@ import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import AppAssignmentDialog from '../components/AppAssignmentDialog.vue'
+import { organizationsService } from '../services/organizationsService'
+import { OrganizationRole } from '../types'
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 
 // State
 const apps = ref<any[]>([])
 const loading = ref(true)
 const showAssignDialog = ref(false)
 const selectedApp = ref<any>(null)
+const currentUserRole = ref<string | null>(null)
 
 const organizationId = computed(() => route.params.id as string)
+const isOrgAdmin = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
+const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
 
 onMounted(async () => {
+  // Check user role first
+  try {
+    const org = await organizationsService.getOrganization(organizationId.value)
+    currentUserRole.value = org.currentUserRole || null
+    
+    // Redirect AppUsers - they should use My Apps instead
+    if (isAppUser.value) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Access Restricted',
+        detail: 'AppUsers cannot manage app assignments. Use "My Apps" to view your assigned apps.',
+        life: 4000,
+      })
+      router.push({ name: 'assigned-apps' })
+      return
+    }
+  } catch (error) {
+    // Error handled by service
+  }
+  
   await loadApps()
 })
 

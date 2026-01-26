@@ -26,6 +26,7 @@ const isDeveloperOrAdmin = computed(() =>
   organization.value?.currentUserRole === OrganizationRole.OrgAdmin ||
   organization.value?.currentUserRole === OrganizationRole.Developer
 )
+const isAppUser = computed(() => organization.value?.currentUserRole === OrganizationRole.AppUser)
 
 // Load organization on mount
 onMounted(async () => {
@@ -103,7 +104,8 @@ const formatDate = (date: string) => {
 
       <!-- Overview Cards -->
       <div class="cards-grid">
-        <Card>
+        <!-- Members Card - Hidden for AppUser -->
+        <Card v-if="!isAppUser">
           <template #title>
             <div class="flex align-items-center gap-2">
               <i class="pi pi-users" style="color: var(--p-primary-color)"></i>
@@ -124,7 +126,8 @@ const formatDate = (date: string) => {
           </template>
         </Card>
 
-        <Card>
+        <!-- Projects Card - Hidden for AppUser -->
+        <Card v-if="!isAppUser">
           <template #title>
             <div class="flex align-items-center gap-2">
               <i class="pi pi-folder" style="color: var(--p-primary-color)"></i>
@@ -145,23 +148,24 @@ const formatDate = (date: string) => {
           </template>
         </Card>
 
+        <!-- Apps Card - Label changes based on role -->
         <Card>
           <template #title>
             <div class="flex align-items-center gap-2">
               <i class="pi pi-th-large" style="color: var(--p-primary-color)"></i>
-              <span>Apps</span>
+              <span>{{ isAppUser ? 'My Apps' : 'Apps' }}</span>
             </div>
           </template>
           <template #content>
             <div class="stat-value">-</div>
-            <p class="text-muted">Available apps</p>
+            <p class="text-muted">{{ isAppUser ? 'Apps assigned to you' : 'Available apps' }}</p>
           </template>
           <template #footer>
             <Button
-              label="Manage Apps"
+              :label="isAppUser ? 'View My Apps' : 'Manage Apps'"
               icon="pi pi-arrow-right"
               text
-              @click="navigateToApps"
+              @click="isAppUser ? router.push({ name: 'assigned-apps' }) : navigateToApps()"
             />
           </template>
         </Card>

@@ -9,6 +9,7 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import type { OrganizationDto, UpdateOrganizationRequest } from '../types'
+import { OrganizationRole } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,7 @@ const saving = ref(false)
 
 // Computed
 const organizationId = computed(() => route.params.id as string)
+const isOrgAdmin = computed(() => organization.value?.currentUserRole === OrganizationRole.OrgAdmin)
 
 // Form
 const settingsForm = ref<UpdateOrganizationRequest>({
@@ -35,6 +37,17 @@ const settingsForm = ref<UpdateOrganizationRequest>({
 // Load organization on mount
 onMounted(async () => {
   await loadOrganization()
+  
+  // Redirect non-OrgAdmin users
+  if (organization.value && !isOrgAdmin.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Access Restricted',
+      detail: 'Only OrgAdmins can access organization settings',
+      life: 3000,
+    })
+    router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
+  }
 })
 
 // Load organization details

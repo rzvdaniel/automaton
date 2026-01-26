@@ -22,9 +22,15 @@ const confirm = useConfirm()
 // State
 const members = ref<OrganizationMemberDto[]>([])
 const loading = ref(true)
+const currentUserRole = ref<string | null>(null)
 
 // Computed
 const organizationId = computed(() => route.params.id as string)
+const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
+const canInvite = computed(() => 
+  currentUserRole.value === OrganizationRole.OrgAdmin || 
+  currentUserRole.value === OrganizationRole.Developer
+)
 
 // Dialog and form states
 const showInviteDialog = ref(false)
@@ -43,6 +49,24 @@ const roleOptions = [
 // Load members on mount
 onMounted(async () => {
   await loadMembers()
+  // Get current organization to determine user role
+  try {
+    const org = await organizationsService.getOrganization(organizationId.value)
+    currentUserRole.value = org.currentUserRole || null
+    
+    // Redirect AppUsers back to dashboard
+    if (isAppUser.value) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Access Restricted',
+        detail: 'AppUsers cannot view member management',
+        life: 3000,
+      })
+      router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
+    }
+  } catch (error) {
+    // Error handled by service
+  }
 })
 
 // Load organization members
@@ -156,6 +180,7 @@ function navigateBack() {
         </div>
       </div>
       <Button
+        v-if="canInvite"
         label="Invite Member"
         icon="pi pi-user-plus"
         @click="showInviteDialog = true"
