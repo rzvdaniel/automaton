@@ -28,6 +28,7 @@ const hasOrganizations = computed(() => organizations.value.length > 0)
 
 // Dialog and form states
 const showCreateDialog = ref(false)
+const isCreatingOrganization = ref(false)
 const createForm = ref<CreateOrganizationRequest>({
   name: '',
   description: '',
@@ -45,7 +46,12 @@ async function loadOrganizations() {
     loading.value = true
     organizations.value = await organizationsService.listOrganizations()
   } catch (error) {
-    // Error is handled by the service
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to load organizations',
+      life: 3000,
+    })
   } finally {
     loading.value = false
   }
@@ -83,12 +89,26 @@ async function handleCreateOrganization() {
   }
 
   try {
+    isCreatingOrganization.value = true
     await organizationsService.createOrganization(createForm.value)
-    showCreateDialog.value = false
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Organization created successfully',
+      life: 3000,
+    })
     resetCreateForm()
     await loadOrganizations()
   } catch (error) {
-    // Error toast is already shown by service
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to create organization',
+      life: 3000,
+    })
+  } finally {
+    isCreatingOrganization.value = false
+    showCreateDialog.value = false
   }
 }
 
@@ -102,9 +122,20 @@ function handleDeleteOrganization(organizationId: string, organizationName: stri
     accept: async () => {
       try {
         await organizationsService.deleteOrganization(organizationId)
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Organization deleted successfully',
+          life: 3000,
+        })
         await loadOrganizations()
       } catch (error) {
-        // Error toast is already shown by service
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to delete organization',
+          life: 3000,
+        })
       }
     },
   })
@@ -148,7 +179,7 @@ function resetCreateForm() {
       v-else-if="!hasOrganizations"
       icon="pi-building"
       title="No organizations yet"
-      description="Create your first organization to enable team collaboration and app assignment"
+      message="Create your first organization to enable team collaboration and app assignment"
     >
       <Button
         label="Create Your First Organization"
@@ -268,11 +299,14 @@ function resetCreateForm() {
           text
           severity="secondary"
           @click="showCreateDialog = false"
+          :disabled="isCreatingOrganization"
         />
         <Button
           label="Create"
           icon="pi pi-check"
           @click="handleCreateOrganization"
+          :loading="isCreatingOrganization"
+          :disabled="isCreatingOrganization"
         />
       </template>
     </Dialog>
