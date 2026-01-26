@@ -1,13 +1,52 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Tag from 'primevue/tag'
+import EmptyState from '@/shared/components/EmptyState.vue'
+import AppAssignmentDialog from '../components/AppAssignmentDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 
+// State
+const apps = ref<any[]>([])
+const loading = ref(true)
+const showAssignDialog = ref(false)
+const selectedApp = ref<any>(null)
+
 const organizationId = computed(() => route.params.id as string)
+
+onMounted(async () => {
+  await loadApps()
+})
+
+// Load organization apps (from projects)
+async function loadApps() {
+  try {
+    loading.value = true
+    // TODO: Load apps that belong to projects in this organization
+    // For now, showing placeholder
+    apps.value = []
+  } catch (error) {
+    // Error handled by service
+  } finally {
+    loading.value = false
+  }
+}
+
+function openAssignDialog(app: any) {
+  selectedApp.value = app
+  showAssignDialog.value = true
+}
+
+function handleAssigned() {
+  // Reload apps or assignments
+  loadApps()
+}
 
 function navigateBack() {
   router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
@@ -31,18 +70,69 @@ function navigateBack() {
       </div>
     </div>
 
-    <Card>
-      <template #content>
-        <div class="placeholder-content">
-          <i class="pi pi-th-large" style="font-size: 3rem; color: var(--p-text-muted-color)"></i>
-          <h3>App Assignment Management</h3>
-          <p class="text-muted">
-            This feature allows OrgAdmins to assign apps to AppUser members.<br>
-            Implementation coming soon.
-          </p>
-        </div>
-      </template>
-    </Card>
+    <div v-if="loading" class="loading-state">
+      <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
+      <p>Loading apps...</p>
+    </div>
+
+    <EmptyState
+      v-else-if="apps.length === 0"
+      icon="pi-th-large"
+      title="No apps available"
+      description="Apps from organization projects will appear here for assignment to members"
+    />
+
+    <DataTable
+      v-else
+      :value="apps"
+      :paginator="true"
+      :rows="10"
+      responsiveLayout="scroll"
+      stripedRows
+    >
+      <Column field="name" header="App Name" sortable>
+        <template #body="{ data }">
+          <div class="flex align-items-center gap-2">
+            <i class="pi pi-th-large"></i>
+            <span class="font-semibold">{{ data.name }}</span>
+          </div>
+        </template>
+      </Column>
+
+      <Column field="description" header="Description">
+        <template #body="{ data }">
+          <span class="text-muted">{{ data.description || 'No description' }}</span>
+        </template>
+      </Column>
+
+      <Column field="assignedUsers" header="Assigned Users">
+        <template #body="{ data }">
+          <Tag :value="`${data.assignedUsers || 0} users`" severity="info" />
+        </template>
+      </Column>
+
+      <Column header="Actions" style="width: 12rem">
+        <template #body="{ data }">
+          <Button
+            label="Manage Access"
+            icon="pi pi-users"
+            outlined
+            size="small"
+            @click="openAssignDialog(data)"
+          />
+        </template>
+      </Column>
+    </DataTable>
+
+    <!-- App Assignment Dialog -->
+    <AppAssignmentDialog
+      v-if="selectedApp"
+      v-model:visible="showAssignDialog"
+      :organization-id="organizationId"
+      :app-id="selectedApp.id"
+      :app-name="selectedApp.name"
+      @assigned="handleAssigned"
+    />
   </div>
 </template>
 
@@ -68,13 +158,12 @@ function navigateBack() {
   color: var(--p-text-muted-color);
 }
 
-.placeholder-content {
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
+  padding: 4rem 0;
   gap: 1rem;
 }
 </style>
