@@ -561,11 +561,12 @@ public class OrganizationService : IOrganizationService
     
     public async Task<bool> LinkProjectToOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default)
     {
-        // Verify user is OrgAdmin
-        if (!await IsOrgAdminAsync(organizationId, UserId, cancellationToken))
+        // Get user's role in organization
+        var userRole = await GetUserRoleAsync(organizationId, UserId, cancellationToken);
+        if (userRole == null)
         {
-            logger.Warning("User {UserId} attempted to link project without OrgAdmin rights", UserId);
-            throw new UnauthorizedAccessException("Only OrgAdmin can link projects to organization");
+            logger.Warning("User {UserId} attempted to link project but is not an organization member", UserId);
+            throw new UnauthorizedAccessException("You must be a member of the organization");
         }
         
         // Verify project exists
@@ -578,20 +579,37 @@ public class OrganizationService : IOrganizationService
             return false;
         }
         
-        // Verify user is ProjectAdmin of the project
-        var isProjectAdmin = await dbContext.ProjectMembers
-            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.Role == ProjectRole.ProjectAdmin && pm.IsActive, cancellationToken);
-            
-        if (!isProjectAdmin)
-        {
-            logger.Warning("User {UserId} attempted to link project {ProjectId} without ProjectAdmin rights", UserId, projectId);
-            throw new UnauthorizedAccessException("You must be a ProjectAdmin to link this project");
-        }
-        
         // Check if project is already in another organization
         if (project.OrganizationId.HasValue)
         {
             throw new InvalidOperationException("Project is already linked to an organization. Unlink it first.");
+        }
+        
+        // Check authorization based on role and project ownership
+        var isOrgAdmin = userRole == OrganizationRole.OrgAdmin;
+        var isProjectAdmin = await dbContext.ProjectMembers
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.Role == ProjectRole.ProjectAdmin && pm.IsActive, cancellationToken);
+        
+        // Allow linking if:
+        // 1. User is OrgAdmin AND project owner is an organization member, OR
+        // 2. User is ProjectAdmin (can link their own project)
+        if (isOrgAdmin)
+        {
+            // OrgAdmin can link any project owned by organization members
+            var projectOwnerIsMember = await dbContext.OrganizationMembers
+                .AnyAsync(om => om.OrganizationId == organizationId && om.UserId == project.OwnerId && om.IsActive, cancellationToken);
+                
+            if (!projectOwnerIsMember)
+            {
+                logger.Warning("User {UserId} attempted to link project {ProjectId} but owner is not in organization", UserId, projectId);
+                throw new UnauthorizedAccessException("Can only link projects owned by organization members");
+            }
+        }
+        else if (!isProjectAdmin)
+        {
+            // Non-admins must be ProjectAdmin to link their own project
+            logger.Warning("User {UserId} attempted to link project {ProjectId} without sufficient rights", UserId, projectId);
+            throw new UnauthorizedAccessException("Only OrgAdmin or ProjectAdmin can link projects");
         }
         
         // Link project to organization

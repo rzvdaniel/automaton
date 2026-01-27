@@ -73,16 +73,24 @@ async function openLinkDialog() {
   try {
     // Load all user's projects
     const allProjects = await projectsService.listProjects()
-    // Filter to only personal projects (no organizationId) where user is admin
-    availableProjects.value = allProjects.filter(
-      p => !p.organizationId && (p.role === 'ProjectAdmin')
-    )
+    
+    if (isOrgAdmin.value) {
+      // OrgAdmins can link any personal project (projects owned by org members will be validated on backend)
+      availableProjects.value = allProjects.filter(p => !p.organizationId)
+    } else {
+      // Non-admins can only link personal projects where they are ProjectAdmin
+      availableProjects.value = allProjects.filter(
+        p => !p.organizationId && (p.role === 'ProjectAdmin')
+      )
+    }
     
     if (availableProjects.value.length === 0) {
       toast.add({
         severity: 'info',
         summary: 'No Projects Available',
-        detail: 'You have no personal projects to link. Create a personal project first.',
+        detail: isOrgAdmin.value 
+          ? 'There are no personal projects available to link to this organization.'
+          : 'You have no personal projects to link. Create a personal project first.',
         life: 5000,
       })
       return
