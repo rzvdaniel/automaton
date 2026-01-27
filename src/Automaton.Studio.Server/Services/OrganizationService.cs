@@ -540,6 +540,25 @@ public class OrganizationService : IOrganizationService
         return true;
     }
 
+    public async Task<IEnumerable<WebApp>> GetOrganizationAppsAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        // Verify user has access to organization
+        if (!await CanAccessOrganizationAsync(organizationId, UserId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("You do not have access to this organization");
+        }
+
+        // Get all apps from projects in this organization
+        var apps = await dbContext.ProjectApps
+            .Where(pa => pa.Project.OrganizationId == organizationId && pa.Project.IsActive)
+            .Include(pa => pa.WebApp)
+            .Select(pa => pa.WebApp!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return apps;
+    }
+
     public async Task<IEnumerable<WebApp>> GetAssignedAppsAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default)
     {
         var apps = await dbContext.OrganizationAppAssignments

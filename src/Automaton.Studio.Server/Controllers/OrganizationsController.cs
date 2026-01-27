@@ -312,6 +312,29 @@ public class OrganizationsController : BaseController
     // =====================================================
 
     /// <summary>
+    /// Get all apps from projects in the organization.
+    /// Available to all organization members.
+    /// </summary>
+    [HttpGet("{id}/apps")]
+    public async Task<ActionResult> GetOrganizationApps(Guid id)
+    {
+        try
+        {
+            var apps = await organizationService.GetOrganizationAppsAsync(id);
+            return Ok(apps);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error retrieving apps for organization {OrganizationId}", id);
+            return StatusCode(500, new { message = "Error retrieving organization apps" });
+        }
+    }
+
+    /// <summary>
     /// Get all apps assigned to the current user in an organization.
     /// </summary>
     [HttpGet("{id}/apps/assigned")]

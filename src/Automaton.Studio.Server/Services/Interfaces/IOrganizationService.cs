@@ -72,6 +72,11 @@ public interface IOrganizationService
     // =====================================================
     
     /// <summary>
+    /// Get all apps from projects in the organization
+    /// </summary>
+    Task<IEnumerable<WebApp>> GetOrganizationAppsAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
     /// Assign an app to a user within an organization
     /// </summary>
     Task<OrganizationAppAssignment> AssignAppToUserAsync(Guid organizationId, Guid appId, Guid userId, CancellationToken cancellationToken = default);

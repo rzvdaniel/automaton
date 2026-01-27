@@ -55,11 +55,31 @@ onMounted(async () => {
 async function loadApps() {
   try {
     loading.value = true
-    // TODO: Load apps that belong to projects in this organization
-    // For now, showing placeholder
-    apps.value = []
+    const appsData = await organizationsService.getOrganizationApps(organizationId.value)
+    
+    // Get assignment counts for each app
+    const appsWithCounts = await Promise.all(
+      appsData.map(async (app) => {
+        try {
+          const assignedUsers = await organizationsService.getAppAssignedUsers(organizationId.value, app.id)
+          return {
+            ...app,
+            assignedUsers: assignedUsers.length
+          }
+        } catch (error) {
+          // If error getting assignments, just set to 0
+          return {
+            ...app,
+            assignedUsers: 0
+          }
+        }
+      })
+    )
+    
+    apps.value = appsWithCounts
   } catch (error) {
     // Error handled by service
+    apps.value = []
   } finally {
     loading.value = false
   }
@@ -105,8 +125,8 @@ function navigateBack() {
     <EmptyState
       v-else-if="apps.length === 0"
       icon="pi-th-large"
-      title="No apps available"
-      description="Apps from organization projects will appear here for assignment to members"
+      title="No apps in organization"
+      description="Create apps in organization projects first, then they will appear here for assignment to members. Apps must belong to projects that are part of this organization."
     />
 
     <DataTable

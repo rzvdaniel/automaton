@@ -99,6 +99,14 @@ class OrganizationsService {
   // =====================================================
 
   /**
+   * Get all apps from projects in the organization
+   */
+  async getOrganizationApps(organizationId: string): Promise<any[]> {
+    const response = await apiClient.get(`/api/organizations/${organizationId}/apps`);
+    return response.data;
+  }
+
+  /**
    * Get all apps assigned to the current user in an organization
    */
   async getMyAssignedApps(organizationId: string): Promise<any[]> {
