@@ -764,10 +764,11 @@ dotnet ef database update
 
 **First-Time Org Creation:**
 
-1. User clicks "Create Organization" in Settings or top-level menu
+1. User clicks "Create Organization" button in Settings (Organizations menu hidden until first org created)
 2. Dialog: Name, Description, Slug (auto-generated)
 3. Success → Redirect to Organization Dashboard
 4. Tutorial overlay: "Invite members" → "Create projects" → "Assign apps"
+5. Organizations menu now appears in left navigation
 
 **AppUser Invitation:**
 

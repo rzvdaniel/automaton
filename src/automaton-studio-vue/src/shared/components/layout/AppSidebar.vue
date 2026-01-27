@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { watch } from 'vue'
 import Button from 'primevue/button'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 
@@ -9,10 +10,15 @@ const route = useRoute()
 const isExpanded = ref(false)
 
 // Load organization roles for access control
-const { isAppUserOnly, loadOrganizations } = useOrganizationRole()
+const { isAppUserOnly, loadOrganizations, organizations } = useOrganizationRole()
 
 onMounted(async () => {
   // Load organizations to determine user's roles
+  await loadOrganizations()
+})
+
+// Refresh organizations on route changes to reveal menu after creation
+watch(() => route.fullPath, async () => {
   await loadOrganizations()
 })
 
@@ -42,11 +48,14 @@ const bottomNavItems: NavItem[] = [
 ]
 
 // Filter navigation items based on user role
+const hasOrganizations = computed(() => organizations.value && organizations.value.length > 0)
+
 const visibleNavItems = computed(() => {
-  if (!isAppUserOnly.value) {
-    return navItems.filter(item => item.to !== '/my-apps')
-  }
-  return navItems.filter(item => !item.hideForAppUser)
+  const base = !isAppUserOnly.value
+    ? navItems.filter(item => item.to !== '/my-apps')
+    : navItems.filter(item => !item.hideForAppUser)
+  // Progressive disclosure: hide Organizations until user has at least one org
+  return hasOrganizations.value ? base : base.filter(item => item.to !== '/organizations')
 })
 
 const visibleBottomNavItems = computed(() => {
