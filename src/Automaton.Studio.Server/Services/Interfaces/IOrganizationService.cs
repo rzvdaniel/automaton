@@ -68,6 +68,15 @@ public interface IOrganizationService
     Task<bool> RemoveMemberAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default);
     
     // =====================================================
+    // Projects
+    // =====================================================
+    
+    /// <summary>
+    /// Get all projects in the organization
+    /// </summary>
+    Task<IEnumerable<Project>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    
+    // =====================================================
     // App Assignment
     // =====================================================
     

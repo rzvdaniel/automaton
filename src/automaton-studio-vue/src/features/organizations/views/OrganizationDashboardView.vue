@@ -51,6 +51,10 @@ function navigateToMembers() {
   router.push({ name: 'organization-members', params: { id: organizationId.value } })
 }
 
+function navigateToProjects() {
+  router.push({ name: 'organization-projects', params: { id: organizationId.value } })
+}
+
 function navigateToApps() {
   router.push({ name: 'organization-apps', params: { id: organizationId.value } })
 }
@@ -143,7 +147,7 @@ const formatDate = (date: string) => {
               label="View Projects"
               icon="pi pi-arrow-right"
               text
-              @click="router.push({ name: 'projects' })"
+              @click="navigateToProjects"
             />
           </template>
         </Card>

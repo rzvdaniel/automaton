@@ -20,6 +20,12 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/organizations/:id/projects',
+    name: 'organization-projects',
+    component: () => import('./views/OrganizationProjectsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/organizations/:id/apps',
     name: 'organization-apps',
     component: () => import('./views/OrganizationAppsView.vue'),

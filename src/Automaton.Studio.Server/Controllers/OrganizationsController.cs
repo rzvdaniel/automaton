@@ -308,6 +308,33 @@ public class OrganizationsController : BaseController
     }
 
     // =====================================================
+    // Projects
+    // =====================================================
+
+    /// <summary>
+    /// Get all projects in the organization.
+    /// Available to all organization members.
+    /// </summary>
+    [HttpGet("{id}/projects")]
+    public async Task<ActionResult> GetOrganizationProjects(Guid id)
+    {
+        try
+        {
+            var projects = await organizationService.GetOrganizationProjectsAsync(id);
+            return Ok(projects);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error retrieving projects for organization {OrganizationId}", id);
+            return StatusCode(500, new { message = "Error retrieving organization projects" });
+        }
+    }
+
+    // =====================================================
     // App Assignment
     // =====================================================
 
