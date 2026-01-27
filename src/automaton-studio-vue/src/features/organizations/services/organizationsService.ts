@@ -148,6 +148,22 @@ class OrganizationsService {
     const response = await apiClient.get(`/api/organizations/${organizationId}/apps/${appId}/users`);
     return response.data;
   }
+  
+  /**
+   * Link an existing project to the organization
+   */
+  async linkProject(organizationId: string, projectId: string): Promise<void> {
+    await apiClient.put(`/api/organizations/${organizationId}/projects/${projectId}`);
+    toast.success('Project linked to organization successfully');
+  }
+  
+  /**
+   * Unlink a project from the organization
+   */
+  async unlinkProject(organizationId: string, projectId: string): Promise<void> {
+    await apiClient.delete(`/api/organizations/${organizationId}/projects/${projectId}`);
+    toast.success('Project unlinked from organization');
+  }
 }
 
 export const organizationsService = new OrganizationsService();

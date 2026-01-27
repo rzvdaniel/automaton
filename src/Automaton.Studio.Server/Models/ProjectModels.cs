@@ -10,6 +10,7 @@ public class CreateProjectRequest
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public Guid? OrganizationId { get; set; }
 }
 
 /// <summary>
@@ -33,6 +34,8 @@ public class ProjectDto
     public string? Description { get; set; }
     public Guid OwnerId { get; set; }
     public string OwnerName { get; set; } = string.Empty;
+    public Guid? OrganizationId { get; set; }
+    public string? OrganizationName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool IsActive { get; set; }
@@ -54,6 +57,8 @@ public class ProjectListItem
     public ProjectRole Role { get; set; }
     public int MemberCount { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public Guid? OrganizationId { get; set; }
+    public string? OrganizationName { get; set; }
 }
 
 /// <summary>

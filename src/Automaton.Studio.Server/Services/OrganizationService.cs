@@ -558,6 +558,84 @@ public class OrganizationService : IOrganizationService
 
         return projects;
     }
+    
+    public async Task<bool> LinkProjectToOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default)
+    {
+        // Verify user is OrgAdmin
+        if (!await IsOrgAdminAsync(organizationId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to link project without OrgAdmin rights", UserId);
+            throw new UnauthorizedAccessException("Only OrgAdmin can link projects to organization");
+        }
+        
+        // Verify project exists
+        var project = await dbContext.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId && p.IsActive, cancellationToken);
+            
+        if (project == null)
+        {
+            logger.Warning("Project {ProjectId} not found or inactive", projectId);
+            return false;
+        }
+        
+        // Verify user is ProjectAdmin of the project
+        var isProjectAdmin = await dbContext.ProjectMembers
+            .AnyAsync(pm => pm.ProjectId == projectId && pm.UserId == UserId && pm.Role == ProjectRole.ProjectAdmin && pm.IsActive, cancellationToken);
+            
+        if (!isProjectAdmin)
+        {
+            logger.Warning("User {UserId} attempted to link project {ProjectId} without ProjectAdmin rights", UserId, projectId);
+            throw new UnauthorizedAccessException("You must be a ProjectAdmin to link this project");
+        }
+        
+        // Check if project is already in another organization
+        if (project.OrganizationId.HasValue)
+        {
+            throw new InvalidOperationException("Project is already linked to an organization. Unlink it first.");
+        }
+        
+        // Link project to organization
+        project.OrganizationId = organizationId;
+        project.Updated = DateTime.UtcNow;
+        
+        await dbContext.SaveChangesAsync(cancellationToken);
+        
+        logger.Information("Project {ProjectId} linked to organization {OrganizationId} by user {UserId}", 
+            projectId, organizationId, UserId);
+        
+        return true;
+    }
+    
+    public async Task<bool> UnlinkProjectFromOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default)
+    {
+        // Verify user is OrgAdmin
+        if (!await IsOrgAdminAsync(organizationId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to unlink project without OrgAdmin rights", UserId);
+            throw new UnauthorizedAccessException("Only OrgAdmin can unlink projects from organization");
+        }
+        
+        // Verify project exists and belongs to this organization
+        var project = await dbContext.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId && p.OrganizationId == organizationId && p.IsActive, cancellationToken);
+            
+        if (project == null)
+        {
+            logger.Warning("Project {ProjectId} not found in organization {OrganizationId}", projectId, organizationId);
+            return false;
+        }
+        
+        // Unlink project from organization
+        project.OrganizationId = null;
+        project.Updated = DateTime.UtcNow;
+        
+        await dbContext.SaveChangesAsync(cancellationToken);
+        
+        logger.Information("Project {ProjectId} unlinked from organization {OrganizationId} by user {UserId}", 
+            projectId, organizationId, UserId);
+        
+        return true;
+    }
 
     public async Task<IEnumerable<WebApp>> GetOrganizationAppsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {

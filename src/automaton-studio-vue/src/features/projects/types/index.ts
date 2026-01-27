@@ -23,6 +23,8 @@ export interface ProjectDto {
   description?: string;
   ownerId: string;
   ownerName: string;
+  organizationId?: string;
+  organizationName?: string;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -43,6 +45,8 @@ export interface ProjectListItem {
   role: ProjectRoleType;
   memberCount: number;
   updatedAt: string;
+  organizationId?: string;
+  organizationName?: string;
 }
 
 /**
@@ -92,6 +96,7 @@ export interface CreateProjectRequest {
   name: string;
   displayName: string;
   description?: string;
+  organizationId?: string;
 }
 
 /**

@@ -10,10 +10,13 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
+import Dropdown from 'primevue/dropdown'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
+import { organizationsService } from '@/features/organizations/services/organizationsService'
 import type { CreateProjectRequest } from '@/features/projects/types'
+import type { OrganizationListItem } from '@/features/organizations/types'
 import { ProjectRole } from '@/features/projects/types'
 
 const store = useProjectsStore()
@@ -30,12 +33,17 @@ const createForm = ref<CreateProjectRequest>({
   name: '',
   displayName: '',
   description: '',
+  organizationId: undefined,
 })
+const userOrganizations = ref<OrganizationListItem[]>([])
+const selectedOrganization = ref<OrganizationListItem | null>(null)
 
 // Load projects on mount
 onMounted(async () => {
   try {
     await store.loadProjects()
+    // Load user's organizations for the create dialog
+    userOrganizations.value = await organizationsService.listOrganizations()
   } catch (error) {
     // Error is handled by the store/service
   }
@@ -74,6 +82,8 @@ async function handleCreateProject() {
   }
 
   try {
+    // Set organizationId from selected organization
+    createForm.value.organizationId = selectedOrganization.value?.id
     await store.createProject(createForm.value)
     toast.add({
       severity: 'success',
@@ -122,7 +132,9 @@ function resetCreateForm() {
     name: '',
     displayName: '',
     description: '',
+    organizationId: undefined,
   }
+  selectedOrganization.value = null
 }
 
 // Close dialog and reset form
@@ -159,7 +171,20 @@ function closeCreateDialog() {
           responsiveLayout="scroll"
           class="p-datatable-sm"
         >
-          <Column field="displayName" header="Name" sortable />
+          <Column field="displayName" header="Name" sortable>
+            <template #body="slotProps">
+              <div>
+                <div>{{ slotProps.data.displayName }}</div>
+                <Tag
+                  v-if="slotProps.data.organizationName"
+                  :value="slotProps.data.organizationName"
+                  severity="success"
+                  class="mt-1"
+                  icon="pi pi-users"
+                />
+              </div>
+            </template>
+          </Column>
           <Column field="description" header="Description" />
           <Column field="role" header="Role" sortable>
             <template #body="slotProps">
@@ -258,6 +283,24 @@ function closeCreateDialog() {
             rows="3"
             placeholder="Optional project description"
           />
+        </div>
+        
+        <div v-if="userOrganizations.length > 0">
+          <label for="project-organization" class="block text-sm font-medium mb-2">
+            Organization (Optional)
+          </label>
+          <Dropdown
+            id="project-organization"
+            v-model="selectedOrganization"
+            :options="userOrganizations"
+            optionLabel="name"
+            placeholder="Personal Project (no organization)"
+            class="w-full"
+            :showClear="true"
+          />
+          <p class="text-xs text-color-secondary mt-1">
+            Leave empty for a personal project, or select an organization to create the project under
+          </p>
         </div>
       </div>
 

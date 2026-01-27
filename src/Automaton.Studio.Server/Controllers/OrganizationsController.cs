@@ -473,4 +473,71 @@ public class OrganizationsController : BaseController
             return StatusCode(500, new { message = "Error retrieving assigned users" });
         }
     }
+    
+    /// <summary>
+    /// Link an existing project to the organization.
+    /// Only OrgAdmin can link projects, and user must be ProjectAdmin of the project.
+    /// </summary>
+    [HttpPut("{id}/projects/{projectId}")]
+    public async Task<IActionResult> LinkProject(Guid id, Guid projectId)
+    {
+        try
+        {
+            var success = await organizationService.LinkProjectToOrganizationAsync(id, projectId);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "Project not found" });
+            }
+            
+            logger.LogInformation("Project {ProjectId} linked to organization {OrganizationId}", projectId, id);
+            
+            return Ok(new { message = "Project linked successfully" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Unauthorized project link attempt");
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error linking project {ProjectId} to organization {OrganizationId}", projectId, id);
+            return StatusCode(500, new { message = "Error linking project" });
+        }
+    }
+    
+    /// <summary>
+    /// Unlink a project from the organization (make it personal again).
+    /// Only OrgAdmin can unlink projects.
+    /// </summary>
+    [HttpDelete("{id}/projects/{projectId}")]
+    public async Task<IActionResult> UnlinkProject(Guid id, Guid projectId)
+    {
+        try
+        {
+            var success = await organizationService.UnlinkProjectFromOrganizationAsync(id, projectId);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "Project not found in organization" });
+            }
+            
+            logger.LogInformation("Project {ProjectId} unlinked from organization {OrganizationId}", projectId, id);
+            
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error unlinking project {ProjectId} from organization {OrganizationId}", projectId, id);
+            return StatusCode(500, new { message = "Error unlinking project" });
+        }
+    }
 }

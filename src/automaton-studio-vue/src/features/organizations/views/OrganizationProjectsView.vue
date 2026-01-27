@@ -6,9 +6,13 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import Dialog from 'primevue/dialog'
+import Dropdown from 'primevue/dropdown'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { organizationsService } from '../services/organizationsService'
+import { projectsService } from '@/features/projects/services/projectsService'
 import { OrganizationRole } from '../types'
+import type { ProjectListItem } from '@/features/projects/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,9 +22,14 @@ const toast = useToast()
 const projects = ref<any[]>([])
 const loading = ref(true)
 const currentUserRole = ref<string | null>(null)
+const showLinkDialog = ref(false)
+const availableProjects = ref<ProjectListItem[]>([])
+const selectedProject = ref<ProjectListItem | null>(null)
+const linking = ref(false)
 
 const organizationId = computed(() => route.params.id as string)
 const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
+const isOrgAdmin = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
 
 onMounted(async () => {
   // Check user role first
@@ -60,6 +69,60 @@ async function loadProjects() {
   }
 }
 
+async function openLinkDialog() {
+  try {
+    // Load all user's projects
+    const allProjects = await projectsService.listProjects()
+    // Filter to only personal projects (no organizationId) where user is admin
+    availableProjects.value = allProjects.filter(
+      p => !p.organizationId && (p.role === 'ProjectAdmin')
+    )
+    
+    if (availableProjects.value.length === 0) {
+      toast.add({
+        severity: 'info',
+        summary: 'No Projects Available',
+        detail: 'You have no personal projects to link. Create a personal project first.',
+        life: 5000,
+      })
+      return
+    }
+    
+    showLinkDialog.value = true
+  } catch (error) {
+    // Error handled by service
+  }
+}
+
+async function linkProject() {
+  if (!selectedProject.value) return
+  
+  try {
+    linking.value = true
+    await organizationsService.linkProject(organizationId.value, selectedProject.value.id)
+    showLinkDialog.value = false
+    selectedProject.value = null
+    await loadProjects() // Reload to show the new project
+  } catch (error) {
+    // Error handled by service
+  } finally {
+    linking.value = false
+  }
+}
+
+async function unlinkProject(project: any) {
+  if (!confirm(`Are you sure you want to unlink "${project.displayName}"? It will become a personal project again.`)) {
+    return
+  }
+  
+  try {
+    await organizationsService.unlinkProject(organizationId.value, project.id)
+    await loadProjects() // Reload to remove the unlinked project
+  } catch (error) {
+    // Error handled by service
+  }
+}
+
 function viewProject(project: any) {
   router.push({ name: 'project-settings', params: { id: project.id } })
 }
@@ -93,6 +156,12 @@ const formatDate = (date: string) => {
           <p class="text-muted">Projects belonging to this organization</p>
         </div>
       </div>
+      <Button
+        v-if="isOrgAdmin"
+        label="Link Project"
+        icon="pi pi-link"
+        @click="openLinkDialog"
+      />
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -104,8 +173,15 @@ const formatDate = (date: string) => {
       v-else-if="projects.length === 0"
       icon="pi-folder"
       title="No projects in organization"
-      description="Create projects and link them to this organization to see them here. When creating a project, set its Organization field to this organization."
-    />
+      description="Link existing personal projects or create new projects under this organization."
+    >
+      <Button
+        v-if="isOrgAdmin"
+        label="Link Project"
+        icon="pi pi-link"
+        @click="openLinkDialog"
+      />
+    </EmptyState>
 
     <DataTable
       v-else
@@ -142,18 +218,77 @@ const formatDate = (date: string) => {
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 10rem">
+      <Column header="Actions" style="width: 12rem">
         <template #body="{ data }">
-          <Button
-            label="View"
-            icon="pi pi-eye"
-            outlined
-            size="small"
-            @click="viewProject(data)"
-          />
+          <div class="flex gap-2">
+            <Button
+              label="View"
+              icon="pi pi-eye"
+              outlined
+              size="small"
+              @click="viewProject(data)"
+            />
+            <Button
+              v-if="isOrgAdmin"
+              icon="pi pi-chain"
+              severity="danger"
+              outlined
+              size="small"
+              @click="unlinkProject(data)"
+              v-tooltip.top="'Unlink from organization'"
+            />
+          </div>
         </template>
       </Column>
     </DataTable>
+
+    <!-- Link Project Dialog -->
+    <Dialog
+      v-model:visible="showLinkDialog"
+      header="Link Project to Organization"
+      :modal="true"
+      :style="{ width: '500px' }"
+    >
+      <div class="flex flex-col gap-4 py-4">
+        <p class="text-muted">
+          Select a personal project to link to this organization. You must be a ProjectAdmin to link a project.
+        </p>
+        
+        <div class="field">
+          <label for="project-select">Project</label>
+          <Dropdown
+            id="project-select"
+            v-model="selectedProject"
+            :options="availableProjects"
+            optionLabel="displayName"
+            placeholder="Select a project"
+            class="w-full"
+          >
+            <template #option="{ option }">
+              <div>
+                <div class="font-semibold">{{ option.displayName }}</div>
+                <div class="text-sm text-muted">{{ option.description || 'No description' }}</div>
+              </div>
+            </template>
+          </Dropdown>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          label="Cancel"
+          text
+          @click="showLinkDialog = false"
+        />
+        <Button
+          label="Link Project"
+          icon="pi pi-link"
+          :loading="linking"
+          :disabled="!selectedProject"
+          @click="linkProject"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 

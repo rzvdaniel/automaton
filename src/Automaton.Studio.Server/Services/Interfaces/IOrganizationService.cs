@@ -76,6 +76,16 @@ public interface IOrganizationService
     /// </summary>
     Task<IEnumerable<Project>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default);
     
+    /// <summary>
+    /// Link an existing project to the organization
+    /// </summary>
+    Task<bool> LinkProjectToOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Unlink a project from the organization (make it personal again)
+    /// </summary>
+    Task<bool> UnlinkProjectFromOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default);
+    
     // =====================================================
     // App Assignment
     // =====================================================
