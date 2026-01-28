@@ -7,7 +7,7 @@
 1. **Create an Organization**
    - Go to Organizations → Create Organization
    - Fill in name and description
-   - You're automatically the OrgAdmin
+   - **You're automatically the OrgAdmin** (role stored in `OrganizationMembers` table)
 
 2. **Invite Members**
    - Organizations → {Your Org} → Members
@@ -18,6 +18,8 @@
    - Organizations → {Your Org} → App Assignments
    - Click "Manage Access" on an app
    - Select AppUser members to assign
+
+> **Important:** Organization roles (OrgAdmin, Developer, AppUser) are NOT in the `AspNetRoles` table. They're stored in the `OrganizationMembers.Role` column. See [Roles and Permissions Documentation](./features/roles-and-permissions.md) for details.
 
 ### For Developers
 

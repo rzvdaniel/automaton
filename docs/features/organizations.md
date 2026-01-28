@@ -31,24 +31,31 @@ User → Organizations → Organization Projects → Apps
 
 ## Roles
 
+> **Note:** For a comprehensive explanation of how the role system works, including the distinction between ASP.NET Identity roles and application-level roles, see [Roles and Permissions Documentation](./roles-and-permissions.md).
+
+**Organization roles are stored in the `OrganizationMembers` table**, not in `AspNetRoles`. When you create an organization, you automatically become OrgAdmin.
+
 ### OrgAdmin
 - Full control over the organization
 - Can invite/remove members
 - Can assign apps to AppUsers
 - Can update organization settings
 - Can delete the organization (owner only)
+- Can link/unlink projects to/from the organization
 
 ### Developer
 - Can create and manage projects and apps
 - Can invite new members (OrgAdmin and Developer roles)
 - Cannot assign apps to users
 - Cannot modify organization settings
+- Cannot link/unlink projects
 
 ### AppUser
 - Can only access apps assigned to them
 - Cannot create projects or apps
 - Limited portal view showing only assigned apps
 - Cannot invite members
+- Simplified UI with development tools hidden
 
 ## Features
 
