@@ -18,6 +18,8 @@ const toast = useToast()
 // State
 const organization = ref<OrganizationDto | null>(null)
 const loading = ref(true)
+const appCount = ref<number | null>(null)
+const appCountLoading = ref(false)
 
 // Computed
 const organizationId = computed(() => route.params.id as string)
@@ -38,11 +40,37 @@ async function loadOrganization() {
   try {
     loading.value = true
     organization.value = await organizationsService.getOrganization(organizationId.value)
+    await loadAppCount()
   } catch (error) {
     // Error is handled by the service
     router.push({ name: 'organizations' })
   } finally {
     loading.value = false
+  }
+}
+
+async function loadAppCount() {
+  if (!organization.value || appCountLoading.value) return
+
+  appCountLoading.value = true
+  try {
+    if (organization.value.currentUserRole === OrganizationRole.AppUser) {
+      const assignedApps = await organizationsService.getMyAssignedApps(organizationId.value)
+      appCount.value = assignedApps.length
+    } else {
+      const apps = await organizationsService.getOrganizationApps(organizationId.value)
+      appCount.value = apps.length
+    }
+  } catch (error) {
+    appCount.value = 0
+    toast.add({
+      severity: 'warn',
+      summary: 'Apps count unavailable',
+      detail: 'Unable to load apps count right now.',
+      life: 3000,
+    })
+  } finally {
+    appCountLoading.value = false
   }
 }
 
@@ -161,7 +189,7 @@ const formatDate = (date: string) => {
             </div>
           </template>
           <template #content>
-            <div class="stat-value">-</div>
+            <div class="stat-value">{{ appCountLoading ? '-' : (appCount ?? 0) }}</div>
             <p class="text-muted">{{ isAppUser ? 'Apps assigned to you' : 'Available apps' }}</p>
           </template>
           <template #footer>
