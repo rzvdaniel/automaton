@@ -154,7 +154,6 @@ class OrganizationsService {
    */
   async linkProject(organizationId: string, projectId: string): Promise<void> {
     await apiClient.put(`/api/organizations/${organizationId}/projects/${projectId}`);
-    toast.success('Project linked to organization successfully');
   }
   
   /**
@@ -162,7 +161,6 @@ class OrganizationsService {
    */
   async unlinkProject(organizationId: string, projectId: string): Promise<void> {
     await apiClient.delete(`/api/organizations/${organizationId}/projects/${projectId}`);
-    toast.success('Project unlinked from organization');
   }
 }
 

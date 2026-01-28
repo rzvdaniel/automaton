@@ -114,17 +114,29 @@ async function linkProject() {
     console.log('Linking project:', selectedProject.value.id, 'to organization:', organizationId.value)
     await organizationsService.linkProject(organizationId.value, selectedProject.value.id)
     console.log('Project linked successfully')
+    
+    // Add the linked project to the list dynamically
+    const linkedProject = selectedProject.value
+    projects.value.push({
+      id: linkedProject.id,
+      name: linkedProject.name,
+      displayName: linkedProject.displayName,
+      description: linkedProject.description,
+      updated: new Date().toISOString(),
+      members: [],
+    })
+    
     toast.add({
       severity: 'success',
       summary: 'Success',
       detail: 'Project linked successfully',
       life: 3000,
     })
+    
+    // Close dialog and reset form
     showLinkDialog.value = false
     selectedProject.value = null
-    console.log('Reloading projects...')
-    await loadProjects() // Reload to show the new project
-    console.log('Projects reloaded')
+    console.log('Dialog closed and project added to list')
   } catch (error: any) {
     console.error('Error linking project:', error)
     // Error toast is already shown by service
@@ -144,15 +156,17 @@ async function unlinkProject(project: any) {
         console.log('Unlinking project:', project.id, 'from organization:', organizationId.value)
         await organizationsService.unlinkProject(organizationId.value, project.id)
         console.log('Project unlinked successfully')
+        
+        // Remove the unlinked project from the list dynamically
+        projects.value = projects.value.filter(p => p.id !== project.id)
+        console.log('Project removed from list')
+        
         toast.add({
           severity: 'success',
           summary: 'Success',
           detail: 'Project unlinked successfully',
           life: 3000,
         })
-        console.log('Reloading projects...')
-        await loadProjects() // Reload to remove the unlinked project
-        console.log('Projects reloaded')
       } catch (error: any) {
         console.error('Error unlinking project:', error)
         // Error toast is already shown by service
