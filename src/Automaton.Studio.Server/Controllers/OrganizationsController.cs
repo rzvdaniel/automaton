@@ -316,7 +316,7 @@ public class OrganizationsController : BaseController
     /// Available to all organization members.
     /// </summary>
     [HttpGet("{id}/projects")]
-    public async Task<ActionResult> GetOrganizationProjects(Guid id)
+    public async Task<ActionResult<IEnumerable<ProjectDto>>> GetOrganizationProjects(Guid id)
     {
         try
         {

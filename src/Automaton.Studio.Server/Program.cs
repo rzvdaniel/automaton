@@ -29,6 +29,7 @@ using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Extensions;
+using System.Text.Json.Serialization;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -183,6 +184,11 @@ services.AddControllers(options =>
         .Build();
     options.Filters.Add(new AuthorizeFilter(policy));
     options.Filters.Add<GlobalExceptionFilter>();
+})
+.AddJsonOptions(options =>
+{
+    // Serialize enums as strings instead of integers
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 services.AddTransient<UserNameEnricher>();

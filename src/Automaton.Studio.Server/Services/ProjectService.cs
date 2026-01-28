@@ -49,7 +49,8 @@ public class ProjectService
                 MemberCount = pm.Project.Members.Count(m => m.IsActive),
                 UpdatedAt = pm.Project.Updated,
                 OrganizationId = pm.Project.OrganizationId,
-                OrganizationName = pm.Project.Organization != null ? pm.Project.Organization.Name : null
+                OrganizationName = pm.Project.Organization != null ? pm.Project.Organization.Name : null,
+                IsActive = pm.Project.IsActive
             })
             .OrderByDescending(p => p.UpdatedAt)
             .ToListAsync(cancellationToken);
@@ -269,6 +270,35 @@ public class ProjectService
     }
 
 
+
+    /// <summary>
+    /// Reactivate a previously deleted (deactivated) project. Only the owner can reactivate.
+    /// </summary>
+    public async Task<bool> ReactivateProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        // Check if user can reactivate this project (must be owner)
+        if (!await authorizationService.CanDeleteProjectAsync(projectId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to reactivate project {ProjectId} without ownership", UserId, projectId);
+            return false;
+        }
+
+        var project = await dbContext.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+
+        if (project == null)
+        {
+            return false;
+        }
+
+        project.IsActive = true;
+        project.Updated = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Reactivated project {ProjectId} by user {UserId}", projectId, UserId);
+        return true;
+    }
 
     /// <summary>
     /// Get user's role in a project

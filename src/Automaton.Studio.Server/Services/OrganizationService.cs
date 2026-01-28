@@ -540,7 +540,7 @@ public class OrganizationService : IOrganizationService
         return true;
     }
 
-    public async Task<IEnumerable<Project>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<ProjectDto>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
         // Verify user has access to organization
         if (!await CanAccessOrganizationAsync(organizationId, UserId, cancellationToken))
@@ -553,10 +553,32 @@ public class OrganizationService : IOrganizationService
             .Where(p => p.OrganizationId == organizationId && p.IsActive)
             .Include(p => p.Owner)
             .Include(p => p.Members)
+            .Include(p => p.ProjectApps)
+            .Include(p => p.ProjectFlows)
             .OrderByDescending(p => p.Updated)
             .ToListAsync(cancellationToken);
 
-        return projects;
+        // Map to DTOs
+        var projectDtos = projects.Select(p => new ProjectDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            DisplayName = p.DisplayName,
+            Description = p.Description,
+            OwnerId = p.OwnerId,
+            OwnerName = p.Owner?.UserName ?? "Unknown",
+            OrganizationId = p.OrganizationId,
+            OrganizationName = null,
+            CreatedAt = p.Created,
+            UpdatedAt = p.Updated,
+            IsActive = p.IsActive,
+            MemberCount = p.Members.Count(m => m.IsActive),
+            AppCount = p.ProjectApps.Count,
+            FlowCount = p.ProjectFlows.Count,
+            CurrentUserRole = ProjectRole.Viewer
+        });
+
+        return projectDtos.ToList();
     }
     
     public async Task<bool> LinkProjectToOrganizationAsync(Guid organizationId, Guid projectId, CancellationToken cancellationToken = default)

@@ -47,6 +47,7 @@ export interface ProjectListItem {
   updatedAt: string;
   organizationId?: string;
   organizationName?: string;
+  isActive: boolean;
 }
 
 /**

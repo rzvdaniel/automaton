@@ -74,7 +74,7 @@ public interface IOrganizationService
     /// <summary>
     /// Get all projects in the organization
     /// </summary>
-    Task<IEnumerable<Project>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<ProjectDto>> GetOrganizationProjectsAsync(Guid organizationId, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Link an existing project to the organization

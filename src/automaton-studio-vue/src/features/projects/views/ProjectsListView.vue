@@ -114,11 +114,56 @@ function handleDeleteProject(projectId: string, projectName: string) {
           detail: 'Project deleted successfully',
           life: 3000,
         })
-      } catch (error) {
-        // Error toast is already shown by service
+        console.log('Project deleted, projects list:', store.projects)
+      } catch (error: any) {
+        console.error('Failed to delete project:', error)
+        let errorMessage = 'Failed to delete project';
+        if (error.response?.status === 403) {
+          errorMessage = 'You do not have permission to delete this project. Only Project Admins can delete projects.';
+        } else if (error.response?.status === 404) {
+          errorMessage = 'Project not found';
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: errorMessage,
+          life: 5000,
+        })
       }
     },
   })
+}
+
+// Handle reactivate project
+async function handleReactivateProject(projectId: string, projectName: string) {
+  try {
+    await store.reactivateProject(projectId)
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Project reactivated successfully',
+      life: 3000,
+    })
+    console.log('Project reactivated, projects list:', store.projects)
+  } catch (error: any) {
+    console.error('Failed to reactivate project:', error)
+    let errorMessage = 'Failed to reactivate project';
+    if (error.response?.status === 403) {
+      errorMessage = 'You do not have permission to reactivate this project. Only Project Admins can reactivate projects.';
+    } else if (error.response?.status === 404) {
+      errorMessage = 'Project not found';
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    }
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: errorMessage,
+      life: 5000,
+    })
+  }
 }
 
 // Navigate to project settings
@@ -174,7 +219,15 @@ function closeCreateDialog() {
           <Column field="displayName" header="Name" sortable>
             <template #body="slotProps">
               <div>
-                <div>{{ slotProps.data.displayName }}</div>
+                <div class="flex items-center gap-2">
+                  <span>{{ slotProps.data.displayName }}</span>
+                  <Tag
+                    v-if="!slotProps.data.isActive"
+                    value="Inactive"
+                    severity="danger"
+                    icon="pi pi-ban"
+                  />
+                </div>
                 <Tag
                   v-if="slotProps.data.organizationName"
                   :value="slotProps.data.organizationName"
@@ -201,17 +254,30 @@ function closeCreateDialog() {
             <template #body="slotProps">
               <div class="flex gap-2">
                 <Button
+                  v-if="!slotProps.data.isActive"
+                  icon="pi pi-check-circle"
+                  severity="success"
+                  text
+                  rounded
+                  v-tooltip.top="'Reactivate Project'"
+                  @click="handleReactivateProject(slotProps.data.id, slotProps.data.displayName)"
+                />
+                <Button
+                  v-if="slotProps.data.isActive"
                   icon="pi pi-cog"
                   severity="secondary"
                   text
                   rounded
+                  v-tooltip.top="'Settings'"
                   @click="handleOpenSettings(slotProps.data.id)"
                 />
                 <Button
+                  v-if="slotProps.data.isActive"
                   icon="pi pi-trash"
                   severity="danger"
                   text
                   rounded
+                  v-tooltip.top="'Delete Project'"
                   @click="handleDeleteProject(slotProps.data.id, slotProps.data.displayName)"
                 />
               </div>

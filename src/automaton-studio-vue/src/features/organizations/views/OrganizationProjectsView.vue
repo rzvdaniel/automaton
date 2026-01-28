@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -17,6 +18,7 @@ import type { ProjectListItem } from '@/features/projects/types'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
 // State
 const projects = ref<any[]>([])
@@ -59,10 +61,12 @@ onMounted(async () => {
 async function loadProjects() {
   try {
     loading.value = true
+    console.log('Loading projects for organization:', organizationId.value)
     const projectsData = await organizationsService.getOrganizationProjects(organizationId.value)
+    console.log('Projects loaded:', projectsData)
     projects.value = projectsData
-  } catch (error) {
-    // Error handled by service
+  } catch (error: any) {
+    console.error('Error loading projects:', error)
     projects.value = []
   } finally {
     loading.value = false
@@ -107,28 +111,54 @@ async function linkProject() {
   
   try {
     linking.value = true
+    console.log('Linking project:', selectedProject.value.id, 'to organization:', organizationId.value)
     await organizationsService.linkProject(organizationId.value, selectedProject.value.id)
+    console.log('Project linked successfully')
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Project linked successfully',
+      life: 3000,
+    })
     showLinkDialog.value = false
     selectedProject.value = null
+    console.log('Reloading projects...')
     await loadProjects() // Reload to show the new project
-  } catch (error) {
-    // Error handled by service
+    console.log('Projects reloaded')
+  } catch (error: any) {
+    console.error('Error linking project:', error)
+    // Error toast is already shown by service
   } finally {
     linking.value = false
   }
 }
 
 async function unlinkProject(project: any) {
-  if (!confirm(`Are you sure you want to unlink "${project.displayName}"? It will become a personal project again.`)) {
-    return
-  }
-  
-  try {
-    await organizationsService.unlinkProject(organizationId.value, project.id)
-    await loadProjects() // Reload to remove the unlinked project
-  } catch (error) {
-    // Error handled by service
-  }
+  confirm.require({
+    message: `Are you sure you want to unlink "${project.displayName}"? It will become a personal project again.`,
+    header: 'Unlink Project',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        console.log('Unlinking project:', project.id, 'from organization:', organizationId.value)
+        await organizationsService.unlinkProject(organizationId.value, project.id)
+        console.log('Project unlinked successfully')
+        toast.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Project unlinked successfully',
+          life: 3000,
+        })
+        console.log('Reloading projects...')
+        await loadProjects() // Reload to remove the unlinked project
+        console.log('Projects reloaded')
+      } catch (error: any) {
+        console.error('Error unlinking project:', error)
+        // Error toast is already shown by service
+      }
+    },
+  })
 }
 
 function viewProject(project: any) {
@@ -181,7 +211,7 @@ const formatDate = (date: string) => {
       v-else-if="projects.length === 0"
       icon="pi-folder"
       title="No projects in organization"
-      description="Link existing personal projects or create new projects under this organization."
+      message="Link existing personal projects or create new projects under this organization."
     >
       <Button
         v-if="isOrgAdmin"
@@ -238,12 +268,13 @@ const formatDate = (date: string) => {
             />
             <Button
               v-if="isOrgAdmin"
-              icon="pi pi-chain"
+              icon="pi pi-trash"
               severity="danger"
-              outlined
-              size="small"
+              text
+              rounded
               @click="unlinkProject(data)"
               v-tooltip.top="'Unlink from organization'"
+              aria-label="Unlink project"
             />
           </div>
         </template>

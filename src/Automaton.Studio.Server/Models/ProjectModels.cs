@@ -59,6 +59,7 @@ public class ProjectListItem
     public DateTime UpdatedAt { get; set; }
     public Guid? OrganizationId { get; set; }
     public string? OrganizationName { get; set; }
+    public bool IsActive { get; set; }
 }
 
 /// <summary>
