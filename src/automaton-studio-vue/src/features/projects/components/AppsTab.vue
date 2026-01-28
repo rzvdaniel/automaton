@@ -15,12 +15,14 @@
             <Select
               id="app-select"
               v-model="selectedApp"
-              :options="availableApps"
+              :options="availableAppOptions"
               option-label="name"
               option-value="id"
               placeholder="Choose an app"
               class="w-full"
               filter
+              :disabled="availableAppsLoading"
+              emptyMessage="No available apps"
             >
               <template #option="{ option }">
                 <div class="flex items-center gap-2">
@@ -37,7 +39,7 @@
               label="Add App"
               icon="pi pi-plus"
               @click="handleAddApp"
-              :disabled="!selectedApp"
+              :disabled="!selectedApp || availableAppsLoading"
             />
           </div>
         </div>
@@ -85,11 +87,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
+import { appsService } from '@/features/apps/services/apps.service';
 import { useProjectsStore } from '../stores/projectsStore';
 import { ProjectRole, type ProjectAppDto } from '../types';
+import type { App } from '@/features/apps/types/apps.types';
 import Card from 'primevue/card';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -109,16 +113,16 @@ const confirm = useConfirm();
 const store = useProjectsStore();
 
 const selectedApp = ref<string>('');
-
-// TODO: Replace with actual API call to fetch available apps
-const availableApps = ref([
-  { id: 'app-1', name: 'Customer Portal', isPublished: true },
-  { id: 'app-2', name: 'Admin Dashboard', isPublished: true },
-  { id: 'app-3', name: 'Analytics App', isPublished: false },
-]);
+const availableApps = ref<App[]>([]);
+const availableAppsLoading = ref(false);
 
 const apps = computed(() => store.apps);
 const loading = computed(() => store.loading);
+
+const availableAppOptions = computed(() => {
+  const assignedIds = new Set(apps.value.map((app) => app.appId));
+  return availableApps.value.filter((app) => !assignedIds.has(app.id));
+});
 
 const canManageResources = computed(() => {
   return (
@@ -156,6 +160,24 @@ async function handleAddApp() {
   }
 }
 
+async function loadAvailableApps() {
+  if (availableAppsLoading.value) return;
+
+  availableAppsLoading.value = true;
+  try {
+    availableApps.value = await appsService.list();
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Failed to load apps',
+      detail: 'Unable to load your apps. Please try again.',
+      life: 4000,
+    });
+  } finally {
+    availableAppsLoading.value = false;
+  }
+}
+
 function handleRemoveApp(app: ProjectAppDto) {
   confirm.require({
     message: `Are you sure you want to remove app "${app.appName}" from this project? This may affect flows or other dependencies.`,
@@ -171,4 +193,13 @@ function handleRemoveApp(app: ProjectAppDto) {
     },
   });
 }
+
+watch(
+  () => props.projectId,
+  () => {
+    selectedApp.value = '';
+    loadAvailableApps();
+  },
+  { immediate: true }
+);
 </script>
