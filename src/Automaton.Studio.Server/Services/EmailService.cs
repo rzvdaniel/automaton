@@ -1,34 +1,121 @@
 ﻿using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services.Interfaces;
-using System.Text;
+using Fluid;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
+using System.Resources;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
 public class EmailService(ConfigurationService configurationService, ILogger<EmailService> logger) : IEmailService
 {
-    private const string ApiKeyHeader = "X-Api-Key";
-    private const string ApplicationJson = "application/json";
-    private readonly Serilog.ILogger logger = Serilog.Log.ForContext<EmailService>();
+    private static readonly ResourceManager TemplateResourceManager = new("Automaton.Studio.Server.Resources.EmailTemplates", typeof(EmailService).Assembly);
+    private static readonly FluidParser TemplateParser = new();
 
     public async Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
     {
         try
         {
-            var json = JsonSerializer.Serialize(emailDetails);
-            var content = new StringContent(json, Encoding.UTF8, ApplicationJson);
+            var (subject, bodyHtml) = await RenderEmailAsync(emailDetails, cancellationToken);
+            var message = BuildMessage(emailDetails, subject, bodyHtml);
 
-            var client = new HttpClient();
-            client.DefaultRequestHeaders.Add(ApiKeyHeader, configurationService.EmailConfig.EmailApiKey);
+            using var client = new SmtpClient();
+            await client.ConnectAsync(
+                configurationService.EmailConfig.EmailHost,
+                configurationService.EmailConfig.EmailPort,
+                ResolveSocketOptions(configurationService.EmailConfig.EmailUseSsl),
+                cancellationToken);
 
-            var response = await client.PostAsync(configurationService.EmailConfig.EmailApiUrl, content, cancellationToken);
+            await client.AuthenticateAsync(
+                configurationService.EmailConfig.EmailAccount,
+                configurationService.EmailConfig.EmailPassword,
+                cancellationToken);
 
-            return response.IsSuccessStatusCode;        
+            await client.SendAsync(message, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
+            return true;
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "An error occured when sending the email {0}", JsonSerializer.Serialize(emailDetails));
+            logger.LogError(ex, "An error occured when sending the email {EmailDetails}", JsonSerializer.Serialize(emailDetails));
             throw;
         }
+    }
+
+    private static SecureSocketOptions ResolveSocketOptions(bool useSsl)
+    {
+        return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+    }
+
+    private async Task<(string subject, string bodyHtml)> RenderEmailAsync(EmailData emailDetails, CancellationToken cancellationToken)
+    {
+        var subjectTemplate = GetTemplate(emailDetails.Template, ".Subject")
+            ?? GetTemplate(emailDetails.Template, "_Subject")
+            ?? (emailDetails.Variables.TryGetValue("Subject", out var subjectFallback) ? subjectFallback : emailDetails.Template);
+
+        var bodyTemplate = GetTemplate(emailDetails.Template, ".Body")
+            ?? GetTemplate(emailDetails.Template, "_Body")
+            ?? GetTemplate(emailDetails.Template, string.Empty);
+
+        if (string.IsNullOrWhiteSpace(bodyTemplate))
+        {
+            throw new InvalidOperationException($"Email template '{emailDetails.Template}' was not found in resources.");
+        }
+
+        var subject = await RenderTemplateAsync(subjectTemplate, emailDetails.Variables, cancellationToken);
+        var bodyHtml = await RenderTemplateAsync(bodyTemplate, emailDetails.Variables, cancellationToken);
+        return (subject.Trim(), bodyHtml);
+    }
+
+    private static string? GetTemplate(string templateName, string suffix)
+    {
+        var resourceKey = string.IsNullOrWhiteSpace(suffix)
+            ? templateName
+            : $"{templateName}{suffix}";
+
+        return TemplateResourceManager.GetString(resourceKey);
+    }
+
+    private static async Task<string> RenderTemplateAsync(string template, Dictionary<string, string> variables, CancellationToken cancellationToken)
+    {
+        if (!TemplateParser.TryParse(template, out var fluidTemplate, out var errors))
+        {
+            var errorMessage = errors is not null ? string.Join("; ", errors) : "Unknown Liquid parse error.";
+            throw new InvalidOperationException($"Failed to parse email template. {errorMessage}");
+        }
+
+        var contextVariables = variables.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+        var context = new TemplateContext(contextVariables);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await fluidTemplate.RenderAsync(context);
+    }
+
+    private MimeMessage BuildMessage(EmailData emailDetails, string subject, string bodyHtml)
+    {
+        var message = new MimeMessage();
+
+        var fromAddress = emailDetails.From?.Email ?? configurationService.EmailConfig.EmailAccount;
+        var fromName = string.IsNullOrWhiteSpace(emailDetails.From?.Name)
+            ? configurationService.EmailConfig.EmailSupport
+            : emailDetails.From?.Name;
+
+        message.From.Add(new MailboxAddress(fromName, fromAddress));
+
+        foreach (var to in emailDetails.To)
+        {
+            message.To.Add(new MailboxAddress(to.Name, to.Email));
+        }
+
+        message.Subject = subject;
+
+        var bodyBuilder = new BodyBuilder
+        {
+            HtmlBody = bodyHtml
+        };
+
+        message.Body = bodyBuilder.ToMessageBody();
+        return message;
     }
 }
