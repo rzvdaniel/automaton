@@ -349,12 +349,17 @@ public class OrganizationService : IOrganizationService
             if (user == null)
             {
                 // Create a new user account without password
+                // Use email prefix as name initially, safely handling edge cases
+                var emailParts = request.Email.Split('@');
+                var userName = emailParts.Length > 0 ? emailParts[0] : request.Email;
+                
                 user = new ApplicationUser
                 {
                     UserName = request.Email,
                     Email = request.Email,
                     EmailConfirmed = false,
-                    Name = request.Email.Split('@')[0] // Use email prefix as name initially
+                    Name = userName,
+                    PublicUsername = userName // Use email prefix as public username initially
                 };
                 
                 var createResult = await userManager.CreateAsync(user);
@@ -373,11 +378,11 @@ public class OrganizationService : IOrganizationService
             // Generate invitation URL
             var invitationUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/organizations/invitations/accept?token={token}";
 
-            // Decide if we should include password setup link
-            var requirePasswordSetup = user != null && (createdNewUser || !(await userManager.HasPasswordAsync(user)));
+            // Determine if user needs to set up a password (new users or users without passwords)
+            var userNeedsPasswordSetup = user != null && (createdNewUser || !(await userManager.HasPasswordAsync(user)));
             string? setupPasswordUrl = null;
 
-            if (requirePasswordSetup && user != null)
+            if (userNeedsPasswordSetup && user != null)
             {
                 var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
                 var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
@@ -391,6 +396,8 @@ public class OrganizationService : IOrganizationService
             // Calculate expiration hours
             var expirationHours = (int)Math.Ceiling((invitation.ExpiresAt - DateTime.UtcNow).TotalHours);
 
+            // Build email template variables
+            // Note: RequirePasswordSetup is a string "true" or "false" for Liquid template comparison
             var variables = new Dictionary<string, string>
             {
                 { "OrganizationName", organization.Name },
@@ -399,10 +406,10 @@ public class OrganizationService : IOrganizationService
                 { "InvitationUrl", invitationUrl },
                 { "ExpirationHours", expirationHours.ToString() },
                 { "SupportEmail", configurationService.EmailConfig.EmailSupport },
-                { "RequirePasswordSetup", requirePasswordSetup ? "true" : "false" }
+                { "RequirePasswordSetup", userNeedsPasswordSetup ? "true" : "false" }
             };
 
-            if (requirePasswordSetup && setupPasswordUrl != null)
+            if (userNeedsPasswordSetup && setupPasswordUrl != null)
             {
                 variables["SetupPasswordUrl"] = setupPasswordUrl;
             }
