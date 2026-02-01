@@ -37,6 +37,13 @@ The Vue.js frontend implements feature-based routes (see `src/automaton-studio-v
 - `/runners` – Runner management
 - `/projects` – Project organization
   - `/projects/:id/settings` – Membership, shared variables, permissions
+- `/organizations` – Organization management
+  - `/organizations/:id` – Organization dashboard
+  - `/organizations/:id/members` – Member management and invitations
+  - `/organizations/:id/apps` – App assignments to users
+  - `/organizations/:id/projects` – Projects in organization
+  - `/organizations/:id/settings` – Organization settings
+- `/my-apps` – Apps assigned to current user (AppUser portal)
 - `/apikeys` – API keys management
 - `/ai-keys` – AI provider keys
 - `/settings` – Application settings
@@ -268,6 +275,7 @@ The frontend is composed of self-contained feature modules:
 - **steps/** – Step library, editor (code, IO, tests), AI assist
 - **runners/** – Runner list, status, logs, actions
 - **projects/** – Organization, shared settings, permissions
+- **organizations/** – Multi-tenant structure, member management, app assignments, role-based access
 - **settings/** – User/app settings, API keys, AI keys
 
 Shared modules (`src/shared/`): components, services (Axios, SignalR), composables, utils, types.

@@ -35,6 +35,16 @@ public class Project
     public virtual ApplicationUser? Owner { get; set; }
     
     /// <summary>
+    /// Optional organization this project belongs to. Null for personal projects.
+    /// </summary>
+    public Guid? OrganizationId { get; set; }
+    
+    /// <summary>
+    /// Navigation property to the organization (if project is org-scoped)
+    /// </summary>
+    public virtual Organization? Organization { get; set; }
+    
+    /// <summary>
     /// When the project was created
     /// </summary>
     public DateTime Created { get; set; }

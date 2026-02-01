@@ -13,6 +13,40 @@ Importing and using PrimeVue service components like `ConfirmDialog` locally in 
 
 **Always use globally-registered PrimeVue service components.** These are defined at the application root and accessed via composition hooks rather than local imports.
 
+### Why PrimeVue Dialogs Over Browser Dialogs
+
+**Never use browser's native `confirm()` or `alert()`** – always use PrimeVue's `useConfirm()` hook instead:
+
+| Feature | Browser `confirm()` | PrimeVue `useConfirm()` |
+|---------|---|---|
+| **Styling** | Plain, browser default | Theme-aware, matches app design |
+| **Customization** | None | Headers, icons, button classes |
+| **User Experience** | Blocks interaction | Non-blocking, async |
+| **Accessibility** | Limited | Full ARIA support |
+| **Consistency** | Varies by browser | Consistent across all browsers |
+
+**Example of what to avoid:**
+```typescript
+// ❌ BAD: Browser dialog
+if (!confirm('Delete this item?')) {
+  return
+}
+```
+
+**Use this instead:**
+```typescript
+// ✅ GOOD: PrimeVue styled dialog
+confirm.require({
+  message: 'Are you sure you want to delete this item?',
+  header: 'Delete Item',
+  icon: 'pi pi-exclamation-triangle',
+  acceptClass: 'p-button-danger',
+  accept: () => {
+    // Handle deletion
+  },
+})
+```
+
 ## Global Service Components
 
 The following PrimeVue components are **service-based** and should NOT be imported locally:
@@ -137,6 +171,40 @@ function handleRemove(member: ProjectMemberDto) {
   });
 }
 ```
+
+### ✅ Correct: Using ConfirmDialog with Styling
+
+```typescript
+import { useConfirm } from 'primevue/useconfirm';
+
+const confirm = useConfirm();
+
+function handleDelete(itemName: string) {
+  confirm.require({
+    message: `Are you sure you want to delete "${itemName}"?`,
+    header: 'Delete Item',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',  // Red danger styling
+    accept: async () => {
+      // Perform deletion
+      await deleteItem();
+      toast.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Item deleted successfully',
+        life: 3000,
+      });
+    },
+  });
+}
+```
+
+**Key Options:**
+- `header` - Dialog title
+- `message` - Confirmation question
+- `icon` - PrimeVue icon class
+- `acceptClass` - CSS class for accept button (use `'p-button-danger'` for destructive actions)
+- `accept` - Callback function when user confirms
 
 ### ✅ Correct: Using Toast
 

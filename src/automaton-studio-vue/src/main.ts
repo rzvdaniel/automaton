@@ -15,6 +15,8 @@ import './assets/styles/main.css'
 
 import App from './App.vue'
 import router from './router'
+import { setUnauthorizedCallback } from '@/shared/services/api/axios-instance'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 // Create app
 const app = createApp(App)
@@ -22,6 +24,14 @@ const app = createApp(App)
 // Pinia store
 const pinia = createPinia()
 app.use(pinia)
+
+// Setup unauthorized callback for axios interceptor
+// This prevents full page reloads when tokens expire
+setUnauthorizedCallback(() => {
+  const authStore = useAuthStore()
+  authStore.logout()
+  router.push({ path: '/login', query: { session: 'expired' } })
+})
 
 // PrimeVue with Aura theme (default)
 app.use(PrimeVue, {

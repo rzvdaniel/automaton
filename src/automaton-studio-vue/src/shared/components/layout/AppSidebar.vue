@@ -1,33 +1,69 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { watch } from 'vue'
 import Button from 'primevue/button'
+import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 
 const router = useRouter()
 const route = useRoute()
 const isExpanded = ref(false)
+
+// Load organization roles for access control
+const { isAppUserOnly, loadOrganizations, organizations } = useOrganizationRole()
+
+onMounted(async () => {
+  // Load organizations to determine user's roles
+  await loadOrganizations()
+})
+
+// Refresh organizations on route changes to reveal menu after creation
+watch(() => route.fullPath, async () => {
+  await loadOrganizations()
+})
 
 interface NavItem {
   label: string
   icon: string
   to: string
   divider?: boolean
+  hideForAppUser?: boolean
 }
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
   // { label: 'Flows', icon: 'pi pi-bolt', to: '/flows' },
-  { label: 'Apps', icon: 'pi pi-globe', to: '/apps' },
+  { label: 'Apps', icon: 'pi pi-globe', to: '/apps', hideForAppUser: true },
   // { label: 'Steps', icon: 'pi pi-code', to: '/steps' },
-  { label: 'Runners', icon: 'pi pi-desktop', to: '/runners' },
-  { label: 'Projects', icon: 'pi pi-building', to: '/projects' },
+  { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
+  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
+  { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
+  { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
 ]
 
 const bottomNavItems: NavItem[] = [
-  { label: 'Downloads', icon: 'pi pi-download', to: '/downloads' },
+  { label: 'Downloads', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
   { label: 'Documentation', icon: 'pi pi-book', to: '/docs' },
 ]
+
+// Filter navigation items based on user role
+const hasOrganizations = computed(() => organizations.value && organizations.value.length > 0)
+
+const visibleNavItems = computed(() => {
+  const base = !isAppUserOnly.value
+    ? navItems.filter(item => item.to !== '/my-apps')
+    : navItems.filter(item => !item.hideForAppUser)
+  // Progressive disclosure: hide Organizations until user has at least one org
+  return hasOrganizations.value ? base : base.filter(item => item.to !== '/organizations')
+})
+
+const visibleBottomNavItems = computed(() => {
+  if (isAppUserOnly.value) {
+    return bottomNavItems.filter(item => !item.hideForAppUser)
+  }
+  return bottomNavItems
+})
 
 const isActive = (to: string) => {
   if (to === '/') {
@@ -57,7 +93,7 @@ const sidebarClass = computed(() => ({
 
       <!-- Main Navigation -->
       <nav class="sidebar-nav">
-        <div v-for="item in navItems" :key="item.to" class="nav-item-wrapper">
+        <div v-for="item in visibleNavItems" :key="item.to" class="nav-item-wrapper">
           <Button
             :title="isExpanded ? undefined : item.label"
             :class="['nav-item', { active: isActive(item.to) }]"
@@ -78,7 +114,7 @@ const sidebarClass = computed(() => ({
       <!-- Bottom Navigation -->
       <nav class="sidebar-nav sidebar-nav-bottom">
         <div class="nav-divider"></div>
-        <div v-for="item in bottomNavItems" :key="item.to" class="nav-item-wrapper">
+        <div v-for="item in visibleBottomNavItems" :key="item.to" class="nav-item-wrapper">
           <Button
             :title="isExpanded ? undefined : item.label"
             :class="['nav-item', { active: isActive(item.to) }]"

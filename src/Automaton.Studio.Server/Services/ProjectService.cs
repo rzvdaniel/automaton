@@ -38,6 +38,7 @@ public class ProjectService
         var projects = await dbContext.ProjectMembers
             .Where(pm => pm.UserId == UserId && pm.IsActive)
             .Include(pm => pm.Project)
+                .ThenInclude(p => p.Organization)
             .Select(pm => new ProjectListItem
             {
                 Id = pm.Project.Id,
@@ -46,7 +47,10 @@ public class ProjectService
                 Description = pm.Project.Description,
                 Role = pm.Role,
                 MemberCount = pm.Project.Members.Count(m => m.IsActive),
-                UpdatedAt = pm.Project.Updated
+                UpdatedAt = pm.Project.Updated,
+                OrganizationId = pm.Project.OrganizationId,
+                OrganizationName = pm.Project.Organization != null ? pm.Project.Organization.Name : null,
+                IsActive = pm.Project.IsActive
             })
             .OrderByDescending(p => p.UpdatedAt)
             .ToListAsync(cancellationToken);
@@ -69,6 +73,7 @@ public class ProjectService
 
         var project = await dbContext.Projects
             .Include(p => p.Owner)
+            .Include(p => p.Organization)
             .Include(p => p.Members)
             .Include(p => p.ProjectApps)
             .Include(p => p.ProjectFlows)
@@ -90,6 +95,8 @@ public class ProjectService
             Description = project.Description,
             OwnerId = project.OwnerId,
             OwnerName = project.Owner?.UserName ?? "Unknown",
+            OrganizationId = project.OrganizationId,
+            OrganizationName = project.Organization?.Name,
             CreatedAt = project.Created,
             UpdatedAt = project.Updated,
             IsActive = project.IsActive,
@@ -113,6 +120,18 @@ public class ProjectService
         {
             throw new InvalidOperationException($"Project with name '{request.Name}' already exists");
         }
+        
+        // If organizationId is provided, verify user is a member
+        if (request.OrganizationId.HasValue)
+        {
+            var isMember = await dbContext.OrganizationMembers
+                .AnyAsync(om => om.OrganizationId == request.OrganizationId.Value && om.UserId == UserId && om.IsActive, cancellationToken);
+                
+            if (!isMember)
+            {
+                throw new UnauthorizedAccessException("You must be a member of the organization to create projects under it");
+            }
+        }
 
         var now = DateTime.UtcNow;
         var project = new Project
@@ -122,6 +141,7 @@ public class ProjectService
             DisplayName = request.DisplayName,
             Description = request.Description,
             OwnerId = UserId,
+            OrganizationId = request.OrganizationId,
             Created = now,
             Updated = now,
             IsActive = true
@@ -154,6 +174,8 @@ public class ProjectService
             Description = project.Description,
             OwnerId = project.OwnerId,
             OwnerName = userContextService.GetUserName(),
+            OrganizationId = project.OrganizationId,
+            OrganizationName = null, // Will be loaded if needed
             CreatedAt = project.Created,
             UpdatedAt = project.Updated,
             IsActive = project.IsActive,
@@ -248,6 +270,35 @@ public class ProjectService
     }
 
 
+
+    /// <summary>
+    /// Reactivate a previously deleted (deactivated) project. Only the owner can reactivate.
+    /// </summary>
+    public async Task<bool> ReactivateProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        // Check if user can reactivate this project (must be owner)
+        if (!await authorizationService.CanDeleteProjectAsync(projectId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to reactivate project {ProjectId} without ownership", UserId, projectId);
+            return false;
+        }
+
+        var project = await dbContext.Projects
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+
+        if (project == null)
+        {
+            return false;
+        }
+
+        project.IsActive = true;
+        project.Updated = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("Reactivated project {ProjectId} by user {UserId}", projectId, UserId);
+        return true;
+    }
 
     /// <summary>
     /// Get user's role in a project

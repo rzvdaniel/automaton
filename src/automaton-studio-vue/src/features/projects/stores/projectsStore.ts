@@ -82,11 +82,30 @@ export const useProjectsStore = defineStore('projects', () => {
     loading.value = true;
     try {
       await projectsService.deleteProject(projectId);
-      projects.value = projects.value.filter((p) => p.id !== projectId);
+      // Update the project status in the list
+      projects.value = projects.value.map((p) =>
+        p.id === projectId ? { ...p, isActive: false } : p
+      );
       // Clear active project if it was deleted
       if (activeProjectId.value === projectId) {
         setActiveProject(null);
       }
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Reactivate a previously deleted project
+   */
+  async function reactivateProject(projectId: string) {
+    loading.value = true;
+    try {
+      await projectsService.reactivateProject(projectId);
+      // Update the project status in the list
+      projects.value = projects.value.map((p) =>
+        p.id === projectId ? { ...p, isActive: true } : p
+      );
     } finally {
       loading.value = false;
     }
@@ -231,6 +250,7 @@ export const useProjectsStore = defineStore('projects', () => {
     setActiveProject,
     createProject,
     deleteProject,
+    reactivateProject,
     loadProjectDetails,
     addMember,
     removeMember,

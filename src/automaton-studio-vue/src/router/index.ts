@@ -9,6 +9,7 @@ import { appsRoutes } from '@/features/apps/routes'
 import { stepsRoutes } from '@/features/steps/routes'
 import { runnersRoutes } from '@/features/runners/routes'
 import { projectsRoutes } from '@/features/projects/routes'
+import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
 import { installRoutes } from '@/features/install/routes'
@@ -32,6 +33,7 @@ const router = createRouter({
     ...stepsRoutes,
     ...runnersRoutes,
     ...projectsRoutes,
+    ...organizationsRoutes,
     ...settingsRoutes,
     ...downloadsRoutes,
 

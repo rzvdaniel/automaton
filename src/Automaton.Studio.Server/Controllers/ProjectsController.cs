@@ -185,6 +185,43 @@ public class ProjectsController : BaseController
     }
 
     /// <summary>
+    /// Reactivate a previously deleted (deactivated) project.
+    /// Only the project owner can reactivate the project.
+    /// </summary>
+    [HttpPost("{id}/reactivate")]
+    [Authorize(Policy = "ProjectAdmin")]
+    public async Task<ActionResult> ReactivateProject(Guid id)
+    {
+        try
+        {
+            var success = await projectService.ReactivateProjectAsync(id);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "Project not found" });
+            }
+
+            logger.LogInformation("Project reactivated: {ProjectId} by user {UserId}", 
+                id, GetUserId());
+
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error reactivating project {ProjectId}", id);
+            return StatusCode(500, new { message = "Error reactivating project" });
+        }
+    }
+
+    /// <summary>
     /// Check if current user is a member of the project and get their role.
     /// </summary>
     [HttpGet("{id}/membership")]
