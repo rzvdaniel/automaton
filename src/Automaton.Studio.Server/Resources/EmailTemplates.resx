@@ -162,6 +162,36 @@
 &lt;/html&gt;
     </value>
   </data>
+  <data name="AutomatonOrganizationInvitation.Subject" xml:space="preserve">
+    <value>You've been invited to {{ OrganizationName }}</value>
+  </data>
+  <data name="AutomatonOrganizationInvitation.Body" xml:space="preserve">
+    <value>
+&lt;!doctype html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8" /&gt;
+  &lt;title&gt;Organization Invitation&lt;/title&gt;
+&lt;/head&gt;
+&lt;body style="font-family: Arial, sans-serif; color: #1f2937;"&gt;
+  &lt;h2&gt;Organization Invitation&lt;/h2&gt;
+  &lt;p&gt;Hello,&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;{{ InviterName }}&lt;/strong&gt; has invited you to join the organization &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; as a &lt;strong&gt;{{ Role }}&lt;/strong&gt;.&lt;/p&gt;
+  {% if RequirePasswordSetup == "true" %}
+  &lt;p&gt;Before accepting the invitation, you need to set up your password:&lt;/p&gt;
+  &lt;p&gt;&lt;a href="{{ SetupPasswordUrl }}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;"&gt;Set Up Password&lt;/a&gt;&lt;/p&gt;
+  &lt;p&gt;After setting up your password, accept your invitation here:&lt;/p&gt;
+  {% else %}
+  &lt;p&gt;Accept your invitation here:&lt;/p&gt;
+  {% endif %}
+  &lt;p&gt;&lt;a href="{{ InvitationUrl }}" style="display: inline-block; padding: 10px 20px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 5px;"&gt;Accept Invitation&lt;/a&gt;&lt;/p&gt;
+  &lt;p&gt;This invitation will expire in {{ ExpirationHours }} hours.&lt;/p&gt;
+  &lt;p&gt;If you didn't expect this email, you can safely ignore it.&lt;/p&gt;
+  &lt;p&gt;If you have any questions, contact us at {{ SupportEmail }}.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+    </value>
+  </data>
   <data name="AutomatonResetPassword.Body" xml:space="preserve">
     <value>&lt;!DOCTYPE html&gt;
 &lt;html&gt;
