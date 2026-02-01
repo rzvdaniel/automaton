@@ -22,10 +22,14 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
             var message = BuildMessage(emailDetails, subject, bodyHtml);
 
             using var client = new SmtpClient();
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            
+            var socketOptions = ResolveSocketOptions(configurationService.EmailConfig.EmailPort, configurationService.EmailConfig.EmailUseSsl);
+            
             await client.ConnectAsync(
                 configurationService.EmailConfig.EmailHost,
                 configurationService.EmailConfig.EmailPort,
-                ResolveSocketOptions(configurationService.EmailConfig.EmailUseSsl),
+                socketOptions,
                 cancellationToken);
 
             await client.AuthenticateAsync(
@@ -35,17 +39,33 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
 
             await client.SendAsync(message, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
+            
+            logger.LogInformation("Email sent successfully to {ToCount} recipient(s)", emailDetails.To?.Count() ?? 0);
             return true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occured when sending the email {EmailDetails}", JsonSerializer.Serialize(emailDetails));
+            logger.LogError(ex, "Failed to send email: {ExceptionMessage}", ex.Message);
             throw;
         }
     }
 
-    private static SecureSocketOptions ResolveSocketOptions(bool useSsl)
+    private static SecureSocketOptions ResolveSocketOptions(int port, bool useSsl)
     {
+        // Port 587 is reserved for STARTTLS (explicit TLS)
+        // Port 465 is reserved for implicit SSL/TLS (SMTPS)
+        // Port 25 is typically plain text or opportunistic STARTTLS
+        if (port == 587)
+        {
+            return SecureSocketOptions.StartTls;
+        }
+        
+        if (port == 465)
+        {
+            return SecureSocketOptions.SslOnConnect;
+        }
+        
+        // For other ports, respect the useSsl configuration
         return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
     }
 
@@ -97,9 +117,7 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
         var message = new MimeMessage();
 
         var fromAddress = emailDetails.From?.Email ?? configurationService.EmailConfig.EmailAccount;
-        var fromName = string.IsNullOrWhiteSpace(emailDetails.From?.Name)
-            ? configurationService.EmailConfig.EmailSupport
-            : emailDetails.From?.Name;
+        var fromName = emailDetails.From?.Name ?? "Automaton";
 
         message.From.Add(new MailboxAddress(fromName, fromAddress));
 
