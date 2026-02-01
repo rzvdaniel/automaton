@@ -38,7 +38,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
             var code = await UserManager.GeneratePasswordResetTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
-            var resetPasswordUrl = $"{ConfigurationService.WebsiteUrl}/Account/ResetPassword?email={command.Email}&code={code}";
+            var resetPasswordUrl = $"{ConfigurationService.WebsiteUrl}/reset-password?email={command.Email}&code={code}";
 
             var userDetails = new EmailData
             {
