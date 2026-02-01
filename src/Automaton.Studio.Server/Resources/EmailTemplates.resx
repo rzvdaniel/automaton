@@ -122,19 +122,68 @@
   </data>
   <data name="AutomatonRegisterUser.Body" xml:space="preserve">
     <value>
-&lt;!doctype html&gt;
-&lt;html&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
 &lt;head&gt;
-  &lt;meta charset="utf-8" /&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
   &lt;title&gt;Welcome to Automaton&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #4F46E5; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+      .button { display: block; text-align: center; }
+    }
+  &lt;/style&gt;
 &lt;/head&gt;
-&lt;body style="font-family: Arial, sans-serif; color: #1f2937;"&gt;
-  &lt;h2&gt;Welcome, {{ Name }}!&lt;/h2&gt;
-  &lt;p&gt;Your Automaton account is ready.&lt;/p&gt;
-  &lt;p&gt;
-    You can sign in at: &lt;a href="{{ LoginUrl }}"&gt;{{ LoginUrl }}&lt;/a&gt;
-  &lt;/p&gt;
-  &lt;p&gt;If you have any questions, reach us at {{ SupportEmail }}.&lt;/p&gt;
+&lt;body&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;🚀 Welcome to Automaton&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;Hi {{ Name }},&lt;/h2&gt;
+              &lt;p&gt;Welcome aboard! We're thrilled to have you join Automaton. Your account has been successfully created and is ready to use.&lt;/p&gt;
+              &lt;p&gt;Automaton is your powerful workflow automation platform. Start creating, automating, and collaborating on projects right away.&lt;/p&gt;
+              &lt;center&gt;
+                &lt;a href="{{ LoginUrl }}" class="button"&gt;Sign In to Your Account&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you have any questions or need assistance, our support team is here to help at &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
 &lt;/body&gt;
 &lt;/html&gt;
     </value>
@@ -144,20 +193,73 @@
   </data>
   <data name="AutomatonProjectInvitation.Body" xml:space="preserve">
     <value>
-&lt;!doctype html&gt;
-&lt;html&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
 &lt;head&gt;
-  &lt;meta charset="utf-8" /&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
   &lt;title&gt;Project Invitation&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .highlight-box { background-color: #f0f9ff; border-left: 4px solid #4F46E5; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .highlight-box p { margin: 0; color: #1e40af; }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #4F46E5; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+      .button { display: block; text-align: center; }
+    }
+  &lt;/style&gt;
 &lt;/head&gt;
-&lt;body style="font-family: Arial, sans-serif; color: #1f2937;"&gt;
-  &lt;h2&gt;Project invitation&lt;/h2&gt;
-  &lt;p&gt;Hello {{ Name }},&lt;/p&gt;
-  &lt;p&gt;You’ve been invited to join &lt;strong&gt;{{ ProjectName }}&lt;/strong&gt;.&lt;/p&gt;
-  &lt;p&gt;
-    Accept your invitation here: &lt;a href="{{ InviteUrl }}"&gt;{{ InviteUrl }}&lt;/a&gt;
-  &lt;/p&gt;
-  &lt;p&gt;If you didn’t expect this email, you can ignore it.&lt;/p&gt;
+&lt;body&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;📋 Project Invitation&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;Hi {{ Name }},&lt;/h2&gt;
+              &lt;p&gt;Great news! You've been invited to collaborate on an exciting project.&lt;/p&gt;
+              &lt;div class="highlight-box"&gt;
+                &lt;p&gt;&lt;strong&gt;Project:&lt;/strong&gt; {{ ProjectName }}&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;p&gt;Accept this invitation to start working together on {{ ProjectName }}. You'll gain access to all project resources and be able to collaborate with the team.&lt;/p&gt;
+              &lt;center&gt;
+                &lt;a href="{{ InviteUrl }}" class="button"&gt;Accept Invitation&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you didn't expect this invitation or have concerns, you can safely ignore this email. The invitation will expire if not accepted.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
 &lt;/body&gt;
 &lt;/html&gt;
     </value>
@@ -167,92 +269,161 @@
   </data>
   <data name="AutomatonOrganizationInvitation.Body" xml:space="preserve">
     <value>
-&lt;!doctype html&gt;
-&lt;html&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
 &lt;head&gt;
-  &lt;meta charset="utf-8" /&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
   &lt;title&gt;Organization Invitation&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .highlight-box { background-color: #f0f9ff; border-left: 4px solid #4F46E5; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .highlight-box p { margin: 0 0 8px 0; color: #1e40af; }
+    .highlight-box p:last-child { margin: 0; }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .button-secondary { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25); }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #4F46E5; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    .warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    .warning p { margin: 0; color: #92400e; font-size: 14px; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+      .button, .button-secondary { display: block; text-align: center; }
+    }
+  &lt;/style&gt;
 &lt;/head&gt;
-&lt;body style="font-family: Arial, sans-serif; color: #1f2937;"&gt;
-  &lt;h2&gt;Organization Invitation&lt;/h2&gt;
-  &lt;p&gt;Hello,&lt;/p&gt;
-  &lt;p&gt;&lt;strong&gt;{{ InviterName }}&lt;/strong&gt; has invited you to join the organization &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; as a &lt;strong&gt;{{ Role }}&lt;/strong&gt;.&lt;/p&gt;
-  {% if RequirePasswordSetup == "true" %}
-  &lt;p&gt;Before accepting the invitation, you need to set up your password:&lt;/p&gt;
-  &lt;p&gt;&lt;a href="{{ SetupPasswordUrl }}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;"&gt;Set Up Password&lt;/a&gt;&lt;/p&gt;
-  &lt;p&gt;After setting up your password, accept your invitation here:&lt;/p&gt;
-  {% else %}
-  &lt;p&gt;Accept your invitation here:&lt;/p&gt;
-  {% endif %}
-  &lt;p&gt;&lt;a href="{{ InvitationUrl }}" style="display: inline-block; padding: 10px 20px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 5px;"&gt;Accept Invitation&lt;/a&gt;&lt;/p&gt;
-  &lt;p&gt;This invitation will expire in {{ ExpirationHours }} hours.&lt;/p&gt;
-  &lt;p&gt;If you didn't expect this email, you can safely ignore it.&lt;/p&gt;
-  &lt;p&gt;If you have any questions, contact us at {{ SupportEmail }}.&lt;/p&gt;
+&lt;body&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;🏢 Organization Invitation&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;You're Invited!&lt;/h2&gt;
+              &lt;p&gt;&lt;strong&gt;{{ InviterName }}&lt;/strong&gt; has invited you to join their organization on Automaton.&lt;/p&gt;
+              &lt;div class="highlight-box"&gt;
+                &lt;p&gt;&lt;strong&gt;Organization:&lt;/strong&gt; {{ OrganizationName }}&lt;/p&gt;
+                &lt;p&gt;&lt;strong&gt;Your Role:&lt;/strong&gt; {{ Role }}&lt;/p&gt;
+              &lt;/div&gt;
+              {% if RequirePasswordSetup == "true" %}
+              &lt;div class="warning"&gt;
+                &lt;p&gt;&lt;strong&gt;Action Required:&lt;/strong&gt; Please set up your password before accepting the invitation.&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;center&gt;
+                &lt;a href="{{ SetupPasswordUrl }}" class="button-secondary"&gt;Set Up Password&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;p&gt;After setting up your password, you can accept the invitation:&lt;/p&gt;
+              {% endif %}
+              &lt;center&gt;
+                &lt;a href="{{ InvitationUrl }}" class="button"&gt;Accept Invitation&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;&lt;strong&gt;Note:&lt;/strong&gt; This invitation will expire in {{ ExpirationHours }} hours. If you didn't expect this invitation, you can safely ignore this email.&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;Need help? Contact us at &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
 &lt;/body&gt;
 &lt;/html&gt;
     </value>
   </data>
   <data name="AutomatonResetPassword.Body" xml:space="preserve">
     <value>&lt;!DOCTYPE html&gt;
-&lt;html&gt;
+&lt;html lang="en"&gt;
 &lt;head&gt;
-    &lt;title&gt;Password Reset for your Automaton account&lt;/title&gt;
-    &lt;style&gt;
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            background-color: #f9f9f9;
-        }
-        h1 {
-            color: #4CAF50;
-        }
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            margin: 10px 0;
-            font-size: 16px;
-            color: #fff;
-            background-color: #4CAF50;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        ul li {
-            margin: 5px 0;
-        }
-    &lt;/style&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
+  &lt;title&gt;Reset Your Password&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .security-notice { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .security-notice p { margin: 0; color: #92400e; font-size: 14px; font-weight: 500; }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #4F46E5; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+      .button { display: block; text-align: center; }
+    }
+  &lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
-    &lt;div class="container"&gt;
-        &lt;h1&gt;Hi, {{Name}}!&lt;/h1&gt;
-        
-        &lt;p&gt;You recently requested to reset your password for your Automaton account at &lt;a href="{{WebsiteUrl}}"&gt;{{WebsiteUrl}}&lt;/a&gt;.&lt;/p&gt;
-        
-        &lt;p&gt;Please reset your password by visiting the following link:&lt;/p&gt;
-        &lt;p&gt;&lt;a href="{{ResetPasswordUrl}}" class="button"&gt;Reset Password&lt;/a&gt;&lt;/p&gt;
-        
-        &lt;p&gt;This password reset link is valid for the next 24 hours.&lt;/p&gt;
-        
-        &lt;p&gt;If you have any issues, please contact us at &lt;a href="mailto:{{SupportEmail}}"&gt;{{SupportEmail}}&lt;/a&gt;.&lt;/p&gt;
-        
-        &lt;p&gt;Best regards,&lt;/p&gt;
-        &lt;p&gt;The Automaton Team&lt;/p&gt;
-    &lt;/div&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;🔐 Password Reset Request&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;Hi {{Name}},&lt;/h2&gt;
+              &lt;p&gt;We received a request to reset your password for your Automaton account.&lt;/p&gt;
+              &lt;p&gt;Click the button below to create a new password:&lt;/p&gt;
+              &lt;center&gt;
+                &lt;a href="{{ResetPasswordUrl}}" class="button"&gt;Reset Password&lt;/a&gt;
+              &lt;/center&gt;
+              &lt;div class="security-notice"&gt;
+                &lt;p&gt;⏱️ This password reset link is valid for the next 24 hours.&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;&lt;strong&gt;Didn't request this?&lt;/strong&gt; You can safely ignore this email. Your password will remain unchanged.&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you're having trouble with the button above, copy and paste this URL into your browser: &lt;a href="{{ResetPasswordUrl}}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ResetPasswordUrl}}&lt;/a&gt;&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;Need help? Contact us at &lt;a href="mailto:{{SupportEmail}}" style="color: #4F46E5; text-decoration: none;"&gt;{{SupportEmail}}&lt;/a&gt;&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
 &lt;/body&gt;
 &lt;/html&gt;</value>
   </data>
@@ -261,60 +432,72 @@
   </data>
   <data name="AutomatonResetPasswordConfirmation.Body" xml:space="preserve">
     <value>&lt;!DOCTYPE html&gt;
-&lt;html&gt;
+&lt;html lang="en"&gt;
 &lt;head&gt;
-    &lt;title&gt;Password Reset confirmation for your Automaton account&lt;/title&gt;
-    &lt;style&gt;
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            background-color: #f9f9f9;
-        }
-        h1 {
-            color: #4CAF50;
-        }
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            margin: 10px 0;
-            font-size: 16px;
-            color: #fff;
-            background-color: #4CAF50;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        ul li {
-            margin: 5px 0;
-        }
-    &lt;/style&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
+  &lt;title&gt;Password Reset Confirmation&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; display: block; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
+    .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
+    .content p { margin: 0 0 16px 0; font-size: 16px; }
+    .success-box { background-color: #d1fae5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .success-box p { margin: 0; color: #065f46; font-weight: 500; }
+    .warning-box { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .warning-box p { margin: 0; color: #92400e; font-size: 14px; }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
+    .footer a { color: #10b981; text-decoration: none; }
+    .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 30px 20px !important; }
+      .header { padding: 30px 20px !important; }
+    }
+  &lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
-    &lt;div class="container"&gt;
-        &lt;h1&gt;Hi, {{Name}}!&lt;/h1&gt;
-        
-        &lt;p&gt;You recently reset your password for your Automaton account at &lt;a href="{{WebsiteUrl}}"&gt;{{WebsiteUrl}}&lt;/a&gt;.&lt;/p&gt;
-        
-        &lt;p&gt;If it wasn't you please contact us at &lt;a href="mailto:{{SupportEmail}}"&gt;{{SupportEmail}}&lt;/a&gt;.&lt;/p&gt;
-        
-        &lt;p&gt;Best regards,&lt;/p&gt;
-        &lt;p&gt;The Automaton Team&lt;/p&gt;
-    &lt;/div&gt;
+  &lt;table role="presentation" style="width: 100%; background-color: #f3f4f6;"&gt;
+    &lt;tr&gt;
+      &lt;td align="center" style="padding: 40px 20px;"&gt;
+        &lt;table role="presentation" class="email-container"&gt;
+          &lt;tr&gt;
+            &lt;td class="header"&gt;
+              &lt;h1&gt;✅ Password Updated&lt;/h1&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="content"&gt;
+              &lt;h2&gt;Hi {{Name}},&lt;/h2&gt;
+              &lt;div class="success-box"&gt;
+                &lt;p&gt;✓ Your password has been successfully updated.&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;p&gt;Your Automaton account password was recently changed. You can now sign in with your new password.&lt;/p&gt;
+              &lt;div class="warning-box"&gt;
+                &lt;p&gt;&lt;strong&gt;Security Alert:&lt;/strong&gt; If you didn't make this change, please contact our support team immediately.&lt;/p&gt;
+              &lt;/div&gt;
+              &lt;div class="divider"&gt;&lt;/div&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;For security reasons, if this wasn't you, please contact us at &lt;a href="mailto:{{SupportEmail}}" style="color: #10b981; text-decoration: none;"&gt;{{SupportEmail}}&lt;/a&gt; right away.&lt;/p&gt;
+              &lt;p style="font-size: 14px; color: #6b7280;"&gt;You can access your account at &lt;a href="{{WebsiteUrl}}" style="color: #10b981; text-decoration: none;"&gt;{{WebsiteUrl}}&lt;/a&gt;&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+          &lt;tr&gt;
+            &lt;td class="footer"&gt;
+              &lt;p style="margin: 0 0 10px 0;"&gt;&lt;strong&gt;Automaton&lt;/strong&gt;&lt;/p&gt;
+              &lt;p style="margin: 0;"&gt;Workflow automation made simple&lt;/p&gt;
+              &lt;p style="margin: 15px 0 0 0; font-size: 12px; color: #9ca3af;"&gt;© 2026 Automaton. All rights reserved.&lt;/p&gt;
+            &lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/table&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/table&gt;
 &lt;/body&gt;
 &lt;/html&gt;</value>
   </data>
