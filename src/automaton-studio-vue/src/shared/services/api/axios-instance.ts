@@ -9,6 +9,9 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 const ACCESS_TOKEN_KEY = 'automaton_access_token'
 const REFRESH_TOKEN_KEY = 'automaton_refresh_token'
 
+// Logout callback - will be set by the app
+let onUnauthorized: (() => void) | null = null
+
 // Create axios instance
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -17,6 +20,14 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+/**
+ * Set callback to handle unauthorized access (401 after failed refresh)
+ * This allows the app to handle logout via router instead of window.location
+ */
+export const setUnauthorizedCallback = (callback: () => void): void => {
+  onUnauthorized = callback
+}
 
 // Token storage helpers
 export const tokenStorage = {
@@ -99,7 +110,10 @@ apiClient.interceptors.response.use(
 
       if (!refreshToken) {
         tokenStorage.clearTokens()
-        window.location.href = '/login'
+        // Use callback instead of window.location to avoid page reload
+        if (onUnauthorized) {
+          onUnauthorized()
+        }
         return Promise.reject(error)
       }
 
@@ -126,7 +140,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null)
         tokenStorage.clearTokens()
-        window.location.href = '/login'
+        // Use callback instead of window.location to avoid page reload
+        if (onUnauthorized) {
+          onUnauthorized()
+        }
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
