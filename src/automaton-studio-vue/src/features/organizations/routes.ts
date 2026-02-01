@@ -38,6 +38,12 @@ export const organizationsRoutes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/organizations/invitations/accept',
+    name: 'accept-organization-invitation',
+    component: () => import('./views/AcceptInvitationView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/my-apps',
     name: 'assigned-apps',
     component: () => import('./views/AssignedAppsView.vue'),
