@@ -15,6 +15,9 @@ const router = useRouter()
 const email = ref('')
 const code = ref('')
 
+// Determine if this is creating a new password or resetting
+const isCreatingPassword = ref(false)
+
 // Form state
 const password = ref('')
 const confirmPassword = ref('')
@@ -29,10 +32,12 @@ onMounted(() => {
   // Extract email and code from query params
   const queryEmail = route.query.email
   const queryCode = route.query.code
+  const queryCreate = route.query.create // Optional flag to indicate password creation
 
   if (typeof queryEmail === 'string' && typeof queryCode === 'string') {
     email.value = queryEmail
     code.value = queryCode
+    isCreatingPassword.value = queryCreate === 'true' // Check if creating new password
   } else {
     invalidLink.value = true
   }
@@ -126,10 +131,10 @@ function clearError() {
             :style="{ color: success ? 'var(--p-green-500)' : 'var(--p-primary-500)' }"
           ></i>
           <h1 class="text-2xl font-bold m-0">
-            {{ success ? 'Password Reset' : 'Set New Password' }}
+            {{ success ? 'Password Set Successfully' : isCreatingPassword ? 'Create Your Password' : 'Set New Password' }}
           </h1>
           <p class="text-color-secondary mt-2">
-            {{ success ? 'Your password has been updated' : 'Create a new password for your account' }}
+            {{ success ? 'Your password has been updated' : isCreatingPassword ? 'Set up a password for your account' : 'Create a new password for your account' }}
           </p>
         </div>
       </template>
@@ -151,7 +156,7 @@ function clearError() {
         <!-- Success message -->
         <template v-else-if="success">
           <Message severity="success" :closable="false" class="mb-4">
-            Your password has been successfully reset.
+            {{ isCreatingPassword ? 'Your password has been successfully created.' : 'Your password has been successfully reset.' }}
           </Message>
           <Button label="Sign In" class="w-full" @click="goToLogin" />
         </template>
@@ -206,7 +211,7 @@ function clearError() {
 
             <Button
               type="submit"
-              label="Reset Password"
+              :label="isCreatingPassword ? 'Create Password' : 'Reset Password'"
               class="w-full"
               :loading="isLoading"
               :disabled="isLoading"

@@ -219,14 +219,14 @@ public class UsersService
         // Convert display name to URL-safe slug
         var slug = ConvertToSlug(displayName);
         
-        // Check if slug is unique, if not append numbers
+        // Check if slug is unique
         var publicUsername = slug;
-        var counter = 1;
         
         while (await _userManager.Users.AnyAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower()))
         {
-            publicUsername = $"{slug}{counter}";
-            counter++;
+            // Append random hex suffix for uniqueness (e.g., "john-a7f2b5")
+            var randomSuffix = Guid.NewGuid().ToString("N").Substring(0, 6);
+            publicUsername = $"{slug}-{randomSuffix}";
         }
         
         return publicUsername;
@@ -274,11 +274,10 @@ public class UsersService
         // Convert to lowercase
         var slug = input.ToLowerInvariant();
 
-        // Remove accents
-        var bytes = System.Text.Encoding.GetEncoding("Cyrillic").GetBytes(slug);
-        slug = System.Text.Encoding.ASCII.GetString(bytes);
+        // Remove non-ASCII characters (accents, special chars)
+        slug = new string(slug.Where(c => (int)c < 128).ToArray());
 
-        // Remove invalid characters
+        // Remove invalid characters (keep only alphanumeric, spaces, hyphens, underscores)
         slug = Regex.Replace(slug, @"[^a-z0-9\s\-_]", "");
 
         // Replace spaces with hyphens

@@ -22,6 +22,7 @@ public class OrganizationService : IOrganizationService
     private readonly IEmailService emailService;
     private readonly ConfigurationService configurationService;
     private readonly UserManager<ApplicationUser> userManager;
+    private readonly UsersService usersService;
     private readonly Serilog.ILogger logger;
 
     private Guid UserId => userContextService.GetUserId();
@@ -31,13 +32,15 @@ public class OrganizationService : IOrganizationService
         UserContextService userContextService,
         IEmailService emailService,
         ConfigurationService configurationService,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        UsersService usersService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
         this.emailService = emailService;
         this.configurationService = configurationService;
         this.userManager = userManager;
+        this.usersService = usersService;
         this.logger = Serilog.Log.ForContext<OrganizationService>();
     }
 
@@ -318,6 +321,17 @@ public class OrganizationService : IOrganizationService
             }
         }
 
+        // Check if user is already a member of the organization
+        var isAlreadyMember = await dbContext.OrganizationMembers
+            .AnyAsync(om => om.OrganizationId == organizationId
+                && om.User.Email == request.Email
+                && om.IsActive, cancellationToken);
+
+        if (isAlreadyMember)
+        {
+            throw new InvalidOperationException("This user is already a member of the organization");
+        }
+
         // Create invitation token
         var token = GenerateSecureToken();
         var invitation = new OrganizationInvitation
@@ -353,13 +367,16 @@ public class OrganizationService : IOrganizationService
                 var emailParts = request.Email.Split('@');
                 var userName = emailParts.Length > 0 ? emailParts[0] : request.Email;
                 
+                // Generate unique PublicUsername using UsersService
+                var publicUsername = await usersService.GenerateUniquePublicUsernameAsync(userName);
+                
                 user = new ApplicationUser
                 {
                     UserName = request.Email,
                     Email = request.Email,
                     EmailConfirmed = false,
                     Name = userName,
-                    PublicUsername = userName // Use email prefix as public username initially
+                    PublicUsername = publicUsername
                 };
                 
                 var createResult = await userManager.CreateAsync(user);
@@ -386,7 +403,7 @@ public class OrganizationService : IOrganizationService
             {
                 var rawResetToken = await userManager.GeneratePasswordResetTokenAsync(user);
                 var encodedResetToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(rawResetToken));
-                setupPasswordUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/account/createpassword?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}";
+                setupPasswordUrl = $"{configurationService.WebsiteUrl.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email)}&code={encodedResetToken}&create=true";
             }
 
             // Get inviter name
