@@ -866,6 +866,7 @@ public class OrganizationService : IOrganizationService
         {
             rng.GetBytes(bytes);
         }
-        return Convert.ToBase64String(bytes).Replace("+", "").Replace("/", "").Replace("=", "").Substring(0, 64);
+
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 }

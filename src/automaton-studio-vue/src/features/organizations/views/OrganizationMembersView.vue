@@ -114,11 +114,30 @@ async function handleInviteMember() {
 
   try {
     await organizationsService.inviteMember(organizationId.value, inviteForm.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Invitation Sent',
+      detail: `Invitation sent to ${inviteForm.value.email}`,
+      life: 3000,
+    })
     showInviteDialog.value = false
     resetInviteForm()
     await loadMembers()
-  } catch (error) {
-    // Error toast is already shown by service
+  } catch (error: any) {
+    let errorMessage = 'Failed to send invitation'
+    if (error?.response?.status === 403) {
+      errorMessage = 'You do not have permission to invite members'
+    } else if (error?.response?.status === 404) {
+      errorMessage = 'Organization not found'
+    } else if (error?.response?.data?.message) {
+      errorMessage = error.response.data.message
+    }
+    toast.add({
+      severity: 'error',
+      summary: 'Invitation Failed',
+      detail: errorMessage,
+      life: 5000,
+    })
   }
 }
 
