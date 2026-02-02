@@ -20,11 +20,10 @@ const isAuthLayout = computed(() => route.meta.layout === 'auth')
 const isNoLayout = computed(() => route.meta.layout === 'none')
 
 onMounted(async () => {
-  // Settings are initialized in useUserSettings composable
-  console.log('App mounted, dark mode:', isDark.value)
-  
-  // Initialize projects store (restore active project from localStorage)
-  await projectsStore.initialize()
+  // Only initialize projects store on authenticated pages (not auth/install pages)
+  if (!isAuthLayout.value) {
+    await projectsStore.initialize()
+  }
 })
 </script>
 

@@ -53,5 +53,8 @@ app.directive('tooltip', Tooltip)
 // Router
 app.use(router)
 
-// Mount
-app.mount('#app')
+// Wait for router to be ready before mounting to prevent race conditions
+// This ensures route.meta is available when App.vue renders
+router.isReady().then(() => {
+  app.mount('#app')
+})

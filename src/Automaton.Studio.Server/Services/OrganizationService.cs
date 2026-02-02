@@ -417,8 +417,8 @@ public class OrganizationService : IOrganizationService
             var emailDetails = new EmailData
             {
                 Template = "AutomatonOrganizationInvitation",
-                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport ?? configurationService.EmailConfig.EmailAccount ?? "noreply@automaton.local" },
-                To = new[] { new EmailAccount { Email = request.Email, Name = user?.Name } },
+                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+                To = new[] { new EmailAccount { Email = request.Email, Name = user?.Name ?? request.Email } },
                 Variables = variables
             };
 
