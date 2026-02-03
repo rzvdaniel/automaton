@@ -190,6 +190,11 @@ npm run generate:types  # Generates src/shared/types/api/ from OpenAPI
 
 **Component Testing:** Vitest + Vue Test Utils with colocated `*.spec.ts` files.
 
+**Component Design:**
+- **Split heavy conditionals**: When a component has large `v-if/v-else` blocks (>50 lines each) with diverging logic, extract each path into separate components. Use a thin orchestrator view for conditional rendering.
+- **Example**: `DashboardView.vue` renders `StandardDashboard.vue` or `AppUserDashboard.vue` based on user role, keeping each dashboard focused and testable.
+- **See**: [.github/skills/vue/component-splitting-pattern/SKILL.md](.github/skills/vue/component-splitting-pattern/SKILL.md) for detailed refactoring guidance.
+
 ### Implementing a New Feature
 
 When adding a new feature, use the feature-based structure with components, services, types, and views. Match C# DTOs exactly in TypeScript, use `const` objects instead of enums, and implement loading states with toast notifications.
