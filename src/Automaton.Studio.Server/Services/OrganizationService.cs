@@ -414,21 +414,25 @@ public class OrganizationService : IOrganizationService
             var expirationHours = (int)Math.Ceiling((invitation.ExpiresAt - DateTime.UtcNow).TotalHours);
 
             // Build email template variables
-            // Note: RequirePasswordSetup is a string "true" or "false" for Liquid template comparison
             var variables = new Dictionary<string, string>
             {
                 { "OrganizationName", organization.Name },
                 { "InviterName", inviterName },
                 { "Role", request.Role.ToString() },
-                { "InvitationUrl", invitationUrl },
                 { "ExpirationHours", expirationHours.ToString() },
-                { "SupportEmail", configurationService.EmailConfig.EmailSupport },
-                { "RequirePasswordSetup", userNeedsPasswordSetup ? "true" : "false" }
+                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
             };
 
-            if (userNeedsPasswordSetup && setupPasswordUrl != null)
+            // If user needs to set a password, only send password setup link
+            // They'll accept the invitation from dashboard after logging in
+            if (!string.IsNullOrEmpty(setupPasswordUrl))
             {
                 variables["SetupPasswordUrl"] = setupPasswordUrl;
+            }
+            else
+            {
+                // User already has password, send invitation link
+                variables["InvitationUrl"] = invitationUrl;
             }
 
             var emailDetails = new EmailData
@@ -874,6 +878,80 @@ public class OrganizationService : IOrganizationService
         }
 
         return slug.Trim('-');
+    }
+
+    public async Task<IEnumerable<PendingInvitationDto>> GetPendingInvitationsAsync(CancellationToken cancellationToken = default)
+    {
+        var currentUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == UserId, cancellationToken);
+        if (currentUser == null)
+        {
+            return Enumerable.Empty<PendingInvitationDto>();
+        }
+
+        // Get organizations where user is already a member
+        var userOrganizationIds = await dbContext.OrganizationMembers
+            .Where(om => om.UserId == UserId && om.IsActive)
+            .Select(om => om.OrganizationId)
+            .ToListAsync(cancellationToken);
+
+        var pendingInvitations = await dbContext.OrganizationInvitations
+            .Where(i => i.Email == currentUser.Email 
+                && !i.IsConsumed 
+                && i.ExpiresAt > DateTime.UtcNow
+                && !userOrganizationIds.Contains(i.OrganizationId))
+            .Include(i => i.Organization)
+            .OrderByDescending(i => i.CreatedAt)
+            .Select(i => new PendingInvitationDto
+            {
+                InvitationId = i.Id,
+                OrganizationId = i.OrganizationId,
+                OrganizationName = i.Organization.Name,
+                OrganizationSlug = i.Organization.Slug,
+                Role = i.Role,
+                InvitedAt = i.CreatedAt,
+                ExpiresAt = i.ExpiresAt,
+                Token = i.Token
+            })
+            .ToListAsync(cancellationToken);
+
+        pendingInvitations = pendingInvitations
+            .GroupBy(i => i.OrganizationId)
+            .Select(g => g.OrderByDescending(i => i.InvitedAt).First())
+            .OrderByDescending(i => i.InvitedAt)
+            .ToList();
+
+        logger.Information("Retrieved {Count} pending invitations for user {UserId}", 
+            pendingInvitations.Count, UserId);
+        return pendingInvitations;
+    }
+
+    public async Task<bool> DeclineInvitationAsync(Guid invitationId, CancellationToken cancellationToken = default)
+    {
+        var invitation = await dbContext.OrganizationInvitations
+            .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken);
+
+        if (invitation == null || invitation.IsConsumed || invitation.ExpiresAt < DateTime.UtcNow)
+        {
+            logger.Warning("Invalid invitation {InvitationId} for user {UserId}", invitationId, UserId);
+            return false;
+        }
+
+        // Verify this invitation is for the current user
+        var currentUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == UserId, cancellationToken);
+        if (currentUser == null || currentUser.Email != invitation.Email)
+        {
+            logger.Warning("User {UserId} attempted to decline invitation not addressed to them", UserId);
+            return false;
+        }
+
+        // Mark invitation as consumed (declined)
+        invitation.IsConsumed = true;
+        invitation.AcceptedAt = DateTime.UtcNow; // We'll treat decline as "consumed"
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("User {UserId} declined organization invitation {InvitationId}", UserId, invitationId);
+        return true;
     }
 
     private static string GenerateSecureToken()

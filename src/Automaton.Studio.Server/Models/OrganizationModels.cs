@@ -145,3 +145,17 @@ public class OrganizationAppAssignmentDto
     public string? AssignedByName { get; set; }
     public DateTime AssignedAt { get; set; }
 }
+/// <summary>
+/// Response model for pending organization invitations
+/// </summary>
+public class PendingInvitationDto
+{
+    public Guid InvitationId { get; set; }
+    public Guid OrganizationId { get; set; }
+    public string OrganizationName { get; set; } = string.Empty;
+    public string OrganizationSlug { get; set; } = string.Empty;
+    public OrganizationRole Role { get; set; }
+    public DateTime InvitedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public string Token { get; set; } = string.Empty;
+}

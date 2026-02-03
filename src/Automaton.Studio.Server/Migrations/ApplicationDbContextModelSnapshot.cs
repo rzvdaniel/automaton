@@ -954,6 +954,9 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<int>("AcceptanceMethod")
+                        .HasColumnType("int");
+
                     b.Property<Guid?>("InvitedBy")
                         .HasColumnType("char(36)");
 

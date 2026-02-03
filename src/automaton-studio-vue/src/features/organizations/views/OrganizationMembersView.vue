@@ -22,6 +22,7 @@ const confirm = useConfirm()
 // State
 const members = ref<OrganizationMemberDto[]>([])
 const loading = ref(true)
+const invitingMember = ref(false)
 const currentUserRole = ref<string | null>(null)
 
 // Computed
@@ -112,6 +113,7 @@ async function handleInviteMember() {
     return
   }
 
+  invitingMember.value = true
   try {
     await organizationsService.inviteMember(organizationId.value, inviteForm.value)
     toast.add({
@@ -138,6 +140,8 @@ async function handleInviteMember() {
       detail: errorMessage,
       life: 5000,
     })
+  } finally {
+    invitingMember.value = false
   }
 }
 
@@ -304,11 +308,14 @@ function navigateBack() {
           label="Cancel"
           text
           severity="secondary"
+          :disabled="invitingMember"
           @click="showInviteDialog = false"
         />
         <Button
           label="Send Invitation"
-          icon="pi pi-send"
+          :icon="invitingMember ? 'pi pi-spin pi-spinner' : 'pi pi-send'"
+          :loading="invitingMember"
+          :disabled="invitingMember"
           @click="handleInviteMember"
         />
       </template>

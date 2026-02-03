@@ -140,7 +140,7 @@
     .content { padding: 40px 30px; color: #374151; line-height: 1.6; }
     .content h2 { color: #111827; font-size: 24px; margin: 0 0 20px 0; font-weight: 600; }
     .content p { margin: 0 0 16px 0; font-size: 16px; }
-    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #4F46E5; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
     .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
     .footer a { color: #4F46E5; text-decoration: none; }
     .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
@@ -213,7 +213,7 @@
     .content p { margin: 0 0 16px 0; font-size: 16px; }
     .highlight-box { background-color: #f0f9ff; border-left: 4px solid #4F46E5; padding: 20px; margin: 20px 0; border-radius: 4px; }
     .highlight-box p { margin: 0; color: #1e40af; }
-    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #4F46E5; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
     .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
     .footer a { color: #4F46E5; text-decoration: none; }
     .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
@@ -290,8 +290,8 @@
     .highlight-box { background-color: #f0f9ff; border-left: 4px solid #4F46E5; padding: 20px; margin: 20px 0; border-radius: 4px; }
     .highlight-box p { margin: 0 0 8px 0; color: #1e40af; }
     .highlight-box p:last-child { margin: 0; }
-    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
-    .button-secondary { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25); }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #4F46E5; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .button-secondary { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #10b981; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25); }
     .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
     .footer a { color: #4F46E5; text-decoration: none; }
     .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }
@@ -322,18 +322,18 @@
                 &lt;p&gt;&lt;strong&gt;Organization:&lt;/strong&gt; {{ OrganizationName }}&lt;/p&gt;
                 &lt;p&gt;&lt;strong&gt;Your Role:&lt;/strong&gt; {{ Role }}&lt;/p&gt;
               &lt;/div&gt;
-              {% if RequirePasswordSetup == "true" %}
-              &lt;div class="warning"&gt;
-                &lt;p&gt;&lt;strong&gt;Action Required:&lt;/strong&gt; Please set up your password before accepting the invitation.&lt;/p&gt;
-              &lt;/div&gt;
+              {% if SetupPasswordUrl %}
+              &lt;p&gt;Welcome! Let's get you set up. Click the button below to create your password:&lt;/p&gt;
               &lt;center&gt;
-                &lt;a href="{{ SetupPasswordUrl }}" class="button-secondary"&gt;Set Up Password&lt;/a&gt;
+                &lt;a href="{{ SetupPasswordUrl }}" class="button-secondary"&gt;Create Password&lt;/a&gt;
               &lt;/center&gt;
-              &lt;p&gt;After setting up your password, you can accept the invitation:&lt;/p&gt;
-              {% endif %}
+              &lt;p style="font-size: 14px; color: #6b7280; margin-top: 20px;"&gt;&lt;strong&gt;After creating your password:&lt;/strong&gt; You'll be automatically logged in and can then accept the invitation to join &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; from your dashboard.&lt;/p&gt;
+              {% else %}
+              &lt;p&gt;Click the button below to accept the invitation:&lt;/p&gt;
               &lt;center&gt;
                 &lt;a href="{{ InvitationUrl }}" class="button"&gt;Accept Invitation&lt;/a&gt;
               &lt;/center&gt;
+              {% endif %}
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;&lt;strong&gt;Note:&lt;/strong&gt; This invitation will expire in {{ ExpirationHours }} hours. If you didn't expect this invitation, you can safely ignore this email.&lt;/p&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;Need help? Contact us at &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;&lt;/p&gt;
@@ -375,7 +375,7 @@
     .content p { margin: 0 0 16px 0; font-size: 16px; }
     .security-notice { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
     .security-notice p { margin: 0; color: #92400e; font-size: 14px; font-weight: 500; }
-    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
+    .button { display: inline-block; padding: 14px 32px; margin: 20px 0; background-color: #4F46E5; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
     .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; }
     .footer a { color: #4F46E5; text-decoration: none; }
     .divider { height: 1px; background-color: #e5e7eb; margin: 30px 0; }

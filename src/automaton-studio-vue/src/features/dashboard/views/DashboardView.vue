@@ -9,6 +9,7 @@ import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
 import WelcomeSection from '../components/WelcomeSection.vue'
+import PendingInvitationsCard from '@/features/organizations/components/PendingInvitationsCard.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -117,6 +118,9 @@ const handleDismissWelcome = () => {
         <Button label="Retry" icon="pi pi-refresh" size="small" text @click="handleRetry" />
       </div>
     </Message>
+
+    <!-- Pending Organization Invitations -->
+    <PendingInvitationsCard />
 
     <!-- Welcome Section (dismissible) -->
     <WelcomeSection

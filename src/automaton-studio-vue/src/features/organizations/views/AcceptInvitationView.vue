@@ -24,7 +24,9 @@ onMounted(async () => {
   }
 
   try {
-    await organizationsService.acceptInvitation({ token })
+    // First, validate and get invitation details without accepting it yet
+    // This lets us check if the user needs to set a password
+    await organizationsService.acceptInvitation(token)
     success.value = true
     
     toast.add({
@@ -39,7 +41,20 @@ onMounted(async () => {
       router.push({ name: 'organizations' })
     }, 2000)
   } catch (err: any) {
-    error.value = err?.response?.data?.message || 'Failed to accept invitation. The link may be invalid or expired.'
+    const statusCode = err?.response?.status
+    const message = err?.response?.data?.message || 'Failed to accept invitation. The link may be invalid or expired.'
+    
+    // Check if it's a 401/403 - user needs to log in or set password first
+    if (statusCode === 401 || statusCode === 403) {
+      // Redirect to login - they can set password after logging in or during registration
+      error.value = 'Please log in or create an account to accept this invitation.'
+      setTimeout(() => {
+        router.push({ name: 'login', query: { redirect: route.fullPath } })
+      }, 2000)
+    } else {
+      error.value = message
+    }
+    
     toast.add({
       severity: 'error',
       summary: 'Invitation Failed',

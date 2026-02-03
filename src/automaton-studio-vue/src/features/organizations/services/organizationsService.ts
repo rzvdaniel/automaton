@@ -11,7 +11,6 @@ import type {
   CreateOrganizationRequest,
   UpdateOrganizationRequest,
   InviteMemberRequest,
-  AcceptInvitationRequest,
   AssignAppRequest,
 } from '../types';
 
@@ -83,8 +82,23 @@ class OrganizationsService {
   /**
    * Accept an invitation to join an organization
    */
-  async acceptInvitation(request: AcceptInvitationRequest): Promise<void> {
-    await apiClient.post('/api/organizations/invitations/accept', request);
+  async acceptInvitation(token: string): Promise<void> {
+    await apiClient.post('/api/organizations/invitations/accept', { token });
+  }
+
+  /**
+   * Get all pending organization invitations for the current user
+   */
+  async getPendingInvitations(): Promise<any[]> {
+    const response = await apiClient.get('/api/organizations/invitations/pending');
+    return response.data;
+  }
+
+  /**
+   * Decline an organization invitation
+   */
+  async declineInvitation(invitationId: string): Promise<void> {
+    await apiClient.post(`/api/organizations/invitations/${invitationId}/decline`);
   }
 
   /**

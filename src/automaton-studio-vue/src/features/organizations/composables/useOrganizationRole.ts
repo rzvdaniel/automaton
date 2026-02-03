@@ -7,16 +7,18 @@ import { organizationsService } from '../services/organizationsService'
 import { OrganizationRole } from '../types'
 import type { OrganizationListItem } from '../types'
 
+const organizations = ref<OrganizationListItem[]>([])
+const loading = ref(false)
+
 export function useOrganizationRole() {
-  const organizations = ref<OrganizationListItem[]>([])
-  const loading = ref(false)
 
   /**
    * Check if user has only AppUser role across all organizations
    * (no OrgAdmin or Developer roles anywhere)
    */
   const isAppUserOnly = computed(() => {
-    if (organizations.value.length === 0) return false
+    if (loading.value) return true
+    if (organizations.value.length === 0) return true
     
     return organizations.value.every(org => 
       org.role === OrganizationRole.AppUser

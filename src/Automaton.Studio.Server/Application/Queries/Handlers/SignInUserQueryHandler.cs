@@ -1,9 +1,12 @@
 ﻿using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Common.Authentication;
 using MediatR;
 using System.Collections.Immutable;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Application.Queries.Handlers
 {
@@ -12,12 +15,18 @@ namespace Automaton.Studio.Server.Application.Queries.Handlers
         private readonly ApplicationDbContext dataContext;
         private readonly UsersService userManagerService;
         private readonly IJwtService jwtService;
+        private readonly ILogger<SignInUserQueryHandler> logger;
 
-        public SignInUserQueryHandler(ApplicationDbContext dataContext, UsersService userManagerService, IJwtService jwtService)
+        public SignInUserQueryHandler(
+            ApplicationDbContext dataContext, 
+            UsersService userManagerService, 
+            IJwtService jwtService,
+            ILogger<SignInUserQueryHandler> logger)
         {
             this.dataContext = dataContext;
             this.userManagerService = userManagerService;
             this.jwtService = jwtService;
+            this.logger = logger;
         }
 
         public async Task<JsonWebToken> Handle(SignInUserQuery command, CancellationToken cancellationToken)

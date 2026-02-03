@@ -63,6 +63,16 @@ public interface IOrganizationService
     Task<bool> AcceptInvitationAsync(string token, CancellationToken cancellationToken = default);
     
     /// <summary>
+    /// Get all pending organization invitations for the current user
+    /// </summary>
+    Task<IEnumerable<PendingInvitationDto>> GetPendingInvitationsAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Decline an organization invitation
+    /// </summary>
+    Task<bool> DeclineInvitationAsync(Guid invitationId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
     /// Remove a member from an organization
     /// </summary>
     Task<bool> RemoveMemberAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default);

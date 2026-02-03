@@ -133,3 +133,16 @@ export interface UpdateOrganizationMemberRequest {
 export interface AssignAppRequest {
   userId: string;
 }
+/**
+ * Pending organization invitation
+ */
+export interface PendingInvitationDto {
+  invitationId: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  role: OrganizationRoleType;
+  invitedAt: string;
+  expiresAt: string;
+  token: string;
+}

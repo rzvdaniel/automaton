@@ -246,7 +246,9 @@ public class OrganizationsController : BaseController
 
     /// <summary>
     /// Accept an invitation to join an organization.
+    /// Does not require authentication - anyone with a valid token can accept.
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("invitations/accept")]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
     {
@@ -272,6 +274,51 @@ public class OrganizationsController : BaseController
         {
             logger.LogError(ex, "Error accepting invitation");
             return StatusCode(500, new { message = "Error accepting invitation" });
+        }
+    }
+
+    /// <summary>
+    /// Get pending organization invitations for the current user.
+    /// Returns all unexpired invitations that haven't been accepted yet.
+    /// </summary>
+    [HttpGet("invitations/pending")]
+    public async Task<ActionResult<IEnumerable<PendingInvitationDto>>> GetPendingInvitations()
+    {
+        try
+        {
+            var invitations = await organizationService.GetPendingInvitationsAsync();
+            return Ok(invitations);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error retrieving pending invitations for user {UserId}", GetUserId());
+            return StatusCode(500, new { message = "Error retrieving pending invitations" });
+        }
+    }
+
+    /// <summary>
+    /// Decline an organization invitation.
+    /// </summary>
+    [HttpPost("invitations/{invitationId}/decline")]
+    public async Task<IActionResult> DeclineInvitation(Guid invitationId)
+    {
+        try
+        {
+            var success = await organizationService.DeclineInvitationAsync(invitationId);
+            
+            if (!success)
+            {
+                return BadRequest(new { message = "Invalid or already consumed invitation" });
+            }
+
+            logger.LogInformation("User {UserId} declined organization invitation {InvitationId}", GetUserId(), invitationId);
+
+            return Ok(new { message = "Invitation declined" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error declining invitation");
+            return StatusCode(500, new { message = "Error declining invitation" });
         }
     }
 

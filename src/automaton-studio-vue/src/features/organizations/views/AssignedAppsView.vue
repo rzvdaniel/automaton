@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { organizationsService } from '../services/organizationsService'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import EmptyState from '@/shared/components/EmptyState.vue'
-
-const router = useRouter()
 
 // State
 const assignedApps = ref<any[]>([])
