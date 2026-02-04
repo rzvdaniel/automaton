@@ -3,21 +3,26 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { organizationsService } from '../services/organizationsService'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import type { OrganizationDto } from '../types'
+import type { OrganizationDto, OrganizationMemberDto } from '../types'
 import { OrganizationRole } from '../types'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
+const authStore = useAuthStore()
 
 // State
 const organization = ref<OrganizationDto | null>(null)
 const loading = ref(true)
 const appCount = ref<number | null>(null)
 const appCountLoading = ref(false)
+const members = ref<OrganizationMemberDto[]>([])
 
 // Computed
 const organizationId = computed(() => route.params.id as string)
@@ -27,6 +32,24 @@ const isDeveloperOrAdmin = computed(() =>
   organization.value?.currentUserRole === OrganizationRole.Developer
 )
 const isAppUser = computed(() => organization.value?.currentUserRole === OrganizationRole.AppUser)
+
+const canLeaveOrganization = computed(() => {
+  if (!organization.value || !authStore.userId) return false
+  
+  // Owner cannot leave
+  if (organization.value.ownerId === authStore.userId) return false
+  
+  // If user is OrgAdmin, check if there's at least one other OrgAdmin
+  if (organization.value.currentUserRole === OrganizationRole.OrgAdmin) {
+    const otherAdmins = members.value.filter(
+      m => m.role === OrganizationRole.OrgAdmin && m.userId !== authStore.userId && m.isActive
+    )
+    return otherAdmins.length > 0
+  }
+  
+  // Developers and AppUsers can always leave
+  return true
+})
 
 // Load organization on mount
 onMounted(async () => {
@@ -38,6 +61,10 @@ async function loadOrganization() {
   try {
     loading.value = true
     organization.value = await organizationsService.getOrganization(organizationId.value)
+    
+    // Load members to check if user can leave
+    members.value = await organizationsService.getMembers(organizationId.value)
+    
     await loadAppCount()
   } catch (error) {
     // Error is handled by the service
@@ -89,6 +116,37 @@ function navigateToSettings() {
   router.push({ name: 'organization-settings', params: { id: organizationId.value } })
 }
 
+// Leave organization
+function handleLeaveOrganization() {
+  if (!organization.value || !authStore.userId) return
+
+  confirm.require({
+    message: `Are you sure you want to leave "${organization.value.name}"? You will lose access to all projects and apps in this organization.`,
+    header: 'Leave Organization',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await organizationsService.leaveOrganization(organizationId.value)
+        toast.add({
+          severity: 'success',
+          summary: 'Left Organization',
+          detail: `You have left ${organization.value?.name}`,
+          life: 3000,
+        })
+        router.push({ name: 'organizations' })
+      } catch (error: any) {
+        toast.add({
+          severity: 'error',
+          summary: 'Failed to Leave',
+          detail: error?.response?.data?.message || 'An error occurred while leaving the organization',
+          life: 5000,
+        })
+      }
+    },
+  })
+}
+
 // Format date for display
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('en-US', {
@@ -122,6 +180,14 @@ const formatDate = (date: string) => {
           </div>
         </div>
         <div class="flex gap-2">
+          <Button
+            v-if="canLeaveOrganization"
+            label="Leave Organization"
+            icon="pi pi-sign-out"
+            severity="danger"
+            outlined
+            @click="handleLeaveOrganization"
+          />
           <Button
             v-if="isOrgAdmin"
             label="Settings"

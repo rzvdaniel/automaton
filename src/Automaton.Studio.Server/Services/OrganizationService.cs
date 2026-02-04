@@ -296,11 +296,11 @@ public class OrganizationService : IOrganizationService
 
     public async Task<OrganizationInvitation> InviteMemberAsync(Guid organizationId, InviteMemberRequest request, CancellationToken cancellationToken = default)
     {
-        // Only OrgAdmin or Developer can invite members
+        // Only OrgAdmin can invite members
         var userRole = await GetUserRoleAsync(organizationId, UserId, cancellationToken);
-        if (userRole != OrganizationRole.OrgAdmin && userRole != OrganizationRole.Developer)
+        if (userRole != OrganizationRole.OrgAdmin)
         {
-            throw new UnauthorizedAccessException("Only OrgAdmin or Developer can invite members");
+            throw new UnauthorizedAccessException("Only OrgAdmin can invite members");
         }
 
         // Check if email domain is allowed
@@ -562,6 +562,125 @@ public class OrganizationService : IOrganizationService
 
         logger.Information("User {UserId} removed user {RemovedUserId} from organization {OrganizationId}", UserId, userId, organizationId);
         return true;
+    }
+
+    public async Task<bool> LeaveOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        // Users can leave the organization themselves (self-removal)
+        var organization = await dbContext.Organizations
+            .FirstOrDefaultAsync(o => o.Id == organizationId && o.IsActive, cancellationToken);
+
+        if (organization == null)
+        {
+            logger.Warning("Organization {OrganizationId} not found", organizationId);
+            return false;
+        }
+
+        // Owner cannot leave
+        if (organization.OwnerId == UserId)
+        {
+            logger.Warning("Organization owner cannot leave the organization");
+            throw new InvalidOperationException("The organization owner cannot leave. Transfer ownership or delete the organization instead.");
+        }
+
+        // Check if user is a member
+        var member = await dbContext.OrganizationMembers
+            .FirstOrDefaultAsync(om => om.OrganizationId == organizationId && om.UserId == UserId && om.IsActive, cancellationToken);
+
+        if (member == null)
+        {
+            logger.Warning("User {UserId} is not a member of organization {OrganizationId}", UserId, organizationId);
+            return false;
+        }
+
+        // If user is an OrgAdmin, check if there's at least one other active OrgAdmin
+        if (member.Role == OrganizationRole.OrgAdmin)
+        {
+            var otherAdmins = await dbContext.OrganizationMembers
+                .Where(om => om.OrganizationId == organizationId 
+                    && om.Role == OrganizationRole.OrgAdmin 
+                    && om.UserId != UserId 
+                    && om.IsActive)
+                .CountAsync(cancellationToken);
+
+            if (otherAdmins == 0)
+            {
+                logger.Warning("Cannot leave: User {UserId} is the last OrgAdmin in organization {OrganizationId}", UserId, organizationId);
+                throw new InvalidOperationException("You are the last OrgAdmin. Assign another OrgAdmin before leaving.");
+            }
+        }
+
+        // Soft delete the membership
+        member.IsActive = false;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("User {UserId} left organization {OrganizationId}", UserId, organizationId);
+        return true;
+    }
+
+    public async Task<OrganizationMemberDto?> UpdateMemberRoleAsync(Guid organizationId, Guid userId, UpdateOrganizationMemberRequest request, CancellationToken cancellationToken = default)
+    {
+        // Only OrgAdmin can update member roles
+        if (!await IsOrgAdminAsync(organizationId, UserId, cancellationToken))
+        {
+            logger.Warning("User {UserId} attempted to update member role in organization {OrganizationId} without admin rights", UserId, organizationId);
+            throw new UnauthorizedAccessException("Only OrgAdmin can update member roles");
+        }
+
+        // Cannot change the owner's role
+        var organization = await dbContext.Organizations
+            .FirstOrDefaultAsync(o => o.Id == organizationId && o.IsActive, cancellationToken);
+
+        if (organization == null)
+        {
+            logger.Warning("Organization {OrganizationId} not found", organizationId);
+            return null;
+        }
+
+        if (organization.OwnerId == userId)
+        {
+            logger.Warning("Cannot change organization owner's role");
+            throw new InvalidOperationException("Cannot change the organization owner's role");
+        }
+
+        var member = await dbContext.OrganizationMembers
+            .Include(om => om.User)
+            .FirstOrDefaultAsync(om => om.OrganizationId == organizationId && om.UserId == userId && om.IsActive, cancellationToken);
+
+        if (member == null)
+        {
+            logger.Warning("Member not found in organization {OrganizationId}", organizationId);
+            return null;
+        }
+
+        // Update the role
+        member.Role = request.Role;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.Information("User {UserId} updated role of user {MemberUserId} to {NewRole} in organization {OrganizationId}", 
+            UserId, userId, request.Role, organizationId);
+
+        // Return updated member DTO
+        var invitedByUser = member.InvitedBy.HasValue 
+            ? await dbContext.Users.FirstOrDefaultAsync(u => u.Id == member.InvitedBy.Value, cancellationToken)
+            : null;
+
+        return new OrganizationMemberDto
+        {
+            Id = member.Id,
+            OrganizationId = member.OrganizationId,
+            UserId = member.UserId,
+            UserName = member.User.UserName ?? string.Empty,
+            Email = member.User.Email ?? string.Empty,
+            Role = member.Role,
+            JoinedAt = member.JoinedAt,
+            InvitedBy = member.InvitedBy,
+            InvitedByName = invitedByUser?.UserName,
+            IsActive = member.IsActive,
+            IsOwner = organization.OwnerId == member.UserId
+        };
     }
 
     // =====================================================

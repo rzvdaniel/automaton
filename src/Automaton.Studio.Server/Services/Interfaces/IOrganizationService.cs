@@ -77,6 +77,16 @@ public interface IOrganizationService
     /// </summary>
     Task<bool> RemoveMemberAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken = default);
     
+    /// <summary>
+    /// Leave an organization (self-removal)
+    /// </summary>
+    Task<bool> LeaveOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Update a member's role in an organization
+    /// </summary>
+    Task<OrganizationMemberDto?> UpdateMemberRoleAsync(Guid organizationId, Guid userId, UpdateOrganizationMemberRequest request, CancellationToken cancellationToken = default);
+    
     // =====================================================
     // Projects
     // =====================================================

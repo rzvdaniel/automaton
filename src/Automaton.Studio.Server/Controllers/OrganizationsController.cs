@@ -205,7 +205,7 @@ public class OrganizationsController : BaseController
 
     /// <summary>
     /// Invite a user to join the organization.
-    /// Only OrgAdmin and Developer can invite members.
+    /// Only OrgAdmin can invite members.
     /// </summary>
     [HttpPost("{id}/invitations")]
     public async Task<IActionResult> InviteMember(Guid id, [FromBody] InviteMemberRequest request)
@@ -351,6 +351,79 @@ public class OrganizationsController : BaseController
         {
             logger.LogError(ex, "Error removing member from organization {OrganizationId}", id);
             return StatusCode(500, new { message = "Error removing member" });
+        }
+    }
+
+    /// <summary>
+    /// Leave an organization (self-removal).
+    /// Any member can leave, except the owner.
+    /// OrgAdmins must ensure another OrgAdmin exists before leaving.
+    /// </summary>
+    [HttpPost("{id}/leave")]
+    public async Task<IActionResult> LeaveOrganization(Guid id)
+    {
+        try
+        {
+            var success = await organizationService.LeaveOrganizationAsync(id);
+            
+            if (!success)
+            {
+                return NotFound(new { message = "Organization not found or you are not a member" });
+            }
+
+            logger.LogInformation("User {UserId} left organization {OrganizationId}", GetUserId(), id);
+
+            return Ok(new { message = "Successfully left the organization" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error leaving organization {OrganizationId}", id);
+            return StatusCode(500, new { message = "Error leaving organization" });
+        }
+    }
+
+    /// <summary>
+    /// Update a member's role in an organization.
+    /// Only OrgAdmin can update member roles.
+    /// </summary>
+    [HttpPut("{id}/members/{userId}")]
+    public async Task<ActionResult<OrganizationMemberDto>> UpdateMemberRole(Guid id, Guid userId, [FromBody] UpdateOrganizationMemberRequest request)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var member = await organizationService.UpdateMemberRoleAsync(id, userId, request);
+            
+            if (member == null)
+            {
+                return NotFound(new { message = "Member not found" });
+            }
+
+            logger.LogInformation("User {MemberUserId} role updated to {NewRole} in organization {OrganizationId} by {UserId}", 
+                userId, request.Role, id, GetUserId());
+
+            return Ok(member);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating member role in organization {OrganizationId}", id);
+            return StatusCode(500, new { message = "Error updating member role" });
         }
     }
 

@@ -11,7 +11,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
-import type { OrganizationMemberDto, InviteMemberRequest } from '../types'
+import type { OrganizationMemberDto, InviteMemberRequest, UpdateOrganizationMemberRequest } from '../types'
 import { OrganizationRole } from '../types'
 
 const route = useRoute()
@@ -24,14 +24,14 @@ const members = ref<OrganizationMemberDto[]>([])
 const loading = ref(true)
 const invitingMember = ref(false)
 const currentUserRole = ref<string | null>(null)
+const editingMemberId = ref<string | null>(null)
+const updatingRole = ref(false)
 
 // Computed
 const organizationId = computed(() => route.params.id as string)
 const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
-const canInvite = computed(() => 
-  currentUserRole.value === OrganizationRole.OrgAdmin || 
-  currentUserRole.value === OrganizationRole.Developer
-)
+const canInvite = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
+const canEditRoles = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
 
 // Dialog and form states
 const showInviteDialog = ref(false)
@@ -185,6 +185,55 @@ function resetInviteForm() {
 function navigateBack() {
   router.push({ name: 'organization-dashboard', params: { id: organizationId.value } })
 }
+
+// Handle role update
+async function handleUpdateRole(member: OrganizationMemberDto, newRole: string) {
+  if (newRole === member.role) {
+    editingMemberId.value = null
+    return
+  }
+
+  updatingRole.value = true
+  try {
+    const request: UpdateOrganizationMemberRequest = { role: newRole as any }
+    await organizationsService.updateMemberRole(organizationId.value, member.userId, request)
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Role Updated',
+      detail: `${member.userName}'s role updated to ${newRole}`,
+      life: 3000,
+    })
+    
+    editingMemberId.value = null
+    await loadMembers()
+  } catch (error: any) {
+    let errorMessage = 'Failed to update role'
+    if (error?.response?.status === 403) {
+      errorMessage = 'You do not have permission to update member roles'
+    } else if (error?.response?.data?.message) {
+      errorMessage = error.response.data.message
+    }
+    toast.add({
+      severity: 'error',
+      summary: 'Update Failed',
+      detail: errorMessage,
+      life: 5000,
+    })
+  } finally {
+    updatingRole.value = false
+  }
+}
+
+// Start editing a member's role
+function startEditingRole(memberId: string) {
+  editingMemberId.value = memberId
+}
+
+// Cancel editing
+function cancelEditingRole() {
+  editingMemberId.value = null
+}
 </script>
 
 <template>
@@ -235,8 +284,32 @@ function navigateBack() {
 
       <Column field="role" header="Role" sortable>
         <template #body="{ data }">
-          <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
-          <Tag v-if="data.isOwner" value="Owner" severity="contrast" class="ml-2" />
+          <div v-if="editingMemberId === data.id" class="flex gap-2 align-items-center">
+            <Dropdown
+              :modelValue="data.role"
+              :options="roleOptions"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select role"
+              :disabled="updatingRole"
+              @update:modelValue="(newRole) => handleUpdateRole(data, newRole)"
+              autofocus
+            />
+            <Button
+              icon="pi pi-times"
+              text
+              rounded
+              severity="secondary"
+              size="small"
+              :disabled="updatingRole"
+              @click="cancelEditingRole"
+              v-tooltip="'Cancel'"
+            />
+          </div>
+          <div v-else class="flex gap-2">
+            <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
+            <Tag v-if="data.isOwner" value="Owner" severity="contrast" />
+          </div>
         </template>
       </Column>
 
@@ -252,17 +325,30 @@ function navigateBack() {
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 8rem">
+      <Column header="Actions" style="width: 10rem">
         <template #body="{ data }">
-          <Button
-            icon="pi pi-trash"
-            text
-            rounded
-            severity="danger"
-            :disabled="data.isOwner"
-            @click="handleRemoveMember(data.userId, data.userName, data.isOwner)"
-            v-tooltip="data.isOwner ? 'Cannot remove owner' : 'Remove member'"
-          />
+          <div class="flex gap-1">
+            <Button
+              v-if="canEditRoles && editingMemberId !== data.id"
+              icon="pi pi-pencil"
+              text
+              rounded
+              severity="secondary"
+              :disabled="data.isOwner || editingMemberId !== null"
+              @click="startEditingRole(data.id)"
+              v-tooltip="data.isOwner ? 'Cannot edit owner role' : 'Edit role'"
+            />
+            <Button
+              v-if="canEditRoles && !data.isOwner"
+              icon="pi pi-trash"
+              text
+              rounded
+              severity="danger"
+              :disabled="editingMemberId !== null"
+              @click="handleRemoveMember(data.userId, data.userName, data.isOwner)"
+              v-tooltip="'Remove member'"
+            />
+          </div>
         </template>
       </Column>
     </DataTable>

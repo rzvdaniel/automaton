@@ -11,6 +11,7 @@ import type {
   CreateOrganizationRequest,
   UpdateOrganizationRequest,
   InviteMemberRequest,
+  UpdateOrganizationMemberRequest,
   AssignAppRequest,
 } from '../types';
 
@@ -106,6 +107,21 @@ class OrganizationsService {
    */
   async removeMember(organizationId: string, userId: string): Promise<void> {
     await apiClient.delete(`/api/organizations/${organizationId}/members/${userId}`);
+  }
+
+  /**
+   * Leave an organization (self-removal)
+   */
+  async leaveOrganization(organizationId: string): Promise<void> {
+    await apiClient.post(`/api/organizations/${organizationId}/leave`);
+  }
+
+  /**
+   * Update a member's role in an organization
+   */
+  async updateMemberRole(organizationId: string, userId: string, request: UpdateOrganizationMemberRequest): Promise<OrganizationMemberDto> {
+    const response = await apiClient.put<OrganizationMemberDto>(`/api/organizations/${organizationId}/members/${userId}`, request);
+    return response.data;
   }
 
   // =====================================================
