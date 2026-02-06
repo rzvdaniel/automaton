@@ -25,7 +25,6 @@ export class AiConversationClient {
   private eventSource: EventSource | null = null
   private abortController: AbortController | null = null
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-  private isClosing: boolean = false
 
   constructor(baseUrl: string = import.meta.env.VITE_API_BASE_URL || '') {
     this.baseUrl = baseUrl
@@ -171,9 +170,7 @@ export class AiConversationClient {
       }
     } finally {
       // Always clean up connections in finally block
-      this.isClosing = true
       this.close()
-      this.isClosing = false
     }
   }
 
@@ -181,8 +178,6 @@ export class AiConversationClient {
    * Close the SSE connection
    */
   close(): void {
-    this.isClosing = true
-
     try {
       if (this.eventSource) {
         this.eventSource.close()

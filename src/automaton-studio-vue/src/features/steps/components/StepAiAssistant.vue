@@ -33,7 +33,7 @@ const config = computed<AiChatConfig>(() => ({
 
 // Handlers for step editor AI interactions
 const handlers: AiChatHandlers = {
-  onSendMessage: async (message: string, context) => {
+  onSendMessage: async (message: string, _context) => {
     // TODO: Call step-specific AI endpoint
     // TODO: Generate or fix step code
     return new Promise((resolve) => {

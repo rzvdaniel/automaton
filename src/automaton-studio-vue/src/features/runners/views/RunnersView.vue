@@ -366,7 +366,7 @@ watch(
       </Message>
 
       <TabView>
-        <TabPanel header="Docker CLI">
+        <TabPanel header="Docker CLI" value="docker-cli">
           <div class="py-3">
             <p class="mt-0 mb-3"><strong>Run this command in your terminal:</strong></p>
 
@@ -403,7 +403,7 @@ watch(
           </div>
         </TabPanel>
 
-        <TabPanel header="Docker Desktop">
+        <TabPanel header="Docker Desktop" value="docker-desktop">
           <div class="py-3">
             <p class="mt-0 mb-3 text-color-secondary">
               If you prefer Docker Desktop's graphical interface:
@@ -438,7 +438,7 @@ watch(
           </div>
         </TabPanel>
 
-        <TabPanel header="Manual Download">
+        <TabPanel header="Manual Download" value="manual-download">
           <div class="py-3">
             <p class="mt-0 mb-3 text-color-secondary">
               For advanced users who need to run the runner as a Windows service, on systems without Docker,
