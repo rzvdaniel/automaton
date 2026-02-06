@@ -52,9 +52,13 @@ const {
   },
 })
 
+// View state: 'sessions' (list view) or 'chat' (detail view)
+const currentView = ref<'sessions' | 'chat'>('sessions')
+
 // Session UI state
 const showSessionDialog = ref(false)
 const newSessionTitle = ref('')
+const sessionsSearchQuery = ref('')
 const sortedSessions = computed(() => {
   return [...sessions.value].sort((a, b) => {
     // Active session first, then by creation date descending
@@ -62,6 +66,16 @@ const sortedSessions = computed(() => {
     if (b.isActive) return 1
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
   })
+})
+
+// Filter sessions by search query
+const filteredSessions = computed(() => {
+  if (!sessionsSearchQuery.value.trim()) return sortedSessions.value
+  
+  const query = sessionsSearchQuery.value.toLowerCase()
+  return sortedSessions.value.filter(s => 
+    s.title?.toLowerCase().includes(query)
+  )
 })
 
 // UI state
@@ -84,6 +98,7 @@ onMounted(async () => {
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
     userInput.value = props.initialPrompt
+    currentView.value = 'chat'
     // Small delay to ensure UI is ready
     setTimeout(() => {
       sendMessage()
@@ -104,6 +119,12 @@ async function handleSelectSession(session: ChatSession) {
   if (session.id !== activeSession.value?.id) {
     await activateSession(session.id)
   }
+  currentView.value = 'chat'
+}
+
+// Navigate back to sessions list
+function backToSessions() {
+  currentView.value = 'sessions'
 }
 
 // Format session date
@@ -141,6 +162,11 @@ async function sendMessage() {
   const messageContent = userInput.value.trim()
   userInput.value = ''
 
+  // Switch to chat view if we're in sessions view
+  if (currentView.value === 'sessions') {
+    currentView.value = 'chat'
+  }
+
   // Build context with app and runner info
   const context: Record<string, any> = {
     appId: props.appId,
@@ -172,35 +198,242 @@ function handleKeyPress(event: KeyboardEvent) {
 
 <template>
   <div class="ai-assistant">
-    <!-- Sessions panel -->
-    <div v-if="sessions.length > 0" class="sessions-panel">
-      <div class="sessions-header">
-        <span class="sessions-label">Sessions</span>
-        <Button
-          v-tooltip.top="'New session'"
-          icon="pi pi-plus"
-          size="small"
-          text
-          @click="showSessionDialog = true"
-        />
-      </div>
-      
-      <div class="sessions-list">
-        <div
-          v-for="session in sortedSessions"
-          :key="session.id"
-          class="session-item"
-          :class="{ active: session.id === activeSession?.id }"
-          @click="handleSelectSession(session)"
-        >
-          <div class="session-info">
-            <div class="session-title">{{ session.title }}</div>
-            <div class="session-date">{{ formatSessionDate(session.createdAt) }}</div>
+    <!-- Sessions List View -->
+    <template v-if="currentView === 'sessions'">
+      <!-- Header -->
+      <div class="ai-header">
+        <div class="flex align-items-center justify-content-between w-full gap-2">
+          <div class="flex align-items-center gap-2">
+            <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
+            <span class="font-semibold">AI Assistant</span>
           </div>
-          <i v-if="session.id === activeSession?.id" class="pi pi-check text-color-success"></i>
+          
+          <Button
+            v-tooltip.top="'New session'"
+            icon="pi pi-plus"
+            size="small"
+            text
+            @click="showSessionDialog = true"
+          />
         </div>
       </div>
-    </div>
+
+      <!-- Sessions List -->
+      <div class="sessions-view">
+        <div v-if="isLoadingSessions" class="loading-state">
+          <i class="pi pi-spin pi-spinner text-2xl text-color-secondary"></i>
+          <p class="text-color-secondary text-sm mt-2">Loading sessions...</p>
+        </div>
+
+        <div v-else-if="sessions.length === 0" class="empty-sessions">
+          <i class="pi pi-comments text-3xl text-color-secondary mb-2"></i>
+          <p class="text-color-secondary text-sm mb-3">No chat sessions yet</p>
+          <Button
+            label="Start New Chat"
+            icon="pi pi-plus"
+            size="small"
+            @click="showSessionDialog = true"
+          />
+        </div>
+
+        <div v-else class="sessions-list-container">
+          <div
+            v-for="session in filteredSessions"
+            :key="session.id"
+            class="session-card"
+            :class="{ active: session.id === activeSession?.id }"
+            @click="handleSelectSession(session)"
+          >
+            <div class="session-card-content">
+              <div class="session-card-header">
+                <span class="session-card-title">{{ session.title }}</span>
+                <i v-if="session.id === activeSession?.id" class="pi pi-circle-fill active-indicator"></i>
+              </div>
+              <div class="session-card-footer">
+                <span class="session-card-date">{{ formatSessionDate(session.createdAt) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input area always visible -->
+      <div class="input-area">
+        <div class="flex gap-2">
+          <InputText
+            v-model="userInput"
+            placeholder="Ask AI a question..."
+            class="flex-1"
+            :disabled="isGenerating"
+            @keypress="handleKeyPress"
+          />
+          <Button
+            v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
+            icon="pi pi-send"
+            :disabled="!userInput.trim() || isGenerating || !selectedProvider"
+            :loading="isGenerating"
+            @click="sendMessage"
+          />
+        </div>
+      </div>
+    </template>
+
+    <!-- Chat View (Session Detail) -->
+    <template v-else>
+      <!-- Header with Back Button and Model Selector -->
+      <div class="ai-header">
+        <div class="flex align-items-center justify-content-between w-full gap-2">
+          <div class="flex align-items-center gap-2">
+            <Button
+              v-tooltip.top="'Back to sessions'"
+              icon="pi pi-arrow-left"
+              size="small"
+              text
+              @click="backToSessions"
+            />
+            <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
+            <span class="font-semibold">{{ activeSession?.title || 'AI Assistant' }}</span>
+          </div>
+          
+          <!-- Model Selector -->
+          <div v-if="availableProviders.length > 0" class="flex align-items-center gap-2">
+            <Select
+              v-model="selectedProvider"
+              :options="availableProviders"
+              option-label="displayName"
+              option-value="providerName"
+              placeholder="Provider"
+              size="small"
+              class="model-select"
+              :disabled="isGenerating"
+            >
+              <template #value="slotProps">
+                <span v-if="slotProps.value">{{ availableProviders.find(p => p.providerName === slotProps.value)?.displayName }}</span>
+                <span v-else>{{ slotProps.placeholder }}</span>
+              </template>
+            </Select>
+            
+            <Select
+              v-model="selectedModel"
+              :options="availableModels"
+              placeholder="Model"
+              size="small"
+              class="model-select"
+              :disabled="isGenerating || availableModels.length === 0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div v-if="error" class="error-banner">
+        <i class="pi pi-exclamation-triangle mr-2"></i>
+        {{ error }}
+      </div>
+
+      <!-- Messages area -->
+      <div class="messages-area">
+        <!-- Empty state -->
+        <div v-if="!hasMessages" class="empty-state">
+          <i class="pi pi-sparkles text-3xl text-color-secondary mb-2"></i>
+          <p class="text-color-secondary text-sm mb-3">
+            Ask me to create or modify your app
+          </p>
+
+          <!-- Quick suggestions -->
+          <div class="suggestions">
+            <Button
+              v-for="suggestion in suggestions"
+              :key="suggestion"
+              :label="suggestion"
+              size="small"
+              text
+              class="suggestion-btn"
+              @click="handleSuggestion(suggestion)"
+            />
+          </div>
+        </div>
+
+        <!-- Messages: User in bubbles, AI in timeline -->
+        <div v-else class="messages-container">
+          <!-- User messages as bubbles, AI messages as timeline -->
+          <template v-for="(message, index) in messages" :key="message.id">
+            <!-- User message - Chat bubble -->
+            <div v-if="message.role === 'user'" class="user-message">
+              <div class="message-bubble">{{ message.content }}</div>
+            </div>
+
+            <!-- AI message - Timeline -->
+            <div v-else class="timeline">
+              <div
+                class="timeline-item"
+                :class="[
+                  { 'is-last': index === messages.length - 1 && !isGenerating },
+                  message.toolName ? 'has-tool' : 'regular'
+                ]"
+              >
+                <!-- Simple bullet point -->
+                <div class="timeline-bullet" :class="[message.toolName ? 'tool' : 'regular']">•</div>
+
+                <!-- Connector line (visible if more messages follow) -->
+                <div v-if="index < messages.length - 1 || isGenerating" class="timeline-connector"></div>
+
+                <!-- Message content -->
+                <div class="timeline-content">
+                  <div class="message-text">{{ message.content }}</div>
+                  
+                  <!-- Tool execution status -->
+                  <div v-if="message.toolStatus" class="tool-status" :class="message.toolStatus">
+                    <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner"></i>
+                    <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check"></i>
+                    <i v-else-if="message.toolStatus === 'error'" class="pi pi-times"></i>
+                    <span>{{ message.toolStatus }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Generating indicator -->
+          <div v-if="isGenerating" class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-bullet">•</div>
+              <div class="timeline-content">
+                <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Processing your request...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input area -->
+      <div class="input-area">
+        <div class="flex gap-2">
+          <InputText
+            v-model="userInput"
+            placeholder="Describe what you want..."
+            class="flex-1"
+            :disabled="isGenerating"
+            @keypress="handleKeyPress"
+          />
+          <Button
+            v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
+            icon="pi pi-send"
+            :disabled="!userInput.trim() || isGenerating || !selectedProvider"
+            :loading="isGenerating"
+            @click="sendMessage"
+          />
+          <Button
+            v-if="hasMessages"
+            v-tooltip.top="'Clear conversation'"
+            icon="pi pi-trash"
+            severity="secondary"
+            text
+            @click="clearMessages"
+          />
+        </div>
+      </div>
+    </template>
 
     <!-- New Session Dialog -->
     <Dialog
@@ -232,153 +465,6 @@ function handleKeyPress(event: KeyboardEvent) {
         </div>
       </div>
     </Dialog>
-
-    <!-- Header with Model Selector -->
-    <div class="ai-header">
-      <div class="flex align-items-center justify-content-between w-full gap-2">
-        <div class="flex align-items-center gap-2">
-          <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
-          <span class="font-semibold">AI Assistant</span>
-        </div>
-        
-        <!-- Model Selector -->
-        <div v-if="availableProviders.length > 0" class="flex align-items-center gap-2">
-          <Select
-            v-model="selectedProvider"
-            :options="availableProviders"
-            option-label="displayName"
-            option-value="providerName"
-            placeholder="Provider"
-            size="small"
-            class="model-select"
-            :disabled="isGenerating"
-          >
-            <template #value="slotProps">
-              <span v-if="slotProps.value">{{ availableProviders.find(p => p.providerName === slotProps.value)?.displayName }}</span>
-              <span v-else>{{ slotProps.placeholder }}</span>
-            </template>
-          </Select>
-          
-          <Select
-            v-model="selectedModel"
-            :options="availableModels"
-            placeholder="Model"
-            size="small"
-            class="model-select"
-            :disabled="isGenerating || availableModels.length === 0"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Error message -->
-    <div v-if="error" class="error-banner">
-      <i class="pi pi-exclamation-triangle mr-2"></i>
-      {{ error }}
-    </div>
-
-    <!-- Messages area -->
-    <div class="messages-area">
-      <!-- Empty state -->
-      <div v-if="!hasMessages" class="empty-state">
-        <i class="pi pi-sparkles text-3xl text-color-secondary mb-2"></i>
-        <p class="text-color-secondary text-sm mb-3">
-          Ask me to create or modify your app
-        </p>
-
-        <!-- Quick suggestions -->
-        <div class="suggestions">
-          <Button
-            v-for="suggestion in suggestions"
-            :key="suggestion"
-            :label="suggestion"
-            size="small"
-            text
-            class="suggestion-btn"
-            @click="handleSuggestion(suggestion)"
-          />
-        </div>
-      </div>
-
-      <!-- Messages: User in bubbles, AI in timeline -->
-      <div v-else class="messages-container">
-        <!-- User messages as bubbles, AI messages as timeline -->
-        <template v-for="(message, index) in messages" :key="message.id">
-          <!-- User message - Chat bubble -->
-          <div v-if="message.role === 'user'" class="user-message">
-            <div class="message-bubble">{{ message.content }}</div>
-          </div>
-
-          <!-- AI message - Timeline -->
-          <div v-else class="timeline">
-            <div
-              class="timeline-item"
-              :class="[
-                { 'is-last': index === messages.length - 1 && !isGenerating },
-                message.toolName ? 'has-tool' : 'regular'
-              ]"
-            >
-              <!-- Simple bullet point -->
-              <div class="timeline-bullet" :class="[message.toolName ? 'tool' : 'regular']">•</div>
-
-              <!-- Connector line (visible if more messages follow) -->
-              <div v-if="index < messages.length - 1 || isGenerating" class="timeline-connector"></div>
-
-              <!-- Message content -->
-              <div class="timeline-content">
-                <div class="message-text">{{ message.content }}</div>
-                
-                <!-- Tool execution status -->
-                <div v-if="message.toolStatus" class="tool-status" :class="message.toolStatus">
-                  <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner"></i>
-                  <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check"></i>
-                  <i v-else-if="message.toolStatus === 'error'" class="pi pi-times"></i>
-                  <span>{{ message.toolStatus }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- Generating indicator -->
-        <div v-if="isGenerating" class="timeline">
-          <div class="timeline-item">
-            <div class="timeline-bullet">•</div>
-            <div class="timeline-content">
-              <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Processing your request...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input area -->
-    <div class="input-area">
-      <div class="flex gap-2">
-        <InputText
-          v-model="userInput"
-          placeholder="Describe what you want..."
-          class="flex-1"
-          :disabled="isGenerating"
-          @keypress="handleKeyPress"
-        />
-        <Button
-          v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
-          icon="pi pi-send"
-          :disabled="!userInput.trim() || isGenerating || !selectedProvider"
-          :loading="isGenerating"
-          @click="sendMessage"
-        />
-        <Button
-          v-if="hasMessages"
-          v-tooltip.top="'Clear conversation'"
-          icon="pi pi-trash"
-          severity="secondary"
-          text
-          @click="clearMessages"
-        />
-      </div>
-    </div>
   </div>
 </template>
 
@@ -389,78 +475,96 @@ function handleKeyPress(event: KeyboardEvent) {
   flex-direction: column;
 }
 
-.sessions-panel {
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-  background-color: var(--p-surface-50);
-}
-
-.sessions-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--p-surface-200);
-}
-
-.sessions-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--p-text-muted-color);
-  letter-spacing: 0.5px;
-}
-
-.sessions-list {
-  display: flex;
-  flex-direction: column;
-  max-height: 200px;
+/* Sessions View */
+.sessions-view {
+  flex: 1;
   overflow-y: auto;
-  gap: 0;
+  padding: 1rem;
 }
 
-.session-item {
+.loading-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--p-surface-100);
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.empty-sessions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 2rem;
+}
+
+.sessions-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-card {
+  padding: 1rem;
+  border: 1px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
   cursor: pointer;
   transition: all 0.15s ease;
+  background-color: var(--p-surface-0);
   border-left: 3px solid transparent;
+}
+
+.session-card:hover {
   background-color: var(--p-surface-50);
+  border-color: var(--p-surface-300);
 }
 
-.session-item:hover {
-  background-color: var(--p-surface-100);
-}
-
-.session-item.active {
+.session-card.active {
   background-color: var(--p-primary-50);
   border-left-color: var(--p-primary-500);
+  border-color: var(--p-primary-200);
 }
 
-.session-info {
+.session-card-content {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
-  min-width: 0;
+  gap: 0.5rem;
 }
 
-.session-title {
-  font-size: 0.8125rem;
+.session-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.session-card-title {
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--p-text-color);
+  flex: 1;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
 }
 
-.session-date {
-  font-size: 0.7rem;
+.active-indicator {
+  color: var(--p-primary-500);
+  font-size: 0.5rem;
+  flex-shrink: 0;
+}
+
+.session-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-card-date {
+  font-size: 0.75rem;
   color: var(--p-text-muted-color);
 }
 
@@ -683,9 +787,19 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 /* Dark mode */
-:global(.app-dark) .sessions-panel {
+:global(.app-dark) .session-card {
   background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .session-card:hover {
+  background-color: var(--p-surface-700);
+  border-color: var(--p-surface-600);
+}
+
+:global(.app-dark) .session-card.active {
+  background-color: var(--p-primary-900);
+  border-color: var(--p-primary-700);
 }
 
 :global(.app-dark) .ai-header {
@@ -709,19 +823,6 @@ function handleKeyPress(event: KeyboardEvent) {
 
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .session-item {
-  background-color: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .session-item:hover {
-  background-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .session-item.active {
-  background-color: var(--p-primary-900);
 }
 </style>
 
