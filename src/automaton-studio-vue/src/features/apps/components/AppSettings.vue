@@ -83,7 +83,7 @@ watch(
       publicUrl.value = newApp.publicUrl || ''
       requiresAuthentication.value = newApp.requiresAuthentication || false
       executionRunnerId.value = newApp.executionRunnerId || null
-      thumbnailUrl.value = newApp.thumbnailUrl
+      thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
     }
   },
   { immediate: true },
@@ -191,6 +191,7 @@ async function handleImageUpload(event: { files: File[] }) {
   if (!app.value || !event.files.length) return
 
   const file = event.files[0]
+  if (!file) return
 
   // Validate file type
   if (!file.type.startsWith('image/')) {
@@ -558,7 +559,7 @@ async function removeImage() {
                   choose-label="Upload Image"
                   :auto="true"
                   custom-upload
-                  @uploader="handleImageUpload"
+                  @uploader="(e: any) => handleImageUpload({ files: Array.isArray(e.files) ? e.files : [e.files] })"
                   :disabled="isUploadingImage"
                   class="upload-button"
                 />

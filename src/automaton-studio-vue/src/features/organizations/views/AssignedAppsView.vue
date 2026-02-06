@@ -51,7 +51,7 @@ function openApp(app: any) {
       v-else-if="assignedApps.length === 0"
       icon="pi-inbox"
       title="No apps assigned to you yet"
-      description="Contact your organization admin to get access to apps"
+      message="Contact your organization admin to get access to apps"
     />
 
     <div v-else class="apps-grid">

@@ -9,7 +9,7 @@ import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 
 // Initialize settings on app mount
-const { isDark } = useUserSettings()
+useUserSettings()
 const projectsStore = useProjectsStore()
 const route = useRoute()
 

@@ -11,8 +11,6 @@ import type {
   AppFile,
   FileNode,
   CreateAppStepRequest,
-  FileApiResponse,
-  LinkedStepInfoExtended,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 

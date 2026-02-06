@@ -292,7 +292,7 @@ function cancelEditingRole() {
               optionValue="value"
               placeholder="Select role"
               :disabled="updatingRole"
-              @update:modelValue="(newRole) => handleUpdateRole(data, newRole)"
+              @update:modelValue="(newRole: string) => handleUpdateRole(data, newRole)"
               autofocus
             />
             <Button

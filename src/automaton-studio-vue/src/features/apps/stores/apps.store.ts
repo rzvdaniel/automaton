@@ -106,7 +106,7 @@ export const useAppsStore = defineStore('apps', () => {
       // Update local state
       const index = apps.value.findIndex((app) => app.id === id)
       if (index !== -1) {
-        apps.value[index] = { ...apps.value[index], ...updates }
+        apps.value[index] = { ...apps.value[index]!, ...updates }
       }
       if (selectedApp.value?.id === id) {
         selectedApp.value = { ...selectedApp.value, ...updates }
@@ -140,7 +140,7 @@ export const useAppsStore = defineStore('apps', () => {
       const index = apps.value.findIndex((app) => app.id === id)
       if (index !== -1) {
         apps.value[index] = {
-          ...apps.value[index],
+          ...apps.value[index]!,
           isPublished: true,
           publicUrl: request.publicUrl,
           requiresAuthentication: request.requiresAuthentication,
@@ -170,7 +170,7 @@ export const useAppsStore = defineStore('apps', () => {
       const index = apps.value.findIndex((app) => app.id === id)
       if (index !== -1) {
         apps.value[index] = {
-          ...apps.value[index],
+          ...apps.value[index]!,
           isPublished: false,
           publishedAt: undefined,
         }

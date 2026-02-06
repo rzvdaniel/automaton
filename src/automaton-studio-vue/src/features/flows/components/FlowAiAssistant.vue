@@ -32,7 +32,7 @@ const config = computed<AiChatConfig>(() => ({
 
 // Handlers for flow editor AI interactions
 const handlers: AiChatHandlers = {
-  onSendMessage: async (message: string, context) => {
+  onSendMessage: async (message: string, _context) => {
     // TODO: Call flow-specific AI endpoint
     // TODO: Return suggestions for workflow steps
     return new Promise((resolve) => {

@@ -46,7 +46,7 @@ const selectedType = computed(() => {
 // Full file path
 const fullPath = computed(() => {
   const name = fileName.value.trim()
-  if (!name) return ''
+  if (!name || !selectedType.value) return ''
   // If name already has extension, use it
   if (/\.[a-z]+$/i.test(name)) return name
   // Otherwise add extension
@@ -86,7 +86,7 @@ watch(isVisible, (visible) => {
 
 // Handle create
 async function handleCreate() {
-  if (!isValidName.value || isDuplicate.value || isSubmitting.value) return
+  if (!isValidName.value || isDuplicate.value || isSubmitting.value || !selectedType.value) return
 
   isSubmitting.value = true
 
@@ -187,7 +187,7 @@ function getJsonTemplate(_name: string): string {
             class="flex-1"
             :class="{ 'p-invalid': validationMessage }"
           />
-          <span class="p-inputgroup-addon">{{ selectedType.extension }}</span>
+          <span class="p-inputgroup-addon">{{ selectedType?.extension }}</span>
         </div>
         <small v-if="validationMessage" class="p-error block mt-1">
           {{ validationMessage }}

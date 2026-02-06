@@ -5,7 +5,6 @@ import { useToast } from 'primevue/usetoast'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import AppAssignmentDialog from '../components/AppAssignmentDialog.vue'
@@ -24,7 +23,6 @@ const selectedApp = ref<any>(null)
 const currentUserRole = ref<string | null>(null)
 
 const organizationId = computed(() => route.params.id as string)
-const isOrgAdmin = computed(() => currentUserRole.value === OrganizationRole.OrgAdmin)
 const isAppUser = computed(() => currentUserRole.value === OrganizationRole.AppUser)
 
 onMounted(async () => {
@@ -126,7 +124,7 @@ function navigateBack() {
       v-else-if="apps.length === 0"
       icon="pi-th-large"
       title="No apps in organization"
-      description="Create apps in organization projects first, then they will appear here for assignment to members. Apps must belong to projects that are part of this organization."
+      message="Create apps in organization projects first, then they will appear here for assignment to members. Apps must belong to projects that are part of this organization."
     />
 
     <DataTable

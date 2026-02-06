@@ -4,7 +4,7 @@
  * Displays app version history and allows restoration from previous versions
  * Shows timeline of snapshots with triggers and summaries
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -360,7 +360,7 @@ onMounted(() => {
           icon="pi pi-refresh"
           severity="warn"
           :loading="isRestoringVersion"
-          @click="restoreVersion(selectedVersion.versionNumber)"
+          @click="selectedVersion && restoreVersion(selectedVersion.versionNumber)"
         />
       </template>
     </Dialog>

@@ -273,6 +273,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (index === -1) return true
 
     const file = openFiles.value[index]
+    if (!file) return true
 
     // Check for unsaved changes unless forcing
     if (file.isDirty && !force) {
@@ -284,7 +285,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     // If closing active file, switch to another
     if (activeFilePath.value === filePath) {
-      activeFilePath.value = openFiles.value.length > 0 ? openFiles.value[0].path : null
+      const firstFile = openFiles.value[0]
+      activeFilePath.value = firstFile ? firstFile.path : null
     }
 
     return true

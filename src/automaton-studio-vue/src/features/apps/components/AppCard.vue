@@ -90,7 +90,7 @@ const handlePublish = () => {
   emit('publish', props.app)
 }
 
-const handleUnpublish = () => {
+const handleUnpublish = async () => {
   confirm.require({
     message: `Are you sure you want to unpublish "${props.app.name}"? It will no longer be accessible via its public URL.`,
     header: 'Confirm Unpublish',
@@ -142,7 +142,7 @@ const handleDuplicate = async () => {
   }
 }
 
-const handleDelete = () => {
+const handleDelete = async () => {
   confirm.require({
     message: `Are you sure you want to delete "${props.app.name}"? This action cannot be undone.`,
     header: 'Confirm Delete',

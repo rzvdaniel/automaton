@@ -170,15 +170,14 @@ async function handleUnassign(userId: string, userName: string) {
 
       <!-- Search -->
       <div class="search-box">
-        <InputText
-          v-model="searchQuery"
-          placeholder="Search members by name or email..."
-          class="w-full"
-        >
-          <template #prefix>
-            <i class="pi pi-search"></i>
-          </template>
-        </InputText>
+        <span class="p-input-icon-left w-full">
+          <i class="pi pi-search"></i>
+          <InputText
+            v-model="searchQuery"
+            placeholder="Search members by name or email..."
+            class="w-full"
+          />
+        </span>
       </div>
 
       <!-- Members table -->

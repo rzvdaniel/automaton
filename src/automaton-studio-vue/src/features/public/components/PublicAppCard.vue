@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import type { PublicAppCard as AppCardType } from '../types/publicApps.types'
-import { formatPublishedDate } from '../types/publicApps.types'
 
 const props = defineProps<{
   app: AppCardType

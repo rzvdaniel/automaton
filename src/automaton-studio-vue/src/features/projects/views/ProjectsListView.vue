@@ -137,7 +137,7 @@ function handleDeleteProject(projectId: string, projectName: string) {
 }
 
 // Handle reactivate project
-async function handleReactivateProject(projectId: string, projectName: string) {
+async function handleReactivateProject(projectId: string, _projectName: string) {
   try {
     await store.reactivateProject(projectId)
     toast.add({

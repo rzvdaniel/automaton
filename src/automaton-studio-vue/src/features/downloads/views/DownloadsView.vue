@@ -180,7 +180,7 @@
           :key="platform.id"
           class="platform-tab"
           :class="{ active: selectedPlatform === platform.id }"
-          @click="selectedPlatform = platform.id"
+          @click="selectedPlatform = platform.id as 'windows' | 'linux' | 'macos'"
         >
           <i :class="platform.icon"></i>
           <span>{{ platform.name }}</span>

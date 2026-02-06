@@ -5,8 +5,6 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
-import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
-import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
 import PublicUserHeader from '../components/PublicUserHeader.vue'
 import PublicAppCard from '../components/PublicAppCard.vue'
 import { publicAppsService } from '../services/publicApps.service'
@@ -169,7 +167,6 @@ onMounted(() => {
       modal
       :style="{ width: '90vw', maxWidth: '900px' }"
       :closable="true"
-      :header="null"
       class="netflix-dialog"
     >
       <template #container="{ closeCallback }">
