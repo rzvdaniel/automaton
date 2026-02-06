@@ -558,6 +558,49 @@ class AppsService {
   }
 
   /**
+   * Get version history for an app with pagination
+   * GET /api/apps/{appId}/versions
+   */
+  async getVersions(appId: string, pageNumber: number = 1, pageSize: number = 20) {
+    const { data } = await apiClient.get(`/api/apps/${appId}/versions`, {
+      params: { pageNumber, pageSize },
+    })
+    return data
+  }
+
+  /**
+   * Get detailed information about a specific version
+   * GET /api/apps/{appId}/versions/{versionNumber}
+   */
+  async getVersionDetail(appId: string, versionNumber: number) {
+    const { data } = await apiClient.get(`/api/apps/${appId}/versions/${versionNumber}`)
+    return data
+  }
+
+  /**
+   * Create a manual version snapshot for an app
+   * POST /api/apps/{appId}/versions/snapshot
+   */
+  async createVersionSnapshot(appId: string, trigger?: string) {
+    const { data } = await apiClient.post(`/api/apps/${appId}/versions/snapshot`, {
+      trigger: trigger || 'ManualSave',
+    })
+    return data
+  }
+
+  /**
+   * Restore an app to a previous version
+   * POST /api/apps/{appId}/versions/{versionNumber}/restore
+   */
+  async restoreVersion(appId: string, versionNumber: number) {
+    const { data } = await apiClient.post(
+      `/api/apps/${appId}/versions/${versionNumber}/restore`,
+      {}
+    )
+    return data
+  }
+
+  /**
    * Generate slug from app name
    */
   generateSlug(name: string): string {

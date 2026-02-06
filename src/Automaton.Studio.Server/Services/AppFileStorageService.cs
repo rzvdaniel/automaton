@@ -91,6 +91,126 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Create an immutable snapshot of the current app files for versioning.
+    /// </summary>
+    public Task<string> CreateVersionSnapshotAsync(Guid userId, Guid appId, int versionNumber)
+    {
+        try
+        {
+            var appPath = GetAppPath(userId, appId);
+            if (!Directory.Exists(appPath))
+            {
+                throw new DirectoryNotFoundException($"App directory not found: {appPath}");
+            }
+
+            var versionsPath = Path.Combine(appPath, "versions");
+            var versionFolder = $"v{versionNumber:D3}";
+            var targetPath = Path.Combine(versionsPath, versionFolder, "files");
+
+            Directory.CreateDirectory(targetPath);
+
+            var versionRoot = Path.GetFullPath(versionsPath);
+
+            foreach (var sourceFile in Directory.EnumerateFiles(appPath, "*", SearchOption.AllDirectories))
+            {
+                var fullSourcePath = Path.GetFullPath(sourceFile);
+                if (fullSourcePath.StartsWith(versionRoot))
+                {
+                    continue; // Avoid copying existing versions
+                }
+
+                var relativePath = Path.GetRelativePath(appPath, sourceFile);
+                var targetFilePath = Path.Combine(targetPath, relativePath);
+                var targetDirectory = Path.GetDirectoryName(targetFilePath);
+
+                if (!string.IsNullOrEmpty(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                File.Copy(sourceFile, targetFilePath, overwrite: true);
+            }
+
+            logger.Information("Created app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
+
+            return Task.FromResult(Path.Combine("versions", versionFolder));
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to create app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Restore app files from a version snapshot back to the current app folder.
+    /// </summary>
+    public async Task RestoreVersionAsync(Guid userId, Guid appId, int versionNumber)
+    {
+        try
+        {
+            var appPath = GetAppPath(userId, appId);
+            if (!Directory.Exists(appPath))
+            {
+                throw new DirectoryNotFoundException($"App directory not found: {appPath}");
+            }
+
+            var versionFolder = $"v{versionNumber:D3}";
+            var versionSnapshotPath = Path.Combine(appPath, "versions", versionFolder, "files");
+
+            if (!Directory.Exists(versionSnapshotPath))
+            {
+                throw new DirectoryNotFoundException($"Version snapshot not found: {versionSnapshotPath}");
+            }
+
+            // Delete current files (except versions folder)
+            var versionsPath = Path.Combine(appPath, "versions");
+            var currentFiles = Directory.GetFiles(appPath, "*", SearchOption.AllDirectories)
+                .Where(f => !Path.GetFullPath(f).StartsWith(Path.GetFullPath(versionsPath)))
+                .ToList();
+
+            foreach (var file in currentFiles)
+            {
+                File.Delete(file);
+            }
+
+            // Remove empty directories (except versions)
+            foreach (var dir in Directory.GetDirectories(appPath, "*", SearchOption.AllDirectories))
+            {
+                var fullDirPath = Path.GetFullPath(dir);
+                if (!fullDirPath.StartsWith(Path.GetFullPath(versionsPath)) && !Directory.EnumerateFileSystemEntries(fullDirPath).Any())
+                {
+                    Directory.Delete(fullDirPath);
+                }
+            }
+
+            // Copy files from version snapshot to current
+            foreach (var sourceFile in Directory.EnumerateFiles(versionSnapshotPath, "*", SearchOption.AllDirectories))
+            {
+                var relativePath = Path.GetRelativePath(versionSnapshotPath, sourceFile);
+                var targetFilePath = Path.Combine(appPath, relativePath);
+                var targetDirectory = Path.GetDirectoryName(targetFilePath);
+
+                if (!string.IsNullOrEmpty(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                File.Copy(sourceFile, targetFilePath, overwrite: true);
+            }
+
+            logger.Information("Restored app {AppId} from version v{VersionNumber}", appId, versionNumber);
+
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to restore app {AppId} from version v{VersionNumber}", appId, versionNumber);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Load app definition from file system
     /// </summary>
     public async Task<AppDefinition?> LoadAppAsync(Guid userId, Guid appId)

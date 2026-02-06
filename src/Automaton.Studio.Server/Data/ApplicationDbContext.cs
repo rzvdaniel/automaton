@@ -39,6 +39,8 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
+        public virtual DbSet<AppVersion> AppVersions { get; set; }
+        public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
         public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
         public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
@@ -207,6 +209,54 @@ namespace Automaton.Studio.Server.Data
                     .WithMany()
                     .HasForeignKey(e => e.LinkedBy)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Entities.AppVersion>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AppId).IsRequired();
+                entity.Property(e => e.VersionNumber).IsRequired();
+                entity.Property(e => e.Summary).IsRequired().HasMaxLength(4000);
+                entity.Property(e => e.Trigger).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.CreatedBy).IsRequired();
+                entity.Property(e => e.AiModel).HasMaxLength(200);
+                entity.Property(e => e.SnapshotPath).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.FilesChangeSummary).HasColumnType("json");
+
+                entity.HasIndex(e => e.AppId);
+                entity.HasIndex(e => new { e.AppId, e.VersionNumber }).IsUnique();
+                entity.HasIndex(e => e.AiSessionId);
+
+                entity.HasOne(e => e.WebApp)
+                    .WithMany()
+                    .HasForeignKey(e => e.AppId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Entities.AppVersionStep>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.AppVersionId).IsRequired();
+                entity.Property(e => e.StepId).IsRequired();
+                entity.Property(e => e.StepName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Action).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(2000);
+                entity.Property(e => e.CodeSnapshot).IsRequired();
+                entity.Property(e => e.VariablesSnapshot).IsRequired().HasColumnType("json");
+
+                entity.HasIndex(e => e.AppVersionId);
+                entity.HasIndex(e => e.StepId);
+
+                entity.HasOne(e => e.AppVersion)
+                    .WithMany()
+                    .HasForeignKey(e => e.AppVersionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Step)
+                    .WithMany()
+                    .HasForeignKey(e => e.StepId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<RefreshToken>(entity =>

@@ -291,3 +291,77 @@ export function getFileIcon(filePath: string): string {
       return 'pi pi-file'
   }
 }
+/**
+ * App Version Trigger enum
+ */
+export type AppVersionTrigger = 'NewSession' | 'ManualSave' | 'Publish' | 'Restore'
+
+/**
+ * App Version Step Action enum
+ */
+export type AppVersionStepAction = 'Created' | 'Modified' | 'Deleted' | 'Linked' | 'Unlinked'
+
+/**
+ * Basic version info for list view
+ */
+export interface AppVersion {
+  id: string
+  appId: string
+  versionNumber: number
+  summary: string
+  trigger: AppVersionTrigger
+  createdAt: string // ISO date string
+  createdBy: string
+  aiSessionId?: string
+  aiModel?: string
+}
+
+/**
+ * Detailed version info with file and step changes
+ */
+export interface AppVersionDetail extends AppVersion {
+  snapshotPath: string
+  filesChangeSummary?: string // JSON structure
+  stepChanges: VersionStepChange[]
+}
+
+/**
+ * Step change in a version
+ */
+export interface VersionStepChange {
+  id: string
+  customStepId: string
+  stepName: string
+  action: AppVersionStepAction
+  language?: string
+  codeSnapshot?: string
+  variablesSnapshot?: string // JSON structure
+}
+
+/**
+ * Paginated list of versions
+ */
+export interface AppVersionList {
+  appId: string
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  versions: AppVersion[]
+}
+
+/**
+ * Request to restore a version
+ */
+export interface RestoreVersionRequest {
+  versionNumber: number
+}
+
+/**
+ * Response after restoring a version
+ */
+export interface RestoreVersionResponse {
+  appId: string
+  restoredFromVersion: number
+  restoredAt: string // ISO date string
+  message: string
+}

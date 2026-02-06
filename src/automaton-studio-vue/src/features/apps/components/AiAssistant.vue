@@ -4,11 +4,13 @@
  * AI Assistant sidebar component for the App Editor
  * Provides chat interface for AI-assisted app development with real backend integration
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
+import type { ChatSession } from '@/shared/types/ai.types'
 
 // Props
 const props = defineProps<{
@@ -37,11 +39,29 @@ const {
   sendMessage: sendAiMessage,
   getOrCreateActiveSession,
   clearMessages,
+  sessions,
+  activeSession,
+  isLoadingSessions,
+  loadSessions,
+  createSession,
+  activateSession,
 } = useAiChat('WebApp', props.appId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
     emit('toolExecuted', toolName, args, result)
   },
+})
+
+// Session UI state
+const showSessionDialog = ref(false)
+const newSessionTitle = ref('')
+const sortedSessions = computed(() => {
+  return [...sessions.value].sort((a, b) => {
+    // Active session first, then by creation date descending
+    if (a.isActive) return -1
+    if (b.isActive) return 1
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  })
 })
 
 // UI state
@@ -59,6 +79,7 @@ const suggestions = [
 onMounted(async () => {
   await loadProviders()
   await getOrCreateActiveSession()
+  await loadSessions()
 
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
@@ -69,6 +90,37 @@ onMounted(async () => {
     }, 100)
   }
 })
+
+// Handle creating new session
+async function handleCreateSession() {
+  const title = newSessionTitle.value.trim() || `Chat ${new Date().toLocaleString()}`
+  await createSession(title)
+  newSessionTitle.value = ''
+  showSessionDialog.value = false
+}
+
+// Handle switching to a different session
+async function handleSelectSession(session: ChatSession) {
+  if (session.id !== activeSession.value?.id) {
+    await activateSession(session.id)
+  }
+}
+
+// Format session date
+function formatSessionDate(date: string | undefined) {
+  if (!date) return ''
+  const d = new Date(date)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } else if (d.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
 
 // Watch for code generation in messages
 watch(
@@ -120,6 +172,67 @@ function handleKeyPress(event: KeyboardEvent) {
 
 <template>
   <div class="ai-assistant">
+    <!-- Sessions panel -->
+    <div v-if="sessions.length > 0" class="sessions-panel">
+      <div class="sessions-header">
+        <span class="sessions-label">Sessions</span>
+        <Button
+          v-tooltip.top="'New session'"
+          icon="pi pi-plus"
+          size="small"
+          text
+          @click="showSessionDialog = true"
+        />
+      </div>
+      
+      <div class="sessions-list">
+        <div
+          v-for="session in sortedSessions"
+          :key="session.id"
+          class="session-item"
+          :class="{ active: session.id === activeSession?.id }"
+          @click="handleSelectSession(session)"
+        >
+          <div class="session-info">
+            <div class="session-title">{{ session.title }}</div>
+            <div class="session-date">{{ formatSessionDate(session.createdAt) }}</div>
+          </div>
+          <i v-if="session.id === activeSession?.id" class="pi pi-check text-color-success"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Session Dialog -->
+    <Dialog
+      v-model:visible="showSessionDialog"
+      header="New Chat Session"
+      :modal="true"
+      :style="{ width: '300px' }"
+      @update:visible="(val) => !val && (newSessionTitle = '')"
+    >
+      <div class="flex flex-column gap-3">
+        <InputText
+          v-model="newSessionTitle"
+          placeholder="Session title (optional)"
+          @keyup.enter="handleCreateSession"
+        />
+        <div class="flex gap-2 justify-content-end">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            size="small"
+            @click="showSessionDialog = false"
+          />
+          <Button
+            label="Create"
+            size="small"
+            @click="handleCreateSession"
+            :loading="isLoadingSessions"
+          />
+        </div>
+      </div>
+    </Dialog>
+
     <!-- Header with Model Selector -->
     <div class="ai-header">
       <div class="flex align-items-center justify-content-between w-full gap-2">
@@ -274,6 +387,81 @@ function handleKeyPress(event: KeyboardEvent) {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.sessions-panel {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+  background-color: var(--p-surface-50);
+}
+
+.sessions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--p-surface-200);
+}
+
+.sessions-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+  letter-spacing: 0.5px;
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 200px;
+  overflow-y: auto;
+  gap: 0;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--p-surface-100);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+  background-color: var(--p-surface-50);
+}
+
+.session-item:hover {
+  background-color: var(--p-surface-100);
+}
+
+.session-item.active {
+  background-color: var(--p-primary-50);
+  border-left-color: var(--p-primary-500);
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.session-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-text-color);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.session-date {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
 }
 
 .ai-header {
@@ -495,6 +683,11 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 /* Dark mode */
+:global(.app-dark) .sessions-panel {
+  background-color: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
 :global(.app-dark) .ai-header {
   border-color: var(--p-surface-700);
 }
@@ -517,4 +710,18 @@ function handleKeyPress(event: KeyboardEvent) {
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
 }
+
+:global(.app-dark) .session-item {
+  background-color: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .session-item:hover {
+  background-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .session-item.active {
+  background-color: var(--p-primary-900);
+}
 </style>
+

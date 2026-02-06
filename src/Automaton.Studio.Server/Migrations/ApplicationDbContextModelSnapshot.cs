@@ -409,6 +409,108 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("AiModel")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<Guid?>("AiSessionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("FilesChangeSummary")
+                        .HasColumnType("json");
+
+                    b.Property<string>("SnapshotPath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("varchar(4000)");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AiSessionId");
+
+                    b.HasIndex("AppId");
+
+                    b.HasIndex("AppId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("AppVersions");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("AppVersionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("AppVersionId1")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("CodeSnapshot")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("Language")
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("StepId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("StepName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("VariablesSnapshot")
+                        .IsRequired()
+                        .HasColumnType("json");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppVersionId");
+
+                    b.HasIndex("AppVersionId1");
+
+                    b.HasIndex("StepId");
+
+                    b.ToTable("AppVersionSteps");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -953,9 +1055,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
-
-                    b.Property<int>("AcceptanceMethod")
-                        .HasColumnType("int");
 
                     b.Property<Guid?>("InvitedBy")
                         .HasColumnType("char(36)");
@@ -1832,6 +1931,40 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                        .WithMany()
+                        .HasForeignKey("AppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WebApp");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.AppVersion", "AppVersion")
+                        .WithMany()
+                        .HasForeignKey("AppVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.AppVersion", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("AppVersionId1");
+
+                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "Step")
+                        .WithMany()
+                        .HasForeignKey("StepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppVersion");
+
+                    b.Navigation("Step");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", "Role")
@@ -2316,6 +2449,11 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("ApiKeyUsers");
 
                     b.Navigation("ProjectApiKeys");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>

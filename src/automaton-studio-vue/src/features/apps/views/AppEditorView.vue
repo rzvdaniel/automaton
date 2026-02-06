@@ -28,6 +28,7 @@ import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
 import ConsolePanel from '../components/ConsolePanel.vue'
+import AppVersionHistory from '../components/AppVersionHistory.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -60,6 +61,9 @@ const selectedRunnerId = ref<string | null>(null)
 
 // Active view tab (code, settings, or console)
 const activeTab = ref<'code' | 'settings' | 'console'>('code')
+
+// Right panel mode (aiAssistant or versionHistory)
+const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
 
 // Panel sizes (in percentages) - localStorage keys
 const STORAGE_KEY = 'app-editor-panel-sizes'
@@ -464,6 +468,27 @@ async function handleDeleteFile(path: string) {
   })
 }
 
+// Handle version restored
+async function handleVersionRestored(versionNumber: number) {
+  try {
+    // Reload app files from the restored version
+    await editorStore.loadApp(appId.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Restored',
+      detail: `App restored to version ${versionNumber}. Files have been reloaded.`,
+      life: 5000,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err instanceof Error ? err.message : 'Failed to reload app after restoration',
+      life: 5000,
+    })
+  }
+}
+
 // Start editing app name
 function startEditingName() {
   if (editorStore.currentApp) {
@@ -734,15 +759,45 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           </div>
         </SplitterPanel>
 
-        <!-- Right Panel: AI Assistant -->
+        <!-- Right Panel: AI Assistant or Version History -->
         <SplitterPanel :size="panelSizes[2]" :min-size="15" class="splitter-panel">
-          <div class="ai-sidebar">
-            <AiAssistant
-              :app-id="appId"
-              :runner-id="selectedRunnerId"
-              :initial-prompt="initialPrompt"
-              @tool-executed="handleAiToolExecuted"
-            />
+          <div class="right-panel-container">
+            <!-- Right panel header tabs -->
+            <div class="right-panel-header">
+              <button
+                class="right-panel-tab"
+                :class="{ active: rightPanelMode === 'aiAssistant' }"
+                @click="rightPanelMode = 'aiAssistant'"
+              >
+                <i class="pi pi-sparkles"></i>
+                <span>AI Assistant</span>
+              </button>
+              <button
+                class="right-panel-tab"
+                :class="{ active: rightPanelMode === 'versionHistory' }"
+                @click="rightPanelMode = 'versionHistory'"
+              >
+                <i class="pi pi-history"></i>
+                <span>History</span>
+              </button>
+            </div>
+
+            <!-- Right panel content -->
+            <div class="ai-sidebar">
+              <AiAssistant
+                v-show="rightPanelMode === 'aiAssistant'"
+                :app-id="appId"
+                :runner-id="selectedRunnerId"
+                :initial-prompt="initialPrompt"
+                @tool-executed="handleAiToolExecuted"
+              />
+              <AppVersionHistory
+                v-show="rightPanelMode === 'versionHistory'"
+                :app-id="appId"
+                @version-restored="handleVersionRestored"
+                @version-created="() => {}"
+              />
+            </div>
           </div>
         </SplitterPanel>
       </Splitter>
@@ -859,6 +914,61 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 
 .view-tab i {
   font-size: 0.75rem;
+}
+
+/* Right panel tabs */
+.right-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.right-panel-header {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+  background-color: var(--p-surface-50);
+}
+
+.right-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.right-panel-tab:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.right-panel-tab.active {
+  background: var(--p-surface-ground);
+  border-bottom-color: var(--p-primary-500);
+  color: var(--p-primary-600);
+}
+
+.right-panel-tab i {
+  font-size: 0.8rem;
+}
+
+.ai-sidebar {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Settings view container */

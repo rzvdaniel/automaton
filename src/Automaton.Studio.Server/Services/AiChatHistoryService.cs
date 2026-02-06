@@ -10,11 +10,13 @@ namespace Automaton.Studio.Server.Services;
 public class AiChatHistoryService : IAiChatHistoryService
 {
     private readonly ApplicationDbContext dataContext;
+    private readonly AppVersionService appVersionService;
     private readonly Serilog.ILogger logger;
 
-    public AiChatHistoryService(ApplicationDbContext dataContext)
+    public AiChatHistoryService(ApplicationDbContext dataContext, AppVersionService appVersionService)
     {
         this.dataContext = dataContext;
+        this.appVersionService = appVersionService;
         this.logger = Serilog.Log.ForContext<AiChatHistoryService>();
     }
 
@@ -252,6 +254,27 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             logger.Information("Created new chat session {SessionId} for {ResourceType} {ResourceId}",
                 sessionEntity.Id, request.ResourceType, request.ResourceId);
+
+            // Create app version snapshot for WebApp resources on new chat session
+            if (request.ResourceType == ChatResourceType.WebApp)
+            {
+                try
+                {
+                    await appVersionService.CreateSnapshotAsync(
+                        request.ResourceId,
+                        userId,
+                        AppVersionTrigger.NewSession,
+                        aiSessionId: sessionEntity.Id,
+                        aiModel: request.Model
+                    );
+                    logger.Information("Created app version snapshot for session {SessionId}", sessionEntity.Id);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning(ex, "Failed to create app version snapshot for session {SessionId}", sessionEntity.Id);
+                    // Don't throw; versioning is secondary to session creation
+                }
+            }
 
             return new ChatSessionDto
             {
