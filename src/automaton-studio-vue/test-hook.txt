@@ -1,2 +1,0 @@
-# Test file to verify pre-commit hook
-This file will be deleted after testing.
