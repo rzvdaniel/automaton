@@ -45,6 +45,8 @@ const {
   loadSessions,
   createSession,
   activateSession,
+  updateSessionTitle,
+  deleteSession,
 } = useAiChat('WebApp', props.appId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -58,6 +60,11 @@ const currentView = ref<'sessions' | 'chat'>('sessions')
 // Session UI state
 const showSessionDialog = ref(false)
 const newSessionTitle = ref('')
+const showRenameDialog = ref(false)
+const renameSessionId = ref<string | null>(null)
+const renameSessionTitle = ref('')
+const showDeleteConfirmation = ref(false)
+const deleteConfirmationSessionId = ref<string | null>(null)
 const sessionsSearchQuery = ref('')
 const sortedSessions = computed(() => {
   return [...sessions.value].sort((a, b) => {
@@ -125,6 +132,40 @@ async function handleSelectSession(session: ChatSession) {
 // Navigate back to sessions list
 function backToSessions() {
   currentView.value = 'sessions'
+  // Reload sessions list to ensure it's up-to-date
+  loadSessions()
+}
+
+// Open rename dialog for a session
+function openRenameDialog(session: ChatSession) {
+  renameSessionId.value = session.id
+  renameSessionTitle.value = session.title || ''
+  showRenameDialog.value = true
+}
+
+// Handle renaming a session
+async function handleRenameSession() {
+  if (!renameSessionId.value || !renameSessionTitle.value.trim()) return
+
+  await updateSessionTitle(renameSessionId.value, renameSessionTitle.value.trim())
+  renameSessionId.value = null
+  renameSessionTitle.value = ''
+  showRenameDialog.value = false
+}
+
+// Open delete confirmation dialog
+function openDeleteConfirmation(sessionId: string) {
+  deleteConfirmationSessionId.value = sessionId
+  showDeleteConfirmation.value = true
+}
+
+// Confirm delete session
+async function confirmDeleteSession() {
+  if (deleteConfirmationSessionId.value) {
+    await deleteSession(deleteConfirmationSessionId.value)
+    deleteConfirmationSessionId.value = null
+    showDeleteConfirmation.value = false
+  }
 }
 
 // Format session date
@@ -247,7 +288,26 @@ function handleKeyPress(event: KeyboardEvent) {
             <div class="session-card-content">
               <div class="session-card-header">
                 <span class="session-card-title">{{ session.title }}</span>
-                <i v-if="session.id === activeSession?.id" class="pi pi-circle-fill active-indicator"></i>
+                <div class="session-card-actions" @click.stop>
+                  <Button
+                    v-tooltip.top="'Rename'"
+                    icon="pi pi-pencil"
+                    size="small"
+                    text
+                    severity="secondary"
+                    @click="openRenameDialog(session)"
+                    class="session-action-btn"
+                  />
+                  <Button
+                    v-tooltip.top="'Delete'"
+                    icon="pi pi-trash"
+                    size="small"
+                    text
+                    severity="danger"
+                    @click="openDeleteConfirmation(session.id)"
+                    class="session-action-btn"
+                  />
+                </div>
               </div>
               <div class="session-card-footer">
                 <span class="session-card-date">{{ formatSessionDate(session.createdAt) }}</span>
@@ -293,6 +353,15 @@ function handleKeyPress(event: KeyboardEvent) {
             />
             <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
             <span class="font-semibold">{{ activeSession?.title || 'AI Assistant' }}</span>
+            <Button
+              v-if="activeSession"
+              v-tooltip.top="'Rename session'"
+              icon="pi pi-pencil"
+              size="small"
+              text
+              @click="openRenameDialog(activeSession)"
+              class="p-button-text p-button-sm"
+            />
           </div>
           
           <!-- Model Selector -->
@@ -465,6 +534,62 @@ function handleKeyPress(event: KeyboardEvent) {
         </div>
       </div>
     </Dialog>
+
+    <!-- Rename Session Dialog -->
+    <Dialog
+      v-model:visible="showRenameDialog"
+      header="Rename Session"
+      :modal="true"
+      :style="{ width: '300px' }"
+      @update:visible="(val) => !val && (renameSessionTitle = '')"
+    >
+      <div class="flex flex-column gap-3">
+        <label class="text-sm">Session title</label>
+        <InputText
+          v-model="renameSessionTitle"
+          placeholder="Enter new title"
+          autofocus
+          @keyup.enter="handleRenameSession"
+        />
+        <div class="flex gap-2 justify-content-end">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            size="small"
+            @click="showRenameDialog = false"
+          />
+          <Button
+            label="Rename"
+            size="small"
+            @click="handleRenameSession"
+          />
+        </div>
+      </div>
+    </Dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <Dialog
+      v-model:visible="showDeleteConfirmation"
+      header="Delete Session"
+      :modal="true"
+      :style="{ width: '300px' }"
+    >
+      <p>Are you sure you want to delete this session? This action cannot be undone.</p>
+      <template #footer>
+        <Button
+          label="Cancel"
+          severity="secondary"
+          size="small"
+          @click="showDeleteConfirmation = false"
+        />
+        <Button
+          label="Delete"
+          severity="danger"
+          size="small"
+          @click="confirmDeleteSession"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -541,6 +666,22 @@ function handleKeyPress(event: KeyboardEvent) {
   gap: 0.5rem;
 }
 
+.session-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.session-card:hover .session-card-actions {
+  opacity: 1;
+}
+
+.session-action-btn {
+  flex-shrink: 0;
+}
+
 .session-card-title {
   font-size: 0.875rem;
   font-weight: 500;
@@ -549,12 +690,6 @@ function handleKeyPress(event: KeyboardEvent) {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-}
-
-.active-indicator {
-  color: var(--p-primary-500);
-  font-size: 0.5rem;
-  flex-shrink: 0;
 }
 
 .session-card-footer {
