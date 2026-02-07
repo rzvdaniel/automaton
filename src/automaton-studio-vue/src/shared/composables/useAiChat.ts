@@ -261,11 +261,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       await aiChatHistoryService.deleteSession(sessionId)
       sessions.value = sessions.value.filter((s) => s.id !== sessionId)
 
-      // If deleted session was active, create or get another one
+      // If deleted session was active, clear it but don't create a new one
+      // New session will be created lazily when user sends the first message
       if (activeSession.value?.id === sessionId) {
         activeSession.value = null
         messages.value = []
-        await getOrCreateActiveSession()
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete session'

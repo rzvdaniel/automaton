@@ -99,8 +99,17 @@ const suggestions = [
 // Load providers and session on mount, auto-send initial prompt if provided
 onMounted(async () => {
   await loadProviders()
-  await getOrCreateActiveSession()
+  
+  // Load sessions but don't create one automatically
   await loadSessions()
+  
+  // If sessions exist, switch to chat view with the active session
+  if (sessions.value.length > 0 && activeSession.value) {
+    currentView.value = 'chat'
+    // Load messages for the active session
+    await loadSessionMessages(activeSession.value.id)
+  }
+  // Otherwise stay in sessions view (empty state)
 
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
@@ -203,10 +212,13 @@ async function sendMessage() {
   const messageContent = userInput.value.trim()
   userInput.value = ''
 
-  // Switch to chat view if we're in sessions view
-  if (currentView.value === 'sessions') {
-    currentView.value = 'chat'
+  // If no active session, create one first
+  if (!activeSession.value) {
+    await createSession()
   }
+
+  // Switch to chat view once session is ready
+  currentView.value = 'chat'
 
   // Build context with app and runner info
   const context: Record<string, any> = {
