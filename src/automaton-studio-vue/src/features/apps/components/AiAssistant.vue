@@ -10,6 +10,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
+import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { ChatSession } from '@/shared/types/ai.types'
 
 // Props
@@ -212,9 +213,19 @@ async function sendMessage() {
   const messageContent = userInput.value.trim()
   userInput.value = ''
 
-  // If no active session, create one first
-  if (!activeSession.value) {
-    await createSession()
+  // If we're in the sessions list view, always create a new session
+  // If we're in chat view with no active session, also create one
+  if (currentView.value === 'sessions' || !activeSession.value) {
+    let sessionName: string
+    try {
+      // Generate session name from the prompt using AI
+      sessionName = await aiUtilityService.generateSessionName(messageContent)
+    } catch {
+      // Fallback: use first few words from the prompt
+      const words = messageContent.split(/\s+/).slice(0, 5).join(' ')
+      sessionName = words.length > 40 ? words.substring(0, 40) + '...' : words
+    }
+    await createSession(sessionName)
   }
 
   // Switch to chat view once session is ready

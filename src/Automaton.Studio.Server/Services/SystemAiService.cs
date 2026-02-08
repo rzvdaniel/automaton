@@ -52,6 +52,25 @@ public class SystemAiService : ISystemAiService
     }
 
     /// <inheritdoc />
+    public async Task<string> GenerateSessionNameAsync(string prompt, string? userId = null)
+    {
+        var aiPrompt = $"""
+            Generate a concise, descriptive chat session name (3-5 words) based on this prompt.
+            The name should capture the main topic or intent of the conversation.
+            Return ONLY the session name, nothing else. No quotes, no explanation.
+
+            Prompt: {prompt}
+            """;
+
+        var systemPrompt = "You are a helpful assistant that generates concise, descriptive session names for chat conversations. Always respond with just the session name, nothing else.";
+
+        var result = await CompleteAsync(aiPrompt, systemPrompt, userId);
+
+        // Clean up the result - remove quotes, trim whitespace
+        return result.Trim().Trim('"', '\'');
+    }
+
+    /// <inheritdoc />
     public async Task<string> CompleteAsync(string prompt, string? systemPrompt = null, string? userId = null)
     {
         if (!IsAvailable)

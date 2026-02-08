@@ -64,6 +64,42 @@ public class AiUtilityController : BaseController
     }
 
     /// <summary>
+    /// Generate a concise session name from a chat prompt.
+    /// Uses the system AI service with Automaton's API key.
+    /// </summary>
+    [HttpPost("generate-session-name")]
+    public async Task<ActionResult<GenerateSessionNameResponse>> GenerateSessionName(
+        [FromBody] GenerateSessionNameRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Prompt))
+        {
+            return BadRequest("Prompt is required.");
+        }
+
+        if (!_systemAiService.IsAvailable)
+        {
+            return StatusCode(503, "AI service is not available. Please try again later.");
+        }
+
+        try
+        {
+            var userId = GetUserId().ToString();
+            var name = await _systemAiService.GenerateSessionNameAsync(request.Prompt, userId);
+
+            return Ok(new GenerateSessionNameResponse { Name = name });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Rate limit"))
+        {
+            return StatusCode(429, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate session name");
+            return StatusCode(500, "Failed to generate session name. Please try again.");
+        }
+    }
+
+    /// <summary>
     /// Check if the system AI service is available.
     /// Returns provider and model info for UI display.
     /// </summary>
@@ -98,6 +134,28 @@ public class GenerateAppNameResponse
 {
     /// <summary>
     /// The AI-generated app name (2-4 words).
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request to generate a session name from a chat prompt.
+/// </summary>
+public class GenerateSessionNameRequest
+{
+    /// <summary>
+    /// The first message/prompt in the chat session.
+    /// </summary>
+    public string Prompt { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response containing the generated session name.
+/// </summary>
+public class GenerateSessionNameResponse
+{
+    /// <summary>
+    /// The AI-generated session name (3-5 words).
     /// </summary>
     public string Name { get; set; } = string.Empty;
 }

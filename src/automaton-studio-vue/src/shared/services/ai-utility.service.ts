@@ -27,6 +27,21 @@ class AiUtilityService {
   }
 
   /**
+   * Generate a concise session name from a chat prompt.
+   * @param prompt The first message/prompt in the chat session
+   * @returns The AI-generated session name
+   */
+  async generateSessionName(prompt: string): Promise<string> {
+    const response = await apiClient.post<{ name: string }>(
+      '/api/aiutility/generate-session-name',
+      {
+        prompt,
+      },
+    )
+    return response.data.name
+  }
+
+  /**
    * Check if the system AI service is available and get its config.
    * @returns System AI status including provider and model info
    */

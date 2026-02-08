@@ -16,6 +16,14 @@ public interface ISystemAiService
     Task<string> GenerateAppNameAsync(string description, string? userId = null);
 
     /// <summary>
+    /// Generate a concise session name from a chat prompt.
+    /// </summary>
+    /// <param name="prompt">The first message/prompt in the session</param>
+    /// <param name="userId">Optional user ID for rate limiting and tracking</param>
+    /// <returns>A generated session name (3-5 words)</returns>
+    Task<string> GenerateSessionNameAsync(string prompt, string? userId = null);
+
+    /// <summary>
     /// General-purpose AI completion for utility tasks.
     /// </summary>
     /// <param name="prompt">The prompt to send to the AI</param>
