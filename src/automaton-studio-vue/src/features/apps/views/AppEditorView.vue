@@ -944,7 +944,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   gap: 0;
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
-  background-color: var(--p-surface-50);
 }
 
 .right-panel-tab {
@@ -969,9 +968,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 .right-panel-tab.active {
-  background: var(--p-surface-ground);
   border-bottom-color: var(--p-primary-500);
-  color: var(--p-primary-600);
+  color: var(--p-primary-500);
 }
 
 .right-panel-tab i {

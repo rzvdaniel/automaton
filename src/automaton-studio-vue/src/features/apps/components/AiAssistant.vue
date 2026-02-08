@@ -669,19 +669,18 @@ function handleKeyPress(event: KeyboardEvent) {
   border-radius: var(--p-border-radius);
   cursor: pointer;
   transition: all 0.15s ease;
-  background-color: var(--p-surface-0);
   border-left: 3px solid transparent;
 }
 
 .session-card:hover {
-  background-color: var(--p-surface-50);
-  border-color: var(--p-surface-300);
+  border-color: var(--p-primary-300);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .session-card.active {
-  background-color: var(--p-primary-50);
   border-left-color: var(--p-primary-500);
-  border-color: var(--p-primary-200);
+  border-color: var(--p-primary-300);
+  background: var(--p-highlight-background);
 }
 
 .session-card-content {
@@ -952,22 +951,7 @@ function handleKeyPress(event: KeyboardEvent) {
   flex-shrink: 0;
 }
 
-/* Dark mode */
-:global(.app-dark) .session-card {
-  background-color: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .session-card:hover {
-  background-color: var(--p-surface-700);
-  border-color: var(--p-surface-600);
-}
-
-:global(.app-dark) .session-card.active {
-  background-color: var(--p-primary-900);
-  border-color: var(--p-primary-700);
-}
-
+/* Dark mode - removed session-card overrides as we now use CSS variables */
 :global(.app-dark) .ai-header {
   border-color: var(--p-surface-700);
 }
