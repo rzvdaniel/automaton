@@ -354,7 +354,7 @@
             </div>
             <div class="next-steps-buttons">
               <RouterLink to="/runners" class="no-underline">
-                <Button label="View Runners" icon="pi pi-arrow-right" iconPos="right" />
+                <Button label="View Runners" icon="pi pi-arrow-right" icon-pos="right" />
               </RouterLink>
               <RouterLink to="/settings" class="no-underline">
                 <Button label="API Keys" severity="secondary" />

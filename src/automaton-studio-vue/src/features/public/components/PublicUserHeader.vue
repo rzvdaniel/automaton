@@ -66,14 +66,14 @@ const goToSettings = () => {
               size="small"
               outlined
               icon="pi pi-pencil"
-              @click="goToSettings"
               title="Edit profile settings"
+              @click="goToSettings"
             />
             <Button
               size="small"
               icon="pi pi-home"
-              @click="goToDashboard"
               title="Go to dashboard"
+              @click="goToDashboard"
             />
           </div>
         </div>

@@ -753,7 +753,7 @@ const passwordLoading = computed(() => passwordSaving.value)
         <small class="text-color-secondary">Slug is auto-generated. You can update settings later.</small>
       </div>
       <template #footer>
-        <Button label="Cancel" text severity="secondary" @click="showCreateOrgDialog = false" :disabled="creatingOrg" />
+        <Button label="Cancel" text severity="secondary" :disabled="creatingOrg" @click="showCreateOrgDialog = false" />
         <Button label="Create" icon="pi pi-check" :loading="creatingOrg" :disabled="creatingOrg" @click="handleCreateOrganization" />
       </template>
     </Dialog>

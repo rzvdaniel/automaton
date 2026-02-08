@@ -184,14 +184,14 @@ async function handleUnassign(userId: string, userName: string) {
       <DataTable
         v-model:selection="selectedUserIds"
         :value="filteredMembers"
-        dataKey="userId"
+        data-key="userId"
         :paginator="true"
         :rows="5"
-        responsiveLayout="scroll"
-        stripedRows
+        responsive-layout="scroll"
+        striped-rows
         class="members-table"
       >
-        <Column selectionMode="multiple" headerStyle="width: 3rem">
+        <Column selection-mode="multiple" header-style="width: 3rem">
           <template #body="{ data }">
             <Checkbox
               v-model="selectedUserIds"
@@ -227,12 +227,12 @@ async function handleUnassign(userId: string, userName: string) {
           <template #body="{ data }">
             <Button
               v-if="isUserAssigned(data.userId)"
+              v-tooltip="'Unassign'"
               icon="pi pi-times"
               text
               rounded
               severity="danger"
               @click="handleUnassign(data.userId, data.userName)"
-              v-tooltip="'Unassign'"
             />
           </template>
         </Column>

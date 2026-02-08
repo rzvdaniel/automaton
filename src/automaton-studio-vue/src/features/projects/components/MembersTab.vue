@@ -37,8 +37,8 @@
             <Button
               label="Invite"
               icon="pi pi-send"
-              @click="handleInvite"
               :disabled="!inviteForm.email || !inviteForm.role"
+              @click="handleInvite"
             />
           </div>
         </div>
@@ -51,8 +51,8 @@
       :loading="loading"
       paginator
       :rows="10"
-      dataKey="userId"
-      emptyMessage="No members in this project"
+      data-key="userId"
+      empty-message="No members in this project"
     >
       <Column field="userName" header="Name" sortable>
         <template #body="{ data }">
@@ -84,8 +84,8 @@
               :options="roleOptions"
               option-label="label"
               option-value="value"
-              @change="handleUpdateRole(data)"
               class="w-32"
+              @change="handleUpdateRole(data)"
             />
             <Button
               v-if="canManageMembers && !data.isOwner"
@@ -93,8 +93,8 @@
               severity="danger"
               text
               rounded
-              @click="handleRemove(data)"
               aria-label="Remove member"
+              @click="handleRemove(data)"
             />
           </div>
         </template>

@@ -213,7 +213,7 @@ function closeCreateDialog() {
           :loading="store.loading"
           paginator
           :rows="10"
-          responsiveLayout="scroll"
+          responsive-layout="scroll"
           class="p-datatable-sm"
         >
           <Column field="displayName" header="Name" sortable>
@@ -255,29 +255,29 @@ function closeCreateDialog() {
               <div class="flex gap-2">
                 <Button
                   v-if="!slotProps.data.isActive"
+                  v-tooltip.top="'Reactivate Project'"
                   icon="pi pi-check-circle"
                   severity="success"
                   text
                   rounded
-                  v-tooltip.top="'Reactivate Project'"
                   @click="handleReactivateProject(slotProps.data.id, slotProps.data.displayName)"
                 />
                 <Button
                   v-if="slotProps.data.isActive"
+                  v-tooltip.top="'Settings'"
                   icon="pi pi-cog"
                   severity="secondary"
                   text
                   rounded
-                  v-tooltip.top="'Settings'"
                   @click="handleOpenSettings(slotProps.data.id)"
                 />
                 <Button
                   v-if="slotProps.data.isActive"
+                  v-tooltip.top="'Delete Project'"
                   icon="pi pi-trash"
                   severity="danger"
                   text
                   rounded
-                  v-tooltip.top="'Delete Project'"
                   @click="handleDeleteProject(slotProps.data.id, slotProps.data.displayName)"
                 />
               </div>
@@ -359,10 +359,10 @@ function closeCreateDialog() {
             id="project-organization"
             v-model="selectedOrganization"
             :options="userOrganizations"
-            optionLabel="name"
+            option-label="name"
             placeholder="Personal Project (no organization)"
             class="w-full"
-            :showClear="true"
+            :show-clear="true"
           />
           <p class="text-xs text-color-secondary mt-1">
             Leave empty for a personal project, or select an organization to create the project under

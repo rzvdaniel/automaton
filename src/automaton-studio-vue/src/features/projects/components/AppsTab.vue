@@ -22,7 +22,7 @@
               class="w-full"
               filter
               :disabled="availableAppsLoading"
-              emptyMessage="No available apps"
+              empty-message="No available apps"
             >
               <template #option="{ option }">
                 <div class="flex items-center gap-2">
@@ -38,8 +38,8 @@
             <Button
               label="Add App"
               icon="pi pi-plus"
-              @click="handleAddApp"
               :disabled="!selectedApp || availableAppsLoading"
+              @click="handleAddApp"
             />
           </div>
         </div>
@@ -52,8 +52,8 @@
       :loading="loading"
       paginator
       :rows="10"
-      dataKey="appId"
-      emptyMessage="No apps assigned to this project"
+      data-key="appId"
+      empty-message="No apps assigned to this project"
     >
       <Column field="appName" header="App Name" sortable>
         <template #body="{ data }">
@@ -77,8 +77,8 @@
             severity="danger"
             text
             rounded
-            @click="handleRemoveApp(data)"
             aria-label="Remove app"
+            @click="handleRemoveApp(data)"
           />
         </template>
       </Column>

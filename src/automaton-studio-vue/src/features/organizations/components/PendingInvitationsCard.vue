@@ -123,7 +123,7 @@ const formatDate = (dateString: string) => {
         </p>
 
         <div v-if="loading" class="skeleton-container">
-          <div class="skeleton-row" v-for="i in 2" :key="i">
+          <div v-for="i in 2" :key="i" class="skeleton-row">
             <Skeleton width="30%" height="2rem" />
             <Skeleton width="20%" height="2rem" />
             <Skeleton width="25%" height="2rem" />

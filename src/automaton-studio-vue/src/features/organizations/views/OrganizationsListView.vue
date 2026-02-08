@@ -193,9 +193,9 @@ function resetCreateForm() {
       :value="organizations"
       :paginator="true"
       :rows="10"
-      :rowsPerPageOptions="[10, 20, 50]"
-      responsiveLayout="scroll"
-      stripedRows
+      :rows-per-page-options="[10, 20, 50]"
+      responsive-layout="scroll"
+      striped-rows
     >
       <Column field="name" header="Name" sortable>
         <template #body="{ data }">
@@ -243,21 +243,21 @@ function resetCreateForm() {
         <template #body="{ data }">
           <div class="flex gap-2">
             <Button
+              v-tooltip="'View Details'"
               icon="pi pi-eye"
               text
               rounded
               severity="secondary"
               @click="navigateToOrganization(data.id)"
-              v-tooltip="'View Details'"
             />
             <Button
               v-if="data.role === OrganizationRole.OrgAdmin"
+              v-tooltip="'Delete Organization'"
               icon="pi pi-trash"
               text
               rounded
               severity="danger"
               @click="handleDeleteOrganization(data.id, data.name)"
-              v-tooltip="'Delete Organization'"
             />
           </div>
         </template>
@@ -298,15 +298,15 @@ function resetCreateForm() {
           label="Cancel"
           text
           severity="secondary"
-          @click="showCreateDialog = false"
           :disabled="isCreatingOrganization"
+          @click="showCreateDialog = false"
         />
         <Button
           label="Create"
           icon="pi pi-check"
-          @click="handleCreateOrganization"
           :loading="isCreatingOrganization"
           :disabled="isCreatingOrganization"
+          @click="handleCreateOrganization"
         />
       </template>
     </Dialog>

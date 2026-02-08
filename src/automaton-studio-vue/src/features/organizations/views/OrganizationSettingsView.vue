@@ -158,7 +158,7 @@ function navigateBack() {
               <label for="org-slug" class="font-semibold">Slug (Read-only)</label>
               <InputText
                 id="org-slug"
-                :modelValue="organization?.slug"
+                :model-value="organization?.slug"
                 placeholder="Slug is auto-generated"
                 disabled
               />

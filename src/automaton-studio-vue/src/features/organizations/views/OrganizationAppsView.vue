@@ -132,8 +132,8 @@ function navigateBack() {
       :value="apps"
       :paginator="true"
       :rows="10"
-      responsiveLayout="scroll"
-      stripedRows
+      responsive-layout="scroll"
+      striped-rows
     >
       <Column field="name" header="App Name" sortable>
         <template #body="{ data }">

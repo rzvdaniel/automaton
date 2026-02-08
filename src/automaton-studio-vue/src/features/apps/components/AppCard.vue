@@ -262,7 +262,7 @@ const menuItems = computed(() => {
               {{ statusBadge.label }}
             </span>
           </Tag>
-          <Tag v-if="isLinkedToProject" severity="info" v-tooltip.top="'Linked to ' + projectName">
+          <Tag v-if="isLinkedToProject" v-tooltip.top="'Linked to ' + projectName" severity="info">
             <span class="flex align-items-center gap-1">
               <i class="pi pi-users" style="font-size: 0.75rem"></i>
               Project: {{ projectName }}

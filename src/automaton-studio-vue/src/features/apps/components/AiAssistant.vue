@@ -326,8 +326,8 @@ function handleKeyPress(event: KeyboardEvent) {
                     size="small"
                     text
                     severity="secondary"
-                    @click="openRenameDialog(session)"
                     class="session-action-btn"
+                    @click="openRenameDialog(session)"
                   />
                   <Button
                     v-tooltip.top="'Delete'"
@@ -335,8 +335,8 @@ function handleKeyPress(event: KeyboardEvent) {
                     size="small"
                     text
                     severity="danger"
-                    @click="openDeleteConfirmation(session.id)"
                     class="session-action-btn"
+                    @click="openDeleteConfirmation(session.id)"
                   />
                 </div>
               </div>
@@ -390,8 +390,8 @@ function handleKeyPress(event: KeyboardEvent) {
               icon="pi pi-pencil"
               size="small"
               text
-              @click="openRenameDialog(activeSession)"
               class="p-button-text p-button-sm"
+              @click="openRenameDialog(activeSession)"
             />
           </div>
           
@@ -559,8 +559,8 @@ function handleKeyPress(event: KeyboardEvent) {
           <Button
             label="Create"
             size="small"
-            @click="handleCreateSession"
             :loading="isLoadingSessions"
+            @click="handleCreateSession"
           />
         </div>
       </div>

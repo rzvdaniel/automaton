@@ -269,9 +269,9 @@ function cancelEditingRole() {
       :value="members"
       :paginator="true"
       :rows="10"
-      :rowsPerPageOptions="[10, 20, 50]"
-      responsiveLayout="scroll"
-      stripedRows
+      :rows-per-page-options="[10, 20, 50]"
+      responsive-layout="scroll"
+      striped-rows
     >
       <Column field="userName" header="User" sortable>
         <template #body="{ data }">
@@ -286,16 +286,17 @@ function cancelEditingRole() {
         <template #body="{ data }">
           <div v-if="editingMemberId === data.id" class="flex gap-2 align-items-center">
             <Dropdown
-              :modelValue="data.role"
+              :model-value="data.role"
               :options="roleOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               placeholder="Select role"
               :disabled="updatingRole"
-              @update:modelValue="(newRole: string) => handleUpdateRole(data, newRole)"
               autofocus
+              @update:model-value="(newRole: string) => handleUpdateRole(data, newRole)"
             />
             <Button
+              v-tooltip="'Cancel'"
               icon="pi pi-times"
               text
               rounded
@@ -303,7 +304,6 @@ function cancelEditingRole() {
               size="small"
               :disabled="updatingRole"
               @click="cancelEditingRole"
-              v-tooltip="'Cancel'"
             />
           </div>
           <div v-else class="flex gap-2">
@@ -330,23 +330,23 @@ function cancelEditingRole() {
           <div class="flex gap-1">
             <Button
               v-if="canEditRoles && editingMemberId !== data.id"
+              v-tooltip="data.isOwner ? 'Cannot edit owner role' : 'Edit role'"
               icon="pi pi-pencil"
               text
               rounded
               severity="secondary"
               :disabled="data.isOwner || editingMemberId !== null"
               @click="startEditingRole(data.id)"
-              v-tooltip="data.isOwner ? 'Cannot edit owner role' : 'Edit role'"
             />
             <Button
               v-if="canEditRoles && !data.isOwner"
+              v-tooltip="'Remove member'"
               icon="pi pi-trash"
               text
               rounded
               severity="danger"
               :disabled="editingMemberId !== null"
               @click="handleRemoveMember(data.userId, data.userName, data.isOwner)"
-              v-tooltip="'Remove member'"
             />
           </div>
         </template>
@@ -377,8 +377,8 @@ function cancelEditingRole() {
             id="member-role"
             v-model="inviteForm.role"
             :options="roleOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Select role"
           />
           <small class="text-muted">

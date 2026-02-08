@@ -7,8 +7,8 @@
           icon="pi pi-arrow-left"
           text
           rounded
-          @click="$router.push('/projects')"
           aria-label="Back to projects"
+          @click="$router.push('/projects')"
         />
         <h1 class="text-3xl font-bold">{{ projectTitle }}</h1>
       </div>
@@ -26,7 +26,7 @@
 
     <!-- Content -->
     <div v-else-if="project">
-      <TabView v-model:activeIndex="activeTab">
+      <TabView v-model:active-index="activeTab">
         <!-- Members Tab -->
         <TabPanel value="0" header="Members">
           <MembersTab :project-id="projectId" :current-user-role="currentUserRole" />

@@ -40,8 +40,8 @@
             <Button
               label="Add Runner"
               icon="pi pi-plus"
-              @click="handleAddRunner"
               :disabled="!selectedRunner"
+              @click="handleAddRunner"
             />
           </div>
         </div>
@@ -54,8 +54,8 @@
       :loading="loading"
       paginator
       :rows="10"
-      dataKey="runnerId"
-      emptyMessage="No runners assigned to this project"
+      data-key="runnerId"
+      empty-message="No runners assigned to this project"
     >
       <Column field="runnerName" header="Runner Name" sortable>
         <template #body="{ data }">
@@ -79,8 +79,8 @@
             severity="danger"
             text
             rounded
-            @click="handleRemoveRunner(data)"
             aria-label="Remove runner"
+            @click="handleRemoveRunner(data)"
           />
         </template>
       </Column>

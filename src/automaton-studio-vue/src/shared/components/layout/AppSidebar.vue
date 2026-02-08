@@ -96,7 +96,7 @@ const sidebarClass = computed(() => ({
         <div v-if="loading" class="nav-loading">
           <span v-if="isExpanded">Loading menu...</span>
         </div>
-        <div v-else v-for="item in visibleNavItems" :key="item.to" class="nav-item-wrapper">
+        <div v-for="item in visibleNavItems" v-else :key="item.to" class="nav-item-wrapper">
           <Button
             :title="isExpanded ? undefined : item.label"
             :class="['nav-item', { active: isActive(item.to) }]"
@@ -117,7 +117,7 @@ const sidebarClass = computed(() => ({
       <!-- Bottom Navigation -->
       <nav class="sidebar-nav sidebar-nav-bottom">
         <div class="nav-divider"></div>
-        <div v-if="!loading" v-for="item in visibleBottomNavItems" :key="item.to" class="nav-item-wrapper">
+        <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
             :title="isExpanded ? undefined : item.label"
             :class="['nav-item', { active: isActive(item.to) }]"

@@ -18,5 +18,10 @@ public enum ChatResourceType
     /// <summary>
     /// Chat session associated with a Web App
     /// </summary>
-    WebApp = 2
+    WebApp = 2,
+
+    /// <summary>
+    /// Chat session associated with a Flow
+    /// </summary>
+    Flow = 3
 }

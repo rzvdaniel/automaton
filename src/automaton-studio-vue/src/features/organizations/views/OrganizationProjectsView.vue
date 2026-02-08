@@ -240,8 +240,8 @@ const formatDate = (date: string) => {
       :value="projects"
       :paginator="true"
       :rows="10"
-      responsiveLayout="scroll"
-      stripedRows
+      responsive-layout="scroll"
+      striped-rows
     >
       <Column field="displayName" header="Project Name" sortable>
         <template #body="{ data }">
@@ -282,13 +282,13 @@ const formatDate = (date: string) => {
             />
             <Button
               v-if="isOrgAdmin"
+              v-tooltip.top="'Unlink from organization'"
               icon="pi pi-trash"
               severity="danger"
               text
               rounded
-              @click="unlinkProject(data)"
-              v-tooltip.top="'Unlink from organization'"
               aria-label="Unlink project"
+              @click="unlinkProject(data)"
             />
           </div>
         </template>
@@ -313,7 +313,7 @@ const formatDate = (date: string) => {
             id="project-select"
             v-model="selectedProject"
             :options="availableProjects"
-            optionLabel="displayName"
+            option-label="displayName"
             placeholder="Select a project"
             class="w-full"
           >

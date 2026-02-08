@@ -147,9 +147,18 @@ export interface ChatMessage {
 // Chat History (from backend)
 // ============================================
 
+export const ChatResourceType = {
+  General: 'General',
+  CustomStep: 'CustomStep',
+  WebApp: 'WebApp',
+  Flow: 'Flow',
+} as const
+
+export type ChatResourceType = typeof ChatResourceType[keyof typeof ChatResourceType]
+
 export interface ChatSession {
   id: string
-  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  resourceType: ChatResourceType
   resourceId: string
   title: string
   isActive: boolean
@@ -164,7 +173,7 @@ export interface ChatSessionWithMessages extends ChatSession {
 }
 
 export interface CreateChatSessionRequest {
-  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  resourceType: ChatResourceType
   resourceId: string
   title: string
   provider?: string
@@ -183,7 +192,7 @@ export interface SaveChatMessageRequest {
 
 export interface AiChatConfig {
   /** Resource type for context */
-  resourceType: 'CustomStep' | 'WebApp' | 'Flow'
+  resourceType: ChatResourceType
   
   /** Resource ID */
   resourceId: string

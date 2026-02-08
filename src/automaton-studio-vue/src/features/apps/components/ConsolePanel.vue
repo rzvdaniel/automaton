@@ -71,11 +71,11 @@ function clearConsole(): void {
       </div>
       <Button
         v-if="hasEntries"
+        v-tooltip.left="'Clear console'"
         icon="pi pi-trash"
         text
         size="small"
         severity="secondary"
-        v-tooltip.left="'Clear console'"
         @click="clearConsole"
       />
     </div>

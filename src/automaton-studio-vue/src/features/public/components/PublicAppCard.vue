@@ -73,19 +73,19 @@ function toggleSummary(e: Event) {
         <div v-if="isHovering" class="hover-overlay">
           <div class="overlay-content">
             <Button
+              v-tooltip.top="'Open app'"
               icon="pi pi-play"
               rounded
               class="play-button"
               @click.stop="openApp"
-              v-tooltip.top="'Open app'"
             />
             <Button
+              v-tooltip.top="'View details'"
               icon="pi pi-info-circle"
               rounded
               text
               class="info-button"
               @click.stop="showDetails"
-              v-tooltip.top="'View details'"
             />
           </div>
         </div>

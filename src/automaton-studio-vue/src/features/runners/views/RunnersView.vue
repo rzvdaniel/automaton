@@ -254,9 +254,9 @@ watch(
                   <span class="font-semibold text-lg">{{ runner.name }}</span>
                   <Tag
                     v-if="isRunnerLinkedToProject(runner)"
+                    v-tooltip.top="'Linked to a project. Manage under Project settings.'"
                     :value="`Project: ${runner.projectName}`"
                     severity="info"
-                    v-tooltip.top="'Linked to a project. Manage under Project settings.'"
                   />
                 </div>
                 <Tag
@@ -307,9 +307,9 @@ watch(
                 <span class="font-medium">{{ data.name }}</span>
                 <Tag
                   v-if="isRunnerLinkedToProject(data)"
+                  v-tooltip.top="'Linked to a project. Manage under Project settings.'"
                   :value="`Project: ${data.projectName}`"
                   severity="info"
-                  v-tooltip.top="'Linked to a project. Manage under Project settings.'"
                 />
               </div>
             </template>

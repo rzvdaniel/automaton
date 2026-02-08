@@ -546,8 +546,8 @@ async function removeImage() {
                     outlined
                     size="small"
                     :loading="isRemovingImage"
-                    @click="removeImage"
                     class="mt-2"
+                    @click="removeImage"
                   />
                 </div>
 
@@ -559,9 +559,9 @@ async function removeImage() {
                   choose-label="Upload Image"
                   :auto="true"
                   custom-upload
-                  @uploader="(e: any) => handleImageUpload({ files: Array.isArray(e.files) ? e.files : [e.files] })"
                   :disabled="isUploadingImage"
                   class="upload-button"
+                  @uploader="(e: any) => handleImageUpload({ files: Array.isArray(e.files) ? e.files : [e.files] })"
                 />
                 <small class="text-color-secondary block mt-2">
                   Recommended: 500x300px, PNG or JPG (max 2MB)
