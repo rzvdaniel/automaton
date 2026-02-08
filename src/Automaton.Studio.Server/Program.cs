@@ -350,7 +350,12 @@ services.AddScoped(service => configurationService);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 services.AddEndpointsApiExplorer();
-services.AddSwaggerGen();
+services.AddSwaggerGen(options =>
+{
+    // Use fully qualified type names for schema IDs to avoid conflicts
+    // when multiple types have the same class name in different namespaces
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+});
 
 services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly()));
 

@@ -65,6 +65,9 @@ const activeTab = ref<'code' | 'settings' | 'console'>('code')
 // Right panel mode (aiAssistant or versionHistory)
 const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
 
+// Ref to version history component for manual refresh
+const versionHistoryRef = ref<any>(null)
+
 // AI Assistant configuration
 const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
 You can create and modify HTML, CSS, and JavaScript code.
@@ -480,6 +483,13 @@ async function handleDeleteFile(path: string) {
   })
 }
 
+// Handle version created - refresh the history list
+async function handleVersionCreated() {
+  if (versionHistoryRef.value?.loadVersions) {
+    await versionHistoryRef.value.loadVersions()
+  }
+}
+
 // Handle version restored
 async function handleVersionRestored(versionNumber: number) {
   try {
@@ -500,6 +510,13 @@ async function handleVersionRestored(versionNumber: number) {
     })
   }
 }
+
+// Watch for version history tab activation - reload versions when tab becomes visible
+watch(rightPanelMode, async (mode) => {
+  if (mode === 'versionHistory' && versionHistoryRef.value?.loadVersions) {
+    await versionHistoryRef.value.loadVersions()
+  }
+})
 
 // Start editing app name
 function startEditingName() {
@@ -807,10 +824,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 @tool-executed="handleAiToolExecuted"
               />
               <AppVersionHistory
+                ref="versionHistoryRef"
                 v-show="rightPanelMode === 'versionHistory'"
                 :app-id="appId"
                 @version-restored="handleVersionRestored"
-                @version-created="() => {}"
+                @version-created="handleVersionCreated"
               />
             </div>
           </div>

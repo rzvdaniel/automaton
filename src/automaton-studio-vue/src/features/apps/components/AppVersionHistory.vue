@@ -4,7 +4,7 @@
  * Displays app version history and allows restoration from previous versions
  * Shows timeline of snapshots with triggers and summaries
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineExpose } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -39,9 +39,9 @@ const selectedVersion = ref<AppVersionDetail | null>(null)
 const showVersionDetail = ref(false)
 
 /**
- * Load version history
+ * Load version history (exposed for parent component to call)
  */
-async function loadVersions() {
+const loadVersions = async () => {
   if (!props.appId) return
 
   isLoading.value = true
@@ -212,6 +212,11 @@ function formatDate(dateStr: string): string {
 
 onMounted(() => {
   loadVersions()
+})
+
+// Expose loadVersions to parent component for manual refresh
+defineExpose({
+  loadVersions,
 })
 </script>
 
@@ -603,14 +608,16 @@ onMounted(() => {
 }
 
 .file-changes {
-  background: var(--p-surface-100);
-  border: 1px solid var(--p-surface-200);
+  background: var(--p-surface-ground);
+  color: var(--p-text-color);
+  border: 1px solid var(--p-surface-border);
   border-radius: var(--p-border-radius);
   padding: 0.75rem;
   font-size: 0.75rem;
   max-height: 200px;
   overflow: auto;
   margin: 0;
+  font-family: 'Monaco', 'Courier New', monospace;
 }
 
 .step-change-row {

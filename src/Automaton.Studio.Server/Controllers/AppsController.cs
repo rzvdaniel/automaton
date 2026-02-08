@@ -219,7 +219,8 @@ public class AppsController : BaseController
     }
 
     [HttpPost("{id}/upload-background")]
-    public async Task<IActionResult> UploadBackgroundImage(Guid id, [FromForm] IFormFile file)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadBackgroundImage(Guid id, IFormFile file)
     {
         try
         {
