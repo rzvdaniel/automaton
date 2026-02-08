@@ -143,6 +143,24 @@ async function restoreVersion(versionNumber: number) {
 }
 
 /**
+ * Get trigger label for display
+ */
+function getTriggerLabel(trigger: string): string {
+  switch (trigger) {
+    case 'NewSession':
+      return 'AI Chat'
+    case 'ManualSave':
+      return 'Manual'
+    case 'Publish':
+      return 'Publish'
+    case 'Restore':
+      return 'Restore'
+    default:
+      return trigger
+  }
+}
+
+/**
  * Get trigger severity
  */
 function getTriggerSeverity(trigger: string): string {
@@ -226,67 +244,51 @@ onMounted(() => {
 
     <!-- Empty state -->
     <div v-else-if="!versionList || versionList.versions.length === 0" class="empty-state">
-      <i class="pi pi-inbox text-3xl text-color-secondary mb-2"></i>
+      <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
       <p>No versions yet</p>
-      <p class="text-sm text-color-secondary">Versions are created when you start a new AI chat or manually create snapshots</p>
+      <p class="text-sm text-color-secondary mb-3">
+        Versions are created when you start a new AI chat or manually create snapshots
+      </p>
+      <Button
+        label="Create Snapshot"
+        icon="pi pi-camera"
+        size="small"
+        :loading="isCreatingSnapshot"
+        @click="createSnapshot"
+      />
     </div>
 
-    <!-- Version list timeline -->
+    <!-- Version list -->
     <ScrollPanel v-else class="versions-scroll">
-      <div class="versions-timeline">
+      <div class="versions-list">
         <div
-          v-for="(version, index) in versionList.versions"
+          v-for="version in versionList.versions"
           :key="version.id"
-          class="timeline-item"
+          class="version-card"
+          @click="viewVersionDetail(version)"
         >
-          <!-- Timeline marker -->
-          <div class="timeline-marker">
-            <div class="marker-dot"></div>
-            <div v-if="index < versionList.versions.length - 1" class="marker-line"></div>
-          </div>
-
-          <!-- Version card -->
-          <Card class="version-card">
-            <template #header>
-              <div class="card-header">
-                <div class="version-info">
-                  <span class="version-number">v{{ version.versionNumber }}</span>
-                  <Tag
-                    :value="version.trigger"
-                    :severity="getTriggerSeverity(version.trigger)"
-                    :icon="getTriggerIcon(version.trigger)"
-                    size="small"
-                  />
-                </div>
-                <span class="version-date text-sm text-color-secondary">
-                  {{ formatDate(version.createdAt) }}
-                </span>
+          <div class="version-card-content">
+            <!-- Header -->
+            <div class="version-card-header">
+              <div class="version-title-row">
+                <span class="version-number">Version {{ version.versionNumber }}</span>
+                <Tag
+                  :value="getTriggerLabel(version.trigger)"
+                  :severity="getTriggerSeverity(version.trigger)"
+                  :icon="getTriggerIcon(version.trigger)"
+                  size="small"
+                />
               </div>
-            </template>
-
-            <!-- Summary -->
-            <div class="card-content">
-              <p v-if="version.summary" class="summary">{{ version.summary }}</p>
-              <p v-else class="summary empty">No summary available</p>
-
-              <!-- Created by -->
-              <p class="created-by text-xs text-color-secondary mt-2">
-                Created by {{ version.createdBy }}
-              </p>
-            </div>
-
-            <!-- Actions -->
-            <template #footer>
-              <div class="card-actions">
+              <div class="version-card-actions" @click.stop>
                 <Button
-                  label="Details"
+                  v-tooltip.top="'View details'"
                   icon="pi pi-info-circle"
                   size="small"
                   text
                   @click="viewVersionDetail(version)"
                 />
                 <Button
-                  label="Restore"
+                  v-tooltip.top="'Restore this version'"
                   icon="pi pi-refresh"
                   size="small"
                   text
@@ -294,8 +296,30 @@ onMounted(() => {
                   @click="restoreVersion(version.versionNumber)"
                 />
               </div>
-            </template>
-          </Card>
+            </div>
+
+            <!-- Summary -->
+            <div class="version-summary">
+              <p v-if="version.summary" class="summary-text">{{ version.summary }}</p>
+              <p v-else class="summary-text empty">No summary available</p>
+            </div>
+
+            <!-- Footer metadata -->
+            <div class="version-card-footer">
+              <div class="meta-item">
+                <i class="pi pi-calendar text-xs"></i>
+                <span class="text-xs">{{ formatDate(version.createdAt) }}</span>
+              </div>
+              <div class="meta-item">
+                <i class="pi pi-user text-xs"></i>
+                <span class="text-xs">{{ version.createdBy }}</span>
+              </div>
+              <div v-if="version.aiModel" class="meta-item">
+                <i class="pi pi-bolt text-xs"></i>
+                <span class="text-xs">{{ version.aiModel }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </ScrollPanel>
@@ -315,15 +339,48 @@ onMounted(() => {
           <p v-else class="text-color-secondary">No summary available</p>
         </div>
 
+        <!-- Metadata -->
+        <div class="detail-section">
+          <h4>Version Info</h4>
+          <div class="detail-grid">
+            <div class="detail-row">
+              <span class="detail-label">Version:</span>
+              <span class="detail-value">{{ selectedVersion.versionNumber }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Trigger:</span>
+              <Tag
+                :value="getTriggerLabel(selectedVersion.trigger)"
+                :severity="getTriggerSeverity(selectedVersion.trigger)"
+                :icon="getTriggerIcon(selectedVersion.trigger)"
+                size="small"
+              />
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Created:</span>
+              <span class="detail-value">{{ formatDate(selectedVersion.createdAt) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Created By:</span>
+              <span class="detail-value">{{ selectedVersion.createdBy }}</span>
+            </div>
+            <div v-if="selectedVersion.aiModel" class="detail-row">
+              <span class="detail-label">AI Model:</span>
+              <span class="detail-value">{{ selectedVersion.aiModel }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- File changes -->
         <div class="detail-section">
           <h4>File Changes</h4>
           <Message
             v-if="!selectedVersion.filesChangeSummary"
             severity="info"
-            text
-            message="No file change summary available"
-          />
+            :closable="false"
+          >
+            No file change summary available
+          </Message>
           <pre v-else class="file-changes">{{ selectedVersion.filesChangeSummary }}</pre>
         </div>
 
@@ -372,7 +429,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--p-surface-ground);
 }
 
 .panel-header {
@@ -411,104 +467,94 @@ onMounted(() => {
   overflow: auto;
 }
 
-.versions-timeline {
+.versions-list {
   padding: 1rem;
-}
-
-.timeline-item {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.timeline-marker {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  position: relative;
-  width: 24px;
-  flex-shrink: 0;
-}
-
-.marker-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--p-primary-500);
-  border: 2px solid var(--p-surface-ground);
-  position: relative;
-  z-index: 1;
-}
-
-.marker-line {
-  width: 2px;
-  flex: 1;
-  background: linear-gradient(to bottom, var(--p-primary-300), transparent);
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  gap: 0.75rem;
 }
 
 .version-card {
-  flex: 1;
-  background-color: var(--p-surface-50);
+  cursor: pointer;
+  transition: all 0.2s ease;
   border: 1px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+  padding: 0.75rem;
 }
 
-.card-header {
+.version-card:hover {
+  border-color: var(--p-primary-300);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.version-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.version-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0;
-  background-color: transparent;
-  border-bottom: 1px solid var(--p-surface-200);
+  gap: 0.5rem;
 }
 
-.version-info {
+.version-title-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
 }
 
 .version-number {
   font-weight: 600;
+  font-size: 0.9rem;
   color: var(--p-text-color);
 }
 
-.version-date {
-  white-space: nowrap;
-  margin-left: auto;
+.version-card-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.card-content {
-  padding: 0;
+.version-card:hover .version-card-actions {
+  opacity: 1;
 }
 
-.summary {
+.version-summary {
+  padding: 0.25rem 0;
+}
+
+.summary-text {
   font-size: 0.875rem;
   line-height: 1.5;
   margin: 0;
   color: var(--p-text-muted-color);
 }
 
-.summary.empty {
+.summary-text.empty {
   font-style: italic;
+  opacity: 0.7;
 }
 
-.created-by {
-  display: block;
-}
-
-.card-actions {
+.version-card-footer {
   display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  padding: 0;
-  background-color: transparent;
-  border-top: 1px solid var(--p-surface-200);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
 }
 
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--p-text-muted-color);
+}
+
+/* Version detail dialog */
 .version-detail {
   display: flex;
   flex-direction: column;
@@ -530,8 +576,34 @@ onMounted(() => {
   color: var(--p-text-color);
 }
 
+.detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--p-border-radius);
+}
+
+.detail-label {
+  font-weight: 500;
+  min-width: 100px;
+  color: var(--p-text-muted-color);
+  font-size: 0.875rem;
+}
+
+.detail-value {
+  color: var(--p-text-color);
+  font-size: 0.875rem;
+}
+
 .file-changes {
-  background-color: var(--p-surface-100);
+  background: var(--p-surface-100);
   border: 1px solid var(--p-surface-200);
   border-radius: var(--p-border-radius);
   padding: 0.75rem;
@@ -546,7 +618,6 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem;
-  background-color: var(--p-surface-50);
   border-radius: var(--p-border-radius);
   border: 1px solid var(--p-surface-200);
   margin-bottom: 0.5rem;
