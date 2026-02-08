@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * AiAssistant.vue
- * AI Assistant sidebar component for the App Editor
- * Provides chat interface for AI-assisted app development with real backend integration
+ * Generic AI Assistant sidebar component
+ * Provides chat interface for AI-assisted development with real backend integration
+ * Can be used in any context: Apps, Flows, Steps, etc.
  */
 import { ref, onMounted, watch, computed } from 'vue'
 import Button from 'primevue/button'
@@ -14,11 +15,22 @@ import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { ChatSession } from '@/shared/types/ai.types'
 
 // Props
-const props = defineProps<{
-  appId: string
-  runnerId?: string | null
-  initialPrompt?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    resourceType: string
+    resourceId: string
+    runnerId?: string | null
+    initialPrompt?: string
+    systemPrompt?: string
+    suggestions?: string[]
+  }>(),
+  {
+    runnerId: null,
+    initialPrompt: undefined,
+    systemPrompt: undefined,
+    suggestions: () => [],
+  },
+)
 
 // Emits
 const emit = defineEmits<{
@@ -48,7 +60,7 @@ const {
   activateSession,
   updateSessionTitle,
   deleteSession,
-} = useAiChat('WebApp', props.appId, {
+} = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
     emit('toolExecuted', toolName, args, result)
@@ -89,13 +101,8 @@ const filteredSessions = computed(() => {
 // UI state
 const userInput = ref('')
 
-// Quick suggestions
-const suggestions = [
-  'Add a login form',
-  'Create a navigation bar',
-  'Add a contact form',
-  'Create a data table',
-]
+// Quick suggestions - use provided or empty array
+const displaySuggestions = computed(() => props.suggestions || [])
 
 // Load providers and session on mount, auto-send initial prompt if provided
 onMounted(async () => {
@@ -231,19 +238,20 @@ async function sendMessage() {
   // Switch to chat view once session is ready
   currentView.value = 'chat'
 
-  // Build context with app and runner info
+  // Build context with resource info
   const context: Record<string, any> = {
-    appId: props.appId,
+    resourceType: props.resourceType,
+    resourceId: props.resourceId,
   }
   
   if (props.runnerId) {
     context.runnerId = props.runnerId
   }
 
-  // Build system prompt (this could be more sophisticated)
-  const systemPrompt = `You are an AI assistant helping to build a web application. 
-You can create and modify HTML, CSS, and JavaScript code.
-${props.runnerId ? 'The app has a runner attached for backend step execution.' : 'No runner is attached. Backend steps cannot be executed.'}`
+  // Use provided system prompt or a generic default
+  const systemPrompt =
+    props.systemPrompt ||
+    'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
 
   await sendAiMessage(messageContent, systemPrompt, context)
 }
@@ -429,13 +437,13 @@ function handleKeyPress(event: KeyboardEvent) {
         <div v-if="!hasMessages" class="empty-state">
           <i class="pi pi-sparkles text-3xl text-color-secondary mb-2"></i>
           <p class="text-color-secondary text-sm mb-3">
-            Ask me to create or modify your app
+            How can I help you today?
           </p>
 
-          <!-- Quick suggestions -->
-          <div class="suggestions">
+          <!-- Quick suggestions (if provided) -->
+          <div v-if="displaySuggestions.length > 0" class="suggestions">
             <Button
-              v-for="suggestion in suggestions"
+              v-for="suggestion in displaySuggestions"
               :key="suggestion"
               :label="suggestion"
               size="small"

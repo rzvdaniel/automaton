@@ -65,6 +65,18 @@ const activeTab = ref<'code' | 'settings' | 'console'>('code')
 // Right panel mode (aiAssistant or versionHistory)
 const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
 
+// AI Assistant configuration
+const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
+You can create and modify HTML, CSS, and JavaScript code.
+When a runner is attached, you can also execute backend steps for data processing.`
+
+const aiSuggestions = [
+  'Add a login form',
+  'Create a navigation bar',
+  'Add a contact form',
+  'Create a data table',
+]
+
 // Panel sizes (in percentages) - localStorage keys
 const STORAGE_KEY = 'app-editor-panel-sizes'
 const defaultSizes = [15, 60, 25] // 15% tree, 60% editor, 25% AI
@@ -786,9 +798,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             <div class="ai-sidebar">
               <AiAssistant
                 v-show="rightPanelMode === 'aiAssistant'"
-                :app-id="appId"
+                resource-type="WebApp"
+                :resource-id="appId"
                 :runner-id="selectedRunnerId"
                 :initial-prompt="initialPrompt"
+                :system-prompt="aiSystemPrompt"
+                :suggestions="aiSuggestions"
                 @tool-executed="handleAiToolExecuted"
               />
               <AppVersionHistory
