@@ -26,7 +26,8 @@ public class AppVersionService
         Guid userId,
         AppVersionTrigger trigger,
         Guid? aiSessionId = null,
-        string? aiModel = null)
+        string? aiModel = null,
+        string? aiGeneratedSummary = null)
     {
         var app = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -45,8 +46,8 @@ public class AppVersionService
         // Generate file change summary by comparing with previous version
         var filesChangeSummary = await GenerateFilesChangeSummaryAsync(appId, nextVersion);
         
-        // Generate a human-readable summary
-        var summary = await GenerateVersionSummaryAsync(appId, nextVersion, filesChangeSummary);
+        // Use AI-generated summary if provided, otherwise generate from file changes
+        var summary = aiGeneratedSummary ?? await GenerateVersionSummaryAsync(appId, nextVersion, filesChangeSummary);
 
         var appVersion = new AppVersion
         {
@@ -143,11 +144,8 @@ public class AppVersionService
         // Get app owner to determine correct user ID for file operations
         var ownerId = version.WebApp?.WebAppUsers.FirstOrDefault()?.UserId ?? userId;
 
-        // Restore files from version snapshot to current
+        // Restore files from version snapshot to current working directory
         await fileStorageService.RestoreVersionAsync(ownerId, appId, versionNumber);
-
-        // TODO: Optionally create a new version to track the restore action
-        // For now, we just restore the files
 
         logger.Information("Restored app {AppId} to version {VersionNumber}", appId, versionNumber);
     }

@@ -4,6 +4,7 @@ using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -11,12 +12,17 @@ public class AiChatHistoryService : IAiChatHistoryService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly AppVersionService appVersionService;
+    private readonly ISystemAiService systemAiService;
     private readonly Serilog.ILogger logger;
 
-    public AiChatHistoryService(ApplicationDbContext dataContext, AppVersionService appVersionService)
+    public AiChatHistoryService(
+        ApplicationDbContext dataContext, 
+        AppVersionService appVersionService,
+        ISystemAiService systemAiService)
     {
         this.dataContext = dataContext;
         this.appVersionService = appVersionService;
+        this.systemAiService = systemAiService;
         this.logger = Serilog.Log.ForContext<AiChatHistoryService>();
     }
 
@@ -239,11 +245,15 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             // Deactivate other sessions for this resource
             var otherSessions = await dataContext.AiChatSessions
+                .Include(s => s.Messages)
                 .Where(s => s.ResourceType == request.ResourceType &&
                            s.ResourceId == request.ResourceId &&
                            s.Id != sessionEntity.Id &&
                            s.AiChatSessionUsers.Any(su => su.UserId == userId))
                 .ToListAsync();
+
+            // Get the previous active session to summarize it
+            var previousActiveSession = otherSessions.FirstOrDefault(s => s.IsActive);
 
             foreach (var session in otherSessions)
             {
@@ -260,14 +270,61 @@ public class AiChatHistoryService : IAiChatHistoryService
             {
                 try
                 {
-                    await appVersionService.CreateSnapshotAsync(
-                        request.ResourceId,
-                        userId,
-                        AppVersionTrigger.NewSession,
-                        aiSessionId: sessionEntity.Id,
-                        aiModel: request.Model
-                    );
-                    logger.Information("Created app version snapshot for session {SessionId}", sessionEntity.Id);
+                    // Check if this is the first session (skip version creation for initial app generation)
+                    // We check session count, not version count, because versions might not exist yet
+                    var existingSessionCount = await dataContext.AiChatSessions
+                        .CountAsync(s => s.ResourceType == ChatResourceType.WebApp && 
+                                       s.ResourceId == request.ResourceId);
+
+                    logger.Information("App {AppId} has {SessionCount} existing session(s) including the new one", 
+                        request.ResourceId, existingSessionCount);
+
+                    // If this is the first session (count = 1 after creation), skip version creation
+                    if (existingSessionCount <= 1)
+                    {
+                        logger.Information("Skipping version creation for first session of app {AppId}", request.ResourceId);
+                    }
+                    else
+                    {
+                        logger.Information("Creating version snapshot for app {AppId}, previous active session: {HasPreviousSession}", 
+                            request.ResourceId, previousActiveSession != null);
+
+                        // Generate AI summary of the previous session if it exists
+                        string? aiGeneratedSummary = null;
+                        if (previousActiveSession != null && previousActiveSession.Messages.Any())
+                        {
+                            logger.Information("Previous session {SessionId} has {MessageCount} messages, generating AI summary", 
+                                previousActiveSession.Id, previousActiveSession.Messages.Count);
+                            
+                            try
+                            {
+                                var conversationHistory = BuildConversationHistory(previousActiveSession.Messages);
+                                aiGeneratedSummary = await systemAiService.SummarizeSessionAsync(
+                                    conversationHistory, 
+                                    userId.ToString());
+                                logger.Information("Generated AI summary for previous session {SessionId}", previousActiveSession.Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Warning(ex, "Failed to generate AI summary for previous session {SessionId}", previousActiveSession.Id);
+                                // Continue without summary - will fall back to basic file change summary
+                            }
+                        }
+                        else
+                        {
+                            logger.Information("Previous session has no messages, skipping AI summary generation");
+                        }
+
+                        await appVersionService.CreateSnapshotAsync(
+                            request.ResourceId,
+                            userId,
+                            AppVersionTrigger.NewSession,
+                            aiSessionId: sessionEntity.Id,
+                            aiModel: request.Model,
+                            aiGeneratedSummary: aiGeneratedSummary
+                        );
+                        logger.Information("Created app version snapshot for session {SessionId}", sessionEntity.Id);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -560,5 +617,29 @@ public class AiChatHistoryService : IAiChatHistoryService
             logger.Error(ex, "Error clearing messages from session {SessionId}", sessionId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Build a formatted conversation history from chat messages for AI summarization.
+    /// </summary>
+    private string BuildConversationHistory(ICollection<AiChatMessage> messages)
+    {
+        var sb = new StringBuilder();
+        
+        foreach (var message in messages.OrderBy(m => m.CreatedAt))
+        {
+            var role = message.Role switch
+            {
+                "user" => "User",
+                "assistant" => "Assistant",
+                "system" => "System",
+                _ => message.Role
+            };
+            
+            sb.AppendLine($"{role}: {message.Content}");
+            sb.AppendLine();
+        }
+        
+        return sb.ToString();
     }
 }

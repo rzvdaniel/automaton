@@ -36,6 +36,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'codeGenerated', code: string): void
   (e: 'toolExecuted', toolName: string, args: any, result?: any): void
+  (e: 'sessionCreated'): void
 }>()
 
 // AI Chat composable with tool execution callback
@@ -56,6 +57,7 @@ const {
   activeSession,
   isLoadingSessions,
   loadSessions,
+  loadSessionMessages,
   createSession,
   activateSession,
   updateSessionTitle,
@@ -136,6 +138,7 @@ async function handleCreateSession() {
   await createSession(title)
   newSessionTitle.value = ''
   showSessionDialog.value = false
+  emit('sessionCreated')
 }
 
 // Handle switching to a different session
@@ -233,6 +236,7 @@ async function sendMessage() {
       sessionName = words.length > 40 ? words.substring(0, 40) + '...' : words
     }
     await createSession(sessionName)
+    emit('sessionCreated')
   }
 
   // Switch to chat view once session is ready

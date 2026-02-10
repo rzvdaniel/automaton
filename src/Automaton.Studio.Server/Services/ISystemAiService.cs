@@ -24,6 +24,14 @@ public interface ISystemAiService
     Task<string> GenerateSessionNameAsync(string prompt, string? userId = null);
 
     /// <summary>
+    /// Summarize an AI chat session into a structured format with overview and changes list.
+    /// </summary>
+    /// <param name="messages">The chat messages from the session</param>
+    /// <param name="userId">Optional user ID for rate limiting and tracking</param>
+    /// <returns>JSON string with overview and changes array</returns>
+    Task<string> SummarizeSessionAsync(string conversationHistory, string? userId = null);
+
+    /// <summary>
     /// General-purpose AI completion for utility tasks.
     /// </summary>
     /// <param name="prompt">The prompt to send to the AI</param>

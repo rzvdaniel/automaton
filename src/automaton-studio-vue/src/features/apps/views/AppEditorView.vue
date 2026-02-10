@@ -822,6 +822,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 :system-prompt="aiSystemPrompt"
                 :suggestions="aiSuggestions"
                 @tool-executed="handleAiToolExecuted"
+                @session-created="handleVersionCreated"
               />
               <AppVersionHistory
                 ref="versionHistoryRef"

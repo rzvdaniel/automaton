@@ -71,6 +71,53 @@ public class SystemAiService : ISystemAiService
     }
 
     /// <inheritdoc />
+    public async Task<string> SummarizeSessionAsync(string conversationHistory, string? userId = null)
+    {
+        var aiPrompt = $$"""
+            Analyze this AI chat session and summarize what was accomplished.
+            
+            Format your response as valid JSON with this exact structure:
+            {
+              "overview": "1-2 sentence summary of the session",
+              "changes": [
+                "specific change or feature 1",
+                "specific change or feature 2",
+                ...
+              ]
+            }
+
+            Be thorough - include all significant features, fixes, and improvements.
+            For short sessions, 3-5 items is fine. For longer sessions, include as many items as relevant (up to 15-20).
+            Focus on WHAT was built/changed, not on the conversation itself.
+            Return ONLY the JSON, no markdown code blocks, no explanation.
+
+            Conversation:
+            {{conversationHistory}}
+            """;
+
+        var systemPrompt = "You are a technical assistant that summarizes software development sessions. Always respond with valid JSON only, no additional text.";
+
+        var result = await CompleteAsync(aiPrompt, systemPrompt, userId);
+
+        // Clean up potential markdown code blocks
+        result = result.Trim();
+        if (result.StartsWith("```json"))
+        {
+            result = result.Substring(7);
+        }
+        if (result.StartsWith("```"))
+        {
+            result = result.Substring(3);
+        }
+        if (result.EndsWith("```"))
+        {
+            result = result.Substring(0, result.Length - 3);
+        }
+
+        return result.Trim();
+    }
+
+    /// <inheritdoc />
     public async Task<string> CompleteAsync(string prompt, string? systemPrompt = null, string? userId = null)
     {
         if (!IsAvailable)

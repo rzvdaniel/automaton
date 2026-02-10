@@ -4,7 +4,7 @@
  * Displays app version history and allows restoration from previous versions
  * Shows timeline of snapshots with triggers and summaries
  */
-import { ref, onMounted, defineExpose } from 'vue'
+import { ref, onMounted, defineExpose, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -76,6 +76,58 @@ async function viewVersionDetail(version: AppVersion) {
       life: 5000,
     })
   }
+}
+
+/**
+ * Parse summary JSON (if it's JSON format with overview and changes)
+ */
+const parsedSummary = computed(() => {
+  if (!selectedVersion.value?.summary) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(selectedVersion.value.summary)
+    if (parsed.overview && Array.isArray(parsed.changes)) {
+      return parsed as { overview: string; changes: string[] }
+    }
+  } catch {
+    // Not JSON, return null - template will fall back to plain text
+  }
+
+  return null
+})
+
+/**
+ * Parse a summary string (JSON or plain text) for display in version cards
+ */
+function parseSummary(summary: string | undefined): { overview: string; changes: string[] } | null {
+  if (!summary) return null
+
+  try {
+    const parsed = JSON.parse(summary)
+    if (parsed.overview && Array.isArray(parsed.changes)) {
+      return parsed as { overview: string; changes: string[] }
+    }
+  } catch {
+    // Not JSON, return null
+  }
+
+  return null
+}
+
+/**
+ * Get display text for version card (overview only if JSON, otherwise full text)
+ */
+function getCardSummary(summary: string | undefined): string {
+  if (!summary) return 'No summary available'
+  
+  const parsed = parseSummary(summary)
+  if (parsed) {
+    return parsed.overview
+  }
+  
+  return summary
 }
 
 /**
@@ -305,8 +357,7 @@ defineExpose({
 
             <!-- Summary -->
             <div class="version-summary">
-              <p v-if="version.summary" class="summary-text">{{ version.summary }}</p>
-              <p v-else class="summary-text empty">No summary available</p>
+              <p class="summary-text">{{ getCardSummary(version.summary) }}</p>
             </div>
 
             <!-- Footer metadata -->
@@ -340,8 +391,25 @@ defineExpose({
         <!-- Summary -->
         <div class="detail-section">
           <h4>Summary</h4>
-          <p v-if="selectedVersion.summary">{{ selectedVersion.summary }}</p>
-          <p v-else class="text-color-secondary">No summary available</p>
+          
+          <!-- AI-generated structured summary -->
+          <template v-if="parsedSummary">
+            <p class="summary-overview">{{ parsedSummary.overview }}</p>
+            <div v-if="parsedSummary.changes.length > 0" class="summary-changes">
+              <h5>Changes:</h5>
+              <ul class="changes-list">
+                <li v-for="(change, index) in parsedSummary.changes" :key="index">
+                  {{ change }}
+                </li>
+              </ul>
+            </div>
+          </template>
+          
+          <!-- Plain text summary or no summary -->
+          <template v-else>
+            <p v-if="selectedVersion.summary" class="summary-text">{{ selectedVersion.summary }}</p>
+            <p v-else class="text-color-secondary">No summary available</p>
+          </template>
         </div>
 
         <!-- Metadata -->
@@ -537,12 +605,43 @@ defineExpose({
   font-size: 0.875rem;
   line-height: 1.5;
   margin: 0;
-  color: var(--p-text-muted-color);
+  color: var(--p-text-color);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.summary-text.empty {
-  font-style: italic;
-  opacity: 0.7;
+.summary-overview {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+  color: var(--p-text-color);
+}
+
+.summary-changes h5 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--p-text-color);
+}
+
+.changes-list {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.changes-list li {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin-bottom: 0.375rem;
+  color: var(--p-text-color);
+}
+
+.changes-list li:last-child {
+  margin-bottom: 0;
 }
 
 .version-card-footer {
