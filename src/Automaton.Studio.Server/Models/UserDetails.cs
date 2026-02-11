@@ -9,4 +9,9 @@ public class UserDetails
     public string Email { get; set; }
 
     public string? PublicUsername { get; set; }
+
+    /// <summary>
+    /// User's system roles (e.g., "Admin", "SysAdmin", "User")
+    /// </summary>
+    public ICollection<string> Roles { get; set; } = new List<string>();
 }

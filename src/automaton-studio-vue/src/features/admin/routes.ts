@@ -1,0 +1,42 @@
+/**
+ * Admin feature routes
+ * Routes for system administrator management features.
+ * Uses AdminLayout as a wrapper with sidebar sub-navigation.
+ * To add a new admin section, add a child route here and an entry in AdminLayout's navItems.
+ */
+import AdminLayout from './views/AdminLayout.vue'
+import AdminProvidersView from './views/AdminProvidersView.vue'
+import AdminModelsView from './views/AdminModelsView.vue'
+import type { RouteRecordRaw } from 'vue-router'
+
+export const adminRoutes: RouteRecordRaw[] = [
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: {
+      requiresRole: ['Admin', 'SysAdmin'],
+    },
+    children: [
+      {
+        path: '',
+        redirect: '/admin/ai-providers',
+      },
+      {
+        path: 'ai-providers',
+        name: 'admin-providers',
+        component: AdminProvidersView,
+        meta: {
+          title: 'AI Providers',
+        },
+      },
+      {
+        path: 'ai-providers/:providerId/models',
+        name: 'admin-models',
+        component: AdminModelsView,
+        meta: {
+          title: 'AI Models',
+        },
+      },
+    ],
+  },
+]

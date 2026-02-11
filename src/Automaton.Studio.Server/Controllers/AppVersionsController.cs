@@ -76,7 +76,7 @@ public class AppVersionsController : BaseController
                 Summary = version.Summary ?? "Snapshot created",
                 Trigger = version.Trigger.ToString(),
                 CreatedAt = version.CreatedAt,
-                CreatedBy = version.CreatedBy.ToString(),
+                CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
                 AiSessionId = version.AiSessionId,
                 AiModel = version.AiModel
             };
@@ -125,7 +125,7 @@ public class AppVersionsController : BaseController
                     Summary = v.Summary ?? string.Empty,
                     Trigger = v.Trigger.ToString(),
                     CreatedAt = v.CreatedAt,
-                    CreatedBy = v.CreatedBy.ToString(),
+                    CreatedBy = v.CreatedByUser?.Email ?? v.CreatedBy.ToString(),
                     AiSessionId = v.AiSessionId,
                     AiModel = v.AiModel
                 }).ToList()
@@ -169,7 +169,7 @@ public class AppVersionsController : BaseController
                 Summary = version.Summary ?? string.Empty,
                 Trigger = version.Trigger.ToString(),
                 CreatedAt = version.CreatedAt,
-                CreatedBy = version.CreatedBy.ToString(),
+                CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
                 AiSessionId = version.AiSessionId,
                 AiModel = version.AiModel,
                 SnapshotPath = version.SnapshotPath ?? string.Empty,

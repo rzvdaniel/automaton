@@ -825,8 +825,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 @session-created="handleVersionCreated"
               />
               <AppVersionHistory
-                ref="versionHistoryRef"
                 v-show="rightPanelMode === 'versionHistory'"
+                ref="versionHistoryRef"
                 :app-id="appId"
                 @version-restored="handleVersionRestored"
                 @version-created="handleVersionCreated"

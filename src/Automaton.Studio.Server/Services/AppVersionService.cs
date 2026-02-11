@@ -108,6 +108,7 @@ public class AppVersionService
     public async Task<(List<AppVersion> Versions, int TotalCount)> GetVersionsAsync(Guid appId, int pageNumber = 1, int pageSize = 20)
     {
         var query = dataContext.AppVersions
+            .Include(v => v.CreatedByUser)
             .Where(v => v.AppId == appId)
             .OrderByDescending(v => v.VersionNumber);
 
@@ -125,6 +126,7 @@ public class AppVersionService
     {
         var version = await dataContext.AppVersions
             .Include(v => v.Steps)
+            .Include(v => v.CreatedByUser)
             .FirstOrDefaultAsync(v => v.AppId == appId && v.VersionNumber == versionNumber);
 
         return version;

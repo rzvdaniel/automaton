@@ -4,10 +4,12 @@ import { useRouter, useRoute } from 'vue-router'
 import { watch } from 'vue'
 import Button from 'primevue/button'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const router = useRouter()
 const route = useRoute()
 const isExpanded = ref(false)
+const authStore = useAuthStore()
 
 // Load organization roles for access control
 const { isAppUserOnly, loadOrganizations, organizations, loading } = useOrganizationRole()
@@ -39,6 +41,7 @@ const navItems: NavItem[] = [
   { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
   { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
   { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
+  { label: 'Admin', icon: 'pi pi-shield', to: '/admin', hideForAppUser: true },
 ]
 
 const bottomNavItems: NavItem[] = [
@@ -47,15 +50,29 @@ const bottomNavItems: NavItem[] = [
   { label: 'Documentation', icon: 'pi pi-book', to: '/docs' },
 ]
 
+// Admin role check
+const isAdmin = computed(() => {
+  const roles = authStore.user?.roles
+  if (!roles) return false
+  return roles.includes('Admin') || roles.includes('SysAdmin')
+})
+
 // Filter navigation items based on user role
 const hasOrganizations = computed(() => organizations.value && organizations.value.length > 0)
 
 const visibleNavItems = computed(() => {
-  const base = !isAppUserOnly.value
+  let base = !isAppUserOnly.value
     ? navItems.filter(item => item.to !== '/my-apps')
     : navItems.filter(item => !item.hideForAppUser)
   // Progressive disclosure: hide Organizations until user has at least one org
-  return hasOrganizations.value ? base : base.filter(item => item.to !== '/organizations')
+  if (!hasOrganizations.value) {
+    base = base.filter(item => item.to !== '/organizations')
+  }
+  // Show Admin only for Admin/SysAdmin roles
+  if (!isAdmin.value) {
+    base = base.filter(item => item.to !== '/admin')
+  }
+  return base
 })
 
 const visibleBottomNavItems = computed(() => {

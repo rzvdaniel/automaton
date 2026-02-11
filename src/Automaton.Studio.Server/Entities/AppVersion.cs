@@ -17,5 +17,6 @@ public class AppVersion
     public string? FilesChangeSummary { get; set; }
 
     public virtual WebApp WebApp { get; set; }
+    public virtual ApplicationUser? CreatedByUser { get; set; }
     public virtual ICollection<AppVersionStep> Steps { get; set; } = new List<AppVersionStep>();
 }

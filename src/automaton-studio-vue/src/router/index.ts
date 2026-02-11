@@ -14,6 +14,7 @@ import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
 import { installRoutes } from '@/features/install/routes'
 import { publicRoutes } from '@/features/public/routes'
+import { adminRoutes } from '@/features/admin/routes'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,7 @@ const router = createRouter({
     ...organizationsRoutes,
     ...settingsRoutes,
     ...downloadsRoutes,
+    ...adminRoutes,
 
     // Public pages (no auth required, self-contained layout)
     ...publicRoutes,
@@ -48,7 +50,7 @@ const router = createRouter({
   ],
 })
 
-// Navigation guard for authentication
+// Navigation guard for authentication and authorization
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
@@ -75,6 +77,19 @@ router.beforeEach(async (to, _from, next) => {
     // Redirect to dashboard
     next({ path: '/' })
     return
+  }
+
+  // Check role-based access control
+  const requiredRoles = to.meta.requiresRole as string[] | undefined
+  if (requiredRoles && authStore.user) {
+    const userRoles = authStore.user.roles || []
+    const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role))
+
+    if (!hasRequiredRole) {
+      // User doesn't have required role - redirect to dashboard
+      next({ path: '/' })
+      return
+    }
   }
 
   next()

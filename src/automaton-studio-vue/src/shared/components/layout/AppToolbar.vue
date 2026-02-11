@@ -34,6 +34,8 @@ const pageTitle = computed(() => {
     'projects-list': 'Projects',
     'project-settings': 'Project Settings',
     settings: 'Settings',
+    'admin-providers': 'Admin',
+    'admin-models': 'Admin',
   }
   return titleMap[name] || name.charAt(0).toUpperCase() + name.slice(1)
 })

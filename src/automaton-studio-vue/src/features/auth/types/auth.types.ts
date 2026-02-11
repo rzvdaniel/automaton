@@ -37,6 +37,7 @@ export interface User {
   name: string
   email: string
   publicUsername: string
+  roles: string[]
 }
 
 // Auth state

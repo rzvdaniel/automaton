@@ -131,6 +131,27 @@ function getCardSummary(summary: string | undefined): string {
 }
 
 /**
+ * Parse file changes JSON for display
+ */
+const parsedFileChanges = computed(() => {
+  if (!selectedVersion.value?.filesChangeSummary) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(selectedVersion.value.filesChangeSummary)
+    return {
+      totalChanges: parsed.totalChanges || 0,
+      added: (parsed.added || []) as string[],
+      modified: (parsed.modified || []) as string[],
+      deleted: (parsed.deleted || []) as string[],
+    }
+  } catch {
+    return null
+  }
+})
+
+/**
  * Create a manual version snapshot
  */
 async function createSnapshot() {
@@ -454,6 +475,51 @@ defineExpose({
           >
             No file change summary available
           </Message>
+          <div v-else-if="parsedFileChanges" class="file-changes-list">
+            <div class="file-changes-summary">
+              <strong>{{ parsedFileChanges.totalChanges }}</strong> 
+              {{ parsedFileChanges.totalChanges === 1 ? 'file' : 'files' }} changed
+            </div>
+            
+            <div v-if="parsedFileChanges.added.length > 0" class="file-change-group">
+              <div class="file-change-header added">
+                <i class="pi pi-plus-circle"></i>
+                <span>Added ({{ parsedFileChanges.added.length }})</span>
+              </div>
+              <div class="file-list">
+                <div v-for="file in parsedFileChanges.added" :key="file" class="file-item">
+                  <i class="pi pi-file text-xs"></i>
+                  <span>{{ file }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="parsedFileChanges.modified.length > 0" class="file-change-group">
+              <div class="file-change-header modified">
+                <i class="pi pi-pencil"></i>
+                <span>Modified ({{ parsedFileChanges.modified.length }})</span>
+              </div>
+              <div class="file-list">
+                <div v-for="file in parsedFileChanges.modified" :key="file" class="file-item">
+                  <i class="pi pi-file text-xs"></i>
+                  <span>{{ file }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="parsedFileChanges.deleted.length > 0" class="file-change-group">
+              <div class="file-change-header deleted">
+                <i class="pi pi-minus-circle"></i>
+                <span>Deleted ({{ parsedFileChanges.deleted.length }})</span>
+              </div>
+              <div class="file-list">
+                <div v-for="file in parsedFileChanges.deleted" :key="file" class="file-item">
+                  <i class="pi pi-file text-xs"></i>
+                  <span>{{ file }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <pre v-else class="file-changes">{{ selectedVersion.filesChangeSummary }}</pre>
         </div>
 
@@ -717,6 +783,69 @@ defineExpose({
   overflow: auto;
   margin: 0;
   font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.file-changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.file-changes-summary {
+  font-size: 0.875rem;
+  color: var(--p-text-color);
+  padding: 0.5rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+  border-left: 3px solid var(--p-primary-500);
+}
+
+.file-change-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.file-change-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0;
+}
+
+.file-change-header.added {
+  color: var(--p-green-600);
+}
+
+.file-change-header.modified {
+  color: var(--p-blue-600);
+}
+
+.file-change-header.deleted {
+  color: var(--p-red-600);
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 1.5rem;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--p-text-color);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  padding: 0.25rem 0;
+}
+
+.file-item i {
+  color: var(--p-text-muted-color);
 }
 
 .step-change-row {
