@@ -113,14 +113,9 @@ onMounted(async () => {
   // Load sessions but don't create one automatically
   await loadSessions()
   
-  // If sessions exist, switch to chat view with the active session
-  if (sessions.value.length > 0 && activeSession.value) {
-    currentView.value = 'chat'
-    // Load messages for the active session
-    await loadSessionMessages(activeSession.value.id)
-  }
-  // Otherwise stay in sessions view (empty state)
-
+  // Always stay in sessions list view by default
+  // User can click on a session to open it
+  
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
     userInput.value = props.initialPrompt
