@@ -81,6 +81,7 @@ const renameSessionTitle = ref('')
 const showDeleteConfirmation = ref(false)
 const deleteConfirmationSessionId = ref<string | null>(null)
 const sessionsSearchQuery = ref('')
+const isGeneratingSessionName = ref(false) // Track when session name is being generated
 const sortedSessions = computed(() => {
   return [...sessions.value].sort((a, b) => {
     // Active session first, then by creation date descending
@@ -211,7 +212,7 @@ watch(
   { deep: true }
 )
 
-// Send message
+// Send message with optimistic UI
 async function sendMessage() {
   if (!userInput.value.trim() || isGenerating.value) return
 
@@ -221,38 +222,82 @@ async function sendMessage() {
   // If we're in the sessions list view, always create a new session
   // If we're in chat view with no active session, also create one
   if (currentView.value === 'sessions' || !activeSession.value) {
-    let sessionName: string
-    try {
-      // Generate session name from the prompt using AI
-      sessionName = await aiUtilityService.generateSessionName(messageContent)
-    } catch {
-      // Fallback: use first few words from the prompt
-      const words = messageContent.split(/\s+/).slice(0, 5).join(' ')
-      sessionName = words.length > 40 ? words.substring(0, 40) + '...' : words
-    }
-    await createSession(sessionName)
+    // Optimistic UI: Create session immediately with temporary name
+    // This creates the session on the backend with a temporary title
+    const temporaryName = 'Generating...'
+    await createSession(temporaryName)
     emit('sessionCreated')
+    
+    // Switch to chat view immediately (better UX - no waiting in sessions list)
+    currentView.value = 'chat'
+    
+    // Build context for AI message
+    const context: Record<string, any> = {
+      resourceType: props.resourceType,
+      resourceId: props.resourceId,
+    }
+    
+    if (props.runnerId) {
+      context.runnerId = props.runnerId
+    }
+
+    // Use provided system prompt or a generic default
+    const systemPrompt =
+      props.systemPrompt ||
+      'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
+
+    // Send message to AI (ui already shows it in chat)
+    const sendPromise = sendAiMessage(messageContent, systemPrompt, context)
+    
+    // Generate proper session name in parallel (don't await - let it run in background)
+    generateAndUpdateSessionName(messageContent)
+    
+    // Wait for AI response
+    await sendPromise
+  } else {
+    // Already in chat view with active session - just send the message
+    currentView.value = 'chat'
+    
+    // Build context with resource info
+    const context: Record<string, any> = {
+      resourceType: props.resourceType,
+      resourceId: props.resourceId,
+    }
+    
+    if (props.runnerId) {
+      context.runnerId = props.runnerId
+    }
+
+    // Use provided system prompt or a generic default
+    const systemPrompt =
+      props.systemPrompt ||
+      'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
+
+    await sendAiMessage(messageContent, systemPrompt, context)
   }
+}
 
-  // Switch to chat view once session is ready
-  currentView.value = 'chat'
-
-  // Build context with resource info
-  const context: Record<string, any> = {
-    resourceType: props.resourceType,
-    resourceId: props.resourceId,
+// Generate and update session name in the background
+async function generateAndUpdateSessionName(messageContent: string) {
+  if (!activeSession.value) return
+  
+  isGeneratingSessionName.value = true
+  let sessionName: string
+  try {
+    // Generate session name from the prompt using AI
+    sessionName = await aiUtilityService.generateSessionName(messageContent)
+  } catch {
+    // Fallback: use first few words from the prompt
+    const words = messageContent.split(/\s+/).slice(0, 5).join(' ')
+    sessionName = words.length > 40 ? words.substring(0, 40) + '...' : words
+  } finally {
+    isGeneratingSessionName.value = false
   }
   
-  if (props.runnerId) {
-    context.runnerId = props.runnerId
+  // Update session title
+  if (activeSession.value && sessionName !== 'Generating...') {
+    await updateSessionTitle(activeSession.value.id, sessionName)
   }
-
-  // Use provided system prompt or a generic default
-  const systemPrompt =
-    props.systemPrompt ||
-    'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
-
-  await sendAiMessage(messageContent, systemPrompt, context)
 }
 
 function handleSuggestion(suggestion: string) {
@@ -383,8 +428,9 @@ function handleKeyPress(event: KeyboardEvent) {
             />
             <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
             <span class="font-semibold">{{ activeSession?.title || 'AI Assistant' }}</span>
+            <i v-if="isGeneratingSessionName" v-tooltip.top="'Generating session name...'" class="pi pi-spin pi-spinner text-sm text-color-secondary"></i>
             <Button
-              v-if="activeSession"
+              v-if="activeSession && !isGeneratingSessionName"
               v-tooltip.top="'Rename session'"
               icon="pi pi-pencil"
               size="small"
