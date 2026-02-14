@@ -431,6 +431,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("FilesChangeSummary")
                         .HasColumnType("json");
 
@@ -455,6 +458,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("AiSessionId");
 
                     b.HasIndex("AppId");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("AppId", "VersionNumber")
                         .IsUnique();
@@ -1938,6 +1943,12 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("AppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("WebApp");
                 });

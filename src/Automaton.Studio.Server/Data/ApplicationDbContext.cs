@@ -227,11 +227,17 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.AppId);
                 entity.HasIndex(e => new { e.AppId, e.VersionNumber }).IsUnique();
                 entity.HasIndex(e => e.AiSessionId);
+                entity.HasIndex(e => e.CreatedBy);
 
                 entity.HasOne(e => e.WebApp)
                     .WithMany()
                     .HasForeignKey(e => e.AppId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Entities.AppVersionStep>(entity =>

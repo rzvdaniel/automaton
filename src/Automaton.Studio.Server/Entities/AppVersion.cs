@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Automaton.Studio.Server.Entities;
 
@@ -17,6 +18,9 @@ public class AppVersion
     public string? FilesChangeSummary { get; set; }
 
     public virtual WebApp WebApp { get; set; }
+    
+    [ForeignKey(nameof(CreatedBy))]
     public virtual ApplicationUser? CreatedByUser { get; set; }
+    
     public virtual ICollection<AppVersionStep> Steps { get; set; } = new List<AppVersionStep>();
 }
