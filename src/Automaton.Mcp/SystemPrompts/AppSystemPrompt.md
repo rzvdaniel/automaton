@@ -270,7 +270,8 @@ For data, use:
 
 ## FINAL RESPONSE FORMAT:
 
-After completing all tool calls, end with a clean Summary of Changes section:
+After completing all tool calls for an app task, end with a clean Summary of Changes section.
+If the user message is small talk, clarification, or does NOT require app changes or tool calls, respond normally and do NOT include the Summary of Changes.
 
 ## Summary of Changes
 

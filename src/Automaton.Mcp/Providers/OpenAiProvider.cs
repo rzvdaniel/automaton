@@ -1,6 +1,7 @@
 using Automaton.Mcp.Models;
 using Microsoft.Extensions.Logging;
-using OpenAI.Chat;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -38,156 +39,7 @@ public class OpenAiProvider : IAiProvider
     {
         try
         {
-            var client = new ChatClient(model: request.Model, apiKey: request.ApiKey);
-
-            // Build conversation messages
-            var messages = new List<ChatMessage>();
-
-            // Add system prompt if provided
-            if (!string.IsNullOrEmpty(request.SystemPrompt))
-            {
-                messages.Add(ChatMessage.CreateSystemMessage(request.SystemPrompt));
-            }
-
-            // Add conversation history with sliding window to prevent unbounded token growth
-            if (request.ConversationHistory?.Any() == true)
-            {
-                var historyToInclude = request.ConversationHistory;
-
-                // Apply sliding window: keep only last N messages
-                if (request.ConversationHistory.Count > MaxConversationHistoryMessages)
-                {
-                    var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
-                    historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
-
-                    _logger.LogInformation(
-                        "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
-                        request.ConversationHistory.Count,
-                        historyToInclude.Count);
-                }
-
-                foreach (var msg in historyToInclude)
-                {
-                    ChatMessage chatMessage = msg.Role.ToLowerInvariant() switch
-                    {
-                        "user" => ChatMessage.CreateUserMessage(msg.Content),
-                        "assistant" => ChatMessage.CreateAssistantMessage(msg.Content),
-                        _ => ChatMessage.CreateUserMessage(msg.Content)
-                    };
-                    messages.Add(chatMessage);
-                }
-            }
-
-            // Add current user message
-            messages.Add(ChatMessage.CreateUserMessage(request.InitialMessage));
-
-            // Create chat completion options with tools
-            var options = new ChatCompletionOptions();
-            foreach (var tool in tools)
-            {
-                options.Tools.Add(ChatTool.CreateFunctionTool(
-                    functionName: tool.Name,
-                    functionDescription: tool.Description,
-                    functionParameters: BinaryData.FromString(tool.InputSchemaJson)
-                ));
-            }
-
-            // Handle iterative conversation with tool calls
-            bool requiresAction;
-            var responseBuilder = new StringBuilder();
-            var allConversationMessages = new List<ConversationMessage>();
-
-            // Safety limits to prevent infinite loops (from user settings or defaults)
-            var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
-            var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
-            var iterationCount = 0;
-            var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
-
-            do
-            {
-                requiresAction = false;
-
-                // Check iteration limit
-                iterationCount++;
-                if (iterationCount > maxIterations)
-                {
-                    _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
-                    responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
-                    break;
-                }
-
-                // Use streaming for text responses
-                var streamingResult = await StreamResponseAsync(
-                    client, messages, options, request.ConversationId,
-                    responseBuilder, allConversationMessages, cancellationToken);
-
-                requiresAction = streamingResult.RequiresAction;
-
-                if (streamingResult.RequiresAction && streamingResult.ToolCalls.Any())
-                {
-                    // Add the assistant message with tool calls to conversation history
-                    var toolCallsList = CreateToolCallsList(streamingResult.ToolCalls);
-                    var assistantMessage = ChatMessage.CreateAssistantMessage(toolCallsList);
-                    messages.Add(assistantMessage);
-
-                    // Execute each tool call
-                    var shouldStopDueToFailures = false;
-
-                    foreach (var toolCallInfo in streamingResult.ToolCalls)
-                    {
-                        var argsJson = string.IsNullOrEmpty(toolCallInfo.ArgumentsJson) ? "{}" : toolCallInfo.ArgumentsJson;
-
-                        // Emit tool call started event
-                        EmitToolCallStarted(request.ConversationId, toolCallInfo.Id, toolCallInfo.Name, argsJson);
-
-                        // Execute the tool
-                        var toolResult = await executeToolAsync(toolCallInfo.Id, toolCallInfo.Name, argsJson);
-
-                        // Track consecutive failures per tool
-                        var isFailure = toolResult.StartsWith("Tool execution failed:") ||
-                                       toolResult.StartsWith("Error executing tool") ||
-                                       toolResult.Contains("A second operation was started");
-
-                        if (isFailure)
-                        {
-                            consecutiveFailures.TryGetValue(toolCallInfo.Name, out var currentFailures);
-                            consecutiveFailures[toolCallInfo.Name] = currentFailures + 1;
-
-                            if (consecutiveFailures[toolCallInfo.Name] >= maxConsecutiveFailures)
-                            {
-                                _logger.LogWarning(
-                                    "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
-                                    toolCallInfo.Name, consecutiveFailures[toolCallInfo.Name]);
-
-                                toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolCallInfo.Name]} times consecutively. " +
-                                             "Please stop calling this tool and inform the user about the issue.]";
-                                shouldStopDueToFailures = true;
-                            }
-                        }
-                        else
-                        {
-                            // Reset failure count on success
-                            consecutiveFailures[toolCallInfo.Name] = 0;
-                        }
-
-                        // Emit tool execution completed
-                        EmitToolCallCompleted(request.ConversationId, toolCallInfo.Id, toolCallInfo.Name, argsJson, toolResult);
-
-                        // Add tool message to conversation
-                        messages.Add(ChatMessage.CreateToolMessage(toolCallInfo.Id, toolResult));
-                    }
-
-                    // If we hit max failures, stop the loop
-                    if (shouldStopDueToFailures)
-                    {
-                        responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
-                        requiresAction = false; // Force exit from do-while loop
-                    }
-                }
-
-            } while (requiresAction);
-
-            return responseBuilder.ToString().Trim();
+            return await CallResponsesAsync(request, tools, executeToolAsync, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -207,21 +59,6 @@ public class OpenAiProvider : IAiProvider
 
             throw;
         }
-    }
-
-    private List<ChatToolCall> CreateToolCallsList(List<ToolCallInfo> toolCalls)
-    {
-        var toolCallsList = new List<ChatToolCall>();
-        foreach (var tc in toolCalls)
-        {
-            var argsData = string.IsNullOrEmpty(tc.ArgumentsJson) ? "{}" : tc.ArgumentsJson;
-            _logger.LogDebug("Creating tool call: Id={Id}, Name={Name}, Args={Args}", tc.Id, tc.Name, argsData);
-
-            var binaryArgs = BinaryData.FromString(argsData);
-            var toolCall = ChatToolCall.CreateFunctionToolCall(tc.Id, tc.Name, binaryArgs);
-            toolCallsList.Add(toolCall);
-        }
-        return toolCallsList;
     }
 
     private void EmitToolCallStarted(string conversationId, string toolCallId, string toolName, string argsJson)
@@ -290,159 +127,6 @@ public class OpenAiProvider : IAiProvider
         }
     }
 
-    private async Task<StreamingResult> StreamResponseAsync(
-        ChatClient client,
-        List<ChatMessage> messages,
-        ChatCompletionOptions options,
-        string conversationId,
-        StringBuilder responseBuilder,
-        List<ConversationMessage> allConversationMessages,
-        CancellationToken cancellationToken)
-    {
-        var result = new StreamingResult();
-        var currentText = new StringBuilder();
-        var toolCallsById = new Dictionary<int, StreamingToolCallInfo>();
-        ChatFinishReason? finishReason = null;
-
-        // Track when we last emitted an update for throttling
-        var lastEmitTime = DateTime.UtcNow;
-        var emitIntervalMs = 100;
-
-        try
-        {
-            await foreach (var update in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
-            {
-                // Process content updates (streaming text)
-                if (update.ContentUpdate != null && update.ContentUpdate.Count > 0)
-                {
-                    foreach (var contentPart in update.ContentUpdate)
-                    {
-                        if (contentPart != null && !string.IsNullOrEmpty(contentPart.Text))
-                        {
-                            currentText.Append(contentPart.Text);
-
-                            // Throttle updates to avoid overwhelming the UI
-                            var now = DateTime.UtcNow;
-                            if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
-                            {
-                                EmitStreamingTextUpdate(conversationId, currentText.ToString(), isComplete: false);
-                                lastEmitTime = now;
-                            }
-                        }
-                    }
-                }
-
-                // Process tool call updates
-                if (update.ToolCallUpdates != null && update.ToolCallUpdates.Count > 0)
-                {
-                    foreach (var toolCallUpdate in update.ToolCallUpdates)
-                    {
-                        if (toolCallUpdate == null) continue;
-
-                        if (!toolCallsById.TryGetValue(toolCallUpdate.Index, out var toolInfo))
-                        {
-                            toolInfo = new StreamingToolCallInfo
-                            {
-                                Index = toolCallUpdate.Index,
-                                Id = toolCallUpdate.ToolCallId ?? "",
-                                Name = toolCallUpdate.FunctionName ?? "",
-                                ArgumentsBuilder = new StringBuilder()
-                            };
-                            toolCallsById[toolCallUpdate.Index] = toolInfo;
-                        }
-
-                        if (!string.IsNullOrEmpty(toolCallUpdate.ToolCallId))
-                            toolInfo.Id = toolCallUpdate.ToolCallId;
-                        if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
-                            toolInfo.Name = toolCallUpdate.FunctionName;
-
-                        // Safely extract function arguments
-                        if (toolCallUpdate.FunctionArgumentsUpdate != null)
-                        {
-                            try
-                            {
-                                var binaryData = toolCallUpdate.FunctionArgumentsUpdate;
-                                if (binaryData.ToMemory().Length > 0)
-                                {
-                                    var argsUpdate = binaryData.ToString();
-                                    if (!string.IsNullOrEmpty(argsUpdate))
-                                        toolInfo.ArgumentsBuilder.Append(argsUpdate);
-                                }
-                            }
-                            catch (ArgumentNullException)
-                            {
-                                _logger.LogDebug("Skipping tool call arguments update with null bytes");
-                            }
-                        }
-                    }
-                }
-
-                // Capture finish reason
-                if (update.FinishReason.HasValue)
-                {
-                    finishReason = update.FinishReason.Value;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during OpenAI streaming: {Message}", ex.Message);
-            throw;
-        }
-
-        // Handle final state based on finish reason
-        if (finishReason == ChatFinishReason.Stop)
-        {
-            var finalText = currentText.ToString();
-            if (!string.IsNullOrWhiteSpace(finalText))
-            {
-                EmitStreamingTextUpdate(conversationId, finalText, isComplete: true);
-                responseBuilder.AppendLine(finalText);
-                messages.Add(ChatMessage.CreateAssistantMessage(finalText));
-                allConversationMessages.Add(new ConversationMessage("assistant", finalText));
-            }
-            result.RequiresAction = false;
-        }
-        else if (finishReason == ChatFinishReason.ToolCalls)
-        {
-            var thinkingText = currentText.ToString();
-            if (!string.IsNullOrWhiteSpace(thinkingText))
-            {
-                EmitStreamingTextUpdate(conversationId, thinkingText, isComplete: true);
-                allConversationMessages.Add(new ConversationMessage("assistant", thinkingText));
-                _logger.LogInformation("AI reasoning: {Thinking}", thinkingText);
-            }
-
-            foreach (var toolInfo in toolCallsById.Values.OrderBy(t => t.Index))
-            {
-                var argsString = toolInfo.ArgumentsBuilder.ToString();
-                result.ToolCalls.Add(new ToolCallInfo
-                {
-                    Id = toolInfo.Id,
-                    Name = toolInfo.Name,
-                    ArgumentsJson = string.IsNullOrEmpty(argsString) ? "{}" : argsString
-                });
-            }
-            result.RequiresAction = true;
-        }
-        else if (finishReason == ChatFinishReason.Length)
-        {
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = conversationId,
-                Messages = new List<ConversationMessage>
-                {
-                    new ConversationMessage("assistant", "Error: Response truncated due to token limit")
-                },
-                ToolCalls = new List<ToolCall>(),
-                ToolResults = new List<ToolResult>()
-            });
-            throw new InvalidOperationException("Incomplete model output due to token limit");
-        }
-
-        return result;
-    }
-
     private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete)
     {
         try
@@ -479,25 +163,365 @@ public class OpenAiProvider : IAiProvider
         }
     }
 
-    // Helper classes for streaming
-    private class StreamingResult
+    private static readonly HttpClient ResponsesHttpClient = new()
     {
-        public bool RequiresAction { get; set; }
-        public List<ToolCallInfo> ToolCalls { get; } = new();
+        BaseAddress = new Uri("https://api.openai.com/v1/")
+    };
+
+    private async Task<string> CallResponsesAsync(
+        ConversationRequest request,
+        IEnumerable<ProviderTool> tools,
+        Func<string, string, string, Task<string>> executeToolAsync,
+        CancellationToken cancellationToken)
+    {
+        var inputItems = new List<object>();
+
+        if (!string.IsNullOrEmpty(request.SystemPrompt))
+        {
+            inputItems.Add(CreateInputMessage("system", request.SystemPrompt));
+        }
+
+        if (request.ConversationHistory?.Any() == true)
+        {
+            var historyToInclude = request.ConversationHistory;
+
+            if (request.ConversationHistory.Count > MaxConversationHistoryMessages)
+            {
+                var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
+                historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
+
+                _logger.LogInformation(
+                    "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
+                    request.ConversationHistory.Count,
+                    historyToInclude.Count);
+            }
+
+            foreach (var msg in historyToInclude)
+            {
+                var role = msg.Role.ToLowerInvariant() switch
+                {
+                    "assistant" => "assistant",
+                    "user" => "user",
+                    "system" => "system",
+                    _ => "user"
+                };
+
+                inputItems.Add(CreateInputMessage(role, msg.Content));
+            }
+        }
+
+        inputItems.Add(CreateInputMessage("user", request.InitialMessage));
+
+        var toolSchemaDocs = new List<JsonDocument>();
+        var toolDefinitions = tools.Select(tool =>
+        {
+            var schemaDoc = JsonDocument.Parse(tool.InputSchemaJson);
+            toolSchemaDocs.Add(schemaDoc);
+
+            return new Dictionary<string, object?>
+            {
+                ["type"] = "function",
+                ["name"] = tool.Name,
+                ["description"] = tool.Description,
+                ["parameters"] = schemaDoc.RootElement
+            };
+        }).ToList();
+
+        var responseBuilder = new StringBuilder();
+        var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
+        var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
+        var iterationCount = 0;
+        var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            while (true)
+            {
+                iterationCount++;
+                if (iterationCount > maxIterations)
+                {
+                    _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
+                    responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
+                    break;
+                }
+
+                var response = await CreateResponsesAsync(
+                    request.Model,
+                    request.ApiKey,
+                    inputItems,
+                    toolDefinitions,
+                    cancellationToken);
+
+                if (response.ToolCalls.Count == 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(response.OutputText))
+                    {
+                        EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true);
+                        responseBuilder.AppendLine(response.OutputText);
+                    }
+
+                    break;
+                }
+
+                if (!string.IsNullOrWhiteSpace(response.OutputText))
+                {
+                    EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true);
+                }
+
+                var reusableItems = FilterOutputItemsForInput(response.OutputItems);
+                inputItems.AddRange(reusableItems);
+
+                var shouldStopDueToFailures = false;
+                foreach (var toolCall in response.ToolCalls)
+                {
+                    var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
+
+                    EmitToolCallStarted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson);
+
+                    var toolResult = await executeToolAsync(toolCall.Id, toolCall.Name, argsJson);
+
+                    var isFailure = toolResult.StartsWith("Tool execution failed:") ||
+                                    toolResult.StartsWith("Error executing tool") ||
+                                    toolResult.Contains("A second operation was started");
+
+                    if (isFailure)
+                    {
+                        consecutiveFailures.TryGetValue(toolCall.Name, out var currentFailures);
+                        consecutiveFailures[toolCall.Name] = currentFailures + 1;
+
+                        if (consecutiveFailures[toolCall.Name] >= maxConsecutiveFailures)
+                        {
+                            _logger.LogWarning(
+                                "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
+                                toolCall.Name, consecutiveFailures[toolCall.Name]);
+
+                            toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolCall.Name]} times consecutively. " +
+                                          "Please stop calling this tool and inform the user about the issue.]";
+                            shouldStopDueToFailures = true;
+                        }
+                    }
+                    else
+                    {
+                        consecutiveFailures[toolCall.Name] = 0;
+                    }
+
+                    EmitToolCallCompleted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson, toolResult);
+
+                    inputItems.Add(new Dictionary<string, object?>
+                    {
+                        ["type"] = "function_call_output",
+                        ["call_id"] = toolCall.CallId,
+                        ["output"] = toolResult
+                    });
+                }
+
+                if (shouldStopDueToFailures)
+                {
+                    responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            foreach (var doc in toolSchemaDocs)
+            {
+                doc.Dispose();
+            }
+        }
+
+        return responseBuilder.ToString().Trim();
     }
 
-    private class ToolCallInfo
+    private static Dictionary<string, object> CreateInputMessage(string role, string content)
     {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
+        return new Dictionary<string, object>
+        {
+            ["role"] = role,
+            ["content"] = content
+        };
+    }
+
+    private async Task<ResponsesApiResult> CreateResponsesAsync(
+        string model,
+        string apiKey,
+        List<object> input,
+        List<Dictionary<string, object?>> tools,
+        CancellationToken cancellationToken)
+    {
+        var requestBody = new Dictionary<string, object?>
+        {
+            ["model"] = model,
+            ["input"] = input,
+            ["tools"] = tools,
+            ["tool_choice"] = tools.Count > 0 ? "auto" : "none"
+        };
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "responses")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+        };
+
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var responseMessage = await ResponsesHttpClient.SendAsync(requestMessage, cancellationToken);
+        var responseContent = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!responseMessage.IsSuccessStatusCode)
+        {
+            _logger.LogError("OpenAI responses API error: {Status} {Body}", responseMessage.StatusCode, responseContent);
+            throw new InvalidOperationException(
+                $"OpenAI responses API error: {responseMessage.StatusCode}");
+        }
+
+        using var responseDoc = JsonDocument.Parse(responseContent);
+        var root = responseDoc.RootElement;
+
+        var outputItems = new List<JsonElement>();
+        if (root.TryGetProperty("output", out var outputElement) && outputElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in outputElement.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    _logger.LogWarning("Skipping non-object output item with kind {Kind}", item.ValueKind);
+                    continue;
+                }
+
+                outputItems.Add(item.Clone());
+            }
+        }
+
+        var toolCalls = new List<ResponseToolCall>();
+        foreach (var item in outputItems)
+        {
+            if (!item.TryGetProperty("type", out var typeElement))
+            {
+                continue;
+            }
+
+            if (!string.Equals(typeElement.GetString(), "function_call", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
+            var arguments = item.TryGetProperty("arguments", out var argsElement) ? argsElement.GetString() : null;
+            var callId = item.TryGetProperty("call_id", out var callIdElement) ? callIdElement.GetString() : null;
+            var id = item.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
+
+            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(callId) && !string.IsNullOrEmpty(id))
+            {
+                toolCalls.Add(new ResponseToolCall
+                {
+                    Id = id,
+                    CallId = callId,
+                    Name = name,
+                    ArgumentsJson = arguments ?? "{}"
+                });
+            }
+        }
+
+        var outputText = root.TryGetProperty("output_text", out var outputTextElement)
+            ? outputTextElement.GetString()
+            : ExtractOutputText(outputItems);
+
+        return new ResponsesApiResult
+        {
+            OutputText = outputText ?? string.Empty,
+            OutputItems = outputItems,
+            ToolCalls = toolCalls
+        };
+    }
+
+    private static string ExtractOutputText(List<JsonElement> outputItems)
+    {
+        var builder = new StringBuilder();
+
+        foreach (var item in outputItems)
+        {
+            if (!item.TryGetProperty("type", out var typeElement))
+            {
+                continue;
+            }
+
+            if (!string.Equals(typeElement.GetString(), "message", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!item.TryGetProperty("content", out var contentElement) || contentElement.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var contentPart in contentElement.EnumerateArray())
+            {
+                if (!contentPart.TryGetProperty("type", out var contentTypeElement))
+                {
+                    continue;
+                }
+
+                if (!string.Equals(contentTypeElement.GetString(), "output_text", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (contentPart.TryGetProperty("text", out var textElement))
+                {
+                    builder.Append(textElement.GetString());
+                }
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private List<object> FilterOutputItemsForInput(List<JsonElement> outputItems)
+    {
+        var reusable = new List<object>();
+
+        foreach (var item in outputItems)
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                _logger.LogWarning("Skipping non-object output item with kind {Kind}", item.ValueKind);
+                continue;
+            }
+
+            if (!item.TryGetProperty("type", out var typeElement))
+            {
+                _logger.LogWarning("Skipping output item without type field");
+                continue;
+            }
+
+            var type = typeElement.GetString() ?? string.Empty;
+            if (string.Equals(type, "function_call", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(type, "reasoning", StringComparison.OrdinalIgnoreCase))
+            {
+                reusable.Add(item);
+            }
+            else
+            {
+                _logger.LogDebug("Skipping output item type {Type} for input reuse", type);
+            }
+        }
+
+        return reusable;
+    }
+
+    private sealed class ResponsesApiResult
+    {
+        public string OutputText { get; set; } = string.Empty;
+        public List<JsonElement> OutputItems { get; set; } = new();
+        public List<ResponseToolCall> ToolCalls { get; set; } = new();
+    }
+
+    private sealed class ResponseToolCall
+    {
+        public string Id { get; set; } = string.Empty;
+        public string CallId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public string ArgumentsJson { get; set; } = "{}";
-    }
-
-    private class StreamingToolCallInfo
-    {
-        public int Index { get; set; }
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        public StringBuilder ArgumentsBuilder { get; set; } = new();
     }
 }
