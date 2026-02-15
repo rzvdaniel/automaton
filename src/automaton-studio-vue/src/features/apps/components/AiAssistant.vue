@@ -82,14 +82,17 @@ const showDeleteConfirmation = ref(false)
 const deleteConfirmationSessionId = ref<string | null>(null)
 const sessionsSearchQuery = ref('')
 const isGeneratingSessionName = ref(false) // Track when session name is being generated
+const isResumingSession = ref(false)
 const sortedSessions = computed(() => {
   return [...sessions.value].sort((a, b) => {
     // Active session first, then by creation date descending
     if (a.isActive) return -1
     if (b.isActive) return 1
-    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime()
   })
 })
+
+const latestSession = computed(() => sortedSessions.value[0] || null)
 
 // Filter sessions by search query
 const filteredSessions = computed(() => {
@@ -143,6 +146,24 @@ async function handleSelectSession(session: ChatSession) {
     await activateSession(session.id)
   }
   currentView.value = 'chat'
+}
+
+// Resume the last active session (if any)
+async function handleResumeLastSession() {
+  const targetSession = latestSession.value || activeSession.value
+  if (!targetSession) return
+
+  isResumingSession.value = true
+  try {
+    if (targetSession.id !== activeSession.value?.id) {
+      await activateSession(targetSession.id)
+    } else {
+      await loadSessionMessages(targetSession.id)
+    }
+    currentView.value = 'chat'
+  } finally {
+    isResumingSession.value = false
+  }
 }
 
 // Navigate back to sessions list
@@ -330,6 +351,18 @@ function handleKeyPress(event: KeyboardEvent) {
             size="small"
             text
             @click="showSessionDialog = true"
+          />
+        </div>
+        <div class="flex align-items-center gap-2 mt-2">
+          <Button
+            v-if="latestSession"
+            v-tooltip.top="'Resume last session'"
+            icon="pi pi-history"
+            label="Resume last session"
+            size="small"
+            text
+            :loading="isResumingSession"
+            @click="handleResumeLastSession"
           />
         </div>
       </div>

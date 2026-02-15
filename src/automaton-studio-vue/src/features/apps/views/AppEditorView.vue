@@ -44,6 +44,8 @@ const editorStore = useAppEditorStore()
 // Get app ID from route
 const appId = computed(() => route.params.id as string)
 
+const resolvedAppId = computed(() => editorStore.currentApp?.id || appId.value)
+
 // Get initial prompt from query param (from "Generate App" flow)
 const initialPrompt = computed(() => route.query.prompt as string | undefined)
 
@@ -816,7 +818,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               <AiAssistant
                 v-show="rightPanelMode === 'aiAssistant'"
                 resource-type="WebApp"
-                :resource-id="appId"
+                :resource-id="resolvedAppId"
                 :runner-id="selectedRunnerId"
                 :initial-prompt="initialPrompt"
                 :system-prompt="aiSystemPrompt"
@@ -827,7 +829,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               <AppVersionHistory
                 v-show="rightPanelMode === 'versionHistory'"
                 ref="versionHistoryRef"
-                :app-id="appId"
+                :app-id="resolvedAppId"
                 @version-restored="handleVersionRestored"
                 @version-created="handleVersionCreated"
               />
