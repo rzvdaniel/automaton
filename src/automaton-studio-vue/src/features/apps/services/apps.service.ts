@@ -379,7 +379,7 @@ class AppsService {
    */
   async getPreviewHtml(id: string): Promise<string> {
     const app = await this.get(id)
-    const html = app.definition?.htmlContent || this.getDefaultHtml()
+    let html = app.definition?.htmlContent || this.getDefaultHtml()
 
     // Get current auth token and base URL for injection
     const token = localStorage.getItem('automaton_access_token') || ''
@@ -486,9 +486,19 @@ class AppsService {
 </script>`
 
     // Inject base tag for resolving relative paths to app files in preview
-    // This allows CSS/JS files to be loaded from /app-content/{userId}/{appId}/
     const appBaseUrl = `${baseUrl}/app-content/${app.userId}/${id}/`
     const baseTag = `<base href="${appBaseUrl}">`
+
+    // Add cache-busting to CSS and JS references to ensure changes are immediately visible
+    const cacheBuster = Date.now()
+    html = html.replace(
+      /(<link[^>]+href=["'])([^"'?]+\.css)(["'])/gi,
+      `$1$2?v=${cacheBuster}$3`
+    )
+    html = html.replace(
+      /(<script[^>]+src=["'])([^"'?]+\.js)(["'])/gi,
+      `$1$2?v=${cacheBuster}$3`
+    )
 
     // Inject both base tag and script at the start of <head> if exists, otherwise prepend
     if (html.includes('<head>')) {

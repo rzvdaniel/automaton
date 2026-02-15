@@ -1,8 +1,10 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Config;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -30,17 +32,20 @@ public class UserAppsController : ControllerBase
     private readonly AppFileStorageService fileStorageService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
+    private readonly WebAppConfig webAppConfig;
 
     public UserAppsController(
         ApplicationDbContext dbContext,
         AppFileStorageService fileStorageService,
         ILogger<UserAppsController> logger,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IOptions<WebAppConfig> webAppConfig)
     {
         this.dbContext = dbContext;
         this.fileStorageService = fileStorageService;
         this.logger = logger;
         this.environment = environment;
+        this.webAppConfig = webAppConfig.Value;
     }
 
     /// <summary>
@@ -122,7 +127,10 @@ public class UserAppsController : ControllerBase
 
             // Add security headers
             Response.Headers.XContentTypeOptions = "nosniff";
-            Response.Headers.CacheControl = "public, max-age=3600"; // 1 hour cache
+            
+            // Aggressive caching for published apps (we use version-based cache-busting on frontend)
+            // Files are cached based on configured max-age but URL changes when app version changes
+            Response.Headers.CacheControl = $"public, max-age={webAppConfig.CacheMaxAgeSeconds}";
 
             // Return with appropriate content type
             return Content(content, contentType, Encoding.UTF8);

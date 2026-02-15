@@ -121,13 +121,26 @@ async function loadApp() {
 })(window, '${slug.value}', '${baseUrl}');
 <\/script>`
 
+    // Get HTML content
+    let html = data.htmlContent || getDefaultHtml()
+
     // Inject base tag for resolving relative paths to app files
     const appBaseUrl = `${baseUrl}/apps/${slug.value}/`
     const baseTag = `<base href="${appBaseUrl}">`
 
-    // Inject script and base tag into HTML
-    let html = data.htmlContent || getDefaultHtml()
+    // Add cache-busting using app version/updated timestamp for published apps
+    // This ensures files are cached between page loads but refresh when app is republished
+    const cacheBuster = data.version || new Date(data.updated || Date.now()).getTime()
+    html = html.replace(
+      /(<link[^>]+href=["'])([^"'?]+\.css)(["'])/gi,
+      `$1$2?v=${cacheBuster}$3`
+    )
+    html = html.replace(
+      /(<script[^>]+src=["'])([^"'?]+\.js)(["'])/gi,
+      `$1$2?v=${cacheBuster}$3`
+    )
 
+    // Inject script and base tag into HTML
     if (html.includes('<head>')) {
       const headIndex = html.indexOf('<head>') + 6
       html = html.slice(0, headIndex) + baseTag + publishedScript + html.slice(headIndex)

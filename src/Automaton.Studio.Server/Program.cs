@@ -54,6 +54,7 @@ services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSectio
 
 // Register System AI Configuration and Service
 services.Configure<SystemAiConfig>(applicationBuilder.Configuration.GetSection("SystemAi"));
+services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 
@@ -431,8 +432,11 @@ if (Directory.Exists(appFilesPath))
         RequestPath = "/app-content",
         OnPrepareResponse = ctx =>
         {
-            // Cache static app files for 1 hour (CDN will respect this)
-            ctx.Context.Response.Headers.CacheControl = "public, max-age=3600";
+            // Disable caching for preview/draft apps to ensure changes are immediately visible
+            // Published apps use UserAppsController routes with appropriate caching
+            ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers.Pragma = "no-cache";
+            ctx.Context.Response.Headers.Expires = "0";
 
             // Security headers for user-generated content
             ctx.Context.Response.Headers.XContentTypeOptions = "nosniff";
