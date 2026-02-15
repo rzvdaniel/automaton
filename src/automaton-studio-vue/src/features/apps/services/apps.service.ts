@@ -480,13 +480,33 @@ class AppsService {
     getAppSlug: function() { return null; }
   };
 
+  window.addEventListener('error', function(event) {
+    try {
+      var target = event.target || event.srcElement;
+      if (!target) return;
+
+      var url = target.src || target.href;
+      if (!url) return;
+
+      window.parent.postMessage({
+        type: 'previewResourceError',
+        data: {
+          url: url,
+          tagName: (target.tagName || '').toLowerCase()
+        }
+      }, '*');
+    } catch (e) {
+      // Ignore preview error reporting failures
+    }
+  }, true);
+
   console.log('[AutomatonAPI] Ready!');
 
 })(window, '${id}', '${baseUrl}', '${token}');
 </script>`
 
     // Inject base tag for resolving relative paths to app files in preview
-    const appBaseUrl = `${baseUrl}/app-content/${app.userId}/${id}/`
+    const appBaseUrl = `${baseUrl}/app-preview/${app.userId}/${id}/`
     const baseTag = `<base href="${appBaseUrl}">`
 
     // Add cache-busting to CSS and JS references to ensure changes are immediately visible
@@ -611,6 +631,14 @@ class AppsService {
       {}
     )
     return data
+  }
+
+  /**
+   * Upload preview content to the server for HTTP-based preview
+   * POST /api/apps/{id}/preview
+   */
+  async uploadPreviewContent(id: string, html: string, files?: Record<string, string>): Promise<void> {
+    await apiClient.post(`/api/apps/${id}/preview`, { html, files })
   }
 
   /**

@@ -261,6 +261,17 @@ function handlePreviewMessage(event: MessageEvent) {
       source: message.data.source,
     })
   }
+
+  if (event.data?.type === 'previewResourceError') {
+    const url = event.data?.data?.url as string | undefined
+    const tagName = event.data?.data?.tagName as string | undefined
+    if (url) {
+      const label = tagName ? `${tagName.toUpperCase()} ` : ''
+      editorStore.setPreviewWarning(`Missing preview asset: ${label}${url}`)
+    } else {
+      editorStore.setPreviewWarning('Missing preview asset: a referenced file could not be loaded')
+    }
+  }
 }
 
 // Add beforeunload listener, fullscreen class, and message listener

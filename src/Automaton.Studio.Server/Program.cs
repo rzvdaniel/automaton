@@ -291,6 +291,7 @@ services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<AppFileStorageService>();
+services.AddSingleton<AppPreviewStorageService>();
 services.AddScoped<AppVersionService>();
 
 // Register email service implementation based on environment and configuration.

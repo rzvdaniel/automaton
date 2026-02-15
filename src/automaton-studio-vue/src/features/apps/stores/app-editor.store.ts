@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type {
   App,
   FileNode,
@@ -18,6 +19,9 @@ import { getLanguageFromExtension } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
 
 export const useAppEditorStore = defineStore('appEditor', () => {
+  const authStore = useAuthStore()
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+
   // ============================================
   // State
   // ============================================
@@ -39,6 +43,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Preview HTML content
   const previewHtml = ref('')
+
+  // Preview URL for iframe (HTTP-based preview)
+  const previewUrl = ref('')
 
   // Preview mode (desktop, tablet, mobile)
   const previewMode = ref<PreviewMode>('desktop')
@@ -410,13 +417,74 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingPreview.value = true
 
     try {
+      const userId = currentApp.value.userId || authStore.userId
+      if (!userId) {
+        console.warn('Preview user ID is missing; unable to build preview URL')
+        previewUrl.value = ''
+        return
+      }
+
+      // Build preview URL (uses user ID and app ID)
+      // Add cache-busting timestamp to force iframe reload
+      const cacheBuster = Date.now()
+      const nextPreviewUrl = `${apiBaseUrl}/app-preview/${userId}/${currentApp.value.id}/index.html?v=${cacheBuster}`
+
+      // Get preview HTML with automatonApi injected
       previewHtml.value = await appsService.getPreviewHtml(currentApp.value.id)
+
+      const previewFiles = await buildPreviewFiles(currentApp.value.id)
+      
+      // Upload preview content to server for HTTP-based serving
+      await appsService.uploadPreviewContent(currentApp.value.id, previewHtml.value, previewFiles)
+      previewUrl.value = nextPreviewUrl
     } catch (err: unknown) {
       console.error('Failed to refresh preview:', err)
     } finally {
       isLoadingPreview.value = false
     }
   }
+
+  async function buildPreviewFiles(appId: string): Promise<Record<string, string>> {
+    const files: Record<string, string> = {}
+
+    try {
+      const response = await appsService.getFiles(appId)
+      if (response.success && response.files) {
+        const paths = response.files
+          .map((file) => (typeof file === 'string' ? file : file.path))
+          .filter((path): path is string => Boolean(path))
+          .map((path) => path.replace(/\\/g, '/'))
+          .filter((path) => !path.startsWith('versions/'))
+
+        const contents = await Promise.all(
+          paths.map(async (path) => {
+            try {
+              const result = await appsService.readFile(appId, path)
+              return { path, content: result.content ?? '' }
+            } catch {
+              return { path, content: '' }
+            }
+          })
+        )
+
+        for (const entry of contents) {
+          files[entry.path] = entry.content
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('Failed to load preview files:', err)
+    }
+
+    for (const openFile of openFiles.value) {
+      if (openFile.path) {
+        const normalizedPath = openFile.path.replace(/\\/g, '/')
+        files[normalizedPath] = openFile.content
+      }
+    }
+
+    return files
+  }
+
 
   /**
    * Set preview mode
@@ -665,6 +733,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    */
   function openPreviewOverlay(): void {
     showPreviewOverlay.value = true
+    if (!previewUrl.value && currentApp.value) {
+      void refreshPreview()
+    }
   }
 
   /**
@@ -745,6 +816,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     activeFilePath,
     linkedSteps,
     previewHtml,
+    previewUrl,
+    previewWarning,
     previewMode,
     isLoading,
     isSaving,
@@ -773,6 +846,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     deleteFile,
     refreshPreview,
     setPreviewMode,
+    setPreviewWarning,
     publishApp,
     unpublishApp,
     updateAppRunner,

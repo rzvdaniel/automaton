@@ -4,7 +4,7 @@
  * Full-screen preview overlay for the App Editor
  * Provides responsive viewport switching with maximum visibility
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -24,20 +24,8 @@ const previewModes = ref([
 // Current viewport size
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode])
 
-// Update iframe content when preview HTML changes
-watch(
-  () => editorStore.previewHtml,
-  (newHtml) => {
-    if (!iframeRef.value || !newHtml) return
-    updateIframeContent(newHtml)
-  },
-)
-
 // Initial load
 onMounted(() => {
-  if (editorStore.previewHtml && iframeRef.value) {
-    updateIframeContent(editorStore.previewHtml)
-  }
   // Prevent body scroll when overlay is open
   document.body.style.overflow = 'hidden'
 })
@@ -46,18 +34,6 @@ onUnmounted(() => {
   // Restore body scroll
   document.body.style.overflow = ''
 })
-
-// Update iframe content
-function updateIframeContent(html: string) {
-  if (!iframeRef.value) return
-
-  const doc = iframeRef.value.contentDocument
-  if (doc) {
-    doc.open()
-    doc.write(html)
-    doc.close()
-  }
-}
 
 // Handle refresh button
 async function handleRefresh() {
@@ -145,6 +121,10 @@ onUnmounted(() => {
 
       <!-- Preview Content -->
       <div class="preview-overlay-content">
+          <div v-if="editorStore.previewWarning" class="preview-warning">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ editorStore.previewWarning }}</span>
+          </div>
         <div
           class="preview-viewport"
           :class="editorStore.previewMode"
@@ -160,7 +140,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Empty state -->
-          <div v-else-if="!editorStore.previewHtml" class="preview-empty">
+          <div v-else-if="!editorStore.previewUrl" class="preview-empty">
             <i class="pi pi-eye text-4xl text-color-secondary"></i>
             <p class="mt-2 text-color-secondary">No preview available</p>
             <Button
@@ -172,10 +152,12 @@ onUnmounted(() => {
             />
           </div>
 
-          <!-- Iframe -->
+          <!-- Iframe with HTTP-based preview -->
           <iframe
             v-else
             ref="iframeRef"
+            :key="editorStore.previewUrl"
+            :src="editorStore.previewUrl"
             class="preview-iframe"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
             title="App Preview"
@@ -248,6 +230,22 @@ onUnmounted(() => {
   justify-content: center;
   padding: 1.5rem;
   background-color: var(--p-surface-100);
+  flex-direction: column;
+}
+
+.preview-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 720px;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--p-orange-50);
+  color: var(--p-orange-700);
+  border: 1px solid var(--p-orange-200);
+  border-radius: var(--p-border-radius);
+  font-size: 0.85rem;
 }
 
 .preview-viewport {
