@@ -144,6 +144,8 @@ async function handleCreateSession() {
 async function handleSelectSession(session: ChatSession) {
   if (session.id !== activeSession.value?.id) {
     await activateSession(session.id)
+  } else {
+    await loadSessionMessages(session.id)
   }
   currentView.value = 'chat'
 }
