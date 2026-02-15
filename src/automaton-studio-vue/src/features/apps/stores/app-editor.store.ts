@@ -47,6 +47,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Preview URL for iframe (HTTP-based preview)
   const previewUrl = ref('')
 
+  // Preview warning message (missing assets, etc.)
+  const previewWarning = ref<string | null>(null)
+
   // Preview mode (desktop, tablet, mobile)
   const previewMode = ref<PreviewMode>('desktop')
 
@@ -491,6 +494,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    */
   function setPreviewMode(mode: PreviewMode): void {
     previewMode.value = mode
+  }
+
+  /**
+   * Set preview warning message
+   */
+  function setPreviewWarning(message: string | null): void {
+    previewWarning.value = message
   }
 
   /**
