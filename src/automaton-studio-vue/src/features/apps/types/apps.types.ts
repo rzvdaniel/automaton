@@ -36,6 +36,7 @@ export interface AppDefinition {
  */
 export interface App {
   id: string
+  userId?: string // Owner user ID (for file path resolution)
   name: string
   summary: string
   description: string

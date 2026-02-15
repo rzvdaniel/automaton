@@ -121,20 +121,24 @@ async function loadApp() {
 })(window, '${slug.value}', '${baseUrl}');
 <\/script>`
 
-    // Inject script into HTML
+    // Inject base tag for resolving relative paths to app files
+    const appBaseUrl = `${baseUrl}/apps/${slug.value}/`
+    const baseTag = `<base href="${appBaseUrl}">`
+
+    // Inject script and base tag into HTML
     let html = data.htmlContent || getDefaultHtml()
 
     if (html.includes('<head>')) {
       const headIndex = html.indexOf('<head>') + 6
-      html = html.slice(0, headIndex) + publishedScript + html.slice(headIndex)
+      html = html.slice(0, headIndex) + baseTag + publishedScript + html.slice(headIndex)
     } else if (html.includes('<body')) {
       const bodyMatch = html.match(/<body[^>]*>/)
       if (bodyMatch) {
         const bodyIndex = html.indexOf(bodyMatch[0]) + bodyMatch[0].length
-        html = html.slice(0, bodyIndex) + publishedScript + html.slice(bodyIndex)
+        html = html.slice(0, bodyIndex) + baseTag + publishedScript + html.slice(bodyIndex)
       }
     } else {
-      html = publishedScript + html
+      html = baseTag + publishedScript + html
     }
 
     htmlContent.value = html

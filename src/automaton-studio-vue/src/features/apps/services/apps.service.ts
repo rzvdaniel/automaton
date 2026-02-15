@@ -485,19 +485,24 @@ class AppsService {
 })(window, '${id}', '${baseUrl}', '${token}');
 </script>`
 
-    // Inject script at the start of <head> if exists, otherwise prepend
+    // Inject base tag for resolving relative paths to app files in preview
+    // This allows CSS/JS files to be loaded from /app-content/{userId}/{appId}/
+    const appBaseUrl = `${baseUrl}/app-content/${app.userId}/${id}/`
+    const baseTag = `<base href="${appBaseUrl}">`
+
+    // Inject both base tag and script at the start of <head> if exists, otherwise prepend
     if (html.includes('<head>')) {
       const headIndex = html.indexOf('<head>') + 6
-      return html.slice(0, headIndex) + previewScript + html.slice(headIndex)
+      return html.slice(0, headIndex) + baseTag + previewScript + html.slice(headIndex)
     } else if (html.includes('<body')) {
       const bodyMatch = html.match(/<body[^>]*>/)
       if (bodyMatch) {
         const bodyIndex = html.indexOf(bodyMatch[0]) + bodyMatch[0].length
-        return html.slice(0, bodyIndex) + previewScript + html.slice(bodyIndex)
+        return html.slice(0, bodyIndex) + baseTag + previewScript + html.slice(bodyIndex)
       }
     }
 
-    return previewScript + html
+    return baseTag + previewScript + html
   }
 
   /**

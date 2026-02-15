@@ -38,7 +38,8 @@ public class AppsService
     public IEnumerable<Models.AppModel> List(Guid? projectId = null)
     {
         // Use authorization service to get apps filtered by project context
-        var entities = authorizationService.GetAppsQueryByContext(projectId);
+        var entities = authorizationService.GetAppsQueryByContext(projectId)
+            .Include(x => x.WebAppUsers);
         var apps = entities.Select(e => MapToModel(e, null));
 
         return apps;
@@ -501,6 +502,7 @@ public class AppsService
         return new Models.AppModel
         {
             Id = entity.Id,
+            UserId = entity.WebAppUsers?.FirstOrDefault()?.UserId,
             Name = entity.Name,
             Summary = entity.Summary,
             Description = entity.Description,

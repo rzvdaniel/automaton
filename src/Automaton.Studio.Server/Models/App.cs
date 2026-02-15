@@ -3,6 +3,7 @@ namespace Automaton.Studio.Server.Models;
 public class AppModel
 {
     public Guid Id { get; set; }
+    public Guid? UserId { get; set; } // Owner user ID (for file path resolution)
     public string Name { get; set; }
     public string Summary { get; set; }
     public string Description { get; set; }
