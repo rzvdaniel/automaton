@@ -17,7 +17,6 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
-import AiKeysSection from '../components/AiKeysSection.vue'
 // Organizations (CTA from Settings)
 import { organizationsService } from '@/features/organizations/services/organizationsService'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
@@ -357,14 +356,6 @@ const passwordLoading = computed(() => passwordSaving.value)
                 @click="activeSection = 'apikeys'"
               />
               <Button
-                label="AI Keys"
-                icon="pi pi-sparkles"
-                text
-                :class="{ 'surface-hover': activeSection === 'aikeys' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'aikeys'"
-              />
-              <Button
                 label="Organizations"
                 icon="pi pi-building"
                 text
@@ -527,9 +518,6 @@ const passwordLoading = computed(() => passwordSaving.value)
 
         <!-- API Keys Section -->
         <ApiKeysSection v-if="activeSection === 'apikeys'" />
-
-        <!-- AI Keys Section -->
-        <AiKeysSection v-if="activeSection === 'aikeys'" />
 
         <!-- Appearance Section -->
         <Card v-if="activeSection === 'appearance'">

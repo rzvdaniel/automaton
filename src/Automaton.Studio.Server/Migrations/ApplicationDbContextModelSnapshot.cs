@@ -416,9 +416,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("char(36)");
 
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("char(36)");
-
                     b.Property<string>("FilesChangeSummary")
                         .HasColumnType("json");
 
@@ -444,7 +441,7 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("AppId");
 
-                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CreatedBy");
 
                     b.HasIndex("AppId", "VersionNumber")
                         .IsUnique();
@@ -462,9 +459,6 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("int");
 
                     b.Property<Guid>("AppVersionId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid?>("AppVersionId1")
                         .HasColumnType("char(36)");
 
                     b.Property<string>("CodeSnapshot")
@@ -493,8 +487,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AppVersionId");
-
-                    b.HasIndex("AppVersionId1");
 
                     b.HasIndex("StepId");
 
@@ -1309,9 +1301,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("AddedBy")
                         .HasColumnType("char(36)");
 
-                    b.Property<Guid?>("RunnerId1")
-                        .HasColumnType("char(36)");
-
                     b.HasKey("ProjectId", "RunnerId");
 
                     b.HasIndex("AddedBy");
@@ -1319,8 +1308,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("ProjectId");
 
                     b.HasIndex("RunnerId");
-
-                    b.HasIndex("RunnerId1");
 
                     b.ToTable("ProjectRunners");
                 });
@@ -1922,7 +1909,9 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "CreatedByUser")
                         .WithMany()
-                        .HasForeignKey("CreatedByUserId");
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("CreatedByUser");
 
@@ -1932,14 +1921,10 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.AppVersion", "AppVersion")
-                        .WithMany()
+                        .WithMany("Steps")
                         .HasForeignKey("AppVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Automaton.Studio.Server.Entities.AppVersion", null)
-                        .WithMany("Steps")
-                        .HasForeignKey("AppVersionId1");
 
                     b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "Step")
                         .WithMany()
@@ -2287,14 +2272,10 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
 
                     b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
-                        .WithMany()
+                        .WithMany("ProjectRunners")
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Automaton.Studio.Server.Entities.Runner", null)
-                        .WithMany("ProjectRunners")
-                        .HasForeignKey("RunnerId1");
 
                     b.Navigation("AddedByUser");
 
