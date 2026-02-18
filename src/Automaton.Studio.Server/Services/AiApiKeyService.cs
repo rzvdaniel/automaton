@@ -48,14 +48,6 @@ public class AiApiKeyService
 
         dbContext.AiApiKeys.Add(entity);
 
-        // Create personal ownership link
-        var aiApiKeyUser = new AiApiKeyUser
-        {
-            AiApiKeyId = entity.Id,
-            UserId = userId
-        };
-        dbContext.AiApiKeyUsers.Add(aiApiKeyUser);
-
         // If project is specified, add to project
         if (projectId.HasValue)
         {
@@ -71,7 +63,7 @@ public class AiApiKeyService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key created for user {UserId} with provider {ProviderName}", userId, providerName);
+        logger.LogInformation("AI API key created for provider {ProviderName}", providerName);
         return entity;
     }
 
@@ -85,15 +77,9 @@ public class AiApiKeyService
 
     public async Task<AiApiKey?> GetAiApiKeyAsync(Guid id, Guid userId)
     {
-        // Check if user can access this AI API key
-        if (!await authorizationService.CanAccessAiApiKeyAsync(id, userId))
-        {
-            logger.LogWarning("User {UserId} attempted to access AI API key {AiApiKeyId} without permission", userId, id);
-            return null;
-        }
-
-        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
-            .FirstOrDefaultAsync(ak => ak.Id == id);
+        // For system-level keys, just check if the key exists and is active
+        return await dbContext.AiApiKeys
+            .FirstOrDefaultAsync(ak => ak.Id == id && ak.IsActive);
     }
 
     public async Task<string?> GetDecryptedApiKeyAsync(Guid id, Guid userId)
@@ -118,17 +104,21 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get decrypted API key for a specific provider (returns first active key found)
-    /// Used by AI conversation streaming
+    /// Used by AI conversation streaming - now uses system-level keys
     /// </summary>
     public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
     {
-        // Get user's stored keys for this provider
-        var keys = await GetAiApiKeysByProviderAsync(userId, providerName);
-        var firstActiveKey = keys.FirstOrDefault(k => k.IsActive);
+        // Get system-level keys for this provider (active keys only)
+        var keys = await dbContext.AiApiKeys
+            .Where(k => k.ProviderName == providerName && k.IsActive)
+            .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
+            .ToListAsync();
+
+        var firstActiveKey = keys.FirstOrDefault();
 
         if (firstActiveKey == null)
         {
-            logger.LogWarning("No active API key found for user {UserId} and provider {ProviderName}", userId, providerName);
+            logger.LogWarning("No active system-level API key found for provider {ProviderName}", providerName);
             return null;
         }
 
@@ -151,13 +141,6 @@ public class AiApiKeyService
 
     public async Task<bool> UpdateAiApiKeyAsync(Guid id, Guid userId, string? name = null, string? description = null, bool? isActive = null)
     {
-        // Check if user can update this AI API key
-        if (!await authorizationService.CanUpdateAiApiKeyAsync(id, userId))
-        {
-            logger.LogWarning("User {UserId} attempted to update AI API key {AiApiKeyId} without permission", userId, id);
-            return false;
-        }
-
         var aiApiKey = await GetAiApiKeyAsync(id, userId);
         if (aiApiKey == null) return false;
 
@@ -167,34 +150,27 @@ public class AiApiKeyService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {AiApiKeyId} updated for user {UserId}", id, userId);
+        logger.LogInformation("AI API key {AiApiKeyId} updated", id);
         return true;
     }
 
     public async Task<bool> DeleteAiApiKeyAsync(Guid id, Guid userId)
     {
-        // Check if user can delete this AI API key
-        if (!await authorizationService.CanDeleteAiApiKeyAsync(id, userId))
-        {
-            logger.LogWarning("User {UserId} attempted to delete AI API key {AiApiKeyId} without permission", userId, id);
-            return false;
-        }
-
         var aiApiKey = await GetAiApiKeyAsync(id, userId);
         if (aiApiKey == null) return false;
 
         aiApiKey.IsActive = false;
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {AiApiKeyId} deactivated for user {UserId}", id, userId);
+        logger.LogInformation("AI API key {AiApiKeyId} deactivated", id);
         return true;
     }
 
     public async Task<IEnumerable<AiApiKey>> GetAiApiKeysByProviderAsync(Guid userId, string providerName)
     {
-        // Use authorization service query to get accessible AI API keys
-        return await authorizationService.GetAccessibleAiApiKeysQuery(userId)
-            .Where(ak => ak.ProviderName == providerName)
+        // Return system-level keys for this provider
+        return await dbContext.AiApiKeys
+            .Where(ak => ak.ProviderName == providerName && ak.IsActive)
             .OrderByDescending(ak => ak.LastUsedAt ?? ak.CreatedAt)
             .ToListAsync();
     }
@@ -218,13 +194,16 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get available AI providers with their key status (for UI selection)
+    /// Now returns system-level keys only
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false)
     {
         var providers = new List<AiProviderInfo>();
 
-        // Get stored keys
-        var storedKeys = await GetUserAiApiKeysAsync(userId);
+        // Get system-level keys
+        var storedKeys = await dbContext.AiApiKeys
+            .Where(k => k.IsActive)
+            .ToListAsync();
         var groupedKeys = storedKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase);
 
         // Get environment keys (for desktop)

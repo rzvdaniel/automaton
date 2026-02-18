@@ -10,6 +10,9 @@ import type {
   UpdateAiProviderRequest,
   CreateAiModelRequest,
   UpdateAiModelRequest,
+  AiApiKeyAdmin,
+  CreateAiApiKeyRequest,
+  UpdateAiApiKeyRequest,
 } from '../types/admin.types'
 
 class AdminAiProvidersService {
@@ -105,6 +108,45 @@ class AdminAiProvidersService {
    */
   async deleteModel(modelId: string): Promise<void> {
     await apiClient.delete(`/api/admin/ai-models/${modelId}`)
+  }
+
+  /**
+   * Get all API keys for a provider
+   * GET /api/admin/ai-providers/{providerId}/keys
+   */
+  async getProviderKeys(providerId: string): Promise<AiApiKeyAdmin[]> {
+    const { data } = await apiClient.get<AiApiKeyAdmin[]>(
+      `/api/admin/ai-providers/${providerId}/keys`
+    )
+    return data
+  }
+
+  /**
+   * Create a new API key for a provider
+   * POST /api/admin/ai-providers/{providerId}/keys
+   */
+  async createProviderKey(providerId: string, request: CreateAiApiKeyRequest): Promise<AiApiKeyAdmin> {
+    const { data } = await apiClient.post<AiApiKeyAdmin>(
+      `/api/admin/ai-providers/${providerId}/keys`,
+      request
+    )
+    return data
+  }
+
+  /**
+   * Update an existing API key
+   * PUT /api/admin/ai-keys/{keyId}
+   */
+  async updateApiKey(keyId: string, request: UpdateAiApiKeyRequest): Promise<void> {
+    await apiClient.put(`/api/admin/ai-keys/${keyId}`, request)
+  }
+
+  /**
+   * Delete an API key
+   * DELETE /api/admin/ai-keys/{keyId}
+   */
+  async deleteApiKey(keyId: string): Promise<void> {
+    await apiClient.delete(`/api/admin/ai-keys/${keyId}`)
   }
 }
 

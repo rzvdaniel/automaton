@@ -72,21 +72,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKeyUser", b =>
-                {
-                    b.Property<Guid>("AiApiKeyId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("AiApiKeyId", "UserId");
-
-                    b.HasIndex(new[] { "AiApiKeyId" }, "IX_AiApiKeyUser_AiApiKeyId");
-
-                    b.ToTable("AiApiKeyUsers");
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1877,15 +1862,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AiProvider");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKeyUser", b =>
-                {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiApiKey", null)
-                        .WithMany("AiApiKeyUsers")
-                        .HasForeignKey("AiApiKeyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.AiChatSession", "Session")
@@ -2438,8 +2414,6 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
                 {
-                    b.Navigation("AiApiKeyUsers");
-
                     b.Navigation("ProjectAiApiKeys");
                 });
 

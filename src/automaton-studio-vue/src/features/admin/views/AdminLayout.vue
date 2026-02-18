@@ -21,6 +21,12 @@ const navItems: AdminNavItem[] = [
     to: '/admin/ai-providers',
     routePrefix: '/admin/ai-providers',
   },
+  {
+    label: 'API Keys',
+    icon: 'pi pi-key',
+    to: '/admin/ai-keys',
+    routePrefix: '/admin/ai-keys',
+  },
   // Future: add more admin sections here
   // { label: 'Users', icon: 'pi pi-users', to: '/admin/users', routePrefix: '/admin/users' },
 ]

@@ -33,7 +33,6 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
-        public virtual DbSet<AiApiKeyUser> AiApiKeyUsers { get; set; }
         public virtual DbSet<AiProvider> AiProviders { get; set; }
         public virtual DbSet<AiModel> AiModels { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
@@ -344,14 +343,6 @@ namespace Automaton.Studio.Server.Data
 
                 entity.HasIndex(e => e.ProviderName);
                 entity.HasIndex(e => e.LastUsedAt);
-            });
-            
-            modelBuilder.Entity<AiApiKeyUser>(entity =>
-            {
-                entity.HasKey(e => new { e.AiApiKeyId, e.UserId });
-                entity.HasIndex(e => e.AiApiKeyId, "IX_AiApiKeyUser_AiApiKeyId");
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.AiApiKeyId).IsRequired();
             });
 
             modelBuilder.Entity<AiProvider>(entity =>

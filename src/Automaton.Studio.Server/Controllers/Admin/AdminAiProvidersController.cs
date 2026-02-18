@@ -451,6 +451,166 @@ public class AdminAiProvidersController : ControllerBase
     }
 
     #endregion
+
+    #region API Keys
+
+    /// <summary>
+    /// Get all API keys for a provider
+    /// </summary>
+    [HttpGet("{providerId}/keys")]
+    public async Task<ActionResult<IEnumerable<AiApiKeyAdminResponse>>> GetProviderKeys(Guid providerId)
+    {
+        var provider = await dbContext.AiProviders.FindAsync(providerId);
+        if (provider == null)
+            return NotFound("Provider not found");
+
+        var keys = await dbContext.AiApiKeys
+            .Where(k => k.AiProviderId == providerId)
+            .OrderByDescending(k => k.CreatedAt)
+            .Select(k => new AiApiKeyAdminResponse
+            {
+                Id = k.Id,
+                Name = k.Name,
+                ProviderName = k.ProviderName,
+                Description = k.Description,
+                CreatedAt = k.CreatedAt,
+                LastUsedAt = k.LastUsedAt,
+                IsActive = k.IsActive
+            })
+            .ToListAsync();
+
+        return Ok(keys);
+    }
+
+    /// <summary>
+    /// Create a new API key for a provider
+    /// </summary>
+    [HttpPost("{providerId}/keys")]
+    public async Task<ActionResult<AiApiKeyAdminResponse>> CreateProviderKey(Guid providerId, [FromBody] AdminCreateAiApiKeyRequest request)
+    {
+        var provider = await dbContext.AiProviders.FindAsync(providerId);
+        if (provider == null)
+            return NotFound("Provider not found");
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Name is required");
+
+        if (string.IsNullOrWhiteSpace(request.ApiKey))
+            return BadRequest("API key is required");
+
+        // Encrypt the API key for storage
+        var encryptedApiKey = EncryptApiKey(request.ApiKey);
+
+        var entity = new AiApiKey
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name,
+            ProviderName = provider.Name,
+            AiProviderId = providerId,
+            EncryptedApiKey = encryptedApiKey,
+            CreatedAt = DateTime.UtcNow,
+            Description = request.Description,
+            IsActive = true
+        };
+
+        dbContext.AiApiKeys.Add(entity);
+        await dbContext.SaveChangesAsync();
+
+        logger.LogInformation("AI API key {KeyName} created for provider {ProviderName} by admin", entity.Name, provider.Name);
+
+        return CreatedAtAction(nameof(GetProviderKeys), new { providerId }, new AiApiKeyAdminResponse
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            ProviderName = entity.ProviderName,
+            Description = entity.Description,
+            CreatedAt = entity.CreatedAt,
+            LastUsedAt = entity.LastUsedAt,
+            IsActive = entity.IsActive
+        });
+    }
+
+    /// <summary>
+    /// Update an existing API key
+    /// </summary>
+    [HttpPut("~/api/admin/ai-keys/{id}")]
+    public async Task<IActionResult> UpdateApiKey(Guid id, [FromBody] AdminUpdateAiApiKeyRequest request)
+    {
+        var key = await dbContext.AiApiKeys.FindAsync(id);
+
+        if (key == null)
+            return NotFound();
+
+        if (request.Name != null) key.Name = request.Name;
+        if (request.Description != null) key.Description = request.Description;
+        if (request.IsActive.HasValue) key.IsActive = request.IsActive.Value;
+
+        // If new API key is provided, update it
+        if (!string.IsNullOrWhiteSpace(request.ApiKey))
+        {
+            key.EncryptedApiKey = EncryptApiKey(request.ApiKey);
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        logger.LogInformation("AI API key {KeyId} updated by admin", id);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Delete an API key
+    /// </summary>
+    [HttpDelete("~/api/admin/ai-keys/{id}")]
+    public async Task<IActionResult> DeleteApiKey(Guid id)
+    {
+        var key = await dbContext.AiApiKeys.FindAsync(id);
+
+        if (key == null)
+            return NotFound();
+
+        dbContext.AiApiKeys.Remove(key);
+        await dbContext.SaveChangesAsync();
+
+        logger.LogInformation("AI API key {KeyId} deleted by admin", id);
+
+        return NoContent();
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private string EncryptApiKey(string apiKey)
+    {
+        // Simple encryption - same method as in AiApiKeyService
+        var encryptionKey = GetEncryptionKey();
+        var keyBytes = System.Text.Encoding.UTF8.GetBytes(apiKey);
+        
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.Key = encryptionKey;
+        aes.GenerateIV();
+
+        using var encryptor = aes.CreateEncryptor();
+        var encrypted = encryptor.TransformFinalBlock(keyBytes, 0, keyBytes.Length);
+        
+        // Combine IV and encrypted data
+        var result = new byte[aes.IV.Length + encrypted.Length];
+        Array.Copy(aes.IV, 0, result, 0, aes.IV.Length);
+        Array.Copy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+        
+        return Convert.ToBase64String(result);
+    }
+
+    private byte[] GetEncryptionKey()
+    {
+        // Get encryption key from configuration
+        var keyString = Environment.GetEnvironmentVariable("AI_API_ENCRYPTION_KEY") ?? "default-encryption-key-for-development-only-change-in-production";
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyString));
+    }
+
+    #endregion
 }
 
 #region DTOs
@@ -553,6 +713,32 @@ public class AdminUpdateAiModelRequest
     public decimal? CostPer1kTokensInput { get; set; }
     public decimal? CostPer1kTokensOutput { get; set; }
     public int? SortOrder { get; set; }
+}
+
+public class AiApiKeyAdminResponse
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string ProviderName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastUsedAt { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class AdminCreateAiApiKeyRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
+    public string? Description { get; set; }
+}
+
+public class AdminUpdateAiApiKeyRequest
+{
+    public string? Name { get; set; }
+    public string? ApiKey { get; set; }
+    public string? Description { get; set; }
+    public bool? IsActive { get; set; }
 }
 
 #endregion

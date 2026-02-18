@@ -45,7 +45,6 @@ public class AiApiKey
     [MaxLength(500)]
     public string? Description { get; set; }
 
-    // Navigation properties for many-to-many relationship with users and projects
-    public virtual ICollection<AiApiKeyUser> AiApiKeyUsers { get; set; } = new List<AiApiKeyUser>();
+    // Navigation property for FK relationship
     public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
 }

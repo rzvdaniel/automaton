@@ -669,11 +669,11 @@ public class ProjectResourceService
         }
 
         var aiApiKey = await dbContext.AiApiKeys
-            .FirstOrDefaultAsync(a => a.Id == aiApiKeyId && a.AiApiKeyUsers.Any(u => u.UserId == UserId), cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == aiApiKeyId && a.IsActive, cancellationToken);
 
         if (aiApiKey == null)
         {
-            throw new InvalidOperationException("AI API key not found or access denied");
+            throw new InvalidOperationException("AI API key not found");
         }
 
         var existingLink = await dbContext.ProjectAiApiKeys

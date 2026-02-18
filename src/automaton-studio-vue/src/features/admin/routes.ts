@@ -7,6 +7,7 @@
 import AdminLayout from './views/AdminLayout.vue'
 import AdminProvidersView from './views/AdminProvidersView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
+import AdminAiKeysView from './views/AdminAiKeysView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -35,6 +36,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminModelsView,
         meta: {
           title: 'AI Models',
+        },
+      },
+      {
+        path: 'ai-keys',
+        name: 'admin-ai-keys',
+        component: AdminAiKeysView,
+        meta: {
+          title: 'API Keys',
         },
       },
     ],
