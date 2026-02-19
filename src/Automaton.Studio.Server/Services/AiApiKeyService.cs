@@ -244,14 +244,32 @@ public class AiApiKeyService
                     IsActive = k.IsActive
                 }).ToList(),
                 SupportedModels = dbProvider.Models
-                    .OrderBy(m => m.SortOrder)
+                    .OrderByDescending(m => m.IsDefault)
+                    .ThenBy(m => m.SortOrder)
                     .Select(m => m.ModelId)
                     .ToList()
             });
         }
 
-        // Return all providers - UI will show all but disable ones without keys
-        return providers;
+        // Only return providers that have keys configured (stored or environment)
+        return providers
+            .Where(p => p.HasStoredKeys || p.HasEnvironmentKey)
+            .ToList();
+    }
+
+    public async Task<string?> GetFirstProviderWithActiveKeyAsync()
+    {
+        return await dbContext.AiProviders
+            .Where(p => p.IsActive)
+            .Where(p => dbContext.AiApiKeys.Any(k => k.IsActive && k.ProviderName == p.Name))
+            .OrderBy(p => p.SortOrder)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync();
+    }
+
+    public bool HasAnyActiveKeys()
+    {
+        return dbContext.AiApiKeys.Any(k => k.IsActive);
     }
 
     private string EncryptApiKey(string apiKey)

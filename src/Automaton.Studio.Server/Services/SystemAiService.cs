@@ -1,8 +1,6 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Providers;
 using Automaton.Mcp.Models;
-using Automaton.Studio.Server.Config;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -13,25 +11,28 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class SystemAiService : ISystemAiService
 {
-    private readonly SystemAiConfig _config;
     private readonly IAiProviderRegistry _providerRegistry;
     private readonly ISystemAiRateLimitService _rateLimitService;
+    private readonly AiApiKeyService _aiApiKeyService;
+    private readonly AiProviderMetadataService _providerMetadataService;
     private readonly ILogger<SystemAiService> _logger;
 
     public SystemAiService(
-        IOptions<SystemAiConfig> config,
         IAiProviderRegistry providerRegistry,
         ISystemAiRateLimitService rateLimitService,
+        AiApiKeyService aiApiKeyService,
+        AiProviderMetadataService providerMetadataService,
         ILogger<SystemAiService> logger)
     {
-        _config = config.Value;
         _providerRegistry = providerRegistry;
         _rateLimitService = rateLimitService;
+        _aiApiKeyService = aiApiKeyService;
+        _providerMetadataService = providerMetadataService;
         _logger = logger;
     }
 
     /// <inheritdoc />
-    public bool IsAvailable => _config.Enabled && !string.IsNullOrEmpty(_config.ApiKey);
+    public bool IsAvailable => _aiApiKeyService.HasAnyActiveKeys();
 
     /// <inheritdoc />
     public async Task<string> GenerateAppNameAsync(string description, string? userId = null)
@@ -122,7 +123,7 @@ public class SystemAiService : ISystemAiService
     {
         if (!IsAvailable)
         {
-            throw new InvalidOperationException("System AI service is not configured or disabled.");
+            throw new InvalidOperationException("No active AI provider with API keys is configured.");
         }
 
         // Check rate limit using shared service
@@ -134,24 +135,27 @@ public class SystemAiService : ISystemAiService
             }
         }
 
+        var resolvedUserId = TryParseUserId(userId);
+        var (providerName, model, apiKey) = await ResolveProviderAsync(resolvedUserId);
+
         // Get the provider
-        var provider = _providerRegistry.GetProvider(_config.DefaultProvider);
+        var provider = _providerRegistry.GetProvider(providerName);
         if (provider == null)
         {
-            throw new InvalidOperationException($"AI provider '{_config.DefaultProvider}' is not available.");
+            throw new InvalidOperationException($"AI provider '{providerName}' is not available.");
         }
 
         try
         {
             _logger.LogInformation(
                 "System AI request: Provider={Provider}, Model={Model}, UserId={UserId}",
-                _config.DefaultProvider, _config.DefaultModel, userId ?? "anonymous");
+                providerName, model, userId ?? "anonymous");
 
             var request = new ConversationRequest
             {
-                Provider = _config.DefaultProvider,
-                Model = _config.DefaultModel,
-                ApiKey = _config.ApiKey,
+                Provider = providerName,
+                Model = model,
+                ApiKey = apiKey,
                 InitialMessage = prompt,
                 SystemPrompt = systemPrompt ?? string.Empty,
                 MaxIterations = 1, // No tool calls for simple completion
@@ -179,5 +183,39 @@ public class SystemAiService : ISystemAiService
             _logger.LogError(ex, "System AI request failed: UserId={UserId}", userId ?? "anonymous");
             throw;
         }
+    }
+
+    private async Task<(string Provider, string Model, string ApiKey)> ResolveProviderAsync(Guid? userId)
+    {
+        var providerName = await _aiApiKeyService.GetFirstProviderWithActiveKeyAsync();
+        if (string.IsNullOrWhiteSpace(providerName))
+        {
+            throw new InvalidOperationException("No active AI provider with API keys is configured.");
+        }
+
+        var model = await _providerMetadataService.GetPreferredModelAsync(providerName);
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            throw new InvalidOperationException($"No active AI models configured for provider '{providerName}'.");
+        }
+
+        var resolvedUserId = userId ?? Guid.Empty;
+        var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(resolvedUserId, providerName);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException($"No active API key found for provider '{providerName}'.");
+        }
+
+        return (providerName, model, apiKey);
+    }
+
+    private static Guid? TryParseUserId(string? userId)
+    {
+        if (Guid.TryParse(userId, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
     }
 }

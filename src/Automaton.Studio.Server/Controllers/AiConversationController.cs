@@ -29,8 +29,8 @@ public class AiConversationController : BaseController
     private readonly AiApiKeyService _aiApiKeyService;
     private readonly IAiChatHistoryService _chatHistoryService;
     private readonly AiProvidersConfig _aiProvidersConfig;
-    private readonly SystemAiConfig _systemAiConfig;
     private readonly ISystemAiRateLimitService _rateLimitService;
+    private readonly AiProviderMetadataService _providerMetadataService;
     private readonly StepMcpToolProvider _stepToolProvider;
     private readonly AppMcpToolProvider _appToolProvider;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
@@ -42,8 +42,8 @@ public class AiConversationController : BaseController
         AiApiKeyService aiApiKeyService,
         IAiChatHistoryService chatHistoryService,
         IOptions<AiProvidersConfig> aiProvidersConfig,
-        IOptions<SystemAiConfig> systemAiConfig,
         ISystemAiRateLimitService rateLimitService,
+        AiProviderMetadataService providerMetadataService,
         StepMcpToolProvider stepToolProvider,
         AppMcpToolProvider appToolProvider,
         IStepSystemPromptBuilder stepPromptBuilder,
@@ -54,8 +54,8 @@ public class AiConversationController : BaseController
         _aiApiKeyService = aiApiKeyService;
         _chatHistoryService = chatHistoryService;
         _aiProvidersConfig = aiProvidersConfig.Value;
-        _systemAiConfig = systemAiConfig.Value;
         _rateLimitService = rateLimitService;
+        _providerMetadataService = providerMetadataService;
         _stepToolProvider = stepToolProvider;
         _appToolProvider = appToolProvider;
         _stepPromptBuilder = stepPromptBuilder;
@@ -81,56 +81,38 @@ public class AiConversationController : BaseController
         {
             var userId = GetUserId();
 
-            // 1. Determine API key source - user's own key or system provider
-            // Backend decides based on whether user has configured their own key for this provider
-            var userApiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(
-                userId,
-                request.Provider
-            );
+            // 1. Determine provider/model and resolve an API key
+            var provider = request.Provider;
+            var model = request.Model;
 
-            string apiKey;
-            string provider;
-            string? model;
-            bool usingSystemProvider = false;
-
-            if (!string.IsNullOrEmpty(userApiKey))
+            if (string.IsNullOrWhiteSpace(model))
             {
-                // User has their own API key - use it (no rate limiting)
-                apiKey = userApiKey;
-                provider = request.Provider;
-                model = request.Model;
-                _logger.LogInformation(
-                    "Using user's API key for provider {Provider}",
-                    provider);
+                model = await _providerMetadataService.GetPreferredModelAsync(provider);
             }
-            else if (_systemAiConfig.Enabled && !string.IsNullOrEmpty(_systemAiConfig.ApiKey))
+
+            if (string.IsNullOrWhiteSpace(model))
             {
-                // No user key - use system provider with rate limiting
-                usingSystemProvider = true;
-
-                // Check rate limit before proceeding
-                if (!_rateLimitService.CheckAndRecordRequest(userId.ToString()))
-                {
-                    await WriteErrorEvent("Rate limit exceeded. Please try again later.");
-                    return;
-                }
-
-                apiKey = _systemAiConfig.ApiKey;
-                provider = _systemAiConfig.DefaultProvider;
-                model = _systemAiConfig.DefaultModel;
-                _logger.LogInformation(
-                    "Using system AI provider for user {UserId}: Provider={Provider}, Model={Model}",
-                    userId, provider, model);
+                await WriteErrorEvent($"No active model configured for provider '{provider}'.");
+                return;
             }
-            else
+
+            var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
+            if (string.IsNullOrEmpty(apiKey))
             {
-                await WriteErrorEvent("No API key configured. Please add your own API key or contact support.");
+                await WriteErrorEvent($"No API key configured for provider '{provider}'.");
+                return;
+            }
+
+            // Check rate limit before proceeding (shared API keys)
+            if (!_rateLimitService.CheckAndRecordRequest(userId.ToString()))
+            {
+                await WriteErrorEvent("Rate limit exceeded. Please try again later.");
                 return;
             }
 
             _logger.LogInformation(
-                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}, usingSystemProvider {UsingSystem}",
-                userId, provider, model, request.ResourceType, usingSystemProvider);
+                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, resourceType {ResourceType}",
+                userId, provider, model, request.ResourceType);
 
             // 2. Get or create session for chat history
             Guid sessionId;

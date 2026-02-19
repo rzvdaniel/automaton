@@ -1,8 +1,6 @@
-using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -14,16 +12,13 @@ namespace Automaton.Studio.Server.Controllers;
 public class AiUtilityController : BaseController
 {
     private readonly ISystemAiService _systemAiService;
-    private readonly SystemAiConfig _systemAiConfig;
     private readonly ILogger<AiUtilityController> _logger;
 
     public AiUtilityController(
         ISystemAiService systemAiService,
-        IOptions<SystemAiConfig> systemAiConfig,
         ILogger<AiUtilityController> logger)
     {
         _systemAiService = systemAiService;
-        _systemAiConfig = systemAiConfig.Value;
         _logger = logger;
     }
 
@@ -99,21 +94,6 @@ public class AiUtilityController : BaseController
         }
     }
 
-    /// <summary>
-    /// Check if the system AI service is available.
-    /// Returns provider and model info for UI display.
-    /// </summary>
-    [HttpGet("status")]
-    [AllowAnonymous]
-    public ActionResult<AiServiceStatusResponse> GetStatus()
-    {
-        return Ok(new AiServiceStatusResponse
-        {
-            IsAvailable = _systemAiService.IsAvailable,
-            Provider = _systemAiConfig.DefaultProvider,
-            Model = _systemAiConfig.DefaultModel
-        });
-    }
 }
 
 /// <summary>
@@ -160,23 +140,3 @@ public class GenerateSessionNameResponse
     public string Name { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Response for AI service status check.
-/// </summary>
-public class AiServiceStatusResponse
-{
-    /// <summary>
-    /// Whether the system AI service is available and configured.
-    /// </summary>
-    public bool IsAvailable { get; set; }
-
-    /// <summary>
-    /// The provider name for the system AI (e.g., "OpenAI").
-    /// </summary>
-    public string? Provider { get; set; }
-
-    /// <summary>
-    /// The model used by the system AI (e.g., "gpt-4o-mini").
-    /// </summary>
-    public string? Model { get; set; }
-}

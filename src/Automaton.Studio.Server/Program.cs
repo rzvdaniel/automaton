@@ -52,8 +52,6 @@ services.AddDatabaseDeveloperPageExceptionFilter();
 // Register AI Providers Configuration
 services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
 
-// Register System AI Configuration and Service
-services.Configure<SystemAiConfig>(applicationBuilder.Configuration.GetSection("SystemAi"));
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();

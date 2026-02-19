@@ -1,6 +1,4 @@
-using Automaton.Studio.Server.Config;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -11,18 +9,16 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class SystemAiRateLimitService : ISystemAiRateLimitService
 {
-    private readonly SystemAiConfig _config;
     private readonly IMemoryCache _cache;
     private readonly ILogger<SystemAiRateLimitService> _logger;
 
     private const string RateLimitKeyPrefix = "SystemAi:RateLimit:";
+    private const int MaxRequestsPerUserPerMinute = 10;
 
     public SystemAiRateLimitService(
-        IOptions<SystemAiConfig> config,
         IMemoryCache cache,
         ILogger<SystemAiRateLimitService> logger)
     {
-        _config = config.Value;
         _cache = cache;
         _logger = logger;
     }
@@ -51,11 +47,11 @@ public class SystemAiRateLimitService : ISystemAiRateLimitService
             timestamps.RemoveAll(t => t < windowStart);
 
             // Check if under limit
-            if (timestamps.Count >= _config.MaxRequestsPerUserPerMinute)
+            if (timestamps.Count >= MaxRequestsPerUserPerMinute)
             {
                 _logger.LogWarning(
                     "Rate limit exceeded for user {UserId}: {RequestCount}/{MaxRequests} requests in last minute",
-                    userId, timestamps.Count, _config.MaxRequestsPerUserPerMinute);
+                    userId, timestamps.Count, MaxRequestsPerUserPerMinute);
                 return false;
             }
 
@@ -65,7 +61,7 @@ public class SystemAiRateLimitService : ISystemAiRateLimitService
 
             _logger.LogDebug(
                 "Rate limit check passed for user {UserId}: {RequestCount}/{MaxRequests} requests",
-                userId, timestamps.Count, _config.MaxRequestsPerUserPerMinute);
+                userId, timestamps.Count, MaxRequestsPerUserPerMinute);
 
             return true;
         }
@@ -75,19 +71,19 @@ public class SystemAiRateLimitService : ISystemAiRateLimitService
     public int GetRemainingRequests(string userId)
     {
         if (string.IsNullOrEmpty(userId))
-            return _config.MaxRequestsPerUserPerMinute;
+            return MaxRequestsPerUserPerMinute;
 
         var cacheKey = $"{RateLimitKeyPrefix}{userId}";
         var now = DateTime.UtcNow;
         var windowStart = now.AddMinutes(-1);
 
         if (!_cache.TryGetValue(cacheKey, out List<DateTime>? timestamps) || timestamps == null)
-            return _config.MaxRequestsPerUserPerMinute;
+            return MaxRequestsPerUserPerMinute;
 
         lock (timestamps)
         {
             var validCount = timestamps.Count(t => t >= windowStart);
-            return Math.Max(0, _config.MaxRequestsPerUserPerMinute - validCount);
+            return Math.Max(0, MaxRequestsPerUserPerMinute - validCount);
         }
     }
 }

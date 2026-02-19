@@ -43,9 +43,7 @@ const emit = defineEmits<{
 const {
   messages,
   isGenerating,
-  selectedProvider,
   selectedModel,
-  availableProviders,
   availableModels,
   error,
   hasMessages,
@@ -438,9 +436,9 @@ function handleKeyPress(event: KeyboardEvent) {
             @keypress="handleKeyPress"
           />
           <Button
-            v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
+            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
             icon="pi pi-send"
-            :disabled="!userInput.trim() || isGenerating || !selectedProvider"
+            :disabled="!userInput.trim() || isGenerating || !selectedModel"
             :loading="isGenerating"
             @click="sendMessage"
           />
@@ -476,23 +474,7 @@ function handleKeyPress(event: KeyboardEvent) {
           </div>
           
           <!-- Model Selector -->
-          <div v-if="availableProviders.length > 0" class="flex align-items-center gap-2">
-            <Select
-              v-model="selectedProvider"
-              :options="availableProviders"
-              option-label="displayName"
-              option-value="providerName"
-              placeholder="Provider"
-              size="small"
-              class="model-select"
-              :disabled="isGenerating"
-            >
-              <template #value="slotProps">
-                <span v-if="slotProps.value">{{ availableProviders.find(p => p.providerName === slotProps.value)?.displayName }}</span>
-                <span v-else>{{ slotProps.placeholder }}</span>
-              </template>
-            </Select>
-            
+          <div v-if="availableModels.length > 0" class="flex align-items-center gap-2">
             <Select
               v-model="selectedModel"
               :options="availableModels"
@@ -597,9 +579,9 @@ function handleKeyPress(event: KeyboardEvent) {
             @keypress="handleKeyPress"
           />
           <Button
-            v-tooltip.top="!selectedProvider ? 'Please select an AI provider' : 'Send message'"
+            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
             icon="pi pi-send"
-            :disabled="!userInput.trim() || isGenerating || !selectedProvider"
+            :disabled="!userInput.trim() || isGenerating || !selectedModel"
             :loading="isGenerating"
             @click="sendMessage"
           />

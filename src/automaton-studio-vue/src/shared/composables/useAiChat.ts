@@ -2,11 +2,10 @@
  * useAiChat Composable
  * Manages AI chat state and streaming conversations with session persistence
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
 import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
-import { aiUtilityService } from '../services/ai-utility.service'
 import type {
   ChatMessage,
   ChatSession,
@@ -17,9 +16,6 @@ import type {
   ToolCall,
   ToolResult,
 } from '../types/ai.types'
-
-// Special provider name for Automaton's system AI
-const AUTOMATON_AI_PROVIDER = 'AutomatonAI'
 
 export interface UseAiChatOptions {
   /**
@@ -52,59 +48,78 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const currentProvider = computed(() =>
     availableProviders.value.find((p) => p.providerName === selectedProvider.value),
   )
-  const availableModels = computed(() => currentProvider.value?.supportedModels || [])
+  const availableModels = computed(() => {
+    const models: string[] = []
+    for (const provider of availableProviders.value) {
+      for (const model of provider.supportedModels) {
+        if (!models.includes(model)) {
+          models.push(model)
+        }
+      }
+    }
+    return models.sort((a, b) => a.localeCompare(b))
+  })
+
+  const providerByModel = computed(() => {
+    const map = new Map<string, string>()
+    for (const provider of availableProviders.value) {
+      for (const model of provider.supportedModels) {
+        if (!map.has(model)) {
+          map.set(model, provider.providerName)
+        }
+      }
+    }
+    return map
+  })
+
+  function ensureValidModelSelection() {
+    const models = availableModels.value
+    if (models.length === 0) {
+      selectedModel.value = ''
+      selectedProvider.value = ''
+      return
+    }
+
+    if (!selectedModel.value || !models.includes(selectedModel.value)) {
+      selectedModel.value = models[0]
+    }
+
+    selectedProvider.value = providerByModel.value.get(selectedModel.value) || ''
+  }
 
   /**
-   * Load available AI providers
-   * Includes "Automaton AI" as first option if system AI is available
+   * Load available AI providers with keys and models.
    */
   async function loadProviders() {
     try {
-      // Load user's providers
       const userProviders = await getAvailableProviders(true)
 
-      // Check if system AI is available
-      const systemStatus = await aiUtilityService.getStatus()
-
-      // Build providers list - Automaton AI first if available
-      const providers: AiProvider[] = []
-
-      if (systemStatus.isAvailable) {
-        providers.push({
-          providerName: AUTOMATON_AI_PROVIDER,
-          displayName: 'Automaton AI',
-          description: 'Free AI powered by Automaton (rate limited)',
-          hasStoredKeys: true, // Mark as having keys so it's selectable
-          storedKeyCount: 1,
-          hasEnvironmentKey: false,
-          supportedModels: [systemStatus.model || 'default'],
-        })
-      }
-
-      // Add user's providers
-      providers.push(...userProviders)
+      const providers = userProviders.filter(
+        (p) => (p.hasStoredKeys || p.hasEnvironmentKey) && p.supportedModels.length > 0,
+      )
       availableProviders.value = providers
 
-      // Auto-select Automaton AI if available, otherwise first provider with key
-      if (systemStatus.isAvailable) {
-        selectedProvider.value = AUTOMATON_AI_PROVIDER
-        selectedModel.value = systemStatus.model || 'default'
+      if (providers.length > 0) {
+        ensureValidModelSelection()
       } else {
-        const providerWithKey = userProviders.find(
-          (p) => p.hasStoredKeys || p.hasEnvironmentKey,
-        )
-        if (providerWithKey) {
-          selectedProvider.value = providerWithKey.providerName
-          if (providerWithKey.supportedModels.length > 0) {
-            selectedModel.value = providerWithKey.supportedModels[0] || ''
-          }
-        }
+        selectedProvider.value = ''
+        selectedModel.value = ''
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load AI providers'
       console.error('Error loading providers:', err)
     }
   }
+
+  watch(selectedModel, () => {
+    if (selectedModel.value) {
+      selectedProvider.value = providerByModel.value.get(selectedModel.value) || ''
+    }
+  })
+
+  watch(availableProviders, () => {
+    ensureValidModelSelection()
+  })
 
   /**
    * Load all sessions for this resource
@@ -315,8 +330,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
    */
   async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>) {
     if (!userMessage.trim() || isGenerating.value) return
-    if (!selectedProvider.value) {
-      error.value = 'Please select an AI provider'
+    if (!selectedModel.value) {
+      error.value = 'Please select an AI model'
       return
     }
 

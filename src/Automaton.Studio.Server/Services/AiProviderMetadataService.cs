@@ -76,6 +76,19 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
+    /// Get the preferred model for a provider (default if set, otherwise first by sort order).
+    /// </summary>
+    public async Task<string?> GetPreferredModelAsync(string providerName)
+    {
+        return await dbContext.AiModels
+            .Where(m => m.Provider.Name == providerName && m.IsActive)
+            .OrderByDescending(m => m.IsDefault)
+            .ThenBy(m => m.SortOrder)
+            .Select(m => m.ModelId)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
     /// Check if a provider is active in the database
     /// </summary>
     public async Task<bool> IsProviderActiveAsync(string providerName)

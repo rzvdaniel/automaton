@@ -155,32 +155,6 @@ export interface UpdateAiApiKeyRequest {
 }
 
 /**
- * System AI Settings
- * Matches SystemAiSettingsResponse from backend
- */
-export interface SystemAiSettings {
-  defaultProviderName: string
-  defaultModelId: string
-  maxRequestsPerUserPerMinute: number
-  isEnabled: boolean
-  hasApiKey: boolean
-  createdAt: string
-  updatedAt?: string
-}
-
-/**
- * Update System AI Settings Request
- * Matches UpdateSystemAiSettingsRequest from backend
- */
-export interface UpdateSystemAiSettingsRequest {
-  defaultProviderName: string
-  defaultModelId: string
-  apiKey?: string
-  maxRequestsPerUserPerMinute: number
-  isEnabled: boolean
-}
-
-/**
  * AI Provider Option for admin dropdowns
  * Matches AiProviderOptionResponse from backend
  */
