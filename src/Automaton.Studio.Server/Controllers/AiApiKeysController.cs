@@ -50,7 +50,7 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "Administrators")]
     public async Task<ActionResult<AiApiKeyResponse>> CreateAiApiKey([FromBody] CreateAiApiKeyRequest request)
     {
         var userId = GetUserId();
@@ -100,7 +100,7 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "Administrators")]
     public async Task<IActionResult> UpdateAiApiKey(Guid id, [FromBody] UpdateAiApiKeyRequest request)
     {
         var userId = GetUserId();
@@ -113,7 +113,7 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "Administrators")]
     public async Task<IActionResult> DeleteAiApiKey(Guid id)
     {
         var userId = GetUserId();

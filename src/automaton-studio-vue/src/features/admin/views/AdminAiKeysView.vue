@@ -32,8 +32,12 @@ const isSubmitting = ref(false)
 const createdKey = ref<{ name: string; apiKey: string } | null>(null)
 const showCreatedKeyDialog = ref(false)
 
-// Form
-const formData = reactive<CreateAiApiKeyRequest>({
+// Form - extends CreateAiApiKeyRequest with providerId for UI
+interface CreateAiApiKeyForm extends CreateAiApiKeyRequest {
+  providerId: string
+}
+
+const formData = reactive<CreateAiApiKeyForm>({
   providerId: '',
   name: '',
   apiKey: '',
