@@ -43,6 +43,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const isLoadingSessions = ref(false)
   const isLoadingMessages = ref(false)
 
+  // LocalStorage key for persisting user's model preference
+  const AI_MODEL_PREFERENCE_KEY = 'ai_preferred_model'
+
+  // Flag to prevent saving to localStorage during initialization
+  const isInitializingModel = ref(false)
+
   // Computed
   const hasMessages = computed(() => messages.value.length > 0)
   const currentProvider = computed(() =>
@@ -74,17 +80,46 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
   function ensureValidModelSelection() {
     const models = availableModels.value
+    
     if (models.length === 0) {
       selectedModel.value = ''
       selectedProvider.value = ''
       return
     }
 
-    if (!selectedModel.value || !models.includes(selectedModel.value)) {
-      selectedModel.value = models[0]
+    // If already valid, keep current selection
+    if (selectedModel.value && models.includes(selectedModel.value)) {
+      return
     }
 
-    selectedProvider.value = providerByModel.value.get(selectedModel.value) || ''
+    // Set flag to prevent saving during initialization
+    isInitializingModel.value = true
+
+    // Priority: localStorage > default model > first alphabetically
+    
+    // 1. Check localStorage for user's saved preference
+    const savedModel = localStorage.getItem(AI_MODEL_PREFERENCE_KEY)
+    if (savedModel && models.includes(savedModel)) {
+      selectedModel.value = savedModel
+      selectedProvider.value = providerByModel.value.get(savedModel) || ''
+      isInitializingModel.value = false
+      return
+    }
+
+    // 2. Use default model from backend (first provider with a default)
+    for (const provider of availableProviders.value) {
+      if (provider.defaultModel && models.includes(provider.defaultModel)) {
+        selectedModel.value = provider.defaultModel
+        selectedProvider.value = providerByModel.value.get(provider.defaultModel) || ''
+        isInitializingModel.value = false
+        return
+      }
+    }
+
+    // 3. Fallback to first model alphabetically
+    selectedModel.value = models[0]!
+    selectedProvider.value = providerByModel.value.get(models[0]!) || ''
+    isInitializingModel.value = false
   }
 
   /**
@@ -111,9 +146,16 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     }
   }
 
-  watch(selectedModel, () => {
-    if (selectedModel.value) {
-      selectedProvider.value = providerByModel.value.get(selectedModel.value) || ''
+  watch(selectedModel, (newModel) => {
+    if (newModel) {
+      // Update provider based on model
+      selectedProvider.value = providerByModel.value.get(newModel) || ''
+      
+      // Only save user's preference to localStorage when not initializing
+      // This prevents overwriting during automatic model selection on page load
+      if (!isInitializingModel.value) {
+        localStorage.setItem(AI_MODEL_PREFERENCE_KEY, newModel)
+      }
     }
   })
 

@@ -247,7 +247,11 @@ public class AiApiKeyService
                     .OrderByDescending(m => m.IsDefault)
                     .ThenBy(m => m.SortOrder)
                     .Select(m => m.ModelId)
-                    .ToList()
+                    .ToList(),
+                DefaultModel = dbProvider.Models
+                    .Where(m => m.IsDefault)
+                    .Select(m => m.ModelId)
+                    .FirstOrDefault()
             });
         }
 
@@ -356,6 +360,11 @@ public class AiProviderInfo
     public bool HasEnvironmentKey { get; set; }
     public List<AiApiKeyModel> StoredKeys { get; set; } = new();
     public List<string> SupportedModels { get; set; } = new();
+    
+    /// <summary>
+    /// The default model for this provider (marked as IsDefault in database)
+    /// </summary>
+    public string? DefaultModel { get; set; }
 }
 
 public class AiApiKeyModel
