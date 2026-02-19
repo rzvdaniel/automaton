@@ -418,6 +418,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) return
 
     isLoadingPreview.value = true
+    
+    // Clear any previous preview warnings
+    previewWarning.value = null
 
     try {
       const userId = currentApp.value.userId || authStore.userId

@@ -124,6 +124,15 @@ onUnmounted(() => {
           <div v-if="editorStore.previewWarning" class="preview-warning">
             <i class="pi pi-exclamation-triangle"></i>
             <span>{{ editorStore.previewWarning }}</span>
+            <Button
+              icon="pi pi-times"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              aria-label="Dismiss warning"
+              @click="editorStore.setPreviewWarning(null)"
+            />
           </div>
         <div
           class="preview-viewport"
@@ -246,6 +255,12 @@ onUnmounted(() => {
   border: 1px solid var(--p-orange-200);
   border-radius: var(--p-border-radius);
   font-size: 0.85rem;
+}
+
+.preview-warning > span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .preview-viewport {
