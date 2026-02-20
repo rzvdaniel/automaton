@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="SystemPrompts\AppSystemPrompt.md" />
+    <EmbeddedResource Include="SystemPrompts\StepSystemPrompt.md" />
   </ItemGroup>
 
 </Project>
