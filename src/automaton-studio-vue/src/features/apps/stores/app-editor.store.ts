@@ -10,8 +10,6 @@ import type {
   App,
   FileNode,
   OpenFile,
-  LinkedStepInfo,
-  CreateAppStepRequest,
   PreviewMode,
   PublishAppRequest,
 } from '../types/apps.types'
@@ -37,9 +35,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Currently active file path (selected tab)
   const activeFilePath = ref<string | null>(null)
-
-  // Linked backend steps
-  const linkedSteps = ref<LinkedStepInfo[]>([])
 
   // Preview HTML content
   const previewHtml = ref('')
@@ -136,9 +131,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       // Load file tree
       fileTree.value = await appsService.getFileTree(appId)
 
-      // Load linked steps
-      linkedSteps.value = await appsService.getLinkedSteps(appId)
-
       // Reset editor state
       openFiles.value = []
       activeFilePath.value = null
@@ -210,76 +202,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
-    }
-  }
-
-  /**
-   * Open a backend step file in the editor
-   */
-  async function openBackendStep(step: LinkedStepInfo): Promise<void> {
-    // Create a virtual path for the step
-    const virtualPath = `backend/${step.name}.${getStepExtension(step.language)}`
-
-    // Check if already open
-    const existing = openFiles.value.find((f) => f.path === virtualPath)
-    if (existing) {
-      activeFilePath.value = virtualPath
-      return
-    }
-
-    try {
-      // Load step code
-      const { code, language } = await appsService.getStepCode(step.id)
-
-      // Create open file entry for backend step
-      const openFile: OpenFile = {
-        path: virtualPath,
-        content: code,
-        language: getEditorLanguage(language),
-        isDirty: false,
-        originalContent: code,
-        isBackendStep: true,
-        stepId: step.id,
-        stepName: step.displayName || step.name,
-      }
-
-      openFiles.value.push(openFile)
-      activeFilePath.value = virtualPath
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err)
-      throw err
-    }
-  }
-
-  /**
-   * Get file extension for step language
-   */
-  function getStepExtension(language: string): string {
-    switch (language?.toLowerCase()) {
-      case 'python':
-        return 'py'
-      case 'powershell':
-        return 'ps1'
-      case 'batch':
-        return 'bat'
-      default:
-        return 'py'
-    }
-  }
-
-  /**
-   * Get Monaco editor language for step language
-   */
-  function getEditorLanguage(language: string): string {
-    switch (language?.toLowerCase()) {
-      case 'python':
-        return 'python'
-      case 'powershell':
-        return 'powershell'
-      case 'batch':
-        return 'bat'
-      default:
-        return 'python'
     }
   }
 
@@ -603,50 +525,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Create a new backend step and link it to the app
-   */
-  async function createBackendStep(request: CreateAppStepRequest): Promise<LinkedStepInfo> {
-    if (!currentApp.value) throw new Error('No app loaded')
-
-    try {
-      const step = await appsService.createStepForApp(currentApp.value.id, request)
-      linkedSteps.value.push(step)
-      return step
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err)
-      throw err
-    }
-  }
-
-  /**
-   * Unlink a step from the app
-   */
-  async function unlinkStep(stepId: string): Promise<void> {
-    if (!currentApp.value) return
-
-    try {
-      await appsService.unlinkStep(currentApp.value.id, stepId)
-      linkedSteps.value = linkedSteps.value.filter((s) => s.id !== stepId)
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err)
-      throw err
-    }
-  }
-
-  /**
-   * Refresh linked steps from the server
-   */
-  async function refreshLinkedSteps(): Promise<void> {
-    if (!currentApp.value) return
-
-    try {
-      linkedSteps.value = await appsService.getLinkedSteps(currentApp.value.id)
-    } catch (err: unknown) {
-      console.error('Failed to refresh linked steps:', err)
-    }
-  }
-
-  /**
    * Refresh the file tree without closing open files
    */
   async function refreshFileTree(): Promise<void> {
@@ -813,7 +691,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree.value = []
     openFiles.value = []
     activeFilePath.value = null
-    linkedSteps.value = []
     previewHtml.value = ''
     previewMode.value = 'desktop'
     isLoading.value = false
@@ -849,7 +726,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree,
     openFiles,
     activeFilePath,
-    linkedSteps,
     previewHtml,
     previewUrl,
     previewWarning,
@@ -874,7 +750,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     // Actions
     loadApp,
     openFile,
-    openBackendStep,
     closeFile,
     updateFileContent,
     saveFile,
@@ -888,9 +763,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     unpublishApp,
     deployBackend,
     updateAppRunner,
-    createBackendStep,
-    unlinkStep,
-    refreshLinkedSteps,
     refreshFileTree,
     reloadFile,
     reloadActiveFile,

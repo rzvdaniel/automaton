@@ -23,7 +23,6 @@ import CodeEditor from '../components/CodeEditor.vue'
 import AiAssistant from '../components/AiAssistant.vue'
 import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
-import CreateStepDialog from '../components/CreateStepDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
@@ -32,7 +31,7 @@ import AppVersionHistory from '../components/AppVersionHistory.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
+import type { PublishAppRequest } from '../types/apps.types'
 import type { StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { AppChatStats } from '@/shared/types/ai.types'
@@ -53,7 +52,6 @@ const initialPrompt = computed(() => route.query.prompt as string | undefined)
 
 // Dialog visibility
 const showPublishDialog = ref(false)
-const showCreateStepDialog = ref(false)
 const showCreateFileDialog = ref(false)
 
 // App name editing
@@ -482,27 +480,6 @@ async function handleUnpublish() {
   })
 }
 
-// Handle create step
-async function handleCreateStep(request: CreateAppStepRequest) {
-  try {
-    await editorStore.createBackendStep(request)
-    showCreateStepDialog.value = false
-    toast.add({
-      severity: 'success',
-      summary: 'Created',
-      detail: `Step "${request.name}" created and linked`,
-      life: 3000,
-    })
-  } catch (err: unknown) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: err instanceof Error ? err.message : 'Failed to create step',
-      life: 5000,
-    })
-  }
-}
-
 // Handle create file
 async function handleCreateFile(path: string, content: string) {
   try {
@@ -613,19 +590,15 @@ function saveAppName() {
 async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   console.log('[AppEditor] AI tool executed:', { toolName, args, result })
 
-  // File modification tools that should trigger refresh
   const fileModificationTools = [
     'write_file',
     'save_app_code',
     'delete_file',
-    'create_backend_step',
-    'save_step_code',
   ]
 
   if (fileModificationTools.includes(toolName)) {
     console.log(`[AppEditor] File modification tool "${toolName}" detected, refreshing files...`)
 
-    // Determine which files were affected
     const affectedFiles: string[] = []
 
     if (toolName === 'write_file' && args.path) {
@@ -635,12 +608,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       console.log('[AppEditor] save_app_code detected, affecting index.html')
       affectedFiles.push('index.html')
     } else if (toolName === 'delete_file' && args.path) {
-      // File was deleted, just refresh tree
       await editorStore.refreshFileTree()
-      return
-    } else if (toolName === 'create_backend_step' || toolName === 'save_step_code') {
-      // Backend step created/updated, refresh linked steps
-      await editorStore.refreshLinkedSteps()
       return
     }
 
@@ -833,7 +801,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             <FileTree
               @create-file="showCreateFileDialog = true"
               @delete-file="handleDeleteFile"
-              @create-step="showCreateStepDialog = true"
             />
           </div>
         </SplitterPanel>
@@ -960,11 +927,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       :requires-auth="editorStore.currentApp?.requiresAuthentication"
       :app-name="editorStore.currentApp?.name"
       @publish="handlePublish"
-    />
-
-    <CreateStepDialog
-      v-model:visible="showCreateStepDialog"
-      @create="handleCreateStep"
     />
 
     <CreateFileDialog
