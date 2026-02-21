@@ -267,23 +267,6 @@ public class AppMcpToolProvider : IMcpToolProvider
                 }
                 """)
             },
-            new McpTool
-            {
-                Name = "get_linked_steps",
-                Description = "Get list of steps already linked to this app",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    }
-                }
-                """)
-            },
-
             // File-level tools (for multi-file apps)
             new McpTool
             {
@@ -401,7 +384,6 @@ public class AppMcpToolProvider : IMcpToolProvider
                 "execute_backend_step_code" => await HandleExecuteBackendStepCode(arguments),
                 "test_app_step" => await HandleTestAppStep(arguments, context),
                 "link_step_to_app" => await HandleLinkStepToApp(arguments, context),
-                "get_linked_steps" => await HandleGetLinkedSteps(arguments, context),
 
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
@@ -1112,50 +1094,6 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
     }
 
-    private async Task<McpToolResult> HandleGetLinkedSteps(JsonElement arguments, Dictionary<string, object>? context)
-    {
-        try
-        {
-            var appId = ExtractAppId(arguments, context);
-
-            // Get linked steps for the app
-            var linkedSteps = await _appStepsService.GetLinkedStepsAsync(appId);
-
-            var steps = linkedSteps.Select(step => new
-            {
-                stepId = step.Id.ToString(),
-                name = step.Name,
-                language = step.Language,
-                description = step.Description,
-                inputCount = step.InputCount,
-                outputCount = step.OutputCount
-            }).ToList();
-
-            var result = new
-            {
-                success = true,
-                appId = appId.ToString(),
-                count = steps.Count,
-                steps = steps,
-                message = $"Found {steps.Count} step(s) linked to app"
-            };
-
-            return new McpToolResult
-            {
-                Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting linked steps");
-            return new McpToolResult
-            {
-                Success = false,
-                Error = $"Failed to get linked steps: {ex.Message}"
-            };
-        }
-    }
 
     #endregion
 
