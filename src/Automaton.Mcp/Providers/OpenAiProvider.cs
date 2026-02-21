@@ -375,8 +375,22 @@ public class OpenAiProvider : IAiProvider
         if (!responseMessage.IsSuccessStatusCode)
         {
             _logger.LogError("OpenAI responses API error: {Status} {Body}", responseMessage.StatusCode, responseContent);
+
+            // Try to extract a meaningful error message from the response body
+            string errorDetail = responseContent;
+            try
+            {
+                using var errDoc = JsonDocument.Parse(responseContent);
+                if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
+                    errEl.TryGetProperty("message", out var msgEl))
+                {
+                    errorDetail = msgEl.GetString() ?? responseContent;
+                }
+            }
+            catch { /* fall back to raw body */ }
+
             throw new InvalidOperationException(
-                $"OpenAI responses API error: {responseMessage.StatusCode}");
+                $"OpenAI responses API error: {responseMessage.StatusCode} - {errorDetail}");
         }
 
         using var responseDoc = JsonDocument.Parse(responseContent);
@@ -511,35 +525,11 @@ public class OpenAiProvider : IAiProvider
 
     private List<object> FilterOutputItemsForInput(List<JsonElement> outputItems)
     {
-        var reusable = new List<object>();
-
-        foreach (var item in outputItems)
-        {
-            if (item.ValueKind != JsonValueKind.Object)
-            {
-                _logger.LogWarning("Skipping non-object output item with kind {Kind}", item.ValueKind);
-                continue;
-            }
-
-            if (!item.TryGetProperty("type", out var typeElement))
-            {
-                _logger.LogWarning("Skipping output item without type field");
-                continue;
-            }
-
-            var type = typeElement.GetString() ?? string.Empty;
-            if (string.Equals(type, "function_call", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(type, "reasoning", StringComparison.OrdinalIgnoreCase))
-            {
-                reusable.Add(item);
-            }
-            else
-            {
-                _logger.LogDebug("Skipping output item type {Type} for input reuse", type);
-            }
-        }
-
-        return reusable;
+        // All output items must be returned as-is to preserve ordering constraints.
+        // Reasoning models (e.g. o-series, gpt-5-mini) produce 'reasoning' items that
+        // must be immediately followed by their associated item in the next request.
+        // Filtering any item out breaks that contract and causes a BadRequest from the API.
+        return outputItems.Cast<object>().ToList();
     }
 
     private sealed class ResponsesApiResult
