@@ -48,7 +48,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                     IsActive = s.IsActive,
                     CreatedAt = s.CreatedAt,
                     UpdatedAt = s.UpdatedAt,
-                    MessageCount = s.Messages.Count
+                    MessageCount = s.Messages.Count,
+                    TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalInputTokens = s.TotalInputTokens,
+                    TotalOutputTokens = s.TotalOutputTokens,
+                    TotalTokens = s.TotalTokens
                 })
                 .ToListAsync();
 
@@ -81,7 +85,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                     IsActive = s.IsActive,
                     CreatedAt = s.CreatedAt,
                     UpdatedAt = s.UpdatedAt,
-                    MessageCount = s.Messages.Count
+                    MessageCount = s.Messages.Count,
+                    TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalInputTokens = s.TotalInputTokens,
+                    TotalOutputTokens = s.TotalOutputTokens,
+                    TotalTokens = s.TotalTokens
                 })
                 .FirstOrDefaultAsync();
 
@@ -120,6 +128,10 @@ public class AiChatHistoryService : IAiChatHistoryService
                     Content = m.Content,
                     MessageType = m.MessageType,
                     Metadata = m.Metadata,
+                    InputTokens = m.InputTokens,
+                    OutputTokens = m.OutputTokens,
+                    TotalTokens = m.TotalTokens,
+                    Model = m.Model,
                     CreatedAt = m.CreatedAt
                 })
                 .ToListAsync();
@@ -186,7 +198,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                     IsActive = s.IsActive,
                     CreatedAt = s.CreatedAt,
                     UpdatedAt = s.UpdatedAt,
-                    MessageCount = s.Messages.Count
+                    MessageCount = s.Messages.Count,
+                    TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalInputTokens = s.TotalInputTokens,
+                    TotalOutputTokens = s.TotalOutputTokens,
+                    TotalTokens = s.TotalTokens
                 })
                 .FirstOrDefaultAsync();
 
@@ -344,7 +360,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                 IsActive = sessionEntity.IsActive,
                 CreatedAt = sessionEntity.CreatedAt,
                 UpdatedAt = sessionEntity.UpdatedAt,
-                MessageCount = 0
+                MessageCount = 0,
+                TotalPromptsSubmitted = 0,
+                TotalInputTokens = 0,
+                TotalOutputTokens = 0,
+                TotalTokens = 0
             };
         }
         catch (Exception ex)
@@ -473,6 +493,13 @@ public class AiChatHistoryService : IAiChatHistoryService
                 throw new UnauthorizedAccessException("Access denied to this session");
             }
 
+            // Calculate total tokens
+            int? totalTokens = null;
+            if (request.InputTokens.HasValue && request.OutputTokens.HasValue)
+            {
+                totalTokens = request.InputTokens.Value + request.OutputTokens.Value;
+            }
+
             var messageEntity = new AiChatMessage
             {
                 Id = Guid.NewGuid(),
@@ -481,16 +508,66 @@ public class AiChatHistoryService : IAiChatHistoryService
                 Content = request.Content,
                 MessageType = request.MessageType,
                 Metadata = request.Metadata,
+                InputTokens = request.InputTokens,
+                OutputTokens = request.OutputTokens,
+                TotalTokens = totalTokens,
+                Model = request.Model,
                 CreatedAt = DateTime.UtcNow
             };
 
             dataContext.AiChatMessages.Add(messageEntity);
 
-            // Update session's UpdatedAt timestamp
-            var session = await dataContext.AiChatSessions.FindAsync(request.SessionId);
+            // Update session metrics and get app resource for cascade update
+            var session = await dataContext.AiChatSessions
+                .FirstOrDefaultAsync(s => s.Id == request.SessionId);
+            
             if (session != null)
             {
+                // Update session activity timestamp
+                session.LastActivityAt = DateTime.UtcNow;
                 session.UpdatedAt = DateTime.UtcNow;
+
+                // Count prompts (user messages only)
+                if (request.Role.Equals("user", StringComparison.OrdinalIgnoreCase))
+                {
+                    session.TotalPromptsSubmitted++;
+                }
+
+                // Add token counts (only for AI-generated messages)
+                if (request.InputTokens.HasValue)
+                {
+                    session.TotalInputTokens += request.InputTokens.Value;
+                }
+                if (request.OutputTokens.HasValue)
+                {
+                    session.TotalOutputTokens += request.OutputTokens.Value;
+                }
+                if (totalTokens.HasValue)
+                {
+                    session.TotalTokens += totalTokens.Value;
+                }
+
+                // If this is a WebApp session, cascade updates to the app entity
+                if (session.ResourceType == ChatResourceType.WebApp)
+                {
+                    var app = await dataContext.WebApps
+                        .FirstOrDefaultAsync(w => w.Id == session.ResourceId);
+                    
+                    if (app != null)
+                    {
+                        app.LastChatActivityAt = DateTime.UtcNow;
+                        
+                        if (request.Role.Equals("user", StringComparison.OrdinalIgnoreCase))
+                        {
+                            app.TotalPromptsSubmittedInChat++;
+                        }
+                        
+                        if (totalTokens.HasValue)
+                        {
+                            app.TotalChatTokensUsed += totalTokens.Value;
+                        }
+                    }
+                }
             }
 
             await dataContext.SaveChangesAsync();
@@ -503,6 +580,10 @@ public class AiChatHistoryService : IAiChatHistoryService
                 Content = messageEntity.Content,
                 MessageType = messageEntity.MessageType,
                 Metadata = messageEntity.Metadata,
+                InputTokens = messageEntity.InputTokens,
+                OutputTokens = messageEntity.OutputTokens,
+                TotalTokens = messageEntity.TotalTokens,
+                Model = messageEntity.Model,
                 CreatedAt = messageEntity.CreatedAt
             };
         }
@@ -615,6 +696,48 @@ public class AiChatHistoryService : IAiChatHistoryService
         catch (Exception ex)
         {
             logger.Error(ex, "Error clearing messages from session {SessionId}", sessionId);
+            throw;
+        }
+    }
+
+    public async Task<AppChatStatsDto?> GetAppChatStatsAsync(Guid appId, Guid userId)
+    {
+        try
+        {
+            // Get all sessions for this app where user has access
+            var sessions = await dataContext.AiChatSessions
+                .Where(s => s.ResourceType == ChatResourceType.WebApp &&
+                           s.ResourceId == appId &&
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
+                .ToListAsync();
+
+            if (sessions.Count == 0)
+            {
+                return new AppChatStatsDto
+                {
+                    TotalPromptsSubmitted = 0,
+                    TotalTokens = 0,
+                    InputTokens = 0,
+                    OutputTokens = 0,
+                    SessionCount = 0
+                };
+            }
+
+            // Aggregate stats across all sessions
+            var stats = new AppChatStatsDto
+            {
+                TotalPromptsSubmitted = sessions.Sum(s => s.TotalPromptsSubmitted),
+                TotalTokens = sessions.Sum(s => s.TotalTokens),
+                InputTokens = sessions.Sum(s => s.TotalInputTokens),
+                OutputTokens = sessions.Sum(s => s.TotalOutputTokens),
+                SessionCount = sessions.Count
+            };
+
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error getting app chat stats for {AppId}", appId);
             throw;
         }
     }

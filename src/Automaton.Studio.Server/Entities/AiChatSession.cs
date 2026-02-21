@@ -39,6 +39,31 @@ public class AiChatSession
     /// </summary>
     public bool IsActive { get; set; }
 
+    /// <summary>
+    /// Number of prompts (user messages) submitted in this session
+    /// </summary>
+    public int TotalPromptsSubmitted { get; set; } = 0;
+
+    /// <summary>
+    /// Total input tokens used in this session
+    /// </summary>
+    public int TotalInputTokens { get; set; } = 0;
+
+    /// <summary>
+    /// Total output tokens generated in this session
+    /// </summary>
+    public int TotalOutputTokens { get; set; } = 0;
+
+    /// <summary>
+    /// Total tokens (input + output) for this session
+    /// </summary>
+    public int TotalTokens { get; set; } = 0;
+
+    /// <summary>
+    /// Last time activity occurred in this session (message sent)
+    /// </summary>
+    public DateTime? LastActivityAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

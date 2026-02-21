@@ -85,11 +85,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int?>("InputTokens")
+                        .HasColumnType("int");
+
                     b.Property<int>("MessageType")
                         .HasColumnType("int");
 
                     b.Property<string>("Metadata")
                         .HasColumnType("json");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("OutputTokens")
+                        .HasColumnType("int");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -98,6 +107,9 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<Guid>("SessionId")
                         .HasColumnType("char(36)");
+
+                    b.Property<int?>("TotalTokens")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -122,6 +134,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<DateTime?>("LastActivityAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("Model")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
@@ -140,6 +155,18 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
+
+                    b.Property<int>("TotalInputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalOutputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalPromptsSubmitted")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalTokens")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -392,47 +419,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex(new[] { "ApiKeyId" }, "IX_ApiKeyUser_ApiKeyId");
 
                     b.ToTable("ApiKeyUsers");
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppController", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("Actions")
-                        .HasColumnType("json");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<DateTime>("Updated")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("WebAppId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WebAppId");
-
-                    b.HasIndex("WebAppId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("AppControllers");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
@@ -1680,6 +1666,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<DateTime?>("LastChatActivityAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<DateTime?>("LastViewedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1711,6 +1700,12 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<string>("ThumbnailUrl")
                         .HasColumnType("longtext");
+
+                    b.Property<int>("TotalChatTokensUsed")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalPromptsSubmittedInChat")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("Updated")
                         .HasColumnType("datetime(6)");
@@ -1948,17 +1943,6 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppController", b =>
-                {
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
-                        .WithMany()
-                        .HasForeignKey("WebAppId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("WebApp");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>

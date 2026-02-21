@@ -67,4 +67,9 @@ public interface IAiChatHistoryService
     /// Clear all messages from a session (start new conversation in same session)
     /// </summary>
     Task<bool> ClearSessionMessagesAsync(Guid sessionId, Guid userId);
+
+    /// <summary>
+    /// Get aggregate AI chat statistics for a specific app (WebApp)
+    /// </summary>
+    Task<AppChatStatsDto?> GetAppChatStatsAsync(Guid appId, Guid userId);
 }

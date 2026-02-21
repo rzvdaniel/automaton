@@ -142,6 +142,12 @@ export interface ChatMessage {
   
   // For streaming messages
   isStreaming?: boolean
+  
+  // Token usage
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  model?: string
 }
 
 // ============================================
@@ -167,6 +173,12 @@ export interface ChatSession {
   model?: string
   createdAt: string
   updatedAt: string
+  
+  // Usage metrics
+  totalPromptsSubmitted: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalTokens: number
 }
 
 export interface ChatSessionWithMessages extends ChatSession {
@@ -212,4 +224,31 @@ export interface AiChatConfig {
   
   /** Enable chat history */
   enableHistory?: boolean
+}
+
+// ============================================
+// Chat Statistics
+// ============================================
+
+/**
+ * Statistics for a single AI chat session
+ */
+export interface ChatSessionStats {
+  sessionId: string
+  title: string
+  promptsSubmitted: number
+  totalTokens: number
+  inputTokens: number
+  outputTokens: number
+}
+
+/**
+ * Aggregate statistics for an app's AI chat sessions
+ */
+export interface AppChatStats {
+  totalPromptsSubmitted: number
+  totalTokens: number
+  inputTokens: number
+  outputTokens: number
+  sessionCount: number
 }

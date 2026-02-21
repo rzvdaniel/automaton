@@ -37,6 +37,7 @@ const emit = defineEmits<{
   (e: 'codeGenerated', code: string): void
   (e: 'toolExecuted', toolName: string, args: any, result?: any): void
   (e: 'sessionCreated'): void
+  (e: 'chatMessageSent'): void
 }>()
 
 // AI Chat composable with tool execution callback
@@ -221,6 +222,12 @@ function formatSessionDate(date: string | undefined) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
+  return tokens.toString()
+}
+
 // Watch for code generation in messages
 watch(
   messages,
@@ -275,6 +282,9 @@ async function sendMessage() {
     
     // Wait for AI response
     await sendPromise
+    
+    // Emit event to notify parent that message was sent (for stats refresh, etc.)
+    emit('chatMessageSent')
   } else {
     // Already in chat view with active session - just send the message
     currentView.value = 'chat'
@@ -295,6 +305,9 @@ async function sendMessage() {
       'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
 
     await sendAiMessage(messageContent, systemPrompt, context)
+    
+    // Emit event to notify parent that message was sent (for stats refresh, etc.)
+    emit('chatMessageSent')
   }
 }
 
@@ -419,6 +432,14 @@ function handleKeyPress(event: KeyboardEvent) {
               </div>
               <div class="session-card-footer">
                 <span class="session-card-date">{{ formatSessionDate(session.createdAt) }}</span>
+                <!-- Usage metrics badge -->
+                <div v-if="session.totalPromptsSubmitted > 0" class="session-metrics-badge">
+                  <i class="pi pi-comments" style="font-size: 0.7rem"></i>
+                  <span>{{ session.totalPromptsSubmitted }}</span>
+                  <span class="text-separator">·</span>
+                  <i class="pi pi-zap" style="font-size: 0.7rem"></i>
+                  <span>{{ formatTokens(session.totalTokens) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -564,6 +585,29 @@ function handleKeyPress(event: KeyboardEvent) {
                 <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Processing your request...</div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session usage metrics -->
+      <div v-if="activeSession && activeSession.totalPromptsSubmitted > 0" class="session-metrics-footer">
+        <div class="metrics-row">
+          <div class="metric-item">
+            <i class="pi pi-comments"></i>
+            <span class="metric-label">Prompts:</span>
+            <span class="metric-value">{{ activeSession.totalPromptsSubmitted }}</span>
+          </div>
+          <div class="metric-separator"></div>
+          <div class="metric-item">
+            <i class="pi pi-zap"></i>
+            <span class="metric-label">Tokens:</span>
+            <span class="metric-value">{{ formatTokens(activeSession.totalTokens) }}</span>
+          </div>
+          <div class="metric-separator"></div>
+          <div class="metric-breakdown">
+            <span class="text-xs text-color-secondary">
+              {{ formatTokens(activeSession.totalInputTokens) }} in / {{ formatTokens(activeSession.totalOutputTokens) }} out
+            </span>
           </div>
         </div>
       </div>
@@ -795,6 +839,22 @@ function handleKeyPress(event: KeyboardEvent) {
   color: var(--p-text-muted-color);
 }
 
+.session-metrics-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--p-primary-100);
+  color: var(--p-primary-900);
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.text-separator {
+  opacity: 0.5;
+}
+
 .ai-header {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--p-surface-200);
@@ -1005,6 +1065,54 @@ function handleKeyPress(event: KeyboardEvent) {
 .tool-status.error {
   background-color: var(--p-red-100);
   color: var(--p-red-900);
+}
+
+.session-metrics-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--p-surface-200);
+  background-color: var(--p-surface-50);
+  flex-shrink: 0;
+}
+
+.metrics-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--p-text-color);
+}
+
+.metric-item i {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.metric-label {
+  color: var(--p-text-muted-color);
+  font-weight: 500;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: var(--p-primary-600);
+}
+
+.metric-separator {
+  width: 1px;
+  height: 1rem;
+  background-color: var(--p-surface-300);
+}
+
+.metric-breakdown {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .input-area {

@@ -8,6 +8,7 @@ import type {
   ChatMessage,
   CreateChatSessionRequest,
   SaveChatMessageRequest,
+  AppChatStats,
 } from '@/shared/types/ai.types'
 
 export const aiChatHistoryService = {
@@ -154,5 +155,15 @@ export const aiChatHistoryService = {
     await axiosInstance.delete(
       `/api/AiChatHistory/sessions/${sessionId}/messages`,
     )
+  },
+
+  /**
+   * Get aggregate chat statistics for an app
+   */
+  async getAppChatStats(appId: string): Promise<AppChatStats> {
+    const response = await axiosInstance.get(
+      `/api/AiChatHistory/apps/${appId}/stats`,
+    )
+    return response.data
   },
 }

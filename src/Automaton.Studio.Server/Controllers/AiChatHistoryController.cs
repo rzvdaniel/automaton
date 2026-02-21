@@ -220,4 +220,23 @@ public class AiChatHistoryController : BaseController
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Get aggregate AI chat statistics for a specific app (WebApp)
+    /// </summary>
+    /// <param name="appId">App ID</param>
+    /// <returns>App chat statistics including total prompts, tokens, and session count</returns>
+    [HttpGet("apps/{appId}/stats")]
+    public async Task<ActionResult<AppChatStatsDto>> GetAppChatStats(Guid appId)
+    {
+        var userId = GetUserId();
+        var stats = await chatHistoryService.GetAppChatStatsAsync(appId, userId);
+
+        if (stats == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(stats);
+    }
 }

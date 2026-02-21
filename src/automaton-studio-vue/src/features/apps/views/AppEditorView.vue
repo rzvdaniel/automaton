@@ -34,6 +34,8 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { CreateAppStepRequest, PublishAppRequest } from '../types/apps.types'
 import type { StepResultMessage } from '../types/console.types'
+import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
+import type { AppChatStats } from '@/shared/types/ai.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +71,9 @@ const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
 
 // Ref to version history component for manual refresh
 const versionHistoryRef = ref<any>(null)
+
+// AI Chat app statistics
+const chatStats = ref<AppChatStats | null>(null)
 
 // AI Assistant configuration
 const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
@@ -193,6 +198,14 @@ onMounted(async () => {
       if (editorStore.currentApp?.executionRunnerId) {
         selectedRunnerId.value = editorStore.currentApp.executionRunnerId
       }
+      
+      // Load chat statistics for this app
+      try {
+        chatStats.value = await aiChatHistoryService.getAppChatStats(appId.value)
+      } catch (err) {
+        console.warn('Failed to load chat stats:', err)
+        // Chat stats are optional, don't fail the load
+      }
     } catch (err: unknown) {
       toast.add({
         severity: 'error',
@@ -236,6 +249,25 @@ watch(selectedRunnerId, async (newRunnerId) => {
 onUnmounted(() => {
   editorStore.reset()
 })
+
+// Format token count for display (K/M notation)
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
+  return tokens.toString()
+}
+
+// Refresh chat statistics from the backend
+async function refreshChatStats() {
+  if (appId.value) {
+    try {
+      chatStats.value = await aiChatHistoryService.getAppChatStats(appId.value)
+    } catch (err) {
+      console.warn('Failed to refresh chat stats:', err)
+      // Non-critical error, don't interrupt user workflow
+    }
+  }
+}
 
 // Warn before leaving with unsaved changes
 function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -714,6 +746,26 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               />
             </div>
 
+            <!-- Chat statistics display -->
+            <div v-if="chatStats" class="flex align-items-center gap-2">
+              <Button
+                v-tooltip.bottom="`${chatStats.totalPromptsSubmitted} prompts submitted`"
+                :label="`${chatStats.totalPromptsSubmitted}`"
+                icon="pi pi-comments"
+                text
+                severity="secondary"
+                size="small"
+              />
+              <Button
+                v-tooltip.bottom="`${chatStats.totalTokens} tokens used (${chatStats.inputTokens} in / ${chatStats.outputTokens} out)`"
+                :label="formatTokenCount(chatStats.totalTokens)"
+                icon="pi pi-zap"
+                text
+                severity="secondary"
+                size="small"
+              />
+            </div>
+
             <Button
               v-tooltip.bottom="'Open full-screen preview'"
               icon="pi pi-eye"
@@ -872,6 +924,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 :suggestions="aiSuggestions"
                 @tool-executed="handleAiToolExecuted"
                 @session-created="handleVersionCreated"
+                @chat-message-sent="refreshChatStats"
               />
               <AppVersionHistory
                 v-show="rightPanelMode === 'versionHistory'"

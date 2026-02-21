@@ -19,6 +19,12 @@ public class ChatSessionDto
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public int MessageCount { get; set; }
+    
+    // Usage metrics
+    public int TotalPromptsSubmitted { get; set; }
+    public int TotalInputTokens { get; set; }
+    public int TotalOutputTokens { get; set; }
+    public int TotalTokens { get; set; }
 }
 
 /// <summary>
@@ -33,6 +39,12 @@ public class ChatMessageDto
     public ChatMessageType MessageType { get; set; }
     public string Metadata { get; set; }
     public DateTime CreatedAt { get; set; }
+    
+    // Token usage
+    public int? InputTokens { get; set; }
+    public int? OutputTokens { get; set; }
+    public int? TotalTokens { get; set; }
+    public string? Model { get; set; }
 }
 
 /// <summary>
@@ -57,6 +69,11 @@ public class SaveChatMessageRequest
     public string Content { get; set; }
     public ChatMessageType MessageType { get; set; }
     public string Metadata { get; set; }
+    
+    // Token usage
+    public int? InputTokens { get; set; }
+    public int? OutputTokens { get; set; }
+    public string? Model { get; set; }
 }
 
 /// <summary>
@@ -94,4 +111,29 @@ public class ChatSessionWithMessagesDto
 {
     public ChatSessionDto Session { get; set; }
     public List<ChatMessageDto> Messages { get; set; }
+}
+
+/// <summary>
+/// DTO for AI chat session statistics (for display in app editor header)
+/// </summary>
+public class ChatSessionStatsDto
+{
+    public Guid SessionId { get; set; }
+    public string Title { get; set; }
+    public int PromptsSubmitted { get; set; }
+    public int TotalTokens { get; set; }
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+}
+
+/// <summary>
+/// DTO for aggregate AI chat statistics for an app
+/// </summary>
+public class AppChatStatsDto
+{
+    public int TotalPromptsSubmitted { get; set; }
+    public int TotalTokens { get; set; }
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public int SessionCount { get; set; }
 }

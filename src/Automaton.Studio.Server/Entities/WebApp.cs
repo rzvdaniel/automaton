@@ -57,6 +57,21 @@ public class WebApp
     /// </summary>
     public string? Tags { get; set; }
 
+    /// <summary>
+    /// Total tokens used in AI chat sessions for this app
+    /// </summary>
+    public int TotalChatTokensUsed { get; set; } = 0;
+
+    /// <summary>
+    /// Total number of prompts submitted in AI chat sessions for this app
+    /// </summary>
+    public int TotalPromptsSubmittedInChat { get; set; } = 0;
+
+    /// <summary>
+    /// Last time activity occurred in any chat session for this app
+    /// </summary>
+    public DateTime? LastChatActivityAt { get; set; }
+
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
 
