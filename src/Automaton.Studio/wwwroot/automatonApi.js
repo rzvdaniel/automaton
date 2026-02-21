@@ -129,6 +129,28 @@
   }
 
   /**
+   * Execute a controller action by controller name and action name
+   * @param {string} controllerName - Controller name (e.g. "Users")
+   * @param {string} actionName - Action name (e.g. "create")
+   * @param {object} options - Execution options
+   * @param {object} options.inputs - Input variables as key-value pairs
+   * @param {string[]} options.runnerNames - Optional array of runner names
+   * @returns {Promise<object>} Controller action result with outputVariables
+   */
+  function executeController(controllerName, actionName, options = {}) {
+    const appSlug = getAppSlug();
+    if (!appSlug) {
+      return Promise.reject(new Error('Could not determine app slug'));
+    }
+    const path = `/api/web-apps/${appSlug}/controllers/${encodeURIComponent(controllerName)}/actions/${encodeURIComponent(actionName)}/execute`;
+    const body = {
+      inputs: options.inputs || {},
+      runnerNames: options.runnerNames || null
+    };
+    return apiCall(path, 'POST', body).then(response => response.data || response);
+  }
+
+  /**
    * Make a custom API call (advanced usage)
    * @param {string} path - Full API path (must start with /api/web-apps/)
    * @param {string} method - HTTP method (GET or POST)
@@ -146,6 +168,7 @@
   window.automatonApi = { 
     executeFlow: executeFlow, 
     executeStep: executeStep,
+    executeController: executeController,
     customCall: customCall, 
     getAppSlug: getAppSlug 
   };

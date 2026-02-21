@@ -12,10 +12,12 @@ public class AutomatonHub : Hub
     private const string RunnerNameHeader = "RunnerName";
 
     private readonly RunnerService runnerService;
+    private readonly AppsControllerExecutionService controllerExecutionService;
 
-    public AutomatonHub(RunnerService runnerService)
+    public AutomatonHub(RunnerService runnerService, AppsControllerExecutionService controllerExecutionService)
     {
         this.runnerService = runnerService;
+        this.controllerExecutionService = controllerExecutionService;
     }
 
     public override async Task OnConnectedAsync()
@@ -25,6 +27,10 @@ public class AutomatonHub : Hub
         await Clients.Caller.SendAsync("WelcomeRunner", $"Welcome {runner.Name}");
 
         await UpdateRunnerConnection();
+
+        // Auto-sync backend scripts for all apps configured to use this runner
+        _ = Task.Run(() => controllerExecutionService.SyncScriptsToRunnerAsync(
+            runner.Id, runner.ConnectionId, CancellationToken.None));
 
         await base.OnConnectedAsync();
     }

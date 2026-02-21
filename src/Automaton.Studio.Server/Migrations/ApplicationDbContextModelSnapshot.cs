@@ -394,6 +394,47 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppController", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Actions")
+                        .HasColumnType("json");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("Updated")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebAppId");
+
+                    b.HasIndex("WebAppId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("AppControllers");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -461,6 +502,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid>("AppVersionId")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("AppVersionId1")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("CodeSnapshot")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -487,6 +531,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AppVersionId");
+
+                    b.HasIndex("AppVersionId1");
 
                     b.HasIndex("StepId");
 
@@ -1301,6 +1347,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("AddedBy")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("RunnerId1")
+                        .HasColumnType("char(36)");
+
                     b.HasKey("ProjectId", "RunnerId");
 
                     b.HasIndex("AddedBy");
@@ -1308,6 +1357,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("ProjectId");
 
                     b.HasIndex("RunnerId");
+
+                    b.HasIndex("RunnerId1");
 
                     b.ToTable("ProjectRunners");
                 });
@@ -1899,6 +1950,17 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppController", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                        .WithMany()
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WebApp");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
@@ -1921,10 +1983,14 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.AppVersion", "AppVersion")
-                        .WithMany("Steps")
+                        .WithMany()
                         .HasForeignKey("AppVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.AppVersion", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("AppVersionId1");
 
                     b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "Step")
                         .WithMany()
@@ -2272,10 +2338,14 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
 
                     b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
-                        .WithMany("ProjectRunners")
+                        .WithMany()
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Runner", null)
+                        .WithMany("ProjectRunners")
+                        .HasForeignKey("RunnerId1");
 
                     b.Navigation("AddedByUser");
 

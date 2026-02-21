@@ -22,9 +22,11 @@ services:
     command: ["service"]  # Run in non-interactive service mode
     volumes:
       # Persist runner configuration and registration
-      - runner-config:/app/.config/AutomatonRunner
+      - runner-config:/home/automaton/.config/AutomatonRunner
       # Persist logs
       - runner-logs:/app/logs
+      # Persist deployed backend scripts (app controllers)
+      - runner-data:/app/data
     networks:
       - runner-network
 
@@ -32,6 +34,8 @@ volumes:
   runner-config:
     driver: local
   runner-logs:
+    driver: local
+  runner-data:
     driver: local
 
 networks:

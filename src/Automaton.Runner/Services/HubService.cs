@@ -17,6 +17,8 @@ public class HubService
     private const string RunnerNameHeader = "RunnerName";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
+    private const string RunAppControllerActionMethod = "RunAppControllerAction";
+    private const string UploadControllerScriptMethod = "UploadControllerScript";
     private const string PingMethod = "Ping";
 
     private HubConnection? connection;
@@ -250,6 +252,18 @@ public class HubService
                 return ExecuteCustomStepHandler(customStep);
             });
 
+            // Register app controller action handler
+            connection.On<AppControllerPayload, AppControllerExecutionResponse>(RunAppControllerActionMethod, (payload) =>
+            {
+                return ExecuteAppControllerActionHandler(payload);
+            });
+
+            // Register controller script upload handler
+            connection.On<AppControllerUploadPayload, bool>(UploadControllerScriptMethod, (payload) =>
+            {
+                return UploadControllerScriptHandler(payload);
+            });
+
             connection.On(PingMethod, () =>
             {
                 logger.Debug("Received ping from server");
@@ -383,6 +397,70 @@ public class HubService
                 Finished = DateTime.UtcNow,
                 OutputVariables = []
             };
+        }
+    }
+
+    /// <summary>
+    /// Executes an app controller action on a background thread.
+    /// </summary>
+    private AppControllerExecutionResponse ExecuteAppControllerActionHandler(AppControllerPayload payload)
+    {
+        try
+        {
+            var task = Task.Run(async () =>
+            {
+                using var scope = serviceProvider.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<AppControllerExecuteService>();
+                return await handler.RunControllerAction(payload);
+            });
+
+            var result = task.GetAwaiter().GetResult();
+
+            logger.Information("Controller action {ControllerName}.{ActionName} completed with status: {Success}",
+                payload.ControllerName, payload.ActionName, result.Success ? "Success" : "Failed");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error executing controller action {ControllerName}.{ActionName}",
+                payload.ControllerName, payload.ActionName);
+            WriteLine($"❌ Controller action failed: {ex.Message}");
+
+            return new AppControllerExecutionResponse
+            {
+                Success = false,
+                Output = null,
+                Error = $"Handler exception: {ex.Message}",
+                Started = DateTime.UtcNow,
+                Finished = DateTime.UtcNow,
+                OutputVariables = []
+            };
+        }
+    }
+
+    /// <summary>
+    /// Receives a controller script from the server and writes it to local persistent volume.
+    /// Returns true on success; server uses this as acknowledgement.
+    /// </summary>
+    private bool UploadControllerScriptHandler(AppControllerUploadPayload payload)
+    {
+        try
+        {
+            AppControllerExecuteService.SaveScript(payload.AppId, payload.ControllerName, payload.Code, payload.Language);
+
+            logger.Information("Deployed controller script {ControllerName} for app {AppId}", 
+                payload.ControllerName, payload.AppId);
+            WriteLine($"📦 Deployed controller: {payload.ControllerName} (app {payload.AppId})");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to save controller script {ControllerName} for app {AppId}",
+                payload.ControllerName, payload.AppId);
+            WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
+            return false;
         }
     }
 

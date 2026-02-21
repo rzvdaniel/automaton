@@ -76,6 +76,15 @@ class AppsService {
   }
 
   /**
+   * Deploy backend scripts to the app's configured runner(s).
+   * POST /api/apps/{id}/backend/deploy
+   */
+  async deployBackend(id: string): Promise<{ success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; message: string }> {
+    const { data } = await apiClient.post(`/api/apps/${id}/backend/deploy`, {})
+    return data
+  }
+
+  /**
    * Update the execution runner for an app
    * PUT /api/apps/{id}/runner
    */

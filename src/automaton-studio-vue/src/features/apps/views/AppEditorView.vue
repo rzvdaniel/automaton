@@ -374,6 +374,32 @@ function handleCloseTab(event: Event, path: string) {
   }
 }
 
+// Handle deploy backend
+async function handleDeployBackend() {
+  try {
+    const result = await editorStore.deployBackend()
+    if (result.totalScripts === 0) {
+      toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
+    } else if (!result.deployedCount) {
+      toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.message, life: 5000 })
+    } else {
+      toast.add({
+        severity: 'success',
+        summary: 'Backend Deployed',
+        detail: `Deployed ${result.deployedCount} script(s) to ${result.runnerCount} runner(s)`,
+        life: 4000,
+      })
+    }
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Deploy Failed',
+      detail: err instanceof Error ? err.message : 'Failed to deploy backend',
+      life: 5000,
+    })
+  }
+}
+
 // Handle publish
 async function handlePublish(request: PublishAppRequest) {
   try {
@@ -717,6 +743,16 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             label="Publish"
             icon="pi pi-cloud-upload"
             @click="showPublishDialog = true"
+          />
+          <Button
+            v-if="editorStore.hasBackendFolder"
+            label="Deploy Backend"
+            icon="pi pi-server"
+            outlined
+            severity="secondary"
+            :loading="editorStore.isDeployingBackend"
+            v-tooltip.bottom="'Push backend scripts to runner'"
+            @click="handleDeployBackend"
           />
         </div>
       </div>

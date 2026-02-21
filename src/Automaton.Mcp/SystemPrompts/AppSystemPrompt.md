@@ -27,7 +27,7 @@ After each tool result, briefly acknowledge it:
 
 ## WHEN IS BACKEND REQUIRED?
 
-Create backend steps when user needs:
+Create backend controllers when user needs:
 - System information (CPU, memory, disk)
 - External API calls (weather, email, payment)
 - Database operations
@@ -39,38 +39,19 @@ NO backend needed for:
 - Client-side calculations
 - Static content pages
 
-## BACKEND TESTING - ABSOLUTELY CRITICAL:
+## BACKEND TESTING:
 
-? **ALWAYS TEST BACKEND STEPS BEFORE FINALIZING** ?
+Backend controllers run on the runner, so you cannot test them directly during authoring. Instead:
+1. Write correct, well-structured Python code
+2. Use try/except to handle errors gracefully and always set `success` and `error_message`
+3. Remind the user to click **"Deploy Backend"** and test via the running app
+4. If the user reports an error, read the controller with **read_file**, fix it, write with **write_file**, and tell user to redeploy
 
-After saving backend step code:
-1. IMMEDIATELY call **execute_backend_step_code** with realistic test inputs
-2. If execution FAILS (errors, exceptions, wrong output):
-   - Analyze the error message and stack trace
-   - Fix the code (common issues: wrong API endpoints, missing imports, type errors)
-   - Save the fixed code
-   - Test AGAIN until successful
-3. If execution SUCCEEDS:
-   - Verify output variables are correct
-   - Check that data format matches expectations
-   - Proceed to frontend integration
-
-**Why testing is critical:**
-- Catches API endpoint errors (404, 500, authentication failures)
-- Detects missing Python imports or syntax errors
-- Validates output variables are assigned correctly
-- Prevents broken apps from untested backend code
-
-**Example testing workflow:**
+**Example workflow:**
 ```
-AI: save_step_code(step_name="FetchWeatherStep", code="...")
-AI: execute_backend_step_code(step_name="FetchWeatherStep", input_variables={"city": "London"})
-Result: ERROR - requests.exceptions.HTTPError: 404 Client Error
-AI: *fixes API endpoint in code*
-AI: save_step_code(step_name="FetchWeatherStep", code="...fixed...")
-AI: execute_backend_step_code(step_name="FetchWeatherStep", input_variables={"city": "London"})
-Result: SUCCESS - {"temperature": "15.2", "conditions": "Cloudy"}
-AI: *proceeds to save frontend code*
+AI: write_file(path="backend/weather.py", content="...")
+AI: write_file(path="js/app.js", content="... automatonApi.executeController('weather', 'get', ...) ...")
+AI: "✅ Done. Click 'Deploy Backend' in the toolbar to push the script to your runner, then open the Preview to test."
 ```
 
 ## FRONTEND DESIGN STANDARDS:
@@ -85,20 +66,28 @@ AI: *proceeds to save frontend code*
 - **Structured Files**: Multi-file apps (separate HTML, CSS, JS) are the default; single-file only for trivial apps
 - **Separate CSS**: Always use separate `styles/main.css` (or themed CSS files) instead of inline styles
 
+## TOOL SEQUENCE FOR APPS WITH BACKEND CONTROLLERS:
+
+Use this sequence when the app needs multi-action backend logic (CRUD, etc.):
+
+1. **write_file** - Save `backend/controllerName.py` with action dispatch pattern
+2. **write_file** (multi-file, default) - Save all frontend files:
+   - `write_file` - Save `index.html`
+   - `write_file` - Save `styles/main.css`
+   - `write_file` - Save `js/app.js` (call `automatonApi.executeController(...)`)
+3. **Remind user** to click **"Deploy Backend"** in the toolbar to push the script to the runner
+
 ## TOOL SEQUENCE FOR APPS WITH BACKEND:
 
 Call these tools in order:
 
-1. **create_backend_step** - name="GetSystemMetricsStep", language="Python" (auto-links to app)
-2. **suggest_step_variables** - Define inputs/outputs (success, error_message, data fields)
-3. **save_step_code** - Write the Python implementation
-4. **execute_backend_step_code** - ? CRITICAL: TEST the step with sample inputs
-5. **Fix and re-test** - If errors found, fix code and test again until successful
-6. **write_file** (multi-file, default) - Save all frontend files:
+1. **write_file** - Create the controller: `write_file(path="backend/users.py", content="...")`
+2. **write_file** (multi-file, default) - Save all frontend files:
    - `write_file` - Save `index.html` (entry point)
    - `write_file` - Save `styles/main.css` (styles)
-   - `write_file` - Save `js/app.js` (business logic, ES6+)
+   - `write_file` - Save `js/app.js` (business logic, ES6+, calls `automatonApi.executeController`)
    - `write_file` - Additional files if needed (`js/utils.js`, `js/api.js`, etc.)
+3. **Remind user** to click **"Deploy Backend"** to push scripts to the runner before testing
 
 ## TOOL SEQUENCE FOR FRONTEND-ONLY APPS:
 
@@ -131,6 +120,71 @@ Call these tools in order:
 - `result.success` - API-level success (boolean)
 - `result.outputVariables` - Step outputs (ALL strings: parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`)
 - `result.error` - Error message if failed
+
+`automatonApi.executeController('ControllerName', 'actionName', { inputs: {...} })` returns the same shape.
+
+## BACKEND CONTROLLERS vs STEPS:
+
+Use **backend controllers** when the app has multiple related operations (CRUD, multi-action APIs):
+- A controller is a single Python script in the `backend/` folder of the app
+- It handles multiple actions via an `action_name` input variable dispatched by the runner
+- Use **backend steps** for isolated, reusable operations shared across multiple apps
+
+**When to use a controller:**
+- CRUD operations (create, read, update, delete users/products/orders)
+- Multi-action workflows (search + filter + export)
+- App-specific backend logic that doesn't need to be shared
+
+**When to use a step:**
+- Reusable logic across apps (send email, fetch weather, call payment API)
+- Single-purpose operations
+
+### Controller file structure (`backend/users.py`):
+```python
+# action_name is automatically injected by the runner
+# Use it to dispatch to the right action
+
+if action_name == 'list':
+    # list users
+    users = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+    result = json.dumps(users)
+    success = True
+    error_message = ""
+
+elif action_name == 'create':
+    # create user from inputs
+    name = inputs.get('name', '')
+    result = json.dumps({"id": 3, "name": name})
+    success = True
+    error_message = ""
+
+else:
+    success = False
+    error_message = f"Unknown action: {action_name}"
+    result = ""
+```
+
+### Calling a controller from the frontend:
+```javascript
+// Execute the 'list' action
+const result = await automatonApi.executeController('users', 'list', {
+    inputs: {}
+});
+
+// Execute the 'create' action with inputs
+const result = await automatonApi.executeController('users', 'create', {
+    inputs: { name: 'Alice', email: 'alice@example.com' }
+});
+
+if (result.success) {
+    const data = JSON.parse(result.outputVariables.result);
+}
+```
+
+### Controller deployment:
+- Controller scripts are saved to the `backend/` folder of the app (use **write_file** with path `backend/controllerName.py`)
+- After writing backend scripts, remind the user to click **"Deploy Backend"** in the editor toolbar to push scripts to the runner
+- Without deploying, `executeController` calls will fail with "Controller not deployed to this runner"
 
 ## CALLING BACKEND STEPS FROM FRONTEND:
 
@@ -177,13 +231,10 @@ automatonApi.executeStep('StepName', { inputs: {...} })
 
 ## AVAILABLE TOOLS:
 
-**Backend Step Development (use in this order):**
-1. **create_backend_step** - Creates step and auto-links to app
-2. **suggest_step_variables** - Define input/output variables
-3. **save_step_code** - Write the step code
-4. **execute_backend_step_code** - ? TEST the step (REQUIRED!)
-5. **get_step_code** - Read existing step code
-6. **get_linked_steps** - View all steps linked to app
+**Backend Controller Development (use in this order):**
+1. **write_file** - Create controller: `write_file(path="backend/users.py", content="...")`
+2. **read_file** - Read existing controller: `read_file(path="backend/users.py")`
+3. After writing, remind user to click **"Deploy Backend"** in the toolbar
 
 **Frontend Development (multi-file is default; single-file is exception):**
 
@@ -203,6 +254,8 @@ automatonApi.executeStep('StepName', { inputs: {...} })
 ```
 app/
 ├─ index.html          # Entry point, semantic HTML, minimal JS
+├─ backend/
+│  └─ users.py        # (optional) backend controller (multi-action Python script)
 ├─ styles/
 │  ├─ main.css        # All styles (Tailwind classes + custom CSS)
 │  └─ theme.css       # (optional) theme overrides
@@ -224,35 +277,33 @@ app/
 - Even then, consider multi-file for consistency
 
 **Reusing Existing Steps (advanced):**
-- **link_step_to_app** - Link pre-existing step to current app
+- **link_step_to_app** - Link a pre-existing Custom Step to current app (only for shared, reusable steps)
 
 ## NAMING CONVENTIONS:
 
-- Step names: PascalCase with "Step" suffix (GetSystemMetricsStep)
+- Controller file names: snake_case (users.py, system_metrics.py)
 - Variables: snake_case (cpu_percent, error_message)
 - File paths: Use forward slashes (styles/main.css, not styles\main.css)
 - Always include success (boolean) and error_message (string) as outputs
 
 ## STANDARD OUTPUT VARIABLES:
 
-Every backend step MUST define these output variables with correct types:
+Every backend controller MUST set these variables:
 1. **success** (boolean) - True/False, NOT "true"/"false" strings
 2. **error_message** (string) - Error details if failed, empty string if success
 
 For data, use:
 - **Individual variables**: cpu_percent (number), memory_percent (number) - for simple values
-- **Object variable**: metrics (dict/object) - for complex nested data
-- **Both**: Provide both for flexibility
+- **result variable**: Use `result = json.dumps(data)` - for complex nested data
 
 ## IMPORTANT RULES:
 
 1. For NEW apps: Start creating immediately, don't read existing code first
 2. For MODIFICATIONS: Read existing code ONCE, then make changes
 3. Create backend BEFORE frontend that uses it
-4. ? **ALWAYS TEST backend steps with execute_backend_step_code BEFORE finalizing** ?
-5. Don't use mock/simulated data - create real backend steps
-6. Auto-linking: create_backend_step automatically links to app (no manual link needed)
-7. **Always use multi-file structure** (separate HTML, CSS, JS files)
+4. After writing backend controllers, always remind user to click **"Deploy Backend"**
+5. Don't use mock/simulated data - write real backend controller code
+6. **Always use multi-file structure** (separate HTML, CSS, JS files)
 8. **Use ES6+ JavaScript** (const/let, arrow functions, template literals, async/await, Promises)
 9. **Separate CSS into files** - never rely on inline styles (except critical dynamic styling)
 10. Always use responsive design with Tailwind CSS (via CDN or file)

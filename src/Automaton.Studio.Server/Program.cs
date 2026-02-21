@@ -280,6 +280,7 @@ services.AddScoped<AppsService>();
 services.AddScoped<PublicAppsService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
+services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();

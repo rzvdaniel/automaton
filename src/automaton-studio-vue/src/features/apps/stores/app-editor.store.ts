@@ -57,6 +57,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const isLoading = ref(false)
   const isSaving = ref(false)
   const isLoadingPreview = ref(false)
+  const isDeployingBackend = ref(false)
 
   // Error state
   const error = ref<string | null>(null)
@@ -109,6 +110,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Public URL slug
    */
   const publicUrl = computed(() => currentApp.value?.publicUrl ?? '')
+
+  /**
+   * Check if app has a backend/ folder (deploy button should be visible)
+   */
+  const hasBackendFolder = computed(() =>
+    fileTree.value.some((node) => node.type === 'folder' && node.name === 'backend'),
+  )
 
   // ============================================
   // Actions
@@ -559,6 +567,20 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Deploy backend scripts to the app's configured runner(s)
+   */
+  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; message: string }> {
+    if (!currentApp.value) throw new Error('No app loaded')
+    isDeployingBackend.value = true
+    try {
+      const result = await appsService.deployBackend(currentApp.value.id)
+      return result
+    } finally {
+      isDeployingBackend.value = false
+    }
+  }
+
+  /**
    * Update the execution runner for the current app
    */
   async function updateAppRunner(runnerId: string | null): Promise<void> {
@@ -835,6 +857,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoading,
     isSaving,
     isLoadingPreview,
+    isDeployingBackend,
     error,
     showPreviewOverlay,
     consoleEntries,
@@ -846,6 +869,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     mainHtmlFile,
     isPublished,
     publicUrl,
+    hasBackendFolder,
 
     // Actions
     loadApp,
@@ -862,6 +886,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewWarning,
     publishApp,
     unpublishApp,
+    deployBackend,
     updateAppRunner,
     createBackendStep,
     unlinkStep,

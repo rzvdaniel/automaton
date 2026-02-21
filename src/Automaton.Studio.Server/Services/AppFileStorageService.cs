@@ -30,7 +30,9 @@ public class AppFileStorageService
         // Fonts
         ".woff", ".woff2", ".ttf", ".eot", ".otf",
         // Other web assets
-        ".map", ".ts", ".tsx", ".jsx", ".vue", ".scss", ".sass", ".less"
+        ".map", ".ts", ".tsx", ".jsx", ".vue", ".scss", ".sass", ".less",
+        // Backend controller scripts (app-owned, executed on runner — not on server)
+        ".py", ".bat"
     };
 
     public AppFileStorageService(IWebHostEnvironment webHostEnvironment)
@@ -432,4 +434,117 @@ public class AppFileStorageService
         public IList<string>? ConnectedFlowIds { get; set; }
         public DateTime LastModified { get; set; }
     }
+
+    // ── Backend controller file helpers ──────────────────────────────────────
+
+    private const string BackendFolder = "backend";
+
+    /// <summary>
+    /// Returns the file extension for a given script language (e.g. "Python" → ".py").
+    /// </summary>
+    public static string GetControllerExtension(string language) => language.ToLowerInvariant() switch
+    {
+        "python" => ".py",
+        "batch"  => ".bat",
+        _        => ".txt"
+    };
+
+    /// <summary>
+    /// Reads the controller code from the app's backend/ folder.
+    /// File: AppData/apps/{userId}/{appId}/backend/{controllerName}{ext}
+    /// </summary>
+    public async Task<string?> ReadControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var ext = GetControllerExtension(language);
+        var filePath = Path.Combine(appPath, BackendFolder, controllerName + ext);
+        if (!File.Exists(filePath)) return null;
+        return await File.ReadAllTextAsync(filePath);
+    }
+
+    /// <summary>
+    /// Writes controller code to the app's backend/ folder.
+    /// </summary>
+    public async Task WriteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language, string code)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var backendPath = Path.Combine(appPath, BackendFolder);
+        Directory.CreateDirectory(backendPath);
+
+        var ext = GetControllerExtension(language);
+        var filePath = Path.Combine(backendPath, controllerName + ext);
+
+        // Security: ensure path stays within app directory
+        if (!Path.GetFullPath(filePath).StartsWith(Path.GetFullPath(appPath)))
+            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
+
+        await File.WriteAllTextAsync(filePath, code);
+        logger.Information("Wrote controller {Name} for app {AppId}", controllerName, appId);
+    }
+
+    /// <summary>
+    /// Deletes a controller code file from the app's backend/ folder.
+    /// </summary>
+    public Task DeleteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
+    {
+        var appPath = GetAppPath(userId, appId);
+        var ext = GetControllerExtension(language);
+        var filePath = Path.Combine(appPath, BackendFolder, controllerName + ext);
+        if (File.Exists(filePath)) File.Delete(filePath);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Lists all controller script files in the app's backend/ folder.
+    /// </summary>
+    public async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesAsync(Guid userId, Guid appId)
+    {
+        var backendPath = Path.Combine(GetAppPath(userId, appId), BackendFolder);
+        if (!Directory.Exists(backendPath)) return [];
+
+        var results = new List<BackendScriptFile>();
+        foreach (var file in Directory.GetFiles(backendPath))
+        {
+            var ext = Path.GetExtension(file).ToLowerInvariant();
+            if (ext is ".py" or ".bat" or ".txt")
+            {
+                var code = await File.ReadAllTextAsync(file);
+                results.Add(new BackendScriptFile(
+                    Path.GetFileNameWithoutExtension(file),
+                    code,
+                    GetLanguageFromExtension(ext)));
+            }
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// Finds a controller file by name (any supported extension) in the app's backend/ folder.
+    /// Returns (code, language) or null if not found.
+    /// File: AppData/apps/{userId}/{appId}/backend/{controllerName}.{py|bat|...}
+    /// </summary>
+    public async Task<(string Code, string Language)?> FindControllerFileAsync(Guid userId, Guid appId, string controllerName)
+    {
+        var backendPath = Path.Combine(GetAppPath(userId, appId), BackendFolder);
+        if (!Directory.Exists(backendPath)) return null;
+
+        foreach (var ext in new[] { ".py", ".bat", ".txt" })
+        {
+            var filePath = Path.Combine(backendPath, controllerName + ext);
+            if (File.Exists(filePath))
+            {
+                var code = await File.ReadAllTextAsync(filePath);
+                return (code, GetLanguageFromExtension(ext));
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Maps a file extension to a language name.</summary>
+    public static string GetLanguageFromExtension(string ext) => ext.ToLowerInvariant() switch
+    {
+        ".py"  => "Python",
+        ".bat" => "Batch",
+        _      => "Text"
+    };
 }
