@@ -96,7 +96,7 @@ Call these tools in order:
    - Multiple HTML pages if building a traditional multi-page flow
 
 **Single-file (only if trivial):**
-1. **save_app_code** - Save the HTML/CSS/JavaScript in one file
+1. **write_file** - Save `index.html` with all HTML/CSS/JavaScript inline
    - Use only for simple, prototype apps
    - Keep inline styles minimal; still load Tailwind CSS
 
