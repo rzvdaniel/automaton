@@ -3,115 +3,34 @@
  * FileTree.vue
  * File explorer component for the App Editor
  * Displays hierarchical file structure with icons and context menu
- * Includes a virtual "backend" folder for linked backend steps
  */
 import { ref, computed } from 'vue'
 import Tree from 'primevue/tree'
 import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
-import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { FileNode, LinkedStepInfo } from '../types/apps.types'
+import type { FileNode } from '../types/apps.types'
 
 const emit = defineEmits<{
   createFile: []
   createFolder: []
   deleteFile: [path: string]
   renameFile: [path: string]
-  createStep: []
 }>()
 
-const confirm = useConfirm()
-const toast = useToast()
 const editorStore = useAppEditorStore()
 
 // Context menu reference
 const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedContextNode = ref<FileNode | null>(null)
-const selectedContextStep = ref<LinkedStepInfo | null>(null)
 
 // Tree selection
 const selectedKey = ref<Record<string, boolean>>({})
 
 // Convert FileNode[] to PrimeVue Tree format
 const treeNodes = computed(() => {
-  const appFiles = convertToTreeNodes(editorStore.fileTree)
-
-  // Add backend folder with steps
-  if (editorStore.linkedSteps.length > 0) {
-    const backendFolder = {
-      key: 'backend',
-      label: 'backend',
-      data: {
-        key: 'backend',
-        name: 'backend',
-        path: 'backend',
-        type: 'folder',
-        isBackendFolder: true,
-      } as FileNode & { isBackendFolder: boolean },
-      icon: 'pi pi-server',
-      children: editorStore.linkedSteps.map((step) => ({
-        key: `backend/${step.name}`,
-        label: `${step.displayName || step.name}.${getStepExtension(step.language)}`,
-        data: {
-          ...step,
-          isBackendStep: true,
-          path: `backend/${step.name}.${getStepExtension(step.language)}`,
-        },
-        icon: getStepIcon(step.language),
-        leaf: true,
-      })),
-      leaf: false,
-    }
-    appFiles.push(backendFolder)
-  } else {
-    // Show empty backend folder with "+" indication
-    const backendFolder = {
-      key: 'backend',
-      label: 'backend',
-      data: {
-        key: 'backend',
-        name: 'backend',
-        path: 'backend',
-        type: 'folder',
-        isBackendFolder: true,
-      } as FileNode & { isBackendFolder: boolean },
-      icon: 'pi pi-server',
-      children: [],
-      leaf: false,
-    }
-    appFiles.push(backendFolder)
-  }
-
-  return appFiles
+  return convertToTreeNodes(editorStore.fileTree)
 })
-
-function getStepExtension(language: string): string {
-  switch (language?.toLowerCase()) {
-    case 'python':
-      return 'py'
-    case 'powershell':
-      return 'ps1'
-    case 'batch':
-      return 'bat'
-    default:
-      return 'py'
-  }
-}
-
-function getStepIcon(language: string): string {
-  switch (language?.toLowerCase()) {
-    case 'python':
-      return 'pi pi-code'
-    case 'powershell':
-      return 'pi pi-terminal'
-    case 'batch':
-      return 'pi pi-desktop'
-    default:
-      return 'pi pi-file'
-  }
-}
 
 function convertToTreeNodes(nodes: FileNode[]): any[] {
   return nodes.map((node) => ({
@@ -150,15 +69,6 @@ function getFileIcon(extension: string): string {
 // Handle node selection (click)
 function onNodeSelect(node: any) {
   const data = node.data
-
-  // Handle backend step
-  if (data?.isBackendStep) {
-    const step = data as LinkedStepInfo & { isBackendStep: boolean }
-    editorStore.openBackendStep(step)
-    return
-  }
-
-  // Handle regular file
   const fileNode = data as FileNode
   if (fileNode.type === 'file') {
     editorStore.openFile(fileNode.path)
@@ -169,66 +79,15 @@ function onNodeSelect(node: any) {
 function onNodeContextMenu(event: any) {
   const node = event.node
   if (!node) return
-
-  const data = node.data
-
-  // Handle backend step context menu
-  if (data?.isBackendStep) {
-    selectedContextStep.value = data as LinkedStepInfo
-    selectedContextNode.value = null
-  } else if (data?.isBackendFolder) {
-    // Backend folder context menu
-    selectedContextNode.value = data as FileNode
-    selectedContextStep.value = null
-  } else {
-    selectedContextNode.value = data as FileNode
-    selectedContextStep.value = null
-  }
-
+  selectedContextNode.value = node.data as FileNode
   contextMenu.value?.show(event.originalEvent)
 }
 
 // Context menu items
 const contextMenuItems = computed(() => {
-  // Backend step context menu
-  if (selectedContextStep.value) {
-    const step = selectedContextStep.value
-    return [
-      {
-        label: 'Open',
-        icon: 'pi pi-folder-open',
-        command: () => editorStore.openBackendStep(step),
-      },
-      {
-        label: 'Copy API Code',
-        icon: 'pi pi-copy',
-        command: () => copyStepCode(step),
-      },
-      { separator: true },
-      {
-        label: 'Unlink from App',
-        icon: 'pi pi-times',
-        class: 'text-red-500',
-        command: () => handleUnlinkStep(step),
-      },
-    ]
-  }
-
   const node = selectedContextNode.value
   if (!node) return []
 
-  // Backend folder context menu
-  if ((node as any).isBackendFolder) {
-    return [
-      {
-        label: 'New Backend Step',
-        icon: 'pi pi-plus',
-        command: () => emit('createStep'),
-      },
-    ]
-  }
-
-  // Regular file/folder context menu
   const items: any[] = []
 
   if (node.type === 'file') {
@@ -255,56 +114,6 @@ const contextMenuItems = computed(() => {
   return items
 })
 
-// Copy step usage code
-async function copyStepCode(step: LinkedStepInfo) {
-  const code = `await automatonApi.executeStep('${step.name}', { inputs: {} });`
-  try {
-    await navigator.clipboard.writeText(code)
-    toast.add({
-      severity: 'success',
-      summary: 'Copied',
-      detail: 'API code copied to clipboard',
-      life: 2000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to copy code',
-      life: 3000,
-    })
-  }
-}
-
-// Handle unlink step
-function handleUnlinkStep(step: LinkedStepInfo) {
-  confirm.require({
-    message: `Unlink step "${step.displayName || step.name}" from this app?`,
-    header: 'Confirm Unlink',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Unlink',
-    rejectLabel: 'Cancel',
-    accept: async () => {
-      try {
-        await editorStore.unlinkStep(step.id)
-        toast.add({
-          severity: 'success',
-          summary: 'Unlinked',
-          detail: 'Step unlinked from app',
-          life: 3000,
-        })
-      } catch (err: unknown) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: err instanceof Error ? err.message : 'Failed to unlink step',
-          life: 5000,
-        })
-      }
-    },
-  })
-}
-
 // Check if a file is active
 function isActive(path: string): boolean {
   return editorStore.activeFilePath === path
@@ -313,11 +122,6 @@ function isActive(path: string): boolean {
 // Check if a file has unsaved changes
 function isDirty(path: string): boolean {
   return editorStore.openFiles.some((f) => f.path === path && f.isDirty)
-}
-
-// Check if node is a backend step
-function isBackendStep(node: any): boolean {
-  return node?.data?.isBackendStep === true
 }
 </script>
 
@@ -353,12 +157,10 @@ function isBackendStep(node: any): boolean {
             :class="{
               'tree-node-active': isActive(node.data?.path),
               'tree-node-dirty': isDirty(node.data?.path),
-              'tree-node-backend': isBackendStep(node),
             }"
           >
             <span>{{ node.label }}</span>
             <span v-if="isDirty(node.data?.path)" class="dirty-indicator">*</span>
-            <span v-if="isBackendStep(node)" class="backend-badge">step</span>
           </div>
         </template>
       </Tree>
@@ -448,24 +250,10 @@ function isBackendStep(node: any): boolean {
   font-style: italic;
 }
 
-.tree-node-backend {
-  color: var(--p-text-color);
-}
-
 .dirty-indicator {
   color: var(--p-orange-500);
   margin-left: 0.25rem;
   font-weight: bold;
-}
-
-.backend-badge {
-  margin-left: 0.5rem;
-  font-size: 0.6rem;
-  padding: 0.1rem 0.3rem;
-  background-color: var(--p-primary-100);
-  color: var(--p-primary-700);
-  border-radius: 4px;
-  font-weight: 500;
 }
 
 .empty-state {
@@ -484,10 +272,5 @@ function isBackendStep(node: any): boolean {
 
 :global(.app-dark) .file-tree-component :deep(.p-tree-node-content:hover) {
   background-color: var(--p-surface-800);
-}
-
-:global(.app-dark) .backend-badge {
-  background-color: var(--p-primary-900);
-  color: var(--p-primary-300);
 }
 </style>
