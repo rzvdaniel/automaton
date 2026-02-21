@@ -470,6 +470,16 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     // Process new messages
     if (update.messages && update.messages.length > 0) {
       for (const message of update.messages) {
+        // Accumulate token usage from completed messages
+        if (message.inputTokens || message.outputTokens) {
+          if (activeSession.value) {
+            activeSession.value.totalInputTokens += message.inputTokens || 0
+            activeSession.value.totalOutputTokens += message.outputTokens || 0
+            activeSession.value.totalTokens = activeSession.value.totalInputTokens + activeSession.value.totalOutputTokens
+            activeSession.value.totalPromptsSubmitted += 1
+          }
+        }
+
         // Only add assistant messages (user message already added)
         if (message.role === 'assistant') {
           const existingMessage = messages.value.find(

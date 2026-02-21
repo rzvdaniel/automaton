@@ -49,6 +49,10 @@ export interface ConversationMessage {
   content: string
   toolCallId?: string
   toolName?: string
+  // Token usage (from AI provider)
+  inputTokens?: number
+  outputTokens?: number
+  model?: string
 }
 
 export interface StreamConversationRequest {
