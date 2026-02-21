@@ -375,8 +375,22 @@ public class OpenAiProvider : IAiProvider
         if (!responseMessage.IsSuccessStatusCode)
         {
             _logger.LogError("OpenAI responses API error: {Status} {Body}", responseMessage.StatusCode, responseContent);
+
+            // Try to extract a meaningful error message from the response body
+            string errorDetail = responseContent;
+            try
+            {
+                using var errDoc = JsonDocument.Parse(responseContent);
+                if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
+                    errEl.TryGetProperty("message", out var msgEl))
+                {
+                    errorDetail = msgEl.GetString() ?? responseContent;
+                }
+            }
+            catch { /* fall back to raw body */ }
+
             throw new InvalidOperationException(
-                $"OpenAI responses API error: {responseMessage.StatusCode}");
+                $"OpenAI responses API error: {responseMessage.StatusCode} - {errorDetail}");
         }
 
         using var responseDoc = JsonDocument.Parse(responseContent);
