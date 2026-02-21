@@ -277,9 +277,19 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         provider: selectedProvider.value || undefined,
         model: selectedModel.value || undefined,
       })
-      
+
       sessions.value.push(session)
-      await activateSession(session.id)
+
+      // Activate on the server
+      await aiChatHistoryService.activateSession(session.id)
+
+      // Update local state without loading messages — new sessions are always empty,
+      // and callers may have already added an optimistic user message we must not clear.
+      sessions.value.forEach((s) => {
+        s.isActive = s.id === session.id
+      })
+      activeSession.value = session
+      if (activeSession.value) activeSession.value.isActive = true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to create session'
       console.error('Error creating session:', err)
@@ -369,8 +379,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
   /**
    * Send a message to the AI
+   * @param userMessageAlreadyAdded - set true when the caller has already pushed the user
+   *   message into `messages` optimistically, so we don't add it a second time.
    */
-  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>) {
+  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>, userMessageAlreadyAdded = false) {
     if (!userMessage.trim() || isGenerating.value) return
     if (!selectedModel.value) {
       error.value = 'Please select an AI model'
@@ -382,14 +394,16 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       await getOrCreateActiveSession()
     }
 
-    // Add user message to chat
+    // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: userMessage,
       timestamp: new Date(),
     }
-    messages.value.push(userChatMessage)
+    if (!userMessageAlreadyAdded) {
+      messages.value.push(userChatMessage)
+    }
 
     // Reset error
     error.value = null

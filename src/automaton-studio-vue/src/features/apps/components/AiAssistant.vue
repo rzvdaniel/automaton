@@ -82,6 +82,11 @@ const deleteConfirmationSessionId = ref<string | null>(null)
 const sessionsSearchQuery = ref('')
 const isGeneratingSessionName = ref(false) // Track when session name is being generated
 const isResumingSession = ref(false)
+// True while we're setting up a brand-new session before the AI starts streaming.
+// Drives loading indicators immediately on submit so the user doesn't wait.
+const isPreparingSession = ref(false)
+// Combined "busy" flag: true when preparing the session OR when the AI is generating
+const isBusy = computed(() => isPreparingSession.value || isGenerating.value)
 const sortedSessions = computed(() => {
   return [...sessions.value].sort((a, b) => {
     // Active session first, then by creation date descending
@@ -242,7 +247,7 @@ watch(
 
 // Send message with optimistic UI
 async function sendMessage() {
-  if (!userInput.value.trim() || isGenerating.value) return
+  if (!userInput.value.trim() || isBusy.value) return
 
   const messageContent = userInput.value.trim()
   userInput.value = ''
@@ -250,16 +255,32 @@ async function sendMessage() {
   // If we're in the sessions list view, always create a new session
   // If we're in chat view with no active session, also create one
   if (currentView.value === 'sessions' || !activeSession.value) {
-    // Optimistic UI: Create session immediately with temporary name
-    // This creates the session on the backend with a temporary title
-    const temporaryName = 'Generating...'
-    await createSession(temporaryName)
-    emit('sessionCreated')
-    
-    // Switch to chat view immediately (better UX - no waiting in sessions list)
+    // 1. Navigate to chat view immediately — user should not wait on the sessions list
     currentView.value = 'chat'
-    
-    // Build context for AI message
+
+    // 2. Add user message optimistically so it appears before any backend calls complete
+    messages.value.push({
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: messageContent,
+      timestamp: new Date(),
+    })
+
+    // 3. Show loading indicator immediately — createSession takes a few backend calls
+    isPreparingSession.value = true
+
+    try {
+      // 4. Create the session on the backend (activate only — messages are not loaded
+      //    because a brand-new session is always empty and we already have the user message above)
+      const temporaryName = 'Generating...'
+      await createSession(temporaryName)
+      emit('sessionCreated')
+    } finally {
+      // isGenerating will take over once sendAiMessage runs
+      isPreparingSession.value = false
+    }
+
+    // 5. Build context for AI message
     const context: Record<string, any> = {
       resourceType: props.resourceType,
       resourceId: props.resourceId,
@@ -274,8 +295,8 @@ async function sendMessage() {
       props.systemPrompt ||
       'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
 
-    // Send message to AI (ui already shows it in chat)
-    const sendPromise = sendAiMessage(messageContent, systemPrompt, context)
+    // 6. Send to AI — pass true so sendAiMessage doesn't add the user message a second time
+    const sendPromise = sendAiMessage(messageContent, systemPrompt, context, true)
     
     // Generate proper session name in parallel (don't await - let it run in background)
     generateAndUpdateSessionName(messageContent)
@@ -453,14 +474,14 @@ function handleKeyPress(event: KeyboardEvent) {
             v-model="userInput"
             placeholder="Ask AI a question..."
             class="flex-1"
-            :disabled="isGenerating"
+            :disabled="isBusy"
             @keypress="handleKeyPress"
           />
           <Button
             v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
             icon="pi pi-send"
-            :disabled="!userInput.trim() || isGenerating || !selectedModel"
-            :loading="isGenerating"
+            :disabled="!userInput.trim() || isBusy || !selectedModel"
+            :loading="isBusy"
             @click="sendMessage"
           />
         </div>
@@ -502,7 +523,7 @@ function handleKeyPress(event: KeyboardEvent) {
               placeholder="Model"
               size="small"
               class="model-select"
-              :disabled="isGenerating || availableModels.length === 0"
+              :disabled="isBusy || availableModels.length === 0"
             />
           </div>
         </div>
@@ -551,7 +572,7 @@ function handleKeyPress(event: KeyboardEvent) {
               <div
                 class="timeline-item"
                 :class="[
-                  { 'is-last': index === messages.length - 1 && !isGenerating },
+                  { 'is-last': index === messages.length - 1 && !isBusy },
                   message.toolName ? 'has-tool' : 'regular'
                 ]"
               >
@@ -559,7 +580,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 <div class="timeline-bullet" :class="[message.toolName ? 'tool' : 'regular']">•</div>
 
                 <!-- Connector line (visible if more messages follow) -->
-                <div v-if="index < messages.length - 1 || isGenerating" class="timeline-connector"></div>
+                <div v-if="index < messages.length - 1 || isBusy" class="timeline-connector"></div>
 
                 <!-- Message content -->
                 <div class="timeline-content">
@@ -578,7 +599,7 @@ function handleKeyPress(event: KeyboardEvent) {
           </template>
 
           <!-- Generating indicator -->
-          <div v-if="isGenerating" class="timeline">
+          <div v-if="isBusy" class="timeline">
             <div class="timeline-item">
               <div class="timeline-bullet">•</div>
               <div class="timeline-content">
@@ -619,14 +640,14 @@ function handleKeyPress(event: KeyboardEvent) {
             v-model="userInput"
             placeholder="Describe what you want..."
             class="flex-1"
-            :disabled="isGenerating"
+            :disabled="isBusy"
             @keypress="handleKeyPress"
           />
           <Button
             v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
             icon="pi pi-send"
-            :disabled="!userInput.trim() || isGenerating || !selectedModel"
-            :loading="isGenerating"
+            :disabled="!userInput.trim() || isBusy || !selectedModel"
+            :loading="isBusy"
             @click="sendMessage"
           />
           <Button
