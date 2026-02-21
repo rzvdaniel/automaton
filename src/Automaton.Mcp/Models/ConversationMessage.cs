@@ -12,4 +12,11 @@ public record ConversationMessage(string Role, string Content)
     /// Indicates if this message is still being streamed (partial content)
     /// </summary>
     public bool IsStreaming { get; init; } = false;
+    
+    /// <summary>
+    /// Token usage for AI-generated messages
+    /// </summary>
+    public int? InputTokens { get; init; }
+    public int? OutputTokens { get; init; }
+    public string? Model { get; init; }
 }

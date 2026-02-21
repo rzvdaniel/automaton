@@ -305,7 +305,7 @@ public class AnthropicProvider : IAiProvider
         string conversationId,
         CancellationToken cancellationToken)
     {
-        var result = new StreamResult();
+        var result = new StreamResult { Model = messageParams.Model };
         var currentText = new StringBuilder();
         var toolUseBlocks = new Dictionary<int, ToolUseInfo>();
 
@@ -319,6 +319,14 @@ public class AnthropicProvider : IAiProvider
 
             await foreach (var streamEvent in client.Messages.StreamClaudeMessageAsync(messageParams, cancellationToken))
             {
+                // Capture usage tokens if available (usually in final event)
+                if (streamEvent.Usage != null)
+                {
+                    result.InputTokens = streamEvent.Usage.InputTokens;
+                    result.OutputTokens = streamEvent.Usage.OutputTokens;
+                    // Model is consistent across the stream, captured at start
+                }
+
                 // Handle text content
                 if (streamEvent.Delta?.Text != null)
                 {
@@ -376,7 +384,7 @@ public class AnthropicProvider : IAiProvider
         var finalText = currentText.ToString();
         if (!string.IsNullOrWhiteSpace(finalText))
         {
-            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true);
+            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true, inputTokens: result.InputTokens, outputTokens: result.OutputTokens, model: result.Model);
             result.TextContent = finalText;
         }
 
@@ -475,7 +483,7 @@ public class AnthropicProvider : IAiProvider
         }
     }
 
-    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete)
+    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete, int? inputTokens = null, int? outputTokens = null, string? model = null)
     {
         try
         {
@@ -493,7 +501,10 @@ public class AnthropicProvider : IAiProvider
 
             var message = new ConversationMessage("assistant", text)
             {
-                IsStreaming = !isComplete
+                IsStreaming = !isComplete,
+                InputTokens = isComplete ? inputTokens : null,
+                OutputTokens = isComplete ? outputTokens : null,
+                Model = isComplete ? model : null
             };
 
             ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
@@ -517,6 +528,11 @@ public class AnthropicProvider : IAiProvider
         public string? TextContent { get; set; }
         public string? StopReason { get; set; }
         public List<ToolUseBlockInfo> ToolUseBlocks { get; } = new();
+        
+        // Token usage from API response
+        public int? InputTokens { get; set; }
+        public int? OutputTokens { get; set; }
+        public string? Model { get; set; }
     }
 
     private class ToolUseBlockInfo

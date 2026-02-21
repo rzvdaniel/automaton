@@ -392,6 +392,9 @@ public class AiConversationController : BaseController
                     Role = message.Role,
                     Content = message.Content,
                     MessageType = ChatMessageType.Text,
+                    InputTokens = message.InputTokens,
+                    OutputTokens = message.OutputTokens,
+                    Model = message.Model,
                     Metadata = "{}"
                 }, userId);
 

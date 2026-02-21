@@ -127,7 +127,7 @@ public class OpenAiProvider : IAiProvider
         }
     }
 
-    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete)
+    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete, int? inputTokens = null, int? outputTokens = null, string? model = null)
     {
         try
         {
@@ -145,7 +145,10 @@ public class OpenAiProvider : IAiProvider
 
             var message = new ConversationMessage("assistant", text)
             {
-                IsStreaming = !isComplete
+                IsStreaming = !isComplete,
+                InputTokens = isComplete ? inputTokens : null,
+                OutputTokens = isComplete ? outputTokens : null,
+                Model = isComplete ? model : null
             };
 
             ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
@@ -256,7 +259,8 @@ public class OpenAiProvider : IAiProvider
                 {
                     if (!string.IsNullOrWhiteSpace(response.OutputText))
                     {
-                        EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true);
+                        EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
+                            inputTokens: response.InputTokens, outputTokens: response.OutputTokens, model: response.Model);
                         responseBuilder.AppendLine(response.OutputText);
                     }
 
@@ -265,7 +269,8 @@ public class OpenAiProvider : IAiProvider
 
                 if (!string.IsNullOrWhiteSpace(response.OutputText))
                 {
-                    EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true);
+                    EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
+                        inputTokens: response.InputTokens, outputTokens: response.OutputTokens, model: response.Model);
                 }
 
                 var reusableItems = FilterOutputItemsForInput(response.OutputItems);
@@ -426,11 +431,38 @@ public class OpenAiProvider : IAiProvider
             ? outputTextElement.GetString()
             : ExtractOutputText(outputItems);
 
+        // Extract token usage from API response
+        int? inputTokens = null;
+        int? outputTokens = null;
+        string? responseModel = model;  // Use the provided model as default
+
+        if (root.TryGetProperty("usage", out var usageElement))
+        {
+            if (usageElement.TryGetProperty("input_tokens", out var inputTokensElement))
+            {
+                inputTokens = inputTokensElement.GetInt32();
+            }
+
+            if (usageElement.TryGetProperty("output_tokens", out var outputTokensElement))
+            {
+                outputTokens = outputTokensElement.GetInt32();
+            }
+        }
+
+        // Extract model information from response if available
+        if (root.TryGetProperty("model", out var modelElement))
+        {
+            responseModel = modelElement.GetString();
+        }
+
         return new ResponsesApiResult
         {
             OutputText = outputText ?? string.Empty,
             OutputItems = outputItems,
-            ToolCalls = toolCalls
+            ToolCalls = toolCalls,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            Model = responseModel
         };
     }
 
@@ -515,6 +547,9 @@ public class OpenAiProvider : IAiProvider
         public string OutputText { get; set; } = string.Empty;
         public List<JsonElement> OutputItems { get; set; } = new();
         public List<ResponseToolCall> ToolCalls { get; set; } = new();
+        public int? InputTokens { get; set; }
+        public int? OutputTokens { get; set; }
+        public string? Model { get; set; }
     }
 
     private sealed class ResponseToolCall
