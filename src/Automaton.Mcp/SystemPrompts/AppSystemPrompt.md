@@ -48,12 +48,6 @@ app/
 **Frontend only:**
 1. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
 
-## AVAILABLE TOOLS:
-- **write_file** — create/overwrite a file
-- **read_file** — read a file
-- **list_files** — list app files
-- **delete_file** — remove a file (cannot delete index.html)
-
 ## BACKEND CONTROLLERS:
 Single Python script handling multiple actions via `action_name` (injected by runner).
 
