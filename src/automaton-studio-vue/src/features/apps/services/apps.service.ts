@@ -464,6 +464,23 @@ class AppsService {
     }
   }
 
+  async function executeController(controllerName, actionName, options) {
+    options = options || {};
+    var inputs = options.inputs || {};
+    var startTime = Date.now();
+    var path = '/api/web-apps/preview/' + APP_ID + '/controllers/' + encodeURIComponent(controllerName) + '/actions/' + encodeURIComponent(actionName) + '/execute';
+    var body = { inputs: inputs, runnerNames: options.runnerNames || null };
+
+    try {
+      var result = await apiCall(path, 'POST', body);
+      sendResultToConsole('controller', controllerName + '.' + actionName, inputs, result, Date.now() - startTime, true);
+      return result;
+    } catch (error) {
+      sendResultToConsole('controller', controllerName + '.' + actionName, inputs, { success: false, status: 'Error', error: error.message }, Date.now() - startTime, false);
+      throw error;
+    }
+  }
+
   function sendResultToConsole(type, name, inputs, result, duration, success) {
     try {
       window.parent.postMessage({
@@ -485,6 +502,7 @@ class AppsService {
   window.automatonApi = {
     executeFlow: executeFlow,
     executeStep: executeStep,
+    executeController: executeController,
     getAppId: function() { return APP_ID; },
     getAppSlug: function() { return null; }
   };
