@@ -447,19 +447,19 @@ class AppsService {
     }
   }
 
-  async function executeStep(stepIdentifier, options) {
+  async function executeController(controllerName, actionName, options) {
     options = options || {};
     var inputs = options.inputs || {};
     var startTime = Date.now();
-    var path = '/api/web-apps/preview/' + APP_ID + '/steps/' + encodeURIComponent(stepIdentifier) + '/execute';
+    var path = '/api/web-apps/preview/' + APP_ID + '/controllers/' + encodeURIComponent(controllerName) + '/actions/' + encodeURIComponent(actionName) + '/execute';
     var body = { inputs: inputs, runnerNames: options.runnerNames || null };
 
     try {
       var result = await apiCall(path, 'POST', body);
-      sendResultToConsole('step', stepIdentifier, inputs, result, Date.now() - startTime, true);
+      sendResultToConsole('controller', controllerName + '.' + actionName, inputs, result, Date.now() - startTime, true);
       return result;
     } catch (error) {
-      sendResultToConsole('step', stepIdentifier, inputs, { success: false, status: 'Error', error: error.message }, Date.now() - startTime, false);
+      sendResultToConsole('controller', controllerName + '.' + actionName, inputs, { success: false, status: 'Error', error: error.message }, Date.now() - startTime, false);
       throw error;
     }
   }
@@ -484,7 +484,7 @@ class AppsService {
 
   window.automatonApi = {
     executeFlow: executeFlow,
-    executeStep: executeStep,
+    executeController: executeController,
     getAppId: function() { return APP_ID; },
     getAppSlug: function() { return null; }
   };

@@ -102,13 +102,6 @@ async function loadApp() {
     return apiCall(path, 'POST', body);
   }
 
-  async function executeStep(stepIdentifier, options) {
-    options = options || {};
-    const path = '/api/web-apps/' + encodeURIComponent(APP_SLUG) + '/steps/' + encodeURIComponent(stepIdentifier) + '/execute';
-    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
-    return apiCall(path, 'POST', body);
-  }
-
   async function executeController(controllerName, actionName, options) {
     options = options || {};
     const path = '/api/web-apps/' + encodeURIComponent(APP_SLUG) + '/controllers/' + encodeURIComponent(controllerName) + '/actions/' + encodeURIComponent(actionName) + '/execute';
@@ -118,7 +111,6 @@ async function loadApp() {
 
   window.automatonApi = {
     executeFlow: executeFlow,
-    executeStep: executeStep,
     executeController: executeController,
     getAppId: function() { return null; },
     getAppSlug: function() { return APP_SLUG; }
