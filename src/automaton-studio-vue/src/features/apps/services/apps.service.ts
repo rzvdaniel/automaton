@@ -386,9 +386,9 @@ class AppsService {
    * Returns the app HTML with the Automaton API script injected
    * The preview makes direct fetch calls to the backend with the auth token
    */
-  async getPreviewHtml(id: string): Promise<string> {
+  async getPreviewHtml(id: string, rawHtml?: string): Promise<string> {
     const app = await this.get(id)
-    let html = app.definition?.htmlContent || this.getDefaultHtml()
+    let html = rawHtml || app.definition?.htmlContent || this.getDefaultHtml()
 
     // Get current auth token and base URL for injection
     const token = localStorage.getItem('automaton_access_token') || ''

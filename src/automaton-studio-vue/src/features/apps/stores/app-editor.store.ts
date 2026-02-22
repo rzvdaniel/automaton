@@ -365,10 +365,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const cacheBuster = Date.now()
       const nextPreviewUrl = `${apiBaseUrl}/app-preview/${userId}/${currentApp.value.id}/index.html?v=${cacheBuster}`
 
-      // Get preview HTML with automatonApi injected
-      previewHtml.value = await appsService.getPreviewHtml(currentApp.value.id)
-
       const previewFiles = await buildPreviewFiles(currentApp.value.id)
+
+      // Use current index.html from files (not stale htmlContent from app definition)
+      const currentIndexHtml = previewFiles['index.html'] || undefined
+      previewHtml.value = await appsService.getPreviewHtml(currentApp.value.id, currentIndexHtml)
       
       // Upload preview content to server for HTTP-based serving
       await appsService.uploadPreviewContent(currentApp.value.id, previewHtml.value, previewFiles)
