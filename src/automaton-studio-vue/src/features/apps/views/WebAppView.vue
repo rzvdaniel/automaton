@@ -124,6 +124,9 @@ async function loadApp() {
     // Get HTML content
     let html = data.htmlContent || getDefaultHtml()
 
+    // Strip any existing automatonApi injection to prevent double-injection
+    html = html.replace(/<script\b[^>]*>[\s\S]*?\(function\s*\(\s*window\s*,\s*APP_(?:ID|SLUG)\b[\s\S]*?<\/script>/gi, '')
+
     // Inject base tag for resolving relative paths to app files
     const appBaseUrl = `${baseUrl}/apps/${slug.value}/`
     const baseTag = `<base href="${appBaseUrl}">`

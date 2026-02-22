@@ -394,9 +394,13 @@ class AppsService {
     const token = localStorage.getItem('automaton_access_token') || ''
     const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
 
+    // Strip any existing automatonApi injection to prevent double-injection issues.
+    // Old injections used a plain <script> tag (no id), newer ones use id="__automaton_api__".
+    html = html.replace(/<script\b[^>]*>[\s\S]*?\(function\s*\(\s*window\s*,\s*APP_(?:ID|SLUG)\b[\s\S]*?<\/script>/gi, '')
+
     // Inject preview API that makes direct fetch calls
     const previewScript = `
-<script>
+<script id="__automaton_api__">
 (function(window, APP_ID, BASE_URL, AUTH_TOKEN) {
   'use strict';
 
