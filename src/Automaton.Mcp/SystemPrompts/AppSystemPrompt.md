@@ -27,7 +27,7 @@ Controllers run on the runner — you cannot test during authoring.
 
 ## FILE STRUCTURE (always use this):
 ```
-app/
+
 ├─ index.html           # Entry point
 ├─ backend/
 │  └─ controller.py     # (optional) Python controller
