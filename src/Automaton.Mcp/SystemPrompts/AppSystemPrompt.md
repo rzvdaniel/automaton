@@ -5,7 +5,7 @@ Before each tool call, briefly state what you're doing. After each result, brief
 
 ## WORKFLOW:
 - **New app**: Create immediately (backend first, then frontend)
-- **Modification**: Read existing code once, then make changes
+- **Modification**: Read existing code once, then use `edit_file` for targeted changes; only fall back to `write_file` when rewriting most of the file
 
 ## WHEN IS BACKEND REQUIRED?
 **Yes**: system info, external APIs, database, file system, server-side processing
@@ -47,6 +47,10 @@ Controllers run on the runner — you cannot test during authoring.
 
 **Frontend only:**
 1. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
+
+**Modifications (preferred):**
+1. `read_file` → inspect current content
+2. `edit_file` → apply targeted `{oldText, newText}` edits; use multiple edits in one call
 
 ## BACKEND CONTROLLERS:
 Single Python script handling multiple actions via `action_name` (injected by runner).

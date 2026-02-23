@@ -53,6 +53,32 @@ public class AppMcpToolProvider : IMcpToolProvider
                 Name = "list_files",
                 Description = "List all app files",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
+            },
+            new McpTool
+            {
+                Name = "edit_file",
+                Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText. Use dryRun=true to preview without saving.",
+                InputSchema = JsonDocument.Parse("""
+                    {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string" },
+                            "edits": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "oldText": { "type": "string" },
+                                        "newText": { "type": "string" }
+                                    },
+                                    "required": ["oldText", "newText"]
+                                }
+                            },
+                            "dryRun": { "type": "boolean" }
+                        },
+                        "required": ["path", "edits"]
+                    }
+                    """)
             }
         };
 
@@ -73,6 +99,7 @@ public class AppMcpToolProvider : IMcpToolProvider
                 "write_file" => await HandleWriteFile(arguments, context),
                 "delete_file" => await HandleDeleteFile(arguments, context),
                 "list_files" => await HandleListFiles(arguments, context),
+                "edit_file" => await HandleEditFile(arguments, context),
 
                 _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
             };
@@ -223,6 +250,78 @@ public class AppMcpToolProvider : IMcpToolProvider
                 Success = false,
                 Error = $"Failed to list files: {ex.Message}"
             };
+        }
+    }
+
+    private async Task<McpToolResult> HandleEditFile(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        try
+        {
+            var path = arguments.GetProperty("path").GetString()!;
+            var appId = ExtractAppId(arguments, context);
+            var userId = _userContextService.GetUserId();
+            var dryRun = arguments.TryGetProperty("dryRun", out var dryRunProp) && dryRunProp.GetBoolean();
+
+            var content = await _appFileStorageService.ReadAppFileAsync(userId, appId, path);
+            if (content == null)
+            {
+                return new McpToolResult { Success = false, Error = $"File '{path}' not found" };
+            }
+
+            if (!arguments.TryGetProperty("edits", out var editsElement) || editsElement.ValueKind != JsonValueKind.Array)
+            {
+                return new McpToolResult { Success = false, Error = "Missing or invalid 'edits' array" };
+            }
+
+            var updatedContent = content;
+            var appliedCount = 0;
+            var summary = new System.Text.StringBuilder();
+
+            foreach (var edit in editsElement.EnumerateArray())
+            {
+                var oldText = edit.GetProperty("oldText").GetString()!;
+                var newText = edit.GetProperty("newText").GetString()!;
+
+                if (!updatedContent.Contains(oldText))
+                {
+                    return new McpToolResult
+                    {
+                        Success = false,
+                        Error = $"Edit {appliedCount + 1}: oldText not found in file. Make sure oldText matches exactly (including whitespace)."
+                    };
+                }
+
+                // Replace only the first occurrence to avoid unintended changes
+                var idx = updatedContent.IndexOf(oldText, StringComparison.Ordinal);
+                updatedContent = updatedContent[..idx] + newText + updatedContent[(idx + oldText.Length)..];
+
+                var oldLines = oldText.Split('\n').Length;
+                var newLines = newText.Split('\n').Length;
+                summary.AppendLine($"- Edit {appliedCount + 1}: replaced {oldLines} line(s) with {newLines} line(s)");
+                appliedCount++;
+            }
+
+            if (dryRun)
+            {
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = $"[Dry run] {appliedCount} edit(s) would be applied to '{path}':\n{summary}"
+                };
+            }
+
+            await _appFileStorageService.WriteAppFileAsync(userId, appId, path, updatedContent);
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = $"Applied {appliedCount} edit(s) to '{path}':\n{summary}"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error editing file");
+            return new McpToolResult { Success = false, Error = $"Failed to edit file: {ex.Message}" };
         }
     }
 
