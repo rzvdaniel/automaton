@@ -30,128 +30,41 @@ public class AppMcpToolProvider : IMcpToolProvider
     {
         var tools = new List<McpTool>
         {
-            // Frontend tools
             new McpTool
             {
                 Name = "get_current_code",
-                Description = "Get the current HTML/CSS/JavaScript code from the app",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    }
-                }
-                """)
+                Description = "Get index.html content",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             },
             new McpTool
             {
                 Name = "save_app_code",
-                Description = "Save HTML/CSS/JavaScript code to the app",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "code": {
-                            "type": "string",
-                            "description": "The HTML/CSS/JavaScript code to save"
-                        },
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    },
-                    "required": ["code"]
-                }
-                """)
+                Description = "Save HTML to index.html",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}""")
             },
-
-            // File-level tools (for multi-file apps)
             new McpTool
             {
                 Name = "read_file",
-                Description = "Read a specific file from the app (for multi-file apps with separate CSS/JS files)",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "Relative path to the file (e.g., 'styles/main.css', 'js/app.js', 'index.html')"
-                        },
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    },
-                    "required": ["path"]
-                }
-                """)
+                Description = "Read a file (e.g. 'styles/main.css', 'js/app.js')",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
                 Name = "write_file",
-                Description = "Write a specific file to the app (for multi-file apps). Creates directories as needed. Use for CSS, JS, or component files.",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "Relative path to the file (e.g., 'styles/main.css', 'js/app.js')"
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "File content to write"
-                        },
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    },
-                    "required": ["path", "content"]
-                }
-                """)
+                Description = "Write a file. Creates dirs as needed.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}""")
             },
             new McpTool
             {
                 Name = "delete_file",
-                Description = "Delete a specific file from the app (for multi-file apps). Cannot delete index.html.",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "Relative path to the file to delete (e.g., 'styles/old.css')"
-                        },
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    },
-                    "required": ["path"]
-                }
-                """)
+                Description = "Delete a file. Cannot delete index.html.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
                 Name = "list_files",
-                Description = "List all files in the app directory (useful for multi-file apps)",
-                InputSchema = JsonDocument.Parse("""
-                {
-                    "type": "object",
-                    "properties": {
-                        "appId": {
-                            "type": "string",
-                            "description": "The ID of the app (optional, uses context if not provided)"
-                        }
-                    }
-                }
-                """)
+                Description = "List all app files",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             }
         };
 
@@ -213,17 +126,10 @@ public class AppMcpToolProvider : IMcpToolProvider
                 };
             }
 
-            var result = new
-            {
-                code = content,
-                linesOfCode = content.Split('\n').Length,
-                message = "Current HTML code retrieved successfully"
-            };
-
             return new McpToolResult
             {
                 Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Content = content
             };
         }
         catch (Exception ex)
@@ -248,18 +154,10 @@ public class AppMcpToolProvider : IMcpToolProvider
             // Save to index.html
             await _appFileStorageService.WriteAppFileAsync(userId, appId, "index.html", code);
 
-            var result = new
-            {
-                success = true,
-                appId = appId.ToString(),
-                linesOfCode = code.Split('\n').Length,
-                message = "App code saved successfully"
-            };
-
             return new McpToolResult
             {
                 Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Content = $"Saved index.html ({code.Split('\n').Length} lines)"
             };
         }
         catch (Exception ex)
@@ -292,18 +190,10 @@ public class AppMcpToolProvider : IMcpToolProvider
                 };
             }
 
-            var result = new
-            {
-                path = path,
-                content = content,
-                size = content.Length,
-                lines = content.Split('\n').Length
-            };
-
             return new McpToolResult
             {
                 Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Content = content
             };
         }
         catch (Exception ex)
@@ -328,18 +218,10 @@ public class AppMcpToolProvider : IMcpToolProvider
 
             await _appFileStorageService.WriteAppFileAsync(userId, appId, path, content);
 
-            var result = new
-            {
-                path = path,
-                size = content.Length,
-                lines = content.Split('\n').Length,
-                message = $"File '{path}' saved successfully"
-            };
-
             return new McpToolResult
             {
                 Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Content = $"Saved {path} ({content.Split('\n').Length} lines)"
             };
         }
         catch (InvalidOperationException ex)
@@ -408,17 +290,10 @@ public class AppMcpToolProvider : IMcpToolProvider
 
             var files = await _appFileStorageService.GetAppFilesAsync(userId, appId);
 
-            var result = new
-            {
-                files = files.ToList(),
-                count = files.Count(),
-                message = $"Found {files.Count()} file(s)"
-            };
-
             return new McpToolResult
             {
                 Success = true,
-                Content = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+                Content = JsonSerializer.Serialize(files)
             };
         }
         catch (Exception ex)
