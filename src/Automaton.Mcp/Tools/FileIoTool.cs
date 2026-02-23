@@ -3,7 +3,7 @@ using System.Text.Json;
 using Automaton.Mcp.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Automaton.Studio.Server.Services.Mcp.Tools;
+namespace Automaton.Mcp.Tools;
 
 /// <summary>
 /// Generic file IO MCP tool group: read, write, edit, delete, list.
@@ -105,7 +105,7 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path = arguments.GetProperty("path").GetString()!;
+            var path    = arguments.GetProperty("path").GetString()!;
             var content = await fs.ReadFileAsync(path);
 
             return content is null
@@ -216,7 +216,7 @@ public class FileIoTool : IMcpTool
         try
         {
             var files = await fs.ListFilesAsync();
-            return new McpToolResult { Success = true, Content = System.Text.Json.JsonSerializer.Serialize(files) };
+            return new McpToolResult { Success = true, Content = JsonSerializer.Serialize(files) };
         }
         catch (Exception ex)
         {

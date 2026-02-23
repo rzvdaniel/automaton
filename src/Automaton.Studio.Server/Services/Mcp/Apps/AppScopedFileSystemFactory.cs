@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Automaton.Studio.Server.Services.Mcp.Tools;
+using Automaton.Mcp.Tools;
 
 namespace Automaton.Studio.Server.Services.Mcp.Apps;
 

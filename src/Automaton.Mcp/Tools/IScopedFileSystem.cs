@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services.Mcp.Tools;
+namespace Automaton.Mcp.Tools;
 
 /// <summary>
 /// Abstracts file system operations within a single scoped directory

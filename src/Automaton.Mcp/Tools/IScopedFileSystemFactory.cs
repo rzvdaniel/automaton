@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services.Mcp.Tools;
+namespace Automaton.Mcp.Tools;
 
 /// <summary>
 /// Resolves the correct <see cref="IScopedFileSystem"/> for a tool invocation.

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
-using Automaton.Studio.Server.Services.Mcp.Tools;
+using Automaton.Mcp.Tools;
 
 namespace Automaton.Studio.Server.Services.Mcp;
 

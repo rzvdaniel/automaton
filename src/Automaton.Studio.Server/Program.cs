@@ -324,10 +324,10 @@ services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automato
 services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();
 services.AddScoped<Automaton.Studio.Server.Services.Mcp.AppMcpToolProvider>();
 // File IO tool group — wired to app-scoped file system
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.Tools.IScopedFileSystemFactory,
+services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                    Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.Tools.IMcpTool,
-                   Automaton.Studio.Server.Services.Mcp.Tools.FileIoTool>();
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
+                   Automaton.Mcp.Tools.FileIoTool>();
 
 // MCP Client
 services.AddAutomatonMcpClient();

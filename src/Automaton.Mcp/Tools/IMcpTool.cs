@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Automaton.Mcp.Models;
 
-namespace Automaton.Studio.Server.Services.Mcp.Tools;
+namespace Automaton.Mcp.Tools;
 
 /// <summary>
 /// A cohesive group of related MCP tools (e.g. file IO, flow operations).
