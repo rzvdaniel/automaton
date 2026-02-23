@@ -32,20 +32,8 @@ public class AppMcpToolProvider : IMcpToolProvider
         {
             new McpTool
             {
-                Name = "get_current_code",
-                Description = "Get index.html content",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
-            },
-            new McpTool
-            {
-                Name = "save_app_code",
-                Description = "Save HTML to index.html",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}""")
-            },
-            new McpTool
-            {
                 Name = "read_file",
-                Description = "Read a file (e.g. 'styles/main.css', 'js/app.js')",
+                Description = "Read a file (e.g. 'index.html', 'styles/main.css', 'js/app.js')",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
@@ -81,11 +69,6 @@ public class AppMcpToolProvider : IMcpToolProvider
         {
             return toolName switch
             {
-                // Frontend tools
-                "get_current_code" => await HandleGetCurrentCode(arguments, context),
-                "save_app_code" => await HandleSaveAppCode(arguments, context),
-                
-                // File-level tools (for multi-file apps)
                 "read_file" => await HandleReadFile(arguments, context),
                 "write_file" => await HandleWriteFile(arguments, context),
                 "delete_file" => await HandleDeleteFile(arguments, context),
@@ -105,71 +88,7 @@ public class AppMcpToolProvider : IMcpToolProvider
         }
     }
 
-    #region Frontend Tool Handlers
-
-    private async Task<McpToolResult> HandleGetCurrentCode(JsonElement arguments, Dictionary<string, object>? context)
-    {
-        try
-        {
-            var appId = ExtractAppId(arguments, context);
-            var userId = _userContextService.GetUserId();
-
-            // Read index.html (main app file)
-            var content = await _appFileStorageService.ReadAppFileAsync(userId, appId, "index.html");
-
-            if (content == null)
-            {
-                return new McpToolResult
-                {
-                    Success = true,
-                    Content = "<!-- No code found. Start with a new HTML template -->\n<!DOCTYPE html>\n<html>\n<head>\n    <title>New App</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body>\n    <!-- Add your content here -->\n</body>\n</html>"
-                };
-            }
-
-            return new McpToolResult
-            {
-                Success = true,
-                Content = content
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting current code");
-            return new McpToolResult
-            {
-                Success = false,
-                Error = $"Failed to get current code: {ex.Message}"
-            };
-        }
-    }
-
-    private async Task<McpToolResult> HandleSaveAppCode(JsonElement arguments, Dictionary<string, object>? context)
-    {
-        try
-        {
-            var code = arguments.GetProperty("code").GetString()!;
-            var appId = ExtractAppId(arguments, context);
-            var userId = _userContextService.GetUserId();
-
-            // Save to index.html
-            await _appFileStorageService.WriteAppFileAsync(userId, appId, "index.html", code);
-
-            return new McpToolResult
-            {
-                Success = true,
-                Content = $"Saved index.html ({code.Split('\n').Length} lines)"
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error saving app code");
-            return new McpToolResult
-            {
-                Success = false,
-                Error = $"Failed to save app code: {ex.Message}"
-            };
-        }
-    }
+    #region Tool Handlers
 
     private async Task<McpToolResult> HandleReadFile(JsonElement arguments, Dictionary<string, object>? context)
     {
