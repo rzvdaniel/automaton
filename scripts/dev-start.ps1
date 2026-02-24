@@ -80,7 +80,22 @@ if (-not (Test-Path $AppDataSource)) {
     Write-Ok "AppData symlinked: $AppDataSource -> $AppDataLink"
 }
 
-# ── 2. Automaton.Studio.Server ───────────────────────────────────────────────
+# ── 2. appsettings.Development.json ──────────────────────────────────────────
+
+Write-Step "Copying appsettings.Development.json from main repo..."
+
+$AppSettingsSource = Join-Path $MainRepo "src\Automaton.Studio.Server\appsettings.Development.json"
+$AppSettingsDest   = Join-Path $ServerProject "appsettings.Development.json"
+
+if (-not (Test-Path $AppSettingsSource)) {
+    Write-Warn "appsettings.Development.json not found in main repo: $AppSettingsSource"
+    Write-Warn "Server will use its own config (or defaults)."
+} else {
+    Copy-Item $AppSettingsSource $AppSettingsDest -Force
+    Write-Ok "Copied appsettings.Development.json"
+}
+
+# ── 3. Automaton.Studio.Server ───────────────────────────────────────────────
 
 Write-Step "Starting Automaton.Studio.Server..."
 Start-DevWindow "Automaton Server" $ServerProject "dotnet run"
@@ -89,13 +104,13 @@ Write-Ok "Server window launched"
 # Give the server a moment to bind its port before the runner tries to connect
 Start-Sleep -Seconds 2
 
-# ── 3. Automaton.Runner ──────────────────────────────────────────────────────
+# ── 4. Automaton.Runner ──────────────────────────────────────────────────────
 
 Write-Step "Starting Automaton.Runner..."
 Start-DevWindow "Automaton Runner" $RunnerProject "dotnet run"
 Write-Ok "Runner window launched"
 
-# ── 4. Vue.js frontend ───────────────────────────────────────────────────────
+# ── 5. Vue.js frontend ───────────────────────────────────────────────────────
 
 Write-Step "Starting Vue.js frontend..."
 Start-DevWindow "Automaton Vue" $VueProject "npm run dev"
