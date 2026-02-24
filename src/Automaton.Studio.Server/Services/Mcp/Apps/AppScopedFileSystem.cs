@@ -1,71 +1,45 @@
-using System.Text.RegularExpressions;
 using Automaton.Mcp.Tools;
 
 namespace Automaton.Studio.Server.Services.Mcp.Apps;
 
 /// <summary>
-/// App-scoped file system: sandboxes all operations to /AppData/apps/{userId}/{appId}/.
-/// Enforces the extension whitelist and protects index.html from deletion.
+/// App-scoped file system: extends <see cref="LocalScopedFileSystem"/> with app-specific guards.
+/// - Extension whitelist (prevents uploading executable scripts)
+/// - index.html deletion protection
+/// - Hides internal files (_metadata.json, versions/) from listings
 /// </summary>
-public class AppScopedFileSystem : IScopedFileSystem
+public class AppScopedFileSystem : LocalScopedFileSystem
 {
-    private readonly AppFileStorageService _storage;
-    private readonly Guid _userId;
-    private readonly Guid _appId;
+    public AppScopedFileSystem(string appRootPath) : base(appRootPath) { }
 
-    public AppScopedFileSystem(AppFileStorageService storage, Guid userId, Guid appId)
+    public override async Task WriteFileAsync(string relativePath, string content)
     {
-        _storage = storage;
-        _userId  = userId;
-        _appId   = appId;
+        AppFileStorageService.ValidateFileExtensionPublic(relativePath);
+        await base.WriteFileAsync(relativePath, content);
     }
 
-    public Task<string?> ReadFileAsync(string relativePath) =>
-        _storage.ReadAppFileAsync(_userId, _appId, relativePath);
-
-    public Task WriteFileAsync(string relativePath, string content) =>
-        _storage.WriteAppFileAsync(_userId, _appId, relativePath, content);
-
-    public async Task DeleteFileAsync(string relativePath)
+    public override Task DeleteFileAsync(string relativePath)
     {
         if (relativePath.Equals("index.html", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Cannot delete index.html — it is the main app file.");
 
-        await _storage.DeleteAppFileAsync(_userId, _appId, relativePath);
+        return base.DeleteFileAsync(relativePath);
     }
 
-    public Task<IEnumerable<string>> ListFilesAsync() =>
-        _storage.GetAppFilesAsync(_userId, _appId);
-
-    public async Task<IEnumerable<FileSearchMatch>> SearchFileAsync(
-        string relativePath, string pattern, bool useRegex, int contextLines)
+    public override Task<IEnumerable<string>> ListFilesAsync()
     {
-        var content = await _storage.ReadAppFileAsync(_userId, _appId, relativePath);
-        if (content is null) return [];
+        if (!Directory.Exists(RootPath))
+            return Task.FromResult(Enumerable.Empty<string>());
 
-        var lines   = content.Split('\n');
-        var matches = new List<FileSearchMatch>();
+        var versionsPath = Path.GetFullPath(Path.Combine(RootPath, "versions"));
 
-        Func<string, bool> isMatch = useRegex
-            ? line => Regex.IsMatch(line, pattern)
-            : line => line.Contains(pattern, StringComparison.Ordinal);
+        var files = Directory
+            .GetFiles(RootPath, "*.*", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith("_metadata.json", StringComparison.OrdinalIgnoreCase))
+            .Where(f => !Path.GetFullPath(f).StartsWith(versionsPath, StringComparison.OrdinalIgnoreCase))
+            .Select(f => Path.GetRelativePath(RootPath, f).Replace('\\', '/'));
 
-        for (var i = 0; i < lines.Length; i++)
-        {
-            if (!isMatch(lines[i])) continue;
-
-            var from    = Math.Max(0, i - contextLines);
-            var to      = Math.Min(lines.Length - 1, i + contextLines);
-            var context = string.Join('\n', lines[from..(to + 1)]);
-
-            matches.Add(new FileSearchMatch
-            {
-                LineNumber = i + 1,
-                Match      = lines[i],
-                Context    = context
-            });
-        }
-
-        return matches;
+        return Task.FromResult(files);
     }
 }
+

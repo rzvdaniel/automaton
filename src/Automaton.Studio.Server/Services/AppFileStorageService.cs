@@ -384,7 +384,15 @@ public class AppFileStorageService
     /// Validates that the file extension is in the allowed whitelist.
     /// Throws InvalidOperationException if the extension is not allowed.
     /// </summary>
-    private static void ValidateFileExtension(string relativePath)
+    private static void ValidateFileExtension(string relativePath) =>
+        ValidateFileExtensionPublic(relativePath);
+
+    /// <summary>
+    /// Validates that the file extension is in the allowed whitelist.
+    /// Exposed as public so <see cref="AppScopedFileSystem"/> can reuse it without a service dependency.
+    /// Throws <see cref="InvalidOperationException"/> if the extension is not allowed.
+    /// </summary>
+    public static void ValidateFileExtensionPublic(string relativePath)
     {
         var extension = Path.GetExtension(relativePath);
 

@@ -4,8 +4,9 @@ using Automaton.Mcp.Tools;
 namespace Automaton.Studio.Server.Services.Mcp.Apps;
 
 /// <summary>
-/// Resolves an <see cref="AppScopedFileSystem"/> for the current request by extracting
-/// userId (from the HTTP context) and appId (from tool arguments or conversation context).
+/// Resolves an <see cref="AppScopedFileSystem"/> for the current request by resolving
+/// userId (from HTTP context) and appId (from tool arguments or conversation context)
+/// into the app's root directory path via <see cref="AppFileStorageService"/>.
 /// </summary>
 public class AppScopedFileSystemFactory : IScopedFileSystemFactory
 {
@@ -20,9 +21,10 @@ public class AppScopedFileSystemFactory : IScopedFileSystemFactory
 
     public IScopedFileSystem Create(JsonElement arguments, Dictionary<string, object>? context)
     {
-        var userId = _userContextService.GetUserId();
-        var appId  = ResolveAppId(arguments, context);
-        return new AppScopedFileSystem(_storage, userId, appId);
+        var userId  = _userContextService.GetUserId();
+        var appId   = ResolveAppId(arguments, context);
+        var appPath = _storage.GetAppDirectoryPath(userId, appId);
+        return new AppScopedFileSystem(appPath);
     }
 
     private static Guid ResolveAppId(JsonElement arguments, Dictionary<string, object>? context)
