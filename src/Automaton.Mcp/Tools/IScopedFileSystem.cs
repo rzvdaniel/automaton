@@ -21,4 +21,18 @@ public interface IScopedFileSystem
 
     /// <summary>Lists all files in the scope.</summary>
     Task<IEnumerable<string>> ListFilesAsync();
+
+    /// <summary>
+    /// Searches a file for lines matching a pattern (literal or regex).
+    /// Returns each match with surrounding context lines.
+    /// </summary>
+    Task<IEnumerable<FileSearchMatch>> SearchFileAsync(string relativePath, string pattern, bool useRegex, int contextLines);
+}
+
+/// <summary>A single match returned by <see cref="IScopedFileSystem.SearchFileAsync"/>.</summary>
+public sealed class FileSearchMatch
+{
+    public int LineNumber { get; init; }
+    public string Match   { get; init; } = "";
+    public string Context { get; init; } = "";
 }

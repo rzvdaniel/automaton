@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Automaton.Mcp.Tools;
 
 namespace Automaton.Studio.Server.Services.Mcp.Apps;
@@ -35,4 +36,36 @@ public class AppScopedFileSystem : IScopedFileSystem
 
     public Task<IEnumerable<string>> ListFilesAsync() =>
         _storage.GetAppFilesAsync(_userId, _appId);
+
+    public async Task<IEnumerable<FileSearchMatch>> SearchFileAsync(
+        string relativePath, string pattern, bool useRegex, int contextLines)
+    {
+        var content = await _storage.ReadAppFileAsync(_userId, _appId, relativePath);
+        if (content is null) return [];
+
+        var lines   = content.Split('\n');
+        var matches = new List<FileSearchMatch>();
+
+        Func<string, bool> isMatch = useRegex
+            ? line => Regex.IsMatch(line, pattern)
+            : line => line.Contains(pattern, StringComparison.Ordinal);
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (!isMatch(lines[i])) continue;
+
+            var from    = Math.Max(0, i - contextLines);
+            var to      = Math.Min(lines.Length - 1, i + contextLines);
+            var context = string.Join('\n', lines[from..(to + 1)]);
+
+            matches.Add(new FileSearchMatch
+            {
+                LineNumber = i + 1,
+                Match      = lines[i],
+                Context    = context
+            });
+        }
+
+        return matches;
+    }
 }

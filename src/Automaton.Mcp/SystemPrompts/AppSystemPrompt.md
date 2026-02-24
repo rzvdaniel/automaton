@@ -49,8 +49,9 @@ Controllers run on the runner — you cannot test during authoring.
 1. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
 
 **Modifications (preferred):**
-1. `read_file` → inspect current content
-2. `edit_file` → apply targeted `{oldText, newText}` edits; use multiple edits in one call
+1. For **small files** (<100 lines): `read_file` → `edit_file`
+2. For **large files** (100+ lines): `search_file` → `edit_file` using the returned context verbatim as `oldText`
+3. Only use `write_file` when rewriting most of the file
 
 ## BACKEND CONTROLLERS:
 Single Python script handling multiple actions via `action_name` (injected by runner).
@@ -98,7 +99,7 @@ if (result.success) {
 
 ## RULES:
 1. New apps: create immediately, no pre-reading
-2. Modifications: read once, then change
+2. Modifications: read once (or search), then change
 3. Backend before frontend
 4. Always remind to **Deploy Backend** after writing controllers
 5. No mock data — write real code

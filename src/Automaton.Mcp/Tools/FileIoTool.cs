@@ -12,7 +12,7 @@ namespace Automaton.Mcp.Tools;
 /// </summary>
 public class FileIoTool : IMcpTool
 {
-    private static readonly HashSet<string> HandledTools = ["read_file", "write_file", "edit_file", "delete_file", "list_files"];
+    private static readonly HashSet<string> HandledTools = ["read_file", "write_file", "edit_file", "delete_file", "list_files", "search_file"];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<FileIoTool> _logger;
@@ -76,6 +76,23 @@ public class FileIoTool : IMcpTool
                 Name = "list_files",
                 Description = "List all files in the current scope.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
+            },
+            new McpTool
+            {
+                Name = "search_file",
+                Description = "Search for lines matching a pattern inside a file. Returns each match with surrounding context lines — use the returned text verbatim as oldText in edit_file for guaranteed accuracy. Prefer this over read_file for large files when you only need to find and change specific sections.",
+                InputSchema = JsonDocument.Parse("""
+                    {
+                        "type": "object",
+                        "properties": {
+                            "path":         { "type": "string", "description": "File to search" },
+                            "pattern":      { "type": "string", "description": "Search pattern (literal string or regex)" },
+                            "useRegex":     { "type": "boolean", "description": "Treat pattern as regex (default: false)" },
+                            "contextLines": { "type": "integer", "description": "Lines of context to include around each match (default: 3)" }
+                        },
+                        "required": ["path", "pattern"]
+                    }
+                    """)
             }
         };
 
@@ -95,6 +112,7 @@ public class FileIoTool : IMcpTool
             "edit_file"   => await EditFile(fs, arguments),
             "delete_file" => await DeleteFile(fs, arguments),
             "list_files"  => await ListFiles(fs),
+            "search_file" => await SearchFile(fs, arguments),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
         };
     }
@@ -222,6 +240,37 @@ public class FileIoTool : IMcpTool
         {
             _logger.LogError(ex, "Error listing files");
             return new McpToolResult { Success = false, Error = $"Failed to list files: {ex.Message}" };
+        }
+    }
+
+    private async Task<McpToolResult> SearchFile(IScopedFileSystem fs, JsonElement arguments)
+    {
+        try
+        {
+            var path         = arguments.GetProperty("path").GetString()!;
+            var pattern      = arguments.GetProperty("pattern").GetString()!;
+            var useRegex     = arguments.TryGetProperty("useRegex", out var rx) && rx.GetBoolean();
+            var contextLines = arguments.TryGetProperty("contextLines", out var cl) ? cl.GetInt32() : 3;
+
+            var matches = await fs.SearchFileAsync(path, pattern, useRegex, contextLines);
+            var list    = matches.ToList();
+
+            if (list.Count == 0)
+                return new McpToolResult { Success = true, Content = $"No matches found for '{pattern}' in '{path}'" };
+
+            var result = JsonSerializer.Serialize(list.Select(m => new
+            {
+                lineNumber = m.LineNumber,
+                match      = m.Match,
+                context    = m.Context
+            }), new JsonSerializerOptions { WriteIndented = true });
+
+            return new McpToolResult { Success = true, Content = $"{list.Count} match(es) in '{path}':\n{result}" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching file");
+            return new McpToolResult { Success = false, Error = $"Failed to search file: {ex.Message}" };
         }
     }
 }
