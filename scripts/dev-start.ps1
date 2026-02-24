@@ -94,7 +94,7 @@ if (-not (Test-Path $AppSettingsSource)) {
 # ---------- 3. Automaton.Studio.Server --------------------------------------
 
 Write-Step "Starting Automaton.Studio.Server..."
-Start-DevWindow "Automaton Server" $ServerProject "dotnet run"
+Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
 Write-Ok "Server window launched"
 
 # Give the server a moment before the runner connects
@@ -103,7 +103,7 @@ Start-Sleep -Seconds 2
 # ---------- 4. Automaton.Runner ---------------------------------------------
 
 Write-Step "Starting Automaton.Runner..."
-Start-DevWindow "Automaton Runner" $RunnerProject "dotnet run"
+Start-DevWindow "Automaton Runner" $RunnerProject "dotnet watch"
 Write-Ok "Runner window launched"
 
 # ---------- 5. Vue.js frontend ----------------------------------------------
