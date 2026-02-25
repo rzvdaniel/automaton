@@ -236,9 +236,10 @@ public class AiConversationController : BaseController
 
             // 13. Now that conversation is complete, save all updates to database
             // This happens sequentially - no concurrency issues with DbContext
+            var savedToolCallIds = new HashSet<string>();
             foreach (var update in pendingUpdates)
             {
-                await SaveConversationUpdateAsync(update, sessionId, userId);
+                await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
             }
 
             // 14. Write completion event
@@ -365,7 +366,8 @@ public class AiConversationController : BaseController
     private async Task SaveConversationUpdateAsync(
         ConversationUpdatedEvent update,
         Guid sessionId,
-        Guid userId)
+        Guid userId,
+        HashSet<string>? savedToolCallIds = null)
     {
         try
         {
@@ -402,9 +404,15 @@ public class AiConversationController : BaseController
                     message.Role, sessionId);
             }
 
-            // Save tool calls as special messages
+            // Save tool calls as special messages — skip duplicates across events
             foreach (var toolCall in update.ToolCalls)
             {
+                if (savedToolCallIds != null && !savedToolCallIds.Add(toolCall.Id))
+                {
+                    _logger.LogDebug("Skipping duplicate tool call {ToolCallId}", toolCall.Id);
+                    continue;
+                }
+
                 var metadata = JsonSerializer.Serialize(new
                 {
                     toolCallId = toolCall.Id,
@@ -422,9 +430,16 @@ public class AiConversationController : BaseController
                 }, userId);
             }
 
-            // Save tool results
+            // Save tool results — skip duplicates across events
             foreach (var toolResult in update.ToolResults)
             {
+                var resultKey = $"result:{toolResult.ToolCallId}";
+                if (savedToolCallIds != null && !savedToolCallIds.Add(resultKey))
+                {
+                    _logger.LogDebug("Skipping duplicate tool result {ToolCallId}", toolResult.ToolCallId);
+                    continue;
+                }
+
                 var metadata = JsonSerializer.Serialize(new
                 {
                     toolCallId = toolResult.ToolCallId,
