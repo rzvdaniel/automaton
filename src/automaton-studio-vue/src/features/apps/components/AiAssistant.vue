@@ -605,7 +605,7 @@ function handleKeyPress(event: KeyboardEvent) {
             <div class="timeline-item">
               <div class="timeline-bullet">•</div>
               <div class="timeline-content">
-                <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Processing your request...</div>
+                <div class="message-text"><i class="pi pi-spin pi-spinner mr-2"></i>Working...</div>
               </div>
             </div>
           </div>
