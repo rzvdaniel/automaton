@@ -31,6 +31,22 @@ export class AiConversationClient {
   }
 
   /**
+   * Resolve the stream URL based on resource type.
+   * - WebApp → /api/ai/app/conversation/stream
+   * - CustomStep → /api/ai/step/conversation/stream
+   * - Fallback → /api/ai/app/conversation/stream
+   */
+  private getStreamUrl(resourceType?: string): string {
+    switch (resourceType?.toLowerCase()) {
+      case 'customstep':
+        return `${this.baseUrl}/api/ai/step/conversation/stream`
+      case 'webapp':
+      default:
+        return `${this.baseUrl}/api/ai/app/conversation/stream`
+    }
+  }
+
+  /**
    * Start a streaming conversation with AI using native fetch + ReadableStream
    */
   async startConversation(
@@ -52,7 +68,7 @@ export class AiConversationClient {
         throw new Error('No authentication token found')
       }
 
-      const url = `${this.baseUrl}/api/ai/conversation/stream`
+      const url = this.getStreamUrl(request.resourceType)
 
       // Create abort controller for cancellation
       this.abortController = new AbortController()
