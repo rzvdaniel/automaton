@@ -592,6 +592,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 
   const fileModificationTools = [
     'write_file',
+    'edit_file',
     'save_app_code',
     'delete_file',
   ]
@@ -601,8 +602,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 
     const affectedFiles: string[] = []
 
-    if (toolName === 'write_file' && args.path) {
-      console.log(`[AppEditor] write_file detected for path: ${args.path}`)
+    if ((toolName === 'write_file' || toolName === 'edit_file') && args.path) {
+      console.log(`[AppEditor] ${toolName} detected for path: ${args.path}`)
       affectedFiles.push(args.path)
     } else if (toolName === 'save_app_code') {
       console.log('[AppEditor] save_app_code detected, affecting index.html')
