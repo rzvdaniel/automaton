@@ -522,6 +522,7 @@ defineExpose({
           </div>
           <pre v-else class="file-changes">{{ selectedVersion.filesChangeSummary }}</pre>
         </div>
+      </div>
 
         <!-- Restore button -->
       <template #footer>
