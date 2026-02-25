@@ -523,27 +523,7 @@ defineExpose({
           <pre v-else class="file-changes">{{ selectedVersion.filesChangeSummary }}</pre>
         </div>
 
-        <!-- Step changes -->
-        <div class="detail-section">
-          <h4>Step Changes ({{ selectedVersion.stepChanges.length }})</h4>
-          <div v-if="selectedVersion.stepChanges.length === 0" class="text-color-secondary">
-            No step changes in this version
-          </div>
-          <div
-            v-for="step in selectedVersion.stepChanges"
-            :key="step.id"
-            class="step-change-row"
-          >
-            <div class="step-info">
-              <span class="step-name">{{ step.stepName }}</span>
-              <Tag :value="step.action" size="small" />
-            </div>
-            <div v-if="step.language" class="step-lang">{{ step.language }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Restore button -->
+        <!-- Restore button -->
       <template #footer>
         <Button
           label="Cancel"

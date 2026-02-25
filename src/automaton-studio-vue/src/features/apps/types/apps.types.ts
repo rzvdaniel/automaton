@@ -298,11 +298,6 @@ export function getFileIcon(filePath: string): string {
 export type AppVersionTrigger = 'NewSession' | 'ManualSave' | 'Publish' | 'Restore'
 
 /**
- * App Version Step Action enum
- */
-export type AppVersionStepAction = 'Created' | 'Modified' | 'Deleted' | 'Linked' | 'Unlinked'
-
-/**
  * Basic version info for list view
  */
 export interface AppVersion {
@@ -318,25 +313,11 @@ export interface AppVersion {
 }
 
 /**
- * Detailed version info with file and step changes
+ * Detailed version info with file changes
  */
 export interface AppVersionDetail extends AppVersion {
   snapshotPath: string
   filesChangeSummary?: string // JSON structure
-  stepChanges: VersionStepChange[]
-}
-
-/**
- * Step change in a version
- */
-export interface VersionStepChange {
-  id: string
-  customStepId: string
-  stepName: string
-  action: AppVersionStepAction
-  language?: string
-  codeSnapshot?: string
-  variablesSnapshot?: string // JSON structure
 }
 
 /**
