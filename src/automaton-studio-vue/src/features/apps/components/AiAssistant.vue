@@ -257,10 +257,14 @@ async function sendMessage() {
   // If we're in the sessions list view, always create a new session
   // If we're in chat view with no active session, also create one
   if (currentView.value === 'sessions' || !activeSession.value) {
-    // 1. Navigate to chat view immediately — user should not wait on the sessions list
+    // 1. Clear previous session state so chat view doesn't briefly show old data
+    activeSession.value = null
+    messages.value = []
+
+    // 2. Navigate to chat view immediately — user should not wait on the sessions list
     currentView.value = 'chat'
 
-    // 2. Add user message optimistically so it appears before any backend calls complete
+    // 3. Add user message optimistically so it appears before any backend calls complete
     messages.value.push({
       id: crypto.randomUUID(),
       role: 'user',
