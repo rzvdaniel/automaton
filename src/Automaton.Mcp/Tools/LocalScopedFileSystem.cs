@@ -22,11 +22,17 @@ public class LocalScopedFileSystem : IScopedFileSystem
 
     // ── IScopedFileSystem ────────────────────────────────────────────────────
 
-    public virtual Task<string?> ReadFileAsync(string relativePath)
+    private const int LargeFileThreshold = 100;
+
+    public virtual async Task<string?> ReadFileAsync(string relativePath)
     {
         var full = ResolveSafe(relativePath);
-        if (!File.Exists(full)) return Task.FromResult<string?>(null);
-        return File.ReadAllTextAsync(full).ContinueWith(t => (string?)t.Result);
+        if (!File.Exists(full)) return null;
+        var content = await File.ReadAllTextAsync(full);
+        var lineCount = content.Count(c => c == '\n') + 1;
+        if (lineCount >= LargeFileThreshold)
+            content = $"[File has {lineCount} lines. For targeted edits prefer search_file + edit_file to avoid re-reading.]\n" + content;
+        return content;
     }
 
     public virtual async Task WriteFileAsync(string relativePath, string content)
@@ -51,7 +57,19 @@ public class LocalScopedFileSystem : IScopedFileSystem
 
         var files = Directory
             .GetFiles(RootPath, "*.*", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(RootPath, f).Replace('\\', '/'));
+            .Select(f =>
+            {
+                var rel = Path.GetRelativePath(RootPath, f).Replace('\\', '/');
+                try
+                {
+                    var lines = File.ReadLines(f).Count();
+                    return $"{rel} ({lines} lines)";
+                }
+                catch
+                {
+                    return rel;
+                }
+            });
 
         return Task.FromResult(files);
     }

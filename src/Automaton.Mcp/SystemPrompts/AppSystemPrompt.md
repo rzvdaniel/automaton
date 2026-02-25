@@ -49,9 +49,10 @@ Controllers run on the runner — you cannot test during authoring.
 1. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
 
 **Modifications (preferred):**
-1. For **small files** (<100 lines): `read_file` → `edit_file`
-2. For **large files** (100+ lines): `search_file` → `edit_file` using the returned context verbatim as `oldText`
-3. Only use `write_file` when rewriting most of the file
+1. `list_files` first — the response includes line counts per file (e.g. `js/app.js (312 lines)`)
+2. For **small files** (<100 lines): `read_file` → `edit_file`
+3. For **large files** (100+ lines): `search_file` → `edit_file` using the returned context verbatim as `oldText`
+4. Only use `write_file` when rewriting most of the file
 
 ## BACKEND CONTROLLERS:
 Single Python script handling multiple actions via `action_name` (injected by runner).
