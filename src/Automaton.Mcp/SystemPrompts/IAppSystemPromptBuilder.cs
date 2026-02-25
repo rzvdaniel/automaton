@@ -6,7 +6,8 @@ namespace Automaton.Mcp.SystemPrompts;
 public interface IAppSystemPromptBuilder
 {
     /// <summary>
-    /// Build a unified system prompt for combined frontend + backend generation
+    /// Build a system prompt for the given complexity tier.
+    /// Falls back to the legacy single prompt when tier is null.
     /// </summary>
-    string BuildSystemPrompt();
+    string BuildSystemPrompt(ComplexityTier? tier = null);
 }

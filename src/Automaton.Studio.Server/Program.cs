@@ -55,6 +55,7 @@ services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSectio
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
+services.AddScoped<IPromptClassifierService, PromptClassifierService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {

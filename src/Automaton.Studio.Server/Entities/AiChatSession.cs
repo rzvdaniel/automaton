@@ -67,6 +67,12 @@ public class AiChatSession
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>
+    /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
+    /// Once set it is sticky — never downgraded within the same session.
+    /// </summary>
+    public string? ComplexityTier { get; set; }
+
     // Navigation properties
     public virtual ICollection<AiChatMessage> Messages { get; set; } = new List<AiChatMessage>();
     public virtual ICollection<AiChatSessionUser> AiChatSessionUsers { get; set; } = new List<AiChatSessionUser>();

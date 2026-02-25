@@ -6,12 +6,33 @@ using System.Threading;
 namespace Automaton.Mcp.SystemPrompts;
 
 /// <summary>
-/// Service for building unified AI system prompts that generate both frontend and backend code
+/// Service for building AI system prompts for app generation, with tier-based template selection.
 /// </summary>
 public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 {
-    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.AppSystemPrompt.md";
-    private static readonly Lazy<string> CachedPrompt = new(LoadPrompt, LazyThreadSafetyMode.ExecutionAndPublication);
+    // Legacy single prompt (kept for backward compatibility)
+    private const string LegacyResourceName = "Automaton.Mcp.SystemPrompts.AppSystemPrompt.md";
+    private static readonly Lazy<string> LegacyPrompt = new(
+        () => LoadEmbeddedResource(LegacyResourceName),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
+    // Tiered prompts
+    private static readonly Lazy<string> SimplePrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-simple.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<string> MediumPrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-medium.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<string> LargePrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-large.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<string> EnterprisePrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-enterprise.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
 
     public AppSystemPromptBuilder(IStepSystemPromptBuilder stepPromptBuilder)
@@ -20,18 +41,27 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     }
 
     /// <summary>
-    /// Build a unified system prompt for combined frontend + backend generation
+    /// Build a system prompt for the given complexity tier.
+    /// When <paramref name="tier"/> is null, returns the legacy single prompt for backward compatibility.
     /// </summary>
-    public string BuildSystemPrompt()
+    public string BuildSystemPrompt(ComplexityTier? tier = null)
     {
-        return CachedPrompt.Value;
+        return tier switch
+        {
+            ComplexityTier.Simple => SimplePrompt.Value,
+            ComplexityTier.Medium => MediumPrompt.Value,
+            ComplexityTier.Large => LargePrompt.Value,
+            ComplexityTier.Enterprise => EnterprisePrompt.Value,
+            null => LegacyPrompt.Value,
+            _ => LegacyPrompt.Value
+        };
     }
 
-    private static string LoadPrompt()
+    private static string LoadEmbeddedResource(string resourceName)
     {
         var assembly = typeof(AppSystemPromptBuilder).Assembly;
-        using var stream = assembly.GetManifestResourceStream(PromptResourceName)
-            ?? throw new InvalidOperationException($"Embedded prompt resource '{PromptResourceName}' was not found.");
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded prompt resource '{resourceName}' was not found.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd().Trim();
     }

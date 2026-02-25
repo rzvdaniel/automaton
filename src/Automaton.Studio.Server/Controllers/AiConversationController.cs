@@ -35,6 +35,7 @@ public class AiConversationController : BaseController
     private readonly AppMcpToolProvider _appToolProvider;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IAppSystemPromptBuilder _appPromptBuilder;
+    private readonly IPromptClassifierService _promptClassifier;
     private readonly ILogger<AiConversationController> _logger;
 
     public AiConversationController(
@@ -48,6 +49,7 @@ public class AiConversationController : BaseController
         AppMcpToolProvider appToolProvider,
         IStepSystemPromptBuilder stepPromptBuilder,
         IAppSystemPromptBuilder appPromptBuilder,
+        IPromptClassifierService promptClassifier,
         ILogger<AiConversationController> logger)
     {
         _mcpClient = mcpClient;
@@ -60,6 +62,7 @@ public class AiConversationController : BaseController
         _appToolProvider = appToolProvider;
         _stepPromptBuilder = stepPromptBuilder;
         _appPromptBuilder = appPromptBuilder;
+        _promptClassifier = promptClassifier;
         _logger = logger;
     }
 
@@ -171,7 +174,7 @@ public class AiConversationController : BaseController
             var history = await LoadConversationHistoryAsync(sessionId, userId);
 
             // 4. Build context-aware system prompt (with continuation context if needed)
-            var systemPrompt = await BuildSystemPromptAsync(request, userId, history);
+            var systemPrompt = await BuildSystemPromptAsync(request, userId, sessionId, history);
 
             // 5. Get tool provider based on resource type
             var toolProvider = GetToolProvider(request.ResourceType);
@@ -270,32 +273,83 @@ public class AiConversationController : BaseController
     }
 
     /// <summary>
-    /// Build context-aware system prompt based on resource type
+    /// Build context-aware system prompt based on resource type and detected/stored complexity tier.
     /// </summary>
-    private async Task<string> BuildSystemPromptAsync(StreamConversationRequest request, Guid userId, List<ConversationMessage>? conversationHistory)
+    private async Task<string> BuildSystemPromptAsync(StreamConversationRequest request, Guid userId, Guid sessionId, List<ConversationMessage>? conversationHistory)
     {
-        // Build base system prompt based on resource type
-        var baseSystemPrompt = request.ResourceType?.ToLowerInvariant() switch
+        string baseSystemPrompt;
+
+        if (string.Equals(request.ResourceType, "webapp", StringComparison.OrdinalIgnoreCase))
         {
-            "customstep" => _stepPromptBuilder.BuildSystemPrompt(request.Language ?? "Python"),
-            "webapp" => _appPromptBuilder.BuildSystemPrompt(),
-            _ => "You are a helpful AI assistant for the Automaton platform."
-        };
+            var tier = await ResolveComplexityTierAsync(request.Message, sessionId, userId, conversationHistory);
+            baseSystemPrompt = _appPromptBuilder.BuildSystemPrompt(tier);
+        }
+        else
+        {
+            baseSystemPrompt = request.ResourceType?.ToLowerInvariant() switch
+            {
+                "customstep" => _stepPromptBuilder.BuildSystemPrompt(request.Language ?? "Python"),
+                _ => "You are a helpful AI assistant for the Automaton platform."
+            };
+        }
 
         // Add continuation context if this is a restored session with history
-        // This prevents the AI from being overly cautious in ongoing conversations
         var isRestoredSession = conversationHistory != null && conversationHistory.Count > 0;
-        
+
         if (isRestoredSession)
         {
             _logger.LogInformation(
                 "Adding continuation prompt for session {SessionId} with {MessageCount} historical messages",
-                request.SessionId, conversationHistory!.Count);
-            
+                sessionId, conversationHistory!.Count);
+
             return $"{baseSystemPrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
         }
 
         return baseSystemPrompt;
+    }
+
+    /// <summary>
+    /// Resolve complexity tier: load from session (sticky) or classify from user message (new sessions).
+    /// </summary>
+    private async Task<ComplexityTier?> ResolveComplexityTierAsync(
+        string userMessage, Guid sessionId, Guid userId, List<ConversationMessage>? history)
+    {
+        // Continuation: load sticky tier from session
+        if (history != null && history.Count > 0)
+        {
+            try
+            {
+                var session = await _chatHistoryService.GetSessionAsync(sessionId, userId);
+                if (session?.ComplexityTier != null &&
+                    Enum.TryParse<ComplexityTier>(session.ComplexityTier, ignoreCase: true, out var stored))
+                {
+                    _logger.LogInformation("Using sticky tier {Tier} for session {SessionId}", stored, sessionId);
+                    return stored;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load sticky tier for session {SessionId}", sessionId);
+            }
+        }
+
+        // New session: classify and persist
+        try
+        {
+            var result = await _promptClassifier.ClassifyAsync(userMessage, userId.ToString());
+            _logger.LogInformation("Classified request as {Tier} (confidence={Confidence}) for session {SessionId}",
+                result.Tier, result.Confidence, sessionId);
+
+            // Persist asynchronously — do not block the response
+            _ = _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, result.Tier.ToString(), userId);
+
+            return result.Tier;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Complexity classification failed for session {SessionId}, defaulting to null (legacy prompt)", sessionId);
+            return null;
+        }
     }
 
     /// <summary>

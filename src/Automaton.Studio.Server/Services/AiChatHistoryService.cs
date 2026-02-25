@@ -52,7 +52,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalPromptsSubmitted = s.TotalPromptsSubmitted,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
-                    TotalTokens = s.TotalTokens
+                    TotalTokens = s.TotalTokens,
+                    ComplexityTier = s.ComplexityTier
                 })
                 .ToListAsync();
 
@@ -89,7 +90,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalPromptsSubmitted = s.TotalPromptsSubmitted,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
-                    TotalTokens = s.TotalTokens
+                    TotalTokens = s.TotalTokens,
+                    ComplexityTier = s.ComplexityTier
                 })
                 .FirstOrDefaultAsync();
 
@@ -697,6 +699,29 @@ public class AiChatHistoryService : IAiChatHistoryService
         {
             logger.Error(ex, "Error clearing messages from session {SessionId}", sessionId);
             throw;
+        }
+    }
+
+    public async Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId)
+    {
+        try
+        {
+            var session = await dataContext.AiChatSessions
+                .Include(s => s.AiChatSessionUsers)
+                .FirstOrDefaultAsync(s => s.Id == sessionId &&
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
+
+            if (session == null)
+                return;
+
+            session.ComplexityTier = tier;
+            session.UpdatedAt = DateTime.UtcNow;
+            await dataContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to update complexity tier for session {SessionId}", sessionId);
+            // Non-critical — don't rethrow
         }
     }
 

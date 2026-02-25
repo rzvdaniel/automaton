@@ -25,6 +25,11 @@ public class ChatSessionDto
     public int TotalInputTokens { get; set; }
     public int TotalOutputTokens { get; set; }
     public int TotalTokens { get; set; }
+
+    /// <summary>
+    /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
+    /// </summary>
+    public string? ComplexityTier { get; set; }
 }
 
 /// <summary>

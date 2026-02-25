@@ -168,6 +168,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("TotalTokens")
                         .HasColumnType("int");
 
+                    b.Property<string>("ComplexityTier")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 

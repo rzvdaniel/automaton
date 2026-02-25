@@ -19,6 +19,10 @@
   <ItemGroup>
     <EmbeddedResource Include="SystemPrompts\AppSystemPrompt.md" />
     <EmbeddedResource Include="SystemPrompts\StepSystemPrompt.md" />
+    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-simple.md" />
+    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-medium.md" />
+    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-large.md" />
+    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-enterprise.md" />
   </ItemGroup>
 
 </Project>

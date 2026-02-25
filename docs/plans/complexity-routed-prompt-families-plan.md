@@ -16,21 +16,8 @@ Adopt a complexity-routed prompt architecture with 4 tiers (Simple, Medium, Larg
    - *Large/Enterprise*: Feature-based folder organization (e.g., `features/auth/`, `features/dashboard/`), strict separation of concerns, and modular vanilla JS patterns.
 3. **Update Builder**: Modify `AppSystemPromptBuilder` to select the appropriate template based on the classifier's output.
 
-**Phase 3: Dedicated App Backend Controllers (New Entity)**
-1. **Introduce `AppController` Entity**: Create a new backend entity specifically for Web Apps, separate from `CustomStep`. While Steps remain single-purpose building blocks for visual flows, `AppControllers` will handle complex, multi-action routing (e.g., a `UsersController` with `create`, `read`, `update`, `delete` methods). See [app-controller-execution-architecture.md](app-controller-execution-architecture.md) for detailed execution model.
-2. **File System Storage**: Store controller code in the app's `backend/` folder (e.g., `backend/users-controller.py`, `backend/products-controller.py`) alongside UI files, managed by `AppFileStorageService`.
-3. **Execution Model**: 
-   - Server loads controller code from the file system and sends it to runners via SignalR (Option A from architecture doc).
-   - Runner executes the action method and returns results.
-   - Supports `automatonApi.executeController('Users', 'create', payload)` and similar calls.
-4. **Create Tiered Prompts**:
-   - Introduce AI prompt templates for AppControllers (`controller-simple.md`, `controller-large.md`, etc.).
-5. **Scale Backend Architecture**:
-   - *Simple/Medium*: Continue using single-purpose `CustomStep`s for basic integrations.
-   - *Large/Enterprise*: Instruct the AI to generate `AppController`s to manage complex state and group related operations, keeping the Step library clean.
-
 **Phase 4: Tool Policy & Validation**
-1. **Align Tool Policies**: Update prompts to enforce tier-specific tool usage (e.g., Large/Enterprise tiers *must* use `list_files` and targeted `read_file` before making edits, and must explicitly test controller steps with multiple action inputs).
+1. **Align Tool Policies**: Update prompts to enforce tier-specific tool usage (e.g., Large/Enterprise tiers *must* use `list_files` and targeted `read_file` before making edits, and must explicitly test controller with multiple action inputs).
 2. **End-to-End Validation**: Test with representative scenarios:
    - *Simple*: Landing page.
    - *Medium*: Dashboard with 1-2 API calls.
@@ -57,7 +44,6 @@ Adopt a complexity-routed prompt architecture with 4 tiers (Simple, Medium, Larg
 - **Confirmed**: Complexity detection uses LLM classifier only.
 - **Confirmed**: Start with 4 tiers (Simple, Medium, Large, Enterprise).
 - **Confirmed**: Frontend remains HTML/CSS/JS, scaled via feature-based folder structures for large apps.
-- **Confirmed**: Backend scales via a new `AppController` entity for complex apps, preserving `CustomStep` as a pure, single-purpose building block for flows.
 
 ### Further Considerations
 1. **Tier Stickiness Policy**: Once a session starts at Large/Enterprise, prefer sticky tier for continuity unless user explicitly requests simplification.

@@ -72,4 +72,9 @@ public interface IAiChatHistoryService
     /// Get aggregate AI chat statistics for a specific app (WebApp)
     /// </summary>
     Task<AppChatStatsDto?> GetAppChatStatsAsync(Guid appId, Guid userId);
+
+    /// <summary>
+    /// Persist the complexity tier for a session (sticky — only upgrades, never downgrades).
+    /// </summary>
+    Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId);
 }
