@@ -214,16 +214,20 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     try {
       const serverMessages = await aiChatHistoryService.getSessionMessages(sessionId)
       
-      // Convert server messages to chat messages
-      messages.value = serverMessages.map((m: any) => ({
-        id: m.id || crypto.randomUUID(),
-        role: m.role,
-        content: m.content,
-        type: mapMessageType(m.messageType),
-        timestamp: new Date(m.createdAt || Date.now()),
-        toolName: m.metadata ? parseToolMetadata(m.metadata)?.toolName : undefined,
-        toolStatus: m.messageType === 'ToolExecution' ? 'completed' : undefined,
-      }))
+      // Convert server messages to chat messages.
+      // Skip role='tool' messages — they contain raw tool output (file contents, API results, etc.)
+      // that is only needed by the AI as context, not meaningful for the user to see.
+      messages.value = serverMessages
+        .filter((m: any) => m.role !== 'tool')
+        .map((m: any) => ({
+          id: m.id || crypto.randomUUID(),
+          role: m.role,
+          content: m.content,
+          type: mapMessageType(m.messageType),
+          timestamp: new Date(m.createdAt || Date.now()),
+          toolName: m.metadata ? parseToolMetadata(m.metadata)?.toolName : undefined,
+          toolStatus: m.messageType === 'ToolExecution' ? 'completed' : undefined,
+        }))
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load messages'
       console.error('Error loading messages:', err)
