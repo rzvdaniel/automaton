@@ -72,26 +72,6 @@ const {
 const currentView = ref<'sessions' | 'chat'>('sessions')
 
 // Track which tool result messages are expanded
-const expandedToolResults = ref<Set<string>>(new Set())
-
-const TOOL_RESULT_MAX_LENGTH = 120
-
-function isToolResultTruncatable(content: string): boolean {
-  return content.length > TOOL_RESULT_MAX_LENGTH
-}
-
-function truncateToolResult(content: string): string {
-  if (content.length <= TOOL_RESULT_MAX_LENGTH) return content
-  return content.slice(0, TOOL_RESULT_MAX_LENGTH) + '…'
-}
-
-function toggleToolResult(id: string): void {
-  if (!isToolResultTruncatable(messages.value.find(m => m.id === id)?.content ?? '')) return
-  const next = new Set(expandedToolResults.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expandedToolResults.value = next
-}
 
 // Session UI state
 const showSessionDialog = ref(false)
@@ -606,26 +586,15 @@ function handleKeyPress(event: KeyboardEvent) {
 
                 <!-- Message content -->
                 <div class="timeline-content">
-                  <!-- Tool result content: collapsed by default, expandable -->
-                  <template v-if="message.toolName && message.toolStatus === 'completed' && message.content">
-                    <div
-                      class="tool-result-preview"
-                      :class="{ expanded: expandedToolResults.has(message.id) }"
-                      @click="toggleToolResult(message.id)"
-                    >
-                      <span class="tool-result-text">{{ expandedToolResults.has(message.id) ? message.content : truncateToolResult(message.content) }}</span>
-                      <i v-if="isToolResultTruncatable(message.content)" class="pi tool-result-toggle" :class="expandedToolResults.has(message.id) ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
-                    </div>
-                  </template>
-                  <div v-else class="message-text">{{ message.content }}</div>
-
-                  <!-- Tool execution status -->
-                  <div v-if="message.toolStatus" class="tool-status" :class="message.toolStatus">
-                    <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner"></i>
-                    <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check"></i>
-                    <i v-else-if="message.toolStatus === 'error'" class="pi pi-times"></i>
-                    <span>{{ message.toolStatus }}</span>
+                  <!-- Tool message: single-line name + status icon -->
+                  <div v-if="message.toolName" class="tool-call-line">
+                    <code class="tool-call-name">{{ message.toolName }}</code>
+                    <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner tool-call-icon executing"></i>
+                    <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check tool-call-icon completed"></i>
+                    <i v-else-if="message.toolStatus === 'error'" class="pi pi-times tool-call-icon error"></i>
                   </div>
+                  <!-- Regular AI message -->
+                  <div v-else class="message-text">{{ message.content }}</div>
                 </div>
               </div>
             </div>
@@ -1094,70 +1063,33 @@ function handleKeyPress(event: KeyboardEvent) {
   overflow-wrap: break-word;
 }
 
-.tool-result-preview {
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.25rem 0.375rem;
-  border-radius: 4px;
-  background: var(--p-surface-100);
-  transition: background 0.15s;
-}
-
-.tool-result-preview:hover {
-  background: var(--p-surface-200);
-}
-
-.tool-result-text {
-  flex: 1;
-}
-
-.tool-result-toggle {
-  flex-shrink: 0;
-  margin-top: 2px;
-  font-size: 0.65rem;
-  opacity: 0.6;
-}
-
-:global(.app-dark) .tool-result-preview {
-  background: var(--p-surface-800);
-}
-
-:global(.app-dark) .tool-result-preview:hover {
-  background: var(--p-surface-700);
-}
-
-.tool-status {
-  margin-top: 0.5rem;
-  margin-left: -1.5rem;
-  padding: 0.375rem 0.625rem;
-  border-radius: 0.375rem;
-  font-size: 0.7rem;
+.tool-call-line {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  font-weight: 500;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
 }
 
-.tool-status.executing {
-  background-color: var(--p-blue-100);
-  color: var(--p-blue-900);
+.tool-call-name {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--p-text-color);
 }
 
-.tool-status.completed {
-  background-color: var(--p-green-100);
-  color: var(--p-green-900);
+.tool-call-icon.executing {
+  color: var(--p-blue-500);
+  font-size: 0.7rem;
 }
 
-.tool-status.error {
-  background-color: var(--p-red-100);
-  color: var(--p-red-900);
+.tool-call-icon.completed {
+  color: var(--p-green-500);
+  font-size: 0.7rem;
+}
+
+.tool-call-icon.error {
+  color: var(--p-red-500);
+  font-size: 0.7rem;
 }
 
 .session-metrics-footer {
