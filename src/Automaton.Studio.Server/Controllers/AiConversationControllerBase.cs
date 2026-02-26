@@ -1,5 +1,6 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
+using Automaton.Mcp.Services;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
