@@ -107,7 +107,7 @@ public class AiAppConversationController : AiConversationControllerBase
                 "Classified as {Tier} (confidence={Confidence}) for session {SessionId}",
                 result.Tier, result.Confidence, sessionId);
 
-            _ = _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, result.Tier.ToString(), userId);
+            await _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, result.Tier.ToString(), userId);
 
             return result.Tier;
         }
