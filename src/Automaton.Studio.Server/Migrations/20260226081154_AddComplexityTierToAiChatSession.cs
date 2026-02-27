@@ -10,13 +10,19 @@ namespace Automaton.Studio.Server.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-
+            migrationBuilder.AddColumn<string>(
+                name: "ComplexityTier",
+                table: "AiChatSessions",
+                type: "longtext",
+                nullable: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            migrationBuilder.DropColumn(
+                name: "ComplexityTier",
+                table: "AiChatSessions");
         }
     }
 }
