@@ -12,6 +12,7 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
+import PlanApprovalCard from './PlanApprovalCard.vue'
 import type { ChatSession } from '@/shared/types/ai.types'
 
 // Props
@@ -590,8 +591,19 @@ function handleKeyPress(event: KeyboardEvent) {
 
                 <!-- Message content -->
                 <div class="timeline-content">
+                  <!-- Plan approval card -->
+                  <PlanApprovalCard
+                    v-if="message.type === 'planApproval' && message.planData"
+                    :plan-data="message.planData"
+                    :on-send="(msg) => sendAiMessage(msg)"
+                  />
+                  <!-- Instruction update notification -->
+                  <div v-else-if="message.type === 'instructionUpdate'" class="instruction-notification">
+                    <i class="pi pi-file-edit"></i>
+                    {{ message.instructionNotification || 'Instructions updated.' }}
+                  </div>
                   <!-- Tool message: single-line name + status icon -->
-                  <div v-if="message.toolName" class="tool-call-line">
+                  <div v-else-if="message.toolName" class="tool-call-line">
                     <code class="tool-call-name">{{ message.toolName }}</code>
                     <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner tool-call-icon executing"></i>
                     <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check tool-call-icon completed"></i>
@@ -1079,6 +1091,15 @@ function handleKeyPress(event: KeyboardEvent) {
   font-family: monospace;
   font-size: 0.75rem;
   color: var(--p-text-color);
+}
+
+.instruction-notification {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  font-style: italic;
 }
 
 .tool-call-icon.executing {

@@ -609,18 +609,24 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         toolMessage.error = toolResult.content
       }
 
+      // Parse result JSON once
+      let resultData: any = toolResult.content
+      try { resultData = JSON.parse(toolResult.content) } catch { /* not JSON */ }
+
+      // Upgrade message type for special tools
+      if (!toolResult.isError) {
+        if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
+          toolMessage.type = 'planApproval'
+          toolMessage.planData = resultData as import('../types/ai.types').PlanData
+        } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
+          toolMessage.type = 'instructionUpdate'
+          toolMessage.instructionNotification = resultData.notification as string
+        }
+      }
+
       // Notify tool execution callback with result
       if (options?.onToolExecuted && toolMessage.toolName) {
         try {
-          // Parse result content if it's JSON
-          let resultData: any = toolResult.content
-          try {
-            resultData = JSON.parse(toolResult.content)
-          } catch {
-            // Not JSON, use as-is
-          }
-
-          // Use stored args from tool call
           options.onToolExecuted(toolMessage.toolName, toolMessage.toolArgs || {}, resultData)
         } catch (err) {
           console.error('Error in onToolExecuted callback:', err)

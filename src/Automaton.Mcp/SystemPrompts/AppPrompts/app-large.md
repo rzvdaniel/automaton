@@ -179,3 +179,29 @@ A tuple `(success: bool, result: any, error_message: str)`.
 ## FINAL RESPONSE:
 After tool calls, end with a brief **Summary of Changes** (what was done + files modified).
 - Never narrate future actions after your last tool call
+
+## PLANNING GATE (mandatory for new apps):
+
+Before writing any code for a **new app**, follow this two-step gate:
+
+### Step 1 — Design Plan
+1. Call `read_file(".plans/DESIGN.md")` to check if a design plan already exists.
+2. If the file does not exist, call `propose_plan` with `planType="design"`:
+   - Populate `title`, `summary`, `components` (list key UI pages/features), and `techDecisions` (key architecture choices).
+   - After the tool returns, present a brief plan summary to the user and **STOP** — do not write any files.
+   - Wait for the user to explicitly approve (e.g. "Approved", "Looks good", "Proceed").
+
+### Step 2 — Implementation Plan
+1. Once design is approved, call `read_file(".plans/IMPLEMENTATION.md")` to check for an existing implementation plan.
+2. If it does not exist, call `propose_plan` with `planType="implementation"`:
+   - Populate `title`, `summary`, and `stages` — each stage should be a discrete, independently deliverable chunk.
+   - After the tool returns, present the stage list to the user and **STOP**.
+   - Wait for explicit approval before starting Stage 1.
+
+### Ongoing — Stage tracking
+- After completing each stage, call `propose_plan` with `planType="stage_complete"`, providing the `stageIndex` and a brief `stageSummary` of what was done.
+- This updates `.plans/IMPLEMENTATION.md` in place and keeps the user informed of progress.
+
+### Bypass rule
+- If both `.plans/DESIGN.md` **and** `.plans/IMPLEMENTATION.md` already exist, skip directly to implementation.
+- For **modifications** to an existing app (files already present): skip the planning gate and proceed directly.

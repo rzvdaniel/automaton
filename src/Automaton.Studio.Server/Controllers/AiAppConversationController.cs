@@ -25,6 +25,7 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly AppMcpToolProvider _toolProvider;
     private readonly IAppSystemPromptBuilder _promptBuilder;
     private readonly IPromptClassifierService _promptClassifier;
+    private readonly AppInstructionInjector _instructionInjector;
 
     public AiAppConversationController(
         IAutomatonMcpClient mcpClient,
@@ -36,13 +37,15 @@ public class AiAppConversationController : AiConversationControllerBase
         AppMcpToolProvider toolProvider,
         IAppSystemPromptBuilder promptBuilder,
         IPromptClassifierService promptClassifier,
+        AppInstructionInjector instructionInjector,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
                rateLimitService, providerMetadataService, logger)
     {
-        _toolProvider = toolProvider;
-        _promptBuilder = promptBuilder;
-        _promptClassifier = promptClassifier;
+        _toolProvider         = toolProvider;
+        _promptBuilder        = promptBuilder;
+        _promptClassifier     = promptClassifier;
+        _instructionInjector  = instructionInjector;
     }
 
     protected override ChatResourceType ResourceType => ChatResourceType.WebApp;
@@ -64,17 +67,35 @@ public class AiAppConversationController : AiConversationControllerBase
         Guid sessionId,
         List<ConversationMessage>? history)
     {
-        var tier = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
+        var tier       = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
         var basePrompt = _promptBuilder.BuildSystemPrompt(tier);
+
+        // Inject user instructions from .instructions/ folder (1000 token budget)
+        string? instructionBlock = null;
+        if (request.ResourceId.HasValue)
+        {
+            try
+            {
+                instructionBlock = await _instructionInjector.BuildInjectionBlockAsync(userId, request.ResourceId.Value);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to inject instructions for app {AppId}", request.ResourceId);
+            }
+        }
+
+        var prompt = instructionBlock is not null
+            ? $"{basePrompt}\n\n{instructionBlock}"
+            : basePrompt;
 
         if (history?.Count > 0)
         {
             _logger.LogInformation(
                 "Adding continuation context for session {SessionId} ({Count} messages)", sessionId, history.Count);
-            return $"{basePrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+            return $"{prompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
         }
 
-        return basePrompt;
+        return prompt;
     }
 
     private async Task<ComplexityTier?> ResolveComplexityTierAsync(

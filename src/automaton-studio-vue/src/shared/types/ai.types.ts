@@ -122,6 +122,22 @@ export type ChatMessageType =
   | 'codeError'
   | 'generating'
   | 'system'
+  | 'planApproval'
+  | 'instructionUpdate'
+
+// Payload embedded in a planApproval message
+export interface PlanData {
+  planType: 'design' | 'implementation' | 'stage_complete'
+  title: string
+  summary: string
+  planFile?: string
+  components?: Array<{ name: string; description?: string }>
+  techDecisions?: Array<{ decision: string; rationale?: string }>
+  stages?: Array<{ name: string; description?: string; complexity?: string }>
+  stageIndex?: number
+  stageSummary?: string
+  awaitingApproval: boolean
+}
 
 export interface ChatMessage {
   id: string
@@ -135,6 +151,12 @@ export interface ChatMessage {
   toolArgs?: any
   toolStatus?: 'executing' | 'completed' | 'error'
   toolResult?: any
+  
+  // For plan approval cards
+  planData?: PlanData
+  
+  // For instruction update notifications
+  instructionNotification?: string
   
   // For code generation messages
   generatedCode?: string

@@ -330,6 +330,14 @@ services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                    Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.FileIoTool>();
+// Planning tool group — propose_plan
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
+                   Automaton.Mcp.Tools.PlanningTool>();
+// Instructions tool group — read_instruction, write_instruction, list_instructions
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
+                   Automaton.Mcp.Tools.InstructionsTool>();
+// Instruction injector — injects .instructions/ files into system prompts
+services.AddScoped<Automaton.Studio.Server.Services.AppInstructionInjector>();
 
 // MCP Client
 services.AddAutomatonMcpClient();

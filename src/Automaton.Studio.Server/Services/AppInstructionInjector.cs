@@ -1,0 +1,160 @@
+using System.Text;
+using Serilog;
+
+namespace Automaton.Studio.Server.Services;
+
+/// <summary>
+/// Reads .instructions/ files from an app's directory and injects them into the system prompt.
+///
+/// Injection rules:
+///   - _index.md is always injected (if it exists) — it's the summary file, kept short
+///   - Files with context: always in their YAML frontmatter are injected in full
+///   - Files with context: on-request are NOT injected — the AI reads them via read_instruction
+///   - Hard cap of 1000 tokens (approximated as 4 chars/token) total across all injected files
+///   - Files are prioritized: high → medium → low (frontmatter priority field)
+/// </summary>
+public class AppInstructionInjector
+{
+    private const int MaxTokens = 1000;
+    private const int CharsPerToken = 4;
+    private const int MaxChars = MaxTokens * CharsPerToken;
+
+    private readonly AppFileStorageService _storage;
+    private readonly Serilog.ILogger _logger;
+
+    public AppInstructionInjector(AppFileStorageService storage)
+    {
+        _storage = storage;
+        _logger  = Log.ForContext<AppInstructionInjector>();
+    }
+
+    /// <summary>
+    /// Reads .instructions/ files for the given app and returns an injection block
+    /// to prepend to the system prompt, or null if no instructions exist.
+    /// </summary>
+    public async Task<string?> BuildInjectionBlockAsync(Guid userId, Guid appId)
+    {
+        var appDir = _storage.GetAppDirectoryPath(userId, appId);
+        var instructionsDir = Path.Combine(appDir, ".instructions");
+
+        if (!Directory.Exists(instructionsDir))
+            return null;
+
+        var files = Directory.GetFiles(instructionsDir, "*.md", SearchOption.TopDirectoryOnly);
+        if (files.Length == 0)
+            return null;
+
+        // Always inject _index.md first (it's a short summary)
+        var ordered = new List<(int priority, string path, string filename)>();
+
+        foreach (var file in files)
+        {
+            var filename = Path.GetFileName(file);
+            var content  = await File.ReadAllTextAsync(file);
+            var meta     = ParseFrontmatter(content);
+
+            // _index.md always gets injected with highest priority
+            if (filename.Equals("_index.md", StringComparison.OrdinalIgnoreCase))
+            {
+                ordered.Insert(0, (0, file, filename));
+                continue;
+            }
+
+            var context = meta.GetValueOrDefault("context", "always");
+            if (!context.Equals("always", StringComparison.OrdinalIgnoreCase))
+                continue; // on-request files are skipped here
+
+            var priorityStr = meta.GetValueOrDefault("priority", "medium");
+            var priority = priorityStr.ToLower() switch
+            {
+                "high"   => 1,
+                "medium" => 2,
+                "low"    => 3,
+                _        => 2
+            };
+
+            ordered.Add((priority, file, filename));
+        }
+
+        ordered = ordered.OrderBy(x => x.priority).ToList();
+
+        if (ordered.Count == 0)
+            return null;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("## User Instructions");
+        sb.AppendLine();
+        sb.AppendLine("The following instructions have been set for this project. Follow them consistently:");
+        sb.AppendLine();
+
+        var remaining = MaxChars;
+
+        foreach (var (_, path, filename) in ordered)
+        {
+            if (remaining <= 0) break;
+
+            var content  = await File.ReadAllTextAsync(path);
+            var stripped = StripFrontmatter(content).Trim();
+
+            if (stripped.Length == 0) continue;
+
+            var chunk = stripped.Length <= remaining
+                ? stripped
+                : stripped[..remaining] + "\n_(truncated due to token budget)_";
+
+            sb.AppendLine($"### {filename}");
+            sb.AppendLine(chunk);
+            sb.AppendLine();
+
+            remaining -= stripped.Length;
+        }
+
+        var result = sb.ToString().Trim();
+        if (result.Length < 30) // Nothing meaningful
+            return null;
+
+        _logger.Debug("Injecting {Chars} chars of instructions for app {AppId}", result.Length, appId);
+        return result;
+    }
+
+    // ── YAML frontmatter parsing ─────────────────────────────────────────────
+
+    private static Dictionary<string, string> ParseFrontmatter(string content)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var lines  = content.Split('\n');
+
+        if (lines.Length < 2 || lines[0].Trim() != "---")
+            return result;
+
+        for (var i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i].Trim();
+            if (line == "---") break;
+
+            var colonIdx = line.IndexOf(':');
+            if (colonIdx < 0) continue;
+
+            var key   = line[..colonIdx].Trim();
+            var value = line[(colonIdx + 1)..].Trim().Trim('"', '\'');
+            result[key] = value;
+        }
+
+        return result;
+    }
+
+    private static string StripFrontmatter(string content)
+    {
+        var lines = content.Split('\n');
+        if (lines.Length < 2 || lines[0].Trim() != "---")
+            return content;
+
+        for (var i = 1; i < lines.Length; i++)
+        {
+            if (lines[i].Trim() == "---")
+                return string.Join('\n', lines[(i + 1)..]);
+        }
+
+        return content;
+    }
+}
