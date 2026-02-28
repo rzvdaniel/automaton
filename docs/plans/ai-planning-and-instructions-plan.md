@@ -250,7 +250,42 @@ Clicking any file opens it in Monaco. New file button lets users add instruction
 
 ---
 
-## 6. Generic by Design
+## 7. MCP Tool Visibility & Control
+
+Users and admins can control which MCP tools are available in each AI chat context.
+
+### Per-resource tool configuration
+
+Each resource (app, step, flow) has a "Tools" settings panel listing available MCP tools with enable/disable toggles. Stored as metadata alongside the resource. The system prompt builder only registers enabled tools with the AI client — fewer tools = more focused AI behavior.
+
+### Two levels
+
+| Level | Scope | Example |
+|-------|-------|---------|
+| Organization/admin | All users in org | Admin disables `write_instruction` for non-power users |
+| Resource | Per app/step/flow | User disables `propose_plan` for a simple utility app |
+
+Users can disable within what the admin has approved. They cannot enable tools the admin has disabled.
+
+### Default tool sets per resource type
+
+Until user-overridable UI is built, a static default config per resource type applies:
+
+| Tool | App default | Step default | Flow default |
+|------|------------|-------------|-------------|
+| `propose_plan` | ✅ enabled | ✅ enabled | ✅ enabled |
+| `read_instruction` | ✅ enabled | ✅ enabled | ✅ enabled |
+| `write_instruction` | ✅ enabled | ✅ enabled | ✅ enabled |
+| _(future tools)_ | configurable | configurable | configurable |
+
+### Implementation order
+
+This is a **last step** — implement after all other features are working. The static default config serves as a no-UI placeholder until then.
+
+- [ ] Static default tool sets per resource type (no UI — just config)
+- [ ] Resource-level tool toggle UI in app/step settings
+- [ ] Organization-level approved tool set in admin settings
+- [ ] User-level overrides within org-approved set
 
 All MCP tools (`propose_plan`, `read_instruction`, `write_instruction`) are resource-agnostic. The system prompt builder for any resource type (app, step, flow, or anything added in future) simply points the tools at the right working directory. The tools themselves have no knowledge of what they are building.
 
@@ -262,13 +297,18 @@ The `.instructions/` and `.plans/` folder convention works identically wherever 
 
 - [ ] `propose_plan` MCP tool — writes `.plans/*.md`, returns structured data to stream
 - [ ] `read_instruction` + `write_instruction` MCP tools
-- [ ] Instruction injection logic in system prompt builder (always + on-request)
-- [ ] Complexity-aware planning gate in `AiAppConversationController` pre-build check
+- [ ] Instruction injection logic in system prompt builder (always + on-request, 1000 token cap)
+- [ ] Complexity-aware planning gate — pre-build check, existing plan detection
 - [ ] Frontend: approval card components (`DesignPlanCard.vue`, `ImplementationPlanCard.vue`)
 - [ ] Frontend: detect plan tool calls in chat stream, render cards instead of text
-- [ ] File tree sidebar in App Editor (`AppFilesTree.vue`)
+- [ ] Frontend: stage complete cards with Continue/Stop buttons
+- [ ] Frontend: live progress update on original approval card as stages tick off
+- [ ] File tree sidebar in App Editor (`AppFilesTree.vue`) with badge on `IMPLEMENTATION.md`
+- [ ] App Editor toolbar — `Stage N/M` pill during active implementation
 - [ ] Step editor: wire same tools + sidebar
 - [ ] `_index.md` auto-update when instruction files are written
+- [ ] Silent instruction update chat notifications
+- [ ] **Last**: MCP tool visibility & control (static defaults → resource UI → org admin)
 
 ## Decisions
 
