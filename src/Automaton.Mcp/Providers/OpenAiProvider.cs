@@ -168,7 +168,8 @@ public class OpenAiProvider : IAiProvider
 
     private static readonly HttpClient ResponsesHttpClient = new()
     {
-        BaseAddress = new Uri("https://api.openai.com/v1/")
+        BaseAddress = new Uri("https://api.openai.com/v1/"),
+        Timeout     = System.Threading.Timeout.InfiniteTimeSpan
     };
 
     private async Task<string> CallResponsesAsync(

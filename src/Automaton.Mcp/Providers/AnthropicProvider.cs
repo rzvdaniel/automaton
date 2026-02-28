@@ -34,6 +34,20 @@ public class AnthropicProvider : IAiProvider
         _logger = logger;
     }
 
+    /// <summary>
+    /// Shared HttpClient with infinite timeout for streaming AI calls.
+    /// CancellationToken controls actual request lifetime — not the client timeout.
+    /// </summary>
+    private static readonly HttpClient StreamingHttpClient = new()
+    {
+        Timeout = System.Threading.Timeout.InfiniteTimeSpan
+    };
+
+    private static readonly System.Reflection.PropertyInfo? AnthropicHttpClientProperty =
+        typeof(AnthropicClient).GetProperty(
+            "HttpClient",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
     public async Task<string> CallAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
@@ -42,8 +56,10 @@ public class AnthropicProvider : IAiProvider
     {
         try
         {
-            // Create Anthropic client with API key
+            // Create Anthropic client with API key, then inject our streaming HttpClient
+            // so that long-running streaming calls don't hit the default 100-second timeout.
             var client = new AnthropicClient(request.ApiKey);
+            AnthropicHttpClientProperty?.SetValue(client, StreamingHttpClient);
 
             // Build the initial messages
             var messages = BuildMessages(request);
