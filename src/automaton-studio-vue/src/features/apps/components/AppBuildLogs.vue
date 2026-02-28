@@ -39,6 +39,7 @@ async function toggleSession(sessionId: string) {
     return
   }
   expandedSessionId.value = sessionId
+  expandedMessages.value = new Set()
 
   if (!sessionMessages.value[sessionId]) {
     loadingSessionId.value = sessionId
@@ -99,8 +100,25 @@ function getMessageSeverity(msg: ChatMessage): 'success' | 'info' | 'warn' | 'da
   return 'secondary'
 }
 
-function getToolMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter(m => m.type === 'toolExecution' || m.type === 'codeSuccess' || m.type === 'codeError' || m.role === 'user' || m.type === 'reasoning')
+const expandedMessages = ref<Set<number>>(new Set())
+
+function toggleMessageExpand(idx: number) {
+  if (expandedMessages.value.has(idx)) {
+    expandedMessages.value.delete(idx)
+  } else {
+    expandedMessages.value.add(idx)
+  }
+}
+
+function getAllMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.filter(m =>
+    m.role === 'user' ||
+    m.role === 'assistant' ||
+    m.type === 'toolExecution' ||
+    m.type === 'codeSuccess' ||
+    m.type === 'codeError' ||
+    m.type === 'reasoning'
+  )
 }
 
 function formatTokens(n?: number) {
@@ -184,7 +202,7 @@ watch(() => props.appId, loadSessions)
 
           <div v-else-if="sessionMessages[session.id]" class="timeline">
             <div
-              v-for="(msg, idx) in getToolMessages(sessionMessages[session.id])"
+              v-for="(msg, idx) in getAllMessages(sessionMessages[session.id])"
               :key="idx"
               class="timeline-item"
               :class="`timeline-${msg.type ?? msg.role}`"
@@ -210,13 +228,25 @@ watch(() => props.appId, loadSessions)
                   </span>
                 </div>
                 <div v-else-if="msg.content" class="message-excerpt">
-                  {{ msg.content.slice(0, 200) }}{{ msg.content.length > 200 ? '…' : '' }}
+                  <template v-if="expandedMessages.has(idx)">
+                    {{ msg.content }}
+                  </template>
+                  <template v-else>
+                    {{ msg.content.slice(0, 300) }}{{ msg.content.length > 300 ? '…' : '' }}
+                  </template>
+                  <button
+                    v-if="msg.content.length > 300"
+                    class="show-more-btn"
+                    @click.stop="toggleMessageExpand(idx)"
+                  >
+                    {{ expandedMessages.has(idx) ? 'Show less' : 'Show more' }}
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div v-if="getToolMessages(sessionMessages[session.id]).length === 0" class="text-color-secondary text-sm py-2">
-              No diagnostic messages found in this session.
+            <div v-if="getAllMessages(sessionMessages[session.id]).length === 0" class="text-color-secondary text-sm py-2">
+              No messages found in this session.
             </div>
           </div>
         </div>
@@ -383,5 +413,17 @@ watch(() => props.appId, loadSessions)
   color: var(--p-text-muted-color);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.show-more-btn {
+  display: inline-block;
+  margin-top: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.7rem;
+  color: var(--p-primary-color);
+  cursor: pointer;
+  text-decoration: underline;
 }
 </style>
