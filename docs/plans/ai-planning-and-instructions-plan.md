@@ -313,6 +313,6 @@ The `.instructions/` and `.plans/` folder convention works identically wherever 
 ## Decisions
 
 - **Instruction file updates**: AI updates silently, shown in chat as a small notification (e.g. "📝 Updated `frontend.md`")
-- **Plan file diffs**: No diff view — keep it simple. App history tab already supports full restore including `.instructions/` and `.plans/` folders
+- **Plan file diffs**: No diff view needed for `.plans/` files — the app history tab already handles full restore. Each version is a complete folder snapshot (via `CreateVersionSnapshotAsync`), which means `.instructions/` and `.plans/` are included automatically. A future version diff feature across any file is straightforward: backend reads the same file from two snapshot folders, frontend uses Monaco's built-in `MonacoDiffEditor`. The `filesChangeSummary` already stored per version can pre-filter which files changed.
 - **MCP tools scope**: Tools are fully generic — no `resourceType` enum baked in. The caller (app, step, flow, or anything future) passes its own context. Tools work identically regardless of what is being built
 - **Token budget**: 1000 token hard cap for injected instructions, trimmed by `priority` (high first, then medium, then low until cap is reached)
