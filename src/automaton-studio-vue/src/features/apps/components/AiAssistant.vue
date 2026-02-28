@@ -663,19 +663,18 @@ function handleKeyPress(event: KeyboardEvent) {
             @keypress="handleKeyPress"
           />
           <Button
-            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
-            icon="pi pi-send"
-            :disabled="!userInput.trim() || isBusy || !selectedModel"
-            :loading="isBusy"
-            @click="sendMessage"
-          />
-          <Button
             v-if="isBusy"
             v-tooltip.top="'Cancel'"
             icon="pi pi-stop-circle"
             severity="danger"
-            text
             @click="cancelGeneration"
+          />
+          <Button
+            v-else
+            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
+            icon="pi pi-send"
+            :disabled="!userInput.trim() || !selectedModel"
+            @click="sendMessage"
           />
           <Button
             v-if="hasMessages && !isBusy"
