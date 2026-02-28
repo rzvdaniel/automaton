@@ -131,9 +131,9 @@ export interface PlanData {
   title: string
   summary: string
   planFile?: string
-  components?: Array<{ name: string; description?: string }>
+  components?: Array<{ name: string; description?: string; responsibility?: string }>
   techDecisions?: Array<{ decision: string; rationale?: string }>
-  stages?: Array<{ name: string; description?: string; complexity?: string }>
+  stages?: Array<{ name: string; description?: string; complexity?: string; estimatedComplexity?: string }>
   stageIndex?: number
   stageSummary?: string
   awaitingApproval: boolean

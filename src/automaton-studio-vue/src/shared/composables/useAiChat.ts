@@ -603,18 +603,22 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     )
 
     if (toolMessage) {
-      toolMessage.toolStatus = toolResult.isError ? 'error' : 'completed'
-      toolMessage.toolResult = toolResult.content
-      if (toolResult.isError) {
-        toolMessage.error = toolResult.content
-      }
+      // Backend sends { toolCallId, result, isSuccess, errorMessage }
+      // Frontend ToolResult type has { toolCallId, content, isError } — bridge both shapes
+      const raw      = toolResult as any
+      const content  = raw.result    ?? toolResult.content  ?? ''
+      const isError  = raw.isSuccess !== undefined ? !raw.isSuccess : (toolResult.isError ?? false)
+
+      toolMessage.toolStatus = isError ? 'error' : 'completed'
+      toolMessage.toolResult = content
+      if (isError) toolMessage.error = raw.errorMessage ?? content
 
       // Parse result JSON once
-      let resultData: any = toolResult.content
-      try { resultData = JSON.parse(toolResult.content) } catch { /* not JSON */ }
+      let resultData: any = content
+      try { resultData = JSON.parse(content) } catch { /* not JSON */ }
 
       // Upgrade message type for special tools
-      if (!toolResult.isError) {
+      if (!isError) {
         if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
           toolMessage.type = 'planApproval'
           toolMessage.planData = resultData as import('../types/ai.types').PlanData

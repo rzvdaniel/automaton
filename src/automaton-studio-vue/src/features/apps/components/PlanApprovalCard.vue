@@ -19,7 +19,7 @@
         <ul class="plan-list">
           <li v-for="c in planData.components" :key="c.name">
             <strong>{{ c.name }}</strong>
-            <span v-if="c.description"> — {{ c.description }}</span>
+            <span v-if="c.description || c.responsibility"> — {{ c.description || c.responsibility }}</span>
           </li>
         </ul>
       </div>
@@ -43,8 +43,8 @@
             <span class="stage-num">{{ i + 1 }}</span>
             <span class="stage-name">{{ s.name }}</span>
             <span v-if="s.description" class="stage-desc"> — {{ s.description }}</span>
-            <span v-if="s.complexity" class="complexity-badge" :class="s.complexity?.toLowerCase()">
-              {{ s.complexity }}
+            <span v-if="s.complexity || s.estimatedComplexity" class="complexity-badge" :class="(s.complexity || s.estimatedComplexity)?.toLowerCase()">
+              {{ s.complexity || s.estimatedComplexity }}
             </span>
           </li>
         </ol>
