@@ -53,6 +53,7 @@ const {
   sendMessage: sendAiMessage,
   getOrCreateActiveSession,
   clearMessages,
+  cancelGeneration,
   sessions,
   activeSession,
   isLoadingSessions,
@@ -669,7 +670,15 @@ function handleKeyPress(event: KeyboardEvent) {
             @click="sendMessage"
           />
           <Button
-            v-if="hasMessages"
+            v-if="isBusy"
+            v-tooltip.top="'Cancel'"
+            icon="pi pi-stop-circle"
+            severity="danger"
+            text
+            @click="cancelGeneration"
+          />
+          <Button
+            v-if="hasMessages && !isBusy"
             v-tooltip.top="'Clear conversation'"
             icon="pi pi-trash"
             severity="secondary"
