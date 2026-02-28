@@ -74,8 +74,8 @@ Write-Step "Starting Automaton.Studio.Server..."
 Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
 Write-Ok "Server window launched"
 
-# Give the server a moment before the runner connects
-Start-Sleep -Seconds 2
+# Give the server time to start before the runner connects
+Start-Sleep -Seconds 15
 
 # ---------- 3. Automaton.Runner ---------------------------------------------
 
