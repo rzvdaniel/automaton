@@ -3,11 +3,13 @@
     Start the Automaton worktree dev environment.
 
 .DESCRIPTION
-    1. Symlinks AppData from the main repo into this worktree
-    2. Copies appsettings.Development.json from the main repo
-    3. Starts Automaton.Studio.Server  (new terminal window)
-    4. Starts Automaton.Runner         (new terminal window)
-    5. Starts the Vue.js frontend      (new terminal window)
+    1. Copies appsettings.Development.json from the main repo
+    2. Starts Automaton.Studio.Server  (new terminal window)
+    3. Starts Automaton.Runner         (new terminal window)
+    4. Starts the Vue.js frontend      (new terminal window)
+
+    AppData is NOT managed by this script. Copy app files manually into
+    src\Automaton.Studio.Server\AppData as needed.
 
 .PARAMETER MainRepo
     Path to the main Automaton repository.
@@ -39,9 +41,6 @@ if (-not $MainRepo) {
     $MainRepo  = $mainLine.Trim()
 }
 
-$AppDataSource = Join-Path $MainRepo "src\Automaton.Studio.Server\AppData"
-$AppDataLink   = Join-Path $ServerProject "AppData"
-
 # ---------- Helpers ---------------------------------------------------------
 
 function Write-Step([string]$msg) { Write-Host "[>] $msg" -ForegroundColor Cyan }
@@ -54,29 +53,7 @@ function Start-DevWindow([string]$title, [string]$workDir, [string]$cmd) {
         "`$host.UI.RawUI.WindowTitle = '$title'; Set-Location '$workDir'; $escaped"
 }
 
-# ---------- 1. AppData symlink ----------------------------------------------
-
-Write-Step "Setting up AppData symlink..."
-
-if (-not (Test-Path $AppDataSource)) {
-    Write-Warn "AppData not found at: $AppDataSource"
-    Write-Warn "Server will start without app data."
-} else {
-    if (Test-Path $AppDataLink) {
-        $item = Get-Item $AppDataLink -Force
-        if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            Write-Step "Removing existing symlink..."
-            (Get-Item $AppDataLink).Delete()
-        } else {
-            Write-Step "Removing existing AppData folder..."
-            Remove-Item $AppDataLink -Recurse -Force
-        }
-    }
-    New-Item -ItemType SymbolicLink -Path $AppDataLink -Target $AppDataSource | Out-Null
-    Write-Ok "AppData symlinked -> $AppDataSource"
-}
-
-# ---------- 2. appsettings.Development.json ---------------------------------
+# ---------- 1. appsettings.Development.json ---------------------------------
 
 Write-Step "Copying appsettings.Development.json from main repo..."
 
@@ -91,7 +68,7 @@ if (-not (Test-Path $AppSettingsSource)) {
     Write-Ok "Copied appsettings.Development.json"
 }
 
-# ---------- 3. Automaton.Studio.Server --------------------------------------
+# ---------- 2. Automaton.Studio.Server --------------------------------------
 
 Write-Step "Starting Automaton.Studio.Server..."
 Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
@@ -100,13 +77,13 @@ Write-Ok "Server window launched"
 # Give the server a moment before the runner connects
 Start-Sleep -Seconds 2
 
-# ---------- 4. Automaton.Runner ---------------------------------------------
+# ---------- 3. Automaton.Runner ---------------------------------------------
 
 Write-Step "Starting Automaton.Runner..."
 Start-DevWindow "Automaton Runner" $RunnerProject "dotnet watch"
 Write-Ok "Runner window launched"
 
-# ---------- 5. Vue.js frontend ----------------------------------------------
+# ---------- 4. Vue.js frontend ----------------------------------------------
 
 Write-Step "Starting Vue.js frontend..."
 Start-DevWindow "Automaton Vue" $VueProject "npm run dev"
