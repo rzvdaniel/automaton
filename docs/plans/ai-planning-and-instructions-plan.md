@@ -137,11 +137,10 @@ Users can also manually check off stages in the `.md` file via Monaco — useful
 
 ### `propose_plan`
 
-Generic — works for apps, steps, flows.
+Generic — the caller provides context, the tool has no opinion on what is being built.
 
 ```typescript
 propose_plan({
-  resourceType: "webapp" | "customstep" | "flow",
   planType: "design" | "implementation" | "stage_complete",
   title: string,
   summary: string,
@@ -172,7 +171,6 @@ Side effects:
 
 ```typescript
 read_instruction({
-  resourceType: "webapp" | "customstep" | "flow",
   filename: string   // e.g. "frontend.md"
 })
 // returns: file contents as string
@@ -182,10 +180,9 @@ read_instruction({
 
 ```typescript
 write_instruction({
-  resourceType: "webapp" | "customstep" | "flow",
   filename: string,
   content: string,
-  reason?: string    // logged in _index.md
+  reason?: string    // logged in _index.md, shown as chat notification
 })
 ```
 
@@ -253,17 +250,11 @@ Clicking any file opens it in Monaco. New file button lets users add instruction
 
 ---
 
-## 6. Applicability to Steps & Flows
+## 6. Generic by Design
 
-| Feature | Apps | Custom Steps | Flows |
-|---------|------|-------------|-------|
-| Instructions folder | ✅ Full | ✅ Step-scoped | ⏳ Future |
-| Design plan | ✅ | ✅ (API design) | ⏳ |
-| Implementation plan | ✅ | ✅ (stages = IO/logic/tests) | ⏳ |
-| Stage-by-stage | ✅ | ✅ | ⏳ |
-| File tree sidebar | ✅ | ✅ (step editor) | ⏳ |
+All MCP tools (`propose_plan`, `read_instruction`, `write_instruction`) are resource-agnostic. The system prompt builder for any resource type (app, step, flow, or anything added in future) simply points the tools at the right working directory. The tools themselves have no knowledge of what they are building.
 
-Steps use `StepData/{stepId}/.instructions/` — same file conventions, same MCP tools, different `resourceType`.
+The `.instructions/` and `.plans/` folder convention works identically wherever it is placed.
 
 ---
 
@@ -279,9 +270,9 @@ Steps use `StepData/{stepId}/.instructions/` — same file conventions, same MCP
 - [ ] Step editor: wire same tools + sidebar
 - [ ] `_index.md` auto-update when instruction files are written
 
-## Open Questions
+## Decisions
 
-- Should the AI auto-update instruction files silently, or ask the user first? (Proposed: silently, but shown in chat as a small notification)
-- Should `.plans/` files be shown in Monaco with a diff view when revised?
-- For flows: do they need design plans, or just implementation plans (since flows are already visual)?
-- Token budget: what is the max total tokens for injected instructions? (Proposed: 1000 tokens hard cap, trimmed by priority)
+- **Instruction file updates**: AI updates silently, shown in chat as a small notification (e.g. "📝 Updated `frontend.md`")
+- **Plan file diffs**: No diff view — keep it simple. App history tab already supports full restore including `.instructions/` and `.plans/` folders
+- **MCP tools scope**: Tools are fully generic — no `resourceType` enum baked in. The caller (app, step, flow, or anything future) passes its own context. Tools work identically regardless of what is being built
+- **Token budget**: 1000 token hard cap for injected instructions, trimmed by `priority` (high first, then medium, then low until cap is reached)
