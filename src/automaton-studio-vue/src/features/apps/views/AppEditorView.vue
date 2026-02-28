@@ -28,6 +28,8 @@ import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
 import ConsolePanel from '../components/ConsolePanel.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
+import AppBuildLogs from '../components/AppBuildLogs.vue'
+import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -61,8 +63,11 @@ const editingName = ref('')
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
 
-// Active view tab (code, settings, or console)
-const activeTab = ref<'code' | 'settings' | 'console'>('code')
+// Active view tab (code, settings, console, or logs)
+const activeTab = ref<'code' | 'settings' | 'console' | 'logs'>('code')
+
+// Active sub-tab in logs view
+const activeLogsTab = ref<'build' | 'runtime'>('build')
 
 // Right panel mode (aiAssistant or versionHistory)
 const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
@@ -700,6 +705,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 <i class="pi pi-cog"></i>
                 Settings
               </button>
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'logs' }"
+                @click="activeTab = 'logs'"
+              >
+                <i class="pi pi-history"></i>
+                Logs
+              </button>
             </div>
           </div>
         </div>
@@ -786,6 +799,30 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       <!-- Console View -->
       <div v-show="activeTab === 'console'" class="console-view">
         <ConsolePanel />
+      </div>
+
+      <!-- Logs View -->
+      <div v-show="activeTab === 'logs'" class="logs-view">
+        <div class="logs-view-tabs">
+          <button
+            class="logs-sub-tab"
+            :class="{ active: activeLogsTab === 'build' }"
+            @click="activeLogsTab = 'build'"
+          >
+            <i class="pi pi-sparkles"></i> AI Build Logs
+          </button>
+          <button
+            class="logs-sub-tab"
+            :class="{ active: activeLogsTab === 'runtime' }"
+            @click="activeLogsTab = 'runtime'"
+          >
+            <i class="pi pi-server"></i> Runtime Logs
+          </button>
+        </div>
+        <div class="logs-view-content">
+          <AppBuildLogs v-if="activeLogsTab === 'build'" :app-id="resolvedAppId" />
+          <AppRuntimeLogs v-else :app-id="resolvedAppId" />
+        </div>
       </div>
 
       <!-- Code Editor View - Main editor layout with resizable splitters -->
@@ -1267,5 +1304,51 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 
 :global(.app-dark) .p-splitter-gutter:hover {
   background-color: var(--p-primary-600);
+}
+
+/* Logs view */
+.logs-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.logs-view-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+.logs-sub-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.logs-sub-tab:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.logs-sub-tab.active {
+  border-bottom-color: var(--p-primary-500);
+  color: var(--p-primary-500);
+}
+
+.logs-view-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 </style>

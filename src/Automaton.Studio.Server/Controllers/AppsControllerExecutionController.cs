@@ -2,6 +2,8 @@ using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -14,16 +16,19 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppsControllerExecutionService controllerExecutionService;
     private readonly UserContextService userContextService;
+    private readonly IAppExecutionLogService executionLogService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionController(
         AppsService appsService,
         AppsControllerExecutionService controllerExecutionService,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        IAppExecutionLogService executionLogService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
         this.userContextService = userContextService;
+        this.executionLogService = executionLogService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -67,6 +72,8 @@ public class AppsControllerExecutionController : ControllerBase
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
+        var sw = Stopwatch.StartNew();
+
         try
         {
             logger.Information(
@@ -98,18 +105,68 @@ public class AppsControllerExecutionController : ControllerBase
                 request.RunnerNames,
                 cancellationToken);
 
+            sw.Stop();
+
+            _ = executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            {
+                AppId = app.Id,
+                ControllerName = controllerName,
+                ActionName = actionName,
+                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
+                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
+                Success = true,
+                DurationMs = sw.ElapsedMilliseconds,
+                UserId = User.Identity?.IsAuthenticated == true ? userContextService.GetUserId() : (Guid?)null,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            });
+
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
+            sw.Stop();
             logger.Warning(ex, "Invalid controller action: {ControllerName}.{ActionName}", controllerName, actionName);
+
+            _ = LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
+
             return BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {
+            sw.Stop();
             logger.Error(ex, "Controller action failed: App={AppSlug}, Controller={ControllerName}, Action={ActionName}",
                 appSlug, controllerName, actionName);
+
+            _ = LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
+
             return StatusCode(500, new { error = "Internal server error during controller action execution" });
+        }
+    }
+
+    private async Task LogFailedExecutionAsync(
+        string appSlug, string controllerName, string actionName,
+        AppControllerActionRequest request, long durationMs, string errorMessage)
+    {
+        try
+        {
+            var app = await appsService.GetPublishedAppInfoAsync(appSlug, CancellationToken.None);
+            if (app == null) return;
+
+            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            {
+                AppId = app.Id,
+                ControllerName = controllerName,
+                ActionName = actionName,
+                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
+                Success = false,
+                ErrorMessage = errorMessage,
+                DurationMs = durationMs,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            });
+        }
+        catch
+        {
+            // Best-effort; don't rethrow
         }
     }
 

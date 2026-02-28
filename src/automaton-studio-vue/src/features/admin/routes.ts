@@ -8,6 +8,7 @@ import AdminLayout from './views/AdminLayout.vue'
 import AdminProvidersView from './views/AdminProvidersView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
 import AdminAiKeysView from './views/AdminAiKeysView.vue'
+import AdminLogsView from './views/AdminLogsView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -44,6 +45,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminAiKeysView,
         meta: {
           title: 'API Keys',
+        },
+      },
+      {
+        path: 'logs',
+        name: 'admin-logs',
+        component: AdminLogsView,
+        meta: {
+          title: 'Server Logs',
         },
       },
     ],

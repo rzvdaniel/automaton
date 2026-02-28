@@ -177,6 +177,7 @@ export interface ChatSession {
   model?: string
   createdAt: string
   updatedAt: string
+  complexityTier?: string
   
   // Usage metrics
   totalPromptsSubmitted: number
@@ -255,4 +256,40 @@ export interface AppChatStats {
   inputTokens: number
   outputTokens: number
   sessionCount: number
+}
+
+// ============================================
+// App Runtime Execution Logs
+// ============================================
+
+export interface AppExecutionLog {
+  id: string
+  appId: string
+  controllerName: string
+  actionName: string
+  requestPayload?: string
+  responsePayload?: string
+  success: boolean
+  errorMessage?: string
+  durationMs: number
+  userId?: string
+  ipAddress?: string
+  createdAt: string
+}
+
+export interface AppExecutionLogPage {
+  items: AppExecutionLog[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface AppExecutionLogFilter {
+  success?: boolean
+  controllerName?: string
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
 }

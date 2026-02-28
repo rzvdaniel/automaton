@@ -68,6 +68,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<AiChatSession> AiChatSessions { get; set; }
         public virtual DbSet<AiChatMessage> AiChatMessages { get; set; }
         public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
+        public virtual DbSet<AppExecutionLog> AppExecutionLogs { get; set; }
 
         // User Settings
         public virtual DbSet<UserSetting> UserSettings { get; set; }

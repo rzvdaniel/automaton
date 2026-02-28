@@ -27,8 +27,12 @@ const navItems: AdminNavItem[] = [
     to: '/admin/ai-keys',
     routePrefix: '/admin/ai-keys',
   },
-  // Future: add more admin sections here
-  // { label: 'Users', icon: 'pi pi-users', to: '/admin/users', routePrefix: '/admin/users' },
+  {
+    label: 'Server Logs',
+    icon: 'pi pi-list',
+    to: '/admin/logs',
+    routePrefix: '/admin/logs',
+  },
 ]
 
 const isActive = (item: AdminNavItem) => {
