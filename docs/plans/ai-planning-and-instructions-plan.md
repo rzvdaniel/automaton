@@ -110,6 +110,27 @@ When user picks "Build Stage by Stage":
 - Frontend renders a mini card: "Stage N complete. Continue? [Yes] [Stop here]"
 - Gives user checkpoints without manual micromanagement
 
+### Progress tracking
+
+The AI updates `IMPLEMENTATION.md` after each stage completes — the file becomes a living progress document:
+
+```markdown
+## Implementation Plan
+
+- [x] Stage 1 · Foundation — _completed 2026-02-28 by AI_
+- [x] Stage 2 · Core Components — _completed 2026-02-28 by AI_  
+- [ ] Stage 3 · Data & API
+- [ ] Stage 4 · Polish & UX
+```
+
+Progress is surfaced in multiple places:
+- **Chat**: the original approval card updates in-place as stages tick off — user can scroll up and see current state
+- **Stage complete card**: each `stage_complete` tool call renders a card in chat showing files changed and a "Continue" button
+- **File tree sidebar**: `2/4` badge on `IMPLEMENTATION.md`
+- **App Editor toolbar**: small `Stage 2/4` pill, visible only while an implementation is in progress
+
+Users can also manually check off stages in the `.md` file via Monaco — useful when they implement something by hand outside of AI.
+
 ---
 
 ## 3. MCP Tools
