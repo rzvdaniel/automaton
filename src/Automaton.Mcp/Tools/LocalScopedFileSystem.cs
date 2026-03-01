@@ -22,17 +22,13 @@ public class LocalScopedFileSystem : IScopedFileSystem
 
     // ── IScopedFileSystem ────────────────────────────────────────────────────
 
-    private const int LargeFileThreshold = 100;
+    internal const int LargeFileThreshold = 100;
 
     public virtual async Task<string?> ReadFileAsync(string relativePath)
     {
         var full = ResolveSafe(relativePath);
         if (!File.Exists(full)) return null;
-        var content = await File.ReadAllTextAsync(full);
-        var lineCount = content.Count(c => c == '\n') + 1;
-        if (lineCount >= LargeFileThreshold)
-            content = $"[File has {lineCount} lines. For targeted edits prefer search_file + edit_file to avoid re-reading.]\n" + content;
-        return content;
+        return await File.ReadAllTextAsync(full);
     }
 
     public virtual async Task WriteFileAsync(string relativePath, string content)
@@ -40,17 +36,8 @@ public class LocalScopedFileSystem : IScopedFileSystem
         var full = ResolveSafe(relativePath);
         var dir  = Path.GetDirectoryName(full)!;
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        // Strip the large-file hint that read_file prepends — the AI sometimes passes
-        // the hint-prefixed content straight back into write_file.
-        var cleaned = StripLargeFileHint(content);
-        await File.WriteAllTextAsync(full, cleaned);
+        await File.WriteAllTextAsync(full, content);
     }
-
-    private static readonly Regex LargeFileHintRegex =
-        new(@"^\[File has \d+ lines\. For targeted edits prefer search_file \+ edit_file to avoid re-reading\.\]\r?\n", RegexOptions.Compiled);
-
-    private static string StripLargeFileHint(string content) =>
-        LargeFileHintRegex.Replace(content, string.Empty);
 
     public virtual Task DeleteFileAsync(string relativePath)
     {

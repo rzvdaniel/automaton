@@ -126,9 +126,23 @@ public class FileIoTool : IMcpTool
             var path    = arguments.GetProperty("path").GetString()!;
             var content = await fs.ReadFileAsync(path);
 
-            return content is null
-                ? new McpToolResult { Success = false, Error = $"File '{path}' not found" }
-                : new McpToolResult { Success = true, Content = content };
+            if (content is null)
+                return new McpToolResult { Success = false, Error = $"File '{path}' not found" };
+
+            var lineCount = content.Count(c => c == '\n') + 1;
+            if (lineCount >= LocalScopedFileSystem.LargeFileThreshold)
+            {
+                // Return hint as a separate JSON field so it is never part of the file content.
+                // The AI reads `content` for the file text and `note` as metadata — they stay separate.
+                var json = JsonSerializer.Serialize(new
+                {
+                    note    = $"File has {lineCount} lines. For targeted edits prefer search_file + edit_file to avoid re-reading.",
+                    content
+                });
+                return new McpToolResult { Success = true, Content = json };
+            }
+
+            return new McpToolResult { Success = true, Content = content };
         }
         catch (Exception ex)
         {
