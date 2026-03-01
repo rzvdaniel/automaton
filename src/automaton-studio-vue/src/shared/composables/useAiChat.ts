@@ -51,6 +51,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
   // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
   const pendingAutoContinu = ref(false)
+  const pendingNextStage = ref<{ index: number; name: string; description: string } | null>(null)
 
   // Stored context for auto-continue (same systemPrompt/context as the last call).
   const lastCallContext = ref<{ systemPrompt?: string; context?: Record<string, any> }>({})
@@ -470,15 +471,22 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           // Silently send the next trigger so the AI continues without user intervention.
           if (pendingAutoContinu.value) {
             pendingAutoContinu.value = false
+            const next = pendingNextStage.value
+            pendingNextStage.value = null
             const { systemPrompt: sp, context: ctx } = lastCallContext.value
+            // Build a precise message so the AI knows exactly what to implement next.
+            const msg = next
+              ? `Implement Stage ${next.index + 1}: "${next.name}"${next.description ? ` — ${next.description}` : ''}. When done, call propose_plan(stage_complete, stageIndex=${next.index}).`
+              : 'Continue to the next stage.'
             // Pass userMessageAlreadyAdded=true so the internal trigger isn't shown in the UI.
-            nextTick(() => sendMessage('Continue to the next stage.', sp, ctx, true))
+            nextTick(() => sendMessage(msg, sp, ctx, true))
           }
         },
         onError: (data) => {
           error.value = data.error
           isGenerating.value = false
           pendingAutoContinu.value = false
+          pendingNextStage.value = null
 
           // Add error message to chat
           messages.value.push({
@@ -492,12 +500,14 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         onCancelled: () => {
           isGenerating.value = false
           pendingAutoContinu.value = false
+          pendingNextStage.value = null
         },
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to send message'
       isGenerating.value = false
       pendingAutoContinu.value = false
+      pendingNextStage.value = null
       console.error('Error sending message:', err)
     }
   }
@@ -651,8 +661,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           resultData?.planType === 'stage_complete' &&
           resultData?.hasMoreStages === true
         ) {
-          // Signal auto-continuation: the frontend will send a follow-up after the stream ends.
+          // Signal auto-continuation with the exact next stage details.
           pendingAutoContinu.value = true
+          pendingNextStage.value = resultData.nextStage ?? null
         }
       }
 

@@ -160,17 +160,10 @@ Before writing any code for a **new app**, follow this two-step gate:
    - Number stages starting at **1** (stageIndex 0 = Stage 1).
    - **Immediately after the tool call: output nothing. Zero words. Stop.**
    - Resume only when the user sends an approval message.
-3. When the user approves the implementation plan, **implement ALL stages back-to-back without stopping**:
-   - Work through stages in order: Stage 1 (stageIndex=0), Stage 2 (stageIndex=1), Stage 3 (stageIndex=2), etc.
-   - After finishing each stage, call `propose_plan(stage_complete, stageIndex=N)` where N is the **exact 0-based index** of that stage.
-   - **Never combine two stages into one `stage_complete` call** — every stage in the plan must get its own call.
-   - Do not pause between stages — immediately start the next one after calling `stage_complete`.
-   - Only pause if you hit an error or genuine ambiguity that requires user input.
+3. When instructed to implement a specific stage (e.g. "Implement Stage 2: Frontend API module"), implement exactly that stage, then call `propose_plan(stage_complete, stageIndex=N)` where N is the 0-based index shown in the instruction. The next stage will be sent automatically.
 
 ### Ongoing — Stage tracking
-- `stageIndex` is **0-based** and must match the stage position in the plan exactly (Stage 1 = stageIndex 0, Stage 2 = stageIndex 1, etc.).
-- Every stage must be individually marked complete — skipping a `stage_complete` call leaves that stage unchecked.
-- After calling `stage_complete`, continue immediately to the next unchecked stage.
+- Call `propose_plan(stage_complete)` after completing each stage. The system will tell you what to implement next.
 
 ### Bypass rule
 - If both `.plans/DESIGN.md` **and** `.plans/IMPLEMENTATION.md` already exist, skip directly to implementation.

@@ -159,6 +159,10 @@ public class PlanningTool : IMcpTool
             }
 
             // Return structured result for frontend approval card
+            var nextStageInfo = planType == "stage_complete"
+                ? FindNextStage(markdownContent)
+                : null;
+
             var result = new
             {
                 awaitingApproval = planType != "stage_complete",
@@ -173,7 +177,11 @@ public class PlanningTool : IMcpTool
                 stageSummary  = planType == "stage_complete" && arguments.TryGetProperty("stageSummary", out var ss) ? ss.GetString() : null,
                 filesChanged  = planType == "stage_complete" ? GetStringArray(arguments, "filesChanged") : null,
                 // True when more unchecked stages remain — frontend uses this to auto-continue.
-                hasMoreStages = planType == "stage_complete" && markdownContent.Contains("- [ ] Stage "),
+                hasMoreStages = nextStageInfo.HasValue,
+                // Next stage details for a precise auto-continue message.
+                nextStage = nextStageInfo.HasValue
+                    ? new { index = nextStageInfo.Value.Index, name = nextStageInfo.Value.Name, description = nextStageInfo.Value.Description }
+                    : null,
             };
 
             return new McpToolResult
@@ -293,6 +301,47 @@ public class PlanningTool : IMcpTool
 
         await fs.WriteFileAsync(".plans/IMPLEMENTATION.md", updated);
         return updated;
+    }
+
+    /// <summary>
+    /// Parse the first unchecked stage from the updated markdown.
+    /// Returns (name, description, index) or null if all stages are done.
+    /// </summary>
+    private static (string Name, string Description, int Index)? FindNextStage(string markdown)
+    {
+        // Lines look like: "- [ ] Stage N · StageName _(complexity: low)_"
+        // followed optionally by "  > description"
+        var lines = markdown.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimStart();
+            if (!line.StartsWith("- [ ] Stage ")) continue;
+
+            // Extract stage number: "Stage N · ..."
+            var afterStage = line["- [ ] Stage ".Length..];
+            var dotPos = afterStage.IndexOf(" · ");
+            if (dotPos < 0) continue;
+
+            if (!int.TryParse(afterStage[..dotPos].Trim(), out var stageNum)) continue;
+            var zeroBasedIndex = stageNum - 1;
+
+            // Extract name: between " · " and " _(complexity"
+            var afterDot = afterStage[(dotPos + 3)..];
+            var complexityPos = afterDot.IndexOf(" _(complexity");
+            var name = complexityPos >= 0 ? afterDot[..complexityPos].Trim() : afterDot.Trim();
+
+            // Look for description on the next line
+            var desc = string.Empty;
+            if (i + 1 < lines.Length)
+            {
+                var nextLine = lines[i + 1].TrimStart();
+                if (nextLine.StartsWith("> "))
+                    desc = nextLine[2..].Trim();
+            }
+
+            return (name, desc, zeroBasedIndex);
+        }
+        return null;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
