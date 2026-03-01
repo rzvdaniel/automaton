@@ -9,9 +9,11 @@ import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 import apiClient from '@/shared/services/api/axios-instance'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const isLoading = ref(true)
 const error = ref<string | null>(null)
@@ -60,9 +62,12 @@ async function loadApp() {
 
     // Inject automatonApi for published apps
     const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+    // Pass the current auth token so authenticated apps can call protected API endpoints.
+    // Anonymous apps get null and use credentials:include (cookie fallback).
+    const authToken = authStore.accessToken
     const publishedScript = `
 <script>
-(function(window, APP_SLUG, BASE_URL) {
+(function(window, APP_SLUG, BASE_URL, AUTH_TOKEN) {
   'use strict';
 
   console.log('[AutomatonAPI] Published app loaded:', APP_SLUG);
@@ -71,12 +76,15 @@ async function loadApp() {
     const url = BASE_URL + path;
     console.log('[AutomatonAPI] ' + method + ' ' + url);
 
+    const headers = { 'Content-Type': 'application/json' };
+    if (AUTH_TOKEN) {
+      headers['Authorization'] = 'Bearer ' + AUTH_TOKEN;
+    }
+
     const options = {
       method: method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include'
+      headers: headers,
+      credentials: AUTH_TOKEN ? 'same-origin' : 'include'
     };
 
     if (body) {
@@ -118,7 +126,7 @@ async function loadApp() {
 
   console.log('[AutomatonAPI] Ready!');
 
-})(window, '${slug.value}', '${baseUrl}');
+})(window, '${slug.value}', '${baseUrl}', ${authToken ? `'${authToken}'` : 'null'});
 <\/script>`
 
     // Get HTML content
