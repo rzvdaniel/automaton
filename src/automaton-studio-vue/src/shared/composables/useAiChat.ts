@@ -2,7 +2,7 @@
  * useAiChat Composable
  * Manages AI chat state and streaming conversations with session persistence
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
 import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
@@ -48,6 +48,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
+
+  // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
+  const pendingAutoContinu = ref(false)
+
+  // Stored context for auto-continue (same systemPrompt/context as the last call).
+  const lastCallContext = ref<{ systemPrompt?: string; context?: Record<string, any> }>({})
 
   // Computed
   const hasMessages = computed(() => messages.value.length > 0)
@@ -409,6 +415,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       messages.value.push(userChatMessage)
     }
 
+    // Save context for potential auto-continue after stage_complete
+    lastCallContext.value = { systemPrompt, context }
+
     // Reset error
     error.value = null
     isGenerating.value = true
@@ -456,10 +465,20 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
               m.isStreaming = false
             }
           })
+
+          // Auto-continue: stage_complete signalled more stages remain.
+          // Silently send the next trigger so the AI continues without user intervention.
+          if (pendingAutoContinu.value) {
+            pendingAutoContinu.value = false
+            const { systemPrompt: sp, context: ctx } = lastCallContext.value
+            // Use nextTick to let the UI settle before starting the next stream.
+            nextTick(() => sendMessage('Continue to the next stage.', sp, ctx))
+          }
         },
         onError: (data) => {
           error.value = data.error
           isGenerating.value = false
+          pendingAutoContinu.value = false
 
           // Add error message to chat
           messages.value.push({
@@ -472,11 +491,13 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         },
         onCancelled: () => {
           isGenerating.value = false
+          pendingAutoContinu.value = false
         },
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to send message'
       isGenerating.value = false
+      pendingAutoContinu.value = false
       console.error('Error sending message:', err)
     }
   }
@@ -625,6 +646,13 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
+        } else if (
+          toolMessage.toolName === 'propose_plan' &&
+          resultData?.planType === 'stage_complete' &&
+          resultData?.hasMoreStages === true
+        ) {
+          // Signal auto-continuation: the frontend will send a follow-up after the stream ends.
+          pendingAutoContinu.value = true
         }
       }
 

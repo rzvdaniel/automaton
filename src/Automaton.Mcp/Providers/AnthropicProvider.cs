@@ -141,6 +141,7 @@ public class AnthropicProvider : IAiProvider
                 // Execute each tool and collect results
                 var toolResults = new List<ContentBase>();
                 var shouldStopDueToFailures = false;
+                var stopForPlanGate = false;
 
                 foreach (var toolUse in streamResult.ToolUseBlocks)
                 {
@@ -151,6 +152,22 @@ public class AnthropicProvider : IAiProvider
 
                     // Execute the tool
                     var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
+
+                    // Plan gate: if propose_plan returns awaitingApproval, stop the loop
+                    // so the AI has no chance to write a text summary after the plan card.
+                    if (toolUse.Name == "propose_plan" && !stopForPlanGate)
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(toolResult);
+                            if (doc.RootElement.TryGetProperty("awaitingApproval", out var aw) &&
+                                aw.ValueKind == JsonValueKind.True)
+                            {
+                                stopForPlanGate = true;
+                            }
+                        }
+                        catch { /* ignore JSON parse errors */ }
+                    }
 
                     // Track consecutive failures per tool
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
@@ -200,6 +217,14 @@ public class AnthropicProvider : IAiProvider
                         Role = RoleType.User,
                         Content = toolResults
                     });
+                    break;
+                }
+
+                // Plan gate: tool result already emitted via SSE — stop here so the AI
+                // cannot generate a follow-up text summary after the plan card.
+                if (stopForPlanGate)
+                {
+                    messages.Add(new Message { Role = RoleType.User, Content = toolResults });
                     break;
                 }
 

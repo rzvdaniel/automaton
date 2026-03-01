@@ -172,6 +172,8 @@ public class PlanningTool : IMcpTool
                 stageIndex    = planType == "stage_complete" && arguments.TryGetProperty("stageIndex", out var si) ? si.GetInt32() : (int?)null,
                 stageSummary  = planType == "stage_complete" && arguments.TryGetProperty("stageSummary", out var ss) ? ss.GetString() : null,
                 filesChanged  = planType == "stage_complete" ? GetStringArray(arguments, "filesChanged") : null,
+                // True when more unchecked stages remain — frontend uses this to auto-continue.
+                hasMoreStages = planType == "stage_complete" && markdownContent.Contains("- [ ] Stage "),
             };
 
             return new McpToolResult

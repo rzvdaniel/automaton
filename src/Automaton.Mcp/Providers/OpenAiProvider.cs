@@ -278,6 +278,7 @@ public class OpenAiProvider : IAiProvider
                 inputItems.AddRange(reusableItems);
 
                 var shouldStopDueToFailures = false;
+                var stopForPlanGate = false;
                 foreach (var toolCall in response.ToolCalls)
                 {
                     var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
@@ -285,6 +286,21 @@ public class OpenAiProvider : IAiProvider
                     EmitToolCallStarted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson);
 
                     var toolResult = await executeToolAsync(toolCall.Id, toolCall.Name, argsJson);
+
+                    // Plan gate: if propose_plan returns awaitingApproval, stop after this batch.
+                    if (toolCall.Name == "propose_plan" && !stopForPlanGate)
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(toolResult);
+                            if (doc.RootElement.TryGetProperty("awaitingApproval", out var aw) &&
+                                aw.ValueKind == JsonValueKind.True)
+                            {
+                                stopForPlanGate = true;
+                            }
+                        }
+                        catch { /* ignore JSON parse errors */ }
+                    }
 
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                     toolResult.StartsWith("Error executing tool") ||
@@ -326,6 +342,10 @@ public class OpenAiProvider : IAiProvider
                     responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                     break;
                 }
+
+                // Plan gate: tool result already emitted via SSE — stop here.
+                if (stopForPlanGate)
+                    break;
             }
         }
         finally
