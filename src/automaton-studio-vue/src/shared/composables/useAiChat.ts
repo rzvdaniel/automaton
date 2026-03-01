@@ -471,8 +471,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           if (pendingAutoContinu.value) {
             pendingAutoContinu.value = false
             const { systemPrompt: sp, context: ctx } = lastCallContext.value
-            // Use nextTick to let the UI settle before starting the next stream.
-            nextTick(() => sendMessage('Continue to the next stage.', sp, ctx))
+            // Pass userMessageAlreadyAdded=true so the internal trigger isn't shown in the UI.
+            nextTick(() => sendMessage('Continue to the next stage.', sp, ctx, true))
           }
         },
         onError: (data) => {
