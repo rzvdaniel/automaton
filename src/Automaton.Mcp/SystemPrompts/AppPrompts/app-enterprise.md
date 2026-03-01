@@ -236,6 +236,13 @@ Before writing any code for a **new app**, follow this two-step gate:
 ### Ongoing — Stage tracking
 - Call `propose_plan(stage_complete)` after completing each stage. The system will tell you what to implement next.
 
+### README requirement
+- The **last stage** of every implementation plan must always be: create `README.md` with:
+  - A brief description of what the app does.
+  - How to use it (key features, any inputs needed).
+  - A **"Deploy Backend" reminder** if the app has a backend controller.
+- The README must always be included in the implementation plan stages — not added ad-hoc.
+
 ### Bypass rule
 - If both `.plans/DESIGN.md` **and** `.plans/IMPLEMENTATION.md` already exist, skip directly to implementation.
 - For **modifications** to an existing app (files already present): skip the planning gate and proceed directly.
