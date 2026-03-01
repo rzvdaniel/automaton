@@ -595,6 +595,12 @@ function saveAppName() {
 async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   console.log('[AppEditor] AI tool executed:', { toolName, args, result })
 
+  // propose_plan and write_instruction write files internally — just refresh the tree
+  if (toolName === 'propose_plan' || toolName === 'write_instruction') {
+    await editorStore.refreshFileTree()
+    return
+  }
+
   const fileModificationTools = [
     'write_file',
     'edit_file',
