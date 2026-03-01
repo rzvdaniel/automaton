@@ -27,6 +27,9 @@ Controllers run on the runner — you cannot test during authoring.
 - `__file__` **is available** — the runner injects the script path as `__file__` before execution
 - Use `os.path.dirname(__file__)` freely for locating sibling files and data directories
 - All other injected variables: `action_name` (string), `inputs` (dict)
+- **CRITICAL**: Set `result` to the **Python object** (list, dict, string, number) — **never** call `json.dumps()` on it.
+  The runner serializes `result` automatically. Using `json.dumps()` causes double-encoding and breaks the frontend.
+  ✅ `result = tasks`  ✅ `result = new_task`  ❌ `result = json.dumps(tasks)`
 
 ## FRONTEND DESIGN:
 - Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`

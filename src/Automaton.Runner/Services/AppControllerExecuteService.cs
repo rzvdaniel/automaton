@@ -88,7 +88,7 @@ public class AppControllerExecuteService
                 Error = null,
                 Started = result.Started,
                 Finished = result.Finished,
-                OutputVariables = result.OutputVariables ?? []
+                OutputVariables = NormalizeOutputVariables(result.OutputVariables ?? [])
             };
         }
         catch (Exception ex)
@@ -157,4 +157,50 @@ public class AppControllerExecuteService
         "batch"  => ".bat",
         _        => ".txt"
     };
+
+    /// <summary>
+    /// Normalizes the 'result' output variable to avoid double JSON-encoding.
+    /// ConvertFromPython calls json.dumps on every Python value. If AI code also calls
+    /// json.dumps before assigning to result, the value arrives as a JSON-encoded string
+    /// (e.g. '"[{...}]"') instead of the raw JSON value ('[{...}]').
+    /// This method unwraps one level when result is a quoted JSON string that itself
+    /// contains a valid JSON array or object.
+    /// </summary>
+    private static Dictionary<string, string> NormalizeOutputVariables(IDictionary<string, string> vars)
+    {
+        var normalized = new Dictionary<string, string>(vars);
+        if (normalized.TryGetValue("result", out var raw) && raw != null)
+        {
+            normalized["result"] = UnwrapDoubleEncodedJson(raw);
+        }
+        return normalized;
+    }
+
+    private static string UnwrapDoubleEncodedJson(string value)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(value);
+            // If the outer JSON is a string, check if its content is also valid JSON
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var inner = doc.RootElement.GetString();
+                if (inner != null)
+                {
+                    var trimmed = inner.TrimStart();
+                    if (trimmed.StartsWith('[') || trimmed.StartsWith('{'))
+                    {
+                        try
+                        {
+                            System.Text.Json.JsonDocument.Parse(inner);
+                            return inner; // Unwrap one level
+                        }
+                        catch { /* inner is not valid JSON; keep outer */ }
+                    }
+                }
+            }
+        }
+        catch { /* value is not valid JSON at all; return as-is */ }
+        return value;
+    }
 }
