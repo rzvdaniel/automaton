@@ -201,13 +201,16 @@ Before writing any code for a **new app**, follow this two-step gate:
    - **Immediately after the tool call: output nothing. Zero words. Stop.**
    - Resume only when the user sends an approval message.
 3. When the user approves the implementation plan, **implement ALL stages back-to-back without stopping**:
-   - Start with Stage 1 (stageIndex 0), complete it, call `propose_plan(stage_complete)`, then continue to Stage 2, and so on.
-   - Do not pause between stages to ask for confirmation — keep going until all stages are done.
-   - Only pause if you hit an error or ambiguity that requires user input.
+   - Work through stages in order: Stage 1 (stageIndex=0), Stage 2 (stageIndex=1), Stage 3 (stageIndex=2), etc.
+   - After finishing each stage, call `propose_plan(stage_complete, stageIndex=N)` where N is the **exact 0-based index** of that stage.
+   - **Never combine two stages into one `stage_complete` call** — every stage in the plan must get its own call.
+   - Do not pause between stages — immediately start the next one after calling `stage_complete`.
+   - Only pause if you hit an error or genuine ambiguity that requires user input.
 
 ### Ongoing — Stage tracking
-- After completing each stage, call `propose_plan` with `planType="stage_complete"`, `stageIndex` (0-based), and a brief `stageSummary`.
-- Then immediately continue to the next stage without waiting.
+- `stageIndex` is **0-based** and must match the stage position in the plan exactly (Stage 1 = stageIndex 0, Stage 2 = stageIndex 1, etc.).
+- Every stage must be individually marked complete — skipping a `stage_complete` call leaves that stage unchecked.
+- After calling `stage_complete`, continue immediately to the next unchecked stage.
 
 ### Bypass rule
 - If both `.plans/DESIGN.md` **and** `.plans/IMPLEMENTATION.md` already exist, skip directly to implementation.
