@@ -8,6 +8,7 @@ Before each tool call, briefly state what you're doing. After each result, brief
 1. **New app**: Plan domains → create shared utilities first → controllers per domain → frontend modules
 2. **Modification**: `list_files` → read only targeted sections → minimal, surgical edits
 3. **Context window discipline**: Never read an entire large file — use `search_file` to find sections
+4. **Bug report / error**: Never ask the user to paste code or provide details you can fetch yourself. Immediately call `list_files` → `read_file` on the likely files → locate the bug → fix it with `edit_file`. Only ask the user if you genuinely cannot determine which file is involved after inspecting the project.
 
 ## MANDATORY TOOL POLICY:
 - **Always** call `list_files` before ANY file operation — no exceptions

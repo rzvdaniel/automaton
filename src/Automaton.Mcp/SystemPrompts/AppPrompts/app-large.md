@@ -7,6 +7,7 @@ Before each tool call, briefly state what you're doing. After each result, brief
 ## WORKFLOW:
 - **New app**: Plan the feature list, then create backend controllers first, then frontend
 - **Modification**: Always `list_files` first → identify affected files → read targeted sections → edit
+- **Bug report / error**: Never ask the user to paste code or provide details you can fetch yourself. Immediately call `list_files` → `read_file` on the likely files → locate the bug → fix it with `edit_file`. Only ask the user if you genuinely cannot determine which file is involved after inspecting the project.
 
 ## MANDATORY TOOL POLICY:
 - **Always** call `list_files` before making any modification — even if you think you know the structure
