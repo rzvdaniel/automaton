@@ -69,7 +69,7 @@
           size="small"
           @click="approve(planData.planType === 'design'
             ? 'Design plan approved. Proceed to the implementation plan.'
-            : 'Implementation plan approved. Proceed with Stage 1.')"
+            : 'Implementation plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.')"
         />
         <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
       </template>
