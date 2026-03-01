@@ -163,8 +163,10 @@ public class PublicWebAppsController : ControllerBase
                 return NotFound(new { message = "App not found or not published" });
             }
 
-            // Check authentication if required
-            if (app.RequiresAuthentication)
+            // Only gate HTML entry points on authentication — static assets (JS, CSS, images) must load freely.
+            var isHtmlEntryPoint = string.IsNullOrEmpty(path) || path == "index.html" ||
+                                   Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
+            if (app.RequiresAuthentication && isHtmlEntryPoint)
             {
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 if (!isAuthenticated)

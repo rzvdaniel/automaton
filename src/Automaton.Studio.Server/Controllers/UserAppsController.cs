@@ -84,8 +84,12 @@ public class UserAppsController : ControllerBase
                 return NotFound(GetErrorPage("App Not Found", "This app does not exist or is not published."));
             }
 
-            // Check authentication if required
-            if (app.RequiresAuthentication)
+            // Check authentication if required.
+            // Only gate index.html — static assets (JS, CSS, images) must load freely so the page can render.
+            // Protecting individual asset files is pointless: they are useless without a working session.
+            var isHtmlEntryPoint = string.IsNullOrEmpty(path) || path == "index.html" ||
+                                   Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
+            if (app.RequiresAuthentication && isHtmlEntryPoint)
             {
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 if (!isAuthenticated)
