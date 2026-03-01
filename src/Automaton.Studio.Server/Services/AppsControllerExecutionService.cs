@@ -249,13 +249,15 @@ public class AppsControllerExecutionService
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
 
                 // Lean payload — no code, runner reads from local disk
+                // OutputVariableNames: the standard contract for app controller scripts —
+                // every script must set success (bool), result (any), error_message (str).
                 var payload = new
                 {
                     AppId = appId,
                     ControllerName = controllerName,
                     ActionName = actionName,
                     Inputs = inputs,
-                    OutputVariableNames = (List<string>?)null
+                    OutputVariableNames = new List<string> { "success", "result", "error_message" }
                 };
 
                 var response = await automatonHub.Clients.Client(runner.ConnectionId)

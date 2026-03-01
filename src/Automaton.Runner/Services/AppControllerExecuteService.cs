@@ -41,14 +41,22 @@ public class AppControllerExecuteService
 
             // Inject action_name so the controller code knows which action to run.
             // Also inject __file__ so Python scripts can use os.path.dirname(__file__) for relative paths.
-            var inputs = new Dictionary<string, string>(payload.Inputs ?? [])
+            // _inputs_json is the JSON-encoded user inputs, decoded into `inputs` dict by the preamble below.
+            var userInputs = payload.Inputs ?? new Dictionary<string, string>();
+            var inputs = new Dictionary<string, string>(userInputs)
             {
                 ["action_name"] = payload.ActionName,
-                ["__file__"]    = scriptPath
+                ["__file__"]    = scriptPath,
+                ["_inputs_json"] = System.Text.Json.JsonSerializer.Serialize(userInputs)
             };
 
+            // Prepend a preamble that builds the `inputs` Python dict from the injected JSON.
+            // This lets AI-generated scripts use inputs.get('key') naturally.
+            const string inputsPreamble = "import json as _json; inputs = _json.loads(_inputs_json)\n";
+            var codeWithPreamble = inputsPreamble + code;
+
             var result = await Task.Run(() =>
-                executor.Execute(code, language, inputs, payload.OutputVariableNames));
+                executor.Execute(codeWithPreamble, language, inputs, payload.OutputVariableNames));
 
             if (!result.Success)
             {
