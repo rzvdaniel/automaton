@@ -63,7 +63,14 @@
         <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
       </template>
       <template v-else>
-        <Button label="Approve" icon="pi pi-check" size="small" @click="approve('Approved. Proceed.')" />
+        <Button
+          label="Approve"
+          icon="pi pi-check"
+          size="small"
+          @click="approve(planData.planType === 'design'
+            ? 'Design plan approved. Proceed to the implementation plan.'
+            : 'Implementation plan approved. Proceed with Stage 1.')"
+        />
         <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
       </template>
     </div>
