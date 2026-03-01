@@ -53,6 +53,7 @@ public class UserAppsController : ControllerBase
     /// Example: https://apps.automaton.monster/my-cool-app
     /// </summary>
     [HttpGet("apps/{slug}")]
+    [AllowAnonymous]
     [Produces("text/html")]
     public async Task<IActionResult> ServeApp(string slug)
     {
@@ -64,6 +65,7 @@ public class UserAppsController : ControllerBase
     /// Example: https://apps.automaton.monster/my-cool-app/styles.css
     /// </summary>
     [HttpGet("apps/{slug}/{*path}")]
+    [AllowAnonymous]
     public async Task<IActionResult> ServeAppFile(string slug, string path = "index.html")
     {
         try
