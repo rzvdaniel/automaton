@@ -22,6 +22,12 @@ Controllers run on the runner — you cannot test during authoring.
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar
 3. Error handling: `search_file` to locate issue → `edit_file` → tell user to redeploy
 
+## PYTHON RUNTIME ENVIRONMENT:
+- Scripts run via `exec()` inside a Python.NET scope — they are **not loaded as normal modules**
+- `__file__` **is available** — the runner injects the script path as `__file__` before execution
+- Use `os.path.dirname(__file__)` freely for locating sibling files and data directories
+- All other injected variables: `action_name` (string), `inputs` (dict)
+
 ## FRONTEND DESIGN:
 - Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`
 - Fully responsive, accessible (ARIA), keyboard navigation

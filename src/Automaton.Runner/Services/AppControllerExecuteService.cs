@@ -34,15 +34,17 @@ public class AppControllerExecuteService
         try
         {
             // Load script from local persistent volume — code is NOT in the payload
-            var (code, language) = FindLocalScript(payload.AppId, payload.ControllerName)
+            var (code, language, scriptPath) = FindLocalScript(payload.AppId, payload.ControllerName)
                 ?? throw new InvalidOperationException(
                     $"Controller '{payload.ControllerName}' not deployed to this runner. " +
                     $"Use the 'Deploy Backend' button in the app editor to push scripts to this runner.");
 
-            // Inject action_name so the controller code knows which action to run
+            // Inject action_name so the controller code knows which action to run.
+            // Also inject __file__ so Python scripts can use os.path.dirname(__file__) for relative paths.
             var inputs = new Dictionary<string, string>(payload.Inputs ?? [])
             {
-                ["action_name"] = payload.ActionName
+                ["action_name"] = payload.ActionName,
+                ["__file__"]    = scriptPath
             };
 
             var result = await Task.Run(() =>
@@ -104,7 +106,7 @@ public class AppControllerExecuteService
     /// Finds a deployed controller script on the local filesystem.
     /// Path: {workingDir}/data/apps/{appId}/backend/{controllerName}.{ext}
     /// </summary>
-    private static (string Code, string Language)? FindLocalScript(Guid appId, string controllerName)
+    private static (string Code, string Language, string Path)? FindLocalScript(Guid appId, string controllerName)
     {
         var backendPath = GetBackendPath(appId);
         if (!Directory.Exists(backendPath)) return null;
@@ -116,7 +118,7 @@ public class AppControllerExecuteService
             {
                 var code = File.ReadAllText(filePath);
                 var language = GetLanguageFromExtension(ext);
-                return (code, language);
+                return (code, language, filePath);
             }
         }
         return null;
