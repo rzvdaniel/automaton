@@ -26,7 +26,7 @@ const emit = defineEmits<{
 
 // Form state
 const slug = ref('')
-const requiresAuthentication = ref(true)
+const requiresAuthentication = ref(false)
 const isValidating = ref(false)
 const validationError = ref<string | null>(null)
 const isSlugAvailable = ref(true)
@@ -71,7 +71,7 @@ watch(isVisible, (visible) => {
       slug.value = ''
     }
 
-    requiresAuthentication.value = props.requiresAuth ?? true
+    requiresAuthentication.value = props.requiresAuth ?? false
     validationError.value = null
     isSlugAvailable.value = true
   }

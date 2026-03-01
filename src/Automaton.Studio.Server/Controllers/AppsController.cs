@@ -888,7 +888,7 @@ public class GitHubSettingsRequest
 public class PublishAppRequest
 {
     public required string PublicUrl { get; set; }
-    public bool RequiresAuthentication { get; set; } = true;
+    public bool RequiresAuthentication { get; set; } = false;
     public Guid? ExecutionRunnerId { get; set; }
 }
 
