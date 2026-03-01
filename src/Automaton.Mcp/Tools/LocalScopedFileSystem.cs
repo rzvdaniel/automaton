@@ -40,8 +40,17 @@ public class LocalScopedFileSystem : IScopedFileSystem
         var full = ResolveSafe(relativePath);
         var dir  = Path.GetDirectoryName(full)!;
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        await File.WriteAllTextAsync(full, content);
+        // Strip the large-file hint that read_file prepends — the AI sometimes passes
+        // the hint-prefixed content straight back into write_file.
+        var cleaned = StripLargeFileHint(content);
+        await File.WriteAllTextAsync(full, cleaned);
     }
+
+    private static readonly Regex LargeFileHintRegex =
+        new(@"^\[File has \d+ lines\. For targeted edits prefer search_file \+ edit_file to avoid re-reading\.\]\r?\n", RegexOptions.Compiled);
+
+    private static string StripLargeFileHint(string content) =>
+        LargeFileHintRegex.Replace(content, string.Empty);
 
     public virtual Task DeleteFileAsync(string relativePath)
     {
