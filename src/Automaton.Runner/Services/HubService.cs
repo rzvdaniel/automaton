@@ -17,14 +17,16 @@ public class HubService
     private const string RunnerNameHeader = "RunnerName";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
-    private const string RunAppControllerActionMethod = "RunAppControllerAction";
     private const string UploadControllerScriptMethod = "UploadControllerScript";
+    private const string TunnelRequestMethod = "TunnelRequest";
+    private const string TunnelResponseMethod = "TunnelResponse";
     private const string PingMethod = "Ping";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
     private readonly ApiKeyAuthenticationService apiKeyAuthService;
     private readonly FlowExecutionService flowExecutionService;
+    private readonly TunnelForwarderService tunnelForwarder;
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
@@ -36,11 +38,13 @@ public class HubService
         ConfigurationService configService,
         ApiKeyAuthenticationService apiKeyAuthService,
         FlowExecutionService flowExecutionService,
+        TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
         this.flowExecutionService = flowExecutionService;
+        this.tunnelForwarder = tunnelForwarder;
         this.serviceProvider = serviceProvider;
         this.logger = Log.ForContext<HubService>();
         
@@ -252,16 +256,17 @@ public class HubService
                 return ExecuteCustomStepHandler(customStep);
             });
 
-            // Register app controller action handler
-            connection.On<AppControllerPayload, AppControllerExecutionResponse>(RunAppControllerActionMethod, (payload) =>
-            {
-                return ExecuteAppControllerActionHandler(payload);
-            });
-
-            // Register controller script upload handler
+            // Register script upload handler — runner saves scripts to local disk for FastAPI to read
             connection.On<AppControllerUploadPayload, bool>(UploadControllerScriptMethod, (payload) =>
             {
                 return UploadControllerScriptHandler(payload);
+            });
+
+            // Register tunnel forwarding handler
+            connection.On<TunnelRequest>(TunnelRequestMethod, async (request) =>
+            {
+                var response = await tunnelForwarder.ForwardAsync(request);
+                await connection.SendAsync(TunnelResponseMethod, response);
             });
 
             connection.On(PingMethod, () =>
@@ -401,55 +406,23 @@ public class HubService
     }
 
     /// <summary>
-    /// Executes an app controller action on a background thread.
-    /// </summary>
-    private AppControllerExecutionResponse ExecuteAppControllerActionHandler(AppControllerPayload payload)
-    {
-        try
-        {
-            var task = Task.Run(async () =>
-            {
-                using var scope = serviceProvider.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<AppControllerExecuteService>();
-                return await handler.RunControllerAction(payload);
-            });
-
-            var result = task.GetAwaiter().GetResult();
-
-            logger.Information("Controller action {ControllerName}.{ActionName} completed with status: {Success}",
-                payload.ControllerName, payload.ActionName, result.Success ? "Success" : "Failed");
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Error executing controller action {ControllerName}.{ActionName}",
-                payload.ControllerName, payload.ActionName);
-            WriteLine($"❌ Controller action failed: {ex.Message}");
-
-            return new AppControllerExecutionResponse
-            {
-                Success = false,
-                Output = null,
-                Error = $"Handler exception: {ex.Message}",
-                Started = DateTime.UtcNow,
-                Finished = DateTime.UtcNow,
-                OutputVariables = []
-            };
-        }
-    }
-
-    /// <summary>
-    /// Receives a controller script from the server and writes it to local persistent volume.
+    /// Receives a controller script from the server and writes it to local disk for FastAPI to read.
     /// Returns true on success; server uses this as acknowledgement.
     /// </summary>
     private bool UploadControllerScriptHandler(AppControllerUploadPayload payload)
     {
         try
         {
-            AppControllerExecuteService.SaveScript(payload.AppId, payload.ControllerName, payload.Code, payload.Language);
+            var dir = Path.Combine(
+                AppContext.BaseDirectory, "data", "apps",
+                payload.AppId.ToString(), "backend");
 
-            logger.Information("Deployed controller script {ControllerName} for app {AppId}", 
+            Directory.CreateDirectory(dir);
+
+            var path = Path.Combine(dir, payload.ControllerName + ".py");
+            File.WriteAllText(path, payload.Code);
+
+            logger.Information("Deployed controller script {ControllerName} for app {AppId}",
                 payload.ControllerName, payload.AppId);
             WriteLine($"📦 Deployed controller: {payload.ControllerName} (app {payload.AppId})");
 

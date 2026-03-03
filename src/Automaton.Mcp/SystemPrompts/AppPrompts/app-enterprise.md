@@ -18,18 +18,17 @@ Before each tool call, briefly state what you're doing. After each result, brief
 
 ## BACKEND TESTING:
 Controllers run on the runner — you cannot test during authoring.
-1. Write correct Python with try/except and validation; always set `success` and `error_message`
+1. Write correct Python with try/except and validation; always set `success` and `error`
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar
 3. Error handling: `search_file` to locate issue → `edit_file` → tell user to redeploy
 
 ## PYTHON RUNTIME ENVIRONMENT:
-- Scripts run via `exec()` inside a Python.NET scope — they are **not loaded as normal modules**
-- `__file__` **is available** — the runner injects the script path as `__file__` before execution
-- Use `os.path.dirname(__file__)` freely for locating sibling files and data directories
-- All other injected variables: `action_name` (string), `inputs` (dict)
-- **CRITICAL**: Set `result` to the **Python object** (list, dict, string, number) — **never** call `json.dumps()` on it.
-  The runner serializes `result` automatically. Using `json.dumps()` causes double-encoding and breaks the frontend.
-  ✅ `result = tasks`  ✅ `result = new_task`  ❌ `result = json.dumps(tasks)`
+- Controllers are plain Python modules loaded via `importlib` — **normal module imports work as expected**
+- Each controller file must export a `handle(action_name: str, inputs: dict) -> dict` function
+- `__file__` is set to the script's path — use `os.path.dirname(__file__)` freely for sibling data files
+- **Return a dict** with three keys: `success` (bool), `data` (any Python value), `error` (str)
+  ✅ `return {"success": True, "data": data, "error": ""}`
+  ✅ `return {"success": False, "data": None, "error": "not found"}`
 
 ## FRONTEND DESIGN:
 - Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`
@@ -78,7 +77,7 @@ Controllers run on the runner — you cannot test during authoring.
    └─ api.js                        # Core API wrapper (callController)
 ```
 
-## BACKEND CONTROLLERS — CLASS-BASED DISPATCH:
+## BACKEND CONTROLLERS — handle() DISPATCH:
 Each domain gets its own file. REGISTRY maps domain names to controller instances.
 
 ```python
@@ -88,58 +87,58 @@ from datetime import datetime
 class CustomersController:
     def list(self, inputs):
         try:
-            page = int(inputs.get('page', '1'))
-            limit = int(inputs.get('limit', '25'))
+            page = int(inputs.get('page', 1))
+            limit = int(inputs.get('limit', 25))
             search = inputs.get('search', '')
             # Real implementation here
             customers = []
-            return True, json.dumps({"items": customers, "total": 0, "page": page}), ""
+            return {"success": True, "data": {"items": customers, "total": 0, "page": page}, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def get(self, inputs):
         try:
             customer_id = inputs.get('id', '')
             if not customer_id:
-                return False, "", "id is required"
+                return {"success": False, "data": None, "error": "id is required"}
             customer = {"id": customer_id}
-            return True, json.dumps(customer), ""
+            return {"success": True, "data": customer, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def create(self, inputs):
         try:
             name = inputs.get('name', '').strip()
             email = inputs.get('email', '').strip()
             if not name:
-                return False, "", "name is required"
+                return {"success": False, "data": None, "error": "name is required"}
             if not email:
-                return False, "", "email is required"
+                return {"success": False, "data": None, "error": "email is required"}
             customer = {"id": "new-id", "name": name, "email": email,
                        "created_at": datetime.utcnow().isoformat()}
-            return True, json.dumps(customer), ""
+            return {"success": True, "data": customer, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def update(self, inputs):
         try:
             customer_id = inputs.get('id', '')
             if not customer_id:
-                return False, "", "id is required"
+                return {"success": False, "data": None, "error": "id is required"}
             updates = {k: v for k, v in inputs.items() if k != 'id'}
             customer = {"id": customer_id, **updates}
-            return True, json.dumps(customer), ""
+            return {"success": True, "data": customer, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def delete(self, inputs):
         try:
             customer_id = inputs.get('id', '')
             if not customer_id:
-                return False, "", "id is required"
-            return True, json.dumps({"deleted": customer_id}), ""
+                return {"success": False, "data": None, "error": "id is required"}
+            return {"success": True, "data": {"deleted": customer_id}, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────
@@ -148,21 +147,19 @@ REGISTRY = {
     # Add more: 'deals': DealsController(), etc.
 }
 
-def _dispatch(action_name, inputs):
+def handle(action_name: str, inputs: dict) -> dict:
     parts = action_name.split('.', 1)
     if len(parts) != 2:
-        return False, "", f"Invalid action format '{action_name}'. Expected 'domain.method'."
+        return {"success": False, "data": None, "error": f"Invalid action '{action_name}'. Expected 'domain.method'."}
     domain_key, method_name = parts
     controller = REGISTRY.get(domain_key)
     if controller is None:
-        return False, "", f"Unknown domain '{domain_key}'. Available: {list(REGISTRY.keys())}"
+        return {"success": False, "data": None, "error": f"Unknown domain '{domain_key}'. Available: {list(REGISTRY.keys())}"}
     method = getattr(controller, method_name, None)
     if method is None:
         available = [m for m in dir(controller) if not m.startswith('_')]
-        return False, "", f"Unknown method '{method_name}' on '{domain_key}'. Available: {available}"
+        return {"success": False, "data": None, "error": f"Unknown method '{method_name}' on '{domain_key}'. Available: {available}"}
     return method(inputs)
-
-success, result, error_message = _dispatch(action_name, inputs)
 ```
 
 ## SHARED API WRAPPER (js/api.js):
@@ -171,33 +168,26 @@ success, result, error_message = _dispatch(action_name, inputs)
 export async function callController(controllerName, action, inputs = {}) {
     const res = await automatonApi.executeController(controllerName, action, { inputs });
     if (!res.success) {
-        const msg = res.error || `${action} failed`;
-        throw new Error(msg);
+        throw new Error(res.error || `${action} failed`);
     }
-    const raw = res.outputVariables?.result;
-    if (!raw) return null;
-    try {
-        return JSON.parse(raw);
-    } catch {
-        return raw;
-    }
+    return res.data ?? null;
 }
 
 // Paged list helper
 export async function fetchPage(controllerName, action, page = 1, extraInputs = {}) {
-    return callController(controllerName, action, { page: String(page), ...extraInputs });
+    return callController(controllerName, action, { page, ...extraInputs });
 }
 ```
 
-## DATA FORMAT — ALL VALUES ARE STRINGS:
-- **Frontend → backend**: `String(num)`, `String(bool)`, `JSON.stringify(obj)`
-- **Backend receives**: convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
-- **Backend outputs**: native Python types — runner serializes automatically
-- **Frontend receives**: parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
-- **NEVER** `json.dumps()` on Python return values — causes double-escaping
+## DATA FORMAT:
+- **Frontend → backend**: `inputs` values are plain JS values (strings, numbers, booleans)
+- **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
+- **Frontend receives**: `res.data` is ready to use — no `JSON.parse()` needed
 
-## OUTPUT VARIABLES:
-Every controller action returns a tuple `(success: bool, result: any, error_message: str)`.
+## OUTPUT CONTRACT (every handle() must return):
+```python
+{"success": bool, "data": <any Python value>, "error": str}
+```
 
 ## NAMING:
 - Controller files: `snake_case.py` — one per domain

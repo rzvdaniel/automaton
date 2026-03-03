@@ -20,18 +20,17 @@ Before each tool call, briefly state what you're doing. After each result, brief
 
 ## BACKEND TESTING:
 Controllers run on the runner — you cannot test during authoring.
-1. Write correct Python with try/except; always set `success` and `error_message`
+1. Write correct Python with try/except; always set `success` and `error`
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar
 3. Error handling: `read_file` → fix → `write_file` → tell user to redeploy
 
 ## PYTHON RUNTIME ENVIRONMENT:
-- Scripts run via `exec()` inside a Python.NET scope — they are **not loaded as normal modules**
-- `__file__` **is available** — the runner injects the script path as `__file__` before execution
-- Use `os.path.dirname(__file__)` freely for locating sibling files and data directories
-- All other injected variables: `action_name` (string), `inputs` (dict)
-- **CRITICAL**: Set `result` to the **Python object** (list, dict, string, number) — **never** call `json.dumps()` on it.
-  The runner serializes `result` automatically. Using `json.dumps()` causes double-encoding and breaks the frontend.
-  ✅ `result = tasks`  ✅ `result = new_task`  ❌ `result = json.dumps(tasks)`
+- Controllers are plain Python modules loaded via `importlib` — **normal module imports work as expected**
+- Each controller file must export a `handle(action_name: str, inputs: dict) -> dict` function
+- `__file__` is set to the script's path — use `os.path.dirname(__file__)` freely for sibling data files
+- **Return a dict** with three keys: `success` (bool), `data` (any Python value), `error` (str)
+  ✅ `return {"success": True, "data": data, "error": ""}`
+  ✅ `return {"success": False, "data": None, "error": "not found"}`
 
 ## FRONTEND DESIGN:
 - Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`
@@ -67,8 +66,8 @@ Controllers run on the runner — you cannot test during authoring.
       └─ format.js              # Date, number, string helpers
 ```
 
-## BACKEND CONTROLLERS — CLASS-BASED DISPATCH:
-Each controller file handles one resource. Use a class per resource with a `REGISTRY` + `_dispatch`.
+## BACKEND CONTROLLERS — handle() DISPATCH:
+Each controller file handles one resource. Use a class per resource with a `handle()` entry point.
 
 ```python
 import json
@@ -76,50 +75,50 @@ import json
 class ProductsController:
     def list(self, inputs):
         try:
-            page = int(inputs.get('page', '1'))
-            limit = int(inputs.get('limit', '20'))
+            page = int(inputs.get('page', 1))
+            limit = int(inputs.get('limit', 20))
             # Real logic here
             data = {"items": [], "total": 0, "page": page}
-            return True, json.dumps(data), ""
+            return {"success": True, "data": data, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def get(self, inputs):
         try:
             product_id = inputs.get('id', '')
             if not product_id:
-                return False, "", "id is required"
+                return {"success": False, "data": None, "error": "id is required"}
             item = {"id": product_id, "name": "Product"}
-            return True, json.dumps(item), ""
+            return {"success": True, "data": item, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def create(self, inputs):
         try:
             name = inputs.get('name', '')
-            price = float(inputs.get('price', '0'))
+            price = float(inputs.get('price', 0))
             if not name:
-                return False, "", "name is required"
+                return {"success": False, "data": None, "error": "name is required"}
             record = {"id": "new-id", "name": name, "price": price}
-            return True, json.dumps(record), ""
+            return {"success": True, "data": record, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def update(self, inputs):
         try:
             product_id = inputs.get('id', '')
             name = inputs.get('name', '')
             record = {"id": product_id, "name": name}
-            return True, json.dumps(record), ""
+            return {"success": True, "data": record, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
     def delete(self, inputs):
         try:
             product_id = inputs.get('id', '')
-            return True, json.dumps({"deleted": product_id}), ""
+            return {"success": True, "data": {"deleted": product_id}, "error": ""}
         except Exception as e:
-            return False, "", str(e)
+            return {"success": False, "data": None, "error": str(e)}
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────
@@ -127,20 +126,18 @@ REGISTRY = {
     'products': ProductsController(),
 }
 
-def _dispatch(action_name, inputs):
+def handle(action_name: str, inputs: dict) -> dict:
     parts = action_name.split('.', 1)
     if len(parts) != 2:
-        return False, "", f"Invalid action format '{action_name}'. Expected 'resource.method'."
+        return {"success": False, "data": None, "error": f"Invalid action '{action_name}'. Expected 'resource.method'."}
     controller_key, method_name = parts
     controller = REGISTRY.get(controller_key)
     if controller is None:
-        return False, "", f"Unknown controller '{controller_key}'"
+        return {"success": False, "data": None, "error": f"Unknown controller '{controller_key}'"}
     method = getattr(controller, method_name, None)
     if method is None:
-        return False, "", f"Unknown action '{method_name}' on '{controller_key}'"
+        return {"success": False, "data": None, "error": f"Unknown action '{method_name}' on '{controller_key}'"}
     return method(inputs)
-
-success, result, error_message = _dispatch(action_name, inputs)
 ```
 
 **Action naming**: `resource.method` → `products.list`, `products.create`, `orders.get`
@@ -151,26 +148,26 @@ success, result, error_message = _dispatch(action_name, inputs)
 export async function callController(controllerName, action, inputs = {}) {
     const res = await automatonApi.executeController(controllerName, action, { inputs });
     if (!res.success) throw new Error(res.error || 'Request failed');
-    return JSON.parse(res.outputVariables.result);
+    return res.data;
 }
 
 // features/products/products-list.js
 import { callController } from '../../js/api.js';
 
 export async function loadProducts(page = 1) {
-    return callController('products', 'products.list', { page: String(page) });
+    return callController('products', 'products.list', { page });
 }
 ```
 
-## DATA FORMAT — ALL VALUES ARE STRINGS:
-- **Frontend → backend**: `String(num)`, `String(bool)`, `JSON.stringify(obj)`
-- **Backend receives**: convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
-- **Backend outputs**: native Python types — runner serializes automatically
-- **Frontend receives**: parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
-- **NEVER** use `json.dumps()` on Python return values — causes double-escaping
+## DATA FORMAT:
+- **Frontend → backend**: `inputs` values are plain JS values (strings, numbers, booleans)
+- **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
+- **Frontend receives**: `res.data` is ready to use — no `JSON.parse()` needed
 
-## OUTPUT VARIABLES (every controller action must return):
-A tuple `(success: bool, result: any, error_message: str)`.
+## OUTPUT CONTRACT (every handle() must return):
+```python
+{"success": bool, "data": <any Python value>, "error": str}
+```
 
 ## NAMING:
 - Controller files: `snake_case.py` (one per resource)

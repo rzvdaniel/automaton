@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     ca-certificates \
     wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install .NET 9 runtime
@@ -93,6 +94,10 @@ WORKDIR /app
 # Copy published app from build stage
 COPY --from=build /app/publish .
 
+# Copy FastAPI server
+COPY Automaton.Runner/fastapi_server /app/fastapi_server
+RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
+
 # Set ownership for non-root user
 RUN chown -R automaton:automaton /app
 
@@ -111,6 +116,8 @@ ENV PATH="/usr/local/bin:/usr/share/dotnet:$PATH"
 
 USER automaton
 
-# Default: run in service mode (non-interactive, for production/container use)
-ENTRYPOINT ["dotnet", "automaton-runner.dll"]
-CMD ["service"]
+# Default: run in service mode via entrypoint that starts FastAPI + .NET runner
+COPY --chown=automaton:automaton Automaton.Runner/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+CMD ["/app/docker-entrypoint.sh"]

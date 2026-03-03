@@ -282,6 +282,7 @@ services.AddScoped<AppsService>();
 services.AddScoped<PublicAppsService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
+services.AddSingleton<TunnelRequestRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();

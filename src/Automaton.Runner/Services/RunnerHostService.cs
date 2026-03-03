@@ -108,6 +108,8 @@ public class RunnerHostService
 
         try
         {
+            await WaitForFastApiAsync();
+
             var connected = await hubService.ConnectAsync();
 
             if (!connected)
@@ -1132,5 +1134,31 @@ public class RunnerHostService
             WriteLine("⚠️  Could not configure server interactively, continuing with current server.");
             return configService.BaseUrl;
         }
+    }
+
+    /// <summary>
+    /// Waits for the local FastAPI backend to become ready before connecting to the server hub.
+    /// In Docker, FastAPI starts alongside the .NET runner; this health check ensures it's up.
+    /// On bare-metal (no FastAPI), this times out gracefully and logs a warning.
+    /// </summary>
+    private async Task WaitForFastApiAsync(int maxWaitSeconds = 30)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+        var deadline = DateTime.UtcNow.AddSeconds(maxWaitSeconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var response = await client.GetAsync("http://localhost:8001/health");
+                if (response.IsSuccessStatusCode)
+                {
+                    logger.Information("FastAPI backend ready");
+                    return;
+                }
+            }
+            catch { /* not ready yet */ }
+            await Task.Delay(1000);
+        }
+        logger.Warning("FastAPI backend did not become ready within {Seconds}s — tunnel will be unavailable", maxWaitSeconds);
     }
 }

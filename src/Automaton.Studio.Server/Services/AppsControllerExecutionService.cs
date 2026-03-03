@@ -1,32 +1,35 @@
+using Automaton.Core.Models;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
 /// <summary>
-/// Handles deploying backend scripts to runners and executing controller actions.
-/// Deploy phase: server reads files, pushes to runner via SignalR (stored on runner's persistent volume).
-/// Execute phase: server sends only appId+controllerName+actionName+inputs — no code.
+/// Deploys backend scripts to runners and executes controller actions via HTTP tunnel.
 /// </summary>
 public class AppsControllerExecutionService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
         ApplicationDbContext dataContext,
         AppFileStorageService fileStorageService,
-        IHubContext<AutomatonHub> automatonHub)
+        IHubContext<AutomatonHub> automatonHub,
+        TunnelRequestRegistry tunnelRegistry)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
+        this.tunnelRegistry = tunnelRegistry;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -93,47 +96,6 @@ public class AppsControllerExecutionService
         };
     }
 
-    /// <summary>
-    /// Auto-sync: called when a specific runner reconnects to push all its app scripts.
-    /// </summary>
-    public async Task SyncScriptsToRunnerAsync(Guid runnerId, string connectionId, CancellationToken cancellationToken)
-    {
-        // Find all apps that have this runner configured and their owners (via WebAppUsers)
-        var apps = await dataContext.WebApps
-            .Where(a => a.ExecutionRunnerId == runnerId)
-            .Join(dataContext.WebAppUsers,
-                a => a.Id,
-                wu => wu.WebAppId,
-                (a, wu) => new { AppId = a.Id, OwnerId = wu.UserId })
-            .ToListAsync(cancellationToken);
-
-        foreach (var app in apps)
-        {
-            var scripts = await fileStorageService.ListBackendFilesAsync(app.OwnerId, app.AppId);
-            foreach (var script in scripts)
-            {
-                try
-                {
-                    var payload = new
-                    {
-                        AppId = app.AppId,
-                        ControllerName = script.ControllerName,
-                        Code = script.Code,
-                        Language = script.Language
-                    };
-
-                    await automatonHub.Clients.Client(connectionId)
-                        .InvokeAsync<bool>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logger.Warning(ex, "Auto-sync failed for {ControllerName} app {AppId} runner {RunnerId}",
-                        script.ControllerName, app.AppId, runnerId);
-                }
-            }
-        }
-    }
-
     // ── Execute ───────────────────────────────────────────────────────────────
 
     public async Task<AppControllerActionResponse> ExecuteActionAsync(
@@ -158,10 +120,10 @@ public class AppsControllerExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Using {runners.Count()} runner(s)");
 
-            var results = await ExecuteOnRunnersAsync(app.Id, controllerName, actionName, inputs, runners, cancellationToken, logs);
+            var results = await ExecuteViaTunnelAsync(app.Id, controllerName, actionName, inputs, runners, cancellationToken, logs);
 
             var success = results.All(r => r.Success);
-            var outputVariables = AggregateOutputVariables(results);
+            var firstSuccess = results.FirstOrDefault(r => r.Success);
             var errors = results.Where(r => !r.Success).Select(r => r.Error).ToList();
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Execution completed. Success: {success}");
@@ -175,7 +137,7 @@ public class AppsControllerExecutionService
                 RunnerCount = runners.Count(),
                 ExecutedAt = startTime,
                 CompletedAt = DateTime.UtcNow,
-                OutputVariables = outputVariables,
+                Data = firstSuccess?.Data,
                 Logs = logs,
                 Error = errors.Any() ? string.Join("; ", errors) : null
             };
@@ -231,7 +193,7 @@ public class AppsControllerExecutionService
         return await query.ToListAsync();
     }
 
-    private async Task<List<RunnerAppControllerResult>> ExecuteOnRunnersAsync(
+    private async Task<List<RunnerAppControllerResult>> ExecuteViaTunnelAsync(
         Guid appId,
         string controllerName,
         string actionName,
@@ -248,39 +210,53 @@ public class AppsControllerExecutionService
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
 
-                // Lean payload — no code, runner reads from local disk
-                // OutputVariableNames: the standard contract for app controller scripts —
-                // every script must set success (bool), result (any), error_message (str).
-                var payload = new
+                var body = JsonSerializer.Serialize(new
                 {
-                    AppId = appId,
-                    ControllerName = controllerName,
-                    ActionName = actionName,
-                    Inputs = inputs,
-                    OutputVariableNames = new List<string> { "success", "result", "error_message" }
-                };
-
-                var response = await automatonHub.Clients.Client(runner.ConnectionId)
-                    .InvokeAsync<AppControllerExecutionResponse>(
-                        AutomatonHubMethods.RunAppControllerAction,
-                        payload,
-                        cancellationToken);
-
-                results.Add(new RunnerAppControllerResult
-                {
-                    RunnerId = runner.Id,
-                    Success = response.Success,
-                    Output = response.Output,
-                    Error = response.Error,
-                    Started = response.Started,
-                    Finished = response.Finished,
-                    OutputVariables = response.OutputVariables
+                    app_id = appId,
+                    action = actionName,
+                    inputs = inputs
                 });
 
-                if (!string.IsNullOrEmpty(response.Output))
+                var (requestId, responseTask) = tunnelRegistry.Register(
+                    timeout: TimeSpan.FromSeconds(30),
+                    ct: cancellationToken);
+
+                var tunnelRequest = new TunnelRequest
                 {
-                    foreach (var line in response.Output.Split('\n'))
-                        logs.Add($"[{runner.Name}] {line}");
+                    RequestId = requestId,
+                    Method = "POST",
+                    Path = $"/api/controller/{controllerName}",
+                    Body = body
+                };
+
+                await automatonHub.Clients
+                    .Client(runner.ConnectionId)
+                    .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
+
+                var tunnelResponse = await responseTask;
+
+                if (tunnelResponse.StatusCode >= 200 && tunnelResponse.StatusCode < 300)
+                {
+                    var payload = JsonSerializer.Deserialize<TunnelControllerResponse>(
+                        tunnelResponse.Body ?? "{}",
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    results.Add(new RunnerAppControllerResult
+                    {
+                        RunnerId = runner.Id,
+                        Success = payload?.Success ?? false,
+                        Data = payload?.Data,
+                        Error = payload?.Error
+                    });
+                }
+                else
+                {
+                    results.Add(new RunnerAppControllerResult
+                    {
+                        RunnerId = runner.Id,
+                        Success = false,
+                        Error = tunnelResponse.Error ?? $"HTTP {tunnelResponse.StatusCode}"
+                    });
                 }
             }
             catch (Exception ex)
@@ -291,25 +267,11 @@ public class AppsControllerExecutionService
                 {
                     RunnerId = runner.Id,
                     Success = false,
-                    Error = ex.Message,
-                    Started = DateTime.UtcNow,
-                    Finished = DateTime.UtcNow
+                    Error = ex.Message
                 });
             }
         }
 
         return results;
-    }
-
-    private static Dictionary<string, string> AggregateOutputVariables(List<RunnerAppControllerResult> results)
-    {
-        var output = new Dictionary<string, string>();
-        var successResult = results.FirstOrDefault(r => r.Success && r.OutputVariables != null);
-        if (successResult?.OutputVariables != null)
-        {
-            foreach (var kvp in successResult.OutputVariables)
-                output[kvp.Key] = kvp.Value;
-        }
-        return output;
     }
 }

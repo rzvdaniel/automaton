@@ -14,18 +14,17 @@ Before each tool call, briefly state what you're doing. After each result, brief
 
 ## BACKEND TESTING:
 Controllers run on the runner — you cannot test during authoring.
-1. Write correct Python with try/except; always set `success` and `error_message`
+1. Write correct Python with try/except; always set `success` and `error`
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar
 3. If user reports an error: `read_file` → fix → `write_file` → tell user to redeploy
 
 ## PYTHON RUNTIME ENVIRONMENT:
-- Scripts run via `exec()` inside a Python.NET scope — they are **not loaded as normal modules**
-- `__file__` **is available** — the runner injects the script path as `__file__` before execution
-- Use `os.path.dirname(__file__)` freely for locating sibling files and data directories
-- All other injected variables: `action_name` (string), `inputs` (dict)
-- **CRITICAL**: Set `result` to the **Python object** (list, dict, string, number) — **never** call `json.dumps()` on it.
-  The runner serializes `result` automatically. Using `json.dumps()` causes double-encoding and breaks the frontend.
-  ✅ `result = tasks`  ✅ `result = new_task`  ❌ `result = json.dumps(tasks)`
+- Controllers are plain Python modules loaded via `importlib` — **normal module imports work as expected**
+- Each controller file must export a `handle(action_name: str, inputs: dict) -> dict` function
+- `__file__` is set to the script's path — use `os.path.dirname(__file__)` freely for sibling data files
+- **Return a dict** with three keys: `success` (bool), `data` (any Python value), `error` (str)
+  ✅ `return {"success": True, "data": data, "error": ""}`
+  ✅ `return {"success": False, "data": None, "error": "not found"}`
 
 ## FRONTEND DESIGN:
 - Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`
@@ -64,44 +63,45 @@ Controllers run on the runner — you cannot test during authoring.
 4. Only use `write_file` when rewriting most of the file
 
 ## BACKEND CONTROLLERS:
-Single Python script handling multiple actions via `action_name` (injected by runner).
+Single Python file with a `handle(action_name, inputs)` function.
 
 ```python
-if action_name == 'list':
-    result = json.dumps([{"id": 1, "name": "Alice"}])
-    success = True
-    error_message = ""
-elif action_name == 'create':
-    name = inputs.get('name', '')
-    result = json.dumps({"id": 2, "name": name})
-    success = True
-    error_message = ""
-else:
-    success = False
-    error_message = f"Unknown action: {action_name}"
-    result = ""
+import json
+import os
+
+def handle(action_name: str, inputs: dict) -> dict:
+    try:
+        if action_name == 'list':
+            data = [{"id": 1, "name": "Alice"}]
+            return {"success": True, "data": data, "error": ""}
+        elif action_name == 'create':
+            name = inputs.get('name', '')
+            record = {"id": 2, "name": name}
+            return {"success": True, "data": record, "error": ""}
+        else:
+            return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+    except Exception as e:
+        return {"success": False, "data": None, "error": str(e)}
 ```
 
 ## CALLING A CONTROLLER (frontend):
 ```javascript
 const result = await automatonApi.executeController('users', 'list', { inputs: {} });
 if (result.success) {
-    const data = JSON.parse(result.outputVariables.result);
+    const data = result.data;  // already a JS value, no parsing needed
 }
 ```
-`result.success` (bool), `result.outputVariables` (all strings), `result.error` (string)
+`result.success` (bool), `result.data` (any JS value), `result.error` (string)
 
-## DATA FORMAT — ALL VALUES ARE STRINGS:
-- **Frontend → backend**: `String(num)`, `String(bool)`, `JSON.stringify(obj)`
-- **Backend receives**: convert with `int()`, `float()`, `.lower() == 'true'`, `json.loads()`
-- **Backend outputs**: native Python types (`True`, `45.2`, `{...}`) — runner serializes automatically
-- **Frontend receives**: parse with `=== 'true'`, `parseFloat()`, `JSON.parse()`
-- **NEVER** use `json.dumps()` on Python outputs — causes double-escaping
+## DATA FORMAT:
+- **Frontend → backend**: `inputs` values are plain JS values (strings, numbers, booleans)
+- **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
+- **Frontend receives**: `result.data` is ready to use — no `JSON.parse()` needed
 
-## OUTPUT VARIABLES (every controller action must set):
-1. `success` (bool) — `True` / `False`
-2. `error_message` (str) — error details or empty string
-3. `result` — use `json.dumps(data)` for complex data; individual vars for simple values
+## OUTPUT CONTRACT (every handle() must return):
+```python
+{"success": bool, "data": <any Python value>, "error": str}
+```
 
 ## NAMING:
 - Controller files: `snake_case.py`

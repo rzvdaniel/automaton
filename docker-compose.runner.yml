@@ -19,7 +19,8 @@ services:
       - .env
     environment:
       - DOTNET_ENVIRONMENT=Production
-    command: ["service"]  # Run in non-interactive service mode
+      - RUNNER_SCRIPTS_DIR=/app/data/apps
+    command: ["/app/docker-entrypoint.sh"]
     volumes:
       # Persist runner configuration and registration
       - runner-config:/home/automaton/.config/AutomatonRunner

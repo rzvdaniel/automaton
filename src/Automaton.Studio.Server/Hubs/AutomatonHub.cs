@@ -1,4 +1,5 @@
-﻿using Automaton.Studio.Server.Services;
+﻿using Automaton.Core.Models;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -12,12 +13,12 @@ public class AutomatonHub : Hub
     private const string RunnerNameHeader = "RunnerName";
 
     private readonly RunnerService runnerService;
-    private readonly AppsControllerExecutionService controllerExecutionService;
+    private readonly TunnelRequestRegistry tunnelRegistry;
 
-    public AutomatonHub(RunnerService runnerService, AppsControllerExecutionService controllerExecutionService)
+    public AutomatonHub(RunnerService runnerService, TunnelRequestRegistry tunnelRegistry)
     {
         this.runnerService = runnerService;
-        this.controllerExecutionService = controllerExecutionService;
+        this.tunnelRegistry = tunnelRegistry;
     }
 
     public override async Task OnConnectedAsync()
@@ -28,11 +29,17 @@ public class AutomatonHub : Hub
 
         await UpdateRunnerConnection();
 
-        // Auto-sync backend scripts for all apps configured to use this runner
-        _ = Task.Run(() => controllerExecutionService.SyncScriptsToRunnerAsync(
-            runner.Id, runner.ConnectionId, CancellationToken.None));
-
         await base.OnConnectedAsync();
+    }
+
+    /// <summary>
+    /// Called by the runner to deliver a tunnel response back to the server.
+    /// Resolves the pending TaskCompletionSource by requestId.
+    /// </summary>
+    public Task TunnelResponse(TunnelResponse response)
+    {
+        tunnelRegistry.TryComplete(response);
+        return Task.CompletedTask;
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

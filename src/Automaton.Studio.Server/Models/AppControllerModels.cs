@@ -38,7 +38,7 @@ public class AppControllerActionResponse
     public DateTime ExecutedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Error { get; set; }
-    public Dictionary<string, string>? OutputVariables { get; set; }
+    public System.Text.Json.JsonElement? Data { get; set; }
     public List<string>? Logs { get; set; }
 }
 
@@ -48,21 +48,6 @@ public class RunnerAppControllerResult
 {
     public Guid RunnerId { get; set; }
     public bool Success { get; set; }
-    public string? Output { get; set; }
     public string? Error { get; set; }
-    public DateTime Started { get; set; }
-    public DateTime Finished { get; set; }
-    public Dictionary<string, string>? OutputVariables { get; set; }
-}
-
-// ── Runner execution response (returned from runner via SignalR) ──────────────
-
-public class AppControllerExecutionResponse
-{
-    public bool Success { get; set; }
-    public string? Output { get; set; }
-    public string? Error { get; set; }
-    public DateTime Started { get; set; }
-    public DateTime Finished { get; set; }
-    public Dictionary<string, string>? OutputVariables { get; set; }
+    public System.Text.Json.JsonElement? Data { get; set; }
 }
