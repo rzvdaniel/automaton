@@ -18,8 +18,9 @@ services:
     env_file:
       - .env
     environment:
-      - DOTNET_ENVIRONMENT=Production
       - RUNNER_SCRIPTS_DIR=/app/data/apps
+      # Uncomment for local dev only (self-signed cert on localhost):
+      # - DOTNET_ENVIRONMENT=Development
     command: ["/app/docker-entrypoint.sh"]
     volumes:
       # Persist runner configuration and registration

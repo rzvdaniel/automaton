@@ -209,6 +209,8 @@ public class AppsControllerExecutionService
             try
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
+                logger.Debug("Tunnel request: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
+                    appId, controllerName, actionName, runner.Name);
 
                 var body = JsonSerializer.Serialize(new
                 {
@@ -241,6 +243,13 @@ public class AppsControllerExecutionService
                         tunnelResponse.Body ?? "{}",
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
+                    if (payload?.Success == true)
+                        logger.Information("Tunnel success: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
+                            appId, controllerName, actionName, runner.Name);
+                    else
+                        logger.Warning("Controller returned failure: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName} Error={Error}",
+                            appId, controllerName, actionName, runner.Name, payload?.Error);
+
                     results.Add(new RunnerAppControllerResult
                     {
                         RunnerId = runner.Id,
@@ -251,6 +260,9 @@ public class AppsControllerExecutionService
                 }
                 else
                 {
+                    logger.Warning("Tunnel HTTP error: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName} StatusCode={StatusCode} Error={Error}",
+                        appId, controllerName, actionName, runner.Name, tunnelResponse.StatusCode, tunnelResponse.Error);
+
                     results.Add(new RunnerAppControllerResult
                     {
                         RunnerId = runner.Id,
@@ -262,6 +274,8 @@ public class AppsControllerExecutionService
             catch (Exception ex)
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {ex.Message}");
+                logger.Error(ex, "Tunnel exception: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
+                    appId, controllerName, actionName, runner.Name);
 
                 results.Add(new RunnerAppControllerResult
                 {

@@ -65,10 +65,14 @@ async def health():
 
 
 if __name__ == "__main__":
+    # Windows does not support uvicorn multi-worker mode (no fork/socket passing).
+    # On Linux (Docker), use 4 workers for true parallelism across GIL boundaries.
+    import sys
+    workers = 1 if sys.platform == "win32" else 4
     uvicorn.run(
         "main:app",
         host="127.0.0.1",
         port=8001,
-        workers=4,        # true parallelism — no GIL across processes
-        log_level="warning"
+        workers=workers,
+        log_level="info"
     )

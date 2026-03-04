@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure writable data directories exist (guards against pre-existing root-owned volumes)
+mkdir -p /app/data/apps
+
 # Start FastAPI backend on port 8001 (localhost-only)
 cd /app/fastapi_server
 echo "Starting FastAPI backend..."

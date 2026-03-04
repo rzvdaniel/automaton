@@ -69,3 +69,11 @@ appsettings*.json
 .claude
 # App file storage
 AppData/
+# Runner data
+runner-data/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/

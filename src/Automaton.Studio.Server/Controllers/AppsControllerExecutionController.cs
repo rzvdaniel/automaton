@@ -114,7 +114,8 @@ public class AppsControllerExecutionController : ControllerBase
                 ActionName = actionName,
                 RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
                 ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
-                Success = true,
+                Success = result.Success,
+                ErrorMessage = result.Error,
                 DurationMs = sw.ElapsedMilliseconds,
                 UserId = User.Identity?.IsAuthenticated == true ? userContextService.GetUserId() : (Guid?)null,
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -182,6 +183,8 @@ public class AppsControllerExecutionController : ControllerBase
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
+        var sw = Stopwatch.StartNew();
+
         try
         {
             logger.Information(
@@ -208,18 +211,66 @@ public class AppsControllerExecutionController : ControllerBase
                 request.RunnerNames,
                 cancellationToken);
 
+            sw.Stop();
+
+            _ = executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            {
+                AppId = appId,
+                ControllerName = controllerName,
+                ActionName = actionName,
+                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
+                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
+                Success = result.Success,
+                ErrorMessage = result.Error,
+                DurationMs = sw.ElapsedMilliseconds,
+                UserId = userContextService.GetUserId(),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            });
+
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
+            sw.Stop();
             logger.Warning(ex, "Invalid preview controller action: {ControllerName}.{ActionName}", controllerName, actionName);
+
+            _ = LogFailedPreviewAsync(appId, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
+
             return BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {
+            sw.Stop();
             logger.Error(ex, "Preview controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
+
+            _ = LogFailedPreviewAsync(appId, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
+
             return StatusCode(500, new { error = "Internal server error during controller action execution" });
+        }
+    }
+
+    private async Task LogFailedPreviewAsync(
+        Guid appId, string controllerName, string actionName,
+        AppControllerActionRequest request, long durationMs, string errorMessage)
+    {
+        try
+        {
+            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            {
+                AppId = appId,
+                ControllerName = controllerName,
+                ActionName = actionName,
+                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
+                Success = false,
+                ErrorMessage = errorMessage,
+                DurationMs = durationMs,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            });
+        }
+        catch
+        {
+            // Best-effort; don't rethrow
         }
     }
 }

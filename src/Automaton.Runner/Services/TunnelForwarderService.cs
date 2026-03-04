@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using Serilog;
 using System.Text;
 
 namespace Automaton.Runner.Console.Services;
@@ -10,6 +11,8 @@ public class TunnelForwarderService
         BaseAddress = new Uri("http://localhost:8001"),
         Timeout = TimeSpan.FromSeconds(25)
     };
+
+    private static readonly ILogger _logger = Log.ForContext<TunnelForwarderService>();
 
     // SignalR default max message size is 32KB. Guard before sending to avoid silent failures.
     private const int MaxBodyBytes = 30 * 1024;
@@ -30,6 +33,8 @@ public class TunnelForwarderService
             foreach (var (k, v) in request.Headers)
                 httpRequest.Headers.TryAddWithoutValidation(k, v);
 
+            _logger.Debug("Forwarding to FastAPI: {Method} {Path}", request.Method, request.Path);
+
             var httpResponse = await _client.SendAsync(httpRequest);
 
             tunnelResponse.StatusCode = (int)httpResponse.StatusCode;
@@ -37,16 +42,19 @@ public class TunnelForwarderService
 
             if (bodyBytes.Length > MaxBodyBytes)
             {
+                _logger.Warning("FastAPI response body too large ({Bytes} bytes) for {Path}", bodyBytes.Length, request.Path);
                 tunnelResponse.StatusCode = 413;
                 tunnelResponse.Error = $"Response body ({bodyBytes.Length} bytes) exceeds SignalR message limit ({MaxBodyBytes} bytes). Return less data or paginate.";
             }
             else
             {
                 tunnelResponse.Body = Encoding.UTF8.GetString(bodyBytes);
+                _logger.Debug("FastAPI responded {StatusCode} for {Method} {Path}", tunnelResponse.StatusCode, request.Method, request.Path);
             }
         }
         catch (Exception ex)
         {
+            _logger.Error(ex, "FastAPI call failed: {Method} {Path}", request.Method, request.Path);
             tunnelResponse.StatusCode = 502;
             tunnelResponse.Error = ex.Message;
         }

@@ -265,8 +265,23 @@ public class HubService
             // Register tunnel forwarding handler
             connection.On<TunnelRequest>(TunnelRequestMethod, async (request) =>
             {
-                var response = await tunnelForwarder.ForwardAsync(request);
-                await connection.SendAsync(TunnelResponseMethod, response);
+                logger.Debug("Tunnel request received: {Method} {Path} RequestId={RequestId}",
+                    request.Method, request.Path, request.RequestId);
+                try
+                {
+                    var response = await tunnelForwarder.ForwardAsync(request);
+                    if (response.StatusCode >= 200 && response.StatusCode < 300)
+                        logger.Debug("Tunnel response sent: {StatusCode} RequestId={RequestId}", response.StatusCode, request.RequestId);
+                    else
+                        logger.Warning("Tunnel forwarded with non-2xx: {StatusCode} RequestId={RequestId} Error={Error}",
+                            response.StatusCode, request.RequestId, response.Error);
+                    await connection.SendAsync(TunnelResponseMethod, response);
+                }
+                catch (Exception ex)
+                {
+                    logger.Error(ex, "Tunnel forwarding failed: {Method} {Path} RequestId={RequestId}",
+                        request.Method, request.Path, request.RequestId);
+                }
             });
 
             connection.On(PingMethod, () =>
@@ -409,12 +424,16 @@ public class HubService
     /// Receives a controller script from the server and writes it to local disk for FastAPI to read.
     /// Returns true on success; server uses this as acknowledgement.
     /// </summary>
+    private static string AppsRootDir =>
+        Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
+        ?? Path.Combine(AppContext.BaseDirectory, "data", "apps");
+
     private bool UploadControllerScriptHandler(AppControllerUploadPayload payload)
     {
         try
         {
             var dir = Path.Combine(
-                AppContext.BaseDirectory, "data", "apps",
+                AppsRootDir,
                 payload.AppId.ToString(), "backend");
 
             Directory.CreateDirectory(dir);

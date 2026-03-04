@@ -1159,6 +1159,8 @@ public class RunnerHostService
             catch { /* not ready yet */ }
             await Task.Delay(1000);
         }
-        logger.Warning("FastAPI backend did not become ready within {Seconds}s — tunnel will be unavailable", maxWaitSeconds);
+        logger.Warning("FastAPI backend did not become ready within {Seconds}s - tunnel will be unavailable", maxWaitSeconds);
+        WriteLine($"[!] FastAPI backend not ready after {maxWaitSeconds}s. App controller execution will not work.");
+        WriteLine("[!] Run: pip install fastapi \"uvicorn[standard]\" and restart.");
     }
 }
