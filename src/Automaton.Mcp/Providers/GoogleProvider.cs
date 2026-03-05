@@ -33,7 +33,6 @@ public class GoogleProvider : IAiProvider
     /// </summary>
     private static readonly HttpClient GeminiHttpClient = new()
     {
-        BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/models/"),
         Timeout = System.Threading.Timeout.InfiniteTimeSpan
     };
 
@@ -282,7 +281,7 @@ public class GoogleProvider : IAiProvider
         var json = JsonSerializer.Serialize(requestBody);
 
         using var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
-        var url = new Uri(GeminiHttpClient.BaseAddress!, $"{Uri.EscapeDataString(model)}:streamGenerateContent?key={Uri.EscapeDataString(apiKey)}&alt=sse");
+        var url = new Uri($"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:streamGenerateContent?key={Uri.EscapeDataString(apiKey)}&alt=sse");
 
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
         {
