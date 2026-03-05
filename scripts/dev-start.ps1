@@ -57,21 +57,6 @@ function Start-DevWindow([string]$title, [string]$workDir, [string]$cmd) {
         "`$host.UI.RawUI.WindowTitle = '$title'; Set-Location '$workDir'; $escaped"
 }
 
-# ---------- 1. appsettings.Development.json ---------------------------------
-
-Write-Step "Copying appsettings.Development.json from main repo..."
-
-$AppSettingsSource = Join-Path $MainRepo "src\Automaton.Studio.Server\appsettings.Development.json"
-$AppSettingsDest   = Join-Path $ServerProject "appsettings.Development.json"
-
-if (-not (Test-Path $AppSettingsSource)) {
-    Write-Warn "appsettings.Development.json not found in main repo."
-    Write-Warn "Server will use defaults."
-} else {
-    Copy-Item $AppSettingsSource $AppSettingsDest -Force
-    Write-Ok "Copied appsettings.Development.json"
-}
-
 # ---------- 2. Automaton.Studio.Server --------------------------------------
 
 Write-Step "Starting Automaton.Studio.Server..."
