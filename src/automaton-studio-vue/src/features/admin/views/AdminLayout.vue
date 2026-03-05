@@ -22,7 +22,7 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-providers',
   },
   {
-    label: 'API Keys',
+    label: 'AI API Keys',
     icon: 'pi pi-key',
     to: '/admin/ai-keys',
     routePrefix: '/admin/ai-keys',
