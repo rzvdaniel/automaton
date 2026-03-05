@@ -283,7 +283,7 @@ public class AiApiKeyService
         return dbContext.AiApiKeys.Any(k => k.IsActive);
     }
 
-    private string EncryptApiKey(string apiKey)
+    internal string EncryptApiKey(string apiKey)
     {
         // Simple encryption - in production, use more robust encryption
         var encryptionKey = GetEncryptionKey();

@@ -4,7 +4,6 @@ using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 namespace Automaton.Studio.Server.Controllers.Admin;
 
 /// <summary>
@@ -17,16 +16,16 @@ public class AdminAiProvidersController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AdminAiProvidersController> logger;
-    private readonly ConfigurationService configuration;
+    private readonly AiApiKeyService aiApiKeyService;
 
     public AdminAiProvidersController(
         ApplicationDbContext dbContext,
         ILogger<AdminAiProvidersController> logger,
-        ConfigurationService configuration)
+        AiApiKeyService aiApiKeyService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
-        this.configuration = configuration;
+        this.aiApiKeyService = aiApiKeyService;
     }
 
     #region Providers
@@ -502,25 +501,12 @@ public class AdminAiProvidersController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.ApiKey))
             return BadRequest("API key is required");
 
-        // Encrypt the API key for storage
-        var encryptedApiKey = EncryptApiKey(request.ApiKey);
-
-        var entity = new AiApiKey
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name,
-            ProviderName = provider.Name,
-            AiProviderId = providerId,
-            EncryptedApiKey = encryptedApiKey,
-            CreatedAt = DateTime.UtcNow,
-            Description = request.Description,
-            IsActive = true
-        };
-
-        dbContext.AiApiKeys.Add(entity);
-        await dbContext.SaveChangesAsync();
-
-        logger.LogInformation("AI API key {KeyName} created for provider {ProviderName} by admin", entity.Name, provider.Name);
+        var entity = await aiApiKeyService.CreateAiApiKeyAsync(
+            userId: Guid.Empty,
+            name: request.Name,
+            providerName: provider.Name,
+            apiKey: request.ApiKey,
+            description: request.Description);
 
         return CreatedAtAction(nameof(GetProviderKeys), new { providerId }, new AiApiKeyAdminResponse
         {
@@ -552,7 +538,7 @@ public class AdminAiProvidersController : ControllerBase
         // If new API key is provided, update it
         if (!string.IsNullOrWhiteSpace(request.ApiKey))
         {
-            key.EncryptedApiKey = EncryptApiKey(request.ApiKey);
+            key.EncryptedApiKey = aiApiKeyService.EncryptApiKey(request.ApiKey);
         }
 
         await dbContext.SaveChangesAsync();
@@ -579,38 +565,6 @@ public class AdminAiProvidersController : ControllerBase
         logger.LogInformation("AI API key {KeyId} deleted by admin", id);
 
         return NoContent();
-    }
-
-    #endregion
-
-    #region Helper Methods
-
-    private string EncryptApiKey(string apiKey)
-    {
-        // Simple encryption - same method as in AiApiKeyService
-        var encryptionKey = GetEncryptionKey();
-        var keyBytes = System.Text.Encoding.UTF8.GetBytes(apiKey);
-        
-        using var aes = System.Security.Cryptography.Aes.Create();
-        aes.Key = encryptionKey;
-        aes.GenerateIV();
-
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(keyBytes, 0, keyBytes.Length);
-        
-        // Combine IV and encrypted data
-        var result = new byte[aes.IV.Length + encrypted.Length];
-        Array.Copy(aes.IV, 0, result, 0, aes.IV.Length);
-        Array.Copy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
-        
-        return Convert.ToBase64String(result);
-    }
-
-    private byte[] GetEncryptionKey()
-    {
-        var keyString = configuration.AppConfig.AiApiEncryptionKey;
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyString));
     }
 
     #endregion
