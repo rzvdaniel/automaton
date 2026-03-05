@@ -98,6 +98,7 @@ public class GoogleProvider : IAiProvider
             // Stream the response, collecting text and function calls
             var currentText = new StringBuilder();
             var functionCalls = new List<GeminiFunctionCall>();
+            var rawModelParts = new List<JsonElement>(); // preserve all parts verbatim (incl. thought_signature)
             int? inputTokens = null;
             int? outputTokens = null;
             string? modelVersion = null;
@@ -130,6 +131,7 @@ public class GoogleProvider : IAiProvider
                 }
 
                 functionCalls.AddRange(chunk.FunctionCalls);
+                rawModelParts.AddRange(chunk.RawParts);
             }
 
             var textContent = currentText.ToString();
@@ -152,29 +154,12 @@ public class GoogleProvider : IAiProvider
                 EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true);
             }
 
-            // Add model response (text + function calls) to contents for next turn
-            var modelParts = new List<object>();
-            if (!string.IsNullOrWhiteSpace(textContent))
-                modelParts.Add(new Dictionary<string, object> { ["text"] = textContent });
-
-            foreach (var fc in functionCalls)
-            {
-                modelParts.Add(new Dictionary<string, object>
-                {
-                    ["functionCall"] = new Dictionary<string, object>
-                    {
-                        ["name"] = fc.Name,
-                        ["args"] = fc.Args.ValueKind != JsonValueKind.Undefined
-                            ? (object)fc.Args
-                            : new Dictionary<string, object>()
-                    }
-                });
-            }
-
+            // Add model response back to contents using raw parts verbatim.
+            // This preserves thought_signature fields required by Gemini thinking models.
             contents.Add(new Dictionary<string, object>
             {
                 ["role"] = "model",
-                ["parts"] = modelParts
+                ["parts"] = rawModelParts.Count > 0 ? (object)rawModelParts : new List<object>()
             });
 
             // Execute each function call and collect results
@@ -377,9 +362,16 @@ public class GoogleProvider : IAiProvider
 
         foreach (var part in parts.EnumerateArray())
         {
+            // Preserve every part verbatim (thought, functionCall, text) so thought_signature
+            // is included when we echo the model turn back for thinking models.
+            chunk.RawParts.Add(part.Clone());
+
             if (part.TryGetProperty("text", out var textEl))
             {
-                chunk.TextDelta = textEl.GetString() ?? string.Empty;
+                // Only emit visible text (skip thought parts which have "thought: true")
+                var isThought = part.TryGetProperty("thought", out var thoughtEl) && thoughtEl.ValueKind == JsonValueKind.True;
+                if (!isThought)
+                    chunk.TextDelta = textEl.GetString() ?? string.Empty;
             }
             else if (part.TryGetProperty("functionCall", out var funcCallEl))
             {
@@ -579,6 +571,7 @@ public class GoogleProvider : IAiProvider
     {
         public string? TextDelta { get; set; }
         public List<GeminiFunctionCall> FunctionCalls { get; set; } = new();
+        public List<JsonElement> RawParts { get; set; } = new();
         public int? InputTokens { get; set; }
         public int? OutputTokens { get; set; }
         public string? ModelVersion { get; set; }
