@@ -28,10 +28,6 @@ const loading = ref(false)
 const showCreateDialog = ref(false)
 const isSubmitting = ref(false)
 
-// CreatedKey state - to show copy dialog
-const createdKey = ref<{ name: string; apiKey: string } | null>(null)
-const showCreatedKeyDialog = ref(false)
-
 // Form - extends CreateAiApiKeyRequest with providerId for UI
 interface CreateAiApiKeyForm extends CreateAiApiKeyRequest {
   providerId: string
@@ -124,15 +120,15 @@ async function handleCreate() {
       description: formData.description,
     })
 
-    // Show the created key dialog with copy button
-    createdKey.value = {
-      name: formData.name,
-      apiKey: formData.apiKey,
-    }
-    showCreatedKeyDialog.value = true
-
     showCreateDialog.value = false
     await loadApiKeys()
+
+    toast.add({
+      severity: 'success',
+      summary: 'API Key Added',
+      detail: `API key "${formData.name}" was added successfully`,
+      life: 3000,
+    })
   } catch (error: unknown) {
     console.error('Error creating API key:', error)
     const axiosError = error as { response?: { data?: { message?: string } } }
@@ -145,16 +141,6 @@ async function handleCreate() {
   } finally {
     isSubmitting.value = false
   }
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
-  toast.add({
-    severity: 'success',
-    summary: 'Copied',
-    detail: 'API key copied to clipboard',
-    life: 2000,
-  })
 }
 
 function getProviderName(providerId: string): string {
@@ -347,67 +333,11 @@ function confirmDeleteKey(key: AiApiKeyAdmin) {
         <Button label="Add Key" :loading="isSubmitting" @click="handleCreate" />
       </template>
     </Dialog>
-
-    <!-- Created Key Dialog - Shows the key with copy button -->
-    <Dialog
-      v-model:visible="showCreatedKeyDialog"
-      header="API Key Created"
-      modal
-      :style="{ width: '550px' }"
-    >
-      <div v-if="createdKey" class="flex flex-column gap-4">
-        <div class="bg-blue-50 border-left-4 border-left-blue-500 p-4">
-          <p class="m-0 text-sm text-color-secondary mb-2">
-            <i class="pi pi-info-circle mr-2"></i>
-            Save your API key now. You won't be able to view it again.
-          </p>
-        </div>
-
-        <div class="flex flex-column gap-2">
-          <label class="font-medium">Key Name</label>
-          <InputText :model-value="createdKey.name" disabled />
-        </div>
-
-        <div class="flex flex-column gap-2">
-          <label class="font-medium">API Key</label>
-          <div class="flex gap-2">
-            <InputText
-              :model-value="createdKey.apiKey"
-              type="password"
-              disabled
-              class="flex-1"
-            />
-            <Button
-              icon="pi pi-copy"
-              text
-              @click="copyToClipboard(createdKey.apiKey)"
-              title="Copy to clipboard"
-            />
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <Button label="Done" @click="showCreatedKeyDialog = false" />
-      </template>
-    </Dialog>
   </div>
 </template>
 
 <style scoped>
 .admin-ai-keys-view {
   max-width: 1200px;
-}
-
-:deep(.bg-blue-50) {
-  background-color: var(--blue-50);
-}
-
-:deep(.border-left-4) {
-  border-left-width: 4px;
-}
-
-:deep(.border-left-blue-500) {
-  border-left-color: var(--blue-500);
 }
 </style>
