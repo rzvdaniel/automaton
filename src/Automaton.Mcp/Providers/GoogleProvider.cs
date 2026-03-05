@@ -1,19 +1,25 @@
 using Automaton.Mcp.Models;
 using Microsoft.Extensions.Logging;
+using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 
 namespace Automaton.Mcp.Client.Providers;
 
 /// <summary>
-/// Google Gemini provider implementation using the Gemini REST API
+/// Google Gemini provider implementation using the Gemini REST API with SSE streaming
 /// </summary>
 public class GoogleProvider : IAiProvider
 {
     private readonly ILogger _logger;
 
+    /// <summary>
+    /// Maximum number of conversation messages to keep in history (sliding window).
+    /// Prevents unbounded token growth. Each turn = 2 messages (user + assistant).
+    /// 10 messages = last 5 turns, typically 2,000-5,000 tokens saved per call.
+    /// </summary>
     private const int MaxConversationHistoryMessages = 10;
 
     /// <inheritdoc />
@@ -21,6 +27,10 @@ public class GoogleProvider : IAiProvider
 
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
+    /// <summary>
+    /// Shared HttpClient with infinite timeout for streaming Gemini calls.
+    /// CancellationToken controls actual request lifetime — not the client timeout.
+    /// </summary>
     private static readonly HttpClient GeminiHttpClient = new()
     {
         BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/models/"),
@@ -86,65 +96,48 @@ public class GoogleProvider : IAiProvider
                 break;
             }
 
-            var response = await SendGenerateContentAsync(
+            // Stream the response, collecting text and function calls
+            var currentText = new StringBuilder();
+            var functionCalls = new List<GeminiFunctionCall>();
+            int? inputTokens = null;
+            int? outputTokens = null;
+            string? modelVersion = null;
+            var lastEmitTime = DateTime.UtcNow;
+            const int emitIntervalMs = 100;
+
+            await foreach (var chunk in StreamGenerateContentAsync(
                 request.Model ?? "gemini-2.0-flash",
                 request.ApiKey,
                 request.SystemPrompt,
                 contents,
                 toolList,
-                cancellationToken);
-
-            // Extract text and function calls from response parts
-            var textParts = new List<string>();
-            var functionCalls = new List<GeminiFunctionCall>();
-
-            if (response.TryGetProperty("candidates", out var candidates) &&
-                candidates.ValueKind == JsonValueKind.Array &&
-                candidates.GetArrayLength() > 0)
+                cancellationToken))
             {
-                var firstCandidate = candidates[0];
-                if (firstCandidate.TryGetProperty("content", out var content) &&
-                    content.TryGetProperty("parts", out var parts) &&
-                    parts.ValueKind == JsonValueKind.Array)
+                if (chunk.InputTokens.HasValue) inputTokens = chunk.InputTokens;
+                if (chunk.OutputTokens.HasValue) outputTokens = chunk.OutputTokens;
+                if (chunk.ModelVersion != null) modelVersion = chunk.ModelVersion;
+
+                if (!string.IsNullOrEmpty(chunk.TextDelta))
                 {
-                    foreach (var part in parts.EnumerateArray())
+                    currentText.Append(chunk.TextDelta);
+
+                    // Throttle streaming updates (same pattern as Anthropic)
+                    var now = DateTime.UtcNow;
+                    if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
                     {
-                        if (part.TryGetProperty("text", out var textEl))
-                        {
-                            textParts.Add(textEl.GetString() ?? string.Empty);
-                        }
-                        else if (part.TryGetProperty("functionCall", out var funcCallEl))
-                        {
-                            functionCalls.Add(new GeminiFunctionCall
-                            {
-                                Name = funcCallEl.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                                Args = funcCallEl.TryGetProperty("args", out var a) ? a.Clone() : default
-                            });
-                        }
+                        EmitStreamingTextUpdate(request.ConversationId, currentText.ToString(), isComplete: false);
+                        lastEmitTime = now;
                     }
                 }
+
+                functionCalls.AddRange(chunk.FunctionCalls);
             }
 
-            // Extract token usage
-            int? inputTokens = null;
-            int? outputTokens = null;
-            string? modelVersion = null;
-
-            if (response.TryGetProperty("usageMetadata", out var usage))
-            {
-                if (usage.TryGetProperty("promptTokenCount", out var inp))
-                    inputTokens = inp.GetInt32();
-                if (usage.TryGetProperty("candidatesTokenCount", out var out_))
-                    outputTokens = out_.GetInt32();
-            }
-            if (response.TryGetProperty("modelVersion", out var mv))
-                modelVersion = mv.GetString();
-
-            var textContent = string.Join("\n", textParts.Where(t => !string.IsNullOrWhiteSpace(t)));
+            var textContent = currentText.ToString();
 
             if (functionCalls.Count == 0)
             {
-                // No tool calls — emit text and finish
+                // No tool calls — emit final text and finish
                 if (!string.IsNullOrWhiteSpace(textContent))
                 {
                     EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
@@ -154,29 +147,27 @@ public class GoogleProvider : IAiProvider
                 break;
             }
 
-            // Emit text portion (if any) before tool calls
+            // Emit text portion before tool calls (if any)
             if (!string.IsNullOrWhiteSpace(textContent))
             {
                 EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true);
             }
 
-            // Add model response (with function calls) to contents
+            // Add model response (text + function calls) to contents for next turn
             var modelParts = new List<object>();
             if (!string.IsNullOrWhiteSpace(textContent))
                 modelParts.Add(new Dictionary<string, object> { ["text"] = textContent });
 
             foreach (var fc in functionCalls)
             {
-                var argsObj = fc.Args.ValueKind != JsonValueKind.Undefined
-                    ? (object)fc.Args
-                    : new Dictionary<string, object>();
-
                 modelParts.Add(new Dictionary<string, object>
                 {
                     ["functionCall"] = new Dictionary<string, object>
                     {
                         ["name"] = fc.Name,
-                        ["args"] = argsObj
+                        ["args"] = fc.Args.ValueKind != JsonValueKind.Undefined
+                            ? (object)fc.Args
+                            : new Dictionary<string, object>()
                     }
                 });
             }
@@ -187,7 +178,7 @@ public class GoogleProvider : IAiProvider
                 ["parts"] = modelParts
             });
 
-            // Execute each function call
+            // Execute each function call and collect results
             var functionResponseParts = new List<object>();
             var shouldStop = false;
             var stopForPlanGate = false;
@@ -203,6 +194,7 @@ public class GoogleProvider : IAiProvider
 
                 var toolResult = await executeToolAsync(callId, funcCall.Name, argsJson);
 
+                // Plan gate: if propose_plan returns awaitingApproval, stop the loop
                 if (funcCall.Name == "propose_plan" && !stopForPlanGate)
                 {
                     try
@@ -254,7 +246,7 @@ public class GoogleProvider : IAiProvider
                 });
             }
 
-            // Add tool results to contents as a user turn
+            // Add tool results as a user turn
             contents.Add(new Dictionary<string, object>
             {
                 ["role"] = "user",
@@ -272,6 +264,135 @@ public class GoogleProvider : IAiProvider
         }
 
         return responseBuilder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Streams the Gemini response via SSE (streamGenerateContent?alt=sse).
+    /// Yields parsed chunks containing text deltas, function calls, and usage metadata.
+    /// </summary>
+    private async IAsyncEnumerable<GeminiStreamChunk> StreamGenerateContentAsync(
+        string model,
+        string apiKey,
+        string? systemPrompt,
+        List<Dictionary<string, object>> contents,
+        List<ProviderTool> tools,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var requestBody = BuildRequestBody(systemPrompt, contents, tools);
+        var json = JsonSerializer.Serialize(requestBody);
+
+        using var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
+        var url = $"{Uri.EscapeDataString(model)}:streamGenerateContent?key={Uri.EscapeDataString(apiKey)}&alt=sse";
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = requestContent
+        };
+
+        using var response = await GeminiHttpClient.SendAsync(
+            requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogError("Gemini streaming API error: {Status} {Body}", response.StatusCode, errorBody);
+
+            string errorDetail = errorBody;
+            try
+            {
+                using var errDoc = JsonDocument.Parse(errorBody);
+                if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
+                    errEl.TryGetProperty("message", out var msgEl))
+                {
+                    errorDetail = msgEl.GetString() ?? errorBody;
+                }
+            }
+            catch { /* fall back to raw body */ }
+
+            throw new InvalidOperationException($"Gemini API error: {response.StatusCode} - {errorDetail}");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line == null) break;
+
+            // SSE format: lines starting with "data: " contain JSON payloads
+            if (!line.StartsWith("data: ", StringComparison.Ordinal)) continue;
+
+            var jsonData = line.Substring(6).Trim();
+            if (string.IsNullOrEmpty(jsonData) || jsonData == "[DONE]") break;
+
+            GeminiStreamChunk? chunk = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(jsonData);
+                chunk = ParseChunk(doc.RootElement);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse Gemini SSE chunk: {Data}", jsonData);
+                continue;
+            }
+
+            if (chunk != null)
+                yield return chunk;
+        }
+    }
+
+    private GeminiStreamChunk ParseChunk(JsonElement root)
+    {
+        var chunk = new GeminiStreamChunk();
+
+        // Extract usage metadata (present in final chunks)
+        if (root.TryGetProperty("usageMetadata", out var usage))
+        {
+            if (usage.TryGetProperty("promptTokenCount", out var inp))
+                chunk.InputTokens = inp.GetInt32();
+            if (usage.TryGetProperty("candidatesTokenCount", out var outp))
+                chunk.OutputTokens = outp.GetInt32();
+        }
+
+        if (root.TryGetProperty("modelVersion", out var mv))
+            chunk.ModelVersion = mv.GetString();
+
+        // Extract content parts from the first candidate
+        if (!root.TryGetProperty("candidates", out var candidates) ||
+            candidates.ValueKind != JsonValueKind.Array ||
+            candidates.GetArrayLength() == 0)
+        {
+            return chunk;
+        }
+
+        var candidate = candidates[0];
+
+        if (!candidate.TryGetProperty("content", out var content) ||
+            !content.TryGetProperty("parts", out var parts) ||
+            parts.ValueKind != JsonValueKind.Array)
+        {
+            return chunk;
+        }
+
+        foreach (var part in parts.EnumerateArray())
+        {
+            if (part.TryGetProperty("text", out var textEl))
+            {
+                chunk.TextDelta = textEl.GetString() ?? string.Empty;
+            }
+            else if (part.TryGetProperty("functionCall", out var funcCallEl))
+            {
+                chunk.FunctionCalls.Add(new GeminiFunctionCall
+                {
+                    Name = funcCallEl.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                    Args = funcCallEl.TryGetProperty("args", out var a) ? a.Clone() : default
+                });
+            }
+        }
+
+        return chunk;
     }
 
     private List<Dictionary<string, object>> BuildContents(ConversationRequest request)
@@ -294,7 +415,7 @@ public class GoogleProvider : IAiProvider
 
             foreach (var msg in history)
             {
-                // Gemini uses "user" and "model" roles
+                // Gemini uses "user" and "model" roles (not "assistant")
                 var role = msg.Role.ToLowerInvariant() == "assistant" ? "model" : "user";
                 contents.Add(new Dictionary<string, object>
                 {
@@ -313,13 +434,10 @@ public class GoogleProvider : IAiProvider
         return contents;
     }
 
-    private async Task<JsonElement> SendGenerateContentAsync(
-        string model,
-        string apiKey,
+    private static Dictionary<string, object?> BuildRequestBody(
         string? systemPrompt,
         List<Dictionary<string, object>> contents,
-        List<ProviderTool> tools,
-        CancellationToken cancellationToken)
+        List<ProviderTool> tools)
     {
         var requestBody = new Dictionary<string, object?>
         {
@@ -336,15 +454,11 @@ public class GoogleProvider : IAiProvider
 
         if (tools.Count > 0)
         {
-            var functionDeclarations = tools.Select(tool =>
+            var functionDeclarations = tools.Select(tool => new Dictionary<string, object?>
             {
-                var schemaNode = BuildParameterSchema(tool.InputSchemaJson);
-                return new Dictionary<string, object?>
-                {
-                    ["name"] = tool.Name,
-                    ["description"] = tool.Description,
-                    ["parameters"] = schemaNode
-                };
+                ["name"] = tool.Name,
+                ["description"] = tool.Description,
+                ["parameters"] = BuildParameterSchema(tool.InputSchemaJson)
             }).ToList();
 
             requestBody["tools"] = new List<object>
@@ -357,34 +471,7 @@ public class GoogleProvider : IAiProvider
             };
         }
 
-        var json = JsonSerializer.Serialize(requestBody);
-        using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var url = $"{Uri.EscapeDataString(model)}:generateContent?key={Uri.EscapeDataString(apiKey)}";
-
-        using var responseMessage = await GeminiHttpClient.PostAsync(url, content, cancellationToken);
-        var responseBody = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!responseMessage.IsSuccessStatusCode)
-        {
-            _logger.LogError("Gemini API error: {Status} {Body}", responseMessage.StatusCode, responseBody);
-
-            string errorDetail = responseBody;
-            try
-            {
-                using var errDoc = JsonDocument.Parse(responseBody);
-                if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
-                    errEl.TryGetProperty("message", out var msgEl))
-                {
-                    errorDetail = msgEl.GetString() ?? responseBody;
-                }
-            }
-            catch { /* fall back to raw body */ }
-
-            throw new InvalidOperationException($"Gemini API error: {responseMessage.StatusCode} - {errorDetail}");
-        }
-
-        using var responseDoc = JsonDocument.Parse(responseBody);
-        return responseDoc.RootElement.Clone();
+        return requestBody;
     }
 
     private static object BuildParameterSchema(string inputSchemaJson)
@@ -400,12 +487,8 @@ public class GoogleProvider : IAiProvider
 
         try
         {
-            // Gemini requires the schema to have type: "object" at root
             using var doc = JsonDocument.Parse(inputSchemaJson);
-            var root = doc.RootElement;
-
-            // Return as a raw JsonElement for proper serialization
-            return root.Clone();
+            return doc.RootElement.Clone();
         }
         catch
         {
@@ -448,12 +531,7 @@ public class GoogleProvider : IAiProvider
             Messages = new List<ConversationMessage>(),
             ToolCalls = new List<ToolCall>
             {
-                new ToolCall
-                {
-                    Id = toolCallId,
-                    Name = toolName,
-                    Arguments = ParseToolArguments(argsJson)
-                }
+                new ToolCall { Id = toolCallId, Name = toolName, Arguments = ParseToolArguments(argsJson) }
             },
             ToolResults = new List<ToolResult>()
         });
@@ -496,6 +574,15 @@ public class GoogleProvider : IAiProvider
         {
             return new Dictionary<string, object?>();
         }
+    }
+
+    private class GeminiStreamChunk
+    {
+        public string? TextDelta { get; set; }
+        public List<GeminiFunctionCall> FunctionCalls { get; set; } = new();
+        public int? InputTokens { get; set; }
+        public int? OutputTokens { get; set; }
+        public string? ModelVersion { get; set; }
     }
 
     private class GeminiFunctionCall
