@@ -134,7 +134,9 @@ public class AiApiKeyService
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to decrypt API key for provider {ProviderName}", providerName);
+            logger.LogError(ex, "Failed to decrypt API key for provider {ProviderName} (key id: {KeyId}). " +
+                "This usually means the AiApiEncryptionKey in appsettings does not match the key used when the API key was stored.",
+                providerName, firstActiveKey.Id);
             return null;
         }
     }
