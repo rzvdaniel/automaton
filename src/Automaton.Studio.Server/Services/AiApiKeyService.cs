@@ -108,17 +108,21 @@ public class AiApiKeyService
     /// </summary>
     public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
     {
+        logger.LogInformation("Looking up API key for provider '{ProviderName}'", providerName);
+
         // Get system-level keys for this provider (active keys only)
         var keys = await dbContext.AiApiKeys
             .Where(k => k.ProviderName == providerName && k.IsActive)
             .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
             .ToListAsync();
 
+        logger.LogInformation("Found {Count} active key(s) for provider '{ProviderName}'", keys.Count, providerName);
+
         var firstActiveKey = keys.FirstOrDefault();
 
         if (firstActiveKey == null)
         {
-            logger.LogWarning("No active system-level API key found for provider {ProviderName}", providerName);
+            logger.LogWarning("No active API key found in database for provider '{ProviderName}'", providerName);
             return null;
         }
 
@@ -130,11 +134,12 @@ public class AiApiKeyService
 
             var decryptedKey = DecryptApiKey(firstActiveKey.EncryptedApiKey);
 
+            logger.LogInformation("Successfully decrypted API key for provider '{ProviderName}'", providerName);
             return decryptedKey;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to decrypt API key for provider {ProviderName} (key id: {KeyId}). " +
+            logger.LogError(ex, "Failed to decrypt API key for provider '{ProviderName}' (key id: {KeyId}). " +
                 "This usually means the AiApiEncryptionKey in appsettings does not match the key used when the API key was stored.",
                 providerName, firstActiveKey.Id);
             return null;
