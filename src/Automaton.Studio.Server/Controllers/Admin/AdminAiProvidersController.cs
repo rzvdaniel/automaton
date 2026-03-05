@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,13 +17,16 @@ public class AdminAiProvidersController : ControllerBase
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AdminAiProvidersController> logger;
+    private readonly ConfigurationService configuration;
 
     public AdminAiProvidersController(
         ApplicationDbContext dbContext,
-        ILogger<AdminAiProvidersController> logger)
+        ILogger<AdminAiProvidersController> logger,
+        ConfigurationService configuration)
     {
         this.dbContext = dbContext;
         this.logger = logger;
+        this.configuration = configuration;
     }
 
     #region Providers
@@ -604,8 +608,7 @@ public class AdminAiProvidersController : ControllerBase
 
     private byte[] GetEncryptionKey()
     {
-        // Get encryption key from configuration
-        var keyString = Environment.GetEnvironmentVariable("AI_API_ENCRYPTION_KEY") ?? "default-encryption-key-for-development-only-change-in-production";
+        var keyString = configuration.AppConfig.AiApiEncryptionKey;
         using var sha256 = System.Security.Cryptography.SHA256.Create();
         return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyString));
     }
