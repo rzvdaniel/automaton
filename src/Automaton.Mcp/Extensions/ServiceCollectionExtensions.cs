@@ -27,6 +27,10 @@ public static class ServiceCollectionExtensions
             // Register Anthropic provider
             var anthropicProvider = new AnthropicProvider(logger.CreateLogger("AnthropicProvider"));
             registry.Register(anthropicProvider);
+
+            // Register Google Gemini provider
+            var googleProvider = new GoogleProvider(logger.CreateLogger("GoogleProvider"));
+            registry.Register(googleProvider);
             
             return registry;
         });
