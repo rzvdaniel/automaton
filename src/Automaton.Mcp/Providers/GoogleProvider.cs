@@ -460,6 +460,18 @@ public class GoogleProvider : IAiProvider
             {
                 ["function_calling_config"] = new Dictionary<string, object> { ["mode"] = "AUTO" }
             };
+
+            // Disable thinking when tools are involved. Thinking models (gemini-2.5+) embed a
+            // thought_signature in function calls that must be echoed verbatim. Since streaming
+            // can split parts across chunks making faithful reconstruction unreliable, we simply
+            // turn thinking off for tool-calling turns — matching OpenAI/Anthropic behaviour.
+            requestBody["generationConfig"] = new Dictionary<string, object>
+            {
+                ["thinkingConfig"] = new Dictionary<string, object>
+                {
+                    ["thinkingBudget"] = 0
+                }
+            };
         }
 
         return requestBody;
