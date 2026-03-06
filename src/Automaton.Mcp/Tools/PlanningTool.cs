@@ -132,12 +132,34 @@ public class PlanningTool : IMcpTool
             switch (planType)
             {
                 case "design":
-                    planFilePath    = ".plans/DESIGN.md";
+                    planFilePath = ".plans/DESIGN.md";
+                    // Guard: reject if design plan already exists (model skipped the read_file check).
+                    if (await fs.ReadFileAsync(planFilePath) != null)
+                    {
+                        return new McpToolResult
+                        {
+                            Success = false,
+                            Error = "Design plan already exists at .plans/DESIGN.md. " +
+                                    "Read it with read_file(\".plans/IMPLEMENTATION.md\") to check if an implementation plan exists, " +
+                                    "then proceed to Step 2 of the planning gate."
+                        };
+                    }
                     markdownContent = BuildDesignMarkdown(title, summary, arguments);
                     break;
 
                 case "implementation":
-                    planFilePath    = ".plans/IMPLEMENTATION.md";
+                    planFilePath = ".plans/IMPLEMENTATION.md";
+                    // Guard: reject if implementation plan already exists (model skipped the read_file check).
+                    if (await fs.ReadFileAsync(planFilePath) != null)
+                    {
+                        return new McpToolResult
+                        {
+                            Success = false,
+                            Error = "Implementation plan already exists at .plans/IMPLEMENTATION.md. " +
+                                    "Do NOT call propose_plan again. Proceed directly to implementation: " +
+                                    "implement ALL stages now, one after another, calling stage_complete after each."
+                        };
+                    }
                     markdownContent = BuildImplementationMarkdown(title, summary, arguments);
                     break;
 
