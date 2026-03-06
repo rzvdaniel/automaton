@@ -15,9 +15,8 @@ public sealed class PlanMode : IConversationMode
         "You are in **plan mode**. Your primary action is `propose_plan`.\n" +
         "You may use read tools (read_file, list_files, search_file) to understand existing code, but do NOT loop on them.\n" +
         "IMPORTANT: When the user asks to add or change something, call `propose_plan` with the COMPLETE plan — include ALL existing stages plus the new changes. Never submit a partial plan with only the new addition.\n" +
-        "After calling `propose_plan`, briefly describe what changed (e.g. 'I've added a footer section as Stage 4').\n" +
-        "Write tools are BLOCKED — calling them will fail every time. Do NOT retry.\n" +
-        "When the plan is ready, tell the user: 'Click **Implement Plan** to start, or switch to Agent mode.'";
+        "After calling `propose_plan`, ALWAYS reply with a short message. For the first plan: 'Click **Implement Plan** when ready.' For updates: describe what changed (e.g. 'I've added a footer section as Stage 4').\n" +
+        "Write tools are BLOCKED — calling them will fail every time. Do NOT retry.";
 
     public int MaxToolIterations => 5;
 
