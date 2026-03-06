@@ -1,5 +1,6 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
+using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Enums;
@@ -113,26 +114,9 @@ public abstract class AiConversationControllerBase : BaseController
             // 3. Load history
             var history = await LoadConversationHistoryAsync(sessionId, userId);
 
-            // 4. Build system prompt (delegated to subclass)
+            // 4. Build system prompt (delegated to subclass) + append mode-specific instructions
             var systemPrompt = await BuildSystemPromptAsync(request, userId, sessionId, history);
-
-            // Append mode context so the model knows exactly what tools are available.
-            // This is the primary guard against hallucinating tools that belong to the other mode.
-            if (request.Mode == "agent")
-            {
-                systemPrompt +=
-                    "\n\n## CURRENT MODE: Agent\n" +
-                    "You are in **agent mode**. The plan has been approved — proceed directly with implementation.\n" +
-                    "`propose_plan` and `stage_complete` are NOT available. Do not call them under any circumstances.\n" +
-                    "Use write_file / edit_file / list_files to implement the solution.";
-            }
-            else if (request.Mode == "plan")
-            {
-                systemPrompt +=
-                    "\n\n## CURRENT MODE: Plan\n" +
-                    "You are in **plan mode**. Your only job is to discuss and propose a plan using `propose_plan`.\n" +
-                    "write_file, edit_file, delete_file and all other write tools are NOT available. Do not call them.";
-            }
+            systemPrompt += ConversationModeFactory.From(request.Mode).SystemPromptSuffix;
 
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());

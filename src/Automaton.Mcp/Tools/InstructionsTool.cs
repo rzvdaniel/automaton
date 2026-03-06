@@ -31,6 +31,7 @@ public class InstructionsTool : IMcpTool
             new McpTool
             {
                 Name = "read_instruction",
+                Capability = ToolCapability.Read,
                 Description = "Read an instruction file from the .instructions/ folder (e.g. 'frontend.md', 'design.md'). Use this to load relevant preferences before making decisions.",
                 InputSchema = JsonDocument.Parse("""
                     {
@@ -45,6 +46,7 @@ public class InstructionsTool : IMcpTool
             new McpTool
             {
                 Name = "write_instruction",
+                Capability = ToolCapability.Write,
                 Description = "Write or update an instruction file in the .instructions/ folder. Use this to record design decisions, coding preferences, or conventions so future sessions stay consistent. The _index.md summary is updated automatically.",
                 InputSchema = JsonDocument.Parse("""
                     {
@@ -70,6 +72,7 @@ public class InstructionsTool : IMcpTool
             new McpTool
             {
                 Name = "list_instructions",
+                Capability = ToolCapability.Read,
                 Description = "List all instruction files in the .instructions/ folder.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             }

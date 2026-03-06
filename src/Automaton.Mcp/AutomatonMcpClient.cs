@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Models;
+using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Client.Providers;
 using OpenAI.Chat;
@@ -140,8 +141,9 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             var provider = _providerRegistry.GetProvider(request.Provider);
             if (provider != null)
             {
-                // Get tools from the tool provider
-                var providerTools = await CreateProviderToolsAsync(request.Mode);
+                // Get tools filtered for the current mode
+                var mode = ConversationModeFactory.From(request.Mode);
+                var providerTools = await CreateProviderToolsAsync(mode);
                 var allowedToolNames = new HashSet<string>(providerTools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
 
                 // Call the provider
@@ -209,7 +211,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     /// <summary>
     /// Create provider tools from the MCP tool provider
     /// </summary>
-    private async Task<List<ProviderTool>> CreateProviderToolsAsync(string mode = "agent")
+    private async Task<List<ProviderTool>> CreateProviderToolsAsync(IConversationMode mode)
     {
         if (_toolProvider == null)
         {
@@ -218,30 +220,16 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         }
 
         var mcpTools = await _toolProvider.GetToolsAsync();
-        var providerTools = new List<ProviderTool>();
 
-        // Plan mode: read-only tools + propose_plan (no write tools)
-        // Agent mode: all write tools, no propose_plan / stage_complete
-        var planOnlyTools  = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "propose_plan", "stage_complete" };
-        var writeTools     = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "write_file", "edit_file", "delete_file", "write_instruction", "rename_file", "move_file" };
-
-        foreach (var tool in mcpTools)
-        {
-            bool include = mode == "plan"
-                ? !writeTools.Contains(tool.Name)               // plan: allow reads + propose_plan
-                : !planOnlyTools.Contains(tool.Name);           // agent: allow writes, no planning tools
-
-            if (!include) continue;
-
-            providerTools.Add(new ProviderTool
+        return mcpTools
+            .Where(mode.IsToolAllowed)
+            .Select(tool => new ProviderTool
             {
                 Name = tool.Name,
                 Description = tool.Description,
                 InputSchemaJson = tool.InputSchema?.RootElement.GetRawText() ?? "{}"
-            });
-        }
-
-        return providerTools;
+            })
+            .ToList();
     }
 
     /// <summary>

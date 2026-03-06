@@ -31,6 +31,7 @@ public class PlanningTool : IMcpTool
             new McpTool
             {
                 Name = "propose_plan",
+                Capability = ToolCapability.Planning,
                 Description = """
                     Propose a plan before starting work on a new app.
                     Use planType="implementation" to present the full plan (components, tech decisions, and build stages) for user approval.

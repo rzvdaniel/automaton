@@ -30,18 +30,21 @@ public class FileIoTool : IMcpTool
             new McpTool
             {
                 Name = "read_file",
+                Capability = ToolCapability.Read,
                 Description = "Read a file (e.g. 'index.html', 'styles/main.css', 'js/app.js')",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
                 Name = "write_file",
+                Capability = ToolCapability.Write,
                 Description = "Write a file. Creates directories as needed.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}""")
             },
             new McpTool
             {
                 Name = "edit_file",
+                Capability = ToolCapability.Write,
                 Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText. Use dryRun=true to preview without saving.",
                 InputSchema = JsonDocument.Parse("""
                     {
@@ -68,18 +71,21 @@ public class FileIoTool : IMcpTool
             new McpTool
             {
                 Name = "delete_file",
+                Capability = ToolCapability.Write,
                 Description = "Delete a file.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
                 Name = "list_files",
+                Capability = ToolCapability.Read,
                 Description = "List all files in the current scope.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             },
             new McpTool
             {
                 Name = "search_file",
+                Capability = ToolCapability.Read,
                 Description = "Search for lines matching a pattern inside a file. Returns each match with surrounding context lines — use the returned text verbatim as oldText in edit_file for guaranteed accuracy. Prefer this over read_file for large files when you only need to find and change specific sections.",
                 InputSchema = JsonDocument.Parse("""
                     {
