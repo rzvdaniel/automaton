@@ -12,9 +12,9 @@ public sealed class PlanMode : IConversationMode
 
     public string SystemPromptSuffix =>
         "\n\n## CURRENT MODE: Plan\n" +
-        "You are in **plan mode**. Your ONLY action tool is `propose_plan`.\n" +
-        "When the user asks to add, change, or remove something — call `propose_plan` with an UPDATED plan. Do NOT read or list files to investigate.\n" +
-        "Read tools (read_file, list_files, search_file) are available only when the user explicitly asks to inspect existing code.\n" +
+        "You are in **plan mode**. Your primary action is `propose_plan`.\n" +
+        "You may use read tools (read_file, list_files, search_file) to understand existing code, but do NOT loop on them.\n" +
+        "When the user asks to add, change, or remove something from the plan — call `propose_plan` with an UPDATED plan.\n" +
         "Write tools are BLOCKED — calling them will fail every time. Do NOT retry.\n" +
         "When the plan is ready, tell the user: 'Click **Implement Plan** to start, or switch to Agent mode.'";
 
