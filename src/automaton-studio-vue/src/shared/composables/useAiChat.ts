@@ -191,11 +191,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         activeSession.value = active
       }
 
-      // If prior sessions exist the user has already built something — default to agent mode.
-      // For a brand-new app (no sessions) we keep the 'plan' default.
-      if (sessions.value.length > 0) {
-        chatMode.value = 'agent'
-      }
+      // Mode is never changed automatically — only the user can switch via the toggle
+      // or by clicking "Implement Plan". New apps default to 'plan' (set at ref init).
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load sessions'
       console.error('Error loading sessions:', err)
