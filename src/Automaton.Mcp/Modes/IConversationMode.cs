@@ -17,6 +17,9 @@ public interface IConversationMode
     /// </summary>
     string SystemPromptSuffix { get; }
 
+    /// <summary>Maximum tool call iterations per turn. Prevents infinite loops.</summary>
+    int MaxToolIterations { get; }
+
     /// <summary>Returns true if the tool is allowed in this mode.</summary>
     bool IsToolAllowed(McpTool tool);
 }
