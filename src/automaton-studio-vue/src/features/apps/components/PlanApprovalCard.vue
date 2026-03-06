@@ -73,7 +73,7 @@
           label="Approve"
           icon="pi pi-check"
           size="small"
-          @click="approve('Plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.')"
+          @click="approve('Plan approved. Do NOT call propose_plan again. Start implementing Stage 1 immediately using write_file/edit_file. Call stage_complete(stageIndex=0) when Stage 1 is done, then continue each stage in sequence without pausing.')"
         />
         <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
       </template>

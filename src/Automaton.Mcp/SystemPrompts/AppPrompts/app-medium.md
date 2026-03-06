@@ -160,7 +160,7 @@ Before writing any code for a **new app**, follow this single-step gate:
    - **Immediately after the tool call: output nothing. Zero words. Stop.**
    - The UI renders the plan card with Approve/Refine buttons for the user.
    - Resume only when the user sends an approval message.
-3. When instructed to implement (e.g. "Plan approved"), implement ALL stages sequentially, calling `propose_plan(stage_complete, stageIndex=N)` after each stage (N is 0-based).
+3. When instructed to implement (e.g. "Plan approved"), **do NOT call propose_plan again** — go directly to Stage 1. Write files with write_file/edit_file, then call `propose_plan(stage_complete, stageIndex=0)`. Continue each stage in sequence without pausing.
 
 ### Ongoing — Stage tracking
 - Call `propose_plan(stage_complete)` after completing each stage. The system will tell you what to implement next.

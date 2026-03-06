@@ -138,9 +138,9 @@ public class PlanningTool : IMcpTool
                         return new McpToolResult
                         {
                             Success = false,
-                            Error = "Implementation plan already exists at .plans/IMPLEMENTATION.md. " +
-                                    "Do NOT call propose_plan again. Proceed directly to implementation: " +
-                                    "implement ALL stages now, one after another, calling stage_complete after each."
+                            Error = "ERROR: Implementation plan already exists — do NOT call propose_plan again. " +
+                                    "Start implementing Stage 1 immediately using write_file/edit_file. " +
+                                    "Call stage_complete(stageIndex=0) when done, then continue each stage in sequence."
                         };
                     }
                     markdownContent = BuildImplementationMarkdown(title, summary, arguments);
