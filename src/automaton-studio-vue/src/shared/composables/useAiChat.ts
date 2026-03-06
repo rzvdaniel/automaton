@@ -56,9 +56,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
   const pendingPlan = ref(false)
 
-  // History of plans proposed by the AI — latest is shown expanded, older ones collapsed
-  const planHistory = ref<import('../types/ai.types').PlanData[]>([])
-  const currentPlan = computed(() => planHistory.value.length > 0 ? planHistory.value[planHistory.value.length - 1] : null)
+  // The current plan proposed by the AI — updated in-place on each propose_plan call
+  const currentPlan = ref<import('../types/ai.types').PlanData | null>(null)
 
   // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
   const pendingAutoContinu = ref(false)
@@ -666,8 +665,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       // Upgrade message type for special tools
       if (!isError) {
         if (toolMessage.toolName === 'propose_plan' && resultData?.planType === 'implementation') {
-          // Push to plan history — panel shows latest, older ones stay accessible
-          planHistory.value = [...planHistory.value, resultData as import('../types/ai.types').PlanData]
+          // Update the persistent plan panel (rendered outside chat)
+          currentPlan.value = resultData as import('../types/ai.types').PlanData
           pendingPlan.value = true
           // Don't convert inline message — it stays as a normal tool call line in the timeline
         } else if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
@@ -730,7 +729,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     chatMode,
     pendingPlan,
     currentPlan,
-    planHistory,
 
     // Session state
     sessions,

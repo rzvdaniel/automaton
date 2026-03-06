@@ -139,15 +139,13 @@ public class PlanningTool : IMcpTool
                     var existingPlan = await fs.ReadFileAsync(planFilePath);
                     isRefinement = existingPlan != null;
                     // In plan mode, allow overwriting — the user is refining the plan.
-                    // In agent mode, block duplicate plans — the model should be implementing, not re-planning.
+                    // In agent mode, silently acknowledge and redirect to implementation.
                     if (!isInPlanMode && isRefinement)
                     {
                         return new McpToolResult
                         {
-                            Success = false,
-                            Error = "ERROR: Implementation plan already exists — do NOT call propose_plan again. " +
-                                    "Start implementing Stage 1 immediately using write_file/edit_file. " +
-                                    "Call stage_complete(stageIndex=0) when done, then continue each stage in sequence."
+                            Success = true,
+                            Content = "{\"instruction\":\"Plan already exists. Proceed with implementation using write_file/edit_file. Do NOT call propose_plan again.\",\"planType\":\"implementation\",\"alreadyExists\":true}"
                         };
                     }
                     markdownContent = BuildImplementationMarkdown(title, summary, arguments);
