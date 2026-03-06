@@ -145,7 +145,7 @@ public class PlanningTool : IMcpTool
                         return new McpToolResult
                         {
                             Success = true,
-                            Content = "{\"instruction\":\"Plan already exists. Proceed with implementation using write_file/edit_file. Do NOT call propose_plan again.\",\"planType\":\"implementation\",\"alreadyExists\":true}"
+                            Content = "{\"instruction\":\"Plan already exists. Do NOT call propose_plan again. Proceed with implementation using write_file/edit_file, or if implementation is already complete, STOP and write a summary.\",\"planType\":\"implementation\",\"alreadyExists\":true}"
                         };
                     }
                     markdownContent = BuildImplementationMarkdown(title, summary, arguments);
@@ -178,7 +178,7 @@ public class PlanningTool : IMcpTool
             var instruction = planType == "stage_complete"
                 ? (nextStageInfo.HasValue
                     ? $"Stage complete. Now implement Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
-                    : "All stages are complete. Implementation is finished. Do NOT call propose_plan or stage_complete again. Write a brief summary for the user.")
+                    : "All stages are complete. Implementation is finished. STOP all tool calls immediately. Write a brief summary for the user and do nothing else.")
                 : isRefinement
                     ? "Plan updated. Briefly tell the user what you changed in the plan (e.g. 'I've updated the plan to include a background image in Stage 2'). Do NOT start implementing."
                     : "Plan submitted and is awaiting user approval. Stop here — output zero text.";
