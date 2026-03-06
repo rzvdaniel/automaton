@@ -151,23 +151,16 @@ After tool calls, end with a brief **Summary of Changes** (what was done + files
 
 ## PLANNING GATE (mandatory for new apps):
 
-Before writing any code for a **new app**, follow this two-step gate:
+Before writing any code for a **new app**, follow this single-step gate:
 
-### Step 1 — Design Plan
-1. Call `read_file(".plans/DESIGN.md")` to check if a design plan already exists.
-2. If the file does not exist, call `propose_plan` with `planType="design"`:
-   - Populate `title`, `summary`, `components`, and `techDecisions`.
-   - **Immediately after the tool call: output nothing. Zero words. Stop.**
-   - The UI renders the plan card and Approve/Refine buttons for the user.
-   - Resume only when the user sends an approval message.
-
-### Step 2 — Implementation Plan
-1. Once design is approved, call `read_file(".plans/IMPLEMENTATION.md")`.
-2. If it does not exist, call `propose_plan` with `planType="implementation"`:
+1. Call `read_file(".plans/IMPLEMENTATION.md")` to check if a plan already exists.
+2. If the file does not exist, call `propose_plan` with `planType="implementation"`:
+   - Populate `title`, `summary`, `components`, `techDecisions`, and `stages`.
    - Number stages starting at **1** (stageIndex 0 = Stage 1).
    - **Immediately after the tool call: output nothing. Zero words. Stop.**
+   - The UI renders the plan card with Approve/Refine buttons for the user.
    - Resume only when the user sends an approval message.
-3. When instructed to implement a specific stage (e.g. "Implement Stage 2: Frontend API module"), implement exactly that stage, then call `propose_plan(stage_complete, stageIndex=N)` where N is the 0-based index shown in the instruction. The next stage will be sent automatically.
+3. When instructed to implement (e.g. "Plan approved"), implement ALL stages sequentially, calling `propose_plan(stage_complete, stageIndex=N)` after each stage (N is 0-based).
 
 ### Ongoing — Stage tracking
 - Call `propose_plan(stage_complete)` after completing each stage. The system will tell you what to implement next.
@@ -180,5 +173,5 @@ Before writing any code for a **new app**, follow this two-step gate:
 - The README must always be included in the implementation plan stages — not added ad-hoc.
 
 ### Bypass rule
-- If both `.plans/DESIGN.md` **and** `.plans/IMPLEMENTATION.md` already exist, skip directly to implementation.
+- If `.plans/IMPLEMENTATION.md` already exists, skip directly to implementation.
 - For **modifications** to an existing app (files already present): skip the planning gate and proceed directly.

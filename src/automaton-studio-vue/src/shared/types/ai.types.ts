@@ -127,7 +127,7 @@ export type ChatMessageType =
 
 // Payload embedded in a planApproval message
 export interface PlanData {
-  planType: 'design' | 'implementation' | 'stage_complete'
+  planType: 'implementation' | 'stage_complete'
   title: string
   summary: string
   planFile?: string

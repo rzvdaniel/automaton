@@ -32,12 +32,11 @@ public class PlanningTool : IMcpTool
             {
                 Name = "propose_plan",
                 Description = """
-                    Propose a design or implementation plan before starting work.
-                    Use planType="design" to present the architecture/component breakdown for user approval.
-                    Use planType="implementation" to present a staged build plan for user approval.
-                    Use planType="stage_complete" to mark a stage as done and ask whether to continue.
+                    Propose a plan before starting work on a new app.
+                    Use planType="implementation" to present the full plan (components, tech decisions, and build stages) for user approval.
+                    Use planType="stage_complete" to mark a stage as done and continue to the next.
                     The plan is saved as a markdown file and the user must approve before implementation begins.
-                    IMPORTANT: After calling this tool, present a brief summary to the user and STOP.
+                    IMPORTANT: After calling this tool, output zero text. The plan card renders automatically — stop and wait for user approval.
                     Do not write any code or files until the user explicitly approves.
                     """,
                 InputSchema = JsonDocument.Parse("""
@@ -46,14 +45,14 @@ public class PlanningTool : IMcpTool
                         "properties": {
                             "planType": {
                                 "type": "string",
-                                "enum": ["design", "implementation", "stage_complete"],
-                                "description": "Type of plan: design (architecture), implementation (staged build), or stage_complete (mark stage done)"
+                                "enum": ["implementation", "stage_complete"],
+                                "description": "Type: implementation (full plan with components + stages) or stage_complete (mark stage done)"
                             },
                             "title": { "type": "string", "description": "Short title for the plan" },
                             "summary": { "type": "string", "description": "1-3 sentence overview" },
                             "components": {
                                 "type": "array",
-                                "description": "For design plans: list of components/modules",
+                                "description": "List of components/modules to be built",
                                 "items": {
                                     "type": "object",
                                     "properties": {
@@ -65,7 +64,7 @@ public class PlanningTool : IMcpTool
                             },
                             "techDecisions": {
                                 "type": "array",
-                                "description": "For design plans: key technology/approach decisions",
+                                "description": "Key technology/approach decisions",
                                 "items": {
                                     "type": "object",
                                     "properties": {
@@ -77,7 +76,7 @@ public class PlanningTool : IMcpTool
                             },
                             "stages": {
                                 "type": "array",
-                                "description": "For implementation plans: ordered list of build stages",
+                                "description": "Ordered list of build stages",
                                 "items": {
                                     "type": "object",
                                     "properties": {
@@ -131,22 +130,6 @@ public class PlanningTool : IMcpTool
 
             switch (planType)
             {
-                case "design":
-                    planFilePath = ".plans/DESIGN.md";
-                    // Guard: reject if design plan already exists (model skipped the read_file check).
-                    if (await fs.ReadFileAsync(planFilePath) != null)
-                    {
-                        return new McpToolResult
-                        {
-                            Success = false,
-                            Error = "Design plan already exists at .plans/DESIGN.md. " +
-                                    "Read it with read_file(\".plans/IMPLEMENTATION.md\") to check if an implementation plan exists, " +
-                                    "then proceed to Step 2 of the planning gate."
-                        };
-                    }
-                    markdownContent = BuildDesignMarkdown(title, summary, arguments);
-                    break;
-
                 case "implementation":
                     planFilePath = ".plans/IMPLEMENTATION.md";
                     // Guard: reject if implementation plan already exists (model skipped the read_file check).
@@ -221,10 +204,10 @@ public class PlanningTool : IMcpTool
 
     // ── Markdown builders ─────────────────────────────────────────────────────
 
-    private static string BuildDesignMarkdown(string title, string summary, JsonElement args)
+    private static string BuildImplementationMarkdown(string title, string summary, JsonElement args)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"# Design Plan: {title}");
+        sb.AppendLine($"# Plan: {title}");
         sb.AppendLine();
         sb.AppendLine($"> {summary}");
         sb.AppendLine();
@@ -255,17 +238,6 @@ public class PlanningTool : IMcpTool
             sb.AppendLine();
         }
 
-        sb.AppendLine($"_Created by AI on {DateTime.UtcNow:yyyy-MM-dd}_");
-        return sb.ToString();
-    }
-
-    private static string BuildImplementationMarkdown(string title, string summary, JsonElement args)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"# Implementation Plan: {title}");
-        sb.AppendLine();
-        sb.AppendLine($"> {summary}");
-        sb.AppendLine();
         sb.AppendLine("## Stages");
         sb.AppendLine();
 

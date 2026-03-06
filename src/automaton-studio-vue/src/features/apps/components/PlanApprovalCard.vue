@@ -2,7 +2,7 @@
   <div class="plan-approval-card">
     <!-- Header -->
     <div class="plan-header">
-      <span class="plan-badge" :class="planType">
+      <span class="plan-badge" :class="planData.planType">
         <i :class="planIcon"></i>
         {{ planLabel }}
       </span>
@@ -12,30 +12,8 @@
     <!-- Summary -->
     <p class="plan-summary">{{ planData.summary }}</p>
 
-    <!-- Design plan: components + tech decisions -->
-    <template v-if="planData.planType === 'design'">
-      <div v-if="planData.components?.length" class="plan-section">
-        <div class="section-label">Components</div>
-        <ul class="plan-list">
-          <li v-for="c in planData.components" :key="c.name">
-            <strong>{{ c.name }}</strong>
-            <span v-if="c.description || c.responsibility"> — {{ c.description || c.responsibility }}</span>
-          </li>
-        </ul>
-      </div>
-      <div v-if="planData.techDecisions?.length" class="plan-section">
-        <div class="section-label">Tech Decisions</div>
-        <ul class="plan-list">
-          <li v-for="td in planData.techDecisions" :key="td.decision">
-            <strong>{{ td.decision }}</strong>
-            <span v-if="td.rationale"> — {{ td.rationale }}</span>
-          </li>
-        </ul>
-      </div>
-    </template>
-
-    <!-- Implementation plan: stages -->
-    <template v-else-if="planData.planType === 'implementation'">
+    <!-- Implementation plan: stages (primary) + collapsible details -->
+    <template v-if="planData.planType === 'implementation'">
       <div v-if="planData.stages?.length" class="plan-section">
         <div class="section-label">Stages</div>
         <ol class="plan-stages">
@@ -49,6 +27,34 @@
           </li>
         </ol>
       </div>
+
+      <!-- Collapsible details: components + tech decisions -->
+      <details
+        v-if="planData.components?.length || planData.techDecisions?.length"
+        class="plan-details"
+      >
+        <summary class="plan-details-toggle">Details</summary>
+
+        <div v-if="planData.components?.length" class="plan-section plan-section-inner">
+          <div class="section-label">Components</div>
+          <ul class="plan-list">
+            <li v-for="c in planData.components" :key="c.name">
+              <strong>{{ c.name }}</strong>
+              <span v-if="c.description || c.responsibility"> — {{ c.description || c.responsibility }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="planData.techDecisions?.length" class="plan-section plan-section-inner">
+          <div class="section-label">Tech Decisions</div>
+          <ul class="plan-list">
+            <li v-for="td in planData.techDecisions" :key="td.decision">
+              <strong>{{ td.decision }}</strong>
+              <span v-if="td.rationale"> — {{ td.rationale }}</span>
+            </li>
+          </ul>
+        </div>
+      </details>
     </template>
 
     <!-- Stage complete: progress info -->
@@ -67,9 +73,7 @@
           label="Approve"
           icon="pi pi-check"
           size="small"
-          @click="approve(planData.planType === 'design'
-            ? 'Design plan approved. Proceed to the implementation plan.'
-            : 'Implementation plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.')"
+          @click="approve('Plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.')"
         />
         <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
       </template>
@@ -102,12 +106,9 @@ const props = defineProps<{
 const showRefine = ref(false)
 const refineText = ref('')
 
-const planType = computed(() => props.planData.planType)
-
 const planLabel = computed(() => {
   switch (props.planData.planType) {
-    case 'design': return 'Design Plan'
-    case 'implementation': return 'Implementation Plan'
+    case 'implementation': return 'Plan'
     case 'stage_complete': return `Stage ${(props.planData.stageIndex ?? 0) + 1} Complete`
     default: return 'Plan'
   }
@@ -115,7 +116,6 @@ const planLabel = computed(() => {
 
 const planIcon = computed(() => {
   switch (props.planData.planType) {
-    case 'design': return 'pi pi-palette'
     case 'implementation': return 'pi pi-list'
     case 'stage_complete': return 'pi pi-check-circle'
     default: return 'pi pi-file'
@@ -168,11 +168,6 @@ function submitRefine() {
   white-space: nowrap;
 }
 
-.plan-badge.design {
-  background: color-mix(in srgb, var(--p-blue-500) 15%, transparent);
-  color: var(--p-blue-500);
-}
-
 .plan-badge.implementation {
   background: color-mix(in srgb, var(--p-green-500) 15%, transparent);
   color: var(--p-green-500);
@@ -196,6 +191,11 @@ function submitRefine() {
 
 .plan-section {
   margin-bottom: 8px;
+}
+
+.plan-section-inner {
+  margin-top: 8px;
+  margin-bottom: 4px;
 }
 
 .section-label {
@@ -263,6 +263,33 @@ function submitRefine() {
 .complexity-badge.low    { background: color-mix(in srgb, var(--p-green-500)  15%, transparent); color: var(--p-green-500); }
 .complexity-badge.medium { background: color-mix(in srgb, var(--p-yellow-500) 15%, transparent); color: var(--p-yellow-600); }
 .complexity-badge.high   { background: color-mix(in srgb, var(--p-red-500)    15%, transparent); color: var(--p-red-500); }
+
+.plan-details {
+  margin-bottom: 6px;
+}
+
+.plan-details-toggle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.plan-details-toggle::-webkit-details-marker { display: none; }
+.plan-details-toggle::before {
+  content: '▶';
+  font-size: 0.6rem;
+  transition: transform 0.15s;
+}
+details[open] > .plan-details-toggle::before {
+  transform: rotate(90deg);
+}
 
 .stage-summary {
   color: var(--p-text-muted-color);
