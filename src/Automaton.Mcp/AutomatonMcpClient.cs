@@ -142,12 +142,21 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             {
                 // Get tools from the tool provider
                 var providerTools = await CreateProviderToolsAsync(request.Mode);
+                var allowedToolNames = new HashSet<string>(providerTools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
 
                 // Call the provider
                 responseText = await provider.CallAsync(
                     request,
                     providerTools,
-                    async (toolCallId, toolName, argsJson) => await ExecuteMcpToolAsync(toolCallId, toolName, argsJson, request),
+                    async (toolCallId, toolName, argsJson) =>
+                    {
+                        if (!allowedToolNames.Contains(toolName))
+                        {
+                            _logger.LogWarning("Tool '{ToolName}' is not available in '{Mode}' mode — call rejected", toolName, request.Mode);
+                            return $"{{\"error\":\"Tool '{toolName}' is not available in {request.Mode} mode. Stick to the allowed tools.\"}}";
+                        }
+                        return await ExecuteMcpToolAsync(toolCallId, toolName, argsJson, request);
+                    },
                     cancellationToken);
             }
             else
