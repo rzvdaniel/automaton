@@ -147,9 +147,11 @@ public class PlanningTool : IMcpTool
                     break;
 
                 case "stage_complete":
-                    planFilePath    = ".plans/IMPLEMENTATION.md";
-                    markdownContent = await UpdateStageCompleteAsync(fs, arguments);
-                    planFilePath    = string.Empty; // content handled inside
+                    planFilePath = string.Empty; // content handled inside
+                    var (updatedMarkdown, stageError) = await UpdateStageCompleteAsync(fs, arguments);
+                    if (stageError != null)
+                        return new McpToolResult { Success = false, Error = stageError };
+                    markdownContent = updatedMarkdown;
                     break;
 
                 default:
@@ -163,13 +165,20 @@ public class PlanningTool : IMcpTool
                 _logger.LogInformation("Wrote {PlanType} plan to {Path}", planType, planFilePath);
             }
 
-            // Return structured result for frontend approval card
             var nextStageInfo = planType == "stage_complete"
                 ? FindNextStage(markdownContent)
                 : null;
 
+            // Plain-English instruction included in the result so the model knows exactly what to do next.
+            var instruction = planType == "stage_complete"
+                ? (nextStageInfo.HasValue
+                    ? $"Stage complete. Now implement Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
+                    : "All stages are complete. Implementation is finished. Do NOT call propose_plan or stage_complete again. Write a brief summary for the user.")
+                : "Plan submitted and is awaiting user approval. Stop here — output zero text.";
+
             var result = new
             {
+                instruction,
                 awaitingApproval = planType != "stage_complete",
                 planType,
                 title,
@@ -181,9 +190,7 @@ public class PlanningTool : IMcpTool
                 stageIndex    = planType == "stage_complete" && arguments.TryGetProperty("stageIndex", out var si) ? si.GetInt32() : (int?)null,
                 stageSummary  = planType == "stage_complete" && arguments.TryGetProperty("stageSummary", out var ss) ? ss.GetString() : null,
                 filesChanged  = planType == "stage_complete" ? GetStringArray(arguments, "filesChanged") : null,
-                // True when more unchecked stages remain — frontend uses this to auto-continue.
                 hasMoreStages = nextStageInfo.HasValue,
-                // Next stage details for a precise auto-continue message.
                 nextStage = nextStageInfo.HasValue
                     ? new { index = nextStageInfo.Value.Index, name = nextStageInfo.Value.Name, description = nextStageInfo.Value.Description }
                     : null,
@@ -269,20 +276,25 @@ public class PlanningTool : IMcpTool
         return sb.ToString();
     }
 
-    private static async Task<string> UpdateStageCompleteAsync(IScopedFileSystem fs, JsonElement args)
+    private static async Task<(string Markdown, string? Error)> UpdateStageCompleteAsync(IScopedFileSystem fs, JsonElement args)
     {
         var stageIndex = args.TryGetProperty("stageIndex", out var si) ? si.GetInt32() : -1;
         var existing   = await fs.ReadFileAsync(".plans/IMPLEMENTATION.md");
 
         if (existing is null || stageIndex < 0)
-            return existing ?? string.Empty;
+            return (existing ?? string.Empty, null);
+
+        // Detect already-completed stage — return an error so the model doesn't repeat the call.
+        var alreadyDoneMarker = $"- [x] Stage {stageIndex + 1} ·";
+        if (existing.Contains(alreadyDoneMarker))
+            return (existing, $"Stage {stageIndex + 1} was already marked complete. Do not call stage_complete for this stage again.");
 
         // Replace "- [ ] Stage {stageIndex+1}" with "- [x]" and append completion note
         var marker  = $"- [ ] Stage {stageIndex + 1} ·";
         var replace = $"- [x] Stage {stageIndex + 1} · ";
 
         if (!existing.Contains(marker))
-            return existing;
+            return (existing, $"Stage {stageIndex + 1} does not exist in the plan. Check .plans/IMPLEMENTATION.md with read_file and use the correct stageIndex.");
 
         var updated = existing.Replace(marker, replace, StringComparison.Ordinal);
 
@@ -294,7 +306,7 @@ public class PlanningTool : IMcpTool
         }
 
         await fs.WriteFileAsync(".plans/IMPLEMENTATION.md", updated);
-        return updated;
+        return (updated, null);
     }
 
     /// <summary>
