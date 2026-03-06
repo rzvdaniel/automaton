@@ -32,4 +32,9 @@ public class ConversationRequest
     /// Default: 3
     /// </summary>
     public int MaxConsecutiveFailures { get; set; } = 3;
+
+    /// <summary>
+    /// Interaction mode: "plan" (read-only, propose_plan available) or "agent" (write tools, no propose_plan).
+    /// </summary>
+    public string Mode { get; set; } = "agent";
 }

@@ -151,7 +151,8 @@ public abstract class AiConversationControllerBase : BaseController
                 ConversationHistory = history,
                 Context = BuildContextDictionary(request, userId),
                 MaxIterations = _aiProvidersConfig.MaxIterations,
-                MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures
+                MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
+                Mode = request.Mode
             };
 
             var result = await _mcpClient.StartConversationAsync(conversationRequest, cancellationToken);
@@ -380,4 +381,6 @@ public abstract class BaseStreamConversationRequest
     public Dictionary<string, object>? Context { get; set; }
     public Guid? SessionId { get; set; }
     public Guid? ResourceId { get; set; }
+    /// <summary>"plan" or "agent" (default)</summary>
+    public string Mode { get; set; } = "agent";
 }

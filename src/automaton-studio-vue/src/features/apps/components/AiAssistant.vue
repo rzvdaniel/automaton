@@ -63,6 +63,8 @@ const {
   activateSession,
   updateSessionTitle,
   deleteSession,
+  chatMode,
+  pendingPlan,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -373,6 +375,28 @@ function handleKeyPress(event: KeyboardEvent) {
     sendMessage()
   }
 }
+
+// Switch to agent mode and send the approval message to start implementation
+function implementPlan() {
+  chatMode.value = 'agent'
+  pendingPlan.value = false
+
+  const systemPrompt =
+    props.systemPrompt ||
+    'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
+  const context: Record<string, any> = {
+    resourceType: props.resourceType,
+    resourceId: props.resourceId,
+  }
+  if (props.runnerId) context.runnerId = props.runnerId
+
+  sendAiMessage(
+    'Plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.',
+    systemPrompt,
+    context,
+    false,
+  )
+}
 </script>
 
 <template>
@@ -654,10 +678,35 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Input area -->
       <div class="input-area">
+        <!-- Mode toggle + Implement Plan button row -->
+        <div class="mode-row">
+          <div class="mode-toggle" v-if="!pendingPlan">
+            <button
+              class="mode-btn"
+              :class="{ active: chatMode === 'agent' }"
+              :disabled="isBusy"
+              @click="chatMode = 'agent'"
+            >Agent</button>
+            <button
+              class="mode-btn"
+              :class="{ active: chatMode === 'plan' }"
+              :disabled="isBusy"
+              @click="chatMode = 'plan'"
+            >Plan</button>
+          </div>
+          <Button
+            v-if="pendingPlan && !isBusy"
+            label="Implement Plan"
+            icon="pi pi-play"
+            size="small"
+            class="implement-plan-btn"
+            @click="implementPlan"
+          />
+        </div>
         <div class="flex gap-2">
           <InputText
             v-model="userInput"
-            placeholder="Describe what you want..."
+            :placeholder="chatMode === 'plan' ? 'Describe what to build...' : 'Describe what you want...'"
             class="flex-1"
             :disabled="isBusy"
             @keypress="handleKeyPress"
@@ -1177,6 +1226,45 @@ function handleKeyPress(event: KeyboardEvent) {
   padding: 0.75rem;
   border-top: 1px solid var(--p-surface-200);
   flex-shrink: 0;
+}
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--p-surface-300);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode-btn {
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--p-text-muted-color);
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-btn.active {
+  background: var(--p-primary-500);
+  color: #fff;
+}
+
+.implement-plan-btn {
+  width: 100%;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */

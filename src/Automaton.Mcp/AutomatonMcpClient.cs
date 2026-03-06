@@ -141,7 +141,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             if (provider != null)
             {
                 // Get tools from the tool provider
-                var providerTools = await CreateProviderToolsAsync();
+                var providerTools = await CreateProviderToolsAsync(request.Mode);
 
                 // Call the provider
                 responseText = await provider.CallAsync(
@@ -200,7 +200,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     /// <summary>
     /// Create provider tools from the MCP tool provider
     /// </summary>
-    private async Task<List<ProviderTool>> CreateProviderToolsAsync()
+    private async Task<List<ProviderTool>> CreateProviderToolsAsync(string mode = "agent")
     {
         if (_toolProvider == null)
         {
@@ -211,8 +211,19 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         var mcpTools = await _toolProvider.GetToolsAsync();
         var providerTools = new List<ProviderTool>();
 
+        // Plan mode: read-only tools + propose_plan (no write tools)
+        // Agent mode: all write tools, no propose_plan / stage_complete
+        var planOnlyTools  = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "propose_plan", "stage_complete" };
+        var writeTools     = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "write_file", "edit_file", "delete_file", "write_instruction", "rename_file", "move_file" };
+
         foreach (var tool in mcpTools)
         {
+            bool include = mode == "plan"
+                ? !writeTools.Contains(tool.Name)               // plan: allow reads + propose_plan
+                : !planOnlyTools.Contains(tool.Name);           // agent: allow writes, no planning tools
+
+            if (!include) continue;
+
             providerTools.Add(new ProviderTool
             {
                 Name = tool.Name,

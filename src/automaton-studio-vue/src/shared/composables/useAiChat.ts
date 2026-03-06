@@ -49,6 +49,13 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
+  // Session-scoped chat mode: 'plan' (read-only + propose_plan) or 'agent' (write tools, default)
+  // Stored per-session using activeSession.id as the key
+  const chatMode = ref<'plan' | 'agent'>('agent')
+
+  // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
+  const pendingPlan = ref(false)
+
   // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
   const pendingAutoContinu = ref(false)
   const pendingNextStage = ref<{ index: number; name: string; description: string } | null>(null)
@@ -443,6 +450,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       resourceType: resourceType, // Top-level property for backend
       resourceId: resourceId, // Top-level property for backend
       language: context?.language,
+      mode: chatMode.value,
       context: {
         ...context, // Additional context (e.g., runnerId, appId)
       },
@@ -653,6 +661,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
           toolMessage.type = 'planApproval'
           toolMessage.planData = resultData as import('../types/ai.types').PlanData
+          pendingPlan.value = true
         } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
@@ -706,6 +715,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     error,
     hasMessages,
     currentProvider,
+    chatMode,
+    pendingPlan,
 
     // Session state
     sessions,

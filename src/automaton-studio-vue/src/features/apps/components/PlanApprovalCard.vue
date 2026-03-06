@@ -62,19 +62,13 @@
       <p v-if="planData.stageSummary" class="stage-summary">{{ planData.stageSummary }}</p>
     </template>
 
-    <!-- Actions -->
+    <!-- Actions: only Refine for implementation plans (Approve is handled by "Implement Plan" button outside) -->
     <div class="plan-actions" v-if="planData.awaitingApproval">
       <template v-if="planData.planType === 'stage_complete'">
         <Button label="Continue to next stage" icon="pi pi-play" size="small" @click="approve('Approved. Continue to the next stage.')" />
         <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
       </template>
       <template v-else>
-        <Button
-          label="Approve"
-          icon="pi pi-check"
-          size="small"
-          @click="approve('Plan approved. Do NOT call propose_plan again. Start implementing Stage 1 immediately using write_file/edit_file. Call stage_complete(stageIndex=0) when Stage 1 is done, then continue each stage in sequence without pausing.')"
-        />
         <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
       </template>
     </div>

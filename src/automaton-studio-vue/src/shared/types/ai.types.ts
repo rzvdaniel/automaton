@@ -67,6 +67,8 @@ export interface StreamConversationRequest {
   resourceType?: string
   resourceId?: string
   language?: string
+  /** "plan" (read-only + propose_plan) or "agent" (write tools, default) */
+  mode?: string
 }
 
 // ============================================
