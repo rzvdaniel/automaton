@@ -180,8 +180,8 @@ public class PlanningTool : IMcpTool
                     ? $"Stage complete. Now implement Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
                     : "All stages are complete. Implementation is finished. STOP all tool calls immediately. Write a brief summary for the user and do nothing else.")
                 : isRefinement
-                    ? "Plan updated. Briefly tell the user what you changed in the plan (e.g. 'I've updated the plan to include a background image in Stage 2'). Do NOT start implementing."
-                    : "Plan submitted and is awaiting user approval. Stop here — output zero text.";
+                    ? "Plan updated successfully. You MUST now respond to the user with a brief message explaining what changed (e.g. 'I've added a footer section as Stage 4'). Do NOT call any more tools."
+                    : "Plan submitted. Do not output any text — the plan card is shown to the user automatically.";
 
             var result = new
             {
