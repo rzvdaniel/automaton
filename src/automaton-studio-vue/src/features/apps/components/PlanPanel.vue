@@ -89,8 +89,9 @@ const previousPlans = computed(() => props.planHistory.slice(0, -1))
 
 <style scoped>
 .plan-panel {
-  border-bottom: 1px solid var(--p-surface-border);
+  border-bottom: 2px solid var(--p-surface-border);
   font-size: 0.875rem;
+  background: color-mix(in srgb, var(--p-primary-500) 4%, var(--p-surface-ground));
 }
 
 .plan-panel-header {
