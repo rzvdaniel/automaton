@@ -7,14 +7,6 @@
         <span v-if="planHistory.length > 1" class="plan-version">v{{ planHistory.length }}</span>
       </div>
       <div class="plan-panel-actions">
-        <Button
-          v-if="showImplement"
-          label="Implement Plan"
-          icon="pi pi-play"
-          size="small"
-          class="implement-btn"
-          @click.stop="$emit('implement')"
-        />
         <i class="pi" :class="expanded ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
       </div>
     </div>
@@ -84,17 +76,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import Button from 'primevue/button'
 import type { PlanData } from '@/shared/types/ai.types'
 
 const props = defineProps<{
   planData: PlanData | null
   planHistory: PlanData[]
-  showImplement: boolean
-}>()
-
-defineEmits<{
-  (e: 'implement'): void
 }>()
 
 const expanded = ref(true)

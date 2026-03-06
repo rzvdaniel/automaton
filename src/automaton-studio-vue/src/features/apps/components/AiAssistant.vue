@@ -575,8 +575,6 @@ function implementPlan() {
       <PlanPanel
         :plan-data="currentPlan"
         :plan-history="planHistory"
-        :show-implement="pendingPlan && chatMode === 'plan'"
-        @implement="implementPlan"
       />
 
       <!-- Messages area -->
@@ -695,10 +693,10 @@ function implementPlan() {
           <div class="mode-toggle">
             <button
               class="mode-btn"
-              :class="{ active: chatMode === 'plan' }"
+              :class="{ active: chatMode === 'plan', 'implement-ready': pendingPlan && chatMode === 'plan' }"
               :disabled="isBusy"
-              @click="chatMode = 'plan'"
-            >Plan</button>
+              @click="pendingPlan && chatMode === 'plan' ? implementPlan() : chatMode = 'plan'"
+            >{{ pendingPlan && chatMode === 'plan' ? 'Implement Plan' : 'Plan' }}</button>
             <button
               class="mode-btn"
               :class="{ active: chatMode === 'agent' }"
@@ -1264,6 +1262,11 @@ function implementPlan() {
 
 .mode-btn.active {
   background: var(--p-primary-500);
+  color: #fff;
+}
+
+.mode-btn.implement-ready {
+  background: var(--p-green-500);
   color: #fff;
 }
 
