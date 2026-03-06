@@ -678,30 +678,22 @@ function implementPlan() {
 
       <!-- Input area -->
       <div class="input-area">
-        <!-- Mode toggle + Implement Plan button row -->
+        <!-- Mode toggle row -->
         <div class="mode-row">
-          <div class="mode-toggle" v-if="!pendingPlan">
+          <div class="mode-toggle">
+            <button
+              class="mode-btn"
+              :class="{ active: chatMode === 'plan' }"
+              :disabled="isBusy"
+              @click="pendingPlan && chatMode === 'plan' ? implementPlan() : chatMode = 'plan'"
+            >{{ pendingPlan && chatMode === 'plan' ? 'Implement Plan' : 'Plan' }}</button>
             <button
               class="mode-btn"
               :class="{ active: chatMode === 'agent' }"
               :disabled="isBusy"
               @click="chatMode = 'agent'"
             >Agent</button>
-            <button
-              class="mode-btn"
-              :class="{ active: chatMode === 'plan' }"
-              :disabled="isBusy"
-              @click="chatMode = 'plan'"
-            >Plan</button>
           </div>
-          <Button
-            v-if="pendingPlan && !isBusy"
-            label="Implement Plan"
-            icon="pi pi-play"
-            size="small"
-            class="implement-plan-btn"
-            @click="implementPlan"
-          />
         </div>
         <div class="flex gap-2">
           <InputText
@@ -1261,10 +1253,6 @@ function implementPlan() {
 .mode-btn.active {
   background: var(--p-primary-500);
   color: #fff;
-}
-
-.implement-plan-btn {
-  width: 100%;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */

@@ -62,43 +62,23 @@
       <p v-if="planData.stageSummary" class="stage-summary">{{ planData.stageSummary }}</p>
     </template>
 
-    <!-- Actions: only Refine for implementation plans (Approve is handled by "Implement Plan" button outside) -->
-    <div class="plan-actions" v-if="planData.awaitingApproval">
-      <template v-if="planData.planType === 'stage_complete'">
-        <Button label="Continue to next stage" icon="pi pi-play" size="small" @click="approve('Approved. Continue to the next stage.')" />
-        <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
-      </template>
-      <template v-else>
-        <Button label="Refine" icon="pi pi-pencil" severity="secondary" size="small" @click="toggleRefine" />
-      </template>
-    </div>
-
-    <!-- Refine input -->
-    <div v-if="showRefine" class="refine-area">
-      <InputText
-        v-model="refineText"
-        placeholder="Describe what to change..."
-        class="refine-input"
-        @keydown.enter="submitRefine"
-      />
-      <Button icon="pi pi-send" size="small" :disabled="!refineText.trim()" @click="submitRefine" />
+    <!-- Actions: stage_complete still has Continue/Stop; implementation plan has no buttons (see mode toggle) -->
+    <div class="plan-actions" v-if="planData.awaitingApproval && planData.planType === 'stage_complete'">
+      <Button label="Continue to next stage" icon="pi pi-play" size="small" @click="approve('Approved. Continue to the next stage.')" />
+      <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
 import type { PlanData } from '@/shared/types/ai.types'
 
 const props = defineProps<{
   planData: PlanData
   onSend: (message: string) => void
 }>()
-
-const showRefine = ref(false)
-const refineText = ref('')
 
 const planLabel = computed(() => {
   switch (props.planData.planType) {
@@ -118,18 +98,6 @@ const planIcon = computed(() => {
 
 function approve(message: string) {
   props.onSend(message)
-}
-
-function toggleRefine() {
-  showRefine.value = !showRefine.value
-  if (!showRefine.value) refineText.value = ''
-}
-
-function submitRefine() {
-  if (!refineText.value.trim()) return
-  props.onSend(refineText.value.trim())
-  refineText.value = ''
-  showRefine.value = false
 }
 </script>
 
@@ -295,16 +263,5 @@ details[open] > .plan-details-toggle::before {
   display: flex;
   gap: 6px;
   margin-top: 10px;
-}
-
-.refine-area {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.refine-input {
-  flex: 1;
-  font-size: 0.8rem;
 }
 </style>
