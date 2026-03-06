@@ -14,7 +14,8 @@ import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import PlanApprovalCard from './PlanApprovalCard.vue'
 import PlanPanel from './PlanPanel.vue'
-import type { ChatSession } from '@/shared/types/ai.types'
+import ToolOperationsGroup from './ToolOperationsGroup.vue'
+import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
 // Props
 const props = withDefaults(
@@ -121,6 +122,41 @@ const userInput = ref('')
 
 // Quick suggestions - use provided or empty array
 const displaySuggestions = computed(() => props.suggestions || [])
+
+// Group consecutive tool messages for collapsible display
+type MessageGroup =
+  | { type: 'user' | 'assistant'; message: ChatMessage }
+  | { type: 'tool-group'; messages: ChatMessage[]; id: string }
+
+const messageGroups = computed<MessageGroup[]>(() => {
+  const groups: MessageGroup[] = []
+  let toolBatch: ChatMessage[] = []
+
+  function flushTools() {
+    if (toolBatch.length > 0) {
+      groups.push({ type: 'tool-group', messages: [...toolBatch], id: `tg-${toolBatch[0].id}` })
+      toolBatch = []
+    }
+  }
+
+  for (const msg of messages.value) {
+    // Groupable: regular tool execution (not special cards like planApproval/instructionUpdate)
+    const isGroupable =
+      msg.role === 'assistant' &&
+      msg.toolName &&
+      msg.type !== 'planApproval' &&
+      msg.type !== 'instructionUpdate'
+
+    if (isGroupable) {
+      toolBatch.push(msg)
+    } else {
+      flushTools()
+      groups.push({ type: msg.role === 'user' ? 'user' : 'assistant', message: msg })
+    }
+  }
+  flushTools()
+  return groups
+})
 
 // Load providers and session on mount, auto-send initial prompt if provided
 onMounted(async () => {
@@ -598,13 +634,23 @@ function implementPlan() {
           </div>
         </div>
 
-        <!-- Messages: User in bubbles, AI in timeline -->
+        <!-- Messages: User in bubbles, AI in timeline, tools in collapsible groups -->
         <div v-else class="messages-container">
-          <!-- User messages as bubbles, AI messages as timeline -->
-          <template v-for="(message, index) in messages" :key="message.id">
+          <template v-for="(group, gIdx) in messageGroups" :key="group.type === 'tool-group' ? group.id : group.message.id">
             <!-- User message - Chat bubble -->
-            <div v-if="message.role === 'user'" class="user-message">
-              <div class="message-bubble">{{ message.content }}</div>
+            <div v-if="group.type === 'user'" class="user-message">
+              <div class="message-bubble">{{ group.message.content }}</div>
+            </div>
+
+            <!-- Tool operations group - Collapsible -->
+            <div v-else-if="group.type === 'tool-group'" class="timeline">
+              <div class="timeline-item has-tool" :class="{ 'is-last': gIdx === messageGroups.length - 1 && !isBusy }">
+                <div class="timeline-bullet tool">•</div>
+                <div v-if="gIdx < messageGroups.length - 1 || isBusy" class="timeline-connector"></div>
+                <div class="timeline-content">
+                  <ToolOperationsGroup :operations="group.messages" />
+                </div>
+              </div>
             </div>
 
             <!-- AI message - Timeline -->
@@ -612,38 +658,26 @@ function implementPlan() {
               <div
                 class="timeline-item"
                 :class="[
-                  { 'is-last': index === messages.length - 1 && !isBusy },
-                  message.toolName ? 'has-tool' : 'regular'
+                  { 'is-last': gIdx === messageGroups.length - 1 && !isBusy },
+                  'regular'
                 ]"
               >
-                <!-- Simple bullet point -->
-                <div class="timeline-bullet" :class="[message.toolName ? 'tool' : 'regular']">•</div>
-
-                <!-- Connector line (visible if more messages follow) -->
-                <div v-if="index < messages.length - 1 || isBusy" class="timeline-connector"></div>
-
-                <!-- Message content -->
+                <div class="timeline-bullet regular">•</div>
+                <div v-if="gIdx < messageGroups.length - 1 || isBusy" class="timeline-connector"></div>
                 <div class="timeline-content">
                   <!-- Plan approval card -->
                   <PlanApprovalCard
-                    v-if="message.type === 'planApproval' && message.planData"
-                    :plan-data="message.planData"
+                    v-if="group.message.type === 'planApproval' && group.message.planData"
+                    :plan-data="group.message.planData"
                     :on-send="(msg) => sendAiMessage(msg)"
                   />
                   <!-- Instruction update notification -->
-                  <div v-else-if="message.type === 'instructionUpdate'" class="instruction-notification">
+                  <div v-else-if="group.message.type === 'instructionUpdate'" class="instruction-notification">
                     <i class="pi pi-file-edit"></i>
-                    {{ message.instructionNotification || 'Instructions updated.' }}
-                  </div>
-                  <!-- Tool message: single-line name + status icon -->
-                  <div v-else-if="message.toolName" class="tool-call-line">
-                    <code class="tool-call-name">{{ message.toolName }}</code>
-                    <i v-if="message.toolStatus === 'executing'" class="pi pi-spin pi-spinner tool-call-icon executing"></i>
-                    <i v-else-if="message.toolStatus === 'completed'" class="pi pi-check tool-call-icon completed"></i>
-                    <i v-else-if="message.toolStatus === 'error'" class="pi pi-times tool-call-icon error"></i>
+                    {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
                   <!-- Regular AI message -->
-                  <div v-else class="message-text">{{ message.content }}</div>
+                  <div v-else class="message-text">{{ group.message.content }}</div>
                 </div>
               </div>
             </div>
