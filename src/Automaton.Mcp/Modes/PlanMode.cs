@@ -12,8 +12,10 @@ public sealed class PlanMode : IConversationMode
 
     public string SystemPromptSuffix =>
         "\n\n## CURRENT MODE: Plan\n" +
-        "You are in **plan mode**. Your only job is to discuss requirements and propose a plan using `propose_plan`.\n" +
-        "write_file, edit_file, delete_file and all other write tools are NOT available. Do not call them.";
+        "You are in **plan mode**. Discuss requirements and propose plans using `propose_plan`. That is all.\n" +
+        "write_file, edit_file, delete_file and all write tools are BLOCKED — calling them will fail every time.\n" +
+        "Do NOT retry blocked tools. Do NOT try to escape plan mode yourself.\n" +
+        "When the plan is ready and the user wants to implement, tell them: 'Click **Implement Plan** to start, or switch to Agent mode.'";
 
     /// <summary>Allow Read and Planning tools; block Write tools.</summary>
     public bool IsToolAllowed(McpTool tool) => tool.Capability != ToolCapability.Write;
