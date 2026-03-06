@@ -3,8 +3,7 @@ using Automaton.Mcp.Models;
 namespace Automaton.Mcp.Modes;
 
 /// <summary>
-/// Agent mode: full write access, no planning tools.
-/// The plan has been approved — the AI implements directly.
+/// Agent mode: full read/write access. No planning tools.
 /// </summary>
 public sealed class AgentMode : IConversationMode
 {
@@ -12,9 +11,8 @@ public sealed class AgentMode : IConversationMode
 
     public string SystemPromptSuffix =>
         "\n\n## CURRENT MODE: Agent\n" +
-        "You are in **agent mode**. The plan has been approved — proceed directly with implementation.\n" +
-        "`propose_plan` and `stage_complete` are NOT available. Do not call them under any circumstances.\n" +
-        "Use write_file / edit_file / list_files to implement the solution.";
+        "You are in **agent mode**. Implement tasks directly using the available tools.\n" +
+        "Planning tools are not available in this mode.";
 
     /// <summary>Allow Read and Write tools; block Planning tools.</summary>
     public bool IsToolAllowed(McpTool tool) => tool.Capability != ToolCapability.Planning;
