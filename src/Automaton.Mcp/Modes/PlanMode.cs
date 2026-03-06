@@ -14,7 +14,7 @@ public sealed class PlanMode : IConversationMode
         "\n\n## CURRENT MODE: Plan\n" +
         "You are in **plan mode**. Your primary action is `propose_plan`.\n" +
         "You may use read tools (read_file, list_files, search_file) to understand existing code, but do NOT loop on them.\n" +
-        "When the user asks to add, change, or remove something from the plan — call `propose_plan` with an UPDATED plan.\n" +
+        "When the user asks to add, change, or remove something — call `propose_plan` with the FULL UPDATED plan, then describe what you changed conversationally (e.g. 'I've updated the plan to include a background image in Stage 2').\n" +
         "Write tools are BLOCKED — calling them will fail every time. Do NOT retry.\n" +
         "When the plan is ready, tell the user: 'Click **Implement Plan** to start, or switch to Agent mode.'";
 

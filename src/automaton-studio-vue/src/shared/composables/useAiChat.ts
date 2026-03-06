@@ -50,11 +50,14 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const isInitializingModel = ref(false)
 
   // Session-scoped chat mode: 'plan' (read-only + propose_plan) or 'agent' (write tools)
-  // Defaults to 'plan' for first-time users; switches to 'agent' once sessions exist.
+  // Defaults to 'plan' for first-time users; only changed by explicit user action.
   const chatMode = ref<'plan' | 'agent'>('plan')
 
   // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
   const pendingPlan = ref(false)
+
+  // The latest plan proposed by the AI — rendered outside the chat in a persistent panel
+  const currentPlan = ref<import('../types/ai.types').PlanData | null>(null)
 
   // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
   const pendingAutoContinu = ref(false)
@@ -661,10 +664,15 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
       // Upgrade message type for special tools
       if (!isError) {
-        if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
+        if (toolMessage.toolName === 'propose_plan' && resultData?.planType === 'implementation') {
+          // Update the persistent plan panel (rendered outside chat)
+          currentPlan.value = resultData as import('../types/ai.types').PlanData
+          pendingPlan.value = true
+          // Don't convert inline message — it stays as a normal tool call line in the timeline
+        } else if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
+          // Non-implementation plan types (e.g. stage_complete with awaitingApproval) stay inline
           toolMessage.type = 'planApproval'
           toolMessage.planData = resultData as import('../types/ai.types').PlanData
-          pendingPlan.value = true
         } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
@@ -720,6 +728,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     currentProvider,
     chatMode,
     pendingPlan,
+    currentPlan,
 
     // Session state
     sessions,

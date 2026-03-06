@@ -13,6 +13,7 @@ import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import PlanApprovalCard from './PlanApprovalCard.vue'
+import PlanPanel from './PlanPanel.vue'
 import type { ChatSession } from '@/shared/types/ai.types'
 
 // Props
@@ -65,6 +66,7 @@ const {
   deleteSession,
   chatMode,
   pendingPlan,
+  currentPlan,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -380,6 +382,7 @@ function handleKeyPress(event: KeyboardEvent) {
 function implementPlan() {
   chatMode.value = 'agent'
   pendingPlan.value = false
+  // Keep currentPlan visible during implementation so user can reference it
 
   const systemPrompt =
     props.systemPrompt ||
@@ -567,6 +570,13 @@ function implementPlan() {
         {{ error }}
       </div>
 
+      <!-- Persistent plan panel (above chat messages) -->
+      <PlanPanel
+        :plan-data="currentPlan"
+        :show-implement="pendingPlan && chatMode === 'plan'"
+        @implement="implementPlan"
+      />
+
       <!-- Messages area -->
       <div class="messages-area">
         <!-- Empty state -->
@@ -685,8 +695,8 @@ function implementPlan() {
               class="mode-btn"
               :class="{ active: chatMode === 'plan' }"
               :disabled="isBusy"
-              @click="pendingPlan && chatMode === 'plan' ? implementPlan() : chatMode = 'plan'"
-            >{{ pendingPlan && chatMode === 'plan' ? 'Implement Plan' : 'Plan' }}</button>
+              @click="chatMode = 'plan'"
+            >Plan</button>
             <button
               class="mode-btn"
               :class="{ active: chatMode === 'agent' }"
