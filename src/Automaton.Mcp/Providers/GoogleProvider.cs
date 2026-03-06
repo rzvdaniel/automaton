@@ -244,7 +244,14 @@ public class GoogleProvider : IAiProvider
             }
 
             if (stopForPlanGate)
-                break;
+            {
+                // In plan mode, let the loop continue so the model can produce
+                // conversational text after the tool result (e.g. "I've added a footer").
+                // Write tools are blocked by the mode filter, so there's no risk.
+                var isInPlanMode = request.Mode == "plan";
+                if (!isInPlanMode)
+                    break;
+            }
         }
 
         return responseBuilder.ToString().Trim();

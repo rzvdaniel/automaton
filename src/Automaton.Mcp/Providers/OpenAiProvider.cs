@@ -343,8 +343,9 @@ public class OpenAiProvider : IAiProvider
                     break;
                 }
 
-                // Plan gate: tool result already emitted via SSE — stop here.
-                if (stopForPlanGate)
+                // Plan gate: in agent mode, stop after plan proposal.
+                // In plan mode, let the loop continue so the model can respond conversationally.
+                if (stopForPlanGate && request.Mode != "plan")
                     break;
             }
         }

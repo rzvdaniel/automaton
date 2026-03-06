@@ -220,12 +220,15 @@ public class AnthropicProvider : IAiProvider
                     break;
                 }
 
-                // Plan gate: tool result already emitted via SSE — stop here so the AI
-                // cannot generate a follow-up text summary after the plan card.
+                // Plan gate: in agent mode, stop after plan proposal so the AI
+                // cannot start implementing without user approval.
+                // In plan mode, let the loop continue so the model can produce
+                // conversational text after the tool result (e.g. "I've added a footer").
                 if (stopForPlanGate)
                 {
                     messages.Add(new Message { Role = RoleType.User, Content = toolResults });
-                    break;
+                    if (request.Mode != "plan")
+                        break;
                 }
 
                 // Add user message with tool results
