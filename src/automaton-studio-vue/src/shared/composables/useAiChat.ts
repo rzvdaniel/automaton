@@ -49,9 +49,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Session-scoped chat mode: 'plan' (read-only + propose_plan) or 'agent' (write tools, default)
-  // Stored per-session using activeSession.id as the key
-  const chatMode = ref<'plan' | 'agent'>('agent')
+  // Session-scoped chat mode: 'plan' (read-only + propose_plan) or 'agent' (write tools)
+  // Defaults to 'plan' for first-time users; switches to 'agent' once sessions exist.
+  const chatMode = ref<'plan' | 'agent'>('plan')
 
   // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
   const pendingPlan = ref(false)
@@ -189,6 +189,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       const active = sessions.value.find((s) => s.isActive)
       if (active) {
         activeSession.value = active
+      }
+
+      // If prior sessions exist the user has already built something — default to agent mode.
+      // For a brand-new app (no sessions) we keep the 'plan' default.
+      if (sessions.value.length > 0) {
+        chatMode.value = 'agent'
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load sessions'
