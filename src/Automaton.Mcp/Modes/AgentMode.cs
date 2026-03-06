@@ -3,7 +3,7 @@ using Automaton.Mcp.Models;
 namespace Automaton.Mcp.Modes;
 
 /// <summary>
-/// Agent mode: unrestricted access to all tools.
+/// Agent mode: full read/write access, no planning tools.
 /// </summary>
 public sealed class AgentMode : IConversationMode
 {
@@ -13,6 +13,6 @@ public sealed class AgentMode : IConversationMode
 
     public int MaxToolIterations => 20;
 
-    /// <summary>All tools are allowed in agent mode.</summary>
-    public bool IsToolAllowed(McpTool tool) => true;
+    /// <summary>Allow Read and Write tools; block Planning tools.</summary>
+    public bool IsToolAllowed(McpTool tool) => tool.Capability != ToolCapability.Planning;
 }
