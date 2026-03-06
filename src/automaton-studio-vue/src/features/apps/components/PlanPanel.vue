@@ -4,6 +4,7 @@
       <div class="plan-panel-title">
         <i class="pi pi-list"></i>
         <span>{{ planData.title }}</span>
+        <span v-if="planHistory.length > 1" class="plan-version">v{{ planHistory.length }}</span>
       </div>
       <div class="plan-panel-actions">
         <Button
@@ -65,17 +66,30 @@
           </ul>
         </div>
       </details>
+
+      <!-- Previous plan versions -->
+      <details v-if="previousPlans.length > 0" class="plan-details plan-history">
+        <summary class="plan-details-toggle">{{ previousPlans.length }} previous {{ previousPlans.length === 1 ? 'version' : 'versions' }}</summary>
+        <div v-for="(plan, i) in previousPlans" :key="i" class="plan-history-item">
+          <div class="plan-history-header">
+            <span class="plan-version-label">v{{ i + 1 }}</span>
+            <span class="plan-history-title">{{ plan.title }}</span>
+          </div>
+          <p class="plan-history-summary">{{ plan.summary }}</p>
+        </div>
+      </details>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import type { PlanData } from '@/shared/types/ai.types'
 
-defineProps<{
+const props = defineProps<{
   planData: PlanData | null
+  planHistory: PlanData[]
   showImplement: boolean
 }>()
 
@@ -84,6 +98,7 @@ defineEmits<{
 }>()
 
 const expanded = ref(true)
+const previousPlans = computed(() => props.planHistory.slice(0, -1))
 </script>
 
 <style scoped>
@@ -236,5 +251,48 @@ const expanded = ref(true)
 }
 details[open] > .plan-details-toggle::before {
   transform: rotate(90deg);
+}
+
+.plan-version {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--p-primary-500) 15%, transparent);
+  color: var(--p-primary-500);
+}
+
+.plan-history-item {
+  padding: 6px 0;
+  border-top: 1px solid var(--p-surface-border);
+}
+
+.plan-history-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.plan-version-label {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 600;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+}
+
+.plan-history-title {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--p-text-color);
+}
+
+.plan-history-summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.4;
 }
 </style>

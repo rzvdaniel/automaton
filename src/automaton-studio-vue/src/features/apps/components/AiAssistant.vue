@@ -67,6 +67,7 @@ const {
   chatMode,
   pendingPlan,
   currentPlan,
+  planHistory,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -573,6 +574,7 @@ function implementPlan() {
       <!-- Persistent plan panel (above chat messages) -->
       <PlanPanel
         :plan-data="currentPlan"
+        :plan-history="planHistory"
         :show-implement="pendingPlan && chatMode === 'plan'"
         @implement="implementPlan"
       />

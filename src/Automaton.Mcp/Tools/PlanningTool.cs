@@ -128,6 +128,7 @@ public class PlanningTool : IMcpTool
 
             string planFilePath;
             string markdownContent;
+            var isRefinement = false;
 
             switch (planType)
             {
@@ -135,9 +136,11 @@ public class PlanningTool : IMcpTool
                     planFilePath = ".plans/IMPLEMENTATION.md";
                     var isInPlanMode = context?.TryGetValue("mode", out var modeVal) == true
                                       && string.Equals(modeVal?.ToString(), "plan", StringComparison.OrdinalIgnoreCase);
+                    var existingPlan = await fs.ReadFileAsync(planFilePath);
+                    isRefinement = existingPlan != null;
                     // In plan mode, allow overwriting — the user is refining the plan.
                     // In agent mode, block duplicate plans — the model should be implementing, not re-planning.
-                    if (!isInPlanMode && await fs.ReadFileAsync(planFilePath) != null)
+                    if (!isInPlanMode && isRefinement)
                     {
                         return new McpToolResult
                         {
@@ -178,7 +181,9 @@ public class PlanningTool : IMcpTool
                 ? (nextStageInfo.HasValue
                     ? $"Stage complete. Now implement Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
                     : "All stages are complete. Implementation is finished. Do NOT call propose_plan or stage_complete again. Write a brief summary for the user.")
-                : "Plan submitted and is awaiting user approval. Stop here — output zero text.";
+                : isRefinement
+                    ? "Plan updated. Briefly tell the user what you changed in the plan (e.g. 'I've updated the plan to include a background image in Stage 2'). Do NOT start implementing."
+                    : "Plan submitted and is awaiting user approval. Stop here — output zero text.";
 
             var result = new
             {
