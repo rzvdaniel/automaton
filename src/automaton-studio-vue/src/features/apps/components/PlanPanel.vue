@@ -75,8 +75,9 @@ const expanded = ref(true)
 <style scoped>
 .plan-panel {
   border-bottom: 2px solid var(--p-surface-border);
+  border-left: 3px solid var(--p-green-500);
   font-size: 0.875rem;
-  background: color-mix(in srgb, var(--p-primary-500) 4%, var(--p-surface-ground));
+  background: color-mix(in srgb, var(--p-green-500) 6%, var(--p-surface-ground));
 }
 
 .plan-panel-header {
