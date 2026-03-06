@@ -133,8 +133,11 @@ public class PlanningTool : IMcpTool
             {
                 case "implementation":
                     planFilePath = ".plans/IMPLEMENTATION.md";
-                    // Guard: reject if implementation plan already exists (model skipped the read_file check).
-                    if (await fs.ReadFileAsync(planFilePath) != null)
+                    var isInPlanMode = context?.TryGetValue("mode", out var modeVal) == true
+                                      && string.Equals(modeVal?.ToString(), "plan", StringComparison.OrdinalIgnoreCase);
+                    // In plan mode, allow overwriting — the user is refining the plan.
+                    // In agent mode, block duplicate plans — the model should be implementing, not re-planning.
+                    if (!isInPlanMode && await fs.ReadFileAsync(planFilePath) != null)
                     {
                         return new McpToolResult
                         {

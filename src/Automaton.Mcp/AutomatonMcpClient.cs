@@ -253,8 +253,14 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
             var arguments = JsonDocument.Parse(string.IsNullOrEmpty(argumentsJson) ? "{}" : argumentsJson);
 
+            // Inject conversation mode into tool context so tools can adapt behavior
+            var toolContext = request.Context != null
+                ? new Dictionary<string, object>(request.Context)
+                : new Dictionary<string, object>();
+            toolContext["mode"] = request.Mode ?? "agent";
+
             var contextId = request.Context?.GetValueOrDefault("contextId")?.ToString();
-            var result = await _toolProvider.ExecuteToolAsync(toolName, arguments.RootElement, contextId, request.Context);
+            var result = await _toolProvider.ExecuteToolAsync(toolName, arguments.RootElement, contextId, toolContext);
 
             if (result.Success)
             {
