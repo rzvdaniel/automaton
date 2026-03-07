@@ -348,8 +348,22 @@ public class GoogleProvider : IAiProvider
         {
             if (usage.TryGetProperty("promptTokenCount", out var inp))
                 chunk.InputTokens = inp.GetInt32();
+
+            // candidatesTokenCount = text output tokens
+            // thoughtsTokenCount = reasoning tokens (thinking models)
+            // Sum both to get the full output token count charged by the API
+            var candidateTokens = 0;
+            var thoughtTokens = 0;
             if (usage.TryGetProperty("candidatesTokenCount", out var outp))
-                chunk.OutputTokens = outp.GetInt32();
+                candidateTokens = outp.GetInt32();
+            if (usage.TryGetProperty("thoughtsTokenCount", out var thoughts_))
+                thoughtTokens = thoughts_.GetInt32();
+            if (candidateTokens > 0 || thoughtTokens > 0)
+                chunk.OutputTokens = candidateTokens + thoughtTokens;
+
+            _logger.LogDebug("Gemini usage: prompt={Input} candidates={Candidates} thoughts={Thoughts} total={Total}",
+                chunk.InputTokens, candidateTokens, thoughtTokens,
+                usage.TryGetProperty("totalTokenCount", out var tot) ? tot.GetInt32() : (int?)null);
         }
 
         if (root.TryGetProperty("modelVersion", out var mv))
