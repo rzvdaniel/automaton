@@ -453,13 +453,24 @@ function implementPlan() {
             <span class="font-semibold">AI Assistant</span>
           </div>
           
-          <Button
-            v-tooltip.top="'New session'"
-            icon="pi pi-plus"
-            size="small"
-            text
-            @click="showSessionDialog = true"
-          />
+          <div class="flex align-items-center gap-2">
+            <!-- Model Selector -->
+            <Select
+              v-if="availableModels.length > 0"
+              v-model="selectedModel"
+              :options="availableModels"
+              placeholder="Model"
+              size="small"
+              class="model-select"
+            />
+            <Button
+              v-tooltip.top="'New session'"
+              icon="pi pi-plus"
+              size="small"
+              text
+              @click="showSessionDialog = true"
+            />
+          </div>
         </div>
         <div class="flex align-items-center gap-2 mt-2">
           <Button
