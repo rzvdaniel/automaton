@@ -56,172 +56,7 @@ public class AnthropicProvider : IAiProvider
     {
         try
         {
-            // Create Anthropic client with API key, then inject our streaming HttpClient
-            // so that long-running streaming calls don't hit the default 100-second timeout.
-            var client = new AnthropicClient(request.ApiKey);
-            AnthropicHttpClientProperty?.SetValue(client, StreamingHttpClient);
-
-            // Build the initial messages
-            var messages = BuildMessages(request);
-
-            // Build the tools list
-            var anthropicTools = BuildTools(tools);
-
-            // Handle iterative conversation with tool calls
-            var responseBuilder = new StringBuilder();
-
-            // Safety limits to prevent infinite loops (from user settings or defaults)
-            var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
-            var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
-            var iterationCount = 0;
-            var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
-
-            while (true)
-            {
-                // Check iteration limit
-                iterationCount++;
-                if (iterationCount > maxIterations)
-                {
-                    _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
-                    responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
-                    break;
-                }
-                // Create the message parameters
-                var messageParams = new MessageParameters
-                {
-                    Model = request.Model ?? Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet,
-                    MaxTokens = 4096,
-                    System = string.IsNullOrEmpty(request.SystemPrompt) ? null : new List<SystemMessage> { new SystemMessage(request.SystemPrompt) },
-                    Messages = messages,
-                    Tools = anthropicTools.Count > 0 ? anthropicTools : null,
-                    Stream = true
-                };
-
-                // Stream the response
-                var streamResult = await StreamResponseAsync(
-                    client, messageParams, request.ConversationId, cancellationToken);
-
-                // If there's text content, add it to the response
-                if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
-                {
-                    responseBuilder.AppendLine(streamResult.TextContent);
-                }
-
-                // If the model stopped normally (no tool use), we're done
-                if (streamResult.StopReason != "tool_use" || !streamResult.ToolUseBlocks.Any())
-                {
-                    break;
-                }
-
-                // Add assistant message with tool use blocks to conversation
-                var assistantContent = new List<ContentBase>();
-
-                if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
-                {
-                    assistantContent.Add(new TextContent { Text = streamResult.TextContent });
-                }
-
-                foreach (var toolUse in streamResult.ToolUseBlocks)
-                {
-                    assistantContent.Add(new ToolUseContent
-                    {
-                        Id = toolUse.Id,
-                        Name = toolUse.Name,
-                        // Anthropic API requires Input to be non-null; use empty object if null
-                        Input = toolUse.Input ?? JsonNode.Parse("{}")
-                    });
-                }
-
-                messages.Add(new Message
-                {
-                    Role = RoleType.Assistant,
-                    Content = assistantContent
-                });
-
-                // Execute each tool and collect results
-                var toolResults = new List<ContentBase>();
-                var shouldStopDueToFailures = false;
-                var planGate = new PlanGateTracker();
-
-                foreach (var toolUse in streamResult.ToolUseBlocks)
-                {
-                    var argsJson = toolUse.Input != null ? JsonSerializer.Serialize(toolUse.Input) : "{}";
-
-                    // Emit tool call started event
-                    EmitToolCallStarted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson);
-
-                    // Execute the tool
-                    var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
-
-                    planGate.CheckToolResult(toolUse.Name, toolResult);
-
-                    // Track consecutive failures per tool
-                    var isFailure = toolResult.StartsWith("Tool execution failed:") ||
-                                   toolResult.StartsWith("Error executing tool") ||
-                                   toolResult.Contains("A second operation was started");
-
-                    if (isFailure)
-                    {
-                        consecutiveFailures.TryGetValue(toolUse.Name, out var currentFailures);
-                        consecutiveFailures[toolUse.Name] = currentFailures + 1;
-
-                        if (consecutiveFailures[toolUse.Name] >= maxConsecutiveFailures)
-                        {
-                            _logger.LogWarning(
-                                "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
-                                toolUse.Name, consecutiveFailures[toolUse.Name]);
-
-                            toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolUse.Name]} times consecutively. " +
-                                         "Please stop calling this tool and inform the user about the issue.]";
-                            shouldStopDueToFailures = true;
-                        }
-                    }
-                    else
-                    {
-                        // Reset failure count on success
-                        consecutiveFailures[toolUse.Name] = 0;
-                    }
-
-                    // Emit tool execution completed
-                    EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
-
-                    // Add tool result - Content can be a string or List<ContentBase>
-                    toolResults.Add(new ToolResultContent
-                    {
-                        ToolUseId = toolUse.Id,
-                        Content = new List<ContentBase> { new TextContent { Text = toolResult } }
-                    });
-                }
-
-                // If we hit max failures, add a message and break
-                if (shouldStopDueToFailures)
-                {
-                    responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
-                    // Still add the tool results so the AI sees the final error
-                    messages.Add(new Message
-                    {
-                        Role = RoleType.User,
-                        Content = toolResults
-                    });
-                    break;
-                }
-
-                if (planGate.IsGated)
-                {
-                    messages.Add(new Message { Role = RoleType.User, Content = toolResults });
-                    if (planGate.ShouldBreakLoop(request.Mode))
-                        break;
-                }
-
-                // Add user message with tool results
-                messages.Add(new Message
-                {
-                    Role = RoleType.User,
-                    Content = toolResults
-                });
-            }
-
-            return responseBuilder.ToString().Trim();
+            return await CallAnthropicAsync(request, tools, executeToolAsync, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -246,6 +81,180 @@ public class AnthropicProvider : IAiProvider
 
             throw;
         }
+    }
+
+    private async Task<string> CallAnthropicAsync(
+        ConversationRequest request,
+        IEnumerable<ProviderTool> tools,
+        Func<string, string, string, Task<string>> executeToolAsync,
+        CancellationToken cancellationToken)
+    {
+        // Create Anthropic client with API key, then inject our streaming HttpClient
+        // so that long-running streaming calls don't hit the default 100-second timeout.
+        var client = new AnthropicClient(request.ApiKey);
+        AnthropicHttpClientProperty?.SetValue(client, StreamingHttpClient);
+
+        // Build the initial messages
+        var messages = BuildMessages(request);
+
+        // Build the tools list
+        var anthropicTools = BuildTools(tools);
+
+        // Handle iterative conversation with tool calls
+        var responseBuilder = new StringBuilder();
+
+        // Safety limits to prevent infinite loops (from user settings or defaults)
+        var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
+        var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
+        var iterationCount = 0;
+        var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
+
+        while (true)
+        {
+            // Check iteration limit
+            iterationCount++;
+            if (iterationCount > maxIterations)
+            {
+                _logger.LogWarning("Conversation exceeded maximum iterations ({MaxIterations}), stopping", maxIterations);
+                responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
+                break;
+            }
+            // Create the message parameters
+            var messageParams = new MessageParameters
+            {
+                Model = request.Model ?? Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet,
+                MaxTokens = 4096,
+                System = string.IsNullOrEmpty(request.SystemPrompt) ? null : new List<SystemMessage> { new SystemMessage(request.SystemPrompt) },
+                Messages = messages,
+                Tools = anthropicTools.Count > 0 ? anthropicTools : null,
+                Stream = true
+            };
+
+            // Stream the response
+            var streamResult = await StreamResponseAsync(
+                client, messageParams, request.ConversationId, cancellationToken);
+
+            // If there's text content, add it to the response
+            if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
+            {
+                responseBuilder.AppendLine(streamResult.TextContent);
+            }
+
+            // If the model stopped normally (no tool use), we're done
+            if (streamResult.StopReason != "tool_use" || !streamResult.ToolUseBlocks.Any())
+            {
+                break;
+            }
+
+            // Add assistant message with tool use blocks to conversation
+            var assistantContent = new List<ContentBase>();
+
+            if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
+            {
+                assistantContent.Add(new TextContent { Text = streamResult.TextContent });
+            }
+
+            foreach (var toolUse in streamResult.ToolUseBlocks)
+            {
+                assistantContent.Add(new ToolUseContent
+                {
+                    Id = toolUse.Id,
+                    Name = toolUse.Name,
+                    // Anthropic API requires Input to be non-null; use empty object if null
+                    Input = toolUse.Input ?? JsonNode.Parse("{}")
+                });
+            }
+
+            messages.Add(new Message
+            {
+                Role = RoleType.Assistant,
+                Content = assistantContent
+            });
+
+            // Execute each tool and collect results
+            var toolResults = new List<ContentBase>();
+            var shouldStopDueToFailures = false;
+            var planGate = new PlanGateTracker();
+
+            foreach (var toolUse in streamResult.ToolUseBlocks)
+            {
+                var argsJson = toolUse.Input != null ? JsonSerializer.Serialize(toolUse.Input) : "{}";
+
+                // Emit tool call started event
+                EmitToolCallStarted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson);
+
+                // Execute the tool
+                var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
+
+                planGate.CheckToolResult(toolUse.Name, toolResult);
+
+                // Track consecutive failures per tool
+                var isFailure = toolResult.StartsWith("Tool execution failed:") ||
+                               toolResult.StartsWith("Error executing tool") ||
+                               toolResult.Contains("A second operation was started");
+
+                if (isFailure)
+                {
+                    consecutiveFailures.TryGetValue(toolUse.Name, out var currentFailures);
+                    consecutiveFailures[toolUse.Name] = currentFailures + 1;
+
+                    if (consecutiveFailures[toolUse.Name] >= maxConsecutiveFailures)
+                    {
+                        _logger.LogWarning(
+                            "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
+                            toolUse.Name, consecutiveFailures[toolUse.Name]);
+
+                        toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolUse.Name]} times consecutively. " +
+                                     "Please stop calling this tool and inform the user about the issue.]";
+                        shouldStopDueToFailures = true;
+                    }
+                }
+                else
+                {
+                    // Reset failure count on success
+                    consecutiveFailures[toolUse.Name] = 0;
+                }
+
+                // Emit tool execution completed
+                EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
+
+                // Add tool result - Content can be a string or List<ContentBase>
+                toolResults.Add(new ToolResultContent
+                {
+                    ToolUseId = toolUse.Id,
+                    Content = new List<ContentBase> { new TextContent { Text = toolResult } }
+                });
+            }
+
+            // If we hit max failures, add a message and break
+            if (shouldStopDueToFailures)
+            {
+                responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
+                // Still add the tool results so the AI sees the final error
+                messages.Add(new Message
+                {
+                    Role = RoleType.User,
+                    Content = toolResults
+                });
+                break;
+            }
+
+            if (planGate.IsGated)
+            {
+                messages.Add(new Message { Role = RoleType.User, Content = toolResults });
+                if (planGate.ShouldBreakLoop(request.Mode))
+                    break;
+            }
+
+            // Add user message with tool results
+            messages.Add(new Message
+            {
+                Role = RoleType.User,
+                Content = toolResults
+            });
+        }
+
+        return responseBuilder.ToString().Trim();
     }
 
     private List<Message> BuildMessages(ConversationRequest request)
