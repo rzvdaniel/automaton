@@ -246,6 +246,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           type: mapMessageType(m.messageType),
           timestamp: new Date(m.createdAt || Date.now()),
           toolName: m.metadata ? parseToolMetadata(m.metadata)?.toolName : undefined,
+          toolArgs: m.metadata ? parseToolMetadata(m.metadata)?.arguments : undefined,
           toolStatus: m.messageType === 'ToolExecution' ? 'completed' : undefined,
         }))
     } catch (err) {
