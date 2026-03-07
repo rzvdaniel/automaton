@@ -51,6 +51,11 @@ public class GoogleProvider : IAiProvider
         {
             return await CallGeminiAsync(request, tools, executeToolAsync, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Client cancelled the request — not an error, don't emit to conversation
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling Google Gemini API");

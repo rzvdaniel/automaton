@@ -223,6 +223,11 @@ public class AnthropicProvider : IAiProvider
 
             return responseBuilder.ToString().Trim();
         }
+        catch (OperationCanceledException)
+        {
+            // Client cancelled the request — not an error, don't emit to conversation
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling Anthropic API with MCP tools");

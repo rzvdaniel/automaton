@@ -41,6 +41,11 @@ public class OpenAiProvider : IAiProvider
         {
             return await CallResponsesAsync(request, tools, executeToolAsync, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // Client cancelled the request — not an error, don't emit to conversation
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling OpenAI API with MCP tools");
