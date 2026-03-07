@@ -11,6 +11,38 @@ import type {
   AppChatStats,
 } from '@/shared/types/ai.types'
 
+function parseMetadata(metadata: string | null | undefined): any {
+  if (!metadata) return null
+  try { return JSON.parse(metadata) } catch { return null }
+}
+
+function mapMessageType(serverType: string | undefined): ChatMessage['type'] {
+  const map: Record<string, ChatMessage['type']> = {
+    Text: 'text',
+    ToolExecution: 'toolExecution',
+    OperationComplete: 'codeSuccess',
+    CodeError: 'codeError',
+  }
+  return serverType ? (map[serverType] ?? 'text') : 'text'
+}
+
+function mapServerMessage(m: any): ChatMessage {
+  const meta = parseMetadata(m.metadata)
+  return {
+    id: m.id || crypto.randomUUID(),
+    role: m.role,
+    content: m.content,
+    type: mapMessageType(m.messageType),
+    timestamp: new Date(m.createdAt || Date.now()),
+    toolName: meta?.toolName,
+    toolArgs: meta?.arguments,
+    toolStatus: m.messageType === 'ToolExecution' ? 'completed' : undefined,
+    inputTokens: m.inputTokens,
+    outputTokens: m.outputTokens,
+    model: m.model,
+  }
+}
+
 export const aiChatHistoryService = {
   /**
    * Get all sessions for a resource
@@ -42,7 +74,7 @@ export const aiChatHistoryService = {
     const response = await axiosInstance.get(
       `/api/AiChatHistory/sessions/${sessionId}/messages`,
     )
-    return response.data
+    return (response.data as any[]).map(mapServerMessage)
   },
 
   /**
