@@ -41,6 +41,7 @@ const emit = defineEmits<{
   (e: 'toolExecuted', toolName: string, args: any, result?: any): void
   (e: 'sessionCreated'): void
   (e: 'chatMessageSent'): void
+  (e: 'sessionNameGenerated', name: string): void
 }>()
 
 // AI Chat composable with tool execution callback
@@ -400,6 +401,8 @@ async function generateAndUpdateSessionName(messageContent: string) {
   // Update session title
   if (activeSession.value && sessionName !== 'Generating...') {
     await updateSessionTitle(activeSession.value.id, sessionName)
+    // Notify parent so it can use the AI-generated name (e.g., update app name)
+    emit('sessionNameGenerated', sessionName)
   }
 }
 

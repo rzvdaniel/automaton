@@ -506,6 +506,21 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Update the name of the current app
+   */
+  async function updateAppName(name: string): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      await appsService.updateSettings(currentApp.value.id, { name })
+      currentApp.value = { ...currentApp.value, name }
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err)
+      throw err
+    }
+  }
+
+  /**
    * Update the execution runner for the current app
    */
   async function updateAppRunner(runnerId: string | null): Promise<void> {
@@ -765,6 +780,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     publishApp,
     unpublishApp,
     deployBackend,
+    updateAppName,
     updateAppRunner,
     refreshFileTree,
     reloadFile,
