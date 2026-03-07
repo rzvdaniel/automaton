@@ -34,13 +34,14 @@ public class AiAppConversationController : AiConversationControllerBase
         IOptions<AiProvidersConfig> aiProvidersConfig,
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
+        ITokenBudgetService tokenBudgetService,
         AppMcpToolProvider toolProvider,
         IAppSystemPromptBuilder promptBuilder,
         IPromptClassifierService promptClassifier,
         AppInstructionInjector instructionInjector,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
-               rateLimitService, providerMetadataService, logger)
+               rateLimitService, providerMetadataService, tokenBudgetService, logger)
     {
         _toolProvider         = toolProvider;
         _promptBuilder        = promptBuilder;

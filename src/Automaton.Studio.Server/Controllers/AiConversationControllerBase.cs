@@ -28,6 +28,7 @@ public abstract class AiConversationControllerBase : BaseController
     protected readonly AiProvidersConfig _aiProvidersConfig;
     protected readonly ISystemAiRateLimitService _rateLimitService;
     protected readonly AiProviderMetadataService _providerMetadataService;
+    protected readonly ITokenBudgetService _tokenBudgetService;
     protected readonly ILogger _logger;
 
     protected AiConversationControllerBase(
@@ -37,6 +38,7 @@ public abstract class AiConversationControllerBase : BaseController
         IOptions<AiProvidersConfig> aiProvidersConfig,
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
+        ITokenBudgetService tokenBudgetService,
         ILogger logger)
     {
         _mcpClient = mcpClient;
@@ -45,6 +47,7 @@ public abstract class AiConversationControllerBase : BaseController
         _aiProvidersConfig = aiProvidersConfig.Value;
         _rateLimitService = rateLimitService;
         _providerMetadataService = providerMetadataService;
+        _tokenBudgetService = tokenBudgetService;
         _logger = logger;
     }
 
@@ -90,6 +93,9 @@ public abstract class AiConversationControllerBase : BaseController
                 await WriteErrorEvent($"No active model configured for provider '{provider}'.");
                 return;
             }
+
+            // Downgrade model if user has exceeded their monthly token allowance
+            model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 
             var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
             if (string.IsNullOrEmpty(apiKey))

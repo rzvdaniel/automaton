@@ -13,16 +13,19 @@ public class AiChatHistoryService : IAiChatHistoryService
     private readonly ApplicationDbContext dataContext;
     private readonly AppVersionService appVersionService;
     private readonly ISystemAiService systemAiService;
+    private readonly ITokenBudgetService tokenBudgetService;
     private readonly Serilog.ILogger logger;
 
     public AiChatHistoryService(
         ApplicationDbContext dataContext, 
         AppVersionService appVersionService,
-        ISystemAiService systemAiService)
+        ISystemAiService systemAiService,
+        ITokenBudgetService tokenBudgetService)
     {
         this.dataContext = dataContext;
         this.appVersionService = appVersionService;
         this.systemAiService = systemAiService;
+        this.tokenBudgetService = tokenBudgetService;
         this.logger = Serilog.Log.ForContext<AiChatHistoryService>();
     }
 
@@ -574,6 +577,10 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
+            // Record usage against the user's monthly token budget
+            if (request.InputTokens.HasValue || request.OutputTokens.HasValue)
+                await tokenBudgetService.RecordUsageAsync(userId, request.InputTokens ?? 0, request.OutputTokens ?? 0);
+
             return new ChatMessageDto
             {
                 Id = messageEntity.Id,
@@ -721,6 +728,8 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             session.UpdatedAt = DateTime.UtcNow;
             await dataContext.SaveChangesAsync();
+
+            await tokenBudgetService.RecordUsageAsync(userId, inputTokens ?? 0, outputTokens ?? 0);
         }
         catch (Exception ex)
         {

@@ -346,6 +346,7 @@ services.AddAutomatonMcpClient();
 
 // AI Chat History Service
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
+services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ITokenBudgetService, Automaton.Studio.Server.Services.TokenBudgetService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();

@@ -73,6 +73,9 @@ namespace Automaton.Studio.Server.Data
         // User Settings
         public virtual DbSet<UserSetting> UserSettings { get; set; }
 
+        // Token budget
+        public virtual DbSet<UserTokenAllowance> UserTokenAllowances { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // No-op, configuration is handled by DI
@@ -885,6 +888,27 @@ namespace Automaton.Studio.Server.Data
                     .WithMany()
                     .HasForeignKey(e => e.InvitedBy)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Token Budget
+            modelBuilder.Entity<UserTokenAllowance>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.MonthlyTokenLimit).IsRequired().HasDefaultValue(1_000_000);
+                entity.Property(e => e.CurrentMonthTokens).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CurrentMonth).IsRequired();
+                entity.Property(e => e.CurrentYear).IsRequired();
+                entity.Property(e => e.OverageAction).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // One row per user
+                entity.HasIndex(e => e.UserId).IsUnique();
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
 

@@ -1676,6 +1676,47 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("UserSettings");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserTokenAllowance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("CurrentMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CurrentMonthTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("CurrentYear")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MonthlyTokenLimit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1000000);
+
+                    b.Property<string>("OverageAction")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("UserTokenAllowances");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2423,6 +2464,17 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("SensitiveVariableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserTokenAllowance", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
