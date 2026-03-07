@@ -141,7 +141,7 @@ public class AnthropicProvider : IAiProvider
                 // Execute each tool and collect results
                 var toolResults = new List<ContentBase>();
                 var shouldStopDueToFailures = false;
-                var stopForPlanGate = false;
+                var planGate = new PlanGateTracker();
 
                 foreach (var toolUse in streamResult.ToolUseBlocks)
                 {
@@ -153,21 +153,7 @@ public class AnthropicProvider : IAiProvider
                     // Execute the tool
                     var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
 
-                    // Plan gate: if propose_plan returns awaitingApproval, stop the loop
-                    // so the AI has no chance to write a text summary after the plan card.
-                    if (toolUse.Name == "propose_plan" && !stopForPlanGate)
-                    {
-                        try
-                        {
-                            var doc = JsonDocument.Parse(toolResult);
-                            if (doc.RootElement.TryGetProperty("awaitingApproval", out var aw) &&
-                                aw.ValueKind == JsonValueKind.True)
-                            {
-                                stopForPlanGate = true;
-                            }
-                        }
-                        catch { /* ignore JSON parse errors */ }
-                    }
+                    planGate.CheckToolResult(toolUse.Name, toolResult);
 
                     // Track consecutive failures per tool
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
@@ -220,14 +206,10 @@ public class AnthropicProvider : IAiProvider
                     break;
                 }
 
-                // Plan gate: in agent mode, stop after plan proposal so the AI
-                // cannot start implementing without user approval.
-                // In plan mode, let the loop continue so the model can produce
-                // conversational text after the tool result (e.g. "I've added a footer").
-                if (stopForPlanGate)
+                if (planGate.IsGated)
                 {
                     messages.Add(new Message { Role = RoleType.User, Content = toolResults });
-                    if (request.Mode != "plan")
+                    if (planGate.ShouldBreakLoop(request.Mode))
                         break;
                 }
 

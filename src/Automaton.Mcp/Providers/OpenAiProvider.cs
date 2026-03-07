@@ -278,7 +278,7 @@ public class OpenAiProvider : IAiProvider
                 inputItems.AddRange(reusableItems);
 
                 var shouldStopDueToFailures = false;
-                var stopForPlanGate = false;
+                var planGate = new PlanGateTracker();
                 foreach (var toolCall in response.ToolCalls)
                 {
                     var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
@@ -287,20 +287,7 @@ public class OpenAiProvider : IAiProvider
 
                     var toolResult = await executeToolAsync(toolCall.Id, toolCall.Name, argsJson);
 
-                    // Plan gate: if propose_plan returns awaitingApproval, stop after this batch.
-                    if (toolCall.Name == "propose_plan" && !stopForPlanGate)
-                    {
-                        try
-                        {
-                            var doc = JsonDocument.Parse(toolResult);
-                            if (doc.RootElement.TryGetProperty("awaitingApproval", out var aw) &&
-                                aw.ValueKind == JsonValueKind.True)
-                            {
-                                stopForPlanGate = true;
-                            }
-                        }
-                        catch { /* ignore JSON parse errors */ }
-                    }
+                    planGate.CheckToolResult(toolCall.Name, toolResult);
 
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                     toolResult.StartsWith("Error executing tool") ||
@@ -343,9 +330,7 @@ public class OpenAiProvider : IAiProvider
                     break;
                 }
 
-                // Plan gate: in agent mode, stop after plan proposal.
-                // In plan mode, let the loop continue so the model can respond conversationally.
-                if (stopForPlanGate && request.Mode != "plan")
+                if (planGate.ShouldBreakLoop(request.Mode))
                     break;
             }
         }

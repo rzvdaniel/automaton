@@ -165,7 +165,7 @@ public class GoogleProvider : IAiProvider
             // Execute each function call and collect results
             var functionResponseParts = new List<object>();
             var shouldStop = false;
-            var stopForPlanGate = false;
+            var planGate = new PlanGateTracker();
 
             foreach (var funcCall in functionCalls)
             {
@@ -178,20 +178,7 @@ public class GoogleProvider : IAiProvider
 
                 var toolResult = await executeToolAsync(callId, funcCall.Name, argsJson);
 
-                // Plan gate: if propose_plan returns awaitingApproval, stop the loop
-                if (funcCall.Name == "propose_plan" && !stopForPlanGate)
-                {
-                    try
-                    {
-                        var doc = JsonDocument.Parse(toolResult);
-                        if (doc.RootElement.TryGetProperty("awaitingApproval", out var aw) &&
-                            aw.ValueKind == JsonValueKind.True)
-                        {
-                            stopForPlanGate = true;
-                        }
-                    }
-                    catch { /* ignore JSON parse errors */ }
-                }
+                planGate.CheckToolResult(funcCall.Name, toolResult);
 
                 var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                 toolResult.StartsWith("Error executing tool") ||
@@ -243,15 +230,8 @@ public class GoogleProvider : IAiProvider
                 break;
             }
 
-            if (stopForPlanGate)
-            {
-                // In plan mode, let the loop continue so the model can produce
-                // conversational text after the tool result (e.g. "I've added a footer").
-                // Write tools are blocked by the mode filter, so there's no risk.
-                var isInPlanMode = request.Mode == "plan";
-                if (!isInPlanMode)
-                    break;
-            }
+            if (planGate.ShouldBreakLoop(request.Mode))
+                break;
         }
 
         return responseBuilder.ToString().Trim();
