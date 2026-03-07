@@ -90,6 +90,13 @@ public class GoogleProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+        // Accumulate tokens across all iterations.
+        // Gemini reports promptTokenCount cumulatively (keep the last/largest value).
+        // candidatesTokenCount is per-call, so we sum across iterations.
+        int? totalInputTokens = null;
+        int totalOutputTokens = 0;
+        string? modelVersion = null;
+
         while (true)
         {
             iterationCount++;
@@ -104,9 +111,8 @@ public class GoogleProvider : IAiProvider
             var currentText = new StringBuilder();
             var functionCalls = new List<GeminiFunctionCall>();
             var rawModelParts = new List<JsonElement>(); // preserve all parts verbatim (incl. thought_signature)
-            int? inputTokens = null;
-            int? outputTokens = null;
-            string? modelVersion = null;
+            int? iterInputTokens = null;
+            int? iterOutputTokens = null;
             var lastEmitTime = DateTime.UtcNow;
             const int emitIntervalMs = 100;
 
@@ -118,8 +124,8 @@ public class GoogleProvider : IAiProvider
                 toolList,
                 cancellationToken))
             {
-                if (chunk.InputTokens.HasValue) inputTokens = chunk.InputTokens;
-                if (chunk.OutputTokens.HasValue) outputTokens = chunk.OutputTokens;
+                if (chunk.InputTokens.HasValue) iterInputTokens = chunk.InputTokens;
+                if (chunk.OutputTokens.HasValue) iterOutputTokens = chunk.OutputTokens;
                 if (chunk.ModelVersion != null) modelVersion = chunk.ModelVersion;
 
                 if (!string.IsNullOrEmpty(chunk.TextDelta))
@@ -139,6 +145,12 @@ public class GoogleProvider : IAiProvider
                 rawModelParts.AddRange(chunk.RawParts);
             }
 
+            // Accumulate tokens across iterations.
+            // inputTokens is cumulative in Gemini (includes all prior turns) — keep the latest value.
+            // outputTokens is per-call — sum them.
+            if (iterInputTokens.HasValue) totalInputTokens = iterInputTokens;
+            if (iterOutputTokens.HasValue) totalOutputTokens += iterOutputTokens.Value;
+
             var textContent = currentText.ToString();
 
             if (functionCalls.Count == 0)
@@ -147,24 +159,24 @@ public class GoogleProvider : IAiProvider
                 if (!string.IsNullOrWhiteSpace(textContent))
                 {
                     EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                        inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
+                        inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
                     responseBuilder.AppendLine(textContent);
                 }
                 break;
             }
 
             // Emit text portion before tool calls (if any).
-            // Always pass tokens so usage is recorded for this API call.
+            // Pass accumulated tokens so usage is recorded even for intermediate turns.
             if (!string.IsNullOrWhiteSpace(textContent))
             {
                 EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                    inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
+                    inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
             }
-            else if (inputTokens.HasValue || outputTokens.HasValue)
+            else if (totalInputTokens.HasValue || totalOutputTokens > 0)
             {
                 // Pure tool-call turn (no text) — emit a token-only update so usage is still recorded.
                 EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
-                    inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
+                    inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
             }
 
             // Add model response back to contents using raw parts verbatim.
