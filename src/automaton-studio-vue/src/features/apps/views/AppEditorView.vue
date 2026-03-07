@@ -196,6 +196,12 @@ const existingFilePaths = computed(() => {
 
 // Load app on mount
 onMounted(async () => {
+  // Clear ?prompt from URL immediately so navigating back doesn't re-submit it
+  if (route.query.prompt) {
+    const { prompt: _, ...rest } = route.query
+    router.replace({ ...route, query: rest })
+  }
+
   if (appId.value) {
     try {
       await editorStore.loadApp(appId.value)
