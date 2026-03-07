@@ -36,42 +36,40 @@ function toggle() {
   manualToggle.value = !isExpanded.value
 }
 
-/** Map tool name + args to a human-readable label */
+// --- Tool label registry ---
+// Each entry maps a tool name to a formatter function.
+// To add a new tool, just add an entry here.
+type ToolArgs = Record<string, any>
+type LabelFormatter = (file: string, args: ToolArgs) => string
+
+function lineRange(args: ToolArgs): string {
+  const s = args.startLine ?? args.start_line
+  const e = args.endLine ?? args.end_line
+  return s != null && e != null ? `, lines ${s}–${e}` : ''
+}
+
+function searchTerm(args: ToolArgs): string {
+  return args.pattern || args.query || args.search || ''
+}
+
+const toolLabels: Record<string, LabelFormatter> = {
+  read_file:      (f, a) => `Read ${f || 'file'}${lineRange(a)}`,
+  write_file:     (f)    => `Created ${f || 'file'}`,
+  edit_file:      (f)    => `Edited ${f || 'file'}`,
+  delete_file:    (f)    => `Deleted ${f || 'file'}`,
+  search_file:    (_f, a) => { const t = searchTerm(a); return t ? `Searched for "${t}"` : 'Searched files' },
+  search_files:   (_f, a) => { const t = searchTerm(a); return t ? `Searched for "${t}"` : 'Searched files' },
+  list_files:     (f)    => f ? `Listed files in ${f}` : 'Listed files',
+  propose_plan:   ()     => 'Updated plan',
+  stage_complete: (_f, a) => `Completed stage${a.stageIndex != null ? ` ${Number(a.stageIndex) + 1}` : ''}`,
+}
+
 function getLabel(msg: ChatMessage): string {
   const args = msg.toolArgs || {}
   const rawPath: string = args.path || args.filePath || args.file_path || ''
   const fileName = rawPath ? rawPath.replace(/\\/g, '/').split('/').pop() || rawPath : ''
-
-  switch (msg.toolName) {
-    case 'read_file': {
-      const lines =
-        args.startLine != null && args.endLine != null
-          ? `, lines ${args.startLine}–${args.endLine}`
-          : args.start_line != null && args.end_line != null
-            ? `, lines ${args.start_line}–${args.end_line}`
-            : ''
-      return `Read ${fileName || 'file'}${lines}`
-    }
-    case 'write_file':
-      return `Created ${fileName || 'file'}`
-    case 'edit_file':
-      return `Edited ${fileName || 'file'}`
-    case 'delete_file':
-      return `Deleted ${fileName || 'file'}`
-    case 'search_file':
-    case 'search_files': {
-      const pattern = args.pattern || args.query || args.search || ''
-      return pattern ? `Searched for "${pattern}"` : 'Searched files'
-    }
-    case 'list_files':
-      return `Listed files${fileName ? ` in ${fileName}` : ''}`
-    case 'propose_plan':
-      return 'Updated plan'
-    case 'stage_complete':
-      return `Completed stage${args.stageIndex != null ? ` ${Number(args.stageIndex) + 1}` : ''}`
-    default:
-      return msg.toolName || 'Unknown operation'
-  }
+  const formatter = toolLabels[msg.toolName || '']
+  return formatter ? formatter(fileName, args) : (msg.toolName || 'Unknown operation')
 }
 
 /** Summary text for the collapsed state */
