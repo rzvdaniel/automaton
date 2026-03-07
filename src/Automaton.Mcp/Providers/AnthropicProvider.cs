@@ -109,6 +109,12 @@ public class AnthropicProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
 
+        // Accumulate tokens across iterations.
+        // Anthropic reports inputTokens cumulatively — keep the latest value.
+        // outputTokens is per-call — sum across iterations.
+        int? totalInputTokens = null;
+        int totalOutputTokens = 0;
+
         while (true)
         {
             // Check iteration limit
@@ -132,7 +138,15 @@ public class AnthropicProvider : IAiProvider
 
             // Stream the response
             var streamResult = await StreamResponseAsync(
-                client, messageParams, request.ConversationId, cancellationToken);
+                client, messageParams, request.ConversationId, cancellationToken,
+                accumulatedInputTokens: totalInputTokens,
+                accumulatedOutputTokens: totalOutputTokens);
+
+            // Accumulate tokens across iterations.
+            // Anthropic reports inputTokens cumulatively — keep the latest value.
+            // outputTokens is per-call — sum across iterations.
+            if (streamResult.InputTokens.HasValue) totalInputTokens = streamResult.InputTokens;
+            if (streamResult.OutputTokens.HasValue) totalOutputTokens += streamResult.OutputTokens.Value;
 
             // If there's text content, add it to the response
             if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
@@ -343,7 +357,9 @@ public class AnthropicProvider : IAiProvider
         AnthropicClient client,
         MessageParameters messageParams,
         string conversationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? accumulatedInputTokens = null,
+        int accumulatedOutputTokens = 0)
     {
         var result = new StreamResult { Model = messageParams.Model };
         var currentText = new StringBuilder();
@@ -424,7 +440,10 @@ public class AnthropicProvider : IAiProvider
         var finalText = currentText.ToString();
         if (!string.IsNullOrWhiteSpace(finalText))
         {
-            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true, inputTokens: result.InputTokens, outputTokens: result.OutputTokens, model: result.Model);
+            // Use accumulated totals so multi-turn conversations report correct cumulative usage
+            var emitInput = result.InputTokens.HasValue ? result.InputTokens : accumulatedInputTokens;
+            var emitOutput = accumulatedOutputTokens + (result.OutputTokens ?? 0);
+            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true, inputTokens: emitInput, outputTokens: emitOutput > 0 ? emitOutput : null, model: result.Model);
             result.TextContent = finalText;
         }
 

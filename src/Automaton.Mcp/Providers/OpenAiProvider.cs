@@ -242,6 +242,12 @@ public class OpenAiProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+        // Accumulate tokens across iterations.
+        // OpenAI reports inputTokens cumulatively — keep the latest value.
+        // outputTokens is per-call — sum across iterations.
+        int? totalInputTokens = null;
+        int totalOutputTokens = 0;
+
         try
         {
             while (true)
@@ -261,12 +267,18 @@ public class OpenAiProvider : IAiProvider
                     toolDefinitions,
                     cancellationToken);
 
+                // Accumulate tokens across iterations.
+                // OpenAI reports inputTokens cumulatively — keep the latest value.
+                // outputTokens is per-call — sum across iterations.
+                if (response.InputTokens.HasValue) totalInputTokens = response.InputTokens;
+                if (response.OutputTokens.HasValue) totalOutputTokens += response.OutputTokens.Value;
+
                 if (response.ToolCalls.Count == 0)
                 {
                     if (!string.IsNullOrWhiteSpace(response.OutputText))
                     {
                         EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
-                            inputTokens: response.InputTokens, outputTokens: response.OutputTokens, model: response.Model);
+                            inputTokens: totalInputTokens, outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null, model: response.Model);
                         responseBuilder.AppendLine(response.OutputText);
                     }
 
@@ -276,7 +288,7 @@ public class OpenAiProvider : IAiProvider
                 if (!string.IsNullOrWhiteSpace(response.OutputText))
                 {
                     EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
-                        inputTokens: response.InputTokens, outputTokens: response.OutputTokens, model: response.Model);
+                        inputTokens: totalInputTokens, outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null, model: response.Model);
                 }
 
                 var reusableItems = FilterOutputItemsForInput(response.OutputItems);
