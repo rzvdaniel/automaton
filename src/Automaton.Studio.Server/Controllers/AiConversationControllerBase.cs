@@ -267,6 +267,7 @@ public abstract class AiConversationControllerBase : BaseController
             foreach (var message in update.Messages)
             {
                 if (message.IsStreaming) continue;
+                if (string.IsNullOrEmpty(message.Content)) continue;
 
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
                 {

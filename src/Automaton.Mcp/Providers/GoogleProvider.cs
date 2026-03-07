@@ -153,10 +153,12 @@ public class GoogleProvider : IAiProvider
                 break;
             }
 
-            // Emit text portion before tool calls (if any)
+            // Emit text portion before tool calls (if any).
+            // Always pass tokens so usage is recorded for this API call.
             if (!string.IsNullOrWhiteSpace(textContent))
             {
-                EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true);
+                EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
+                    inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
             }
 
             // Add model response back to contents using raw parts verbatim.
