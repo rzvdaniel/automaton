@@ -121,17 +121,7 @@ public abstract class AiConversationControllerBase : BaseController
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());
 
-            // 6. Save user message
-            await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-            {
-                SessionId = sessionId,
-                Role = "user",
-                Content = request.Message,
-                MessageType = ChatMessageType.Text,
-                Metadata = "{}"
-            }, userId);
-
-            // 7. Collect events for post-conversation persistence
+            // 6. Collect events for post-conversation persistence
             var pendingUpdates = new List<ConversationUpdatedEvent>();
 
             EventHandler<ConversationUpdatedEvent> eventHandler = (_, e) =>
@@ -141,7 +131,7 @@ public abstract class AiConversationControllerBase : BaseController
             };
             _mcpClient.ConversationUpdated += eventHandler;
 
-            // 8. Run conversation
+            // 7. Run conversation
             var conversationRequest = new ConversationRequest
             {
                 ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
@@ -161,14 +151,24 @@ public abstract class AiConversationControllerBase : BaseController
 
             _mcpClient.ConversationUpdated -= eventHandler;
 
-            // 9. Persist updates
-            var savedToolCallIds = new HashSet<string>();
-            foreach (var update in pendingUpdates)
-                await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
-
-            // 10. Done event
+            // 8. Persist only on success — failed/cancelled attempts save nothing,
+            //    so orphaned user messages and partial AI responses don't pollute history.
             if (result.IsSuccess)
             {
+                // Save user message first (before AI responses to preserve chronological order)
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId = sessionId,
+                    Role = "user",
+                    Content = request.Message,
+                    MessageType = ChatMessageType.Text,
+                    Metadata = "{}"
+                }, userId);
+
+                var savedToolCallIds = new HashSet<string>();
+                foreach (var update in pendingUpdates)
+                    await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
+
                 await WriteEvent("done", new
                 {
                     conversationId = result.ConversationId,
