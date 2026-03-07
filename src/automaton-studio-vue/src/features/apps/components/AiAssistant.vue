@@ -165,7 +165,13 @@ onMounted(async () => {
   
   // Load sessions but don't create one automatically
   await loadSessions()
-  
+
+  // If the app already has prior work (any session with prompts), default to agent mode
+  // so the user can make changes directly without having to switch modes manually.
+  if (sessions.value.some((s) => s.totalPromptsSubmitted > 0)) {
+    chatMode.value = 'agent'
+  }
+
   // Always stay in sessions list view by default
   // User can click on a session to open it
   
