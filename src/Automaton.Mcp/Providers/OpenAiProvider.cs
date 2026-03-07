@@ -43,7 +43,7 @@ public class OpenAiProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            // Client cancelled the request — not an error, don't emit to conversation
+            _logger.LogInformation("OpenAI conversation cancelled by client");
             throw;
         }
         catch (Exception ex)

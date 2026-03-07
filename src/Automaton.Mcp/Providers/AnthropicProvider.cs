@@ -225,7 +225,7 @@ public class AnthropicProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            // Client cancelled the request — not an error, don't emit to conversation
+            _logger.LogInformation("Anthropic conversation cancelled by client");
             throw;
         }
         catch (Exception ex)

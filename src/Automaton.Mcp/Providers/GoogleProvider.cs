@@ -53,7 +53,7 @@ public class GoogleProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            // Client cancelled the request — not an error, don't emit to conversation
+            _logger.LogInformation("Google Gemini conversation cancelled by client");
             throw;
         }
         catch (Exception ex)
