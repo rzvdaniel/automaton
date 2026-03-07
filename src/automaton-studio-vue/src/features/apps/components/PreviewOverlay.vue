@@ -22,7 +22,7 @@ const previewModes = ref([
 ])
 
 // Current viewport size
-const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode])
+const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
 
 // Initial load
 onMounted(() => {
@@ -89,6 +89,7 @@ onUnmounted(() => {
             :model-value="editorStore.previewMode"
             :options="previewModes"
             option-value="value"
+            :allow-empty="false"
             @update:model-value="handleModeChange"
           >
             <template #option="{ option }">

@@ -427,7 +427,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Set preview mode
    */
   function setPreviewMode(mode: PreviewMode): void {
-    previewMode.value = mode
+    if (mode) {
+      previewMode.value = mode
+    }
   }
 
   /**

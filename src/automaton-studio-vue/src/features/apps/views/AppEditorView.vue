@@ -770,6 +770,21 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               @click="handleSaveAll"
             />
           </template>
+          <a
+            v-if="editorStore.isPublished"
+            :href="`/web/${editorStore.publicUrl}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="no-underline"
+          >
+            <Button
+              v-tooltip.bottom="'Open published app in new tab'"
+              label="Open"
+              icon="pi pi-external-link"
+              outlined
+              severity="secondary"
+            />
+          </a>
           <Button
             v-if="editorStore.isPublished"
             label="Unpublish"
