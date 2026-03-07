@@ -160,6 +160,12 @@ public class GoogleProvider : IAiProvider
                 EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
                     inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
             }
+            else if (inputTokens.HasValue || outputTokens.HasValue)
+            {
+                // Pure tool-call turn (no text) — emit a token-only update so usage is still recorded.
+                EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
+                    inputTokens: inputTokens, outputTokens: outputTokens, model: modelVersion ?? request.Model);
+            }
 
             // Add model response back to contents using raw parts verbatim.
             // This preserves thought_signature fields required by Gemini thinking models.

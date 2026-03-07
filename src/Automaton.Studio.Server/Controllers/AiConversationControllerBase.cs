@@ -267,7 +267,14 @@ public abstract class AiConversationControllerBase : BaseController
             foreach (var message in update.Messages)
             {
                 if (message.IsStreaming) continue;
-                if (string.IsNullOrEmpty(message.Content)) continue;
+
+                // Token-only update (pure tool-call turn, no text) — accumulate tokens without saving a blank message.
+                if (string.IsNullOrEmpty(message.Content))
+                {
+                    if (message.InputTokens.HasValue || message.OutputTokens.HasValue)
+                        await _chatHistoryService.AccumulateTokensAsync(sessionId, userId, message.InputTokens, message.OutputTokens);
+                    continue;
+                }
 
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
                 {

@@ -702,6 +702,32 @@ public class AiChatHistoryService : IAiChatHistoryService
         }
     }
 
+    public async Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens)
+    {
+        if (!inputTokens.HasValue && !outputTokens.HasValue) return;
+        try
+        {
+            var session = await dataContext.AiChatSessions
+                .Include(s => s.AiChatSessionUsers)
+                .FirstOrDefaultAsync(s => s.Id == sessionId &&
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
+
+            if (session == null) return;
+
+            if (inputTokens.HasValue) session.TotalInputTokens += inputTokens.Value;
+            if (outputTokens.HasValue) session.TotalOutputTokens += outputTokens.Value;
+            if (inputTokens.HasValue || outputTokens.HasValue)
+                session.TotalTokens += (inputTokens ?? 0) + (outputTokens ?? 0);
+
+            session.UpdatedAt = DateTime.UtcNow;
+            await dataContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to accumulate tokens for session {SessionId}", sessionId);
+        }
+    }
+
     public async Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId)
     {
         try

@@ -77,4 +77,10 @@ public interface IAiChatHistoryService
     /// Persist the complexity tier for a session (sticky — only upgrades, never downgrades).
     /// </summary>
     Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId);
+
+    /// <summary>
+    /// Add input/output token counts to a session's running totals without saving a message.
+    /// Used for AI turns that consist purely of tool calls (no text content to persist).
+    /// </summary>
+    Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens);
 }
