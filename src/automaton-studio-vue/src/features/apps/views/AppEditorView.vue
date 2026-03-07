@@ -49,8 +49,9 @@ const appId = computed(() => route.params.id as string)
 
 const resolvedAppId = computed(() => editorStore.currentApp?.id || appId.value)
 
-// Get initial prompt from query param (from "Generate App" flow)
-const initialPrompt = computed(() => route.query.prompt as string | undefined)
+// Capture initial prompt once at setup time — using ref so clearing the URL query
+// via router.replace() doesn't wipe the value before AiAssistant.onMounted reads it.
+const initialPrompt = ref(route.query.prompt as string | undefined)
 
 // Dialog visibility
 const showPublishDialog = ref(false)
