@@ -53,13 +53,13 @@ function searchTerm(args: ToolArgs): string {
 }
 
 const toolLabels: Record<string, LabelFormatter> = {
-  read_file:      (f, a) => `Read ${f || 'file'}${lineRange(a)}`,
-  write_file:     (f)    => `Created ${f || 'file'}`,
-  edit_file:      (f)    => `Edited ${f || 'file'}`,
-  delete_file:    (f)    => `Deleted ${f || 'file'}`,
+  read_file:      (f, a) => `Read ${f}${lineRange(a)}`,
+  write_file:     (f)    => `Created ${f}`,
+  edit_file:      (f)    => `Edited ${f}`,
+  delete_file:    (f)    => `Deleted ${f}`,
   search_file:    (_f, a) => { const t = searchTerm(a); return t ? `Searched for "${t}"` : 'Searched files' },
   search_files:   (_f, a) => { const t = searchTerm(a); return t ? `Searched for "${t}"` : 'Searched files' },
-  list_files:     (f)    => f ? `Listed files in ${f}` : 'Listed files',
+  list_files:     (f)    => `Listed files${f ? ` in ${f}` : ''}`,
   propose_plan:   ()     => 'Updated plan',
   stage_complete: (_f, a) => `Completed stage${a.stageIndex != null ? ` ${Number(a.stageIndex) + 1}` : ''}`,
 }
