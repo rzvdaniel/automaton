@@ -360,10 +360,6 @@ public class GoogleProvider : IAiProvider
                 thoughtTokens = thoughts_.GetInt32();
             if (candidateTokens > 0 || thoughtTokens > 0)
                 chunk.OutputTokens = candidateTokens + thoughtTokens;
-
-            _logger.LogDebug("Gemini usage: prompt={Input} candidates={Candidates} thoughts={Thoughts} total={Total}",
-                chunk.InputTokens, candidateTokens, thoughtTokens,
-                usage.TryGetProperty("totalTokenCount", out var tot) ? tot.GetInt32() : (int?)null);
         }
 
         if (root.TryGetProperty("modelVersion", out var mv))
