@@ -59,6 +59,8 @@ const showCreateFileDialog = ref(false)
 // App name editing
 const isEditingName = ref(false)
 const editingName = ref('')
+// Tracks whether app name has already been auto-updated from AI session name
+const appNameAutoUpdated = ref(false)
 
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
@@ -586,9 +588,43 @@ function cancelEditingName() {
 }
 
 // Save app name
-function saveAppName() {
-  // TODO: Implement app name update
+async function saveAppName() {
   isEditingName.value = false
+  const newName = editingName.value.trim()
+  editingName.value = ''
+  if (!newName || newName === editorStore.currentApp?.name) return
+  if (newName.length > 100) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Name too long',
+      detail: 'App name must be 100 characters or fewer',
+      life: 3000,
+    })
+    return
+  }
+  try {
+    await editorStore.updateAppName(newName)
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to update app name',
+      life: 3000,
+    })
+  }
+}
+
+// Handle AI-generated session name — use it to rename the app on first session
+// (only when arriving from the "Generate App" flow via ?prompt= query param)
+async function handleSessionNameGenerated(name: string) {
+  if (!appNameAutoUpdated.value && initialPrompt.value?.trim()) {
+    appNameAutoUpdated.value = true
+    try {
+      await editorStore.updateAppName(name)
+    } catch {
+      // Best-effort: silently ignore — the app name is non-critical at this point
+    }
+  }
 }
 
 // Handle AI tool execution for real-time file updates
@@ -936,6 +972,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 @tool-executed="handleAiToolExecuted"
                 @session-created="handleVersionCreated"
                 @chat-message-sent="refreshChatStats"
+                @session-name-generated="handleSessionNameGenerated"
               />
               <AppVersionHistory
                 v-show="rightPanelMode === 'versionHistory'"
