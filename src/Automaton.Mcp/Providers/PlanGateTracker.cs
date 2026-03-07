@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Mcp.Tools;
 
 namespace Automaton.Mcp.Client.Providers;
 
@@ -18,7 +19,7 @@ public class PlanGateTracker
     /// </summary>
     public void CheckToolResult(string toolName, string toolResult)
     {
-        if (toolName != "propose_plan" || IsGated) return;
+        if (toolName != PlanningTool.ProposePlanName || IsGated) return;
 
         try
         {

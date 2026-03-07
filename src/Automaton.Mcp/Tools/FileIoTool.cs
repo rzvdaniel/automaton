@@ -12,7 +12,14 @@ namespace Automaton.Mcp.Tools;
 /// </summary>
 public class FileIoTool : IMcpTool
 {
-    private static readonly HashSet<string> HandledTools = ["read_file", "write_file", "edit_file", "delete_file", "list_files", "search_file"];
+    public const string ReadFileName   = "read_file";
+    public const string WriteFileName  = "write_file";
+    public const string EditFileName   = "edit_file";
+    public const string DeleteFileName = "delete_file";
+    public const string ListFilesName  = "list_files";
+    public const string SearchFileName = "search_file";
+
+    private static readonly HashSet<string> HandledTools = [ReadFileName, WriteFileName, EditFileName, DeleteFileName, ListFilesName, SearchFileName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<FileIoTool> _logger;
@@ -29,21 +36,21 @@ public class FileIoTool : IMcpTool
         {
             new McpTool
             {
-                Name = "read_file",
+                Name = ReadFileName,
                 Capability = ToolCapability.Read,
                 Description = "Read a file (e.g. 'index.html', 'styles/main.css', 'js/app.js')",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
-                Name = "write_file",
+                Name = WriteFileName,
                 Capability = ToolCapability.Write,
                 Description = "Write a file. Creates directories as needed.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}""")
             },
             new McpTool
             {
-                Name = "edit_file",
+                Name = EditFileName,
                 Capability = ToolCapability.Write,
                 Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText. Use dryRun=true to preview without saving.",
                 InputSchema = JsonDocument.Parse("""
@@ -70,21 +77,21 @@ public class FileIoTool : IMcpTool
             },
             new McpTool
             {
-                Name = "delete_file",
+                Name = DeleteFileName,
                 Capability = ToolCapability.Write,
                 Description = "Delete a file.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
-                Name = "list_files",
+                Name = ListFilesName,
                 Capability = ToolCapability.Read,
                 Description = "List all files in the current scope.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             },
             new McpTool
             {
-                Name = "search_file",
+                Name = SearchFileName,
                 Capability = ToolCapability.Read,
                 Description = "Search for lines matching a pattern inside a file. Returns each match with surrounding context lines — use the returned text verbatim as oldText in edit_file for guaranteed accuracy. Prefer this over read_file for large files when you only need to find and change specific sections.",
                 InputSchema = JsonDocument.Parse("""
@@ -113,12 +120,12 @@ public class FileIoTool : IMcpTool
 
         return toolName switch
         {
-            "read_file"   => await ReadFile(fs, arguments),
-            "write_file"  => await WriteFile(fs, arguments),
-            "edit_file"   => await EditFile(fs, arguments),
-            "delete_file" => await DeleteFile(fs, arguments),
-            "list_files"  => await ListFiles(fs),
-            "search_file" => await SearchFile(fs, arguments),
+            ReadFileName   => await ReadFile(fs, arguments),
+            WriteFileName  => await WriteFile(fs, arguments),
+            EditFileName   => await EditFile(fs, arguments),
+            DeleteFileName => await DeleteFile(fs, arguments),
+            ListFilesName  => await ListFiles(fs),
+            SearchFileName => await SearchFile(fs, arguments),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
         };
     }

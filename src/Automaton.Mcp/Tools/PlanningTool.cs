@@ -13,7 +13,9 @@ namespace Automaton.Mcp.Tools;
 /// </summary>
 public class PlanningTool : IMcpTool
 {
-    private static readonly HashSet<string> HandledTools = ["propose_plan"];
+    public const string ProposePlanName = "propose_plan";
+
+    private static readonly HashSet<string> HandledTools = [ProposePlanName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<PlanningTool> _logger;
@@ -30,7 +32,7 @@ public class PlanningTool : IMcpTool
         {
             new McpTool
             {
-                Name = "propose_plan",
+                Name = ProposePlanName,
                 Capability = ToolCapability.Planning,
                 Description = """
                     Propose a plan before starting work on a new app.
@@ -109,7 +111,7 @@ public class PlanningTool : IMcpTool
     {
         return toolName switch
         {
-            "propose_plan" => await ProposePlan(arguments, context),
+            ProposePlanName => await ProposePlan(arguments, context),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
         };
     }
