@@ -19,7 +19,6 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
-import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import type { App } from '../types/apps.types'
 
 const router = useRouter()
@@ -103,15 +102,10 @@ const handleGenerateApp = async () => {
 
   isCreating.value = true
   try {
-    // Generate app name using AI (falls back to simple extraction if AI unavailable)
-    let appName: string
-    try {
-      appName = await aiUtilityService.generateAppName(aiDescription.value.trim())
-    } catch {
-      // Fallback: extract first few words from description
-      const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
-      appName = words.length > 30 ? words.substring(0, 30) + '...' : words
-    }
+    // Extract a name from the description immediately (no AI call) so we navigate fast.
+    // The editor page receives the full prompt and performs the expensive AI generation there.
+    const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
+    const appName = words.length > 30 ? words.substring(0, 30) + '...' : words
 
     const app = await appsStore.createApp({
       name: appName,
