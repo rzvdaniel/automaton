@@ -205,7 +205,8 @@ applicationBuilder.Host.UseSerilog((context, services, config) =>
         .Destructure.JsonNetTypes()
         .Enrich.With<EventTypeEnricher>()
         .Enrich.With(services.GetService<UserNameEnricher>())
-        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning);
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning);
 
     // Console logging - environment-specific
     if (applicationBuilder.Environment.IsDevelopment())
