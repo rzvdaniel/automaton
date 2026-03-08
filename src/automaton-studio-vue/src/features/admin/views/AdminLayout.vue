@@ -33,6 +33,12 @@ const navItems: AdminNavItem[] = [
     to: '/admin/logs',
     routePrefix: '/admin/logs',
   },
+  {
+    label: 'Subscription Plans',
+    icon: 'pi pi-credit-card',
+    to: '/admin/subscription-plans',
+    routePrefix: '/admin/subscription-plans',
+  },
 ]
 
 const isActive = (item: AdminNavItem) => {

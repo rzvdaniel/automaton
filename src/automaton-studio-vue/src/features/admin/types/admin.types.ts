@@ -174,3 +174,47 @@ export interface AiModelOption {
   displayName: string
 }
 
+// ── Subscription Plans ───────────────────────────────────────────────────────
+
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  description?: string
+  monthlyCostLimitUsd: number
+  isDefault: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface CreateSubscriptionPlanRequest {
+  name: string
+  description?: string
+  monthlyCostLimitUsd: number
+  isDefault: boolean
+  sortOrder: number
+}
+
+export interface UpdateSubscriptionPlanRequest {
+  name?: string
+  description?: string
+  monthlyCostLimitUsd?: number
+  isDefault?: boolean
+  sortOrder?: number
+}
+
+export interface UserPlan {
+  userId: string
+  email: string
+  name: string
+  subscriptionPlanId?: string
+  planName?: string
+  monthlyCostLimitUsd: number
+  currentMonthCostUsd: number
+  overageAction: string
+}
+
+export interface AssignPlanRequest {
+  planId?: string
+}
+

@@ -1612,6 +1612,41 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.SubscriptionPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("MonthlyCostLimitUsd")
+                        .HasColumnType("decimal(10, 2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SubscriptionPlans");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.UserGitHubToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1713,6 +1748,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)");
 
+                    b.Property<Guid?>("SubscriptionPlanId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1720,6 +1758,8 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SubscriptionPlanId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -2478,11 +2518,18 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.UserTokenAllowance", b =>
                 {
+                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("SubscriptionPlan");
 
                     b.Navigation("User");
                 });

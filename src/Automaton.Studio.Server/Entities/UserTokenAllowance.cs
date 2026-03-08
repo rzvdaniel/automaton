@@ -42,10 +42,16 @@ public class UserTokenAllowance
     [MaxLength(50)]
     public string OverageAction { get; set; } = OverageActions.Downgrade;
 
+    /// <summary>The subscription plan currently assigned to this user. Null = manually set or default.</summary>
+    public Guid? SubscriptionPlanId { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     [ForeignKey(nameof(UserId))]
     public virtual ApplicationUser User { get; set; } = null!;
+
+    [ForeignKey(nameof(SubscriptionPlanId))]
+    public virtual SubscriptionPlan? SubscriptionPlan { get; set; }
 }
 
 public static class OverageActions

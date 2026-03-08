@@ -76,6 +76,9 @@ namespace Automaton.Studio.Server.Data
         // Token budget
         public virtual DbSet<UserTokenAllowance> UserTokenAllowances { get; set; }
 
+        // Subscription plans
+        public virtual DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // No-op, configuration is handled by DI
@@ -911,6 +914,11 @@ namespace Automaton.Studio.Server.Data
                     .WithMany()
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.SubscriptionPlan)
+                    .WithMany()
+                    .HasForeignKey(e => e.SubscriptionPlanId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
 
