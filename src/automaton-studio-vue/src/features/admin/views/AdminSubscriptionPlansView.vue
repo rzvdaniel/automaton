@@ -37,10 +37,6 @@ const planForm = ref<CreateSubscriptionPlanRequest>({
   isDefault: false,
   canCreateProjects: false,
   canCreateOrganizations: false,
-  canUseCustomRunners: false,
-  maxFlows: 5,
-  maxApps: 2,
-  maxCustomSteps: 3,
   sortOrder: 0,
 })
 const savingPlan = ref(false)
@@ -97,10 +93,6 @@ function openCreatePlan() {
     isDefault: false,
     canCreateProjects: false,
     canCreateOrganizations: false,
-    canUseCustomRunners: false,
-    maxFlows: 5,
-    maxApps: 2,
-    maxCustomSteps: 3,
     sortOrder: 0,
   }
   planDialogVisible.value = true
@@ -115,10 +107,6 @@ function openEditPlan(plan: SubscriptionPlan) {
     isDefault: plan.isDefault,
     canCreateProjects: plan.canCreateProjects,
     canCreateOrganizations: plan.canCreateOrganizations,
-    canUseCustomRunners: plan.canUseCustomRunners,
-    maxFlows: plan.maxFlows,
-    maxApps: plan.maxApps,
-    maxCustomSteps: plan.maxCustomSteps,
     sortOrder: plan.sortOrder,
   }
   planDialogVisible.value = true
@@ -221,22 +209,12 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
             ${{ data.monthlyCostLimitUsd.toFixed(2) }}
           </template>
         </Column>
-        <Column header="Features" style="width:200px">
+        <Column header="Features" style="width:160px">
           <template #body="{ data }">
             <div class="flex gap-1 flex-wrap">
-              <Tag v-if="data.canCreateProjects"      value="Projects"      severity="secondary" />
-              <Tag v-if="data.canCreateOrganizations" value="Orgs"          severity="secondary" />
-              <Tag v-if="data.canUseCustomRunners"    value="Runners"       severity="secondary" />
+              <Tag v-if="data.canCreateProjects"      value="Projects" severity="secondary" />
+              <Tag v-if="data.canCreateOrganizations" value="Orgs"     severity="secondary" />
             </div>
-          </template>
-        </Column>
-        <Column header="Limits" style="width:150px">
-          <template #body="{ data }">
-            <span class="text-sm text-color-secondary">
-              {{ data.maxFlows === 0 ? '∞' : data.maxFlows }} flows ·
-              {{ data.maxApps === 0 ? '∞' : data.maxApps }} apps ·
-              {{ data.maxCustomSteps === 0 ? '∞' : data.maxCustomSteps }} steps
-            </span>
           </template>
         </Column>
         <Column header="Default" style="width:90px">
@@ -333,26 +311,6 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <div class="flex align-items-center gap-2">
           <Checkbox v-model="planForm.canCreateOrganizations" :binary="true" inputId="canOrgs" />
           <label for="canOrgs" class="text-sm">Can create Organizations</label>
-        </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox v-model="planForm.canUseCustomRunners" :binary="true" inputId="canRunners" />
-          <label for="canRunners" class="text-sm">Can use custom Runners</label>
-        </div>
-      </div>
-
-      <div class="font-medium text-sm mt-1">Resource Limits <span class="text-color-secondary font-normal">(0 = unlimited)</span></div>
-      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem">
-        <div class="flex flex-column gap-1">
-          <label class="text-sm">Max Flows</label>
-          <InputNumber v-model="planForm.maxFlows" :min="0" class="w-full" />
-        </div>
-        <div class="flex flex-column gap-1">
-          <label class="text-sm">Max Apps</label>
-          <InputNumber v-model="planForm.maxApps" :min="0" class="w-full" />
-        </div>
-        <div class="flex flex-column gap-1">
-          <label class="text-sm">Max Steps</label>
-          <InputNumber v-model="planForm.maxCustomSteps" :min="0" class="w-full" />
         </div>
       </div>
       <div class="flex flex-column gap-1">

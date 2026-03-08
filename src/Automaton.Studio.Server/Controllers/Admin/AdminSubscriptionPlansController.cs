@@ -74,10 +74,6 @@ public class AdminSubscriptionPlansController : ControllerBase
             IsDefault              = req.IsDefault,
             CanCreateProjects      = req.CanCreateProjects,
             CanCreateOrganizations = req.CanCreateOrganizations,
-            CanUseCustomRunners    = req.CanUseCustomRunners,
-            MaxFlows               = req.MaxFlows,
-            MaxApps                = req.MaxApps,
-            MaxCustomSteps         = req.MaxCustomSteps,
             SortOrder              = req.SortOrder,
             CreatedAt              = DateTime.UtcNow
         };
@@ -102,15 +98,11 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         if (req.Name        != null) plan.Name               = req.Name;
         if (req.Description != null) plan.Description        = req.Description;
-        if (req.MonthlyCostLimitUsd.HasValue)   plan.MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd.Value;
-        if (req.IsDefault          .HasValue)   plan.IsDefault              = req.IsDefault.Value;
-        if (req.CanCreateProjects  .HasValue)   plan.CanCreateProjects      = req.CanCreateProjects.Value;
-        if (req.CanCreateOrganizations.HasValue)plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
-        if (req.CanUseCustomRunners.HasValue)   plan.CanUseCustomRunners    = req.CanUseCustomRunners.Value;
-        if (req.MaxFlows           .HasValue)   plan.MaxFlows               = req.MaxFlows.Value;
-        if (req.MaxApps            .HasValue)   plan.MaxApps                = req.MaxApps.Value;
-        if (req.MaxCustomSteps     .HasValue)   plan.MaxCustomSteps         = req.MaxCustomSteps.Value;
-        if (req.SortOrder          .HasValue)   plan.SortOrder              = req.SortOrder.Value;
+        if (req.MonthlyCostLimitUsd   .HasValue) plan.MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd.Value;
+        if (req.IsDefault             .HasValue) plan.IsDefault              = req.IsDefault.Value;
+        if (req.CanCreateProjects     .HasValue) plan.CanCreateProjects      = req.CanCreateProjects.Value;
+        if (req.CanCreateOrganizations.HasValue) plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
+        if (req.SortOrder             .HasValue) plan.SortOrder              = req.SortOrder.Value;
         plan.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -221,20 +213,16 @@ public class AdminSubscriptionPlansController : ControllerBase
 
     private static SubscriptionPlanResponse ToResponse(SubscriptionPlan p) => new()
     {
-        Id                    = p.Id,
-        Name                  = p.Name,
-        Description           = p.Description,
-        MonthlyCostLimitUsd   = p.MonthlyCostLimitUsd,
-        IsDefault             = p.IsDefault,
-        CanCreateProjects     = p.CanCreateProjects,
-        CanCreateOrganizations= p.CanCreateOrganizations,
-        CanUseCustomRunners   = p.CanUseCustomRunners,
-        MaxFlows              = p.MaxFlows,
-        MaxApps               = p.MaxApps,
-        MaxCustomSteps        = p.MaxCustomSteps,
-        SortOrder             = p.SortOrder,
-        CreatedAt             = p.CreatedAt,
-        UpdatedAt             = p.UpdatedAt
+        Id                     = p.Id,
+        Name                   = p.Name,
+        Description            = p.Description,
+        MonthlyCostLimitUsd    = p.MonthlyCostLimitUsd,
+        IsDefault              = p.IsDefault,
+        CanCreateProjects      = p.CanCreateProjects,
+        CanCreateOrganizations = p.CanCreateOrganizations,
+        SortOrder              = p.SortOrder,
+        CreatedAt              = p.CreatedAt,
+        UpdatedAt              = p.UpdatedAt
     };
 }
 
@@ -249,10 +237,6 @@ public record SubscriptionPlanResponse
     public bool    IsDefault              { get; init; }
     public bool    CanCreateProjects      { get; init; }
     public bool    CanCreateOrganizations { get; init; }
-    public bool    CanUseCustomRunners    { get; init; }
-    public int     MaxFlows               { get; init; }
-    public int     MaxApps                { get; init; }
-    public int     MaxCustomSteps         { get; init; }
     public int     SortOrder              { get; init; }
     public DateTime  CreatedAt            { get; init; }
     public DateTime? UpdatedAt            { get; init; }
@@ -266,10 +250,6 @@ public record CreateSubscriptionPlanRequest
     public bool    IsDefault              { get; init; } = false;
     public bool    CanCreateProjects      { get; init; } = false;
     public bool    CanCreateOrganizations { get; init; } = false;
-    public bool    CanUseCustomRunners    { get; init; } = false;
-    public int     MaxFlows               { get; init; } = 5;
-    public int     MaxApps                { get; init; } = 2;
-    public int     MaxCustomSteps         { get; init; } = 3;
     public int     SortOrder              { get; init; } = 0;
 }
 
@@ -281,10 +261,6 @@ public record UpdateSubscriptionPlanRequest
     public bool?    IsDefault              { get; init; }
     public bool?    CanCreateProjects      { get; init; }
     public bool?    CanCreateOrganizations { get; init; }
-    public bool?    CanUseCustomRunners    { get; init; }
-    public int?     MaxFlows               { get; init; }
-    public int?     MaxApps                { get; init; }
-    public int?     MaxCustomSteps         { get; init; }
     public int?     SortOrder              { get; init; }
 }
 

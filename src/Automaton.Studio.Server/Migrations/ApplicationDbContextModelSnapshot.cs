@@ -1624,9 +1624,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<bool>("CanCreateProjects")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<bool>("CanUseCustomRunners")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1636,15 +1633,6 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("MaxApps")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaxCustomSteps")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaxFlows")
-                        .HasColumnType("int");
 
                     b.Property<decimal>("MonthlyCostLimitUsd")
                         .HasColumnType("decimal(10, 2)");

@@ -26,26 +26,12 @@ public class SubscriptionPlan
     public bool IsDefault { get; set; } = false;
 
     // ── Feature gates ────────────────────────────────────────────────────────
-    // These flags are checked at the API level to allow/deny feature access.
-    // Enforcement is done in service/controller layer — not yet wired up.
 
     /// <summary>User can create and manage Projects (multi-asset containers with shared settings).</summary>
     public bool CanCreateProjects { get; set; } = false;
 
     /// <summary>User can create and manage Organizations (multi-user teams).</summary>
     public bool CanCreateOrganizations { get; set; } = false;
-
-    /// <summary>User can register and use custom runner nodes.</summary>
-    public bool CanUseCustomRunners { get; set; } = false;
-
-    /// <summary>Maximum number of flows the user may own. 0 = unlimited.</summary>
-    public int MaxFlows { get; set; } = 5;
-
-    /// <summary>Maximum number of apps the user may own. 0 = unlimited.</summary>
-    public int MaxApps { get; set; } = 2;
-
-    /// <summary>Maximum number of custom steps the user may own. 0 = unlimited.</summary>
-    public int MaxCustomSteps { get; set; } = 3;
 
     public int SortOrder { get; set; } = 0;
 
