@@ -14,10 +14,14 @@ import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import type { CreateOrganizationRequest, OrganizationListItem } from '../types'
 import { OrganizationRole } from '../types'
+import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
+import { usePlanLimit } from '@/shared/composables/usePlanLimit'
 
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
+const { canCreateOrganizations } = usePlanFeatures()
+const { showUpgrade } = usePlanLimit()
 
 // State
 const organizations = ref<OrganizationListItem[]>([])
@@ -77,6 +81,14 @@ const formatDate = (date: string) => {
 }
 
 // Handle create organization
+function openCreateDialog() {
+  if (!canCreateOrganizations.value) {
+    showUpgrade('CanCreateOrganizations', 'Pro')
+    return
+  }
+  showCreateDialog.value = true
+}
+
 async function handleCreateOrganization() {
   if (!createForm.value.name) {
     toast.add({
@@ -166,7 +178,7 @@ function resetCreateForm() {
       <Button
         label="Create Organization"
         icon="pi pi-plus"
-        @click="showCreateDialog = true"
+        @click="openCreateDialog"
       />
     </div>
 
@@ -184,7 +196,7 @@ function resetCreateForm() {
       <Button
         label="Create Your First Organization"
         icon="pi pi-plus"
-        @click="showCreateDialog = true"
+        @click="openCreateDialog"
       />
     </EmptyState>
 

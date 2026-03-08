@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { usePlanLimit } from '@/shared/composables/usePlanLimit'
+import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
 import Toast from 'primevue/toast'
@@ -17,6 +18,7 @@ const projectsStore = useProjectsStore()
 const route = useRoute()
 const router = useRouter()
 const { visible: planLimitVisible, featureName, requiredPlan, install: installPlanLimit, dismiss } = usePlanLimit()
+const { load: loadPlanFeatures } = usePlanFeatures()
 
 // Check if current route uses auth layout (login, register, install, etc.)
 const isAuthLayout = computed(() => route.meta.layout === 'auth')
@@ -29,6 +31,7 @@ onMounted(async () => {
   // Only initialize projects store on authenticated pages (not auth/install pages)
   if (!isAuthLayout.value) {
     await projectsStore.initialize()
+    await loadPlanFeatures()
   }
 })
 

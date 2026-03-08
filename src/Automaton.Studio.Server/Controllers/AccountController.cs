@@ -229,4 +229,13 @@ public class AccountController : BaseController
 
         return NoContent();
     }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetPlanFeatures([FromServices] ISubscriptionGatewayService subscriptionGateway)
+    {
+        var userId = GetUserId();
+        var (canCreateProjects, canCreateOrganizations) = await subscriptionGateway.GetPlanFeaturesAsync(userId);
+        return Ok(new { canCreateProjects, canCreateOrganizations });
+    }
 }

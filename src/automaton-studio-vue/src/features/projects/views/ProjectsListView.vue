@@ -18,11 +18,15 @@ import { organizationsService } from '@/features/organizations/services/organiza
 import type { CreateProjectRequest } from '@/features/projects/types'
 import type { OrganizationListItem } from '@/features/organizations/types'
 import { ProjectRole } from '@/features/projects/types'
+import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
+import { usePlanLimit } from '@/shared/composables/usePlanLimit'
 
 const store = useProjectsStore()
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
+const { canCreateProjects } = usePlanFeatures()
+const { showUpgrade } = usePlanLimit()
 
 // Computed
 const hasProjects = computed(() => store.projects.length > 0)
@@ -70,6 +74,14 @@ const formatDate = (date: string) => {
 }
 
 // Handle create project
+function openCreateDialog() {
+  if (!canCreateProjects.value) {
+    showUpgrade('CanCreateProjects', 'Starter')
+    return
+  }
+  showCreateDialog.value = true
+}
+
 async function handleCreateProject() {
   if (!createForm.value.name || !createForm.value.displayName) {
     toast.add({
@@ -200,9 +212,8 @@ function closeCreateDialog() {
       <Button
         icon="pi pi-plus"
         label="Create Project"
-        @click="showCreateDialog = true"
+        @click="openCreateDialog"
       />
-    </div>
 
     <!-- Projects DataTable -->
     <Card>
@@ -295,7 +306,7 @@ function closeCreateDialog() {
           <Button
             icon="pi pi-plus"
             label="Create Project"
-            @click="showCreateDialog = true"
+            @click="openCreateDialog"
           />
         </EmptyState>
       </template>

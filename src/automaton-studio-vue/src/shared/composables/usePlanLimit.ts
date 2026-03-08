@@ -28,5 +28,12 @@ export function usePlanLimit() {
     visible.value = false
   }
 
-  return { visible, featureName, requiredPlan, install, dismiss }
+  /** Proactively show the upgrade dialog without waiting for a 402. */
+  function showUpgrade(feature: string, plan: string) {
+    featureName.value = featureLabels[feature] ?? feature
+    requiredPlan.value = plan
+    visible.value = true
+  }
+
+  return { visible, featureName, requiredPlan, install, dismiss, showUpgrade }
 }
