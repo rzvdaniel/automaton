@@ -71,6 +71,7 @@ public class AdminSubscriptionPlansController : ControllerBase
             Name                   = req.Name,
             Description            = req.Description,
             MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd,
+            PriceUsd               = req.PriceUsd,
             IsDefault              = req.IsDefault,
             CanCreateProjects      = req.CanCreateProjects,
             CanCreateOrganizations = req.CanCreateOrganizations,
@@ -99,6 +100,7 @@ public class AdminSubscriptionPlansController : ControllerBase
         if (req.Name        != null) plan.Name               = req.Name;
         if (req.Description != null) plan.Description        = req.Description;
         if (req.MonthlyCostLimitUsd   .HasValue) plan.MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd.Value;
+        if (req.PriceUsd              .HasValue) plan.PriceUsd               = req.PriceUsd.Value;
         if (req.IsDefault             .HasValue) plan.IsDefault              = req.IsDefault.Value;
         if (req.CanCreateProjects     .HasValue) plan.CanCreateProjects      = req.CanCreateProjects.Value;
         if (req.CanCreateOrganizations.HasValue) plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
@@ -217,6 +219,7 @@ public class AdminSubscriptionPlansController : ControllerBase
         Name                   = p.Name,
         Description            = p.Description,
         MonthlyCostLimitUsd    = p.MonthlyCostLimitUsd,
+        PriceUsd               = p.PriceUsd,
         IsDefault              = p.IsDefault,
         CanCreateProjects      = p.CanCreateProjects,
         CanCreateOrganizations = p.CanCreateOrganizations,
@@ -234,6 +237,7 @@ public record SubscriptionPlanResponse
     public string  Name                   { get; init; } = string.Empty;
     public string? Description            { get; init; }
     public decimal MonthlyCostLimitUsd    { get; init; }
+    public decimal PriceUsd               { get; init; }
     public bool    IsDefault              { get; init; }
     public bool    CanCreateProjects      { get; init; }
     public bool    CanCreateOrganizations { get; init; }
@@ -247,6 +251,7 @@ public record CreateSubscriptionPlanRequest
     public string  Name                   { get; init; } = string.Empty;
     public string? Description            { get; init; }
     public decimal MonthlyCostLimitUsd    { get; init; } = 10m;
+    public decimal PriceUsd               { get; init; } = 0m;
     public bool    IsDefault              { get; init; } = false;
     public bool    CanCreateProjects      { get; init; } = false;
     public bool    CanCreateOrganizations { get; init; } = false;
@@ -258,6 +263,7 @@ public record UpdateSubscriptionPlanRequest
     public string?  Name                   { get; init; }
     public string?  Description            { get; init; }
     public decimal? MonthlyCostLimitUsd    { get; init; }
+    public decimal? PriceUsd               { get; init; }
     public bool?    IsDefault              { get; init; }
     public bool?    CanCreateProjects      { get; init; }
     public bool?    CanCreateOrganizations { get; init; }

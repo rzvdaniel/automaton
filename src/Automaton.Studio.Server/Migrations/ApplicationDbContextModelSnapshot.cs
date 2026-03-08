@@ -1642,6 +1642,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<decimal>("PriceUsd")
+                        .HasColumnType("decimal(10, 2)");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 

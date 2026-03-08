@@ -181,6 +181,7 @@ export interface SubscriptionPlan {
   name: string
   description?: string
   monthlyCostLimitUsd: number
+  priceUsd: number
   isDefault: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
@@ -193,6 +194,7 @@ export interface CreateSubscriptionPlanRequest {
   name: string
   description?: string
   monthlyCostLimitUsd: number
+  priceUsd: number
   isDefault: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
@@ -203,6 +205,7 @@ export interface UpdateSubscriptionPlanRequest {
   name?: string
   description?: string
   monthlyCostLimitUsd?: number
+  priceUsd?: number
   isDefault?: boolean
   canCreateProjects?: boolean
   canCreateOrganizations?: boolean

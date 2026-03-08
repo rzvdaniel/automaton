@@ -22,6 +22,10 @@ public class SubscriptionPlan
     [Column(TypeName = "decimal(10, 2)")]
     public decimal MonthlyCostLimitUsd { get; set; } = 10.00m;
 
+    /// <summary>Subscription price charged to the user per month (USD). Independent of AI budget.</summary>
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal PriceUsd { get; set; } = 0.00m;
+
     /// <summary>When true, this plan is automatically assigned to new users.</summary>
     public bool IsDefault { get; set; } = false;
 

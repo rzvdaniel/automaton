@@ -11,6 +11,7 @@ interface SubscriptionPlan {
   name: string
   description: string | null
   monthlyCostLimitUsd: number
+  priceUsd: number
   canCreateProjects: boolean
   canCreateOrganizations: boolean
   isDefault: boolean
@@ -85,8 +86,11 @@ const highlightedIndex = computed(() => {
           <div v-if="index === highlightedIndex" class="plan-badge">Most Popular</div>
           <div class="plan-name">{{ plan.name }}</div>
           <div class="plan-price">
-            <span class="price-amount">${{ plan.monthlyCostLimitUsd.toFixed(0) }}</span>
-            <span class="price-period text-color-secondary">/ month AI budget</span>
+            <span v-if="plan.priceUsd > 0">
+              <span class="price-amount">${{ plan.priceUsd.toFixed(0) }}</span>
+              <span class="price-period text-color-secondary">/month</span>
+            </span>
+            <span v-else class="price-amount">Free</span>
           </div>
           <p class="plan-description text-color-secondary text-sm">{{ plan.description }}</p>
           <ul class="plan-features">

@@ -34,6 +34,7 @@ const planForm = ref<CreateSubscriptionPlanRequest>({
   name: '',
   description: '',
   monthlyCostLimitUsd: 10,
+  priceUsd: 0,
   isDefault: false,
   canCreateProjects: false,
   canCreateOrganizations: false,
@@ -90,6 +91,7 @@ function openCreatePlan() {
   planForm.value = {
     name: '', description: '',
     monthlyCostLimitUsd: 10,
+    priceUsd: 0,
     isDefault: false,
     canCreateProjects: false,
     canCreateOrganizations: false,
@@ -104,6 +106,7 @@ function openEditPlan(plan: SubscriptionPlan) {
     name: plan.name,
     description: plan.description ?? '',
     monthlyCostLimitUsd: plan.monthlyCostLimitUsd,
+    priceUsd: plan.priceUsd,
     isDefault: plan.isDefault,
     canCreateProjects: plan.canCreateProjects,
     canCreateOrganizations: plan.canCreateOrganizations,
@@ -204,7 +207,13 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
       <DataTable :value="plans" :loading="loadingPlans" stripedRows>
         <Column field="name" header="Plan" />
         <Column field="description" header="Description" />
-        <Column header="Monthly Limit" style="width:140px">
+        <Column header="Price" style="width:110px">
+          <template #body="{ data }">
+            <span v-if="data.priceUsd > 0">${{ data.priceUsd.toFixed(2) }}/mo</span>
+            <span v-else class="text-color-secondary">Free</span>
+          </template>
+        </Column>
+        <Column header="AI Budget" style="width:120px">
           <template #body="{ data }">
             ${{ data.monthlyCostLimitUsd.toFixed(2) }}
           </template>
@@ -286,7 +295,21 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <Textarea v-model="planForm.description" rows="2" class="w-full" />
       </div>
       <div class="flex flex-column gap-1">
-        <label class="font-medium text-sm">Monthly AI Spend Limit (USD)</label>
+        <label class="font-medium text-sm">Subscription Price (USD/month)</label>
+        <InputNumber
+          v-model="planForm.priceUsd"
+          mode="currency"
+          currency="USD"
+          :min="0"
+          :max="100000"
+          :minFractionDigits="2"
+          class="w-full"
+          placeholder="0.00 = Free"
+        />
+        <small class="text-color-secondary">What you charge the user per month.</small>
+      </div>
+      <div class="flex flex-column gap-1">
+        <label class="font-medium text-sm">Monthly AI Spend Budget (USD)</label>
         <InputNumber
           v-model="planForm.monthlyCostLimitUsd"
           mode="currency"
@@ -296,6 +319,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
           :minFractionDigits="2"
           class="w-full"
         />
+        <small class="text-color-secondary">How much of that is passed through to AI providers.</small>
       </div>
       <div class="flex align-items-center gap-2">
         <Checkbox v-model="planForm.isDefault" :binary="true" inputId="isDefault" />

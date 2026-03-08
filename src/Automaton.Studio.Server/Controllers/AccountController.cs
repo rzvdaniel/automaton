@@ -254,6 +254,7 @@ public class AccountController : BaseController
                 p.Name,
                 p.Description,
                 p.MonthlyCostLimitUsd,
+                p.PriceUsd,
                 p.CanCreateProjects,
                 p.CanCreateOrganizations,
                 p.IsDefault,
