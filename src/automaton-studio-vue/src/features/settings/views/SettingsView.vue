@@ -17,10 +17,6 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
-// Organizations (CTA from Settings)
-import { organizationsService } from '@/features/organizations/services/organizationsService'
-import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
-import type { CreateOrganizationRequest } from '@/features/organizations/types'
 
 const {
   theme: themePreference,
@@ -33,13 +29,6 @@ const {
 const authStore = useAuthStore()
 const router = useRouter()
 const toast = useToast()
-
-// Organizations state (for progressive disclosure)
-const { organizations, loadOrganizations } = useOrganizationRole()
-const hasOrganizations = computed(() => organizations.value && organizations.value.length > 0)
-const showCreateOrgDialog = ref(false)
-const creatingOrg = ref(false)
-const createOrgForm = ref<CreateOrganizationRequest>({ name: '', description: '' })
 
 const activeSection = ref('account')
 
@@ -71,8 +60,6 @@ onMounted(async () => {
   }
   // Sync local value from cached settings
   editorFontSize.value = fontSize.value
-  // Load organizations to determine if CTA should be shown
-  await loadOrganizations()
 })
 
 // Keep local value in sync with cached settings
@@ -208,30 +195,6 @@ async function saveEditorSettings() {
   }
 }
 
-// Create organization from Settings CTA
-async function handleCreateOrganization() {
-  if (!createOrgForm.value.name || createOrgForm.value.name.trim().length < 2) {
-    toast.add({ severity: 'error', summary: 'Validation', detail: 'Organization name is required', life: 3000 })
-    return
-  }
-  try {
-    creatingOrg.value = true
-    const org = await organizationsService.createOrganization(createOrgForm.value)
-    toast.add({ severity: 'success', summary: 'Organization Created', detail: 'Redirecting to dashboard…', life: 2500 })
-    showCreateOrgDialog.value = false
-    createOrgForm.value = { name: '', description: '' }
-    // Navigate to org dashboard
-    router.push({ name: 'organization-dashboard', params: { id: org.id } })
-  } catch (err) {
-    console.error('Failed to create organization', err)
-    toast.add({ severity: 'error', summary: 'Create Failed', detail: 'Could not create organization', life: 4000 })
-  } finally {
-    creatingOrg.value = false
-    // Refresh orgs so sidebar can reveal Organizations menu
-    await loadOrganizations()
-  }
-}
-
 // Change password dialog state
 const showPasswordDialog = ref(false)
 const oldPassword = ref('')
@@ -354,14 +317,6 @@ const passwordLoading = computed(() => passwordSaving.value)
                 :class="{ 'surface-hover': activeSection === 'apikeys' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'apikeys'"
-              />
-              <Button
-                label="Organizations"
-                icon="pi pi-building"
-                text
-                :class="{ 'surface-hover': activeSection === 'organizations' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'organizations'"
               />
 
               <div class="text-color-secondary text-sm font-semibold mb-2 mt-4 px-3">Preferences</div>
@@ -487,35 +442,6 @@ const passwordLoading = computed(() => passwordSaving.value)
             </div>
           </template>
         </Card>
-        <!-- Organizations Section -->
-        <Card v-if="activeSection === 'organizations'">
-          <template #title>Organizations</template>
-          <template #content>
-            <div class="flex flex-column gap-4">
-              <div v-if="hasOrganizations" class="flex align-items-center justify-content-between p-3 surface-ground border-round">
-                <div>
-                  <div class="font-medium">You're a member of {{ organizations.length }} organization(s).</div>
-                  <div class="text-color-secondary text-sm">Manage collaboration, members, and app assignments.</div>
-                </div>
-                <div class="flex gap-2">
-                  <Button label="Manage" icon="pi pi-users" outlined @click="router.push('/organizations')" />
-                  <Button label="Create Organization" icon="pi pi-plus" @click="showCreateOrgDialog = true" />
-                </div>
-              </div>
-
-              <div v-else class="p-3 surface-ground border-round">
-                <div class="flex align-items-center justify-content-between">
-                  <div>
-                    <div class="font-medium">No organizations yet</div>
-                    <div class="text-color-secondary text-sm">Create your first organization to enable team access and assignments.</div>
-                  </div>
-                  <Button label="Create Your First Organization" icon="pi pi-plus" @click="showCreateOrgDialog = true" />
-                </div>
-              </div>
-            </div>
-          </template>
-        </Card>
-
         <!-- API Keys Section -->
         <ApiKeysSection v-if="activeSection === 'apikeys'" />
 
@@ -722,29 +648,6 @@ const passwordLoading = computed(() => passwordSaving.value)
       </template>
     </Dialog>
 
-    <!-- Create Organization Dialog (from Settings) -->
-    <Dialog
-      v-model:visible="showCreateOrgDialog"
-      header="Create Organization"
-      modal
-      :style="{ width: '28rem' }"
-    >
-      <div class="flex flex-column gap-3 pt-2">
-        <div class="flex flex-column gap-2">
-          <label for="orgName" class="font-medium">Name *</label>
-          <InputText id="orgName" v-model="createOrgForm.name" placeholder="Organization name" />
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="orgDesc" class="font-medium">Description</label>
-          <Textarea id="orgDesc" v-model="createOrgForm.description" placeholder="Optional description" rows="3" />
-        </div>
-        <small class="text-color-secondary">Slug is auto-generated. You can update settings later.</small>
-      </div>
-      <template #footer>
-        <Button label="Cancel" text severity="secondary" :disabled="creatingOrg" @click="showCreateOrgDialog = false" />
-        <Button label="Create" icon="pi pi-check" :loading="creatingOrg" :disabled="creatingOrg" @click="handleCreateOrganization" />
-      </template>
-    </Dialog>
   </div>
 </template>
 

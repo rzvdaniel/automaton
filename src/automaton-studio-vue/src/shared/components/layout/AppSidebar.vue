@@ -12,7 +12,7 @@ const isExpanded = ref(false)
 const authStore = useAuthStore()
 
 // Load organization roles for access control
-const { isAppUserOnly, loadOrganizations, organizations, loading } = useOrganizationRole()
+const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
 
 onMounted(async () => {
   // Load organizations to determine user's roles
@@ -58,16 +58,10 @@ const isAdmin = computed(() => {
 })
 
 // Filter navigation items based on user role
-const hasOrganizations = computed(() => organizations.value && organizations.value.length > 0)
-
 const visibleNavItems = computed(() => {
   let base = !isAppUserOnly.value
     ? navItems.filter(item => item.to !== '/my-apps')
     : navItems.filter(item => !item.hideForAppUser)
-  // Progressive disclosure: hide Organizations until user has at least one org
-  if (!hasOrganizations.value) {
-    base = base.filter(item => item.to !== '/organizations')
-  }
   // Show Admin only for Admin/SysAdmin roles
   if (!isAdmin.value) {
     base = base.filter(item => item.to !== '/admin')
