@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import api from '@/shared/services/api/axios-instance'
+import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
 
 interface SubscriptionPlan {
   id: string
@@ -17,10 +18,12 @@ interface SubscriptionPlan {
 }
 
 const router = useRouter()
+const subscriptionsEnabled = useSubscriptionsEnabled()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
+  if (!subscriptionsEnabled) { loading.value = false; return }
   try {
     const { data } = await api.get<SubscriptionPlan[]>('/api/account/getsubscriptionplans')
     plans.value = data
@@ -61,6 +64,15 @@ const highlightedIndex = computed(() => {
 
     <div v-if="loading" class="flex justify-center py-10">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem" />
+    </div>
+
+    <div v-else-if="!subscriptionsEnabled" class="coming-soon">
+      <i class="pi pi-clock text-5xl text-color-secondary mb-4" />
+      <h2>Paid plans coming soon</h2>
+      <p class="text-color-secondary">
+        Everyone is on the <strong>Free</strong> plan for now.
+        Paid plans will be available shortly — stay tuned!
+      </p>
     </div>
 
     <div v-else class="plans-grid">
@@ -178,6 +190,15 @@ const highlightedIndex = computed(() => {
 
 .pricing-note {
   opacity: 0.7;
+}
+
+.coming-soon {
+  text-align: center;
+  padding: 3rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 </style>
 

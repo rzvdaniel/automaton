@@ -5,6 +5,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { usePlanLimit } from '@/shared/composables/usePlanLimit'
 import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
+import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
 import Toast from 'primevue/toast'
@@ -19,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const { visible: planLimitVisible, featureName, requiredPlan, install: installPlanLimit, dismiss } = usePlanLimit()
 const { load: loadPlanFeatures } = usePlanFeatures()
+const subscriptionsEnabled = useSubscriptionsEnabled()
 
 // Check if current route uses auth layout (login, register, install, etc.)
 const isAuthLayout = computed(() => route.meta.layout === 'auth')
@@ -67,7 +69,7 @@ function goToPricing() {
     </div>
     <template #footer>
       <Button label="Maybe later" text @click="dismiss" />
-      <Button label="See plans" icon="pi pi-arrow-right" icon-pos="right" @click="goToPricing" />
+      <Button v-if="subscriptionsEnabled" label="See plans" icon="pi pi-arrow-right" icon-pos="right" @click="goToPricing" />
     </template>
   </Dialog>
 
