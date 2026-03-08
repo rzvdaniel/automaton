@@ -17,8 +17,8 @@ export function useOrganizationRole() {
    * (no OrgAdmin or Developer roles anywhere)
    */
   const isAppUserOnly = computed(() => {
-    if (loading.value) return true
-    if (organizations.value.length === 0) return true
+    if (loading.value) return false
+    if (organizations.value.length === 0) return false
     
     return organizations.value.every(org => 
       org.role === OrganizationRole.AppUser
