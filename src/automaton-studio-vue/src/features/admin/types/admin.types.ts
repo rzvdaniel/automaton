@@ -182,6 +182,12 @@ export interface SubscriptionPlan {
   description?: string
   monthlyCostLimitUsd: number
   isDefault: boolean
+  canCreateProjects: boolean
+  canCreateOrganizations: boolean
+  canUseCustomRunners: boolean
+  maxFlows: number
+  maxApps: number
+  maxCustomSteps: number
   sortOrder: number
   createdAt: string
   updatedAt?: string
@@ -192,6 +198,12 @@ export interface CreateSubscriptionPlanRequest {
   description?: string
   monthlyCostLimitUsd: number
   isDefault: boolean
+  canCreateProjects: boolean
+  canCreateOrganizations: boolean
+  canUseCustomRunners: boolean
+  maxFlows: number
+  maxApps: number
+  maxCustomSteps: number
   sortOrder: number
 }
 
@@ -200,6 +212,12 @@ export interface UpdateSubscriptionPlanRequest {
   description?: string
   monthlyCostLimitUsd?: number
   isDefault?: boolean
+  canCreateProjects?: boolean
+  canCreateOrganizations?: boolean
+  canUseCustomRunners?: boolean
+  maxFlows?: number
+  maxApps?: number
+  maxCustomSteps?: number
   sortOrder?: number
 }
 
