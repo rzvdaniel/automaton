@@ -214,6 +214,7 @@ function closeCreateDialog() {
         label="Create Project"
         @click="openCreateDialog"
       />
+    </div>
 
     <!-- Projects DataTable -->
     <Card>
