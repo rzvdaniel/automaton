@@ -28,10 +28,10 @@ public class TokenBudgetService : ITokenBudgetService
                 .Include(m => m.Provider)
                 .FirstOrDefaultAsync(m => m.ModelId == modelId && m.Provider.Name == provider);
 
-            var costPer1kInput  = model?.CostPer1kTokensInput  ?? 0m;
-            var costPer1kOutput = model?.CostPer1kTokensOutput ?? 0m;
-            var costUsd = (inputTokens  / 1000m) * costPer1kInput
-                        + (outputTokens / 1000m) * costPer1kOutput;
+            var costPer1MInput  = model?.CostPer1MTokensInput  ?? 0m;
+            var costPer1MOutput = model?.CostPer1MTokensOutput ?? 0m;
+            var costUsd = (inputTokens  / 1_000_000m) * costPer1MInput
+                        + (outputTokens / 1_000_000m) * costPer1MOutput;
 
             var now   = DateTime.UtcNow;
             var month = now.Month;
@@ -97,7 +97,7 @@ public class TokenBudgetService : ITokenBudgetService
                          && m.SupportsTools
                          && m.SupportsStreaming
                          && m.ModelId != requestedModel)
-                .OrderBy(m => m.CostPer1kTokensInput ?? decimal.MaxValue)
+                .OrderBy(m => m.CostPer1MTokensInput ?? decimal.MaxValue)
                 .ThenBy(m => m.SortOrder)
                 .FirstOrDefaultAsync();
 

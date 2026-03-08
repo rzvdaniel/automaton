@@ -39,10 +39,10 @@ public class AiModel
     public bool SupportsVision { get; set; } = false;
 
     [Column(TypeName = "decimal(10, 6)")]
-    public decimal? CostPer1kTokensInput { get; set; }
+    public decimal? CostPer1MTokensInput { get; set; }
 
     [Column(TypeName = "decimal(10, 6)")]
-    public decimal? CostPer1kTokensOutput { get; set; }
+    public decimal? CostPer1MTokensOutput { get; set; }
 
     public int SortOrder { get; set; } = 0;
 

@@ -48,8 +48,8 @@ const formData = ref({
   supportsStreaming: true,
   supportsTools: false,
   supportsVision: false,
-  costPer1kTokensInput: undefined as number | undefined,
-  costPer1kTokensOutput: undefined as number | undefined,
+  costPer1MTokensInput: undefined as number | undefined,
+  costPer1MTokensOutput: undefined as number | undefined,
   sortOrder: 0,
 })
 const formErrors = ref<Record<string, string>>({})
@@ -92,8 +92,8 @@ function openCreateDialog() {
     supportsStreaming: true,
     supportsTools: false,
     supportsVision: false,
-    costPer1kTokensInput: undefined,
-    costPer1kTokensOutput: undefined,
+    costPer1MTokensInput: undefined,
+    costPer1MTokensOutput: undefined,
     sortOrder: 0,
   }
   formErrors.value = {}
@@ -112,8 +112,8 @@ function openEditDialog(model: AiModelAdmin) {
     supportsStreaming: model.supportsStreaming,
     supportsTools: model.supportsTools,
     supportsVision: model.supportsVision,
-    costPer1kTokensInput: model.costPer1kTokensInput,
-    costPer1kTokensOutput: model.costPer1kTokensOutput,
+    costPer1MTokensInput: model.costPer1MTokensInput,
+    costPer1MTokensOutput: model.costPer1MTokensOutput,
     sortOrder: model.sortOrder,
   }
   formErrors.value = {}
@@ -146,8 +146,8 @@ async function handleSave() {
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
         supportsVision: formData.value.supportsVision,
-        costPer1kTokensInput: formData.value.costPer1kTokensInput,
-        costPer1kTokensOutput: formData.value.costPer1kTokensOutput,
+        costPer1MTokensInput: formData.value.costPer1MTokensInput,
+        costPer1MTokensOutput: formData.value.costPer1MTokensOutput,
         sortOrder: formData.value.sortOrder,
       }
       await adminAiProvidersService.updateModel(editingModel.value.id, request)
@@ -163,8 +163,8 @@ async function handleSave() {
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
         supportsVision: formData.value.supportsVision,
-        costPer1kTokensInput: formData.value.costPer1kTokensInput,
-        costPer1kTokensOutput: formData.value.costPer1kTokensOutput,
+        costPer1MTokensInput: formData.value.costPer1MTokensInput,
+        costPer1MTokensOutput: formData.value.costPer1MTokensOutput,
         sortOrder: formData.value.sortOrder,
       }
       await adminAiProvidersService.createModel(providerId.value, request)
@@ -456,7 +456,7 @@ function goBackToProviders() {
               <label for="costInput" class="text-sm text-color-secondary">Input</label>
               <InputNumber
                 id="costInput"
-                v-model="formData.costPer1kTokensInput"
+                v-model="formData.costPer1MTokensInput"
                 :min-fraction-digits="2"
                 :max-fraction-digits="6"
                 mode="decimal"
@@ -467,7 +467,7 @@ function goBackToProviders() {
               <label for="costOutput" class="text-sm text-color-secondary">Output</label>
               <InputNumber
                 id="costOutput"
-                v-model="formData.costPer1kTokensOutput"
+                v-model="formData.costPer1MTokensOutput"
                 :min-fraction-digits="2"
                 :max-fraction-digits="6"
                 mode="decimal"

@@ -1,4 +1,4 @@
-﻿using Automaton.Core.Enums;
+using Automaton.Core.Enums;
 using Automaton.Studio.Server.Entities;
 using Common.Authentication;
 using Common.EF;

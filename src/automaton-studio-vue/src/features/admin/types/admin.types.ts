@@ -75,8 +75,8 @@ export interface AiModelAdmin {
   supportsStreaming: boolean
   supportsTools: boolean
   supportsVision: boolean
-  costPer1kTokensInput?: number
-  costPer1kTokensOutput?: number
+  costPer1MTokensInput?: number
+  costPer1MTokensOutput?: number
   sortOrder: number
   createdAt: string
   updatedAt?: string
@@ -96,8 +96,8 @@ export interface CreateAiModelRequest {
   supportsStreaming: boolean
   supportsTools: boolean
   supportsVision: boolean
-  costPer1kTokensInput?: number
-  costPer1kTokensOutput?: number
+  costPer1MTokensInput?: number
+  costPer1MTokensOutput?: number
   sortOrder: number
 }
 
@@ -114,8 +114,8 @@ export interface UpdateAiModelRequest {
   supportsStreaming?: boolean
   supportsTools?: boolean
   supportsVision?: boolean
-  costPer1kTokensInput?: number
-  costPer1kTokensOutput?: number
+  costPer1MTokensInput?: number
+  costPer1MTokensOutput?: number
   sortOrder?: number
 }
 

@@ -254,8 +254,8 @@ public class AdminAiProvidersController : ControllerBase
                 SupportsStreaming = m.SupportsStreaming,
                 SupportsTools = m.SupportsTools,
                 SupportsVision = m.SupportsVision,
-                CostPer1kTokensInput = m.CostPer1kTokensInput,
-                CostPer1kTokensOutput = m.CostPer1kTokensOutput,
+                CostPer1MTokensInput = m.CostPer1MTokensInput,
+                CostPer1MTokensOutput = m.CostPer1MTokensOutput,
                 SortOrder = m.SortOrder,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt
@@ -290,8 +290,8 @@ public class AdminAiProvidersController : ControllerBase
                 SupportsStreaming = m.SupportsStreaming,
                 SupportsTools = m.SupportsTools,
                 SupportsVision = m.SupportsVision,
-                CostPer1kTokensInput = m.CostPer1kTokensInput,
-                CostPer1kTokensOutput = m.CostPer1kTokensOutput,
+                CostPer1MTokensInput = m.CostPer1MTokensInput,
+                CostPer1MTokensOutput = m.CostPer1MTokensOutput,
                 SortOrder = m.SortOrder,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt
@@ -344,8 +344,8 @@ public class AdminAiProvidersController : ControllerBase
             SupportsStreaming = request.SupportsStreaming,
             SupportsTools = request.SupportsTools,
             SupportsVision = request.SupportsVision,
-            CostPer1kTokensInput = request.CostPer1kTokensInput,
-            CostPer1kTokensOutput = request.CostPer1kTokensOutput,
+            CostPer1MTokensInput = request.CostPer1MTokensInput,
+            CostPer1MTokensOutput = request.CostPer1MTokensOutput,
             SortOrder = request.SortOrder,
             CreatedAt = DateTime.UtcNow
         };
@@ -369,8 +369,8 @@ public class AdminAiProvidersController : ControllerBase
             SupportsStreaming = newModel.SupportsStreaming,
             SupportsTools = newModel.SupportsTools,
             SupportsVision = newModel.SupportsVision,
-            CostPer1kTokensInput = newModel.CostPer1kTokensInput,
-            CostPer1kTokensOutput = newModel.CostPer1kTokensOutput,
+            CostPer1MTokensInput = newModel.CostPer1MTokensInput,
+            CostPer1MTokensOutput = newModel.CostPer1MTokensOutput,
             SortOrder = newModel.SortOrder,
             CreatedAt = newModel.CreatedAt,
             UpdatedAt = newModel.UpdatedAt
@@ -421,8 +421,8 @@ public class AdminAiProvidersController : ControllerBase
         if (request.SupportsStreaming.HasValue) model.SupportsStreaming = request.SupportsStreaming.Value;
         if (request.SupportsTools.HasValue) model.SupportsTools = request.SupportsTools.Value;
         if (request.SupportsVision.HasValue) model.SupportsVision = request.SupportsVision.Value;
-        if (request.CostPer1kTokensInput.HasValue) model.CostPer1kTokensInput = request.CostPer1kTokensInput.Value;
-        if (request.CostPer1kTokensOutput.HasValue) model.CostPer1kTokensOutput = request.CostPer1kTokensOutput.Value;
+        if (request.CostPer1MTokensInput.HasValue) model.CostPer1MTokensInput = request.CostPer1MTokensInput.Value;
+        if (request.CostPer1MTokensOutput.HasValue) model.CostPer1MTokensOutput = request.CostPer1MTokensOutput.Value;
         if (request.SortOrder.HasValue) model.SortOrder = request.SortOrder.Value;
 
         model.UpdatedAt = DateTime.UtcNow;
@@ -633,8 +633,8 @@ public class AiModelAdminResponse
     public bool SupportsStreaming { get; set; }
     public bool SupportsTools { get; set; }
     public bool SupportsVision { get; set; }
-    public decimal? CostPer1kTokensInput { get; set; }
-    public decimal? CostPer1kTokensOutput { get; set; }
+    public decimal? CostPer1MTokensInput { get; set; }
+    public decimal? CostPer1MTokensOutput { get; set; }
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -651,8 +651,8 @@ public class AdminCreateAiModelRequest
     public bool SupportsStreaming { get; set; } = true;
     public bool SupportsTools { get; set; } = false;
     public bool SupportsVision { get; set; } = false;
-    public decimal? CostPer1kTokensInput { get; set; }
-    public decimal? CostPer1kTokensOutput { get; set; }
+    public decimal? CostPer1MTokensInput { get; set; }
+    public decimal? CostPer1MTokensOutput { get; set; }
     public int SortOrder { get; set; } = 0;
 }
 
@@ -667,8 +667,8 @@ public class AdminUpdateAiModelRequest
     public bool? SupportsStreaming { get; set; }
     public bool? SupportsTools { get; set; }
     public bool? SupportsVision { get; set; }
-    public decimal? CostPer1kTokensInput { get; set; }
-    public decimal? CostPer1kTokensOutput { get; set; }
+    public decimal? CostPer1MTokensInput { get; set; }
+    public decimal? CostPer1MTokensOutput { get; set; }
     public int? SortOrder { get; set; }
 }
 

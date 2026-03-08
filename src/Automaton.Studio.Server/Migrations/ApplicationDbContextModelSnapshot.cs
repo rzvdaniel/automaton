@@ -211,10 +211,10 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid>("AiProviderId")
                         .HasColumnType("char(36)");
 
-                    b.Property<decimal?>("CostPer1kTokensInput")
+                    b.Property<decimal?>("CostPer1MTokensInput")
                         .HasColumnType("decimal(10, 6)");
 
-                    b.Property<decimal?>("CostPer1kTokensOutput")
+                    b.Property<decimal?>("CostPer1MTokensOutput")
                         .HasColumnType("decimal(10, 6)");
 
                     b.Property<DateTime>("CreatedAt")
