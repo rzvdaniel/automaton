@@ -6,8 +6,10 @@ import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { usePlanLimit } from '@/shared/composables/usePlanLimit'
 import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
+import { useBudgetBanner } from '@/shared/composables/useBudgetBanner'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
+import BudgetBanner from '@/shared/components/layout/BudgetBanner.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Dialog from 'primevue/dialog'
@@ -20,6 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const { visible: planLimitVisible, featureName, requiredPlan, install: installPlanLimit, dismiss } = usePlanLimit()
 const { load: loadPlanFeatures } = usePlanFeatures()
+const { load: loadBudgetBanner } = useBudgetBanner()
 const subscriptionsEnabled = useSubscriptionsEnabled()
 
 // Check if current route uses auth layout (login, register, install, etc.)
@@ -34,6 +37,7 @@ onMounted(async () => {
   if (!isAuthLayout.value) {
     await projectsStore.initialize()
     await loadPlanFeatures()
+    await loadBudgetBanner()
   }
 })
 
@@ -92,6 +96,9 @@ function goToPricing() {
     <div class="app-content">
       <!-- Top Toolbar -->
       <AppToolbar />
+
+      <!-- Budget usage warning banner -->
+      <BudgetBanner />
 
       <!-- Page Content -->
       <main class="app-main">

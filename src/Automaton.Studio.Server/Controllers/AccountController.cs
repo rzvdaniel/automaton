@@ -242,8 +242,33 @@ public class AccountController : BaseController
 
     [HttpGet]
     [Authorize]
-    public async Task<IActionResult> GetSubscriptionPlans([FromServices] Data.ApplicationDbContext db)
+    public async Task<IActionResult> GetBudgetUsage([FromServices] Data.ApplicationDbContext db)
     {
+        var userId = GetUserId();
+        var now = DateTime.UtcNow;
+
+        var allowance = await db.UserTokenAllowances
+            .AsNoTracking()
+            .Include(a => a.SubscriptionPlan)
+            .FirstOrDefaultAsync(a => a.UserId == userId);
+
+        if (allowance == null)
+            return Ok(new { currentMonthCostUsd = 0m, monthlyCostLimitUsd = 0m, percentUsed = 0, planName = (string?)null });
+
+        var isCurrentMonth = allowance.CurrentMonth == now.Month && allowance.CurrentYear == now.Year;
+        var currentCost = isCurrentMonth ? allowance.CurrentMonthCostUsd : 0m;
+        var limit = allowance.MonthlyCostLimitUsd;
+        var percent = limit > 0 ? (int)Math.Min(100, Math.Round(currentCost / limit * 100)) : 0;
+
+        return Ok(new
+        {
+            currentMonthCostUsd = currentCost,
+            monthlyCostLimitUsd = limit,
+            percentUsed = percent,
+            planName = allowance.SubscriptionPlan?.Name
+        });
+    }
+
         var plans = await db.SubscriptionPlans
             .AsNoTracking()
             .OrderBy(p => p.SortOrder)
