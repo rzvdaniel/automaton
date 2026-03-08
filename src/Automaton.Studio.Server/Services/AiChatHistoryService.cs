@@ -577,9 +577,14 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            // Record usage against the user's monthly token budget
+            // Record usage against the user's monthly cost budget
             if (request.InputTokens.HasValue || request.OutputTokens.HasValue)
-                await tokenBudgetService.RecordUsageAsync(userId, request.InputTokens ?? 0, request.OutputTokens ?? 0);
+                await tokenBudgetService.RecordUsageAsync(
+                    userId,
+                    session?.Provider ?? string.Empty,
+                    session?.Model ?? string.Empty,
+                    request.InputTokens ?? 0,
+                    request.OutputTokens ?? 0);
 
             return new ChatMessageDto
             {
@@ -729,7 +734,12 @@ public class AiChatHistoryService : IAiChatHistoryService
             session.UpdatedAt = DateTime.UtcNow;
             await dataContext.SaveChangesAsync();
 
-            await tokenBudgetService.RecordUsageAsync(userId, inputTokens ?? 0, outputTokens ?? 0);
+            await tokenBudgetService.RecordUsageAsync(
+                userId,
+                session.Provider ?? string.Empty,
+                session.Model ?? string.Empty,
+                inputTokens ?? 0,
+                outputTokens ?? 0);
         }
         catch (Exception ex)
         {

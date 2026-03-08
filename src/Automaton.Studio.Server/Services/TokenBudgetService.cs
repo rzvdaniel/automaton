@@ -16,33 +16,50 @@ public class TokenBudgetService : ITokenBudgetService
         _logger = Serilog.Log.ForContext<TokenBudgetService>();
     }
 
-    public async Task RecordUsageAsync(Guid userId, int inputTokens, int outputTokens)
+    public async Task RecordUsageAsync(Guid userId, string provider, string modelId, int inputTokens, int outputTokens)
     {
-        var total = inputTokens + outputTokens;
-        if (total <= 0) return;
+        if (inputTokens <= 0 && outputTokens <= 0) return;
 
         try
         {
-            var now = DateTime.UtcNow;
-            var month = now.Month;
-            var year = now.Year;
+            // Look up model pricing to compute real USD cost
+            var model = await _db.AiModels
+                .AsNoTracking()
+                .Include(m => m.Provider)
+                .FirstOrDefaultAsync(m => m.ModelId == modelId && m.Provider.Name == provider);
 
-            // Atomic upsert: insert row if missing, then update counter.
-            // The IF handles the lazy month reset in a single statement — no read needed.
+            var costPer1kInput  = model?.CostPer1kTokensInput  ?? 0m;
+            var costPer1kOutput = model?.CostPer1kTokensOutput ?? 0m;
+            var costUsd = (inputTokens  / 1000m) * costPer1kInput
+                        + (outputTokens / 1000m) * costPer1kOutput;
+
+            var now   = DateTime.UtcNow;
+            var month = now.Month;
+            var year  = now.Year;
+
+            // Atomic upsert. The IF handles the lazy month reset — no separate read needed.
             await _db.Database.ExecuteSqlRawAsync(@"
                 INSERT INTO `UserTokenAllowances`
-                    (`Id`, `UserId`, `MonthlyTokenLimit`, `CurrentMonthTokens`,
+                    (`Id`, `UserId`, `MonthlyCostLimitUsd`,
+                     `CurrentMonthInputTokens`, `CurrentMonthOutputTokens`, `CurrentMonthCostUsd`,
                      `CurrentMonth`, `CurrentYear`, `OverageAction`, `UpdatedAt`)
                 VALUES
-                    ({0}, {1}, 1000000, {2}, {3}, {4}, 'Downgrade', {5})
+                    ({0}, {1}, 10.0,
+                     {2}, {3}, {4},
+                     {5}, {6}, 'Downgrade', {7})
                 ON DUPLICATE KEY UPDATE
-                    `CurrentMonthTokens` = IF(`CurrentMonth` = {3} AND `CurrentYear` = {4},
-                                              `CurrentMonthTokens` + {2},
-                                              {2}),
-                    `CurrentMonth`       = {3},
-                    `CurrentYear`        = {4},
-                    `UpdatedAt`          = {5}",
-                Guid.NewGuid(), userId, total, month, year, now);
+                    `CurrentMonthInputTokens`  = IF(`CurrentMonth` = {5} AND `CurrentYear` = {6},
+                                                    `CurrentMonthInputTokens`  + {2}, {2}),
+                    `CurrentMonthOutputTokens` = IF(`CurrentMonth` = {5} AND `CurrentYear` = {6},
+                                                    `CurrentMonthOutputTokens` + {3}, {3}),
+                    `CurrentMonthCostUsd`      = IF(`CurrentMonth` = {5} AND `CurrentYear` = {6},
+                                                    `CurrentMonthCostUsd`      + {4}, {4}),
+                    `CurrentMonth` = {5},
+                    `CurrentYear`  = {6},
+                    `UpdatedAt`    = {7}",
+                Guid.NewGuid(), userId,
+                inputTokens, outputTokens, costUsd,
+                month, year, now);
         }
         catch (Exception ex)
         {
@@ -59,20 +76,19 @@ public class TokenBudgetService : ITokenBudgetService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(a => a.UserId == userId);
 
-            // No row = use defaults (unlimited)
-            var limit = allowance?.MonthlyTokenLimit ?? 1_000_000;
-            var action = allowance?.OverageAction ?? OverageActions.Downgrade;
+            var limitUsd = allowance?.MonthlyCostLimitUsd ?? 10.00m;
+            var action   = allowance?.OverageAction ?? OverageActions.Downgrade;
 
-            // Check if current month matches; if not, counter is effectively 0
+            // If month has changed the cost is effectively 0 — not over budget
             var now = DateTime.UtcNow;
-            var currentTokens = (allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year)
-                ? (allowance?.CurrentMonthTokens ?? 0)
-                : 0;
+            var currentCost = (allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year)
+                ? (allowance?.CurrentMonthCostUsd ?? 0m)
+                : 0m;
 
-            if (currentTokens <= limit || action != OverageActions.Downgrade)
+            if (currentCost <= limitUsd || action != OverageActions.Downgrade)
                 return requestedModel;
 
-            // Find cheapest active model for this provider that supports tools + streaming
+            // Find cheapest active model for this provider with tools + streaming
             var cheaperModel = await _db.AiModels
                 .AsNoTracking()
                 .Include(m => m.Provider)
@@ -88,9 +104,9 @@ public class TokenBudgetService : ITokenBudgetService
             if (cheaperModel != null)
             {
                 _logger.Information(
-                    "User {UserId} exceeded monthly token limit ({CurrentTokens}/{Limit}). " +
+                    "User {UserId} exceeded monthly cost limit (${CurrentCost:F4}/${LimitUsd:F2}). " +
                     "Downgrading from {RequestedModel} to {CheaperModel}",
-                    userId, currentTokens, limit, requestedModel, cheaperModel.ModelId);
+                    userId, currentCost, limitUsd, requestedModel, cheaperModel.ModelId);
                 return cheaperModel.ModelId;
             }
         }
@@ -102,7 +118,7 @@ public class TokenBudgetService : ITokenBudgetService
         return requestedModel;
     }
 
-    public async Task SetAllowanceAsync(Guid userId, int monthlyTokenLimit, string overageAction)
+    public async Task SetAllowanceAsync(Guid userId, decimal monthlyCostLimitUsd, string overageAction)
     {
         var allowance = await _db.UserTokenAllowances
             .FirstOrDefaultAsync(a => a.UserId == userId);
@@ -112,18 +128,18 @@ public class TokenBudgetService : ITokenBudgetService
             var now = DateTime.UtcNow;
             allowance = new UserTokenAllowance
             {
-                Id = Guid.NewGuid(),
-                UserId = userId,
+                Id           = Guid.NewGuid(),
+                UserId       = userId,
                 CurrentMonth = now.Month,
-                CurrentYear = now.Year,
-                UpdatedAt = now
+                CurrentYear  = now.Year,
+                UpdatedAt    = now
             };
             _db.UserTokenAllowances.Add(allowance);
         }
 
-        allowance.MonthlyTokenLimit = monthlyTokenLimit;
-        allowance.OverageAction = overageAction;
-        allowance.UpdatedAt = DateTime.UtcNow;
+        allowance.MonthlyCostLimitUsd = monthlyCostLimitUsd;
+        allowance.OverageAction       = overageAction;
+        allowance.UpdatedAt           = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
     }

@@ -17,8 +17,10 @@ namespace Automaton.Studio.Server.Migrations
                 {
                     Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     UserId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
-                    MonthlyTokenLimit = table.Column<int>(type: "int", nullable: false, defaultValue: 1000000),
-                    CurrentMonthTokens = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    MonthlyCostLimitUsd = table.Column<decimal>(type: "decimal(10,6)", nullable: false, defaultValue: 10.00m),
+                    CurrentMonthInputTokens = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    CurrentMonthOutputTokens = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    CurrentMonthCostUsd = table.Column<decimal>(type: "decimal(10,6)", nullable: false, defaultValue: 0m),
                     CurrentMonth = table.Column<int>(type: "int", nullable: false),
                     CurrentYear = table.Column<int>(type: "int", nullable: false),
                     OverageAction = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)

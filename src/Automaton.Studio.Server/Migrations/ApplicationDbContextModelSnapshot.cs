@@ -1685,7 +1685,17 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("CurrentMonth")
                         .HasColumnType("int");
 
-                    b.Property<int>("CurrentMonthTokens")
+                    b.Property<decimal>("CurrentMonthCostUsd")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(10,6)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("CurrentMonthInputTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("CurrentMonthOutputTokens")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(0);
@@ -1693,10 +1703,10 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("CurrentYear")
                         .HasColumnType("int");
 
-                    b.Property<int>("MonthlyTokenLimit")
+                    b.Property<decimal>("MonthlyCostLimitUsd")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1000000);
+                        .HasColumnType("decimal(10,6)")
+                        .HasDefaultValue(10.00m);
 
                     b.Property<string>("OverageAction")
                         .IsRequired()

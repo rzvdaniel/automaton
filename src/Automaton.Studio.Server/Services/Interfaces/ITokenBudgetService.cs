@@ -3,14 +3,15 @@ namespace Automaton.Studio.Server.Services.Interfaces;
 public interface ITokenBudgetService
 {
     /// <summary>
-    /// Atomically increments the current month's token counter for the user.
-    /// Resets the counter if the month has changed. Upserts the row if it doesn't exist yet.
+    /// Records token usage for a user. Looks up model pricing to compute real USD cost.
+    /// Atomically increments monthly counters; resets them if the month has changed.
+    /// Upserts the allowance row if it doesn't exist yet.
     /// </summary>
-    Task RecordUsageAsync(Guid userId, int inputTokens, int outputTokens);
+    Task RecordUsageAsync(Guid userId, string provider, string modelId, int inputTokens, int outputTokens);
 
     /// <summary>
     /// Returns the model to use for the given request.
-    /// If the user has exceeded their monthly allowance, returns the cheapest active model
+    /// If the user's monthly cost exceeds their limit, returns the cheapest active model
     /// for the provider that supports tools + streaming. Otherwise returns requestedModel.
     /// </summary>
     Task<string> GetEffectiveModelAsync(Guid userId, string provider, string requestedModel);
@@ -19,5 +20,5 @@ public interface ITokenBudgetService
     /// Updates (or creates) the allowance settings for a user.
     /// Call this when a subscription plan changes.
     /// </summary>
-    Task SetAllowanceAsync(Guid userId, int monthlyTokenLimit, string overageAction);
+    Task SetAllowanceAsync(Guid userId, decimal monthlyCostLimitUsd, string overageAction);
 }

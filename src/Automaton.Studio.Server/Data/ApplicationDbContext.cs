@@ -895,8 +895,10 @@ namespace Automaton.Studio.Server.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.MonthlyTokenLimit).IsRequired().HasDefaultValue(1_000_000);
-                entity.Property(e => e.CurrentMonthTokens).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.MonthlyCostLimitUsd).IsRequired().HasColumnType("decimal(10,6)").HasDefaultValue(10.00m);
+                entity.Property(e => e.CurrentMonthInputTokens).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CurrentMonthOutputTokens).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CurrentMonthCostUsd).IsRequired().HasColumnType("decimal(10,6)").HasDefaultValue(0m);
                 entity.Property(e => e.CurrentMonth).IsRequired();
                 entity.Property(e => e.CurrentYear).IsRequired();
                 entity.Property(e => e.OverageAction).IsRequired().HasMaxLength(50);
