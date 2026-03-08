@@ -347,6 +347,7 @@ services.AddAutomatonMcpClient();
 // AI Chat History Service
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ITokenBudgetService, Automaton.Studio.Server.Services.TokenBudgetService>();
+services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ISubscriptionGatewayService, Automaton.Studio.Server.Services.SubscriptionGatewayService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();
@@ -468,6 +469,27 @@ if (corsOrigins != null && corsOrigins.Length > 0)
 {
     app.UseCors("CorsPolicy");
 }
+
+// Plan limit (402) middleware — converts PlanLimitException to structured HTTP 402
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Automaton.Studio.Server.Exceptions.PlanLimitException ex)
+    {
+        context.Response.StatusCode  = 402;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            code         = "PLAN_LIMIT",
+            feature      = ex.FeatureName,
+            requiredPlan = ex.RequiredPlan,
+            message      = ex.Message
+        });
+    }
+});
 
 app.UseAuthentication();
 app.UseRouting();

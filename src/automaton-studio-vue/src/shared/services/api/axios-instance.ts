@@ -12,6 +12,13 @@ const REFRESH_TOKEN_KEY = 'automaton_refresh_token'
 // Logout callback - will be set by the app
 let onUnauthorized: (() => void) | null = null
 
+// Plan limit callback - will be set by the app
+let onPlanLimit: ((feature: string, requiredPlan: string) => void) | null = null
+
+export const setPlanLimitCallback = (callback: (feature: string, requiredPlan: string) => void): void => {
+  onPlanLimit = callback
+}
+
 // Create axios instance
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -150,6 +157,20 @@ apiClient.interceptors.response.use(
       }
     }
 
+    return Promise.reject(error)
+  },
+)
+
+// Response interceptor - Handle 402 plan limit
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 402) {
+      const data = error.response.data as { feature?: string; requiredPlan?: string }
+      if (onPlanLimit) {
+        onPlanLimit(data.feature ?? 'unknown', data.requiredPlan ?? 'a higher plan')
+      }
+    }
     return Promise.reject(error)
   },
 )

@@ -1,5 +1,7 @@
-﻿using Automaton.Studio.Server.Entities;
+﻿using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
@@ -10,11 +12,19 @@ public class UsersService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly ITokenBudgetService _tokenBudgetService;
+    private readonly ApplicationDbContext _db;
 
-    public UsersService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager)
+    public UsersService(
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        ITokenBudgetService tokenBudgetService,
+        ApplicationDbContext db)
     {
-        _userManager = userManager;
-        _roleManager = roleManager;
+        _userManager         = userManager;
+        _roleManager         = roleManager;
+        _tokenBudgetService  = tokenBudgetService;
+        _db                  = db;
     }
 
     public async Task CreateUser(ApplicationUser user, string password)
@@ -38,6 +48,9 @@ public class UsersService
                 (current, error) => current + (" - " + error.Description + "\n\r"));
             throw new Exception(exceptionText);
         }
+
+        // Assign default subscription plan allowance
+        await AssignDefaultPlanAsync(user.Id);
     }
 
     public async Task UpdatePassword(Guid userId, string oldPassword, string newPassword)
@@ -298,5 +311,33 @@ public class UsersService
             slug = slug.Substring(0, 32).TrimEnd('-', '_');
 
         return slug;
+    }
+
+    private async Task AssignDefaultPlanAsync(Guid userId)
+    {
+        try
+        {
+            var defaultPlan = await _db.SubscriptionPlans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.IsDefault);
+
+            var limitUsd = defaultPlan?.MonthlyCostLimitUsd ?? 2.00m;
+            await _tokenBudgetService.SetAllowanceAsync(userId, limitUsd, Entities.OverageActions.Downgrade);
+
+            // Store plan FK if a default plan exists
+            if (defaultPlan != null)
+            {
+                var allowance = await _db.UserTokenAllowances.FirstOrDefaultAsync(a => a.UserId == userId);
+                if (allowance != null)
+                {
+                    allowance.SubscriptionPlanId = defaultPlan.Id;
+                    await _db.SaveChangesAsync();
+                }
+            }
+        }
+        catch
+        {
+            // Never block registration because of billing setup failure
+        }
     }
 }

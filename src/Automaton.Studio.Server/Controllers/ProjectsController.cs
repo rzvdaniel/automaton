@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,14 +14,17 @@ namespace Automaton.Studio.Server.Controllers;
 public class ProjectsController : BaseController
 {
     private readonly ProjectService projectService;
+    private readonly ISubscriptionGatewayService subscriptionGateway;
     private readonly ILogger<ProjectsController> logger;
 
     public ProjectsController(
         ProjectService projectService,
+        ISubscriptionGatewayService subscriptionGateway,
         ILogger<ProjectsController> logger)
     {
-        this.projectService = projectService;
-        this.logger = logger;
+        this.projectService       = projectService;
+        this.subscriptionGateway  = subscriptionGateway;
+        this.logger               = logger;
     }
 
     /// <summary>
@@ -85,6 +89,8 @@ public class ProjectsController : BaseController
             {
                 return BadRequest(ModelState);
             }
+
+            await subscriptionGateway.EnsureCanCreateProjectAsync(GetUserId());
 
             var project = await projectService.CreateProjectAsync(request);
             
