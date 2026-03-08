@@ -11,6 +11,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
+import Card from 'primevue/card'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import type { CreateOrganizationRequest, OrganizationListItem } from '../types'
 import { OrganizationRole } from '../types'
@@ -187,18 +188,21 @@ function resetCreateForm() {
       <p>Loading organizations...</p>
     </div>
 
-    <EmptyState
-      v-else-if="!hasOrganizations"
-      icon="pi-building"
-      title="No organizations yet"
-      message="Create your first organization to enable team collaboration and app assignment"
-    >
-      <Button
-        label="Create Your First Organization"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-    </EmptyState>
+    <Card v-else-if="!hasOrganizations">
+      <template #content>
+        <EmptyState
+          icon="pi pi-building"
+          title="No organizations yet"
+          message="Create your first organization to enable team collaboration and app assignment"
+        >
+          <Button
+            label="Create Your First Organization"
+            icon="pi pi-plus"
+            @click="openCreateDialog"
+          />
+        </EmptyState>
+      </template>
+    </Card>
 
     <DataTable
       v-else
