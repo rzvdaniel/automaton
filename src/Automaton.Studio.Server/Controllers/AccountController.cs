@@ -269,6 +269,10 @@ public class AccountController : BaseController
         });
     }
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetSubscriptionPlans([FromServices] Data.ApplicationDbContext db)
+    {
         var plans = await db.SubscriptionPlans
             .AsNoTracking()
             .OrderBy(p => p.SortOrder)
