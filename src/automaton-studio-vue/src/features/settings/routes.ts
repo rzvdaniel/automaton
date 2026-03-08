@@ -6,4 +6,9 @@ export const settingsRoutes: RouteRecordRaw[] = [
     name: 'settings',
     component: () => import('./views/SettingsView.vue'),
   },
+  {
+    path: '/pricing',
+    name: 'pricing',
+    component: () => import('./views/PricingView.vue'),
+  },
 ]
