@@ -1,70 +1,48 @@
 <script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import api from '@/shared/services/api/axios-instance'
+
+interface SubscriptionPlan {
+  id: string
+  name: string
+  description: string | null
+  monthlyCostLimitUsd: number
+  canCreateProjects: boolean
+  canCreateOrganizations: boolean
+  isDefault: boolean
+  sortOrder: number
+}
 
 const router = useRouter()
+const plans = ref<SubscriptionPlan[]>([])
+const loading = ref(true)
 
-const plans = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: '/month',
-    description: 'Get started building apps',
-    highlight: false,
-    features: [
-      '$2 AI budget / month',
-      'Unlimited apps',
-      'Unlimited runners (self-hosted)',
-      'Community support',
-    ],
-    cta: 'Current plan',
-    ctaDisabled: true,
-  },
-  {
-    name: 'Starter',
-    price: '$9',
-    period: '/month',
-    description: 'For solo builders who need more AI',
-    highlight: false,
-    features: [
-      '$10 AI budget / month',
-      'Everything in Free',
-      'Projects',
-    ],
-    cta: 'Upgrade to Starter',
-    ctaDisabled: false,
-  },
-  {
-    name: 'Pro',
-    price: '$29',
-    period: '/month',
-    description: 'For teams collaborating on apps',
-    highlight: true,
-    features: [
-      '$30 AI budget / month',
-      'Everything in Starter',
-      'Organizations',
-      'Priority support',
-    ],
-    cta: 'Upgrade to Pro',
-    ctaDisabled: false,
-  },
-  {
-    name: 'Business',
-    price: '$99',
-    period: '/month',
-    description: 'For growing businesses',
-    highlight: false,
-    features: [
-      '$100 AI budget / month',
-      'Everything in Pro',
-      'Dedicated support',
-    ],
-    cta: 'Upgrade to Business',
-    ctaDisabled: false,
-  },
-]
+onMounted(async () => {
+  try {
+    const { data } = await api.get<SubscriptionPlan[]>('/api/account/getsubscriptionplans')
+    plans.value = data
+  } finally {
+    loading.value = false
+  }
+})
+
+function planFeatures(plan: SubscriptionPlan): string[] {
+  const features: string[] = [
+    `$${plan.monthlyCostLimitUsd.toFixed(0)} AI budget / month`,
+  ]
+  if (plan.canCreateProjects) features.push('Projects')
+  if (plan.canCreateOrganizations) features.push('Organizations')
+  return features
+}
+
+// Highlight the middle plan (Pro / highest non-last paid plan)
+const highlightedIndex = computed(() => {
+  if (plans.value.length <= 2) return -1
+  return Math.floor(plans.value.length / 2)
+})
 </script>
 
 <template>
@@ -81,29 +59,33 @@ const plans = [
       <p class="text-color-secondary">Upgrade to unlock more AI budget and collaboration features.</p>
     </div>
 
-    <div class="plans-grid">
+    <div v-if="loading" class="flex justify-center py-10">
+      <i class="pi pi-spin pi-spinner" style="font-size: 2rem" />
+    </div>
+
+    <div v-else class="plans-grid">
       <Card
-        v-for="plan in plans"
-        :key="plan.name"
-        :class="['plan-card', { 'plan-card--highlighted': plan.highlight }]"
+        v-for="(plan, index) in plans"
+        :key="plan.id"
+        :class="['plan-card', { 'plan-card--highlighted': index === highlightedIndex }]"
       >
         <template #content>
-          <div class="plan-badge" v-if="plan.highlight">Most Popular</div>
+          <div v-if="index === highlightedIndex" class="plan-badge">Most Popular</div>
           <div class="plan-name">{{ plan.name }}</div>
           <div class="plan-price">
-            <span class="price-amount">{{ plan.price }}</span>
-            <span class="price-period text-color-secondary">{{ plan.period }}</span>
+            <span class="price-amount">${{ plan.monthlyCostLimitUsd.toFixed(0) }}</span>
+            <span class="price-period text-color-secondary">/ month AI budget</span>
           </div>
           <p class="plan-description text-color-secondary text-sm">{{ plan.description }}</p>
           <ul class="plan-features">
-            <li v-for="feature in plan.features" :key="feature">
+            <li v-for="feature in planFeatures(plan)" :key="feature">
               <i class="pi pi-check text-green-500 mr-2" />{{ feature }}
             </li>
           </ul>
           <Button
-            :label="plan.cta"
-            :disabled="plan.ctaDisabled"
-            :outlined="!plan.highlight"
+            :label="plan.isDefault ? 'Current plan' : `Upgrade to ${plan.name}`"
+            :disabled="plan.isDefault"
+            :outlined="index !== highlightedIndex"
             class="w-full mt-4"
           />
         </template>
@@ -198,3 +180,4 @@ const plans = [
   opacity: 0.7;
 }
 </style>
+

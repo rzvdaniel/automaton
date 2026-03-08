@@ -7,6 +7,7 @@ using Automaton.Studio.Server.Services.Interfaces;
 using Common.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -237,5 +238,29 @@ public class AccountController : BaseController
         var userId = GetUserId();
         var (canCreateProjects, canCreateOrganizations) = await subscriptionGateway.GetPlanFeaturesAsync(userId);
         return Ok(new { canCreateProjects, canCreateOrganizations });
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetSubscriptionPlans([FromServices] Data.ApplicationDbContext db)
+    {
+        var plans = await db.SubscriptionPlans
+            .AsNoTracking()
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Name)
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.Description,
+                p.MonthlyCostLimitUsd,
+                p.CanCreateProjects,
+                p.CanCreateOrganizations,
+                p.IsDefault,
+                p.SortOrder
+            })
+            .ToListAsync();
+
+        return Ok(plans);
     }
 }
