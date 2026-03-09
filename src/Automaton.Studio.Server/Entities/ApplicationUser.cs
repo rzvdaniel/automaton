@@ -49,5 +49,12 @@ namespace Automaton.Studio.Server.Entities
         // Navigation properties for organization relationships
         public virtual ICollection<Organization> OwnedOrganizations { get; set; }
         public virtual ICollection<OrganizationMember> OrganizationMemberships { get; set; }
+
+        // Stripe billing
+        /// <summary>Stripe Customer ID (cus_xxx). Created on first checkout.</summary>
+        public string StripeCustomerId { get; set; }
+
+        /// <summary>Active Stripe Subscription ID (sub_xxx). Null on Free plan.</summary>
+        public string StripeSubscriptionId { get; set; }
     }
 }

@@ -26,6 +26,14 @@ public class SubscriptionPlan
     [Column(TypeName = "decimal(10, 2)")]
     public decimal PriceUsd { get; set; } = 0.00m;
 
+    /// <summary>Stripe Product ID (e.g. prod_xxx). Set when Stripe is configured.</summary>
+    [MaxLength(100)]
+    public string? StripeProductId { get; set; }
+
+    /// <summary>Stripe Price ID for monthly recurring billing (e.g. price_xxx).</summary>
+    [MaxLength(100)]
+    public string? StripePriceId { get; set; }
+
     /// <summary>When true, this plan is automatically assigned to new users.</summary>
     public bool IsDefault { get; set; } = false;
 

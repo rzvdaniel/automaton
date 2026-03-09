@@ -348,6 +348,8 @@ services.AddAutomatonMcpClient();
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ITokenBudgetService, Automaton.Studio.Server.Services.TokenBudgetService>();
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ISubscriptionGatewayService, Automaton.Studio.Server.Services.SubscriptionGatewayService>();
+services.Configure<Automaton.Studio.Server.Services.StripeOptions>(applicationBuilder.Configuration.GetSection("Stripe"));
+services.AddScoped<Automaton.Studio.Server.Services.StripeService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();

@@ -72,6 +72,8 @@ public class AdminSubscriptionPlansController : ControllerBase
             Description            = req.Description,
             MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd,
             PriceUsd               = req.PriceUsd,
+            StripeProductId        = req.StripeProductId,
+            StripePriceId          = req.StripePriceId,
             IsDefault              = req.IsDefault,
             CanCreateProjects      = req.CanCreateProjects,
             CanCreateOrganizations = req.CanCreateOrganizations,
@@ -101,6 +103,8 @@ public class AdminSubscriptionPlansController : ControllerBase
         if (req.Description != null) plan.Description        = req.Description;
         if (req.MonthlyCostLimitUsd   .HasValue) plan.MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd.Value;
         if (req.PriceUsd              .HasValue) plan.PriceUsd               = req.PriceUsd.Value;
+        if (req.StripeProductId != null) plan.StripeProductId = req.StripeProductId == "" ? null : req.StripeProductId;
+        if (req.StripePriceId   != null) plan.StripePriceId   = req.StripePriceId   == "" ? null : req.StripePriceId;
         if (req.IsDefault             .HasValue) plan.IsDefault              = req.IsDefault.Value;
         if (req.CanCreateProjects     .HasValue) plan.CanCreateProjects      = req.CanCreateProjects.Value;
         if (req.CanCreateOrganizations.HasValue) plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
@@ -220,6 +224,8 @@ public class AdminSubscriptionPlansController : ControllerBase
         Description            = p.Description,
         MonthlyCostLimitUsd    = p.MonthlyCostLimitUsd,
         PriceUsd               = p.PriceUsd,
+        StripeProductId        = p.StripeProductId,
+        StripePriceId          = p.StripePriceId,
         IsDefault              = p.IsDefault,
         CanCreateProjects      = p.CanCreateProjects,
         CanCreateOrganizations = p.CanCreateOrganizations,
@@ -238,6 +244,8 @@ public record SubscriptionPlanResponse
     public string? Description            { get; init; }
     public decimal MonthlyCostLimitUsd    { get; init; }
     public decimal PriceUsd               { get; init; }
+    public string? StripeProductId        { get; init; }
+    public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; }
     public bool    CanCreateProjects      { get; init; }
     public bool    CanCreateOrganizations { get; init; }
@@ -252,6 +260,8 @@ public record CreateSubscriptionPlanRequest
     public string? Description            { get; init; }
     public decimal MonthlyCostLimitUsd    { get; init; } = 10m;
     public decimal PriceUsd               { get; init; } = 0m;
+    public string? StripeProductId        { get; init; }
+    public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; } = false;
     public bool    CanCreateProjects      { get; init; } = false;
     public bool    CanCreateOrganizations { get; init; } = false;
@@ -264,6 +274,8 @@ public record UpdateSubscriptionPlanRequest
     public string?  Description            { get; init; }
     public decimal? MonthlyCostLimitUsd    { get; init; }
     public decimal? PriceUsd               { get; init; }
+    public string?  StripeProductId        { get; init; }
+    public string?  StripePriceId          { get; init; }
     public bool?    IsDefault              { get; init; }
     public bool?    CanCreateProjects      { get; init; }
     public bool?    CanCreateOrganizations { get; init; }

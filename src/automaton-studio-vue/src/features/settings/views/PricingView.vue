@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import api from '@/shared/services/api/axios-instance'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
+import billingService from '../services/billingService'
 
 interface SubscriptionPlan {
   id: string
@@ -19,9 +20,10 @@ interface SubscriptionPlan {
 }
 
 const router = useRouter()
-const subscriptionsEnabled = useSubscriptionsEnabled()
+const { isEnabled: subscriptionsEnabled } = useSubscriptionsEnabled()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(true)
+const checkoutLoadingId = ref<string | null>(null)
 
 onMounted(async () => {
   if (!subscriptionsEnabled) { loading.value = false; return }
@@ -47,6 +49,17 @@ const highlightedIndex = computed(() => {
   if (plans.value.length <= 2) return -1
   return Math.floor(plans.value.length / 2)
 })
+
+async function upgrade(plan: SubscriptionPlan) {
+  if (plan.isDefault || !plan.priceUsd) return
+  checkoutLoadingId.value = plan.id
+  try {
+    const { checkoutUrl } = await billingService.createCheckoutSession(plan.id)
+    window.location.href = checkoutUrl
+  } catch {
+    checkoutLoadingId.value = null
+  }
+}
 </script>
 
 <template>
@@ -101,15 +114,17 @@ const highlightedIndex = computed(() => {
           <Button
             :label="plan.isDefault ? 'Current plan' : `Upgrade to ${plan.name}`"
             :disabled="plan.isDefault"
+            :loading="checkoutLoadingId === plan.id"
             :outlined="index !== highlightedIndex"
             class="w-full mt-4"
+            @click="upgrade(plan)"
           />
         </template>
       </Card>
     </div>
 
     <p class="pricing-note text-color-secondary text-sm text-center mt-4">
-      Payment processing coming soon. Contact us to upgrade manually.
+      Payment powered by Stripe. Your subscription activates instantly after checkout.
     </p>
   </div>
 </template>

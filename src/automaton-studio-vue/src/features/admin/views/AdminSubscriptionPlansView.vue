@@ -35,6 +35,8 @@ const planForm = ref<CreateSubscriptionPlanRequest>({
   description: '',
   monthlyCostLimitUsd: 10,
   priceUsd: 0,
+  stripeProductId: '',
+  stripePriceId: '',
   isDefault: false,
   canCreateProjects: false,
   canCreateOrganizations: false,
@@ -92,6 +94,8 @@ function openCreatePlan() {
     name: '', description: '',
     monthlyCostLimitUsd: 10,
     priceUsd: 0,
+    stripeProductId: '',
+    stripePriceId: '',
     isDefault: false,
     canCreateProjects: false,
     canCreateOrganizations: false,
@@ -107,6 +111,8 @@ function openEditPlan(plan: SubscriptionPlan) {
     description: plan.description ?? '',
     monthlyCostLimitUsd: plan.monthlyCostLimitUsd,
     priceUsd: plan.priceUsd,
+    stripeProductId: plan.stripeProductId ?? '',
+    stripePriceId: plan.stripePriceId ?? '',
     isDefault: plan.isDefault,
     canCreateProjects: plan.canCreateProjects,
     canCreateOrganizations: plan.canCreateOrganizations,
@@ -320,6 +326,16 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
           class="w-full"
         />
         <small class="text-color-secondary">How much of that is passed through to AI providers.</small>
+      </div>
+      <div class="flex flex-column gap-1">
+        <label class="font-medium text-sm">Stripe Product ID</label>
+        <InputText v-model="planForm.stripeProductId" placeholder="prod_..." class="w-full" />
+        <small class="text-color-secondary">From your Stripe Dashboard → Products.</small>
+      </div>
+      <div class="flex flex-column gap-1">
+        <label class="font-medium text-sm">Stripe Price ID</label>
+        <InputText v-model="planForm.stripePriceId" placeholder="price_..." class="w-full" />
+        <small class="text-color-secondary">Recurring price linked to the product above.</small>
       </div>
       <div class="flex align-items-center gap-2">
         <Checkbox v-model="planForm.isDefault" :binary="true" inputId="isDefault" />

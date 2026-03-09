@@ -71,6 +71,11 @@ const userMenuItems = computed<MenuItem[]>(() => {
       command: () => router.push('/settings'),
     },
     {
+      label: 'Billing',
+      icon: 'pi pi-credit-card',
+      command: () => router.push('/billing'),
+    },
+    {
       separator: true,
     },
     {

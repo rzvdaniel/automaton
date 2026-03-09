@@ -182,6 +182,8 @@ export interface SubscriptionPlan {
   description?: string
   monthlyCostLimitUsd: number
   priceUsd: number
+  stripeProductId?: string
+  stripePriceId?: string
   isDefault: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
@@ -195,6 +197,8 @@ export interface CreateSubscriptionPlanRequest {
   description?: string
   monthlyCostLimitUsd: number
   priceUsd: number
+  stripeProductId?: string
+  stripePriceId?: string
   isDefault: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
@@ -206,6 +210,8 @@ export interface UpdateSubscriptionPlanRequest {
   description?: string
   monthlyCostLimitUsd?: number
   priceUsd?: number
+  stripeProductId?: string
+  stripePriceId?: string
   isDefault?: boolean
   canCreateProjects?: boolean
   canCreateOrganizations?: boolean

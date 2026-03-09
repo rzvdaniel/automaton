@@ -11,4 +11,19 @@ export const settingsRoutes: RouteRecordRaw[] = [
     name: 'pricing',
     component: () => import('./views/PricingView.vue'),
   },
+  {
+    path: '/billing',
+    name: 'billing',
+    component: () => import('./views/BillingStatusView.vue'),
+  },
+  {
+    path: '/billing/success',
+    name: 'billing-success',
+    component: () => import('./views/BillingSuccessView.vue'),
+  },
+  {
+    path: '/billing/cancel',
+    name: 'billing-cancel',
+    component: () => import('./views/BillingCancelView.vue'),
+  },
 ]
