@@ -20,7 +20,7 @@ interface SubscriptionPlan {
 }
 
 const router = useRouter()
-const { isEnabled: subscriptionsEnabled } = useSubscriptionsEnabled()
+const subscriptionsEnabled = useSubscriptionsEnabled()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(true)
 const checkoutLoadingId = ref<string | null>(null)

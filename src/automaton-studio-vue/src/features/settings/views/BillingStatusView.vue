@@ -5,7 +5,7 @@ import billingService, { type BillingStatusResponse } from '../services/billingS
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
 
 const router = useRouter()
-const { isEnabled } = useSubscriptionsEnabled()
+const subscriptionsEnabled = useSubscriptionsEnabled()
 
 const status = ref<BillingStatusResponse | null>(null)
 const loading = ref(true)
@@ -100,7 +100,7 @@ async function goToPortal() {
       <!-- Actions -->
       <div class="flex gap-3">
         <Button
-          v-if="status.stripeSubscriptionId && isEnabled"
+          v-if="status.stripeSubscriptionId && subscriptionsEnabled"
           label="Manage Subscription"
           icon="pi pi-external-link"
           :loading="portalLoading"
