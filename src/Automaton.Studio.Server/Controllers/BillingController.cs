@@ -13,11 +13,13 @@ public class BillingController : BaseController
 {
     private readonly StripeService _stripe;
     private readonly ApplicationDbContext _db;
+    private readonly ConfigurationService _config;
 
-    public BillingController(StripeService stripe, ApplicationDbContext db)
+    public BillingController(StripeService stripe, ApplicationDbContext db, ConfigurationService config)
     {
         _stripe = stripe;
         _db = db;
+        _config = config;
     }
 
     /// <summary>
@@ -29,7 +31,7 @@ public class BillingController : BaseController
     {
         var userId = GetUserId();
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = _config.WebsiteUrl.TrimEnd('/');
         var successUrl = $"{baseUrl}/billing/success?session_id={{CHECKOUT_SESSION_ID}}";
         var cancelUrl  = $"{baseUrl}/pricing";
 
@@ -53,8 +55,7 @@ public class BillingController : BaseController
     {
         var userId = GetUserId();
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        var returnUrl = $"{baseUrl}/billing";
+        var returnUrl = $"{_config.WebsiteUrl.TrimEnd('/')}/billing";
 
         try
         {
