@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import Card from 'primevue/card'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import ProgressBar from 'primevue/progressbar'
+import ProgressSpinner from 'primevue/progressspinner'
+import Message from 'primevue/message'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
 
