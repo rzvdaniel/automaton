@@ -13,8 +13,10 @@ export interface BillingStatusResponse {
   priceUsd: number
   monthlyCostLimitUsd: number
   currentMonthCostUsd: number
-  stripeSubscriptionId: string | null
-  isActive: boolean
+  percentUsed: number
+  hasActiveSubscription: boolean
+  canCreateProjects: boolean
+  canCreateOrganizations: boolean
 }
 
 const billingService = {

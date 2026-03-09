@@ -175,9 +175,17 @@ public class StripeService
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null) return;
 
-        // Store subscription ID on user
-        user.StripeCustomerId = session.CustomerId;
-        user.StripeSubscriptionId = session.SubscriptionId;
+        // session.SubscriptionId can be null when the event fires — expand to get it
+        var subscriptionId = session.SubscriptionId;
+        if (string.IsNullOrEmpty(subscriptionId))
+        {
+            var expanded = await new SessionService().GetAsync(session.Id,
+                new SessionGetOptions { Expand = ["subscription"] });
+            subscriptionId = expanded.SubscriptionId ?? expanded.Subscription?.Id;
+        }
+
+        user.StripeCustomerId    = session.CustomerId;
+        user.StripeSubscriptionId = subscriptionId;
         await _userManager.UpdateAsync(user);
 
         await AssignPlanAsync(userId, planId);

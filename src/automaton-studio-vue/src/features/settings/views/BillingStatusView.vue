@@ -100,7 +100,7 @@ async function goToPortal() {
       <!-- Actions -->
       <div class="flex gap-3">
         <Button
-          v-if="status.stripeSubscriptionId && subscriptionsEnabled"
+          v-if="status.hasActiveSubscription && subscriptionsEnabled"
           label="Manage Subscription"
           icon="pi pi-external-link"
           :loading="portalLoading"
