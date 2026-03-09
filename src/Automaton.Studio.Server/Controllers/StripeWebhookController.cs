@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
 
@@ -10,6 +11,7 @@ namespace Automaton.Studio.Server.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/webhooks/stripe")]
+[AllowAnonymous]
 public class StripeWebhookController : ControllerBase
 {
     private readonly StripeService _stripe;
