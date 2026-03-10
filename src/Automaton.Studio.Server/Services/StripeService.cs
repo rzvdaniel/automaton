@@ -25,7 +25,7 @@ public class StripeService
     public StripeService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
-        IOptions<StripeOptions> options,
+        IOptionsSnapshot<StripeOptions> options,
         ILogger<StripeService> logger)
     {
         _db = db;
