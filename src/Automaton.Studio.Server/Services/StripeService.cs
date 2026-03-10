@@ -128,10 +128,9 @@ public class StripeService
             }
         });
 
-        // Assign the new plan immediately in our DB — the webhook will also fire
-        // (customer.subscription.updated) but AssignPlanAsync is idempotent.
-        await AssignPlanAsync(user.Id, newPlan.Id);
-        _logger.LogInformation("Subscription upgraded — user {UserId} moved to plan {PlanName}", user.Id, newPlan.Name);
+        // Do NOT assign the plan here — wait for customer.subscription.updated webhook
+        // which fires only after Stripe confirms the subscription is active (payment succeeded).
+        _logger.LogInformation("Subscription change requested — user {UserId} → plan {PlanName}. Awaiting webhook.", user.Id, newPlan.Name);
     }
 
     // ── Billing Portal ────────────────────────────────────────────────────────
@@ -267,7 +266,17 @@ public class StripeService
 
     private async Task HandleSubscriptionUpdatedAsync(Subscription subscription)
     {
-        // Handle plan changes made via Billing Portal
+        // Only assign the plan when Stripe confirms the subscription is active.
+        // "active" means the latest invoice was paid. This prevents granting higher-tier
+        // access before payment has been collected.
+        if (subscription.Status != "active")
+        {
+            _logger.LogInformation(
+                "Subscription {SubId} updated but status is '{Status}' — skipping plan assignment",
+                subscription.Id, subscription.Status);
+            return;
+        }
+
         var user = await _userManager.Users.FirstOrDefaultAsync(u => u.StripeSubscriptionId == subscription.Id);
         if (user == null) return;
 
