@@ -168,7 +168,7 @@ const sidebarClass = computed(() => ({
           }"
         />
         <div class="billing-widget-footer">
-          <span class="text-color-secondary">${{ billingStatus.currentMonthCostUsd.toFixed(2) }} / ${{ billingStatus.monthlyCostLimitUsd.toFixed(2) }}</span>
+          <span class="text-color-secondary">AI: ${{ billingStatus.currentMonthCostUsd.toFixed(2) }} / ${{ billingStatus.monthlyCostLimitUsd.toFixed(2) }}</span>
           <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate('/pricing')">Upgrade</span>
         </div>
       </div>
