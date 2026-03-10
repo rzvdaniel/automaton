@@ -52,6 +52,14 @@ public class StripeService
         if (string.IsNullOrEmpty(plan.StripePriceId))
             throw new InvalidOperationException($"Plan '{plan.Name}' has no Stripe Price ID configured.");
 
+        // If the user already has an active subscription, upgrade/downgrade it in place
+        // instead of creating a second subscription.
+        if (!string.IsNullOrEmpty(user.StripeSubscriptionId))
+        {
+            await UpgradeSubscriptionAsync(user, plan);
+            return successUrl.Split('?')[0]; // redirect straight to success, no Stripe checkout needed
+        }
+
         // Ensure customer exists in Stripe
         var customerId = await EnsureStripeCustomerAsync(user);
 
@@ -86,6 +94,44 @@ public class StripeService
         });
 
         return session.Url;
+    }
+
+    /// <summary>
+    /// Upgrades or downgrades an existing subscription to a new plan in place.
+    /// Stripe prorates the charge automatically.
+    /// </summary>
+    private async Task UpgradeSubscriptionAsync(ApplicationUser user, SubscriptionPlan newPlan)
+    {
+        var subscriptionService = new SubscriptionService();
+        var subscription = await subscriptionService.GetAsync(user.StripeSubscriptionId,
+            new SubscriptionGetOptions { Expand = ["items"] });
+
+        var existingItemId = subscription.Items?.Data?.FirstOrDefault()?.Id
+            ?? throw new InvalidOperationException("Subscription has no line items.");
+
+        await subscriptionService.UpdateAsync(user.StripeSubscriptionId, new SubscriptionUpdateOptions
+        {
+            Items =
+            [
+                new SubscriptionItemOptions
+                {
+                    Id = existingItemId,
+                    Price = newPlan.StripePriceId,
+                    Quantity = 1,
+                }
+            ],
+            ProrationBehavior = "create_prorations",
+            Metadata = new Dictionary<string, string>
+            {
+                ["userId"] = user.Id.ToString(),
+                ["planId"] = newPlan.Id.ToString(),
+            }
+        });
+
+        // Assign the new plan immediately in our DB — the webhook will also fire
+        // (customer.subscription.updated) but AssignPlanAsync is idempotent.
+        await AssignPlanAsync(user.Id, newPlan.Id);
+        _logger.LogInformation("Subscription upgraded — user {UserId} moved to plan {PlanName}", user.Id, newPlan.Name);
     }
 
     // ── Billing Portal ────────────────────────────────────────────────────────

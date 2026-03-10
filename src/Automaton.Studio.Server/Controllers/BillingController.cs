@@ -33,12 +33,16 @@ public class BillingController : BaseController
 
         var baseUrl = _config.WebsiteUrl.TrimEnd('/');
         var successUrl = $"{baseUrl}/billing/success?session_id={{CHECKOUT_SESSION_ID}}";
+        var successUrlDirect = $"{baseUrl}/billing/success";
         var cancelUrl  = $"{baseUrl}/pricing";
 
         try
         {
             var url = await _stripe.CreateCheckoutSessionAsync(userId, planId, successUrl, cancelUrl);
-            return Ok(new { checkoutUrl = url });
+            // If the user already had a subscription, the service upgrades it in place and
+            // returns the plain success URL (no Stripe session involved).
+            var checkoutUrl = url.Contains("{CHECKOUT_SESSION_ID}") ? successUrlDirect : url;
+            return Ok(new { checkoutUrl });
         }
         catch (InvalidOperationException ex)
         {
