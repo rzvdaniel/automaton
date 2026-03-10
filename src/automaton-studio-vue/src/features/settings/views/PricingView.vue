@@ -3,9 +3,10 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
 import api from '@/shared/services/api/axios-instance'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
-import billingService from '../services/billingService'
+import billingService, { type BillingStatusResponse } from '../services/billingService'
 
 interface SubscriptionPlan {
   id: string
@@ -24,12 +25,20 @@ const subscriptionsEnabled = useSubscriptionsEnabled()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(true)
 const checkoutLoadingId = ref<string | null>(null)
+const currentStatus = ref<BillingStatusResponse | null>(null)
+
+// Upgrade confirmation dialog
+const confirmDialogVisible = ref(false)
+const pendingPlan = ref<SubscriptionPlan | null>(null)
 
 onMounted(async () => {
   if (!subscriptionsEnabled) { loading.value = false; return }
   try {
-    const { data } = await api.get<SubscriptionPlan[]>('/api/account/getsubscriptionplans')
-    plans.value = data
+    const [plansRes] = await Promise.all([
+      api.get<SubscriptionPlan[]>('/api/account/getsubscriptionplans'),
+      billingService.getBillingStatus().then(s => { currentStatus.value = s }).catch(() => {}),
+    ])
+    plans.value = plansRes.data
   } finally {
     loading.value = false
   }
@@ -50,8 +59,28 @@ const highlightedIndex = computed(() => {
   return Math.floor(plans.value.length / 2)
 })
 
-async function upgrade(plan: SubscriptionPlan) {
-  if (plan.isDefault || !plan.priceUsd) return
+const isCurrentPlan = (plan: SubscriptionPlan) =>
+  currentStatus.value?.planName === plan.name
+
+function upgrade(plan: SubscriptionPlan) {
+  if (plan.isDefault || !plan.priceUsd || isCurrentPlan(plan)) return
+  // If user already has an active subscription, show confirmation with proration warning
+  if (currentStatus.value?.hasActiveSubscription) {
+    pendingPlan.value = plan
+    confirmDialogVisible.value = true
+    return
+  }
+  doCheckout(plan)
+}
+
+async function confirmUpgrade() {
+  if (!pendingPlan.value) return
+  confirmDialogVisible.value = false
+  await doCheckout(pendingPlan.value)
+  pendingPlan.value = null
+}
+
+async function doCheckout(plan: SubscriptionPlan) {
   checkoutLoadingId.value = plan.id
   try {
     const { checkoutUrl } = await billingService.createCheckoutSession(plan.id)
@@ -60,6 +89,16 @@ async function upgrade(plan: SubscriptionPlan) {
     checkoutLoadingId.value = null
   }
 }
+
+const buttonLabel = (plan: SubscriptionPlan) => {
+  if (isCurrentPlan(plan)) return 'Current plan'
+  if (plan.isDefault && !currentStatus.value?.hasActiveSubscription) return 'Current plan'
+  if (plan.priceUsd === 0) return 'Downgrade to Free'
+  return `Upgrade to ${plan.name}`
+}
+
+const isDisabled = (plan: SubscriptionPlan) =>
+  isCurrentPlan(plan) || (plan.isDefault && !currentStatus.value?.hasActiveSubscription)
 </script>
 
 <template>
@@ -112,8 +151,8 @@ async function upgrade(plan: SubscriptionPlan) {
             </li>
           </ul>
           <Button
-            :label="plan.isDefault ? 'Current plan' : `Upgrade to ${plan.name}`"
-            :disabled="plan.isDefault"
+            :label="buttonLabel(plan)"
+            :disabled="isDisabled(plan)"
             :loading="checkoutLoadingId === plan.id"
             :outlined="index !== highlightedIndex"
             class="w-full mt-4"
@@ -127,6 +166,37 @@ async function upgrade(plan: SubscriptionPlan) {
       Payment powered by Stripe. Your subscription activates instantly after checkout.
     </p>
   </div>
+
+  <!-- Upgrade confirmation dialog -->
+  <Dialog
+    v-model:visible="confirmDialogVisible"
+    header="Confirm plan change"
+    modal
+    style="width: 420px"
+  >
+    <div v-if="pendingPlan" class="flex flex-column gap-3">
+      <p>
+        You're switching from <strong>{{ currentStatus?.planName }}</strong>
+        to <strong>{{ pendingPlan.name }}</strong> (${{ pendingPlan.priceUsd.toFixed(2) }}/month).
+      </p>
+      <p class="text-sm text-color-secondary">
+        Your card will be charged a <strong>prorated amount</strong> immediately for the
+        remainder of this billing period. Your next full invoice will be on your regular billing date.
+      </p>
+      <p class="text-sm text-color-secondary">
+        The new plan activates as soon as payment succeeds.
+      </p>
+    </div>
+    <template #footer>
+      <Button label="Cancel" text @click="confirmDialogVisible = false" />
+      <Button
+        :label="`Switch to ${pendingPlan?.name}`"
+        icon="pi pi-check"
+        :loading="!!checkoutLoadingId"
+        @click="confirmUpgrade"
+      />
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
