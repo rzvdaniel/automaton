@@ -55,11 +55,38 @@ Alternative: expose localhost with **ngrok** and register that URL in the Stripe
 
 | Scenario | How to trigger | Webhook fired |
 |----------|---------------|---------------|
-| Successful subscription | Checkout with `4242...` card | `checkout.session.completed` → plan activated |
-| Declined payment | Checkout with `4000...9995` card | `invoice.payment_failed` |
+| Successful new subscription | Checkout with `4242...` card | `checkout.session.completed` → plan activated |
+| Declined payment on new subscription | Checkout with `4000...9995` card | `invoice.payment_failed` |
+| Upgrade existing subscription (success) | Pricing page → Upgrade (no checkout) → `4242...` card on file | `customer.subscription.updated` (status=active) → plan upgraded |
+| Upgrade existing subscription (declined) | Change card to `4000 0000 0000 0341` → Pricing page → Upgrade | `customer.subscription.updated` (status=past_due) → plan NOT upgraded |
 | Cancel subscription | Stripe billing portal → Cancel | `customer.subscription.deleted` → downgrade to Free |
-| Update subscription | Stripe billing portal → Change plan | `customer.subscription.updated` |
 | Renewal payment | Advance test clock in Stripe Dashboard | `invoice.payment_succeeded` |
+
+## Testing Upgrade with Failed Payment
+
+1. In Stripe Dashboard (test mode) → Customers → your user → Payment methods
+2. Add test card `4000 0000 0000 0341` (always declines) and set as default
+3. Go to `/pricing` in Automaton → click Upgrade to a higher plan
+4. Watch `stripe listen` — `customer.subscription.updated` fires with `status=past_due`
+5. Server logs: `skipping plan assignment` — user stays on their current plan
+6. Clean up: switch card back to `4242 4242 4242 4242`
+
+## Important: `whsec_` Secret Changes Every Session
+
+`stripe listen` generates a **new signing secret every time it starts**. After restarting the CLI you must update `appsettings.Development.json`:
+
+```json
+"Stripe": {
+  "WebhookSecret": "whsec_<new_value_from_stripe_listen>"
+}
+```
+
+Then press **Ctrl+R** in the `dotnet watch` terminal to force a restart (config is cached at startup).
+
+Or use .NET user secrets to avoid editing files:
+```bash
+dotnet user-secrets set "Stripe:WebhookSecret" "whsec_..."
+```
 
 ## Development Workflow
 
