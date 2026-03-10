@@ -31,6 +31,7 @@ public class StripeService
         _db = db;
         _userManager = userManager;
         _options = options.Value;
+        _logger = logger;
         StripeConfiguration.ApiKey = _options.SecretKey;
     }
 
