@@ -52,7 +52,7 @@ async function goToPortal() {
 </script>
 
 <template>
-  <div class="billing-view p-6 max-w-2xl mx-auto">
+  <div class="billing-view">
     <div class="flex items-center gap-3 mb-6">
       <i class="pi pi-credit-card text-2xl text-primary"></i>
       <h1 class="text-2xl font-semibold">Billing</h1>
@@ -63,45 +63,53 @@ async function goToPortal() {
     <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
 
     <template v-else-if="status">
-      <!-- Current Plan Card -->
-      <Card class="mb-4">
-        <template #title>
-          <div class="flex items-center justify-between">
-            <span>Current Plan</span>
-            <Tag :value="status.planName" severity="info" />
-          </div>
-        </template>
-        <template #content>
-          <div class="flex items-center justify-between text-sm text-surface-600 mb-1">
-            <span>Monthly price</span>
-            <span class="font-medium text-surface-800 dark:text-surface-200">
-              ${{ status.priceUsd.toFixed(2) }} / month
-            </span>
-          </div>
-          <div class="flex items-center justify-between text-sm text-surface-600">
-            <span>AI budget</span>
-            <span class="font-medium text-surface-800 dark:text-surface-200">
-              ${{ status.monthlyCostLimitUsd.toFixed(2) }} / month
-            </span>
-          </div>
-        </template>
-      </Card>
+      <!-- Cards row -->
+      <div class="billing-grid mb-5">
 
-      <!-- Usage Card -->
-      <Card class="mb-4">
-        <template #title>This Month's AI Usage</template>
-        <template #content>
-          <div class="flex items-center justify-between text-sm mb-2">
-            <span class="text-surface-600">
-              ${{ status.currentMonthCostUsd.toFixed(2) }} of ${{ status.monthlyCostLimitUsd.toFixed(2) }} used
-            </span>
-            <span :class="usagePercent >= 80 ? 'font-bold text-orange-600' : 'text-surface-600'">
-              {{ usagePercent }}%
-            </span>
-          </div>
-          <ProgressBar :value="usagePercent" :showValue="false" :class="`h-3 progress-${usageSeverity}`" />
-        </template>
-      </Card>
+        <!-- Current Plan Card -->
+        <Card class="billing-card">
+          <template #content>
+            <div class="billing-card-label">Current Plan</div>
+            <div class="billing-card-value">
+              {{ status.planName }}
+              <Tag v-if="status.hasActiveSubscription" value="Active" severity="success" class="ml-2" />
+            </div>
+            <div class="billing-card-meta">
+              <span>${{ status.priceUsd.toFixed(2) }} / month</span>
+              <span class="billing-card-divider">·</span>
+              <span>${{ status.monthlyCostLimitUsd.toFixed(2) }} AI budget</span>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Usage Card -->
+        <Card class="billing-card">
+          <template #content>
+            <div class="billing-card-label">AI Usage This Month</div>
+            <div class="billing-card-value">
+              ${{ status.currentMonthCostUsd.toFixed(2) }}
+              <span class="billing-card-of">/ ${{ status.monthlyCostLimitUsd.toFixed(2) }}</span>
+            </div>
+            <ProgressBar
+              :value="usagePercent"
+              :showValue="false"
+              class="billing-progress mb-2"
+              :class="`progress-${usageSeverity}`"
+            />
+            <div class="billing-card-meta">
+              <span
+                :class="{
+                  'text-orange-500 font-semibold': usagePercent >= 80,
+                  'text-red-500 font-semibold': usagePercent >= 100,
+                }"
+              >{{ usagePercent }}% used</span>
+              <span class="billing-card-divider">·</span>
+              <span>${{ (status.monthlyCostLimitUsd - status.currentMonthCostUsd).toFixed(2) }} remaining</span>
+            </div>
+          </template>
+        </Card>
+
+      </div>
 
       <!-- Actions -->
       <div class="flex gap-3">
@@ -124,6 +132,71 @@ async function goToPortal() {
 </template>
 
 <style scoped>
+.billing-view {
+  padding: 1.5rem;
+  max-width: 760px;
+}
+
+.billing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .billing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.billing-card {
+  height: 100%;
+}
+
+.billing-card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--p-text-muted-color);
+  margin-bottom: 0.35rem;
+}
+
+.billing-card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+}
+
+.billing-card-of {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--p-text-muted-color);
+  margin-left: 0.25rem;
+}
+
+.billing-card-meta {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.billing-card-divider {
+  opacity: 0.4;
+}
+
+.billing-progress {
+  height: 6px !important;
+}
+
+:deep(.billing-progress.p-progressbar) {
+  height: 6px;
+}
+
 :deep(.progress-success .p-progressbar-value) { background: var(--p-green-500); }
 :deep(.progress-warn   .p-progressbar-value)  { background: var(--p-orange-500); }
 :deep(.progress-danger .p-progressbar-value)  { background: var(--p-red-500); }
