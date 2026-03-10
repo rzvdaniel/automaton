@@ -54,7 +54,7 @@ const assigning = ref(false)
 
 const planOptions = computed(() => [
   { label: '— None (remove plan) —', value: null },
-  ...plans.value.map((p) => ({ label: `${p.name} ($${p.monthlyCostLimitUsd}/mo)`, value: p.id })),
+  ...plans.value.map((p) => ({ label: p.priceUsd > 0 ? `${p.name} ($${p.priceUsd}/mo)` : `${p.name} (Free)`, value: p.id })),
 ])
 
 // ── Load ─────────────────────────────────────────────────────────────────────
