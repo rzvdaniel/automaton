@@ -203,6 +203,25 @@ When adding a new feature, use the feature-based structure with components, serv
 
 **Reference Implementation:** API Keys feature in `src/automaton-studio-vue/src/features/settings/`
 
+### Backend (ASP.NET Core)
+
+**No magic strings for well-known values.** Whenever code uses string literals to identify a mode, state, role, or category that has a fixed set of known values — replace them with a `static class` of `const string` properties (not a C# `enum`, because enums need `.ToString()` when serialized over the wire or compared to JSON strings).
+
+```csharp
+// ✅ DO — static class with const string values
+public static class ConversationModes
+{
+    public const string Plan  = "plan";
+    public const string Agent = "agent";
+}
+
+// ❌ DON'T — scattered magic strings
+if (request.Mode == "plan") { ... }
+public string Mode { get; set; } = "agent";
+```
+
+Apply this pattern to: mode names, provider names, role names, status values, event type identifiers, action names, and any other string that appears in more than one place.
+
 ### API Key Scopes
 
 API keys authenticate runners, web apps, and integrations. Format: `ak_<scope>_<random>`.
