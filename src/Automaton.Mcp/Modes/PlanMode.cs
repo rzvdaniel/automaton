@@ -8,7 +8,7 @@ namespace Automaton.Mcp.Modes;
 /// </summary>
 public sealed class PlanMode : IConversationMode
 {
-    public string Name => "plan";
+    public string Name => ConversationModes.Plan;
 
     public string SystemPromptSuffix =>
         "\n\n## CURRENT MODE: Plan\n" +

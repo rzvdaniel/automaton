@@ -1,3 +1,5 @@
+using Automaton.Mcp.Modes;
+
 namespace Automaton.Mcp.Models;
 
 /// <summary>
@@ -34,7 +36,8 @@ public class ConversationRequest
     public int MaxConsecutiveFailures { get; set; } = 3;
 
     /// <summary>
-    /// Interaction mode: "plan" (read-only, propose_plan available) or "agent" (write tools, no propose_plan).
+    /// Interaction mode: <see cref="ConversationModes.Plan"/> (read-only, propose_plan available)
+    /// or <see cref="ConversationModes.Agent"/> (write tools, default).
     /// </summary>
-    public string Mode { get; set; } = "agent";
+    public string Mode { get; set; } = ConversationModes.Agent;
 }

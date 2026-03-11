@@ -14,8 +14,8 @@ public static class ConversationModeFactory
     /// </summary>
     public static IConversationMode From(string? modeName) => modeName?.ToLowerInvariant() switch
     {
-        "plan"  => _plan,
-        "agent" => _agent,
-        _       => _agent,   // safe default
+        ConversationModes.Plan  => _plan,
+        ConversationModes.Agent => _agent,
+        _                       => _agent,   // safe default
     };
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Mcp.Modes;
 using Automaton.Mcp.Tools;
 
 namespace Automaton.Mcp.Client.Providers;
@@ -38,5 +39,5 @@ public class PlanGateTracker
     /// In agent mode the loop stops immediately so the AI can't implement without approval.
     /// In plan mode the loop continues so the model can produce conversational feedback.
     /// </summary>
-    public bool ShouldBreakLoop(string? mode) => IsGated && mode != "plan";
+    public bool ShouldBreakLoop(string? mode) => IsGated && mode != ConversationModes.Plan;
 }

@@ -7,7 +7,7 @@ namespace Automaton.Mcp.Modes;
 /// </summary>
 public sealed class AgentMode : IConversationMode
 {
-    public string Name => "agent";
+    public string Name => ConversationModes.Agent;
 
     public string SystemPromptSuffix => string.Empty;
 

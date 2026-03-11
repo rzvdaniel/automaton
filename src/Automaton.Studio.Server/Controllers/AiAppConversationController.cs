@@ -1,5 +1,6 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
+using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
 using Automaton.Studio.Server.Config;
@@ -58,7 +59,7 @@ public class AiAppConversationController : AiConversationControllerBase
     /// so PlanMode never appends "Your primary action is propose_plan".
     /// </summary>
     protected override string GetEffectiveMode(BaseStreamConversationRequest request) =>
-        _resolvedTier is ComplexityTier.Simple or ComplexityTier.Medium ? "agent" : request.Mode;
+        _resolvedTier is ComplexityTier.Simple or ComplexityTier.Medium ? ConversationModes.Agent : request.Mode;
 
     // Stores the tier resolved during BuildSystemPromptAsync for use in GetEffectiveMode.
     private ComplexityTier? _resolvedTier;

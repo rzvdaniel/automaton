@@ -101,7 +101,7 @@ public abstract class AiConversationControllerBase : BaseController
             }
 
             // In plan mode, prefer the designated planning model if one is configured
-            if (string.Equals(request.Mode, "plan", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(request.Mode, ConversationModes.Plan, StringComparison.OrdinalIgnoreCase))
             {
                 var planningModel = await _providerMetadataService.GetPlanningModelAsync(provider);
                 if (!string.IsNullOrWhiteSpace(planningModel))
@@ -415,5 +415,5 @@ public abstract class BaseStreamConversationRequest
     public Guid? SessionId { get; set; }
     public Guid? ResourceId { get; set; }
     /// <summary>"plan" or "agent" (default)</summary>
-    public string Mode { get; set; } = "agent";
+    public string Mode { get; set; } = ConversationModes.Agent;
 }
