@@ -44,6 +44,7 @@ const formData = ref({
   description: '',
   isActive: true,
   isDefault: false,
+  isPlanningModel: false,
   maxTokens: 4096,
   supportsStreaming: true,
   supportsTools: false,
@@ -88,6 +89,7 @@ function openCreateDialog() {
     description: '',
     isActive: true,
     isDefault: false,
+    isPlanningModel: false,
     maxTokens: 4096,
     supportsStreaming: true,
     supportsTools: false,
@@ -108,6 +110,7 @@ function openEditDialog(model: AiModelAdmin) {
     description: model.description || '',
     isActive: model.isActive,
     isDefault: model.isDefault,
+    isPlanningModel: model.isPlanningModel,
     maxTokens: model.maxTokens,
     supportsStreaming: model.supportsStreaming,
     supportsTools: model.supportsTools,
@@ -142,6 +145,7 @@ async function handleSave() {
         description: formData.value.description || undefined,
         isActive: formData.value.isActive,
         isDefault: formData.value.isDefault,
+        isPlanningModel: formData.value.isPlanningModel,
         maxTokens: formData.value.maxTokens,
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
@@ -159,6 +163,7 @@ async function handleSave() {
         description: formData.value.description || undefined,
         isActive: formData.value.isActive,
         isDefault: formData.value.isDefault,
+        isPlanningModel: formData.value.isPlanningModel,
         maxTokens: formData.value.maxTokens,
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
@@ -315,6 +320,7 @@ function goBackToProviders() {
                   :severity="data.isActive ? 'success' : 'warning'"
                 />
                 <Tag v-if="data.isDefault" value="Default" severity="contrast" class="text-xs" />
+                <Tag v-if="data.isPlanningModel" value="Planning" severity="secondary" class="text-xs" />
               </div>
             </template>
           </Column>
@@ -405,6 +411,12 @@ function goBackToProviders() {
           <div class="flex align-items-center gap-2">
             <Checkbox id="modelIsDefault" v-model="formData.isDefault" :binary="true" />
             <label for="modelIsDefault">Default model</label>
+          </div>
+          <div class="flex align-items-center gap-2">
+            <Checkbox id="modelIsPlanningModel" v-model="formData.isPlanningModel" :binary="true" />
+            <label for="modelIsPlanningModel" title="Used for the planning phase (plan mode) instead of the user's selected model">
+              Planning model
+            </label>
           </div>
         </div>
 
