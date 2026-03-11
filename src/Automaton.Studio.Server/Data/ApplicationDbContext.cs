@@ -261,7 +261,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.StepId);
 
                 entity.HasOne(e => e.AppVersion)
-                    .WithMany()
+                    .WithMany(p => p.Steps)
                     .HasForeignKey(e => e.AppVersionId)
                     .OnDelete(DeleteBehavior.Cascade);
 
@@ -577,7 +577,7 @@ namespace Automaton.Studio.Server.Data
                     .OnDelete(DeleteBehavior.Cascade);
                     
                 entity.HasOne(e => e.Runner)
-                    .WithMany()
+                    .WithMany(r => r.ProjectRunners)
                     .HasForeignKey(e => e.RunnerId)
                     .OnDelete(DeleteBehavior.Cascade);
                     
