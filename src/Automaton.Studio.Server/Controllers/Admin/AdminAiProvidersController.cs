@@ -250,6 +250,7 @@ public class AdminAiProvidersController : ControllerBase
                 Description = m.Description,
                 IsActive = m.IsActive,
                 IsDefault = m.IsDefault,
+                IsPlanningModel = m.IsPlanningModel,
                 MaxTokens = m.MaxTokens,
                 SupportsStreaming = m.SupportsStreaming,
                 SupportsTools = m.SupportsTools,
@@ -286,6 +287,7 @@ public class AdminAiProvidersController : ControllerBase
                 Description = m.Description,
                 IsActive = m.IsActive,
                 IsDefault = m.IsDefault,
+                IsPlanningModel = m.IsPlanningModel,
                 MaxTokens = m.MaxTokens,
                 SupportsStreaming = m.SupportsStreaming,
                 SupportsTools = m.SupportsTools,
@@ -340,6 +342,7 @@ public class AdminAiProvidersController : ControllerBase
             Description = request.Description,
             IsActive = request.IsActive,
             IsDefault = request.IsDefault,
+            IsPlanningModel = request.IsPlanningModel,
             MaxTokens = request.MaxTokens,
             SupportsStreaming = request.SupportsStreaming,
             SupportsTools = request.SupportsTools,
@@ -365,6 +368,7 @@ public class AdminAiProvidersController : ControllerBase
             Description = newModel.Description,
             IsActive = newModel.IsActive,
             IsDefault = newModel.IsDefault,
+            IsPlanningModel = newModel.IsPlanningModel,
             MaxTokens = newModel.MaxTokens,
             SupportsStreaming = newModel.SupportsStreaming,
             SupportsTools = newModel.SupportsTools,
@@ -417,6 +421,7 @@ public class AdminAiProvidersController : ControllerBase
         if (request.Description != null) model.Description = request.Description;
         if (request.IsActive.HasValue) model.IsActive = request.IsActive.Value;
         if (request.IsDefault.HasValue) model.IsDefault = request.IsDefault.Value;
+        if (request.IsPlanningModel.HasValue) model.IsPlanningModel = request.IsPlanningModel.Value;
         if (request.MaxTokens.HasValue) model.MaxTokens = request.MaxTokens.Value;
         if (request.SupportsStreaming.HasValue) model.SupportsStreaming = request.SupportsStreaming.Value;
         if (request.SupportsTools.HasValue) model.SupportsTools = request.SupportsTools.Value;
@@ -629,6 +634,7 @@ public class AiModelAdminResponse
     public string? Description { get; set; }
     public bool IsActive { get; set; }
     public bool IsDefault { get; set; }
+    public bool IsPlanningModel { get; set; }
     public int MaxTokens { get; set; }
     public bool SupportsStreaming { get; set; }
     public bool SupportsTools { get; set; }
@@ -647,6 +653,7 @@ public class AdminCreateAiModelRequest
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsDefault { get; set; } = false;
+    public bool IsPlanningModel { get; set; } = false;
     public int MaxTokens { get; set; } = 4096;
     public bool SupportsStreaming { get; set; } = true;
     public bool SupportsTools { get; set; } = false;
@@ -663,6 +670,7 @@ public class AdminUpdateAiModelRequest
     public string? Description { get; set; }
     public bool? IsActive { get; set; }
     public bool? IsDefault { get; set; }
+    public bool? IsPlanningModel { get; set; }
     public int? MaxTokens { get; set; }
     public bool? SupportsStreaming { get; set; }
     public bool? SupportsTools { get; set; }

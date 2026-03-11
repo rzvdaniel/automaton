@@ -71,6 +71,7 @@ export interface AiModelAdmin {
   description?: string
   isActive: boolean
   isDefault: boolean
+  isPlanningModel: boolean
   maxTokens: number
   supportsStreaming: boolean
   supportsTools: boolean
@@ -92,6 +93,7 @@ export interface CreateAiModelRequest {
   description?: string
   isActive: boolean
   isDefault: boolean
+  isPlanningModel: boolean
   maxTokens: number
   supportsStreaming: boolean
   supportsTools: boolean
@@ -110,6 +112,7 @@ export interface UpdateAiModelRequest {
   description?: string
   isActive?: boolean
   isDefault?: boolean
+  isPlanningModel?: boolean
   maxTokens?: number
   supportsStreaming?: boolean
   supportsTools?: boolean

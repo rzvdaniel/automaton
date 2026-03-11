@@ -94,6 +94,17 @@ public abstract class AiConversationControllerBase : BaseController
                 return;
             }
 
+            // In plan mode, prefer the designated planning model if one is configured
+            if (string.Equals(request.Mode, "plan", StringComparison.OrdinalIgnoreCase))
+            {
+                var planningModel = await _providerMetadataService.GetPlanningModelAsync(provider);
+                if (!string.IsNullOrWhiteSpace(planningModel))
+                {
+                    _logger.LogInformation("Plan mode: overriding model {Model} with planning model {PlanningModel}", model, planningModel);
+                    model = planningModel;
+                }
+            }
+
             // Downgrade model if user has exceeded their monthly token allowance
             model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 

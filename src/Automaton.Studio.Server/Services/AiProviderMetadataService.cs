@@ -89,6 +89,19 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
+    /// Get the designated planning model for a provider — the model to use during the plan phase.
+    /// Returns null if no model has IsPlanningModel=true for this provider.
+    /// </summary>
+    public async Task<string?> GetPlanningModelAsync(string providerName)
+    {
+        return await dbContext.AiModels
+            .Where(m => m.Provider.Name == providerName && m.IsActive && m.IsPlanningModel)
+            .OrderBy(m => m.SortOrder)
+            .Select(m => m.ModelId)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
     /// Check if a provider is active in the database
     /// </summary>
     public async Task<bool> IsProviderActiveAsync(string providerName)

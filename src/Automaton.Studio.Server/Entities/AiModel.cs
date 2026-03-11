@@ -30,6 +30,14 @@ public class AiModel
 
     public bool IsDefault { get; set; } = false;
 
+    /// <summary>
+    /// When true, this model is preferred for the planning phase (plan mode).
+    /// The system will use this model when generating implementation plans, even if the user
+    /// has selected a different model for implementation.
+    /// Only one model per provider should have this flag set.
+    /// </summary>
+    public bool IsPlanningModel { get; set; } = false;
+
     public int MaxTokens { get; set; } = 4096;
 
     public bool SupportsStreaming { get; set; } = true;

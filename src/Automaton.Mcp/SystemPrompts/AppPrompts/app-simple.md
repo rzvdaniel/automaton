@@ -12,6 +12,93 @@ Before each tool call, briefly state what you're doing. After each result, brief
 **Yes**: system info, external APIs, database, file system, server-side processing
 **No**: pure UI, client-side calculations, static content
 
+## DATA PERSISTENCE:
+- **In-memory** (default): Store data in Python dicts/lists. Resets on restart — fine for demos.
+- **SQLite** (use when data must survive restarts):
+  ```python
+  import sqlite3, os
+  DB_PATH = os.path.join(os.path.dirname(__file__), 'data.db')
+  def get_db():
+      conn = sqlite3.connect(DB_PATH)
+      conn.row_factory = sqlite3.Row
+      return conn
+  def init_db():
+      with get_db() as db:
+          db.execute("""CREATE TABLE IF NOT EXISTS items (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )""")
+  init_db()
+  ```
+
+## DESIGN STANDARDS:
+Build **polished, professional UIs** — never plain unstyled HTML. Apply these patterns consistently:
+
+**Page structure**:
+```html
+<body class="min-h-screen bg-slate-50">
+  <div class="max-w-4xl mx-auto px-6 py-8">...</div>
+</body>
+```
+
+**Typography**:
+- Page title: `text-3xl font-bold text-slate-900`
+- Section header: `text-xl font-semibold text-slate-800`
+- Body: `text-slate-600`
+- Muted/hint: `text-sm text-slate-400`
+
+**Cards**: `bg-white rounded-xl border border-slate-200 shadow-sm p-6`
+
+**Buttons**:
+- Primary: `bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
+- Secondary: `bg-white hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg border border-slate-300 transition-colors cursor-pointer`
+- Danger: `bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
+
+**Form inputs**: `w-full border border-slate-300 rounded-lg px-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`
+
+**Labels**: `block text-sm font-medium text-slate-700 mb-1`
+
+**Status badges**:
+- Success: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800`
+- Warning: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800`
+- Error: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800`
+
+**Loading skeleton**:
+```html
+<div class="animate-pulse space-y-3">
+  <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+  <div class="h-4 bg-slate-200 rounded w-1/2"></div>
+</div>
+```
+
+**Empty state**:
+```html
+<div class="text-center py-16">
+  <p class="text-slate-400 text-lg mb-4">No items yet</p>
+  <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors">Add your first item</button>
+</div>
+```
+
+**Toast notifications** (use instead of `alert()`):
+```javascript
+function showToast(message, type = 'success') {
+    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-amber-500' };
+    const toast = Object.assign(document.createElement('div'), {
+        className: `fixed bottom-4 right-4 ${colors[type] || colors.info} text-white px-5 py-3 rounded-lg shadow-lg z-50 text-sm font-medium`,
+        textContent: message
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+}
+```
+
+**Always include**:
+- `aria-label` on icon-only buttons; `<label>` for all form inputs
+- `role="dialog"` + `aria-modal="true"` on modals
+- Hover/focus states and `transition-colors` on interactive elements
+- Smooth modal: `transition-opacity duration-200`
+
 ## BACKEND TESTING:
 Controllers run on the runner — you cannot test during authoring.
 1. Write correct Python with try/except; always set `success` and `error`
@@ -25,14 +112,6 @@ Controllers run on the runner — you cannot test during authoring.
 - **Return a dict** with three keys: `success` (bool), `data` (any Python value), `error` (str)
   ✅ `return {"success": True, "data": data, "error": ""}`
   ✅ `return {"success": False, "data": None, "error": "not found"}`
-
-## FRONTEND DESIGN:
-- Tailwind CSS via CDN: `<script src="https://cdn.tailwindcss.com"></script>`
-- Responsive (mobile/tablet/desktop), semantic HTML, ARIA labels
-- Loading states, empty states, error handling
-- ES6+ (const/let, arrow functions, async/await)
-- **Always multi-file** (separate HTML, CSS, JS); single-file only for trivial prototypes
-- Separate `styles/main.css`; no inline styles
 
 ## FILE STRUCTURE (always use this):
 ```
@@ -66,7 +145,6 @@ Controllers run on the runner — you cannot test during authoring.
 Single Python file with a `handle(action_name, inputs)` function.
 
 ```python
-import json
 import os
 
 def handle(action_name: str, inputs: dict) -> dict:
@@ -115,6 +193,7 @@ if (result.success) {
 5. No mock data — write real code
 6. Multi-file structure always; ES6+; separate CSS; Tailwind; loading/error/empty states
 7. Vanilla JS by default; jQuery only if genuinely needed
+8. Always follow Design Standards — never plain unstyled HTML
 
 ## FINAL RESPONSE:
 After tool calls, end with a brief **Summary of Changes** (what was done + files modified).

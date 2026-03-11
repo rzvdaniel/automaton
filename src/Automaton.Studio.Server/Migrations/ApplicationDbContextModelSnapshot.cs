@@ -239,6 +239,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsPlanningModel")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("MaxTokens")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
