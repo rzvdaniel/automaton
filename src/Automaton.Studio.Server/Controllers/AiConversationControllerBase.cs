@@ -60,6 +60,12 @@ public abstract class AiConversationControllerBase : BaseController
         Guid sessionId,
         List<ConversationMessage>? history);
 
+    /// <summary>
+    /// Returns the effective mode to use for system-prompt suffix selection.
+    /// Subclasses may override to downgrade the mode (e.g. Simple/Medium tiers always use "agent").
+    /// </summary>
+    protected virtual string GetEffectiveMode(BaseStreamConversationRequest request) => request.Mode;
+
     /// <summary>Return the tool provider to use for this resource type.</summary>
     protected abstract IMcpToolProvider? GetToolProvider();
 
@@ -133,7 +139,7 @@ public abstract class AiConversationControllerBase : BaseController
 
             // 4. Build system prompt (delegated to subclass) + append mode-specific instructions
             var systemPrompt = await BuildSystemPromptAsync(request, userId, sessionId, history);
-            systemPrompt += ConversationModeFactory.From(request.Mode).SystemPromptSuffix;
+            systemPrompt += ConversationModeFactory.From(GetEffectiveMode(request)).SystemPromptSuffix;
 
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());

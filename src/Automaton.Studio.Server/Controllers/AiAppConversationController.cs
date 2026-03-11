@@ -54,6 +54,16 @@ public class AiAppConversationController : AiConversationControllerBase
     protected override IMcpToolProvider? GetToolProvider() => _toolProvider;
 
     /// <summary>
+    /// Simple and Medium tiers always create immediately — force agent mode
+    /// so PlanMode never appends "Your primary action is propose_plan".
+    /// </summary>
+    protected override string GetEffectiveMode(BaseStreamConversationRequest request) =>
+        _resolvedTier is ComplexityTier.Simple or ComplexityTier.Medium ? "agent" : request.Mode;
+
+    // Stores the tier resolved during BuildSystemPromptAsync for use in GetEffectiveMode.
+    private ComplexityTier? _resolvedTier;
+
+    /// <summary>
     /// Stream an AI conversation for Web App generation/editing.
     /// </summary>
     [HttpPost("stream")]
@@ -69,6 +79,7 @@ public class AiAppConversationController : AiConversationControllerBase
         List<ConversationMessage>? history)
     {
         var tier       = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
+        _resolvedTier  = tier;
         var basePrompt = _promptBuilder.BuildSystemPrompt(tier);
 
         // Inject user instructions from .instructions/ folder (1000 token budget)
