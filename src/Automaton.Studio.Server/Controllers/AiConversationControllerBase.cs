@@ -196,6 +196,7 @@ public abstract class AiConversationControllerBase : BaseController
                 {
                     conversationId = result.ConversationId,
                     sessionId,
+                    model,
                     success = true
                 });
             }

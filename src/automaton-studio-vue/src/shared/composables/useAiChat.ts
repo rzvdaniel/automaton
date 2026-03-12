@@ -462,10 +462,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             activeSession.value.id = data.sessionId
           }
 
-          // Mark all streaming messages as complete and stamp the model used
+          // Mark all streaming messages as complete and stamp the actual model used
+          // (data.model comes from the backend — may differ from selectedModel due to plan mode override, token budget, etc.)
+          const usedModel = data.model || selectedModel.value || undefined
           messages.value.forEach((m) => {
-            if (m.role === 'assistant' && !m.model && selectedModel.value) {
-              m.model = selectedModel.value
+            if (m.role === 'assistant' && !m.model && usedModel) {
+              m.model = usedModel
             }
             if (m.isStreaming) {
               m.isStreaming = false

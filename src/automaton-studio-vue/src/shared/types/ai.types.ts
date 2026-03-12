@@ -88,6 +88,7 @@ export interface SseConversationUpdate {
 export interface SseDoneEvent {
   conversationId: string
   sessionId?: string
+  model?: string
   success: boolean
 }
 

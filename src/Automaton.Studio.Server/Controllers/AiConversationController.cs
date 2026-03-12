@@ -252,6 +252,7 @@ public class AiConversationController : BaseController
                 {
                     conversationId = result.ConversationId,
                     sessionId = sessionId,
+                    model,
                     success = true
                 });
             }
