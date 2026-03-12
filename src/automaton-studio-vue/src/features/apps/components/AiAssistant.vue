@@ -8,6 +8,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
@@ -553,13 +554,15 @@ function implementPlan() {
 
       <!-- Input area always visible -->
       <div class="input-area">
-        <div class="flex gap-2">
-          <InputText
+        <div class="flex gap-2 align-items-end">
+          <Textarea
             v-model="userInput"
             placeholder="Ask AI a question..."
-            class="flex-1"
+            class="flex-1 prompt-textarea"
             :disabled="isBusy"
-            @keypress="handleKeyPress"
+            :autoResize="true"
+            rows="2"
+            @keydown="handleKeyPress"
           />
           <Button
             v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
@@ -739,13 +742,15 @@ function implementPlan() {
 
       <!-- Input area -->
       <div class="input-area">
-        <div class="flex gap-2">
-          <InputText
+        <div class="flex gap-2 align-items-end">
+          <Textarea
             v-model="userInput"
             placeholder="Describe what you want..."
-            class="flex-1"
+            class="flex-1 prompt-textarea"
             :disabled="isBusy"
-            @keypress="handleKeyPress"
+            :autoResize="true"
+            rows="2"
+            @keydown="handleKeyPress"
           />
           <Button
             v-if="isBusy"
@@ -1281,6 +1286,13 @@ function implementPlan() {
   padding: 0.75rem;
   border-top: 1px solid var(--p-surface-200);
   flex-shrink: 0;
+}
+
+.prompt-textarea {
+  min-height: 60px;
+  max-height: 200px;
+  resize: none;
+  line-height: 1.5;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */
