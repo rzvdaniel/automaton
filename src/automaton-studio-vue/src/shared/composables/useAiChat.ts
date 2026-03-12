@@ -662,6 +662,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           // Non-implementation plan types (e.g. stage_complete with awaitingApproval) stay inline
           toolMessage.type = 'planApproval'
           toolMessage.planData = resultData as import('../types/ai.types').PlanData
+          toolMessage.model = selectedModel.value || undefined
         } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string

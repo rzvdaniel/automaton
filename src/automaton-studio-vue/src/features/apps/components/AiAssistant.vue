@@ -691,6 +691,7 @@ function implementPlan() {
                     :plan-data="group.message.planData"
                     :on-send="(msg) => sendAiMessage(msg)"
                   />
+                  <span v-if="group.message.type === 'planApproval' && group.message.model" class="message-model-badge">{{ group.message.model }}</span>
                   <!-- Instruction update notification -->
                   <div v-else-if="group.message.type === 'instructionUpdate'" class="instruction-notification">
                     <i class="pi pi-file-edit"></i>
