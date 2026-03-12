@@ -418,7 +418,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
    * @param userMessageAlreadyAdded - set true when the caller has already pushed the user
    *   message into `messages` optimistically, so we don't add it a second time.
    */
-  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>, userMessageAlreadyAdded = false) {
+  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>, userMessageAlreadyAdded = false, modeOverride?: 'plan' | 'agent') {
     if (!userMessage.trim() || isGenerating.value) return
     if (!selectedModel.value) {
       error.value = 'Please select an AI model'
@@ -432,7 +432,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
     // Capture mode BEFORE the user message is pushed — once it's in messages,
     // chatMode (computed) flips to 'agent', so we'd always send 'agent' otherwise.
-    const modeForThisRequest = chatMode.value
+    // A modeOverride lets callers that push the message themselves pass the pre-push mode.
+    const modeForThisRequest = modeOverride ?? chatMode.value
 
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {

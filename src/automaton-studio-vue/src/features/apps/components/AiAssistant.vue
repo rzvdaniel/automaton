@@ -301,6 +301,10 @@ async function sendMessage() {
   // If we're in the sessions list view, always create a new session
   // If we're in chat view with no active session, also create one
   if (currentView.value === 'sessions' || !activeSession.value) {
+    // Capture the mode NOW, before anything is pushed to messages — chatMode is a
+    // computed that flips to 'agent' the moment a user message exists in the array.
+    const modeForThisMessage = chatMode.value
+
     // 1. Clear previous session state so chat view doesn't briefly show old data
     activeSession.value = null
     messages.value = []
@@ -345,8 +349,9 @@ async function sendMessage() {
       props.systemPrompt ||
       'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
 
-    // 6. Send to AI — pass true so sendAiMessage doesn't add the user message a second time
-    const sendPromise = sendAiMessage(messageContent, systemPrompt, context, true)
+    // 6. Send to AI — pass true so sendAiMessage doesn't add the user message a second time,
+    //    and pass the pre-push mode so backend gets 'plan' for the first message.
+    const sendPromise = sendAiMessage(messageContent, systemPrompt, context, true, modeForThisMessage)
     
     // Generate proper session name in parallel (don't await - let it run in background)
     generateAndUpdateSessionName(messageContent)
