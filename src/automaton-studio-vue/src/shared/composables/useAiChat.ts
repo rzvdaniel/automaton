@@ -464,9 +464,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
           // Mark all streaming messages as complete and stamp the model used
           messages.value.forEach((m) => {
+            if (m.role === 'assistant' && !m.model && selectedModel.value) {
+              m.model = selectedModel.value
+            }
             if (m.isStreaming) {
               m.isStreaming = false
-              m.model = selectedModel.value || undefined
             }
           })
 
@@ -547,8 +549,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             if (isNewMessage) {
               console.log('[useAiChat] Detected new message (not streaming continuation), preserving existing message')
 
-              // Mark existing message as complete
+              // Mark existing message as complete and stamp the model
               existingMessage.isStreaming = false
+              existingMessage.model = selectedModel.value || undefined
 
               // Add new message for the summary (will appear after tool messages)
               messages.value.push({
