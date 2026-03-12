@@ -462,10 +462,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             activeSession.value.id = data.sessionId
           }
 
-          // Mark all streaming messages as complete
+          // Mark all streaming messages as complete and stamp the model used
           messages.value.forEach((m) => {
             if (m.isStreaming) {
               m.isStreaming = false
+              m.model = selectedModel.value || undefined
             }
           })
 

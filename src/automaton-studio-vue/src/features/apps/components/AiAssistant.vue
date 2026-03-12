@@ -697,7 +697,10 @@ function implementPlan() {
                     {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
                   <!-- Regular AI message -->
-                  <div v-else class="message-text">{{ group.message.content }}</div>
+                  <div v-else class="message-text">
+                    {{ group.message.content }}
+                    <span v-if="group.message.model" class="message-model-badge">{{ group.message.model }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1188,6 +1191,14 @@ function implementPlan() {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.message-model-badge {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--p-surface-400);
+  font-family: monospace;
 }
 
 .tool-call-line {
