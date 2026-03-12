@@ -433,7 +433,7 @@ function goBackToProviders() {
           </div>
           <div class="flex flex-column gap-2" style="width: 120px">
             <label for="modelSortOrder" class="font-medium">Sort Order</label>
-            <InputNumber id="modelSortOrder" v-model="formData.sortOrder" :min="0" />
+            <InputNumber id="modelSortOrder" v-model="formData.sortOrder" :min="0" fluid />
           </div>
         </div>
 
