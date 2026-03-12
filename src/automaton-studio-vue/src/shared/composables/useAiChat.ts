@@ -430,6 +430,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       await getOrCreateActiveSession()
     }
 
+    // Capture mode BEFORE the user message is pushed — once it's in messages,
+    // chatMode (computed) flips to 'agent', so we'd always send 'agent' otherwise.
+    const modeForThisRequest = chatMode.value
+
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -468,7 +472,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       resourceType: resourceType, // Top-level property for backend
       resourceId: resourceId, // Top-level property for backend
       language: context?.language,
-      mode: chatMode.value,
+      mode: modeForThisRequest,
       context: {
         ...context, // Additional context (e.g., runnerId, appId)
       },
