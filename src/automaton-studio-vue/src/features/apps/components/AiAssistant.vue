@@ -691,7 +691,6 @@ function implementPlan() {
                     :plan-data="group.message.planData"
                     :on-send="(msg) => sendAiMessage(msg)"
                   />
-                  <span v-if="group.message.type === 'planApproval' && group.message.model" class="message-model-badge">{{ group.message.model }}</span>
                   <!-- Instruction update notification -->
                   <div v-else-if="group.message.type === 'instructionUpdate'" class="instruction-notification">
                     <i class="pi pi-file-edit"></i>
@@ -700,8 +699,9 @@ function implementPlan() {
                   <!-- Regular AI message -->
                   <div v-else class="message-text">
                     {{ group.message.content }}
-                    <span v-if="group.message.model" class="message-model-badge">{{ group.message.model }}</span>
                   </div>
+                  <!-- Model badge: shown below message for all assistant messages once model is known -->
+                  <span v-if="group.message.model" class="message-model-badge">{{ group.message.model }}</span>
                 </div>
               </div>
             </div>
