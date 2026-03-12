@@ -700,8 +700,10 @@ function implementPlan() {
                   <div v-else class="message-text">
                     {{ group.message.content }}
                   </div>
-                  <!-- Model badge: always shown for diagnostics (remove v-if once confirmed working) -->
-                  <span class="message-model-badge">{{ group.message.model || 'model-unknown' }}</span>
+                  <!-- Model badge: always shown for diagnostics -->
+                  <div style="background:red;color:white;padding:4px 8px;font-size:12px;margin-top:4px;display:block;">
+                    MODEL: {{ group.message.model || 'unknown' }}
+                  </div>
                 </div>
               </div>
             </div>
