@@ -166,12 +166,6 @@ onMounted(async () => {
   // Load sessions but don't create one automatically
   await loadSessions()
 
-  // If the app already has prior work (any session with prompts), default to agent mode
-  // so the user can make changes directly without having to switch modes manually.
-  if (sessions.value.some((s) => s.totalPromptsSubmitted > 0)) {
-    chatMode.value = 'agent'
-  }
-
   // Always stay in sessions list view by default
   // User can click on a session to open it
   
@@ -423,9 +417,8 @@ function handleKeyPress(event: KeyboardEvent) {
   }
 }
 
-// Switch to agent mode and send the approval message to start implementation
+// Send the approval message to start implementation
 function implementPlan() {
-  chatMode.value = 'agent'
   pendingPlan.value = false
   // Keep currentPlan visible during implementation so user can reference it
 
@@ -746,27 +739,10 @@ function implementPlan() {
 
       <!-- Input area -->
       <div class="input-area">
-        <!-- Mode toggle row -->
-        <div class="mode-row">
-          <div class="mode-toggle">
-            <button
-              class="mode-btn"
-              :class="{ active: chatMode === 'plan', 'implement-ready': pendingPlan && chatMode === 'plan' }"
-              :disabled="isBusy"
-              @click="pendingPlan && chatMode === 'plan' ? implementPlan() : chatMode = 'plan'"
-            >{{ pendingPlan && chatMode === 'plan' ? 'Implement Plan' : 'Plan' }}</button>
-            <button
-              class="mode-btn"
-              :class="{ active: chatMode === 'agent' }"
-              :disabled="isBusy"
-              @click="chatMode = 'agent'"
-            >Agent</button>
-          </div>
-        </div>
         <div class="flex gap-2">
           <InputText
             v-model="userInput"
-            :placeholder="chatMode === 'plan' ? 'Describe what to build...' : 'Describe what you want...'"
+            placeholder="Describe what you want..."
             class="flex-1"
             :disabled="isBusy"
             @keypress="handleKeyPress"
@@ -1305,46 +1281,6 @@ function implementPlan() {
   padding: 0.75rem;
   border-top: 1px solid var(--p-surface-200);
   flex-shrink: 0;
-}
-
-.mode-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.mode-toggle {
-  display: inline-flex;
-  border: 1px solid var(--p-surface-300);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.mode-btn {
-  padding: 2px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--p-text-muted-color);
-  transition: background 0.15s, color 0.15s;
-}
-
-.mode-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.mode-btn.active {
-  background: var(--p-primary-500);
-  color: #fff;
-}
-
-.mode-btn.implement-ready {
-  background: var(--p-green-500);
-  color: #fff;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */

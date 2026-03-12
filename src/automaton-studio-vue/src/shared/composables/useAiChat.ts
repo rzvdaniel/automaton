@@ -49,15 +49,17 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Session-scoped chat mode: 'plan' (read-only + propose_plan) or 'agent' (write tools)
-  // Defaults to 'plan' for first-time users; only changed by explicit user action.
-  const chatMode = ref<'plan' | 'agent'>('plan')
-
   // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
   const pendingPlan = ref(false)
 
   // The current plan proposed by the AI — updated in-place on each propose_plan call
   const currentPlan = ref<import('../types/ai.types').PlanData | null>(null)
+
+  // Derived mode: use 'plan' for the very first message in a fresh session (no prior messages),
+  // 'agent' for all subsequent messages. The explicit toggle is removed — mode is automatic.
+  const chatMode = computed<'plan' | 'agent'>(() =>
+    messages.value.filter((m) => m.role === 'user').length === 0 ? 'plan' : 'agent',
+  )
 
   // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
   const pendingAutoContinu = ref(false)
@@ -193,9 +195,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       if (active) {
         activeSession.value = active
       }
-
-      // Mode is never changed automatically — only the user can switch via the toggle
-      // or by clicking "Implement Plan". New apps default to 'plan' (set at ref init).
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load sessions'
       console.error('Error loading sessions:', err)
@@ -236,6 +235,31 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       
       // Skip role='tool' messages — raw tool output only needed by AI as context, not meaningful for users.
       messages.value = serverMessages.filter((m: any) => m.role !== 'tool')
+
+      // Restore pending plan state from message history.
+      // When a propose_plan(implementation) result was received, the plan data is in the toolResult
+      // of the most recent unimplemented propose_plan message. We scan in reverse to get the latest.
+      pendingPlan.value = false
+      currentPlan.value = null
+      const userCount = messages.value.filter((m) => m.role === 'user').length
+      // Only restore if the plan hasn't been implemented yet (last user message count suggests plan-only session)
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        const m = messages.value[i]
+        if (m.toolName === 'propose_plan' && m.toolResult) {
+          try {
+            const result = typeof m.toolResult === 'string' ? JSON.parse(m.toolResult) : m.toolResult
+            if (result?.planType === 'implementation' && result?.awaitingApproval !== false) {
+              // Found an unimplemented plan — restore it unless the user has already sent follow-up messages after it
+              const messagesAfterPlan = messages.value.slice(i + 1).filter((msg) => msg.role === 'user')
+              if (messagesAfterPlan.length === 0) {
+                currentPlan.value = result
+                pendingPlan.value = true
+              }
+            }
+          } catch { /* not JSON or not a plan */ }
+          break // only check the most recent propose_plan
+        }
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load messages'
       console.error('Error loading messages:', err)
