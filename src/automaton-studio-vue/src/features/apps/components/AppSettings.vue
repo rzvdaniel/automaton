@@ -5,7 +5,9 @@
  * Includes: Basic info, Publishing, Runner, Appearance
  */
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
@@ -16,10 +18,15 @@ import Image from 'primevue/image'
 import Message from 'primevue/message'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
+import { useAppsStore } from '../stores/apps.store'
 import { appsService } from '../services/apps.service'
+import { AccessScope } from '../types/apps.types'
 
 const toast = useToast()
+const confirm = useConfirm()
+const router = useRouter()
 const editorStore = useAppEditorStore()
+const appsStore = useAppsStore()
 
 // Active settings section
 const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance'>('basic')
@@ -37,10 +44,12 @@ const thumbnailUrl = ref<string | undefined>(undefined)
 const isSaving = ref(false)
 const isUploadingImage = ref(false)
 const isRemovingImage = ref(false)
+const isDeleting = ref(false)
 
 // Computed
 const app = computed(() => editorStore.currentApp)
 const isPublished = computed(() => app.value?.isPublished ?? false)
+const isLinkedToProject = computed(() => app.value?.scope === AccessScope.Project)
 
 // Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
@@ -269,6 +278,33 @@ async function removeImage() {
   } finally {
     isRemovingImage.value = false
   }
+}
+
+function handleDelete() {
+  if (!app.value) return
+  confirm.require({
+    message: `Are you sure you want to delete "${app.value.name}"? This action cannot be undone.`,
+    header: 'Confirm Delete',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      isDeleting.value = true
+      try {
+        await appsStore.deleteApp(app.value!.id)
+        toast.add({ severity: 'success', summary: 'Deleted', detail: `"${app.value!.name}" has been deleted`, life: 3000 })
+        router.push('/apps')
+      } catch (err: unknown) {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: err instanceof Error ? err.message : 'Failed to delete app',
+          life: 5000,
+        })
+      } finally {
+        isDeleting.value = false
+      }
+    },
+  })
 }
 </script>
 
@@ -520,8 +556,7 @@ async function removeImage() {
         </Card>
 
         <!-- Appearance Settings -->
-        <Card v-if="activeSection === 'appearance'">
-          <template #title>Card Appearance</template>
+        <Card v-if="activeSection === 'appearance'">          <template #title>Card Appearance</template>
           <template #content>
             <p class="text-color-secondary mb-4">
               Customize how this app appears on the Apps page
@@ -577,6 +612,29 @@ async function removeImage() {
                   @click="saveSettings"
                 />
               </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Danger Zone -->
+        <Card v-if="!isLinkedToProject" class="danger-zone-card">
+          <template #title>
+            <span class="text-red-500"><i class="pi pi-exclamation-triangle mr-2"></i>Danger Zone</span>
+          </template>
+          <template #content>
+            <div class="flex align-items-center justify-content-between gap-4">
+              <div>
+                <div class="font-medium">Delete this app</div>
+                <small class="text-color-secondary">Once deleted, all app files and data will be permanently removed.</small>
+              </div>
+              <Button
+                label="Delete App"
+                icon="pi pi-trash"
+                severity="danger"
+                outlined
+                :loading="isDeleting"
+                @click="handleDelete"
+              />
             </div>
           </template>
         </Card>
@@ -648,5 +706,13 @@ async function removeImage() {
 
 :global(.app-dark) .analytics-section {
   border-color: var(--p-surface-600);
+}
+
+.danger-zone-card {
+  border: 1px solid var(--p-red-200);
+}
+
+:global(.app-dark) .danger-zone-card {
+  border-color: var(--p-red-800);
 }
 </style>

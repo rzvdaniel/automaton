@@ -748,19 +748,19 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               </button>
               <button
                 class="view-tab"
-                :class="{ active: activeTab === 'settings' }"
-                @click="activeTab = 'settings'"
-              >
-                <i class="pi pi-cog"></i>
-                Settings
-              </button>
-              <button
-                class="view-tab"
                 :class="{ active: activeTab === 'logs' }"
                 @click="activeTab = 'logs'"
               >
                 <i class="pi pi-history"></i>
                 Logs
+              </button>
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'settings' }"
+                @click="activeTab = 'settings'"
+              >
+                <i class="pi pi-cog"></i>
+                Settings
               </button>
             </div>
           </div>
