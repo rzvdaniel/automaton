@@ -45,6 +45,8 @@ Choose the right persistence strategy up front:
 ## DESIGN STANDARDS:
 Build **polished, professional UIs** — never plain unstyled HTML. Apply these patterns consistently:
 
+**Images**: Use `https://picsum.photos/seed/{topic}/800/500` for hero/banner images and `https://picsum.photos/seed/{item}/400/300` for cards. Replace `{topic}` and `{item}` with descriptive keywords. Always add `alt` text.
+
 **Page structure**:
 ```html
 <body class="min-h-screen bg-slate-50">
