@@ -700,10 +700,10 @@ function implementPlan() {
                   <div v-else class="message-text">
                     {{ group.message.content }}
                   </div>
-                  <!-- Model badge: always shown for diagnostics -->
-                  <div style="background:red;color:white;padding:4px 8px;font-size:12px;margin-top:4px;display:block;">
-                    MODEL: {{ group.message.model || 'unknown' }}
-                  </div>
+                  <!-- Model badge: only shown once model is resolved (not during streaming) -->
+                  <span v-if="group.message.model && !group.message.isStreaming" class="message-model-badge">
+                    <i class="pi pi-microchip-ai"></i>{{ group.message.model }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1197,15 +1197,22 @@ function implementPlan() {
 }
 
 .message-model-badge {
-  display: block;
-  margin-top: 0.4rem;
-  font-size: 0.7rem;
-  color: #e53935;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 2px 8px;
+  font-size: 0.68rem;
   font-family: monospace;
-  background: rgba(229, 57, 53, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  width: fit-content;
+  color: var(--p-surface-400);
+  background: var(--p-surface-100);
+  border: 1px solid var(--p-surface-200);
+  border-radius: 999px;
+
+  .app-dark & {
+    background: var(--p-surface-800);
+    border-color: var(--p-surface-700);
+  }
 }
 
 .tool-call-line {
