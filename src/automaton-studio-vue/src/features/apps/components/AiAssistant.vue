@@ -1198,8 +1198,12 @@ function implementPlan() {
   display: block;
   margin-top: 0.4rem;
   font-size: 0.7rem;
-  color: var(--p-surface-400);
+  color: #e53935;
   font-family: monospace;
+  background: rgba(229, 57, 53, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  width: fit-content;
 }
 
 .tool-call-line {
