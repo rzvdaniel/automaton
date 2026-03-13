@@ -14,9 +14,20 @@ app = FastAPI(title="Automaton Runner Backend")
 #   AppContext.BaseDirectory/data/apps/{appId}/backend/{controllerName}.py
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR", "/app/data/apps")
 
+# In a Docker container the base filesystem is ephemeral; packages installed via
+# requirements.txt land in {SCRIPTS_DIR}/{app_id}/packages/ on the persistent volume.
+# On a standalone machine pip installs to the system / venv Python — no path injection needed.
+_IN_CONTAINER = (
+    os.environ.get("DOTNET_RUNNING_IN_CONTAINER", "").lower() == "true"
+    or os.path.exists("/.dockerenv")
+)
+
 
 def _inject_packages(app_id: str) -> None:
-    """Prepend the per-app packages directory to sys.path so pip-installed packages are importable."""
+    """In container mode, prepend the per-app volume packages dir to sys.path.
+    On a standalone runner packages are already on the system path — this is a no-op."""
+    if not _IN_CONTAINER:
+        return
     packages_dir = os.path.join(SCRIPTS_DIR, app_id, "packages")
     if os.path.isdir(packages_dir) and packages_dir not in sys.path:
         sys.path.insert(0, packages_dir)

@@ -471,18 +471,36 @@ public class HubService
         }
     }
 
+    /// <summary>
+    /// Returns true when the runner is executing inside a Docker container.
+    /// In a container the base filesystem is ephemeral, so packages must be installed
+    /// to a volume-backed directory via <c>--target</c> to survive image recreates.
+    /// On a standalone machine packages install to the system / venv Python and persist naturally.
+    /// </summary>
+    private static bool IsRunningInContainer =>
+        // .NET SDK images set this; also set by docker-compose.runner.yml explicitly
+        string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase)
+        // Fallback: Linux containers always have this sentinel file
+        || File.Exists("/.dockerenv");
+
     private void InstallRequirements(Guid appId, string requirementsPath, string targetDir)
     {
         try
         {
-            WriteLine($"📦 Installing packages for app {appId}...");
-            logger.Information("Installing packages for app {AppId} from {ReqPath} to {TargetDir}",
-                appId, requirementsPath, targetDir);
+            var inContainer = IsRunningInContainer;
+            var args = inContainer
+                ? $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --quiet --disable-pip-version-check"
+                : $"install -r \"{requirementsPath}\" --quiet --disable-pip-version-check";
+
+            var installMode = inContainer ? $"→ volume target: {targetDir}" : "→ system Python";
+            WriteLine($"📦 Installing packages for app {appId} ({installMode})...");
+            logger.Information("Installing packages for app {AppId} from {ReqPath} (container={InContainer})",
+                appId, requirementsPath, inContainer);
 
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "pip",
-                Arguments = $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --quiet --disable-pip-version-check",
+                Arguments = args,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
