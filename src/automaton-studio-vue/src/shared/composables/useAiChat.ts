@@ -49,12 +49,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Tracks when a plan card is awaiting approval (so the UI can show "Implement Plan" button)
-  const pendingPlan = ref(false)
-
-  // The current plan proposed by the AI — updated in-place on each propose_plan call
-  const currentPlan = ref<import('../types/ai.types').PlanData | null>(null)
-
   // Derived mode: use 'plan' for the very first message in a fresh session (no prior messages),
   // 'agent' for all subsequent messages. The explicit toggle is removed — mode is automatic.
   const chatMode = computed<'plan' | 'agent'>(() =>
@@ -236,28 +230,17 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       // Skip role='tool' messages — raw tool output only needed by AI as context, not meaningful for users.
       messages.value = serverMessages.filter((m: any) => m.role !== 'tool')
 
-      // Restore pending plan state from message history.
-      // When a propose_plan(implementation) result was received, the plan data is in the toolResult
-      // of the most recent unimplemented propose_plan message. We scan in reverse to get the latest.
-      pendingPlan.value = false
-      currentPlan.value = null
-      const userCount = messages.value.filter((m) => m.role === 'user').length
-      // Only restore if the plan hasn't been implemented yet (last user message count suggests plan-only session)
-      for (let i = messages.value.length - 1; i >= 0; i--) {
-        const m = messages.value[i]
+      // Restore planApproval card type for all propose_plan messages that awaited approval.
+      // All plan types except stage_complete have awaitingApproval=true and render as inline cards.
+      for (const m of messages.value) {
         if (m.toolName === 'propose_plan' && m.toolResult) {
           try {
             const result = typeof m.toolResult === 'string' ? JSON.parse(m.toolResult) : m.toolResult
-            if (result?.planType === 'implementation' && result?.awaitingApproval !== false) {
-              // Found an unimplemented plan — restore it unless the user has already sent follow-up messages after it
-              const messagesAfterPlan = messages.value.slice(i + 1).filter((msg) => msg.role === 'user')
-              if (messagesAfterPlan.length === 0) {
-                currentPlan.value = result
-                pendingPlan.value = true
-              }
+            if (result?.awaitingApproval === true) {
+              m.type = 'planApproval'
+              m.planData = result as import('../types/ai.types').PlanData
             }
           } catch { /* not JSON or not a plan */ }
-          break // only check the most recent propose_plan
         }
       }
     } catch (err) {
@@ -689,13 +672,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
       // Upgrade message type for special tools
       if (!isError) {
-        if (toolMessage.toolName === 'propose_plan' && resultData?.planType === 'implementation') {
-          // Update the persistent plan panel (rendered outside chat)
-          currentPlan.value = resultData as import('../types/ai.types').PlanData
-          pendingPlan.value = true
-          // Don't convert inline message — it stays as a normal tool call line in the timeline
-        } else if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
-          // Non-implementation plan types (e.g. stage_complete with awaitingApproval) stay inline
+        if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
+          // All plan types that await approval (implementation, refinements) render inline as a card
           toolMessage.type = 'planApproval'
           toolMessage.planData = resultData as import('../types/ai.types').PlanData
           toolMessage.model = selectedModel.value || undefined
@@ -753,8 +731,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     hasMessages,
     currentProvider,
     chatMode,
-    pendingPlan,
-    currentPlan,
 
     // Session state
     sessions,

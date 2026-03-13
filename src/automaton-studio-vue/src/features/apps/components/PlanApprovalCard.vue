@@ -62,10 +62,21 @@
       <p v-if="planData.stageSummary" class="stage-summary">{{ planData.stageSummary }}</p>
     </template>
 
-    <!-- Actions: stage_complete still has Continue/Stop; implementation plan has no buttons (see mode toggle) -->
-    <div class="plan-actions" v-if="planData.awaitingApproval && planData.planType === 'stage_complete'">
-      <Button label="Continue to next stage" icon="pi pi-play" size="small" @click="approve('Approved. Continue to the next stage.')" />
-      <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
+    <!-- Actions: implementation plan gets "Implement Plan"; stage_complete gets Continue/Stop -->
+    <div class="plan-actions" v-if="planData.awaitingApproval">
+      <template v-if="planData.planType === 'implementation'">
+        <Button
+          label="Implement Plan"
+          icon="pi pi-play"
+          size="small"
+          @click="approve('Plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.')"
+        />
+        <span class="plan-hint">or chat below to refine</span>
+      </template>
+      <template v-else-if="planData.planType === 'stage_complete'">
+        <Button label="Continue to next stage" icon="pi pi-play" size="small" @click="approve('Approved. Continue to the next stage.')" />
+        <Button label="Stop here" icon="pi pi-stop" severity="secondary" size="small" @click="approve('Stop here. Do not continue to the next stage.')" />
+      </template>
     </div>
   </div>
 </template>
@@ -261,7 +272,14 @@ details[open] > .plan-details-toggle::before {
 
 .plan-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.plan-hint {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
 }
 </style>

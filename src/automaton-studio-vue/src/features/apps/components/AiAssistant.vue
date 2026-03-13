@@ -14,7 +14,6 @@ import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import PlanApprovalCard from './PlanApprovalCard.vue'
-import PlanPanel from './PlanPanel.vue'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
@@ -68,8 +67,6 @@ const {
   updateSessionTitle,
   deleteSession,
   chatMode,
-  pendingPlan,
-  currentPlan,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -422,28 +419,6 @@ function handleKeyPress(event: KeyboardEvent) {
     sendMessage()
   }
 }
-
-// Send the approval message to start implementation
-function implementPlan() {
-  pendingPlan.value = false
-  // Keep currentPlan visible during implementation so user can reference it
-
-  const systemPrompt =
-    props.systemPrompt ||
-    'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
-  const context: Record<string, any> = {
-    resourceType: props.resourceType,
-    resourceId: props.resourceId,
-  }
-  if (props.runnerId) context.runnerId = props.runnerId
-
-  sendAiMessage(
-    'Plan approved. Implement ALL stages now, one after another. Start with Stage 1, call stage_complete after each, and continue until all stages are done without pausing.',
-    systemPrompt,
-    context,
-    false,
-  )
-}
 </script>
 
 <template>
@@ -626,13 +601,6 @@ function implementPlan() {
         <i class="pi pi-exclamation-triangle mr-2"></i>
         {{ error }}
       </div>
-
-      <!-- Persistent plan panel (above chat messages) -->
-      <PlanPanel
-        :plan-data="currentPlan"
-        :pending-plan="pendingPlan"
-        @implement="implementPlan"
-      />
 
       <!-- Messages area -->
       <div class="messages-area">
