@@ -83,6 +83,34 @@ Keep stores lean. Colocate all feature logic within the feature folder.
 2. A try/catch with a toast on error
 3. Cleanup in `finally` to reset loading state
 
+## Chat / AI Input Areas
+
+Use the bordered-container pattern (same as GitHub Copilot, ChatGPT, Claude) for all AI prompt inputs:
+
+- Textarea + action buttons live **inside** a single bordered rounded container — never side-by-side with floating buttons
+- Send button sits **bottom-right inside the box**; Cancel (stop-circle) replaces it during generation
+- **Enter = send**, **Shift+Enter = newline** — always use `@keydown` not `@keypress`
+- No "Clear chat" button in the input row — users navigate back to sessions to start fresh
+- Use `text + rounded` button style for send/cancel for visual consistency
+
+```vue
+<!-- ✅ DO — bordered container pattern -->
+<div class="prompt-box">
+  <Textarea v-model="input" @keydown="(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }" />
+  <div class="prompt-actions">
+    <Button v-if="isBusy" icon="pi pi-stop-circle" severity="danger" text rounded @click="cancel" />
+    <Button v-else icon="pi pi-send" text rounded :disabled="!input.trim()" @click="send" />
+  </div>
+</div>
+
+<!-- ❌ DON'T — floating buttons beside the textarea -->
+<div class="flex gap-2 align-items-end">
+  <Textarea v-model="input" class="flex-1" />
+  <Button icon="pi pi-send" @click="send" />
+  <Button icon="pi pi-trash" severity="secondary" text @click="clear" />
+</div>
+```
+
 ## Naming
 
 - Components: `PascalCase.vue`
