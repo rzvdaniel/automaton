@@ -246,8 +246,10 @@ async function handleImageUpload(event: { files: File[] }) {
     const imageUrl = await appsService.uploadThumbnail(app.value.id, file)
     thumbnailUrl.value = imageUrl
 
-    // Reload app to get updated appearance
+    // Reload app to sync store — preserve current settings tab
+    const section = activeSection.value
     await editorStore.loadApp(app.value.id)
+    activeSection.value = section
 
     toast.add({
       severity: 'success',
@@ -276,8 +278,10 @@ async function removeImage() {
     await appsService.removeThumbnail(app.value.id)
     thumbnailUrl.value = undefined
 
-    // Reload app to get updated appearance
+    // Reload app to sync store — preserve current settings tab
+    const section = activeSection.value
     await editorStore.loadApp(app.value.id)
+    activeSection.value = section
 
     toast.add({
       severity: 'success',
@@ -703,24 +707,18 @@ function handleDelete() {
   overflow: hidden;
   cursor: pointer;
   border: 2px dashed var(--p-surface-300);
-  background: var(--p-surface-50);
+  background: var(--p-surface-ground);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 :global(.app-dark) .cover-drop-zone {
-  background: var(--p-surface-900);
+  border-color: var(--p-surface-600);
 }
 
 .cover-drop-zone:hover,
 .cover-drop-zone.is-dragging {
   border-color: var(--p-primary-400);
-  background: var(--p-primary-50);
-}
-
-:global(.app-dark) .cover-drop-zone:hover,
-:global(.app-dark) .cover-drop-zone.is-dragging {
-  border-color: var(--p-primary-400);
-  background: color-mix(in srgb, var(--p-primary-900) 30%, transparent);
+  background: color-mix(in srgb, var(--p-primary-500) 6%, var(--p-surface-ground));
 }
 
 .cover-img {
