@@ -310,6 +310,7 @@ const handleRetry = async () => {
               rows="3"
               placeholder="Describe your app in plain English. For example: 'A customer feedback form that saves responses to a database and sends email notifications...'"
               class="w-full"
+              @keydown="(e: KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateApp() } }"
             />
             <div class="flex align-items-center justify-content-between mt-3">
               <div class="text-color-secondary text-sm">
