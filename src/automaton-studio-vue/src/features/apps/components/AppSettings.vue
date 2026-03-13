@@ -13,8 +13,7 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
-import FileUpload from 'primevue/fileupload'
-import Image from 'primevue/image'
+import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import Message from 'primevue/message'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -44,6 +43,25 @@ const thumbnailUrl = ref<string | undefined>(undefined)
 const isSaving = ref(false)
 const isUploadingImage = ref(false)
 const isRemovingImage = ref(false)
+const isDraggingOver = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerFilePicker() {
+  fileInputRef.value?.click()
+}
+
+function onFileInputChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) handleImageUpload({ files: [file] })
+  // reset so same file can be re-selected
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+function onDrop(e: DragEvent) {
+  isDraggingOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) handleImageUpload({ files: [file] })
+}
 const isDeleting = ref(false)
 
 // Computed
@@ -556,7 +574,8 @@ function handleDelete() {
         </Card>
 
         <!-- Appearance Settings -->
-        <Card v-if="activeSection === 'appearance'">          <template #title>Card Appearance</template>
+        <Card v-if="activeSection === 'appearance'">
+          <template #title>Card Appearance</template>
           <template #content>
             <p class="text-color-secondary mb-4">
               Customize how this app appears on the Apps page
@@ -564,43 +583,62 @@ function handleDelete() {
 
             <div class="flex flex-column gap-4">
               <div class="flex flex-column gap-2">
-                <label class="font-medium">App Thumbnail</label>
+                <label class="font-medium">Cover Image</label>
 
-                <!-- Current image preview -->
-                <div v-if="thumbnailUrl" class="image-preview mb-3">
-                  <Image
-                    :src="fullThumbnailUrl"
-                    alt="App thumbnail"
-                    preview
-                    image-class="preview-image"
-                  />
-                  <Button
-                    label="Remove Image"
-                    icon="pi pi-trash"
-                    severity="danger"
-                    outlined
-                    size="small"
-                    :loading="isRemovingImage"
-                    class="mt-2"
-                    @click="removeImage"
-                  />
+                <!-- Unified drop zone — click or drag to upload; × to remove -->
+                <div
+                  class="cover-drop-zone"
+                  :class="{ 'is-dragging': isDraggingOver }"
+                  @click="!thumbnailUrl && triggerFilePicker()"
+                  @dragover.prevent="isDraggingOver = true"
+                  @dragleave="isDraggingOver = false"
+                  @drop.prevent="onDrop"
+                >
+                  <!-- Uploaded image -->
+                  <img v-if="thumbnailUrl" :src="fullThumbnailUrl" alt="App cover" class="cover-img" />
+                  <!-- Gradient placeholder when no image -->
+                  <AppCoverPlaceholder v-else :app-id="app?.id ?? ''" :name="app?.name ?? ''" />
+
+                  <!-- Uploading spinner -->
+                  <div v-if="isUploadingImage" class="cover-overlay">
+                    <i class="pi pi-spin pi-spinner cover-spinner"></i>
+                  </div>
+
+                  <!-- Hover actions when image is set -->
+                  <div v-else-if="thumbnailUrl" class="cover-hover-actions">
+                    <button class="cover-btn" title="Change image" @click.stop="triggerFilePicker()">
+                      <i class="pi pi-camera"></i>
+                      <span>Change</span>
+                    </button>
+                    <button
+                      class="cover-btn cover-btn-danger"
+                      title="Remove image"
+                      :disabled="isRemovingImage"
+                      @click.stop="removeImage"
+                    >
+                      <i :class="isRemovingImage ? 'pi pi-spin pi-spinner' : 'pi pi-trash'"></i>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+
+                  <!-- Empty state prompt -->
+                  <div v-else class="cover-empty-hint">
+                    <i class="pi pi-cloud-upload"></i>
+                    <span>Click or drag &amp; drop</span>
+                    <small>PNG · JPG · WEBP</small>
+                  </div>
                 </div>
 
-                <!-- Upload area -->
-                <FileUpload
-                  mode="basic"
+                <!-- Hidden native file input -->
+                <input
+                  ref="fileInputRef"
+                  type="file"
                   accept="image/*"
-                  :max-file-size="2000000"
-                  choose-label="Upload Image"
-                  :auto="true"
-                  custom-upload
-                  :disabled="isUploadingImage"
-                  class="upload-button"
-                  @uploader="(e: any) => handleImageUpload({ files: Array.isArray(e.files) ? e.files : [e.files] })"
+                  style="display:none"
+                  @change="onFileInputChange"
                 />
-                <small class="text-color-secondary block mt-2">
-                  Recommended: 500x300px, PNG or JPG (max 2MB)
-                </small>
+
+                <small class="text-color-secondary">Recommended 16:9 · max 2 MB</small>
               </div>
 
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
@@ -659,21 +697,129 @@ function handleDelete() {
   margin-left: 0.5rem;
 }
 
-.image-preview {
-  max-width: 300px;
-}
-
-.image-preview :deep(.preview-image) {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: cover;
-  border-radius: var(--p-border-radius);
-  border: 1px solid var(--p-surface-200);
-}
-
-.upload-button :deep(.p-button) {
+/* Cover drop zone */
+.cover-drop-zone {
+  position: relative;
   width: 100%;
-  max-width: 200px;
+  padding-bottom: 56.25%; /* 16:9 */
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px dashed var(--p-surface-300);
+  transition: border-color 0.2s ease;
+}
+
+.cover-drop-zone:hover,
+.cover-drop-zone.is-dragging {
+  border-color: var(--p-primary-400);
+}
+
+:global(.app-dark) .cover-drop-zone {
+  border-color: var(--p-surface-600);
+}
+
+:global(.app-dark) .cover-drop-zone:hover,
+:global(.app-dark) .cover-drop-zone.is-dragging {
+  border-color: var(--p-primary-400);
+}
+
+.cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Full-cover spinner overlay */
+.cover-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.cover-spinner {
+  font-size: 1.75rem;
+  color: white;
+}
+
+/* Hover action buttons shown over the image */
+.cover-hover-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.cover-drop-zone:hover .cover-hover-actions {
+  opacity: 1;
+}
+
+.cover-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cover-btn i {
+  font-size: 1.1rem;
+}
+
+.cover-btn:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.cover-btn-danger:hover {
+  background: rgba(220, 38, 38, 0.7);
+}
+
+/* Empty state hint */
+.cover-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--p-text-muted-color);
+  pointer-events: none;
+}
+
+.cover-empty-hint i {
+  font-size: 2rem;
+  opacity: 0.5;
+}
+
+.cover-empty-hint span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.cover-empty-hint small {
+  font-size: 0.75rem;
+  opacity: 0.6;
 }
 
 .analytics-section {
@@ -697,11 +843,6 @@ function handleDelete() {
   font-size: 0.75rem;
   color: var(--p-text-muted-color);
   margin-top: 0.25rem;
-}
-
-/* Dark mode */
-:global(.app-dark) .image-preview :deep(.preview-image) {
-  border-color: var(--p-surface-600);
 }
 
 :global(.app-dark) .analytics-section {
