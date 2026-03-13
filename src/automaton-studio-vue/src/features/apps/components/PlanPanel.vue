@@ -6,6 +6,13 @@
         <span>{{ planData.title }}</span>
       </div>
       <div class="plan-panel-actions">
+        <button
+          v-if="pendingPlan && !expanded"
+          class="implement-btn-inline"
+          @click.stop="emit('implement')"
+        >
+          <i class="pi pi-play"></i> Implement Plan
+        </button>
         <i class="pi" :class="expanded ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
       </div>
     </div>
@@ -57,6 +64,14 @@
           </ul>
         </div>
       </details>
+
+      <!-- Implement Plan footer -->
+      <div v-if="pendingPlan" class="plan-footer">
+        <button class="implement-btn" @click="emit('implement')">
+          <i class="pi pi-play"></i> Implement Plan
+        </button>
+        <span class="plan-hint">or chat below to refine</span>
+      </div>
     </div>
   </div>
 </template>
@@ -67,9 +82,14 @@ import type { PlanData } from '@/shared/types/ai.types'
 
 defineProps<{
   planData: PlanData | null
+  pendingPlan?: boolean
 }>()
 
-const expanded = ref(true)
+const emit = defineEmits<{
+  implement: []
+}>()
+
+const expanded = ref(false)
 </script>
 
 <style scoped>
@@ -78,6 +98,12 @@ const expanded = ref(true)
   border-left: 3px solid var(--p-green-500);
   font-size: 0.875rem;
   background: color-mix(in srgb, var(--p-green-500) 6%, var(--p-surface-ground));
+  flex-shrink: 0;
+}
+
+.plan-panel-body {
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .plan-panel-header {
@@ -224,5 +250,43 @@ const expanded = ref(true)
 }
 details[open] > .plan-details-toggle::before {
   transform: rotate(90deg);
+}
+.plan-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid var(--p-surface-200);
+  position: sticky;
+  bottom: 0;
+  background: color-mix(in srgb, var(--p-green-500) 6%, var(--p-surface-ground));
+}
+
+.plan-hint {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+
+.implement-btn,
+.implement-btn-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--p-green-600);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.implement-btn:hover,
+.implement-btn-inline:hover {
+  background: var(--p-green-700);
 }
 </style>

@@ -630,6 +630,8 @@ function implementPlan() {
       <!-- Persistent plan panel (above chat messages) -->
       <PlanPanel
         :plan-data="currentPlan"
+        :pending-plan="pendingPlan"
+        @implement="implementPlan"
       />
 
       <!-- Messages area -->
