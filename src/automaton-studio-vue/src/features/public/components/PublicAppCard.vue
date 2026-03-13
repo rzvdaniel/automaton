@@ -10,7 +10,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'open', app: AppCardType): void
   (e: 'details', app: AppCardType): void
 }>()
 
@@ -31,10 +30,6 @@ const fullThumbnailUrl = computed(() => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
   return `${baseUrl}${props.app.thumbnailUrl}`
 })
-
-function openApp() {
-  emit('open', props.app)
-}
 
 function showDetails() {
   emit('details', props.app)
@@ -67,27 +62,9 @@ function toggleSummary(e: Event) {
         <span>{{ app.viewCount }}</span>
       </div>
 
-      <!-- Hover Overlay -->
+      <!-- Hover Overlay — visual affordance only, no buttons -->
       <transition name="fade">
-        <div v-if="isHovering" class="hover-overlay">
-          <div class="overlay-content">
-            <Button
-              v-tooltip.top="'Open app'"
-              icon="pi pi-play"
-              rounded
-              class="play-button"
-              @click.stop="openApp"
-            />
-            <Button
-              v-tooltip.top="'View details'"
-              icon="pi pi-info-circle"
-              rounded
-              text
-              class="info-button"
-              @click.stop="showDetails"
-            />
-          </div>
-        </div>
+        <div v-if="isHovering" class="hover-overlay" />
       </transition>
     </div>
 
@@ -152,59 +129,13 @@ function toggleSummary(e: Event) {
   z-index: 10;
 }
 
-/* Hover Overlay */
+/* Hover Overlay — subtle tint only */
 .hover-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding-top: 0;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
   z-index: 20;
-}
-
-.overlay-content {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.play-button {
-  background: var(--p-primary-500) !important;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  transition: all 0.2s ease;
-}
-
-.play-button:hover {
-  background: var(--p-primary-600) !important;
-  transform: scale(1.1);
-}
-
-.info-button {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  color: white;
-  font-size: 1.2rem;
-  transition: all 0.2s ease;
-}
-
-.info-button:hover {
-  border-color: white;
-  background: rgba(255, 255, 255, 0.1) !important;
-  transform: scale(1.1);
+  pointer-events: none;
 }
 
 /* Combined Title + Summary block */

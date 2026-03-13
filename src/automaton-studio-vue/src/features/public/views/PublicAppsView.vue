@@ -7,6 +7,7 @@ import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import PublicUserHeader from '../components/PublicUserHeader.vue'
 import PublicAppCard from '../components/PublicAppCard.vue'
+import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 import { publicAppsService } from '../services/publicApps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { PublicUserProfile, PublicAppCard as AppCardType } from '../types/publicApps.types'
@@ -143,7 +144,6 @@ onMounted(() => {
               v-for="app in apps"
               :key="app.id"
               :app="app"
-              @open="openApp"
               @details="showDetails"
             />
           </div>
@@ -179,10 +179,7 @@ onMounted(() => {
             <!-- Thumbnail -->
             <div class="modal-thumbnail">
               <img v-if="selectedApp.thumbnailUrl" :src="fullThumbnailUrl" :alt="selectedApp.name" />
-              <div v-else class="modal-thumbnail-placeholder">
-                <i class="pi pi-image"></i>
-                <p>No image available</p>
-              </div>
+              <AppCoverPlaceholder v-else :app-id="selectedApp.id" :name="selectedApp.name" style="position:relative;height:100%" />
             </div>
 
             <!-- Content -->
@@ -207,6 +204,7 @@ onMounted(() => {
                 </div>
                 <Button
                   icon="pi pi-play"
+                  label="Open App"
                   class="modal-play-btn"
                   @click="selectedApp && openApp(selectedApp)"
                 />
@@ -476,28 +474,6 @@ onMounted(() => {
   object-fit: cover;
 }
 
-.modal-thumbnail-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--p-surface-600) 0%, var(--p-surface-800) 100%);
-  color: var(--p-text-muted-color);
-  gap: 1rem;
-}
-
-.modal-thumbnail-placeholder i {
-  font-size: 3rem;
-  opacity: 0.5;
-}
-
-.modal-thumbnail-placeholder p {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
 .modal-content {
   padding: 2rem;
   flex: 1;
@@ -547,9 +523,11 @@ onMounted(() => {
 }
 
 .modal-play-btn {
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1.75rem;
   font-weight: 600;
+  font-size: 1rem;
   align-self: flex-start;
+  flex-shrink: 0;
 }
 
 .modal-description {
