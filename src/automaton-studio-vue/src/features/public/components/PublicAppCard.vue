@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import type { PublicAppCard as AppCardType } from '../types/publicApps.types'
+import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 
 const props = defineProps<{
   app: AppCardType
@@ -55,9 +56,7 @@ function toggleSummary(e: Event) {
         :alt="app.name"
         class="thumbnail-image"
       />
-      <div v-else class="thumbnail-placeholder">
-        <i class="pi pi-box"></i>
-      </div>
+      <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
 
       <!-- Featured Badge -->
       <Tag v-if="app.isFeatured" value="Featured" severity="warning" class="featured-badge" />
@@ -143,28 +142,6 @@ function toggleSummary(e: Event) {
 
 .netflix-card:hover .thumbnail-image {
   transform: scale(1.05);
-}
-
-.thumbnail-placeholder {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--p-primary-100) 0%, var(--p-primary-200) 100%);
-}
-
-:global(.app-dark) .thumbnail-placeholder {
-  background: linear-gradient(135deg, var(--p-surface-700) 0%, var(--p-surface-800) 100%);
-}
-
-.thumbnail-placeholder i {
-  font-size: 2.5rem;
-  color: var(--p-primary-500);
-  opacity: 0.6;
 }
 
 /* Featured Badge */
