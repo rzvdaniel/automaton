@@ -245,11 +245,9 @@ async function handleImageUpload(event: { files: File[] }) {
   try {
     const imageUrl = await appsService.uploadThumbnail(app.value.id, file)
     thumbnailUrl.value = imageUrl
-
-    // Reload app to sync store — preserve current settings tab
-    const section = activeSection.value
-    await editorStore.loadApp(app.value.id)
-    activeSection.value = section
+    if (editorStore.currentApp) {
+      editorStore.currentApp.thumbnailUrl = imageUrl
+    }
 
     toast.add({
       severity: 'success',
@@ -277,11 +275,9 @@ async function removeImage() {
   try {
     await appsService.removeThumbnail(app.value.id)
     thumbnailUrl.value = undefined
-
-    // Reload app to sync store — preserve current settings tab
-    const section = activeSection.value
-    await editorStore.loadApp(app.value.id)
-    activeSection.value = section
+    if (editorStore.currentApp) {
+      editorStore.currentApp.thumbnailUrl = undefined
+    }
 
     toast.add({
       severity: 'success',
