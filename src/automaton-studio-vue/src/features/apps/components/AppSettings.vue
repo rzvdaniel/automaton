@@ -698,7 +698,7 @@ function handleDelete() {
 .cover-drop-zone {
   position: relative;
   width: 100%;
-  height: 160px;
+  padding-bottom: 56.25%; /* 16:9 */
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
