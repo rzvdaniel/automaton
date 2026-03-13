@@ -11,7 +11,6 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
-import Toast from 'primevue/toast'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { useConfirm } from 'primevue/useconfirm'
@@ -670,15 +669,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
     // Refresh files after AI update
     await editorStore.refreshFilesAfterAiUpdate(affectedFiles)
 
-    // Show toast notification
-    if (affectedFiles.length > 0) {
-      toast.add({
-        severity: 'info',
-        summary: 'Files Updated',
-        detail: `AI updated: ${affectedFiles.join(', ')}`,
-        life: 3000,
-      })
-    }
   }
 }
 </script>
@@ -1037,8 +1027,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       :existing-files="existingFilePaths"
       @create="handleCreateFile"
     />
-
-    <Toast />
   </div>
 </template>
 
