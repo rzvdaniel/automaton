@@ -13,7 +13,6 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
-import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import Message from 'primevue/message'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -594,10 +593,8 @@ function handleDelete() {
                   @dragleave="isDraggingOver = false"
                   @drop.prevent="onDrop"
                 >
-                  <!-- Uploaded image -->
+                  <!-- Uploaded image — contained, not stretched -->
                   <img v-if="thumbnailUrl" :src="fullThumbnailUrl" alt="App cover" class="cover-img" />
-                  <!-- Gradient placeholder when no image -->
-                  <AppCoverPlaceholder v-else :app-id="app?.id ?? ''" :name="app?.name ?? ''" />
 
                   <!-- Uploading spinner -->
                   <div v-if="isUploadingImage" class="cover-overlay">
@@ -701,26 +698,29 @@ function handleDelete() {
 .cover-drop-zone {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 */
+  height: 160px;
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
   border: 2px dashed var(--p-surface-300);
-  transition: border-color 0.2s ease;
+  background: var(--p-surface-50);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+:global(.app-dark) .cover-drop-zone {
+  background: var(--p-surface-900);
 }
 
 .cover-drop-zone:hover,
 .cover-drop-zone.is-dragging {
   border-color: var(--p-primary-400);
-}
-
-:global(.app-dark) .cover-drop-zone {
-  border-color: var(--p-surface-600);
+  background: var(--p-primary-50);
 }
 
 :global(.app-dark) .cover-drop-zone:hover,
 :global(.app-dark) .cover-drop-zone.is-dragging {
   border-color: var(--p-primary-400);
+  background: color-mix(in srgb, var(--p-primary-900) 30%, transparent);
 }
 
 .cover-img {
@@ -728,7 +728,8 @@ function handleDelete() {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 0.5rem;
 }
 
 /* Full-cover spinner overlay */
