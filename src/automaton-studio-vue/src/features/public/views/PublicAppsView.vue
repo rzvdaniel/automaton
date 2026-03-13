@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
+import Drawer from 'primevue/drawer'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import PublicUserHeader from '../components/PublicUserHeader.vue'
@@ -16,46 +16,34 @@ import { formatPublishedDate, parseTags } from '../types/publicApps.types'
 const route = useRoute()
 const authStore = useAuthStore()
 
-// State
 const loading = ref(true)
 const error = ref<string | null>(null)
 const profile = ref<PublicUserProfile | null>(null)
 const apps = ref<AppCardType[]>([])
 
-// Details dialog
-const showDetailsDialog = ref(false)
+const showDrawer = ref(false)
 const selectedApp = ref<AppCardType | null>(null)
 
-// Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
   if (!selectedApp.value?.thumbnailUrl) return ''
-  // If already a full URL, use as-is; otherwise prepend API base URL
-  if (selectedApp.value.thumbnailUrl.startsWith('http')) {
-    return selectedApp.value.thumbnailUrl
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  return `${baseUrl}${selectedApp.value.thumbnailUrl}`
+  if (selectedApp.value.thumbnailUrl.startsWith('http')) return selectedApp.value.thumbnailUrl
+  return `${import.meta.env.VITE_API_BASE_URL || ''}${selectedApp.value.thumbnailUrl}`
 })
 
-// Load data
 async function loadUserApps() {
   const publicUsername = route.params.publicUsername as string
-
   if (!publicUsername) {
     error.value = 'Invalid public username'
     loading.value = false
     return
   }
-
   loading.value = true
   error.value = null
-
   try {
     const response = await publicAppsService.getUserApps(publicUsername)
     profile.value = response.profile
     apps.value = response.apps
   } catch (err: unknown) {
-    console.error('Failed to load user apps:', err)
     if ((err as { response?: { status?: number } })?.response?.status === 404) {
       error.value = 'User not found'
     } else {
@@ -66,15 +54,13 @@ async function loadUserApps() {
   }
 }
 
-// Open app in new tab
 function openApp(app: AppCardType) {
   window.open(app.appUrl, '_blank')
 }
 
-// Show app details
 function showDetails(app: AppCardType) {
   selectedApp.value = app
-  showDetailsDialog.value = true
+  showDrawer.value = true
 }
 
 onMounted(() => {
@@ -161,74 +147,62 @@ onMounted(() => {
       </div>
     </footer>
 
-    <!-- App Details Dialog - Netflix Style -->
-    <Dialog
-      v-model:visible="showDetailsDialog"
-      modal
-      :style="{ width: '90vw', maxWidth: '900px' }"
-      :closable="true"
-      class="netflix-dialog"
+    <!-- App Details Drawer -->
+    <Drawer
+      v-model:visible="showDrawer"
+      position="right"
+      :style="{ width: '420px' }"
+      :pt="{ header: { style: 'display: none' } }"
     >
-      <template #container="{ closeCallback }">
-        <div class="netflix-modal-content">
-          <button class="modal-close-btn" @click="closeCallback">
+      <div v-if="selectedApp" class="drawer-body">
+        <!-- Cover image -->
+        <div class="drawer-cover">
+          <img v-if="selectedApp.thumbnailUrl" :src="fullThumbnailUrl" :alt="selectedApp.name" />
+          <AppCoverPlaceholder v-else :app-id="selectedApp.id" :name="selectedApp.name" />
+          <button class="drawer-close" @click="showDrawer = false">
             <i class="pi pi-times"></i>
           </button>
-
-          <div v-if="selectedApp" class="modal-body">
-            <!-- Thumbnail -->
-            <div class="modal-thumbnail">
-              <img v-if="selectedApp.thumbnailUrl" :src="fullThumbnailUrl" :alt="selectedApp.name" />
-              <AppCoverPlaceholder v-else :app-id="selectedApp.id" :name="selectedApp.name" style="position:relative;height:100%" />
-            </div>
-
-            <!-- Content -->
-            <div class="modal-content">
-              <!-- Title & Actions -->
-              <div class="modal-header">
-                <div>
-                  <h2 class="modal-title">{{ selectedApp.name }}</h2>
-                  <div class="modal-meta">
-                    <span v-if="selectedApp.category" class="meta-category">
-                      {{ selectedApp.category }}
-                    </span>
-                    <span class="meta-views">
-                      <i class="pi pi-eye"></i>
-                      {{ selectedApp.viewCount }} views
-                    </span>
-                    <span v-if="selectedApp.publishedAt" class="meta-date">
-                      <i class="pi pi-calendar"></i>
-                      {{ formatPublishedDate(selectedApp.publishedAt) }}
-                    </span>
-                  </div>
-                </div>
-                <Button
-                  icon="pi pi-play"
-                  label="Open App"
-                  class="modal-play-btn"
-                  @click="selectedApp && openApp(selectedApp)"
-                />
-              </div>
-
-              <!-- Description (or Summary if no description) -->
-              <div v-if="selectedApp.description || selectedApp.summary" class="modal-description">
-                <p>{{ selectedApp.description || selectedApp.summary }}</p>
-              </div>
-
-              <!-- Tags -->
-              <div v-if="(selectedApp as any).tags" class="modal-tags">
-                <Tag
-                  v-for="tag in parseTags((selectedApp as any).tags)"
-                  :key="tag"
-                  :value="tag"
-                  severity="secondary"
-                />
-              </div>
-            </div>
-          </div>
         </div>
-      </template>
-    </Dialog>
+
+        <!-- Content -->
+        <div class="drawer-content">
+          <h2 class="drawer-title">{{ selectedApp.name }}</h2>
+
+          <div class="drawer-meta">
+            <span v-if="selectedApp.category" class="meta-pill meta-primary">
+              {{ selectedApp.category }}
+            </span>
+            <span v-if="selectedApp.viewCount > 0" class="meta-stat">
+              <i class="pi pi-eye"></i> {{ selectedApp.viewCount }}
+            </span>
+            <span v-if="selectedApp.publishedAt" class="meta-stat">
+              <i class="pi pi-calendar"></i> {{ formatPublishedDate(selectedApp.publishedAt) }}
+            </span>
+          </div>
+
+          <p v-if="selectedApp.description || selectedApp.summary" class="drawer-desc">
+            {{ selectedApp.description || selectedApp.summary }}
+          </p>
+
+          <div v-if="(selectedApp as any).tags" class="drawer-tags">
+            <Tag
+              v-for="tag in parseTags((selectedApp as any).tags)"
+              :key="tag"
+              :value="tag"
+              severity="secondary"
+            />
+          </div>
+
+          <Button
+            label="Open App"
+            icon="pi pi-arrow-up-right"
+            icon-pos="right"
+            class="w-full drawer-cta"
+            @click="openApp(selectedApp)"
+          />
+        </div>
+      </div>
+    </Drawer>
   </div>
 </template>
 
@@ -405,170 +379,9 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Netflix Modal Dialog */
-:global(.netflix-dialog .p-dialog) {
-  border-radius: 8px;
-}
-
-:global(.netflix-dialog .p-dialog-mask) {
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-}
-
-.netflix-modal-content {
-  position: relative;
-  background: var(--p-surface-card);
-  border-radius: 8px;
-  overflow: hidden;
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-:global(.app-dark) .netflix-modal-content {
-  background: var(--p-surface-800);
-}
-
-.modal-close-btn {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.modal-close-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
-  transform: scale(1.1);
-}
-
-.modal-body {
-  display: flex;
-  flex-direction: column;
-  max-height: 85vh;
-}
-
-.modal-thumbnail {
-  width: 100%;
-  height: 300px;
-  overflow: hidden;
-  background: var(--p-surface-700);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.modal-content {
-  padding: 2rem;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 1.5rem;
-}
-
-.modal-title {
-  margin: 0 0 0.5rem 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--p-text-color);
-  line-height: 1.2;
-}
-
-.modal-meta {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  font-size: 0.9rem;
-  color: var(--p-text-muted-color);
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.meta-category {
-  background: var(--p-primary-500);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.meta-views,
-.meta-date {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.modal-play-btn {
-  padding: 0.75rem 1.75rem;
-  font-weight: 600;
-  font-size: 1rem;
-  align-self: flex-start;
-  flex-shrink: 0;
-}
-
-.modal-description {
-  margin-bottom: 1.5rem;
-  line-height: 1.6;
-  color: var(--p-text-color);
-}
-
-.modal-description p {
-  margin: 0;
-}
-
-.modal-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
 @media (max-width: 768px) {
   .apps-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-
-  :global(.netflix-dialog .p-dialog) {
-    width: 95vw !important;
-  }
-
-  .modal-header {
-    flex-direction: column;
-  }
-
-  .modal-thumbnail {
-    height: 200px;
-  }
-
-  .modal-content {
-    padding: 1.5rem;
-  }
-
-  .modal-title {
-    font-size: 1.5rem;
   }
 }
 
@@ -577,10 +390,119 @@ onMounted(() => {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 1rem 0.75rem;
   }
+}
 
-  .modal-meta {
-    gap: 0.75rem;
-    font-size: 0.8rem;
-  }
+/* Drawer */
+.drawer-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Cover — 16:9 within drawer width */
+.drawer-cover {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.drawer-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.drawer-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.drawer-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Content */
+.drawer-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.drawer-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--p-text-color);
+}
+
+.drawer-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.meta-pill {
+  padding: 0.2rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.meta-primary {
+  background: var(--p-primary-500);
+  color: white;
+}
+
+.meta-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.meta-stat i {
+  font-size: 0.75rem;
+}
+
+.drawer-desc {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--p-text-color);
+}
+
+.drawer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.drawer-cta {
+  margin-top: auto;
+  font-weight: 600;
 }
 </style>
