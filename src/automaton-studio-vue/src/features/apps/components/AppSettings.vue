@@ -422,6 +422,28 @@ function handleDelete() {
                   @click="saveSettings"
                 />
               </div>
+
+              <!-- Danger Zone -->
+              <div v-if="!isLinkedToProject" class="danger-zone-card mt-2">
+                <div class="flex align-items-center gap-2 mb-3">
+                  <i class="pi pi-exclamation-triangle text-red-500"></i>
+                  <span class="font-semibold text-red-500">Danger Zone</span>
+                </div>
+                <div class="flex align-items-center justify-content-between gap-4">
+                  <div>
+                    <div class="font-medium">Delete this app</div>
+                    <small class="text-color-secondary">Once deleted, all app files and data will be permanently removed.</small>
+                  </div>
+                  <Button
+                    label="Delete App"
+                    icon="pi pi-trash"
+                    severity="danger"
+                    outlined
+                    :loading="isDeleting"
+                    @click="handleDelete"
+                  />
+                </div>
+              </div>
             </div>
           </template>
         </Card>
@@ -652,27 +674,6 @@ function handleDelete() {
         </Card>
 
         <!-- Danger Zone -->
-        <Card v-if="!isLinkedToProject" class="danger-zone-card">
-          <template #title>
-            <span class="text-red-500"><i class="pi pi-exclamation-triangle mr-2"></i>Danger Zone</span>
-          </template>
-          <template #content>
-            <div class="flex align-items-center justify-content-between gap-4">
-              <div>
-                <div class="font-medium">Delete this app</div>
-                <small class="text-color-secondary">Once deleted, all app files and data will be permanently removed.</small>
-              </div>
-              <Button
-                label="Delete App"
-                icon="pi pi-trash"
-                severity="danger"
-                outlined
-                :loading="isDeleting"
-                @click="handleDelete"
-              />
-            </div>
-          </template>
-        </Card>
       </div>
     </div>
   </div>
@@ -698,7 +699,7 @@ function handleDelete() {
 .cover-drop-zone {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 */
+  padding-bottom: 30%; /* compact for settings panel */
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
@@ -846,9 +847,13 @@ function handleDelete() {
 
 .danger-zone-card {
   border: 1px solid var(--p-red-200);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  background: color-mix(in srgb, var(--p-red-500) 4%, var(--p-surface-ground));
 }
 
 :global(.app-dark) .danger-zone-card {
   border-color: var(--p-red-800);
+  background: color-mix(in srgb, var(--p-red-900) 20%, var(--p-surface-ground));
 }
 </style>
