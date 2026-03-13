@@ -10,6 +10,7 @@ namespace Automaton.Core.Scripting.Engines.Python
     {
         private readonly object initLock = new object();
         private static readonly object gilExecutionLock = new object();
+        private static readonly object packageInstallLock = new object();
         private readonly StringBuilder outputBuffer = new StringBuilder();
         private readonly ScriptEngineConfiguration configuration;
         private IntPtr _allowThreadsState = IntPtr.Zero;
@@ -20,6 +21,73 @@ namespace Automaton.Core.Scripting.Engines.Python
         private readonly PythonEnvironmentConfigurator configurator;
 
         public Action<string>? OutputCallback { get; set; }
+
+        // Cache of modules already verified/installed — static so it survives across executions
+        private static readonly HashSet<string> _verifiedModules = new(StringComparer.OrdinalIgnoreCase);
+
+        // Regex that extracts the root package name from import/from statements
+        private static readonly Regex ImportRegex = new(
+            @"^(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            RegexOptions.Multiline | RegexOptions.Compiled);
+
+        // Maps Python import names to their pip package names where they differ
+        private static readonly IReadOnlyDictionary<string, string> ImportToPipName =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PIL"]               = "Pillow",
+            ["cv2"]               = "opencv-python",
+            ["sklearn"]           = "scikit-learn",
+            ["bs4"]               = "beautifulsoup4",
+            ["yaml"]              = "pyyaml",
+            ["dateutil"]          = "python-dateutil",
+            ["dotenv"]            = "python-dotenv",
+            ["pydub"]             = "pydub",
+            ["librosa"]           = "librosa",
+            ["soundfile"]         = "soundfile",
+            ["speech_recognition"]= "SpeechRecognition",
+            ["ffmpeg"]            = "ffmpeg-python",
+            ["moviepy"]           = "moviepy",
+            ["jwt"]               = "PyJWT",
+            ["serial"]            = "pyserial",
+            ["openpyxl"]          = "openpyxl",
+            ["xlrd"]              = "xlrd",
+            ["pymongo"]           = "pymongo",
+            ["sqlalchemy"]        = "SQLAlchemy",
+            ["flask"]             = "flask",
+            ["fastapi"]           = "fastapi",
+            ["uvicorn"]           = "uvicorn",
+            ["django"]            = "django",
+            ["pydantic"]          = "pydantic",
+            ["paramiko"]          = "paramiko",
+            ["redis"]             = "redis",
+            ["celery"]            = "celery",
+            ["anthropic"]         = "anthropic",
+            ["openai"]            = "openai",
+            ["stripe"]            = "stripe",
+            ["twilio"]            = "twilio",
+            ["sendgrid"]          = "sendgrid",
+            ["selenium"]          = "selenium",
+            ["playwright"]        = "playwright",
+            ["scrapy"]            = "scrapy",
+        };
+
+        // Python standard library modules — never attempt to pip-install these
+        private static readonly HashSet<string> StandardLibraryModules = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "sys", "os", "io", "re", "json", "math", "random", "datetime", "time", "calendar",
+            "collections", "itertools", "functools", "pathlib", "shutil", "tempfile", "glob",
+            "fnmatch", "struct", "hashlib", "hmac", "secrets", "base64", "binascii", "codecs",
+            "string", "textwrap", "unicodedata", "enum", "typing", "abc", "dataclasses",
+            "copy", "pprint", "reprlib", "operator", "contextlib", "gc", "inspect", "dis",
+            "traceback", "warnings", "logging", "unittest", "doctest", "pdb", "timeit",
+            "socket", "ssl", "email", "html", "http", "urllib", "xml", "csv", "sqlite3",
+            "zipfile", "tarfile", "gzip", "bz2", "lzma", "zlib", "pickle", "shelve",
+            "multiprocessing", "threading", "queue", "asyncio", "concurrent", "subprocess",
+            "signal", "ctypes", "platform", "sysconfig", "importlib", "pkgutil", "ast",
+            "tokenize", "keyword", "builtins", "site", "argparse", "configparser",
+            "numbers", "decimal", "fractions", "statistics", "array", "bisect", "heapq",
+            "weakref", "types", "__future__", "atexit", "cmath", "getopt", "optparse",
+        };
 
         public PythonNetScriptEngine() : this(new ScriptEngineConfiguration())
         {
@@ -182,6 +250,7 @@ namespace Automaton.Core.Scripting.Engines.Python
         public IDictionary<string, string> Execute(string code, IDictionary<string, string> inputs)
         {
             InitializePython();
+            EnsurePackagesInstalled(code);
 
             // Serialize to avoid GIL deadlocks in ASP.NET environments
             lock (gilExecutionLock)
@@ -430,6 +499,118 @@ _captured_output.close()
             OutputCallback = null;
             outputBuffer.Clear();
             // Do not call PythonEngine.Shutdown() here; it's global and may be used elsewhere in the process
+        }
+
+        /// <summary>
+        /// Parses import statements from the script and installs any packages that are not
+        /// already available in the Python environment. Uses a static cache to avoid re-checking
+        /// packages that were already verified during the lifetime of the process.
+        /// pip install runs out-of-process (no GIL held) with a 60-second timeout per package.
+        /// </summary>
+        private void EnsurePackagesInstalled(string code)
+        {
+            var importedModules = ImportRegex
+                .Matches(code)
+                .Select(m => m.Groups[1].Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(m => !StandardLibraryModules.Contains(m))
+                .ToList();
+
+            if (importedModules.Count == 0) return;
+
+            var unchecked_ = importedModules.Where(m => !_verifiedModules.Contains(m)).ToList();
+            if (unchecked_.Count == 0) return;
+
+            lock (packageInstallLock)
+            {
+                // Re-check after acquiring lock (another thread may have just installed)
+                var toProcess = unchecked_.Where(m => !_verifiedModules.Contains(m)).ToList();
+                if (toProcess.Count == 0) return;
+
+                foreach (var module in toProcess)
+                {
+                    // Skip if already importable (pre-installed in Dockerfile or installed earlier)
+                    if (IsModuleAvailable(module))
+                    {
+                        _verifiedModules.Add(module);
+                        continue;
+                    }
+
+                    var pipPackage = ImportToPipName.TryGetValue(module, out var mapped) ? mapped : module;
+                    OutputCallback?.Invoke($"[AutoInstall] Installing missing package: {pipPackage}");
+
+                    if (TryInstallPackage(pipPackage))
+                    {
+                        OutputCallback?.Invoke($"[AutoInstall] Successfully installed: {pipPackage}");
+                    }
+                    else
+                    {
+                        OutputCallback?.Invoke($"[AutoInstall] Could not install: {pipPackage} — script may fail if this import is required");
+                    }
+
+                    // Mark as processed regardless — avoid retrying on every execution
+                    _verifiedModules.Add(module);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks whether a Python module is importable by running a quick out-of-process check.
+        /// Avoids acquiring the GIL, keeping this safe to call before the execution lock.
+        /// </summary>
+        private bool IsModuleAvailable(string moduleName)
+        {
+            try
+            {
+                var pythonExe = detectedEnv.PythonExe ?? "python3";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"-c \"import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('{moduleName}') is not None else 1)\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return false;
+                proc.WaitForExit(10_000);
+                return proc.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Runs pip install for the given package name. Returns true if the exit code is 0.
+        /// </summary>
+        private bool TryInstallPackage(string packageName)
+        {
+            try
+            {
+                var pythonExe = detectedEnv.PythonExe ?? "python3";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"-m pip install --quiet --disable-pip-version-check {packageName}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return false;
+                proc.WaitForExit(60_000);
+                return proc.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
