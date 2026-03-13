@@ -115,7 +115,7 @@ Controllers run on the runner — you cannot test during authoring.
   ✅ `return {"success": True, "data": data, "error": ""}`
   ✅ `return {"success": False, "data": None, "error": "not found"}`
 
-**Pre-installed packages** (import directly, no pip needed):
+**Pre-installed packages** (import directly, no requirements.txt needed):
 ```
 requests, httpx, aiohttp          # HTTP clients
 pandas, numpy                      # Data processing
@@ -128,8 +128,16 @@ python-dotenv, jinja2              # Config / templating
 sqlite3                            # Built-in, always available
 ```
 
-**⚠️ NOT available**: `ffmpeg` (binary), `pydub`, `librosa`, `moviepy`, `opencv`, `scikit-learn`.
-If you need audio/video conversion, use `Pillow` for images, or tell the user the package is not installed.
+**Extra packages** — if you need anything else, create `backend/requirements.txt`:
+```
+# backend/requirements.txt
+pydub==0.25.1
+ffmpeg-python==0.2.0
+```
+The runner installs these to a **persistent volume** at deploy time — they survive container restarts and recreates.
+After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
+
+**⚠️ NOT available as binaries**: `ffmpeg`, `libav`. Audio conversion with `pydub` requires the `ffmpeg` binary — if not installed, tell the user clearly instead of writing code that will fail silently.
 
 ## FILE STRUCTURE (always use this):
 ```

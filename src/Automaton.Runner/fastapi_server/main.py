@@ -1,4 +1,5 @@
 import os
+import sys
 import importlib.util
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -8,13 +9,23 @@ app = FastAPI(title="Automaton Runner Backend")
 
 # RUNNER_SCRIPTS_DIR must point to the root of the app data directory.
 # FastAPI resolves controller scripts at: {RUNNER_SCRIPTS_DIR}/{app_id}/backend/{controller_name}.py
+# Per-app pip packages live at:           {RUNNER_SCRIPTS_DIR}/{app_id}/packages/
 # This must match the path where .NET writes scripts:
 #   AppContext.BaseDirectory/data/apps/{appId}/backend/{controllerName}.py
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR", "/app/data/apps")
 
 
+def _inject_packages(app_id: str) -> None:
+    """Prepend the per-app packages directory to sys.path so pip-installed packages are importable."""
+    packages_dir = os.path.join(SCRIPTS_DIR, app_id, "packages")
+    if os.path.isdir(packages_dir) and packages_dir not in sys.path:
+        sys.path.insert(0, packages_dir)
+
+
 def load_controller(app_id: str, controller_name: str):
     """Load a controller module from disk by app_id + controller name."""
+    _inject_packages(app_id)
+
     base = os.path.join(SCRIPTS_DIR, app_id, "backend")
     script_path = os.path.join(base, controller_name + ".py")
 

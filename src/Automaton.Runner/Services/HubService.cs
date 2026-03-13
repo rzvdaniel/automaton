@@ -422,6 +422,8 @@ public class HubService
 
     /// <summary>
     /// Receives a controller script from the server and writes it to local disk for FastAPI to read.
+    /// If the file is requirements.txt, installs packages into the per-app packages directory on the
+    /// persistent volume so they survive container recreates.
     /// Returns true on success; server uses this as acknowledgement.
     /// </summary>
     private static string AppsRootDir =>
@@ -438,6 +440,19 @@ public class HubService
 
             Directory.CreateDirectory(dir);
 
+            // requirements.txt — write as plain text, then pip install to volume-backed packages dir
+            if (payload.Language == "Text" && payload.ControllerName == "requirements")
+            {
+                var reqPath = Path.Combine(dir, "requirements.txt");
+                File.WriteAllText(reqPath, payload.Code);
+
+                var packagesDir = Path.Combine(AppsRootDir, payload.AppId.ToString(), "packages");
+                Directory.CreateDirectory(packagesDir);
+
+                InstallRequirements(payload.AppId, reqPath, packagesDir);
+                return true;
+            }
+
             var path = Path.Combine(dir, payload.ControllerName + ".py");
             File.WriteAllText(path, payload.Code);
 
@@ -453,6 +468,49 @@ public class HubService
                 payload.ControllerName, payload.AppId);
             WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
             return false;
+        }
+    }
+
+    private void InstallRequirements(Guid appId, string requirementsPath, string targetDir)
+    {
+        try
+        {
+            WriteLine($"📦 Installing packages for app {appId}...");
+            logger.Information("Installing packages for app {AppId} from {ReqPath} to {TargetDir}",
+                appId, requirementsPath, targetDir);
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "pip",
+                Arguments = $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --quiet --disable-pip-version-check",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi)
+                ?? throw new InvalidOperationException("Failed to start pip process");
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit(120_000); // 2-minute timeout
+
+            if (process.ExitCode == 0)
+            {
+                logger.Information("Packages installed for app {AppId}", appId);
+                WriteLine($"✅ Packages installed for app {appId}");
+            }
+            else
+            {
+                logger.Warning("pip install exited {ExitCode} for app {AppId}: {Error}",
+                    process.ExitCode, appId, stderr);
+                WriteLine($"⚠️ Package install warnings for app {appId}: {stderr}");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to run pip install for app {AppId}", appId);
+            WriteLine($"⚠️ pip unavailable — packages not installed for app {appId}: {ex.Message}");
         }
     }
 
