@@ -18,12 +18,15 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// Check if app has a thumbnail image
+// Check if app has a real uploaded thumbnail image
 const hasThumbnail = computed(() => !!props.app.thumbnailUrl)
 
-// Full thumbnail URL with API base URL
+// Deterministic Picsum placeholder — same app always gets same image
+const picsumUrl = computed(() => `https://picsum.photos/seed/${props.app.id}/500/300`)
+
+// Full thumbnail URL with API base URL; falls back to Picsum when no upload
 const fullThumbnailUrl = computed(() => {
-  if (!props.app.thumbnailUrl) return ''
+  if (!props.app.thumbnailUrl) return picsumUrl.value
   // If already a full URL, use as-is; otherwise prepend API base URL
   if (props.app.thumbnailUrl.startsWith('http')) {
     return props.app.thumbnailUrl
@@ -205,64 +208,52 @@ const menuItems = computed(() => {
 </script>
 
 <template>
-  <Card class="app-card h-full" :class="{ 'has-thumbnail': hasThumbnail }">
-    <!-- Thumbnail Image -->
-    <template v-if="hasThumbnail" #header>
+  <Card class="app-card h-full">
+    <!-- Thumbnail — always shown (uploaded image or Picsum fallback) -->
+    <template #header>
       <div class="app-thumbnail">
-        <img :src="fullThumbnailUrl" :alt="app.name" />
-        <!-- Overlay with menu button -->
+        <img :src="fullThumbnailUrl" :alt="app.name" loading="lazy" />
+        <!-- Status badge on image -->
+        <Tag :severity="statusBadge.severity" class="status-overlay-badge">
+          <span class="flex align-items-center gap-1">
+            <i :class="statusBadge.icon" style="font-size: 0.7rem"></i>
+            {{ statusBadge.label }}
+          </span>
+        </Tag>
+        <!-- Menu button overlay -->
         <div class="thumbnail-overlay">
           <Button
             icon="pi pi-ellipsis-v"
             text
             rounded
-            severity="secondary"
             size="small"
             class="menu-button"
             aria-haspopup="true"
             @click="toggleMenu"
           />
+          <Menu ref="menu" :model="menuItems" popup />
         </div>
       </div>
     </template>
 
     <template #content>
       <div class="flex flex-column h-full">
-        <!-- Header (without thumbnail: show menu button here) -->
-        <div class="flex align-items-center justify-content-between mb-2">
-          <div class="flex align-items-center gap-2 min-w-0 flex-1">
-            <i class="pi pi-globe flex-shrink-0" style="color: var(--p-primary-500)"></i>
-            <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
-              {{ app.name }}
-            </span>
-          </div>
-          <Button
-            v-if="!hasThumbnail"
-            icon="pi pi-ellipsis-v"
-            text
-            rounded
-            severity="secondary"
-            size="small"
-            aria-haspopup="true"
-            @click="toggleMenu"
-          />
-          <Menu ref="menu" :model="menuItems" popup />
+        <!-- App name -->
+        <div class="flex align-items-center gap-2 min-w-0 mb-1">
+          <i class="pi pi-globe flex-shrink-0" style="color: var(--p-primary-500); font-size: 0.85rem"></i>
+          <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
+            {{ app.name }}
+          </span>
         </div>
 
-        <!-- Description (or Summary if no description) -->
+        <!-- Description -->
         <p class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
           {{ app.description || app.summary || 'No description' }}
         </p>
 
-        <!-- Status Badge -->
-        <div class="flex align-items-center gap-2 mb-3">
-          <Tag :severity="statusBadge.severity">
-            <span class="flex align-items-center gap-1">
-              <i :class="statusBadge.icon" style="font-size: 0.75rem"></i>
-              {{ statusBadge.label }}
-            </span>
-          </Tag>
-          <Tag v-if="isLinkedToProject" v-tooltip.top="'Linked to ' + projectName" severity="info">
+        <!-- Project badge -->
+        <div v-if="isLinkedToProject" class="mb-3">
+          <Tag v-tooltip.top="'Linked to ' + projectName" severity="info">
             <span class="flex align-items-center gap-1">
               <i class="pi pi-users" style="font-size: 0.75rem"></i>
               Project: {{ projectName }}
@@ -322,11 +313,11 @@ const menuItems = computed(() => {
   transform: translateY(-2px);
 }
 
-/* Thumbnail styles */
+/* Thumbnail — always shown */
 .app-thumbnail {
   position: relative;
   width: 100%;
-  height: 140px;
+  height: 160px;
   overflow: hidden;
   border-radius: var(--p-card-border-radius) var(--p-card-border-radius) 0 0;
 }
@@ -340,6 +331,15 @@ const menuItems = computed(() => {
 
 .app-card:hover .app-thumbnail img {
   transform: scale(1.05);
+}
+
+/* Status badge pinned top-left on thumbnail */
+.status-overlay-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  font-size: 0.72rem;
 }
 
 .thumbnail-overlay {
@@ -356,16 +356,16 @@ const menuItems = computed(() => {
 }
 
 .thumbnail-overlay .menu-button {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(4px);
 }
 
 .thumbnail-overlay .menu-button:hover {
-  background: white;
+  background: white !important;
 }
 
-/* Card with thumbnail has different padding */
-.has-thumbnail :deep(.p-card-body) {
+/* Reduce body top padding since thumbnail is always present */
+:deep(.p-card-body) {
   padding-top: 0.75rem;
 }
 
@@ -379,11 +379,11 @@ const menuItems = computed(() => {
 
 /* Dark mode */
 :global(.app-dark) .thumbnail-overlay .menu-button {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.7) !important;
   color: white;
 }
 
 :global(.app-dark) .thumbnail-overlay .menu-button:hover {
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.85) !important;
 }
 </style>
