@@ -248,13 +248,6 @@ async function handleImageUpload(event: { files: File[] }) {
     if (editorStore.currentApp) {
       editorStore.currentApp.thumbnailUrl = imageUrl
     }
-
-    toast.add({
-      severity: 'success',
-      summary: 'Uploaded',
-      detail: 'App image uploaded successfully',
-      life: 3000,
-    })
   } catch (err: unknown) {
     toast.add({
       severity: 'error',
@@ -278,13 +271,6 @@ async function removeImage() {
     if (editorStore.currentApp) {
       editorStore.currentApp.thumbnailUrl = undefined
     }
-
-    toast.add({
-      severity: 'success',
-      summary: 'Removed',
-      detail: 'App image removed',
-      life: 3000,
-    })
   } catch (err: unknown) {
     toast.add({
       severity: 'error',
