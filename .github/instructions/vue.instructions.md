@@ -54,6 +54,19 @@ Keep stores lean. Colocate all feature logic within the feature folder.
 - Services are plain functions that return typed promises — no business logic
 - Always handle errors with try/catch and show toast notifications via `useToast()`
 
+## Toast / Notifications (Critical)
+
+- **Never add `<Toast />` to any component other than `App.vue`** — `<Toast />` is registered globally in `App.vue` and must appear exactly once in the entire app. Adding it in any view or child component causes every `toast.add()` call to render duplicate notifications.
+- To show a toast anywhere in the app, simply call `useToast()` — the global instance handles rendering:
+  ```ts
+  // ✅ DO — just use the composable, no <Toast /> needed
+  const toast = useToast()
+  toast.add({ severity: 'success', summary: 'Saved', life: 3000 })
+
+  // ❌ DON'T — never add <Toast /> in views or components
+  // <Toast />  ← removes this from templates; App.vue already has it
+  ```
+
 ## Theme-Aware CSS (Critical)
 
 - **Never set `background-color` in nested components** — this breaks dark mode
