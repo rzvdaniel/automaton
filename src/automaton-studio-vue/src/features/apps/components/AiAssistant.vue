@@ -55,7 +55,6 @@ const {
   loadProviders,
   sendMessage: sendAiMessage,
   getOrCreateActiveSession,
-  clearMessages,
   cancelGeneration,
   sessions,
   activeSession,
@@ -534,23 +533,38 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Input area always visible -->
       <div class="input-area">
-        <div class="flex gap-2 align-items-end">
+        <div class="prompt-box">
           <Textarea
             v-model="userInput"
             placeholder="Ask AI a question..."
-            class="flex-1 prompt-textarea"
+            class="prompt-textarea"
             :disabled="isBusy"
             :autoResize="true"
             rows="2"
             @keydown="handleKeyPress"
           />
-          <Button
-            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
-            icon="pi pi-send"
-            :disabled="!userInput.trim() || isBusy || !selectedModel"
-            :loading="isBusy"
-            @click="sendMessage"
-          />
+          <div class="prompt-actions">
+            <Button
+              v-if="isBusy"
+              v-tooltip.top="'Cancel'"
+              icon="pi pi-stop-circle"
+              severity="danger"
+              size="small"
+              text
+              rounded
+              @click="cancelGeneration"
+            />
+            <Button
+              v-else
+              v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+              icon="pi pi-send"
+              size="small"
+              text
+              rounded
+              :disabled="!userInput.trim() || !selectedModel"
+              @click="sendMessage"
+            />
+          </div>
         </div>
       </div>
     </template>
@@ -717,38 +731,38 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Input area -->
       <div class="input-area">
-        <div class="flex gap-2 align-items-end">
+        <div class="prompt-box">
           <Textarea
             v-model="userInput"
             placeholder="Describe what you want..."
-            class="flex-1 prompt-textarea"
+            class="prompt-textarea"
             :disabled="isBusy"
             :autoResize="true"
             rows="2"
             @keydown="handleKeyPress"
           />
-          <Button
-            v-if="isBusy"
-            v-tooltip.top="'Cancel'"
-            icon="pi pi-stop-circle"
-            severity="danger"
-            @click="cancelGeneration"
-          />
-          <Button
-            v-else
-            v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send message'"
-            icon="pi pi-send"
-            :disabled="!userInput.trim() || !selectedModel"
-            @click="sendMessage"
-          />
-          <Button
-            v-if="hasMessages && !isBusy"
-            v-tooltip.top="'Clear conversation'"
-            icon="pi pi-trash"
-            severity="secondary"
-            text
-            @click="clearMessages"
-          />
+          <div class="prompt-actions">
+            <Button
+              v-if="isBusy"
+              v-tooltip.top="'Cancel'"
+              icon="pi pi-stop-circle"
+              severity="danger"
+              size="small"
+              text
+              rounded
+              @click="cancelGeneration"
+            />
+            <Button
+              v-else
+              v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+              icon="pi pi-send"
+              size="small"
+              text
+              rounded
+              :disabled="!userInput.trim() || !selectedModel"
+              @click="sendMessage"
+            />
+          </div>
         </div>
       </div>
     </template>
@@ -1263,11 +1277,37 @@ function handleKeyPress(event: KeyboardEvent) {
   flex-shrink: 0;
 }
 
+.prompt-box {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--p-surface-300);
+  border-radius: 10px;
+  background: var(--p-surface-0);
+  padding: 6px 8px 4px 10px;
+  transition: border-color 0.15s;
+}
+
+.prompt-box:focus-within {
+  border-color: var(--p-primary-400);
+}
+
 .prompt-textarea {
-  min-height: 60px;
-  max-height: 200px;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 40px;
+  max-height: 180px;
   resize: none;
   line-height: 1.5;
+  width: 100%;
+}
+
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 2px;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */
@@ -1292,6 +1332,15 @@ function handleKeyPress(event: KeyboardEvent) {
 
 :global(.app-dark) .input-area {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .prompt-box {
+  border-color: var(--p-surface-600);
+  background: var(--p-surface-800);
+}
+
+:global(.app-dark) .prompt-box:focus-within {
+  border-color: var(--p-primary-400);
 }
 </style>
 
