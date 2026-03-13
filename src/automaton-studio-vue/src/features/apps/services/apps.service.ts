@@ -77,10 +77,19 @@ class AppsService {
   }
 
   /**
+   * Returns a lightweight pre-deploy summary (script count, whether requirements.txt is present).
+   * GET /api/apps/{id}/backend/deploy-info
+   */
+  async getDeployInfo(id: string): Promise<{ scriptCount: number; hasRequirements: boolean }> {
+    const { data } = await apiClient.get(`/api/apps/${id}/backend/deploy-info`)
+    return data
+  }
+
+  /**
    * Deploy backend scripts to the app's configured runner(s).
    * POST /api/apps/{id}/backend/deploy
    */
-  async deployBackend(id: string): Promise<{ success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; message: string }> {
+  async deployBackend(id: string): Promise<{ success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string }> {
     const { data } = await apiClient.post(`/api/apps/${id}/backend/deploy`, {})
     return data
   }

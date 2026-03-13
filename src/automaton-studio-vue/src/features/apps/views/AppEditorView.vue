@@ -420,16 +420,28 @@ function handleCloseTab(event: Event, path: string) {
 // Handle deploy backend
 async function handleDeployBackend() {
   try {
+    // Pre-check: warn the user if package installation will run (pip can take up to 2 minutes)
+    const info = await editorStore.getDeployInfo()
+    if (info.hasRequirements) {
+      toast.add({
+        severity: 'info',
+        summary: 'Installing Packages',
+        detail: 'requirements.txt detected — installing packages on the runner. This may take a moment...',
+        life: 120_000,
+      })
+    }
+
     const result = await editorStore.deployBackend()
     if (result.totalScripts === 0) {
       toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
     } else if (!result.deployedCount) {
       toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.message, life: 5000 })
     } else {
+      const packagesNote = result.hasRequirements ? ' (packages installed)' : ''
       toast.add({
         severity: 'success',
         summary: 'Backend Deployed',
-        detail: `Deployed ${result.deployedCount} script(s) to ${result.runnerCount} runner(s)`,
+        detail: `Deployed ${result.deployedCount} script(s) to ${result.runnerCount} runner(s)${packagesNote}`,
         life: 4000,
       })
     }

@@ -33,6 +33,21 @@ public class AppsControllerExecutionController : ControllerBase
     }
 
     /// <summary>
+    /// Returns a lightweight pre-deploy summary: script count and whether a requirements.txt is present.
+    /// Called before deploying so the frontend can warn the user about pending package installation.
+    /// </summary>
+    [HttpGet("api/apps/{appId:guid}/backend/deploy-info")]
+    [Authorize]
+    public async Task<ActionResult<DeployInfoResponse>> GetDeployInfo(
+        Guid appId,
+        CancellationToken cancellationToken)
+    {
+        var userId = userContextService.GetUserId();
+        var result = await controllerExecutionService.GetDeployInfoAsync(appId, userId);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Deploy all backend scripts for an app to its configured runner(s).
     /// Called from the app editor "Deploy Backend" button.
     /// </summary>

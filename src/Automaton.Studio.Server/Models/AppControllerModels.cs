@@ -6,12 +6,19 @@ public record BackendScriptFile(string ControllerName, string Code, string Langu
 
 // ── Deploy response ───────────────────────────────────────────────────────────
 
+public class DeployInfoResponse
+{
+    public int ScriptCount { get; set; }
+    public bool HasRequirements { get; set; }
+}
+
 public class DeployBackendResponse
 {
     public bool Success { get; set; }
     public int DeployedCount { get; set; }
     public int TotalScripts { get; set; }
     public int RunnerCount { get; set; }
+    public bool HasRequirements { get; set; }
     public string? Message { get; set; }
 }
 

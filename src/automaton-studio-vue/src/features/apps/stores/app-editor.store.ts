@@ -492,9 +492,17 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
+   * Returns a lightweight pre-deploy summary (whether requirements.txt is present, script count).
+   */
+  async function getDeployInfo(): Promise<{ scriptCount: number; hasRequirements: boolean }> {
+    if (!currentApp.value) throw new Error('No app loaded')
+    return await appsService.getDeployInfo(currentApp.value.id)
+  }
+
+  /**
    * Deploy backend scripts to the app's configured runner(s)
    */
-  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; message: string }> {
+  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string }> {
     if (!currentApp.value) throw new Error('No app loaded')
     isDeployingBackend.value = true
     try {
@@ -779,6 +787,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewWarning,
     publishApp,
     unpublishApp,
+    getDeployInfo,
     deployBackend,
     updateAppName,
     updateAppRunner,

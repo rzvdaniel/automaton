@@ -36,6 +36,21 @@ public class AppsControllerExecutionService
     // ── Deploy ────────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Returns a lightweight summary of what would be deployed for an app.
+    /// Used by the frontend to show pre-deploy notifications (e.g. package installation warnings).
+    /// </summary>
+    public async Task<DeployInfoResponse> GetDeployInfoAsync(Guid appId, Guid ownerId)
+    {
+        var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
+        return new DeployInfoResponse
+        {
+            ScriptCount = scripts.Count,
+            HasRequirements = hasRequirements
+        };
+    }
+
+    /// <summary>
     /// Pushes all backend scripts from the server filesystem to the app's configured runner(s).
     /// Called by the "Deploy Backend" button and automatically on runner reconnect.
     /// </summary>
@@ -46,6 +61,7 @@ public class AppsControllerExecutionService
         CancellationToken cancellationToken)
     {
         var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
 
         if (scripts.Count == 0)
             return new DeployBackendResponse { Success = true, DeployedCount = 0, Message = "No backend scripts found" };
@@ -53,7 +69,7 @@ public class AppsControllerExecutionService
         var runners = await ResolveRunnersByOwnerAsync(ownerId, runnerNames, appId);
 
         if (!runners.Any())
-            return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, Message = "No runners available for deployment. Please select a runner in the app settings." };
+            return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, HasRequirements = hasRequirements, Message = "No runners available for deployment. Please select a runner in the app settings." };
 
         var deployed = 0;
         var errors = new List<string>();
@@ -92,6 +108,7 @@ public class AppsControllerExecutionService
             DeployedCount = deployed,
             TotalScripts = scripts.Count,
             RunnerCount = runners.Count(),
+            HasRequirements = hasRequirements,
             Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)"
         };
     }
