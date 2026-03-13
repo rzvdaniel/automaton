@@ -5,6 +5,7 @@ import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import appsService from '@/features/apps/services/apps.service'
 import type { App } from '@/features/apps/types/apps.types'
+import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 
 const apps = ref<App[]>([])
 const loading = ref(true)
@@ -31,12 +32,11 @@ function setHovering(id: string, value: boolean) {
   hovering.value[id] = value
 }
 
-// Picsum deterministic fallback
+// Full thumbnail URL with API base URL
 function thumbnailSrc(app: App): string {
-  if (!app.thumbnailUrl) return `https://picsum.photos/seed/${app.id}/500/300`
+  if (!app.thumbnailUrl) return ''
   if (app.thumbnailUrl.startsWith('http')) return app.thumbnailUrl
-  const base = import.meta.env.VITE_API_BASE_URL || ''
-  return `${base}${app.thumbnailUrl}`
+  return `${import.meta.env.VITE_API_BASE_URL ?? ''}${app.thumbnailUrl}`
 }
 
 function openApp(app: App) {
@@ -76,7 +76,8 @@ function openApp(app: App) {
       >
         <!-- Image -->
         <div class="card-image">
-          <img :src="thumbnailSrc(app)" :alt="app.name" loading="lazy" />
+          <img v-if="app.thumbnailUrl" :src="thumbnailSrc(app)" :alt="app.name" loading="lazy" class="cover-img" />
+          <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
 
           <!-- Published badge -->
           <Tag

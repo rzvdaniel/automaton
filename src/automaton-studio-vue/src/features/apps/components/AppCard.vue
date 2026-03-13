@@ -11,6 +11,7 @@ import type { App } from '../types/apps.types'
 import { AccessScope } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
+import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 
 interface Props {
   app: App
@@ -21,13 +22,9 @@ const props = defineProps<Props>()
 // Check if app has a real uploaded thumbnail image
 const hasThumbnail = computed(() => !!props.app.thumbnailUrl)
 
-// Deterministic Picsum placeholder — same app always gets same image
-const picsumUrl = computed(() => `https://picsum.photos/seed/${props.app.id}/500/300`)
-
-// Full thumbnail URL with API base URL; falls back to Picsum when no upload
+// Full thumbnail URL with API base URL (only used when thumbnailUrl is set)
 const fullThumbnailUrl = computed(() => {
-  if (!props.app.thumbnailUrl) return picsumUrl.value
-  // If already a full URL, use as-is; otherwise prepend API base URL
+  if (!props.app.thumbnailUrl) return ''
   if (props.app.thumbnailUrl.startsWith('http')) {
     return props.app.thumbnailUrl
   }
@@ -209,10 +206,11 @@ const menuItems = computed(() => {
 
 <template>
   <Card class="app-card h-full">
-    <!-- Thumbnail — always shown (uploaded image or Picsum fallback) -->
+    <!-- Thumbnail — always shown (uploaded image or gradient placeholder) -->
     <template #header>
       <div class="app-thumbnail">
-        <img :src="fullThumbnailUrl" :alt="app.name" loading="lazy" />
+        <img v-if="hasThumbnail" :src="fullThumbnailUrl" :alt="app.name" loading="lazy" />
+        <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
         <!-- Status badge on image -->
         <Tag :severity="statusBadge.severity" class="status-overlay-badge">
           <span class="flex align-items-center gap-1">
