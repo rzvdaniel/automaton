@@ -698,8 +698,9 @@ function handleDelete() {
 /* Cover drop zone */
 .cover-drop-zone {
   position: relative;
-  width: 100%;
-  padding-bottom: 30%; /* compact for settings panel */
+  width: 50%;
+  max-width: 320px;
+  padding-bottom: 28.125%; /* 16:9 relative to parent — width:50% × 56.25% */
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
