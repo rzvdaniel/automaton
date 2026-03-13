@@ -316,6 +316,18 @@ Shared modules (`src/shared/`): components, services (Axios, SignalR), composabl
 
 **Agent skills** codify reusable workflows and best practices for consistent, high-quality development. Store project-specific skills in `.github/skills/`.
 
+**Proactive self-improvement (IMPORTANT):** After fixing a bug, applying a pattern, or performing a repeated action, the AI **must** ask itself:
+> *"Would future me — or another agent — make the same mistake or repeat the same manual steps?"*
+
+If yes, immediately update the relevant document **without waiting to be asked**:
+
+| What happened | Where to document it |
+|---|---|
+| Fixed a recurring bug caused by a wrong pattern (e.g. duplicate `<Toast />`) | Add a ❌/✅ rule to the relevant `.github/instructions/*.md` file |
+| Implemented a multi-step feature pattern used across the codebase | Create or update a `.github/skills/<name>/SKILL.md` |
+| Discovered an architectural decision, pitfall, or lesson learned | Add to `FOR-DEVELOPERS.md` under the appropriate section |
+| Added a significant feature that others will extend | Update `AGENTS.md` to describe the feature, its location, and key concepts |
+
 **When to Create or Update a Skill:**
 - After implementing a significant feature (e.g., multi-tenancy, runner scoping)
 - When you identify a repeatable development pattern (e.g., post-change validation)
