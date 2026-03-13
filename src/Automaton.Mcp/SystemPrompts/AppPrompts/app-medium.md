@@ -163,6 +163,22 @@ Controllers run on the runner — you cannot test during authoring.
   ✅ `return {"success": True, "data": data, "error": ""}`
   ✅ `return {"success": False, "data": None, "error": "not found"}`
 
+**Pre-installed packages** (import directly, no pip needed):
+```
+requests, httpx, aiohttp          # HTTP clients
+pandas, numpy                      # Data processing
+pyyaml, python-dateutil            # YAML / date parsing
+pymysql, psycopg2                  # MySQL / PostgreSQL
+boto3                              # AWS SDK
+beautifulsoup4, lxml               # HTML parsing
+Pillow                             # Image processing (PIL)
+python-dotenv, jinja2              # Config / templating
+sqlite3                            # Built-in, always available
+```
+
+**⚠️ NOT available**: `ffmpeg` (binary), `pydub`, `librosa`, `moviepy`, `opencv`, `scikit-learn`.
+If you need audio/video conversion, use `Pillow` for images, or tell the user the package is not installed.
+
 ## FILE STRUCTURE:
 ```
 ├─ index.html               # Entry point (may have multiple pages)
@@ -246,23 +262,53 @@ def handle(action_name: str, inputs: dict) -> dict:
 
 ## CALLING A CONTROLLER (frontend):
 ```javascript
-// In js/api.js
+// ✅ CORRECT — always wrap inputs inside { inputs: { ... } }
 export async function listUsers() {
     const res = await automatonApi.executeController('users', 'users.list', { inputs: {} });
     if (!res.success) throw new Error(res.error);
     return res.data;
 }
+export async function createUser(name, email) {
+    const res = await automatonApi.executeController('users', 'users.create', { inputs: { name, email } });
+    if (!res.success) throw new Error(res.error);
+    return res.data;
+}
 
-// In js/app.js
-import { listUsers } from './api.js';
-const users = await listUsers();
+// ❌ WRONG — flat object at top level; backend receives empty inputs
+const res = await automatonApi.executeController('users', 'users.create', { name, email });
 ```
 `res.success` (bool), `res.data` (any JS value), `res.error` (string)
 
 ## DATA FORMAT:
-- **Frontend → backend**: `inputs` values are plain JS values (strings, numbers, booleans)
+- **Frontend → backend**: pass all parameters inside `inputs: { ... }` — never at the top level of the options object
 - **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
 - **Frontend receives**: `res.data` is ready to use — no `JSON.parse()` needed
+
+## RETURNING FILES (base64 download pattern):
+When the app needs to return a file (converted audio, generated PDF, processed image) **without storing it on disk**:
+
+**Backend** — encode result as base64:
+```python
+import base64, io
+
+def convert(self, inputs):
+    # ... process data into bytes_io (BytesIO) ...
+    encoded = base64.b64encode(bytes_io.getvalue()).decode('utf-8')
+    return {"success": True, "data": {"filename": "output.mp3", "content": encoded, "mime": "audio/mpeg"}, "error": ""}
+```
+
+**Frontend** — decode and trigger browser download:
+```javascript
+const res = await automatonApi.executeController('converter', 'converter.convert', { inputs: { ... } });
+if (res.success) {
+    const { filename, content, mime } = res.data;
+    const blob = new Blob([Uint8Array.from(atob(content), c => c.charCodeAt(0))], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    a.click();
+    URL.revokeObjectURL(url);
+}
+```
 
 ## OUTPUT CONTRACT (every handle() must return):
 ```python
