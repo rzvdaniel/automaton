@@ -436,7 +436,10 @@ async function handleDeployBackend() {
     } else if (!result.deployedCount) {
       toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.message, life: 5000 })
     } else {
-      const packagesNote = result.hasRequirements ? ' (packages installed)' : ''
+      const lastInstallLog = result.installLogs?.at(-1)
+      const packagesNote = lastInstallLog
+        ? ` — ${lastInstallLog}`
+        : (result.hasRequirements ? ' (packages installed)' : '')
       toast.add({
         severity: 'success',
         summary: 'Backend Deployed',

@@ -24,10 +24,8 @@ using Serilog.Events;
 using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Transactions;
-using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
-using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Extensions;
 using System.Text.Json.Serialization;
 
@@ -53,6 +51,7 @@ services.AddDatabaseDeveloperPageExceptionFilter();
 services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
 
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
+services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();

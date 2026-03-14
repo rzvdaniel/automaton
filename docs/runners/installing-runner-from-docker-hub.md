@@ -375,7 +375,7 @@ The runner image includes:
   - Databases: `pymysql`, `psycopg2-binary`
   - Cloud: `boto3` (AWS SDK)
   - Utilities: `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2`
-- **Pre-installed system packages**: `ffmpeg`, `ghostscript`, `imagemagick`, `wkhtmltopdf`, `poppler-utils`, `pandoc`
+- **Pre-installed system packages**: `ffmpeg`, `ghostscript`, `imagemagick`, `poppler-utils`, `pandoc`
 
 Image size: ~500-600MB
 

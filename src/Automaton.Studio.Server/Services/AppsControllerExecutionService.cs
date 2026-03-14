@@ -5,6 +5,7 @@ using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
@@ -18,18 +19,21 @@ public class AppsControllerExecutionService
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly TunnelRequestRegistry tunnelRegistry;
+    private readonly AppsTunnelConfig tunnelConfig;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
         ApplicationDbContext dataContext,
         AppFileStorageService fileStorageService,
         IHubContext<AutomatonHub> automatonHub,
-        TunnelRequestRegistry tunnelRegistry)
+        TunnelRequestRegistry tunnelRegistry,
+        IOptions<AppsTunnelConfig> tunnelConfig)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
         this.tunnelRegistry = tunnelRegistry;
+        this.tunnelConfig = tunnelConfig.Value;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -73,6 +77,7 @@ public class AppsControllerExecutionService
 
         var deployed = 0;
         var errors = new List<string>();
+        var installLogs = new List<string>();
 
         foreach (var runner in runners)
         {
@@ -88,11 +93,17 @@ public class AppsControllerExecutionService
                         Language = script.Language
                     };
 
-                    var ok = await automatonHub.Clients.Client(runner.ConnectionId)
-                        .InvokeAsync<bool>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
+                    var result = await automatonHub.Clients.Client(runner.ConnectionId)
+                        .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
 
-                    if (ok) deployed++;
-                    else errors.Add($"Runner '{runner.Name}' rejected {script.ControllerName}");
+                    if (result.Success)
+                    {
+                        deployed++;
+                        if (result.Logs?.Count > 0)
+                            installLogs.AddRange(result.Logs.Select(l => $"[{runner.Name}] {l}"));
+                    }
+                    else
+                        errors.Add($"Runner '{runner.Name}' rejected {script.ControllerName}");
                 }
                 catch (Exception ex)
                 {
@@ -109,7 +120,8 @@ public class AppsControllerExecutionService
             TotalScripts = scripts.Count,
             RunnerCount = runners.Count(),
             HasRequirements = hasRequirements,
-            Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)"
+            Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
+            InstallLogs = installLogs.Count > 0 ? installLogs : null
         };
     }
 
@@ -243,7 +255,7 @@ public class AppsControllerExecutionService
                 });
 
                 var (requestId, responseTask) = tunnelRegistry.Register(
-                    timeout: TimeSpan.FromSeconds(30),
+                    timeout: TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds),
                     ct: cancellationToken);
 
                 var tunnelRequest = new TunnelRequest

@@ -51,6 +51,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     curl \
+    sudo \
+    ffmpeg \
+    ghostscript \
+    imagemagick \
+    poppler-utils \
+    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
 # Install .NET 9 runtime
@@ -89,6 +95,10 @@ RUN pip install --no-cache-dir \
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton
 
+# Allow automaton to install system packages via apt-get (used by system-requirements.txt)
+RUN echo "automaton ALL=(root) NOPASSWD: SETENV: /usr/bin/apt-get" > /etc/sudoers.d/automaton-apt \
+    && chmod 0440 /etc/sudoers.d/automaton-apt
+
 WORKDIR /app
 
 # Copy published app from build stage
@@ -121,6 +131,6 @@ USER automaton
 
 # Default: run in service mode via entrypoint that starts FastAPI + .NET runner
 COPY --chown=automaton:automaton Automaton.Runner/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+RUN sed -i 's/\r//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 CMD ["/app/docker-entrypoint.sh"]

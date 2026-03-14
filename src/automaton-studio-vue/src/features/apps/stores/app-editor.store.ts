@@ -497,7 +497,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Checks for requirements.txt up-front and surfaces a status label beneath the button
    * for the duration of the operation — no blocking toast needed.
    */
-  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string }> {
+  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }> {
     if (!currentApp.value) throw new Error('No app loaded')
     isDeployingBackend.value = true
     deployStatusMessage.value = 'Deploying...'

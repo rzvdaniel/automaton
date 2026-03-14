@@ -1,0 +1,31 @@
+# Ensure Unix line endings for shell scripts (prevents CRLF breaking bash shebangs in Docker)
+*.sh text eol=lf
+
+# Ensure Unix line endings for Dockerfiles and related configs
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+docker-entrypoint* text eol=lf
+
+# Normalize line endings for common text files
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ts text eol=lf
+*.vue text eol=lf
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+
+# Binary files - no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.gz binary

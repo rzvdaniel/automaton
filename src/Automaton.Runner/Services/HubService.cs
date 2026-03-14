@@ -257,7 +257,7 @@ public class HubService
             });
 
             // Register script upload handler — runner saves scripts to local disk for FastAPI to read
-            connection.On<AppControllerUploadPayload, bool>(UploadControllerScriptMethod, (payload) =>
+            connection.On<AppControllerUploadPayload, AppControllerUploadResult>(UploadControllerScriptMethod, (payload) =>
             {
                 return UploadControllerScriptHandler(payload);
             });
@@ -433,7 +433,7 @@ public class HubService
         Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
         ?? Path.Combine(AppContext.BaseDirectory, "data", "apps");
 
-    private bool UploadControllerScriptHandler(AppControllerUploadPayload payload)
+    private AppControllerUploadResult UploadControllerScriptHandler(AppControllerUploadPayload payload)
     {
         try
         {
@@ -452,8 +452,18 @@ public class HubService
                 var packagesDir = Path.Combine(AppsRootDir, payload.AppId.ToString(), "packages");
                 Directory.CreateDirectory(packagesDir);
 
-                InstallRequirements(payload.AppId, reqPath, packagesDir);
-                return true;
+                var pipLogs = InstallRequirements(payload.AppId, reqPath, packagesDir);
+                return new AppControllerUploadResult { Success = true, Logs = pipLogs };
+            }
+
+            // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
+            if (payload.Language == "Text" && payload.ControllerName == "system-requirements")
+            {
+                var sysReqPath = Path.Combine(dir, "system-requirements.txt");
+                File.WriteAllText(sysReqPath, payload.Code);
+
+                var aptLogs = InstallSystemPackages(payload.AppId, payload.Code);
+                return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
 
             var path = Path.Combine(dir, payload.ControllerName + ".py");
@@ -463,14 +473,14 @@ public class HubService
                 payload.ControllerName, payload.AppId);
             WriteLine($"📦 Deployed controller: {payload.ControllerName} (app {payload.AppId})");
 
-            return true;
+            return new AppControllerUploadResult { Success = true };
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to save controller script {ControllerName} for app {AppId}",
                 payload.ControllerName, payload.AppId);
             WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
-            return false;
+            return new AppControllerUploadResult { Success = false, Logs = [$"❌ {ex.Message}"] };
         }
     }
 
@@ -486,16 +496,18 @@ public class HubService
         // Fallback: Linux containers always have this sentinel file
         || File.Exists("/.dockerenv");
 
-    private void InstallRequirements(Guid appId, string requirementsPath, string targetDir)
+    private List<string> InstallRequirements(Guid appId, string requirementsPath, string targetDir)
     {
+        var logs = new List<string>();
         try
         {
             var inContainer = IsRunningInContainer;
             var args = inContainer
-                ? $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --quiet --disable-pip-version-check"
-                : $"install -r \"{requirementsPath}\" --quiet --disable-pip-version-check";
+                ? $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --no-color --progress-bar off --disable-pip-version-check"
+                : $"install -r \"{requirementsPath}\" --no-color --progress-bar off --disable-pip-version-check";
 
-            var installMode = inContainer ? $"→ volume target: {targetDir}" : "→ system Python";
+            var installMode = inContainer ? $"volume target: {targetDir}" : "system Python";
+            logs.Add($"📦 Installing packages ({installMode})...");
             WriteLine($"📦 Installing packages for app {appId} ({installMode})...");
             logger.Information("Installing packages for app {AppId} from {ReqPath} (container={InContainer})",
                 appId, requirementsPath, inContainer);
@@ -513,16 +525,29 @@ public class HubService
             using var process = System.Diagnostics.Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start pip process");
 
-            var stderr = process.StandardError.ReadToEnd();
+            // Read stdout and stderr concurrently to avoid deadlock when output buffers fill
+            var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
+            var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
             process.WaitForExit(120_000); // 2-minute timeout
+            var stdout = stdoutTask.Result;
+            var stderr = stderrTask.Result;
+
+            foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                logs.Add(line);
+
+            if (!string.IsNullOrWhiteSpace(stderr))
+                foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    logs.Add($"⚠️ {line}");
 
             if (process.ExitCode == 0)
             {
+                logs.Add("✅ Packages installed successfully");
                 logger.Information("Packages installed for app {AppId}", appId);
                 WriteLine($"✅ Packages installed for app {appId}");
             }
             else
             {
+                logs.Add($"❌ pip install failed (exit code {process.ExitCode})");
                 logger.Warning("pip install exited {ExitCode} for app {AppId}: {Error}",
                     process.ExitCode, appId, stderr);
                 WriteLine($"⚠️ Package install warnings for app {appId}: {stderr}");
@@ -530,9 +555,112 @@ public class HubService
         }
         catch (Exception ex)
         {
+            logs.Add($"⚠️ pip unavailable: {ex.Message}");
             logger.Error(ex, "Failed to run pip install for app {AppId}", appId);
             WriteLine($"⚠️ pip unavailable — packages not installed for app {appId}: {ex.Message}");
         }
+        return logs;
+    }
+
+    /// <summary>
+    /// Installs system (apt-get) packages declared in system-requirements.txt.
+    /// Only works on Docker runners; silently skips with a warning on non-container deployments.
+    /// Packages install to the container filesystem and are reinstalled by docker-entrypoint.sh on container restart.
+    /// </summary>
+    private List<string> InstallSystemPackages(Guid appId, string packageListContent)
+    {
+        var logs = new List<string>();
+        if (!IsRunningInContainer)
+        {
+            logs.Add("⚠️ system-requirements.txt is only supported on Docker runners — skipped on this runner");
+            logger.Warning("system-requirements.txt skipped for app {AppId} — not running in a container", appId);
+            return logs;
+        }
+
+        var packages = packageListContent
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(l => !l.StartsWith('#') && !string.IsNullOrWhiteSpace(l))
+            .Where(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^[a-zA-Z0-9][a-zA-Z0-9\-_.+]*$"))
+            .ToList();
+
+        if (packages.Count == 0)
+        {
+            logs.Add("ℹ️ No system packages to install");
+            return logs;
+        }
+
+        var packageList = string.Join(" ", packages);
+        logs.Add($"🔧 Installing system packages: {packageList}");
+        WriteLine($"🔧 Installing system packages for app {appId}: {packageList}");
+        logger.Information("Installing system packages for app {AppId}: {Packages}", appId, packageList);
+
+        try
+        {
+            // Step 1: update package index
+            var updatePsi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "sudo",
+                Arguments = "apt-get update -qq",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using (var updateProc = System.Diagnostics.Process.Start(updatePsi)
+                ?? throw new InvalidOperationException("Failed to start apt-get update"))
+            {
+                updateProc.WaitForExit(60_000);
+            }
+
+            // Step 2: install packages (sudo -E preserves DEBIAN_FRONTEND from the process environment)
+            var installPsi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "sudo",
+                Arguments = $"-E apt-get install -y --no-install-recommends {packageList}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            installPsi.Environment["DEBIAN_FRONTEND"] = "noninteractive";
+
+            using var process = System.Diagnostics.Process.Start(installPsi)
+                ?? throw new InvalidOperationException("Failed to start apt-get install");
+
+            var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
+            var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
+            process.WaitForExit(300_000); // 5-minute timeout
+            var stdout = stdoutTask.Result;
+            var stderr = stderrTask.Result;
+
+            foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                logs.Add(line);
+
+            if (!string.IsNullOrWhiteSpace(stderr))
+                foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    logs.Add($"⚠️ {line}");
+
+            if (process.ExitCode == 0)
+            {
+                logs.Add("✅ System packages installed successfully");
+                logger.Information("System packages installed for app {AppId}", appId);
+                WriteLine($"✅ System packages installed for app {appId}");
+            }
+            else
+            {
+                logs.Add($"❌ apt-get install failed (exit code {process.ExitCode})");
+                logger.Warning("apt-get install exited {ExitCode} for app {AppId}", process.ExitCode, appId);
+                WriteLine($"⚠️ System package install failed for app {appId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            logs.Add($"⚠️ apt-get unavailable: {ex.Message}");
+            logger.Error(ex, "Failed to run apt-get for app {AppId}", appId);
+            WriteLine($"⚠️ apt-get unavailable for app {appId}: {ex.Message}");
+        }
+
+        return logs;
     }
 
     private async Task HandleConnectionError(Exception ex)

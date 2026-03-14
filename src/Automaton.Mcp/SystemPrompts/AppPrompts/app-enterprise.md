@@ -237,12 +237,52 @@ sqlite3                            # Built-in, always available
 ```
 # backend/requirements.txt
 pydub==0.25.1
-ffmpeg-python==0.2.0
+audioop-lts  # required for pydub on Python 3.13+ (audioop removed from stdlib)
+# your-extra-package==1.0.0
 ```
 The runner installs these to a **persistent volume** at deploy time — they survive container restarts and recreates.
-After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
+After writing `requirements.txt`, remind the user to click **"Deploy Backend"**. The runner captures pip install output and includes it in the deploy response so the user can confirm each package installed correctly.
 
-**⚠️ NOT available as binaries**: `ffmpeg`, `libav`. Audio conversion with `pydub` requires the `ffmpeg` binary — if not installed, tell the user clearly instead of writing code that will fail silently.
+**❗ Never install packages inside controller code.** Do not use `subprocess`, `pip.main()`, or any runtime pip call in Python scripts. `requirements.txt` is the only correct mechanism — packages are installed once at deploy time, not on every request.
+
+**⚠️ System binaries** — not all are pre-installed on every runner type. Use the correct approach for each:
+
+**FFmpeg** (audio/video with `pydub`): pre-installed on Docker runners. For non-Docker (Windows/bare-metal) runners, use `static-ffmpeg` which bundles a prebuilt binary and works everywhere:
+```
+# backend/requirements.txt
+pydub==0.25.1
+audioop-lts  # required for pydub on Python 3.13+ (audioop removed from stdlib)
+static-ffmpeg==2.5
+```
+```python
+# static_ffmpeg.add_paths() must be called before pydub is imported
+import static_ffmpeg
+print("[startup] Configuring static-ffmpeg...")
+static_ffmpeg.add_paths()  # injects ffmpeg binary into PATH
+print("[startup] static-ffmpeg ready")
+from pydub import AudioSegment
+print("[startup] pydub ready")
+```
+
+**Pandoc** (document conversion): pre-installed on Docker runners. For non-Docker runners, use `pypandoc` which can download pandoc automatically:
+```
+# backend/requirements.txt
+pypandoc==1.13
+```
+```python
+import pypandoc
+pypandoc.ensure_pandoc_installed()  # downloads pandoc binary if not present
+```
+
+**Ghostscript, ImageMagick, poppler-utils**: pre-installed on Docker runners. No pip equivalent — not available on non-Docker runners without manual host installation.
+
+**Other apt packages** (Docker runners only): create `backend/system-requirements.txt` with one package name per line. The runner installs these via `apt-get` at deploy time and reinstalls them automatically on container restart:
+```
+# backend/system-requirements.txt
+# One apt package name per line — Docker runners only, warning-skipped on non-Docker
+tesseract-ocr
+libpq-dev
+```
 
 ## FILE STRUCTURE (enterprise feature-based):
 ```
@@ -254,7 +294,9 @@ After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
 │  ├─ customers.py                  # CustomersController
 │  ├─ deals.py                      # DealsController
 │  ├─ activities.py                 # ActivitiesController
-│  └─ reports.py                    # ReportsController
+│  ├─ reports.py                    # ReportsController
+│  ├─ requirements.txt              # (optional) Extra pip packages
+│  └─ system-requirements.txt      # (optional) Extra apt packages — Docker only
 ├─ data/                            # Database directory
 │  └─ app.db                        # SQLite DB (created automatically)
 ├─ features/
@@ -417,10 +459,10 @@ import os, io, requests
 
 def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> str:
     """Upload processed file to the Automaton server. Returns a direct download URL (expires in 15 min)."""
-    server_url = os.environ.get('AUTOMATON_API_URL', '').rstrip('/')
+    server_url = os.environ.get('AUTOMATON_SERVER_URL', '').rstrip('/')
     api_key = os.environ.get('AUTOMATON_API_KEY', '')
     if not server_url or not api_key:
-        raise RuntimeError("AUTOMATON_API_URL and AUTOMATON_API_KEY must be set in the runner environment.")
+        raise RuntimeError("AUTOMATON_SERVER_URL and AUTOMATON_API_KEY must be set in the runner environment.")
     resp = requests.post(
         f"{server_url}/api/runner/files",
         headers={"X-API-Key": api_key},
@@ -431,10 +473,13 @@ def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> st
     resp.raise_for_status()
     return resp.json()["downloadUrl"]
 
-def convert(action_name, inputs):
-    # ... produce output_bytes (bytes) ...
-    download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
-    return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
+class ConverterController:
+    def convert(self, inputs):
+        # ... produce output_bytes (bytes) ...
+        download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
+        return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
+
+# Add to REGISTRY: 'converter': ConverterController()
 ```
 
 **Frontend** — trigger download from the returned URL:
@@ -442,7 +487,11 @@ def convert(action_name, inputs):
 const res = await callController('converter', 'converter.convert', { ... });
 if (res.success) {
     const { download_url, filename } = res.data;
-    const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
+    // ⚠️ Always use pathname only — the server may build the URL with an internal hostname
+    // (e.g. host.docker.internal) that the browser cannot resolve. The path is identical
+    // on the browser's origin, so this works for local, Docker, and production deployments.
+    const href = new URL(download_url).pathname;
+    const a = Object.assign(document.createElement('a'), { href, download: filename });
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -451,6 +500,7 @@ if (res.success) {
 
 **Rules:**
 - ✅ Always use this pattern for any file the user should download
+- ✅ Always use `new URL(download_url).pathname` — never use `download_url` directly as `href`
 - ✅ Works for audio, video, PDFs, images, CSVs, zip archives — no size limit
 - ✅ The download URL expires in 15 minutes and is single-use
 - ❌ Do NOT use base64 for **output** files — use the upload/download URL pattern instead

@@ -20,6 +20,14 @@ public class DeployBackendResponse
     public int RunnerCount { get; set; }
     public bool HasRequirements { get; set; }
     public string? Message { get; set; }
+    /// <summary>Pip install output lines captured from the runner during requirements.txt installation.</summary>
+    public List<string>? InstallLogs { get; set; }
+}
+
+public class AppControllerUploadResult
+{
+    public bool Success { get; set; }
+    public List<string>? Logs { get; set; }
 }
 
 public class DeployBackendRequest
