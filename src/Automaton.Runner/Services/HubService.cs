@@ -273,8 +273,11 @@ public class HubService
                     if (response.StatusCode >= 200 && response.StatusCode < 300)
                         logger.Debug("Tunnel response sent: {StatusCode} RequestId={RequestId}", response.StatusCode, request.RequestId);
                     else
+                    {
                         logger.Warning("Tunnel forwarded with non-2xx: {StatusCode} RequestId={RequestId} Error={Error}",
                             response.StatusCode, request.RequestId, response.Error);
+                        WriteLine($"⚠️ Controller error ({response.StatusCode}): {response.Error ?? "(no details)"}  [{request.Path}]");
+                    }
                     await connection.SendAsync(TunnelResponseMethod, response);
                 }
                 catch (Exception ex)

@@ -1,6 +1,7 @@
 using Automaton.Core.Models;
 using Serilog;
 using System.Text;
+using System.Text.Json;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -49,7 +50,34 @@ public class TunnelForwarderService
             else
             {
                 tunnelResponse.Body = Encoding.UTF8.GetString(bodyBytes);
-                _logger.Debug("FastAPI responded {StatusCode} for {Method} {Path}", tunnelResponse.StatusCode, request.Method, request.Path);
+
+                if (tunnelResponse.StatusCode < 200 || tunnelResponse.StatusCode >= 300)
+                {
+                    // Extract a human-readable error from the response body so callers
+                    // can surface it in logs instead of showing Error=null.
+                    var bodyText = tunnelResponse.Body?.Trim();
+                    if (!string.IsNullOrEmpty(bodyText))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(bodyText);
+                            if (doc.RootElement.TryGetProperty("error", out var errEl))
+                                tunnelResponse.Error = errEl.GetString();
+                            else if (doc.RootElement.TryGetProperty("detail", out var detEl))
+                                tunnelResponse.Error = detEl.GetString();
+                        }
+                        catch { /* not JSON */ }
+
+                        if (tunnelResponse.Error == null)
+                            tunnelResponse.Error = bodyText.Length > 500 ? bodyText[..500] + "..." : bodyText;
+                    }
+                    _logger.Warning("FastAPI responded {StatusCode} for {Method} {Path}: {Error}",
+                        tunnelResponse.StatusCode, request.Method, request.Path, tunnelResponse.Error);
+                }
+                else
+                {
+                    _logger.Debug("FastAPI responded {StatusCode} for {Method} {Path}", tunnelResponse.StatusCode, request.Method, request.Path);
+                }
             }
         }
         catch (Exception ex)

@@ -143,6 +143,12 @@ public class AppsControllerExecutionService
             var firstSuccess = results.FirstOrDefault(r => r.Success);
             var errors = results.Where(r => !r.Success).Select(r => r.Error).ToList();
 
+            if (!success && errors.Any(e => e != null))
+            {
+                foreach (var error in errors.Where(e => e != null))
+                    logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Error: {error}");
+            }
+
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Execution completed. Success: {success}");
 
             return new AppControllerActionResponse
@@ -277,14 +283,17 @@ public class AppsControllerExecutionService
                 }
                 else
                 {
+                    var errorDetail = tunnelResponse.Error ?? $"HTTP {tunnelResponse.StatusCode}";
                     logger.Warning("Tunnel HTTP error: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName} StatusCode={StatusCode} Error={Error}",
-                        appId, controllerName, actionName, runner.Name, tunnelResponse.StatusCode, tunnelResponse.Error);
+                        appId, controllerName, actionName, runner.Name, tunnelResponse.StatusCode, errorDetail);
+
+                    logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {errorDetail}");
 
                     results.Add(new RunnerAppControllerResult
                     {
                         RunnerId = runner.Id,
                         Success = false,
-                        Error = tunnelResponse.Error ?? $"HTTP {tunnelResponse.StatusCode}"
+                        Error = errorDetail
                     });
                 }
             }

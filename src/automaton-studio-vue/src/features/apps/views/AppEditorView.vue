@@ -5,7 +5,7 @@
  * AI-first layout: Files | Editor | AI Assistant
  * Preview opens as full-screen overlay
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -70,6 +70,16 @@ const activeTab = ref<'code' | 'settings' | 'console' | 'logs'>('code')
 
 // Active sub-tab in logs view
 const activeLogsTab = ref<'build' | 'runtime'>('build')
+
+// Ref to runtime logs component for programmatic refresh
+const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
+
+// Refresh runtime logs whenever the user navigates to that view
+watch([activeTab, activeLogsTab], ([tab, logsTab]) => {
+  if (tab === 'logs' && logsTab === 'runtime') {
+    nextTick(() => runtimeLogsRef.value?.loadLogs())
+  }
+})
 
 // Right panel mode (aiAssistant or versionHistory)
 const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
@@ -881,7 +891,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </div>
         <div class="logs-view-content">
           <AppBuildLogs v-if="activeLogsTab === 'build'" :app-id="resolvedAppId" />
-          <AppRuntimeLogs v-else :app-id="resolvedAppId" />
+          <AppRuntimeLogs ref="runtimeLogsRef" v-else :app-id="resolvedAppId" />
         </div>
       </div>
 

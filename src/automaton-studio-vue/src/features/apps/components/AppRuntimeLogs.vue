@@ -91,6 +91,8 @@ function tryFormatJson(raw?: string): string {
 
 onMounted(loadLogs)
 watch(() => props.appId, loadLogs)
+
+defineExpose({ loadLogs })
 </script>
 
 <template>
