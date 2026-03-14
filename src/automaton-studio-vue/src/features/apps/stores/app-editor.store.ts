@@ -53,6 +53,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const isSaving = ref(false)
   const isLoadingPreview = ref(false)
   const isDeployingBackend = ref(false)
+  const deployStatusMessage = ref<string | null>(null)
 
   // Error state
   const error = ref<string | null>(null)
@@ -492,24 +493,24 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Returns a lightweight pre-deploy summary (whether requirements.txt is present, script count).
-   */
-  async function getDeployInfo(): Promise<{ scriptCount: number; hasRequirements: boolean }> {
-    if (!currentApp.value) throw new Error('No app loaded')
-    return await appsService.getDeployInfo(currentApp.value.id)
-  }
-
-  /**
-   * Deploy backend scripts to the app's configured runner(s)
+   * Deploy backend scripts to the app's configured runner(s).
+   * Checks for requirements.txt up-front and surfaces a status label beneath the button
+   * for the duration of the operation — no blocking toast needed.
    */
   async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string }> {
     if (!currentApp.value) throw new Error('No app loaded')
     isDeployingBackend.value = true
+    deployStatusMessage.value = 'Deploying...'
     try {
+      const info = await appsService.getDeployInfo(currentApp.value.id)
+      if (info.hasRequirements) {
+        deployStatusMessage.value = 'Installing packages…'
+      }
       const result = await appsService.deployBackend(currentApp.value.id)
       return result
     } finally {
       isDeployingBackend.value = false
+      deployStatusMessage.value = null
     }
   }
 
@@ -787,8 +788,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewWarning,
     publishApp,
     unpublishApp,
-    getDeployInfo,
     deployBackend,
+    deployStatusMessage,
     updateAppName,
     updateAppRunner,
     refreshFileTree,

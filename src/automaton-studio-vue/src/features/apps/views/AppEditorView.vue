@@ -420,17 +420,6 @@ function handleCloseTab(event: Event, path: string) {
 // Handle deploy backend
 async function handleDeployBackend() {
   try {
-    // Pre-check: warn the user if package installation will run (pip can take up to 2 minutes)
-    const info = await editorStore.getDeployInfo()
-    if (info.hasRequirements) {
-      toast.add({
-        severity: 'info',
-        summary: 'Installing Packages',
-        detail: 'requirements.txt detected — installing packages on the runner. This may take a moment...',
-        life: 120_000,
-      })
-    }
-
     const result = await editorStore.deployBackend()
     if (result.totalScripts === 0) {
       toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
@@ -844,16 +833,21 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             icon="pi pi-cloud-upload"
             @click="showPublishDialog = true"
           />
-          <Button
-            v-if="editorStore.hasBackendFolder"
-            label="Deploy Backend"
-            icon="pi pi-server"
-            outlined
-            severity="secondary"
-            :loading="editorStore.isDeployingBackend"
-            v-tooltip.bottom="'Push backend scripts to runner'"
-            @click="handleDeployBackend"
-          />
+          <div v-if="editorStore.hasBackendFolder" class="deploy-backend-wrapper">
+            <Button
+              label="Deploy Backend"
+              icon="pi pi-server"
+              outlined
+              severity="secondary"
+              :loading="editorStore.isDeployingBackend"
+              :disabled="editorStore.isDeployingBackend"
+              v-tooltip.bottom="'Push backend scripts to runner'"
+              @click="handleDeployBackend"
+            />
+            <span class="deploy-status-label" :class="{ 'deploy-status-label--hidden': !editorStore.deployStatusMessage }">
+              {{ editorStore.deployStatusMessage ?? '\u00a0' }}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1174,6 +1168,26 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 .settings-view {
   flex: 1;
   overflow: hidden;
+}
+
+/* Deploy backend button + inline status */
+.deploy-backend-wrapper {
+  position: relative;
+}
+
+.deploy-status-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--p-surface-400);
+  white-space: nowrap;
+}
+
+.deploy-status-label--hidden {
+  visibility: hidden;
 }
 
 /* Console view container */
