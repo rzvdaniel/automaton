@@ -430,6 +430,18 @@ a.click();
 URL.revokeObjectURL(url);
 ```
 
+⚠️ **PLATFORM SIZE LIMIT — always apply when returning files:**
+File contents travel through the runner↔server tunnel via SignalR. The current platform limit is **~35 MB of base64** (base64 adds ~33% overhead to raw bytes). Practical thresholds:
+- Audio MP3/WAV ≤ 25 MB raw → ✅ Fine
+- Short video, large images 25–35 MB raw → ⚠️ Borderline
+- Long video, raw recordings > 35 MB raw → ❌ Will fail with a size error
+
+**Always add a backend size guard for any file-producing action:**
+```python
+if len(output_bytes) > 25 * 1024 * 1024:  # 25 MB
+    return {"success": False, "data": None, "error": "Output file is too large (>25 MB). Try a lower quality setting, shorter duration, or smaller input."}
+```
+
 ## OUTPUT CONTRACT (every handle() must return):
 ```python
 {"success": bool, "data": <any Python value>, "error": str}
