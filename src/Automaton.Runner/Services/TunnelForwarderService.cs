@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Text;
 using System.Text.Json;
@@ -7,16 +8,20 @@ namespace Automaton.Runner.Console.Services;
 
 public class TunnelForwarderService
 {
-    private static readonly HttpClient _client = new()
-    {
-        BaseAddress = new Uri("http://localhost:8001"),
-        Timeout = TimeSpan.FromSeconds(25)
-    };
-
     private static readonly ILogger _logger = Log.ForContext<TunnelForwarderService>();
 
-    // SignalR default max message size is 32KB. Guard before sending to avoid silent failures.
-    private const int MaxBodyBytes = 30 * 1024;
+    private readonly HttpClient _client;
+    private readonly int _maxBodyBytes;
+
+    public TunnelForwarderService(IOptions<TunnelForwarderConfig> config)
+    {
+        _maxBodyBytes = config.Value.MaxBodyBytes;
+        _client = new HttpClient
+        {
+            BaseAddress = new Uri("http://localhost:8001"),
+            Timeout = TimeSpan.FromSeconds(config.Value.TimeoutSeconds)
+        };
+    }
 
     public async Task<TunnelResponse> ForwardAsync(TunnelRequest request)
     {
@@ -41,11 +46,11 @@ public class TunnelForwarderService
             tunnelResponse.StatusCode = (int)httpResponse.StatusCode;
             var bodyBytes = await httpResponse.Content.ReadAsByteArrayAsync();
 
-            if (bodyBytes.Length > MaxBodyBytes)
+            if (bodyBytes.Length > _maxBodyBytes)
             {
                 _logger.Warning("FastAPI response body too large ({Bytes} bytes) for {Path}", bodyBytes.Length, request.Path);
                 tunnelResponse.StatusCode = 413;
-                tunnelResponse.Error = $"Response body ({bodyBytes.Length} bytes) exceeds SignalR message limit ({MaxBodyBytes} bytes). Return less data or paginate.";
+                tunnelResponse.Error = $"Response body ({bodyBytes.Length} bytes) exceeds SignalR message limit ({_maxBodyBytes} bytes). Return less data or paginate.";
             }
             else
             {

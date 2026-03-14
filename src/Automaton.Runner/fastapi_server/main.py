@@ -7,6 +7,14 @@ import uvicorn
 
 app = FastAPI(title="Automaton Runner Backend")
 
+
+@app.get("/shutdown")
+async def shutdown():
+    """Graceful shutdown endpoint — called by the runner before relaunching with fresh credentials."""
+    import threading
+    threading.Timer(0.1, lambda: os._exit(0)).start()
+    return {"status": "shutting down"}
+
 # RUNNER_SCRIPTS_DIR must point to the root of the app data directory.
 # FastAPI resolves controller scripts at: {RUNNER_SCRIPTS_DIR}/{app_id}/backend/{controller_name}.py
 # Per-app pip packages live at:           {RUNNER_SCRIPTS_DIR}/{app_id}/packages/

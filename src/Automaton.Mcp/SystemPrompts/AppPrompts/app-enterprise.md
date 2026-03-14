@@ -400,47 +400,60 @@ export async function fetchPage(controllerName, action, page = 1, extraInputs = 
 // ❌ WRONG — flat object at top level; backend receives empty inputs
 const res = await automatonApi.executeController('users', 'users.list', { page: 1 });
 ```
+- ❌ Do NOT call server endpoints with raw `fetch` — always use `window.automatonApi.executeController`, which is injected by the platform
 
 ## DATA FORMAT:
 - **Frontend → backend**: pass all parameters inside `inputs: { ... }` — never at the top level of the options object
 - **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
 - **Frontend receives**: `res.data` is ready to use — no `JSON.parse()` needed
+- **Input values are always strings** (`Dictionary<string, string>`): pass numbers/booleans as string literals; encode binary data as base64
 
-## RETURNING FILES (base64 download pattern):
-When the app needs to return a file (converted audio, generated PDF, processed image) **without storing it on disk**:
+## RETURNING FILES (download URL pattern — always use for file outputs):
+When the app needs to return a file (audio, PDF, image, CSV, zip etc.), **always use the download URL pattern**. The runner uploads the file directly to the server — the browser then downloads it straight from the server without passing through SignalR. No size limit in practice.
 
-**Backend** — encode result as base64:
+**Backend** — upload to server, return a download URL:
 ```python
-import base64, io
+import os, io, requests
 
-def convert(self, inputs):
-    # ... process data into bytes_io (BytesIO) ...
-    encoded = base64.b64encode(bytes_io.getvalue()).decode('utf-8')
-    return {"success": True, "data": {"filename": "output.mp3", "content": encoded, "mime": "audio/mpeg"}, "error": ""}
+def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> str:
+    """Upload processed file to the Automaton server. Returns a direct download URL (expires in 15 min)."""
+    server_url = os.environ.get('AUTOMATON_API_URL', '').rstrip('/')
+    api_key = os.environ.get('AUTOMATON_API_KEY', '')
+    if not server_url or not api_key:
+        raise RuntimeError("AUTOMATON_API_URL and AUTOMATON_API_KEY must be set in the runner environment.")
+    resp = requests.post(
+        f"{server_url}/api/runner/files",
+        headers={"X-API-Key": api_key},
+        files={"file": (filename, io.BytesIO(output_bytes), mime_type)},
+        timeout=60,
+        verify=False  # Runner may use a self-signed cert in dev/on-prem
+    )
+    resp.raise_for_status()
+    return resp.json()["downloadUrl"]
+
+def convert(action_name, inputs):
+    # ... produce output_bytes (bytes) ...
+    download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
+    return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
 ```
 
-**Frontend** — decode and trigger browser download:
+**Frontend** — trigger download from the returned URL:
 ```javascript
 const res = await callController('converter', 'converter.convert', { ... });
-const { filename, content, mime } = res;
-const blob = new Blob([Uint8Array.from(atob(content), c => c.charCodeAt(0))], { type: mime });
-const url = URL.createObjectURL(blob);
-const a = Object.assign(document.createElement('a'), { href: url, download: filename });
-a.click();
-URL.revokeObjectURL(url);
+if (res.success) {
+    const { download_url, filename } = res.data;
+    const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
 ```
 
-⚠️ **PLATFORM SIZE LIMIT — always apply when returning files:**
-File contents travel through the runner↔server tunnel via SignalR. The current platform limit is **~35 MB of base64** (base64 adds ~33% overhead to raw bytes). Practical thresholds:
-- Audio MP3/WAV ≤ 25 MB raw → ✅ Fine
-- Short video, large images 25–35 MB raw → ⚠️ Borderline
-- Long video, raw recordings > 35 MB raw → ❌ Will fail with a size error
-
-**Always add a backend size guard for any file-producing action:**
-```python
-if len(output_bytes) > 25 * 1024 * 1024:  # 25 MB
-    return {"success": False, "data": None, "error": "Output file is too large (>25 MB). Try a lower quality setting, shorter duration, or smaller input."}
-```
+**Rules:**
+- ✅ Always use this pattern for any file the user should download
+- ✅ Works for audio, video, PDFs, images, CSVs, zip archives — no size limit
+- ✅ The download URL expires in 15 minutes and is single-use
+- ❌ Do NOT use base64 for **output** files — use the upload/download URL pattern instead
 
 ## OUTPUT CONTRACT (every handle() must return):
 ```python

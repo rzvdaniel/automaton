@@ -260,6 +260,7 @@ public class Program
             .ConfigureServices((context, services) =>
             {
                 services.Configure<AppConfig>(context.Configuration.GetSection("AppConfig"));
+                services.Configure<TunnelForwarderConfig>(context.Configuration.GetSection("TunnelForwarder"));
 
                 // Register configuration services
                 services.AddSingleton<ConfigurationService>();

@@ -108,6 +108,7 @@ public class RunnerHostService
 
         try
         {
+            await StartFastApiProcessAsync();
             await WaitForFastApiAsync();
 
             var connected = await hubService.ConnectAsync();
@@ -547,6 +548,9 @@ public class RunnerHostService
     {
         WriteLine("?? Starting runner...");
         WriteLine();
+
+        await StartFastApiProcessAsync();
+        await WaitForFastApiAsync();
 
         // Attempt to connect to hub with better error handling
         WriteLine("?? Establishing connection to server...");
@@ -1136,6 +1140,82 @@ public class RunnerHostService
         }
     }
 
+    private static bool IsRunningInContainer =>
+        string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase)
+        || File.Exists("/.dockerenv");
+
+    /// <summary>
+    /// Starts the local FastAPI backend process on non-container environments.
+    /// FastAPI inherits the runner process environment — AUTOMATON_API_URL, AUTOMATON_API_KEY,
+    /// and RUNNER_SCRIPTS_DIR are standard env vars set by the operator.
+    /// In Docker, this is a no-op — the entrypoint script already starts FastAPI.
+    /// </summary>
+    private async Task StartFastApiProcessAsync()
+    {
+        if (IsRunningInContainer)
+        {
+            logger.Debug("Running in container — FastAPI managed by entrypoint, skipping launch");
+            return;
+        }
+
+        // Ask any running FastAPI instance (from a previous runner run) to shut down,
+        // then wait until the port is actually free before launching the new one.
+        // This is reliable across process restarts — no PID file or static field needed.
+        try
+        {
+            using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            await probe.GetAsync("http://localhost:8001/shutdown");
+
+            // Poll until the port is released (connection refused = old process exited)
+            var stopDeadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < stopDeadline)
+            {
+                try
+                {
+                    using var check = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+                    await check.GetAsync("http://localhost:8001/health");
+                    await Task.Delay(200); // still bound — keep waiting
+                }
+                catch
+                {
+                    break; // connection refused — port is free
+                }
+            }
+        }
+        catch { /* not running — fine */ }
+
+        var mainPy = Path.Combine(AppContext.BaseDirectory, "fastapi_server", "main.py");
+        if (!File.Exists(mainPy))
+        {
+            logger.Warning("FastAPI main.py not found at {Path} — skipping auto-launch", mainPy);
+            WriteLine($"[!] FastAPI main.py not found at {mainPy} — skipping auto-launch.");
+            return;
+        }
+
+        // FastAPI inherits the runner's process environment: AUTOMATON_API_URL, AUTOMATON_API_KEY,
+        // and RUNNER_SCRIPTS_DIR are all standard env vars — no per-launch injection needed.
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "python",
+            Arguments = $"\"{mainPy}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(mainPy)!
+        };
+
+        try
+        {
+            var proc = System.Diagnostics.Process.Start(psi);
+            logger.Information("FastAPI backend launched (PID {Pid})", proc?.Id);
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to auto-launch FastAPI backend — start it manually");
+            WriteLine($"[!] Failed to auto-launch FastAPI backend: {ex.Message}");
+            WriteLine("[!] Start it manually: python fastapi_server/main.py");
+        }
+    }
+
     /// <summary>
     /// Waits for the local FastAPI backend to become ready before connecting to the server hub.
     /// In Docker, FastAPI starts alongside the .NET runner; this health check ensures it's up.
@@ -1145,6 +1225,7 @@ public class RunnerHostService
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         var deadline = DateTime.UtcNow.AddSeconds(maxWaitSeconds);
+        var attempt = 0;
         while (DateTime.UtcNow < deadline)
         {
             try
@@ -1152,13 +1233,23 @@ public class RunnerHostService
                 var response = await client.GetAsync("http://localhost:8001/health");
                 if (response.IsSuccessStatusCode)
                 {
+                    if (attempt > 0) WriteLine(); // newline after the dots
                     logger.Information("FastAPI backend ready");
                     return;
                 }
             }
             catch { /* not ready yet */ }
+
+            if (attempt == 0)
+                Write("⏳ Waiting for FastAPI backend");
+            else
+                Write(".");
+
+            attempt++;
             await Task.Delay(1000);
         }
+
+        WriteLine(); // newline after the dots
         logger.Warning("FastAPI backend did not become ready within {Seconds}s - tunnel will be unavailable", maxWaitSeconds);
         WriteLine($"[!] FastAPI backend not ready after {maxWaitSeconds}s. App controller execution will not work.");
         WriteLine("[!] Run: pip install fastapi \"uvicorn[standard]\" and restart.");

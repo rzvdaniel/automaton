@@ -159,17 +159,24 @@ services.AddRazorPages();
 services.AddServerSideBlazor();
 
 // Configure SignalR with extended timeouts for long-running script execution
+services.Configure<SignalRConfig>(applicationBuilder.Configuration.GetSection("SignalR"));
+var signalRConfig = applicationBuilder.Configuration.GetSection("SignalR").Get<SignalRConfig>() ?? new SignalRConfig();
 services.AddSignalR(options =>
 {
     // Client timeout - how long the server waits before considering a client disconnected
     // Default is 30 seconds, increased for long-running Python scripts with HTTP calls
-    options.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(signalRConfig.ClientTimeoutIntervalMinutes);
     
     // Keep-alive interval - how often the server sends pings to clients
-    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.KeepAliveInterval = TimeSpan.FromSeconds(signalRConfig.KeepAliveIntervalSeconds);
     
     // Handshake timeout - how long to wait for initial handshake
-    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(signalRConfig.HandshakeTimeoutSeconds);
+    
+    // App controller responses are small JSON payloads — files are now uploaded by the runner directly
+    // to /api/runner/files and the browser downloads them via GET /api/apps/files/{token}, so large
+    // binary content never travels through SignalR. 1 MB is generous for any JSON response.
+    options.MaximumReceiveMessageSize = signalRConfig.MaximumReceiveMessageSizeBytes;
     
     // Enable detailed errors in development for debugging
     options.EnableDetailedErrors = applicationBuilder.Environment.IsDevelopment();
