@@ -19,9 +19,12 @@ Pull and run the runner with a single command:
 docker run -d \
   --name automaton-runner \
   --restart unless-stopped \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_your_key_here \
-  -e AUTOMATON_RUNNER_NAME=My-Local-Runner \
+  -e AUTOMATON_RUNNER_NAME=My-Runner \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -53,9 +56,9 @@ If you prefer using the Docker Desktop graphical interface instead of the comman
 4. Configure the following:
    - **Container name**: `automaton-runner`
    - **Environment variables** (click **+ Add** for each):
-     - `AUTOMATON_SERVER_URL` = `https://automaton.monster`
+     - `AUTOMATON_SERVER_URL` = `https://api.automaton.monster`
      - `AUTOMATON_API_KEY` = `ak_your_key_here`
-     - `AUTOMATON_RUNNER_NAME` = `My-Local-Runner`
+     - `AUTOMATON_RUNNER_NAME` = `My-Runner`
 5. Click **Run**
 
 ### 3. Verify Connection
@@ -94,9 +97,9 @@ For easier configuration management, create a `.env` file:
 ```bash
 # Create .env file
 cat > .env << EOF
-AUTOMATON_SERVER_URL=https://automaton.monster
+AUTOMATON_SERVER_URL=https://api.automaton.monster
 AUTOMATON_API_KEY=ak_your_key_here
-AUTOMATON_RUNNER_NAME=My-Local-Runner
+AUTOMATON_RUNNER_NAME=My-Runner
 EOF
 ```
 
@@ -109,6 +112,9 @@ docker run -d \
   --name automaton-runner \
   --restart unless-stopped \
   --env-file .env \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -118,9 +124,12 @@ docker run -d \
 docker run -d \
   --name automaton-runner \
   --restart unless-stopped \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_your_key_here \
-  -e AUTOMATON_RUNNER_NAME=My-Local-Runner \
+  -e AUTOMATON_RUNNER_NAME=My-Runner \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -154,6 +163,9 @@ docker run -d \
   -e AUTOMATON_SERVER_URL=http://host.docker.internal:5091 \
   -e AUTOMATON_API_KEY=ak_your_dev_key \
   -e AUTOMATON_RUNNER_NAME=Local-Dev-Runner \
+  -v automaton-runner-dev-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-dev-logs:/app/logs \
+  -v automaton-runner-dev-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -170,6 +182,9 @@ docker run -d \
   --add-host=host.docker.internal:host-gateway \
   -e AUTOMATON_SERVER_URL=http://host.docker.internal:5091 \
   -e AUTOMATON_API_KEY=ak_your_key \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -229,6 +244,9 @@ docker run -d \
   --name automaton-runner \
   --restart unless-stopped \
   --env-file .env \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -237,20 +255,27 @@ docker run -d \
 For easier management, create a `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   runner:
     image: rzvdaniel/automaton-runner:latest
     container_name: automaton-runner
     restart: unless-stopped
     environment:
-      - AUTOMATON_SERVER_URL=https://automaton.monster
+      - AUTOMATON_SERVER_URL=https://api.automaton.monster
       - AUTOMATON_API_KEY=ak_your_key_here
-      - AUTOMATON_RUNNER_NAME=My-Production-Runner
+      - AUTOMATON_RUNNER_NAME=My-Runner
+    volumes:
+      - runner-config:/home/automaton/.config/AutomatonRunner
+      - runner-logs:/app/logs
+      - runner-data:/app/data
     # Uncomment for local dev server
     # extra_hosts:
     #   - "host.docker.internal:host-gateway"
+
+volumes:
+  runner-config:
+  runner-logs:
+  runner-data:
 ```
 
 Then manage with simple commands:
@@ -280,31 +305,42 @@ You can run multiple runner containers on the same machine:
 # Runner 1
 docker run -d \
   --name automaton-runner-1 \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  --restart unless-stopped \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_key_1 \
   -e AUTOMATON_RUNNER_NAME=Runner-1 \
+  -v automaton-runner-1-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-1-logs:/app/logs \
+  -v automaton-runner-1-data:/app/data \
   rzvdaniel/automaton-runner:latest
 
 # Runner 2
 docker run -d \
   --name automaton-runner-2 \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  --restart unless-stopped \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_key_2 \
   -e AUTOMATON_RUNNER_NAME=Runner-2 \
+  -v automaton-runner-2-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-2-logs:/app/logs \
+  -v automaton-runner-2-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
 ### Volume Mounting (For Persistent Data)
 
-If your workflows need to access files on the host:
+The runner requires three named volumes for data persistence. If your workflows also need to read files from the host, mount an additional path alongside the required volumes:
 
 ```bash
 docker run -d \
   --name automaton-runner \
   --restart unless-stopped \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_your_key \
-  -v /host/data:/app/data \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
+  -v /host/shared:/app/shared \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -318,8 +354,11 @@ docker run -d \
   --restart unless-stopped \
   --memory="2g" \
   --cpus="2.0" \
-  -e AUTOMATON_SERVER_URL=https://automaton.monster \
+  -e AUTOMATON_SERVER_URL=https://api.automaton.monster \
   -e AUTOMATON_API_KEY=ak_your_key \
+  -v automaton-runner-config:/home/automaton/.config/AutomatonRunner \
+  -v automaton-runner-logs:/app/logs \
+  -v automaton-runner-data:/app/data \
   rzvdaniel/automaton-runner:latest
 ```
 
@@ -336,6 +375,7 @@ The runner image includes:
   - Databases: `pymysql`, `psycopg2-binary`
   - Cloud: `boto3` (AWS SDK)
   - Utilities: `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2`
+- **Pre-installed system packages**: `ffmpeg`, `ghostscript`, `imagemagick`, `wkhtmltopdf`, `poppler-utils`, `pandoc`
 
 Image size: ~500-600MB
 

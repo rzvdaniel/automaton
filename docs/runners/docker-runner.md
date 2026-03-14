@@ -130,9 +130,11 @@ docker compose -f docker-compose.dev.yml logs runner-dev
 
 ### SSL/TLS certificate errors
 
-For local development with self-signed certificates, you may need to:
-1. Add the certificate to the container's trust store, or
-2. Configure the runner to skip certificate validation (development only)
+For local development with a self-signed ASP.NET developer certificate, add this to your `.env` or `-e` flag:
+```
+DOTNET_ENVIRONMENT=Development
+```
+**Do not set this in production** — it disables certificate validation.
 
 ### API key rejected
 
@@ -177,31 +179,37 @@ The runner image comes with commonly-used Python packages pre-installed:
 | **Databases** | `pymysql`, `psycopg2-binary` |
 | **Cloud** | `boto3` (AWS SDK) |
 | **Utilities** | `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2` |
+| **System Binaries** | `ffmpeg`, `ghostscript`, `imagemagick`, `wkhtmltopdf`, `poppler-utils`, `pandoc` |
 
 ### Installing Additional Packages
 
 If your custom step needs a package that's not pre-installed, you have several options:
 
-**Option 1: Install at the start of your step (temporary)**
-```python
-import subprocess
-import sys
+**Option 1: `requirements.txt` (pip packages — recommended)**
 
-# Install package if not available
-try:
-    import some_package
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "some_package"])
-    import some_package
-
-# Your step code here...
+Create `backend/requirements.txt` in your app with one package per line:
 ```
+pydub==0.25.1
+your-package==1.0.0
+```
+Deploy the backend — the runner installs these to a **persistent volume** so they survive container restarts and image upgrades. The deploy response includes pip output so you can confirm each package installed correctly.
 
-**Option 2: Extend the Docker image (permanent)**
+**❗ Never install packages inside controller code.** Do not use `subprocess`, `pip.main()`, or any runtime pip call in Python scripts.
+
+**Option 2: `system-requirements.txt` (apt packages — Docker only)**
+
+For system binaries not installable via pip (tesseract, libpq, etc.), create `backend/system-requirements.txt`:
+```
+tesseract-ocr
+libpq-dev
+```
+The runner installs these via `apt-get` at deploy time and reinstalls them automatically on container restart. On non-Docker runners this is skipped with a warning.
+
+**Option 3: Extend the Docker image (permanent)**
 
 Create a custom Dockerfile:
 ```dockerfile
-FROM automaton-runner:latest
+FROM rzvdaniel/automaton-runner:latest
 
 USER root
 RUN pip install --no-cache-dir \
@@ -215,7 +223,7 @@ Build and use your custom image:
 docker build -t my-automaton-runner .
 ```
 
-**Option 3: Request package addition**
+**Option 4: Request package addition**
 
 If a package is commonly needed, consider requesting it be added to the base image by opening an issue or PR.
 
