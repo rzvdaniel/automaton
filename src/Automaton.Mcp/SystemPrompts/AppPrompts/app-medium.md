@@ -213,7 +213,7 @@ After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
 4. Only `write_file` when rewriting most of the file
 
 ## BACKEND CONTROLLERS — handle() DISPATCH:
-Each controller file handles one resource. Use a class per resource with a `handle()` entry point.
+Each controller file handles one resource. Use a class with a `handle()` entry point that dispatches by action name.
 
 ```python
 import sqlite3, os
@@ -246,42 +246,34 @@ class UsersController:
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────
-REGISTRY = {
-    'users': UsersController(),
-}
+_controller = UsersController()
 
 def handle(action_name: str, inputs: dict) -> dict:
-    parts = action_name.split('.', 1)
-    if len(parts) != 2:
-        return {"success": False, "data": None, "error": f"Invalid action '{action_name}'. Expected 'resource.method'."}
-    controller_key, method_name = parts
-    controller = REGISTRY.get(controller_key)
-    if controller is None:
-        return {"success": False, "data": None, "error": f"Unknown controller '{controller_key}'"}
-    method = getattr(controller, method_name, None)
+    method = getattr(_controller, action_name, None)
     if method is None:
-        return {"success": False, "data": None, "error": f"Unknown action '{method_name}' on '{controller_key}'"}
+        available = [m for m in dir(_controller) if not m.startswith('_')]
+        return {"success": False, "data": None, "error": f"Unknown action '{action_name}'. Available: {available}"}
     return method(inputs)
 ```
 
-**Action naming convention**: `resource.method` → e.g. `users.list`, `users.create`
+**Action naming**: flat method name → e.g. `'list'`, `'create'`, `'delete'`
 
 ## CALLING A CONTROLLER (frontend):
 ```javascript
 // ✅ CORRECT — always wrap inputs inside { inputs: { ... } }
 export async function listUsers() {
-    const res = await automatonApi.executeController('users', 'users.list', { inputs: {} });
+    const res = await automatonApi.executeController('users', 'list', { inputs: {} });
     if (!res.success) throw new Error(res.error);
     return res.data;
 }
 export async function createUser(name, email) {
-    const res = await automatonApi.executeController('users', 'users.create', { inputs: { name, email } });
+    const res = await automatonApi.executeController('users', 'create', { inputs: { name, email } });
     if (!res.success) throw new Error(res.error);
     return res.data;
 }
 
 // ❌ WRONG — flat object at top level; backend receives empty inputs
-const res = await automatonApi.executeController('users', 'users.create', { name, email });
+const res = await automatonApi.executeController('users', 'create', { name, email });
 ```
 `res.success` (bool), `res.data` (any JS value), `res.error` (string)
 
@@ -321,7 +313,7 @@ def convert(action_name, inputs):
 
 **Frontend** — trigger download from the returned URL:
 ```javascript
-const res = await automatonApi.executeController('converter', 'converter.convert', { inputs: { ... } });
+const res = await automatonApi.executeController('converter', 'convert', { inputs: { ... } });
 if (res.success) {
     const { download_url, filename } = res.data;
     const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
@@ -345,7 +337,7 @@ if (res.success) {
 ## NAMING:
 - Controller files: `snake_case.py`
 - File paths: forward slashes (`styles/main.css`)
-- Action names: `resource.method` (`users.list`, `products.create`)
+- Action names: flat method name (`list`, `create`, `delete`)
 
 ## RULES:
 1. New apps: create immediately, no pre-reading

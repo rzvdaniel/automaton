@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Automaton.Studio.Server.Models;
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -39,7 +41,7 @@ public class DeployBackendRequest
 
 public class AppControllerActionRequest
 {
-    public Dictionary<string, string>? Inputs { get; set; }
+    public Dictionary<string, JsonElement>? Inputs { get; set; }
     public List<string>? RunnerNames { get; set; }
 }
 

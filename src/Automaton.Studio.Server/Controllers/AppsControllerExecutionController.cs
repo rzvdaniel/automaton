@@ -116,7 +116,7 @@ public class AppsControllerExecutionController : ControllerBase
                 app,
                 controllerName,
                 actionName,
-                request.Inputs ?? new Dictionary<string, string>(),
+                request.Inputs ?? new Dictionary<string, JsonElement>(),
                 request.RunnerNames,
                 cancellationToken);
 
@@ -222,7 +222,7 @@ public class AppsControllerExecutionController : ControllerBase
                 app,
                 controllerName,
                 actionName,
-                request.Inputs ?? new Dictionary<string, string>(),
+                request.Inputs ?? new Dictionary<string, JsonElement>(),
                 request.RunnerNames,
                 cancellationToken);
 

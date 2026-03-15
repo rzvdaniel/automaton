@@ -279,25 +279,17 @@ class ProductsController:
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────
-REGISTRY = {
-    'products': ProductsController(),
-}
+_controller = ProductsController()
 
 def handle(action_name: str, inputs: dict) -> dict:
-    parts = action_name.split('.', 1)
-    if len(parts) != 2:
-        return {"success": False, "data": None, "error": f"Invalid action '{action_name}'. Expected 'resource.method'."}
-    controller_key, method_name = parts
-    controller = REGISTRY.get(controller_key)
-    if controller is None:
-        return {"success": False, "data": None, "error": f"Unknown controller '{controller_key}'"}
-    method = getattr(controller, method_name, None)
+    method = getattr(_controller, action_name, None)
     if method is None:
-        return {"success": False, "data": None, "error": f"Unknown action '{method_name}' on '{controller_key}'"}
+        available = [m for m in dir(_controller) if not m.startswith('_')]
+        return {"success": False, "data": None, "error": f"Unknown action '{action_name}'. Available: {available}"}
     return method(inputs)
 ```
 
-**Action naming**: `resource.method` → `products.list`, `products.create`, `orders.get`
+**Action naming**: flat method name → e.g. `'list'`, `'create'`, `'delete'`
 
 ## CALLING CONTROLLERS (frontend js/api.js):
 ```javascript
@@ -312,11 +304,11 @@ export async function callController(controllerName, action, inputs = {}) {
 // features/products/products-list.js
 import { callController } from '../../js/api.js';
 export async function loadProducts(page = 1) {
-    return callController('products', 'products.list', { page });
+    return callController('products', 'list', { page });
 }
 
 // ❌ WRONG — passing inputs flat at top level; backend receives empty {}
-const res = await automatonApi.executeController('products', 'products.list', { page: 1 });
+const res = await automatonApi.executeController('products', 'list', { page: 1 });
 ```
 
 ## DATA FORMAT:
@@ -355,7 +347,7 @@ def convert(action_name, inputs):
 
 **Frontend** — trigger download from the returned URL:
 ```javascript
-const res = await callController('converter', 'converter.convert', { ... });
+const res = await callController('converter', 'convert', { ... });
 if (res.success) {
     const { download_url, filename } = res.data;
     const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
@@ -380,7 +372,7 @@ if (res.success) {
 - Controller files: `snake_case.py` (one per resource)
 - Feature folders: `lowercase-hyphen/`
 - File paths: forward slashes
-- Action names: `resource.method`
+- Action names: flat method name (`list`, `create`, `delete`)
 
 ## RULES:
 1. Always `list_files` before modifying anything

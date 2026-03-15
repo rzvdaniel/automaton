@@ -131,7 +131,7 @@ public class AppsControllerExecutionService
         PublishedAppInfo app,
         string controllerName,
         string actionName,
-        Dictionary<string, string> inputs,
+        Dictionary<string, JsonElement> inputs,
         List<string>? runnerNames,
         CancellationToken cancellationToken)
     {
@@ -232,7 +232,7 @@ public class AppsControllerExecutionService
         Guid appId,
         string controllerName,
         string actionName,
-        Dictionary<string, string> inputs,
+        Dictionary<string, JsonElement> inputs,
         IEnumerable<Runner> runners,
         CancellationToken cancellationToken,
         List<string> logs)

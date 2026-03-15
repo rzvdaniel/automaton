@@ -361,23 +361,13 @@ class CustomersController:
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────
-REGISTRY = {
-    'customers': CustomersController(),
-    # Add more: 'deals': DealsController(), etc.
-}
+_controller = CustomersController()
 
 def handle(action_name: str, inputs: dict) -> dict:
-    parts = action_name.split('.', 1)
-    if len(parts) != 2:
-        return {"success": False, "data": None, "error": f"Invalid action '{action_name}'. Expected 'domain.method'."}
-    domain_key, method_name = parts
-    controller = REGISTRY.get(domain_key)
-    if controller is None:
-        return {"success": False, "data": None, "error": f"Unknown domain '{domain_key}'. Available: {list(REGISTRY.keys())}"}
-    method = getattr(controller, method_name, None)
+    method = getattr(_controller, action_name, None)
     if method is None:
-        available = [m for m in dir(controller) if not m.startswith('_')]
-        return {"success": False, "data": None, "error": f"Unknown method '{method_name}' on '{domain_key}'. Available: {available}"}
+        available = [m for m in dir(_controller) if not m.startswith('_')]
+        return {"success": False, "data": None, "error": f"Unknown action '{action_name}'. Available: {available}"}
     return method(inputs)
 ```
 
@@ -398,7 +388,7 @@ export async function fetchPage(controllerName, action, page = 1, extraInputs = 
 }
 
 // ❌ WRONG — flat object at top level; backend receives empty inputs
-const res = await automatonApi.executeController('users', 'users.list', { page: 1 });
+const res = await automatonApi.executeController('customers', 'list', { page: 1 });
 ```
 
 ## DATA FORMAT:
@@ -437,7 +427,7 @@ def convert(action_name, inputs):
 
 **Frontend** — trigger download from the returned URL:
 ```javascript
-const res = await callController('converter', 'converter.convert', { ... });
+const res = await callController('converter', 'convert', { ... });
 if (res.success) {
     const { download_url, filename } = res.data;
     const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
