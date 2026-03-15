@@ -94,7 +94,8 @@ export function buildPreviewApiScript(appId: string, baseUrl: string, token: str
     executeFlow: executeFlow,
     executeController: executeController,
     getAppId: function() { return APP_ID; },
-    getAppSlug: function() { return null; }
+    getAppSlug: function() { return null; },
+    getBaseUrl: function() { return BASE_URL; }
   };
 
   window.addEventListener('error', function(event) {

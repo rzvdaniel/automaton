@@ -169,7 +169,7 @@ onUnmounted(() => {
             :key="editorStore.previewUrl"
             :src="editorStore.previewUrl"
             class="preview-iframe"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
             title="App Preview"
           />
         </div>

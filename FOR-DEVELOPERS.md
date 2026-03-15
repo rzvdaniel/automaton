@@ -197,7 +197,31 @@ In light mode, this looked fine. In dark mode, white text on a white background 
 
 **Lesson:** Theme support isn't just "add a dark mode toggle." It's a systemic commitment to never making assumptions about colors. It's tempting to hardcode `white` or `#f5f5f5`, but don't. Your future self in dark mode will thank you.
 
-### 2. Nullable Reference Types in C#
+### 2. Iframe Sandbox and File Downloads
+
+**The Pitfall:**
+Apps and their preview are rendered inside a sandboxed `<iframe>`. When a published app tries to trigger a file download using a programmatic `<a download>` click, the browser silently discards it — no error, no network request, no download. The execution succeeds (200 OK from the server), the token is created and stored in `IMemoryCache`, the toast fires — but the file never arrives.
+
+The root cause: the `sandbox` attribute did not include `allow-downloads`.
+
+```html
+<!-- ❌ Download clicks are silently blocked -->
+<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" />
+
+<!-- ✅ Downloads work -->
+<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads" />
+```
+
+**The Fix:**
+Add `allow-downloads` to the `sandbox` attribute in:
+- `WebAppView.vue` (published app iframe)
+- `PreviewOverlay.vue` (editor preview iframe)
+
+**Why it's subtle:** There is no console error. The JS runs fine. The server-side token is created and consumed correctly. The only symptom is that the download never starts. This makes it easy to spend a long time debugging the backend (token expiry, IMemoryCache, URL generation) when the problem is entirely in the frontend sandbox permissions.
+
+**Lesson:** When apps need to trigger file downloads, always include `allow-downloads` in the iframe `sandbox`. Any time you add a new sandbox capability to apps, check both `WebAppView.vue` and `PreviewOverlay.vue`.
+
+### 3. Nullable Reference Types in C#
 
 **The Pitfall:**
 We enabled nullable reference types (`#nullable enable`) across the backend, but our validation and null-checking were inconsistent. The compiler warned us about potential null dereferences, and we sometimes dismissed them.

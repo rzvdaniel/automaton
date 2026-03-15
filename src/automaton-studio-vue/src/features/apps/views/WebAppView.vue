@@ -121,7 +121,8 @@ async function loadApp() {
     executeFlow: executeFlow,
     executeController: executeController,
     getAppId: function() { return null; },
-    getAppSlug: function() { return APP_SLUG; }
+    getAppSlug: function() { return APP_SLUG; },
+    getBaseUrl: function() { return BASE_URL; }
   };
 
   console.log('[AutomatonAPI] Ready!');
@@ -268,7 +269,7 @@ function goHome() {
       v-else
       ref="iframeRef"
       class="app-iframe"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
       title="Published App"
     />
   </div>

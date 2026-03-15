@@ -132,60 +132,18 @@ sqlite3                            # Built-in, always available
 ```
 # backend/requirements.txt
 pydub==0.25.1
-audioop-lts  # required for pydub on Python 3.13+ (audioop removed from stdlib)
-# your-extra-package==1.0.0
+ffmpeg-python==0.2.0
 ```
 The runner installs these to a **persistent volume** at deploy time — they survive container restarts and recreates.
-After writing `requirements.txt`, remind the user to click **"Deploy Backend"**. The runner captures pip install output and includes it in the deploy response so the user can confirm each package installed correctly.
+After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
 
-**❗ Never install packages inside controller code.** Do not use `subprocess`, `pip.main()`, or any runtime pip call in Python scripts. `requirements.txt` is the only correct mechanism — packages are installed once at deploy time, not on every request.
-
-**⚠️ System binaries** — not all are pre-installed on every runner type. Use the correct approach for each:
-
-**FFmpeg** (audio/video with `pydub`): pre-installed on Docker runners. For non-Docker (Windows/bare-metal) runners, use `static-ffmpeg` which bundles a prebuilt binary and works everywhere:
-```
-# backend/requirements.txt
-pydub==0.25.1
-audioop-lts  # required for pydub on Python 3.13+ (audioop removed from stdlib)
-static-ffmpeg==2.5
-```
-```python
-# static_ffmpeg.add_paths() must be called before pydub is imported
-import static_ffmpeg
-print("[startup] Configuring static-ffmpeg...")
-static_ffmpeg.add_paths()  # injects ffmpeg binary into PATH
-print("[startup] static-ffmpeg ready")
-from pydub import AudioSegment
-print("[startup] pydub ready")
-```
-
-**Pandoc** (document conversion): pre-installed on Docker runners. For non-Docker runners, use `pypandoc` which can download pandoc automatically:
-```
-# backend/requirements.txt
-pypandoc==1.13
-```
-```python
-import pypandoc
-pypandoc.ensure_pandoc_installed()  # downloads pandoc binary if not present
-```
-
-**Ghostscript, ImageMagick, poppler-utils**: pre-installed on Docker runners. No pip equivalent — not available on non-Docker runners without manual host installation.
-
-**Other apt packages** (Docker runners only): create `backend/system-requirements.txt` with one package name per line. The runner installs these via `apt-get` at deploy time and reinstalls them automatically on container restart:
-```
-# backend/system-requirements.txt
-# One apt package name per line — Docker runners only, warning-skipped on non-Docker
-tesseract-ocr
-libpq-dev
-```
+**⚠️ NOT available as binaries**: `ffmpeg`, `libav`. Audio conversion with `pydub` requires the `ffmpeg` binary — if not installed, tell the user clearly instead of writing code that will fail silently.
 
 ## FILE STRUCTURE (always use this):
 ```
 ├─ index.html           # Entry point
 ├─ backend/
-│  ├─ controller.py             # (optional) Python controller
-│  ├─ requirements.txt          # (optional) Extra pip packages
-│  └─ system-requirements.txt  # (optional) Extra apt packages — Docker only
+│  └─ controller.py     # (optional) Python controller
 ├─ styles/
 │  └─ main.css          # All styles
 └─ js/
@@ -217,10 +175,10 @@ import os
 
 def handle(action_name: str, inputs: dict) -> dict:
     try:
-        if action_name == 'users.list':
+        if action_name == 'list':
             data = [{"id": 1, "name": "Alice"}]
             return {"success": True, "data": data, "error": ""}
-        elif action_name == 'users.create':
+        elif action_name == 'create':
             name = inputs.get('name', '')
             record = {"id": 2, "name": name}
             return {"success": True, "data": record, "error": ""}
@@ -230,27 +188,23 @@ def handle(action_name: str, inputs: dict) -> dict:
         return {"success": False, "data": None, "error": str(e)}
 ```
 
-**Action naming**: always use `controller.method` format — e.g. `users.list`, `users.create`, `converter.convert`.
-
 ## CALLING A CONTROLLER (frontend):
 ```javascript
-// ✅ CORRECT — action name is always 'controller.method'
-const result = await automatonApi.executeController('users', 'users.list', { inputs: { page: 1 } });
+// ✅ CORRECT — always wrap inputs inside { inputs: { ... } }
+const result = await automatonApi.executeController('users', 'list', { inputs: { page: 1 } });
 if (result.success) {
     const data = result.data;  // already a JS value, no parsing needed
 }
 
 // ❌ WRONG — flat object is silently ignored; backend receives empty inputs
-const result = await automatonApi.executeController('users', 'users.list', { page: 1 });
+const result = await automatonApi.executeController('users', 'list', { page: 1 });
 ```
 `result.success` (bool), `result.data` (any JS value), `result.error` (string)
-- ❌ Do NOT call server endpoints with raw `fetch` — always use `window.automatonApi.executeController`, which is injected by the platform
 
 ## DATA FORMAT:
 - **Frontend → backend**: pass all parameters inside `inputs: { ... }` — never at the top level of the options object
 - **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
 - **Frontend receives**: `result.data` is ready to use — no `JSON.parse()` needed
-- **Input values are always strings** (`Dictionary<string, string>`): pass numbers/booleans as string literals; encode binary data as base64
 
 ## RETURNING FILES (download URL pattern — always use for file outputs):
 When the app needs to return a file (audio, PDF, image, CSV, zip etc.), **always use the download URL pattern**. The runner uploads the file directly to the server — the browser then downloads it straight from the server without passing through SignalR. No size limit in practice.
@@ -261,10 +215,10 @@ import os, io, requests
 
 def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> str:
     """Upload processed file to the Automaton server. Returns a direct download URL (expires in 15 min)."""
-    server_url = os.environ.get('AUTOMATON_SERVER_URL', '').rstrip('/')
+    server_url = os.environ.get('AUTOMATON_API_URL', '').rstrip('/')
     api_key = os.environ.get('AUTOMATON_API_KEY', '')
     if not server_url or not api_key:
-        raise RuntimeError("AUTOMATON_SERVER_URL and AUTOMATON_API_KEY must be set in the runner environment.")
+        raise RuntimeError("AUTOMATON_API_URL and AUTOMATON_API_KEY must be set in the runner environment.")
     resp = requests.post(
         f"{server_url}/api/runner/files",
         headers={"X-API-Key": api_key},
@@ -275,24 +229,18 @@ def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> st
     resp.raise_for_status()
     return resp.json()["downloadUrl"]
 
-def handle(action_name: str, inputs: dict) -> dict:
-    if action_name == 'converter.convert':
-        # ... produce output_bytes (bytes) ...
-        download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
-        return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
-    return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+def convert(action_name, inputs):
+    # ... produce output_bytes (bytes) ...
+    download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
+    return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
 ```
 
 **Frontend** — trigger download from the returned URL:
 ```javascript
-const res = await automatonApi.executeController('converter', 'converter.convert', { inputs: { ... } });
+const res = await automatonApi.executeController('converter', 'convert', { inputs: { ... } });
 if (res.success) {
     const { download_url, filename } = res.data;
-    // ⚠️ Always use pathname only — the server may build the URL with an internal hostname
-    // (e.g. host.docker.internal) that the browser cannot resolve. The path is identical
-    // on the browser's origin, so this works for local, Docker, and production deployments.
-    const href = new URL(download_url).pathname;
-    const a = Object.assign(document.createElement('a'), { href, download: filename });
+    const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -301,10 +249,9 @@ if (res.success) {
 
 **Rules:**
 - ✅ Always use this pattern for any file the user should download
-- ✅ Always use `new URL(download_url).pathname` — never use `download_url` directly as `href`
 - ✅ Works for audio, video, PDFs, images, CSVs, zip archives — no size limit
 - ✅ The download URL expires in 15 minutes and is single-use
-- ❌ Do NOT use base64 for **output** files — use the upload/download URL pattern instead
+- ❌ Do NOT use base64 inline for files — it bloats the SignalR payload and breaks on larger files
 
 ## OUTPUT CONTRACT (every handle() must return):
 ```python
