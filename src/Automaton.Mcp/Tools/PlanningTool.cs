@@ -67,7 +67,7 @@ public class PlanningTool : IMcpTool
                             },
                             "techDecisions": {
                                 "type": "array",
-                                "description": "Key technology/approach decisions",
+                                "description": "Key technology/approach decisions. Be specific and actionable — the implementation model will follow these exactly. Include: exact libraries and methods to use, Python 3.13+ compatibility notes, binary dependencies, how data is passed (files must be base64 strings), and any known gotchas. Bad: 'use pydub for audio'. Good: 'use subprocess to call ffmpeg directly — pydub is incompatible with Python 3.13+'.",
                                 "items": {
                                     "type": "object",
                                     "properties": {

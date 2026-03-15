@@ -38,8 +38,6 @@ ffmpeg-python==0.2.0
 The runner installs these to a **persistent volume** at deploy time — they survive container restarts and recreates.
 After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
 
-**⚠️ NOT available as binaries**: `ffmpeg`, `libav`. Audio conversion with `pydub` requires the `ffmpeg` binary — if not installed, tell the user clearly instead of writing code that will fail silently.
-
 ## SHARED DESIGN COMPONENTS:
 These components are consistent across all tiers. See the tier-specific **DESIGN STANDARDS** section for page layout, navigation, and additional patterns.
 
