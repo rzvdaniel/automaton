@@ -122,7 +122,7 @@ public class AppsControllerExecutionController : ControllerBase
 
             sw.Stop();
 
-            _ = executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
             {
                 AppId = app.Id,
                 ControllerName = controllerName,
@@ -143,7 +143,7 @@ public class AppsControllerExecutionController : ControllerBase
             sw.Stop();
             logger.Warning(ex, "Invalid controller action: {ControllerName}.{ActionName}", controllerName, actionName);
 
-            _ = LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
+            await LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
 
             return BadRequest(new { error = ex.Message });
         }
@@ -228,7 +228,7 @@ public class AppsControllerExecutionController : ControllerBase
 
             sw.Stop();
 
-            _ = executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
             {
                 AppId = appId,
                 ControllerName = controllerName,
