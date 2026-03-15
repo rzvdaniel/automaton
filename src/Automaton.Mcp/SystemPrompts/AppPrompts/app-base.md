@@ -32,11 +32,14 @@ sqlite3                            # Built-in, always available
 **Extra packages** — if you need anything else, create `backend/requirements.txt`:
 ```
 # backend/requirements.txt
-pydub==0.25.1
-ffmpeg-python==0.2.0
+httpx==0.27.0
+some-other-package==1.2.3
 ```
 The runner installs these to a **persistent volume** at deploy time — they survive container restarts and recreates.
 After writing `requirements.txt`, remind the user to click **"Deploy Backend"**.
+
+## FOLLOW THE PLAN — MANDATORY:
+When a `.plans/IMPLEMENTATION.md` exists, you **must** implement exactly what the Technical Decisions section specifies. The plan was written by a smarter model that already reasoned through compatibility issues. Do NOT substitute your own library choices — if the plan says `subprocess + ffmpeg`, use `subprocess + ffmpeg`, not `pydub`.
 
 ## SHARED DESIGN COMPONENTS:
 These components are consistent across all tiers. See the tier-specific **DESIGN STANDARDS** section for page layout, navigation, and additional patterns.
