@@ -90,9 +90,15 @@ function sendResultToConsole(type, name, inputs, result, duration, success) {
   }
 }
 
+async function callController(controllerName, actionName, inputs = {}) {
+  const res = await executeController(controllerName, actionName, { inputs });
+  if (!res.success) throw new Error(res.error || 'Request failed');
+  return res.data;
+}
+
 window.automatonApi = {
   executeFlow,
-  executeController,
+  callController,
   getAppId: () => APP_ID,
   getAppSlug: () => null,
   getBaseUrl: () => BASE_URL

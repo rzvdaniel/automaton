@@ -57,9 +57,15 @@ async function executeController(controllerName, actionName, { inputs = {}, runn
   return apiCall(path, 'POST', { inputs, runnerNames });
 }
 
+async function callController(controllerName, actionName, inputs = {}) {
+  const res = await executeController(controllerName, actionName, { inputs });
+  if (!res.success) throw new Error(res.error || 'Request failed');
+  return res.data;
+}
+
 window.automatonApi = {
   executeFlow,
-  executeController,
+  callController,
   getAppId: () => null,
   getAppSlug: () => APP_SLUG,
   getBaseUrl: () => BASE_URL

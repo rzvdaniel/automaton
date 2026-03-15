@@ -16,7 +16,11 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         () => LoadEmbeddedResource(LegacyResourceName),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
-    // Tiered prompts
+    // Tiered prompts — base is always prepended to each tier
+    private static readonly Lazy<string> BasePrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-base.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
     private static readonly Lazy<string> SimplePrompt = new(
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-simple.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
@@ -46,7 +50,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     /// </summary>
     public string BuildSystemPrompt(ComplexityTier? tier = null)
     {
-        return tier switch
+        var tierPrompt = tier switch
         {
             ComplexityTier.Simple => SimplePrompt.Value,
             ComplexityTier.Medium => MediumPrompt.Value,
@@ -55,6 +59,12 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             null => LegacyPrompt.Value,
             _ => LegacyPrompt.Value
         };
+
+        // Legacy path bypasses the base prompt
+        if (tier == null)
+            return tierPrompt;
+
+        return $"{BasePrompt.Value}\n\n{tierPrompt}";
     }
 
     private static string LoadEmbeddedResource(string resourceName)
