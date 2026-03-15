@@ -532,7 +532,7 @@ docker run -d \
   --memory-swap="${MEMORY_LIMIT}" \
   --pids-limit=100 \
   --security-opt=no-new-privileges:true \
-  -e AUTOMATON_API_URL="${API_URL}" \
+  -e AUTOMATON_SERVER_URL="${API_URL}" \
   -e AUTOMATON_API_KEY="${API_KEY}" \
   -e AUTOMATON_RUNNER_NAME="${RUNNER_NAME}" \
   -e AUTOMATON_USER_ID="${USER_ID}" \

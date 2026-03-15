@@ -107,16 +107,16 @@ function showToast(message, type = 'success') {
 ## RETURNING FILES (download URL pattern — always use for file outputs):
 When the app needs to return a file (audio, PDF, image, CSV, zip etc.), **always use the download URL pattern**. The runner uploads the file directly to the server — the browser then downloads it straight from the server without passing through SignalR. No size limit in practice.
 
-**Backend** — upload to server, return a download URL:
+**Backend** — upload to server, return the download path:
 ```python
 import os, io, requests
 
 def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> str:
-    """Upload processed file to the Automaton server. Returns a direct download URL (expires in 15 min)."""
-    server_url = os.environ.get('AUTOMATON_API_URL', '').rstrip('/')
+    """Upload a file to the Automaton server. Returns a server path (e.g. /api/apps/files/abc123)."""
+    server_url = os.environ.get('AUTOMATON_SERVER_URL', '').rstrip('/')
     api_key = os.environ.get('AUTOMATON_API_KEY', '')
     if not server_url or not api_key:
-        raise RuntimeError("AUTOMATON_API_URL and AUTOMATON_API_KEY must be set in the runner environment.")
+        raise RuntimeError("AUTOMATON_SERVER_URL and AUTOMATON_API_KEY must be set in the runner environment.")
     resp = requests.post(
         f"{server_url}/api/runner/files",
         headers={"X-API-Key": api_key},
@@ -125,19 +125,28 @@ def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> st
         verify=False  # Runner may use a self-signed cert in dev/on-prem
     )
     resp.raise_for_status()
-    return resp.json()["downloadUrl"]
+    return resp.json()["downloadUrl"]  # Returns a path like /api/apps/files/abc123
 
-def convert(self, inputs):
-    # ... produce output_bytes (bytes) ...
-    download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
-    return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
+def handle(action_name: str, inputs: dict) -> dict:
+    try:
+        if action_name == 'convert':
+            # ... produce output_bytes (bytes) ...
+            download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
+            return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
+        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+    except Exception as e:
+        return {"success": False, "data": None, "error": str(e)}
 ```
 
 **Frontend** — trigger download:
 ```javascript
 try {
     const { download_url, filename } = await automatonApi.callController('converter', 'convert', { ... });
-    const a = Object.assign(document.createElement('a'), { href: download_url, download: filename });
+    // download_url is a server path (/api/apps/files/...) — prepend the base URL.
+    const a = Object.assign(document.createElement('a'), {
+        href: automatonApi.getBaseUrl() + download_url,
+        download: filename
+    });
     document.body.appendChild(a); a.click(); a.remove();
 } catch (err) {
     showToast(err.message, 'error');
@@ -146,9 +155,13 @@ try {
 
 **Rules:**
 - ✅ Always use this pattern for any file the user should download
+- ✅ `download_url` is a path — always prefix with `automatonApi.getBaseUrl()` before using as `href` or `src`
+- ✅ Same applies to any server path returned for images, thumbnails, exports: `automatonApi.getBaseUrl() + result.image_url`
 - ✅ Works for audio, video, PDFs, images, CSVs, zip archives — no size limit
-- ✅ The download URL expires in 15 minutes and is single-use
+- ✅ The download path expires in 15 minutes and is single-use
+- ❌ Do NOT use the path directly as `href` — it is not a full URL
 - ❌ Do NOT use base64 inline for files — it bloats the SignalR payload and breaks on larger files
+- ❌ External URLs (e.g. `https://example.com/image.png`) do NOT need prefixing — only server paths do
 
 ## CALLING A CONTROLLER:
 `automatonApi.callController(controllerName, action, inputs)` is built into the platform — no setup, no import, no boilerplate.
@@ -163,8 +176,11 @@ try {
     showToast(err.message, 'error');
 }
 
-// ❌ WRONG — don't check res.success manually; callController already throws
-const res = await automatonApi.executeController('users', 'list', { inputs: { page: 1 } });
+// ❌ WRONG — inputs: {} is not valid JS syntax in a function call
+const res = await automatonApi.callController('users', 'list', inputs: { page: 1 });
+
+// ❌ WRONG — don't check res.success; callController already throws on failure
+const res = await automatonApi.callController('users', 'list', { page: 1 });
 if (res.success) { ... }
 ```
 

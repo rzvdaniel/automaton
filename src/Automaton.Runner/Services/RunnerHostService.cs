@@ -49,8 +49,8 @@ public class RunnerHostService
             // Validate configuration from environment variables only
             if (!configService.IsServerConfigured())
             {
-                logger.Error("Service mode requires AUTOMATON_API_URL environment variable");
-                throw new InvalidOperationException("Server URL not configured. Set AUTOMATON_API_URL environment variable.");
+                logger.Error("Service mode requires AUTOMATON_SERVER_URL environment variable");
+                throw new InvalidOperationException("Server URL not configured. Set AUTOMATON_SERVER_URL environment variable.");
             }
 
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
@@ -153,7 +153,7 @@ public class RunnerHostService
 
             // DEBUG: Log all environment variables that might affect configuration
             logger.Debug("=== ENVIRONMENT VARIABLES DEBUG ===");
-            logger.Debug("AUTOMATON_API_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_API_URL"));
+            logger.Debug("AUTOMATON_SERVER_URL: {EnvVar}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
             logger.Debug("AUTOMATON_API_KEY: {EnvVar}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
             logger.Debug("ASPNETCORE_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
             logger.Debug("DOTNET_ENVIRONMENT: {EnvVar}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
@@ -162,7 +162,7 @@ public class RunnerHostService
             logger.Debug("=== END ENVIRONMENT VARIABLES ===");
 
             WriteLine("=== ENVIRONMENT VARIABLES DEBUG ===");
-            WriteLine("AUTOMATON_API_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_API_URL"));
+            WriteLine("AUTOMATON_SERVER_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
             WriteLine("AUTOMATON_API_KEY: {0}", string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")) ? "NOT SET" : "***SET***");
             WriteLine("ASPNETCORE_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
             WriteLine("DOTNET_ENVIRONMENT: {0}", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"));
@@ -1146,7 +1146,7 @@ public class RunnerHostService
 
     /// <summary>
     /// Starts the local FastAPI backend process on non-container environments.
-    /// FastAPI inherits the runner process environment — AUTOMATON_API_URL, AUTOMATON_API_KEY,
+    /// FastAPI inherits the runner process environment — AUTOMATON_SERVER_URL, AUTOMATON_API_KEY,
     /// and RUNNER_SCRIPTS_DIR are standard env vars set by the operator.
     /// In Docker, this is a no-op — the entrypoint script already starts FastAPI.
     /// </summary>
@@ -1192,7 +1192,7 @@ public class RunnerHostService
             return;
         }
 
-        // FastAPI inherits the runner's process environment: AUTOMATON_API_URL, AUTOMATON_API_KEY,
+        // FastAPI inherits the runner's process environment: AUTOMATON_SERVER_URL, AUTOMATON_API_KEY,
         // and RUNNER_SCRIPTS_DIR are all standard env vars — no per-launch injection needed.
         var psi = new System.Diagnostics.ProcessStartInfo
         {

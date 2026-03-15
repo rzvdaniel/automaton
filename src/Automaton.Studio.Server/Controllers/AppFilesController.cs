@@ -74,7 +74,11 @@ public class AppFilesController : ControllerBase
             "[AppFilesController] Runner stored temp file token={Token} name={FileName} size={Size} type={ContentType}",
             token, fileName, data.Length, contentType);
 
-        var downloadUrl = $"{Request.Scheme}://{Request.Host}/api/apps/files/{token}";
+        // Return a path-only URL so the browser can resolve it against whatever origin it
+        // uses to reach the server. The runner calls this endpoint via AUTOMATON_SERVER_URL
+        // (e.g. http://host.docker.internal:7091) so Request.Host would be Docker-internal
+        // and unreachable from the browser. The frontend combines getBaseUrl() + downloadUrl.
+        var downloadUrl = $"/api/apps/files/{token}";
         return Ok(new { token, downloadUrl, expiresInMinutes = (int)FileTtl.TotalMinutes });
     }
 

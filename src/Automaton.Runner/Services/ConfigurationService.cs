@@ -33,7 +33,7 @@ public class ConfigurationService
             // Configuration Priority Order (12-Factor App Pattern):
             // 1. Cached value - Highest priority for current session changes
             // 2. User's stored preference - User's explicit choice from interactive setup
-            // 3. Environment variable - Perfect for services and Docker (AUTOMATON_API_URL)
+            // 3. Environment variable - Perfect for services and Docker (AUTOMATON_SERVER_URL)
             // 4. Exception if none available
             //
             // Rationale: Environment variables are industry standard for service configuration.
@@ -72,7 +72,7 @@ public class ConfigurationService
 
             Log.Warning("Server URL is not configured from any source (cached, environment, or file)");
             throw new InvalidOperationException(
-                "Server URL is not configured. Please set AUTOMATON_API_URL environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
+                "Server URL is not configured. Please set AUTOMATON_SERVER_URL environment variable or run 'automaton-runner server --url <url>' for interactive setup.");
         }
     }
 
