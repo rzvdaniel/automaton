@@ -10,6 +10,8 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Button from 'primevue/button'
 import apiClient from '@/shared/services/api/axios-instance'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
+import rawPublishedScript from '../scripts/automaton-api-published.js?raw'
+import { jsStr } from '../utils/js-str'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,72 +65,14 @@ async function loadApp() {
     // Inject automatonApi for published apps
     const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
     // Pass the current auth token so authenticated apps can call protected API endpoints.
-    // Anonymous apps get null and use credentials:include (cookie fallback).
+    // Anonymous apps use credentials:include (cookie fallback) — represented as empty string.
     const authToken = authStore.accessToken
-    const publishedScript = `
-<script>
-(function(window, APP_SLUG, BASE_URL, AUTH_TOKEN) {
-  'use strict';
-
-  console.log('[AutomatonAPI] Published app loaded:', APP_SLUG);
-
-  async function apiCall(path, method, body) {
-    const url = BASE_URL + path;
-    console.log('[AutomatonAPI] ' + method + ' ' + url);
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (AUTH_TOKEN) {
-      headers['Authorization'] = 'Bearer ' + AUTH_TOKEN;
-    }
-
-    const options = {
-      method: method,
-      headers: headers,
-      credentials: AUTH_TOKEN ? 'same-origin' : 'include'
-    };
-
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(url, options);
-    const data = await response.json();
-
-    if (!response.ok) {
-      const error = new Error(data.error || data.message || 'Request failed');
-      error.response = data;
-      throw error;
-    }
-
-    return data;
-  }
-
-  async function executeFlow(flowIdentifier, options) {
-    options = options || {};
-    const path = '/api/web-apps/' + encodeURIComponent(APP_SLUG) + '/flows/' + encodeURIComponent(flowIdentifier) + '/execute';
-    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
-    return apiCall(path, 'POST', body);
-  }
-
-  async function executeController(controllerName, actionName, options) {
-    options = options || {};
-    const path = '/api/web-apps/' + encodeURIComponent(APP_SLUG) + '/controllers/' + encodeURIComponent(controllerName) + '/actions/' + encodeURIComponent(actionName) + '/execute';
-    const body = { inputs: options.inputs || {}, runnerNames: options.runnerNames || null };
-    return apiCall(path, 'POST', body);
-  }
-
-  window.automatonApi = {
-    executeFlow: executeFlow,
-    executeController: executeController,
-    getAppId: function() { return null; },
-    getAppSlug: function() { return APP_SLUG; },
-    getBaseUrl: function() { return BASE_URL; }
-  };
-
-  console.log('[AutomatonAPI] Ready!');
-
-})(window, '${slug.value}', '${baseUrl}', ${authToken ? `'${authToken}'` : 'null'});
-<\/script>`
+    const publishedScript = `<script>\n${
+      rawPublishedScript
+        .replace(/__APP_SLUG__/g, jsStr(slug.value))
+        .replace(/__BASE_URL__/g, jsStr(baseUrl))
+        .replace(/__AUTH_TOKEN__/g, jsStr(authToken ?? ''))
+    }\n<\/script>`
 
     // Get HTML content
     let html = data.htmlContent || getDefaultHtml()
