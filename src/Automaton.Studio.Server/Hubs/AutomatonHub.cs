@@ -60,6 +60,15 @@ public class AutomatonHub : Hub
     }
 
     /// <summary>
+    /// Called by the runner when a chunk could not be written (disk error, permissions, etc.).
+    /// </summary>
+    public Task FileUploadFailed(FileUploadFailedMessage message)
+    {
+        fileUploadRegistry.TryFail(message);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Called by the runner to deliver a chunk of a requested download file.
     /// </summary>
     public Task FileChunkReady(FileChunkReadyMessage message)

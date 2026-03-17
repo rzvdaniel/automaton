@@ -19,6 +19,13 @@ public class FileUploadCompleteMessage
     public string LocalPath { get; set; } = string.Empty;
 }
 
+/// <summary>Runner sends to server when an upload chunk fails to be written to disk.</summary>
+public class FileUploadFailedMessage
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string Error { get; set; } = string.Empty;
+}
+
 /// <summary>Server sends to runner to request a chunk for download.</summary>
 public class FetchFileChunkRequest
 {

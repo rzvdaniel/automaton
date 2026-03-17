@@ -10,6 +10,7 @@
         public const string Ping = "Ping";
         public const string ReceiveFileChunk = "ReceiveFileChunk";
         public const string FileUploadComplete = "FileUploadComplete";
+        public const string FileUploadFailed = "FileUploadFailed";
         public const string FetchFileChunk = "FetchFileChunk";
         public const string FileChunkReady = "FileChunkReady";
     }

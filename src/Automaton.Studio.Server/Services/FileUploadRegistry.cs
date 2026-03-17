@@ -34,6 +34,16 @@ public class FileUploadRegistry
         return false;
     }
 
+    public bool TryFail(FileUploadFailedMessage message)
+    {
+        if (_pending.TryRemove(message.SessionId, out var tcs))
+        {
+            tcs.TrySetException(new InvalidOperationException(message.Error));
+            return true;
+        }
+        return false;
+    }
+
     private void TryFail(string sessionId, string reason)
     {
         if (_pending.TryRemove(sessionId, out var tcs))

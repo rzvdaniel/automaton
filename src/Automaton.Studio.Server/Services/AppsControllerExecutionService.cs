@@ -125,6 +125,39 @@ public class AppsControllerExecutionService
         };
     }
 
+    /// <summary>
+    /// Deploys only Python controller scripts (skips requirements.txt / system-requirements.txt)
+    /// to a specific runner. Fast — no pip/apt involved. Used for auto-deploy on first execution.
+    /// </summary>
+    private async Task DeployScriptsToRunnerAsync(Guid appId, Guid ownerId, Runner runner, CancellationToken cancellationToken)
+    {
+        var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        var pythonScripts = scripts.Where(s => s.Language != "Text").ToList();
+
+        foreach (var script in pythonScripts)
+        {
+            try
+            {
+                var payload = new
+                {
+                    AppId = appId,
+                    ControllerName = script.ControllerName,
+                    Code = script.Code,
+                    Language = script.Language
+                };
+
+                await automatonHub.Clients.Client(runner.ConnectionId)
+                    .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
+
+                logger.Debug("Auto-deployed {ControllerName} to runner {RunnerName}", script.ControllerName, runner.Name);
+            }
+            catch (Exception ex)
+            {
+                logger.Warning(ex, "Auto-deploy failed for {ControllerName} on runner {RunnerName}", script.ControllerName, runner.Name);
+            }
+        }
+    }
+
     // ── Execute ───────────────────────────────────────────────────────────────
 
     public async Task<AppControllerActionResponse> ExecuteActionAsync(
@@ -149,7 +182,7 @@ public class AppsControllerExecutionService
 
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Using {runners.Count()} runner(s)");
 
-            var results = await ExecuteViaTunnelAsync(app.Id, controllerName, actionName, inputs, runners, cancellationToken, logs);
+            var results = await ExecuteViaTunnelAsync(app.Id, app.OwnerId ?? Guid.Empty, controllerName, actionName, inputs, runners, cancellationToken, logs);
 
             var success = results.All(r => r.Success);
             var firstSuccess = results.FirstOrDefault(r => r.Success);
@@ -230,6 +263,7 @@ public class AppsControllerExecutionService
 
     private async Task<List<RunnerAppControllerResult>> ExecuteViaTunnelAsync(
         Guid appId,
+        Guid ownerId,
         string controllerName,
         string actionName,
         Dictionary<string, JsonElement> inputs,
@@ -254,23 +288,18 @@ public class AppsControllerExecutionService
                     inputs = inputs
                 });
 
-                var (requestId, responseTask) = tunnelRegistry.Register(
-                    timeout: TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds),
-                    ct: cancellationToken);
+                var tunnelResponse = await SendTunnelRequestAsync(runner, controllerName, body, cancellationToken);
 
-                var tunnelRequest = new TunnelRequest
+                // Auto-deploy on 404 "not deployed" — scripts missing from runner, push them and retry once
+                if (tunnelResponse.StatusCode == 404)
                 {
-                    RequestId = requestId,
-                    Method = "POST",
-                    Path = $"/api/controller/{controllerName}",
-                    Body = body
-                };
+                    logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Controller not found on runner — auto-deploying scripts...");
+                    logger.Information("Auto-deploying scripts for AppId={AppId} to runner {RunnerName} (scripts not found on runner)", appId, runner.Name);
 
-                await automatonHub.Clients
-                    .Client(runner.ConnectionId)
-                    .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
+                    await DeployScriptsToRunnerAsync(appId, ownerId, runner, cancellationToken);
 
-                var tunnelResponse = await responseTask;
+                    tunnelResponse = await SendTunnelRequestAsync(runner, controllerName, body, cancellationToken);
+                }
 
                 if (tunnelResponse.StatusCode >= 200 && tunnelResponse.StatusCode < 300)
                 {
@@ -325,5 +354,26 @@ public class AppsControllerExecutionService
         }
 
         return results;
+    }
+
+    private async Task<TunnelResponse> SendTunnelRequestAsync(Runner runner, string controllerName, string body, CancellationToken cancellationToken)
+    {
+        var (requestId, responseTask) = tunnelRegistry.Register(
+            timeout: TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds),
+            ct: cancellationToken);
+
+        var tunnelRequest = new TunnelRequest
+        {
+            RequestId = requestId,
+            Method = "POST",
+            Path = $"/api/controller/{controllerName}",
+            Body = body
+        };
+
+        await automatonHub.Clients
+            .Client(runner.ConnectionId)
+            .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
+
+        return await responseTask;
     }
 }

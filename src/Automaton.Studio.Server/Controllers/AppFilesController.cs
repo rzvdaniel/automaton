@@ -18,14 +18,14 @@ namespace Automaton.Studio.Server.Controllers;
 ///   1. Browser POSTs multipart file to /api/web-apps/preview/{appId}/files/upload
 ///      (or /api/web-apps/{slug}/files/upload for published apps)
 ///   2. Server reads stream in 256 KB chunks, forwards each as ReceiveFileChunk via SignalR to the runner
-///   3. Runner writes chunks to /tmp/uploads/{sessionId}/{filename} on its docker volume
-///   4. Runner sends FileUploadComplete back via hub; server resolves TCS and returns { session_id }
+///   3. Runner writes chunks to {temp}/uploads/{sessionId}/{filename} on its local volume
+///   4. Runner sends FileUploadComplete (success) or FileUploadFailed (error) back via hub; server resolves TCS
 ///   5. Browser passes session_id in callController inputs — file lives ONLY on runner volume
 ///
 /// Download flow:
 ///   1. Browser GETs /api/web-apps/preview/{appId}/files/{sessionId}
 ///   2. Server sends FetchFileChunk to runner (offset=0, chunkSize=256KB)
-///   3. Runner reads from /tmp/results/{sessionId}/, sends FileChunkReady with bytes back
+///   3. Runner reads from {temp}/results/{sessionId}/, sends FileChunkReady with bytes back
 ///   4. Server pipes each chunk directly to Response.Body — never accumulates the file
 ///   5. Repeat until IsLast=true
 ///
@@ -162,6 +162,8 @@ public class AppFilesController : ControllerBase
             return BadRequest(new { error = runnerError });
 
         var runner = await ResolveRunnerAsync(ownerId, appId);
+        if (runner is null)
+            return BadRequest(new { error = "Runner is no longer available. Please try again." });
 
         var (sessionId, completionTask) = uploadRegistry.Register(
             TimeSpan.FromMinutes(UploadTimeoutMinutes), ct);

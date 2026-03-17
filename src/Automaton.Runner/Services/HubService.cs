@@ -24,6 +24,7 @@ public class HubService
     private const string PingMethod = "Ping";
     private const string ReceiveFileChunkMethod = "ReceiveFileChunk";
     private const string FileUploadCompleteMethod = "FileUploadComplete";
+    private const string FileUploadFailedMethod = "FileUploadFailed";
     private const string FetchFileChunkMethod = "FetchFileChunk";
     private const string FileChunkReadyMethod = "FileChunkReady";
 
@@ -836,6 +837,18 @@ public class HubService
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to handle upload chunk: SessionId={SessionId}", chunk.SessionId);
+            try
+            {
+                await connection!.SendAsync(FileUploadFailedMethod, new FileUploadFailedMessage
+                {
+                    SessionId = chunk.SessionId,
+                    Error = $"Runner failed to write upload chunk: {ex.Message}"
+                });
+            }
+            catch (Exception notifyEx)
+            {
+                logger.Error(notifyEx, "Failed to notify server of upload failure: SessionId={SessionId}", chunk.SessionId);
+            }
         }
     }
 
