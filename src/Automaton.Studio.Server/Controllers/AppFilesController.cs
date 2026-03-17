@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -156,9 +157,11 @@ public class AppFilesController : ControllerBase
         if (file is null || file.Length == 0)
             return BadRequest(new { error = "No file provided." });
 
+        var runnerError = await GetRunnerErrorAsync(ownerId, appId);
+        if (runnerError is not null)
+            return BadRequest(new { error = runnerError });
+
         var runner = await ResolveRunnerAsync(ownerId, appId);
-        if (runner is null)
-            return BadRequest(new { error = "No runner available. Please start your runner and configure it for this app." });
 
         var (sessionId, completionTask) = uploadRegistry.Register(
             TimeSpan.FromMinutes(UploadTimeoutMinutes), ct);
@@ -291,6 +294,35 @@ public class AppFilesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Returns a user-facing error string explaining why no runner is available, or null if a runner can be resolved.
+    /// </summary>
+    private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId)
+    {
+        var executionRunnerId = await dataContext.WebApps
+            .Where(a => a.Id == appId)
+            .Select(a => a.ExecutionRunnerId)
+            .FirstOrDefaultAsync();
+
+        if (executionRunnerId == null)
+            return "No runner is configured for this app. Go to App Settings and select a runner.";
+
+        var runner = await dataContext.Runners
+            .Where(r => r.Id == executionRunnerId)
+            .FirstOrDefaultAsync();
+
+        if (runner is null)
+            return "The runner configured for this app no longer exists.";
+
+        if (runner.ConnectionId is null)
+            return $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
+
+        if (!await dataContext.Runners.AnyAsync(r => r.Id == executionRunnerId && r.RunnerUsers.Any(ru => ru.UserId == ownerId)))
+            return $"Runner '{runner.Name}' is not accessible by this app's owner.";
+
+        return null;
+    }
+
     private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId)
     {
         return await dataContext.Runners
@@ -305,7 +337,8 @@ public class AppFilesController : ControllerBase
 
     private Guid GetUserId()
     {
-        var claim = User.Claims.FirstOrDefault(c => c.Type == "uid");
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)
+                 ?? User.Claims.FirstOrDefault(c => c.Type == "uid");
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 

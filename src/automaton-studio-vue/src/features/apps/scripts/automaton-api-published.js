@@ -95,11 +95,45 @@ function getDownloadUrl(sessionId) {
   return `${BASE_URL}/api/web-apps/${encodeURIComponent(APP_SLUG)}/files/${sessionId}`;
 }
 
+/**
+ * Download a result file from the runner.
+ * For published apps the download endpoint is anonymous, so a direct anchor click works.
+ * This is the recommended way for AI-generated apps to trigger downloads.
+ */
+async function downloadFile(sessionId, filename) {
+  const url = getDownloadUrl(sessionId);
+
+  const headers = {};
+  if (AUTH_TOKEN) {
+    headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
+  }
+
+  const response = await fetch(url, {
+    headers,
+    credentials: AUTH_TOKEN ? 'same-origin' : 'include'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  const disposition = response.headers.get('content-disposition') || '';
+  const name = filename || disposition.match(/filename="?([^";\n]+)/i)?.[1] || 'download';
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = name;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+}
+
 window.automatonApi = {
   executeFlow,
   callController,
   uploadFile,
-  getDownloadUrl,
+  downloadFile,
   getAppId: () => null,
   getAppSlug: () => APP_SLUG,
   getBaseUrl: () => BASE_URL

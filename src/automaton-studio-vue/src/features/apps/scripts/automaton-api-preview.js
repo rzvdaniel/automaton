@@ -96,17 +96,38 @@ async function callController(controllerName, actionName, inputs = {}) {
   return res.data;
 }
 
+/**
+ * Request a fresh JWT from the parent editor window via postMessage.
+ * The parent always replies, so no timeout fallback is needed.
+ */
+async function getFreshToken() {
+  return new Promise((resolve) => {
+    const requestId = Math.random().toString(36).slice(2);
+
+    function onMessage(event) {
+      if (event.data?.type === 'tokenResponse' && event.data?.requestId === requestId) {
+        window.removeEventListener('message', onMessage);
+        resolve(event.data.token || AUTH_TOKEN);
+      }
+    }
+
+    window.addEventListener('message', onMessage);
+    window.parent.postMessage({ type: 'requestToken', requestId }, '*');
+  });
+}
+
 async function uploadFile(file, { runnerNames = null } = {}) {
   const url = `${BASE_URL}/api/web-apps/preview/${APP_ID}/files/upload`;
   console.log(`[AutomatonAPI] Uploading file: ${file.name} (${file.size} bytes)`);
 
+  const token = await getFreshToken();
   const formData = new FormData();
   formData.append('file', file);
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${AUTH_TOKEN}`
+      'Authorization': `Bearer ${token}`
     },
     body: formData
   });
@@ -124,11 +145,41 @@ function getDownloadUrl(sessionId) {
   return `${BASE_URL}/api/web-apps/preview/${APP_ID}/files/${sessionId}`;
 }
 
+/**
+ * Download a result file from the runner.
+ * Uses fetch + Blob URL so the Authorization header is included automatically.
+ * This is the recommended way for AI-generated apps to trigger downloads.
+ */
+async function downloadFile(sessionId, filename) {
+  const token = await getFreshToken();
+  const url = getDownloadUrl(sessionId);
+
+  const response = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  // Derive filename from Content-Disposition if not provided
+  const disposition = response.headers.get('content-disposition') || '';
+  const name = filename || disposition.match(/filename="?([^";\n]+)/i)?.[1] || 'download';
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = name;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+}
+
 window.automatonApi = {
   executeFlow,
   callController,
   uploadFile,
-  getDownloadUrl,
+  downloadFile,
   getAppId: () => APP_ID,
   getAppSlug: () => null,
   getBaseUrl: () => BASE_URL

@@ -105,68 +105,109 @@ function showToast(message, type = 'success') {
 - Smooth modal: `transition-opacity duration-200`
 - Skip-to-content link (`<a href="#main" class="sr-only focus:not-sr-only">Skip to content</a>`) for larger apps
 
-## UPLOADING FILES
+## UPLOADING AND DOWNLOADING FILES
 
-Use `automatonApi.uploadFile(file)` to upload a file from the browser to the runner. The file is streamed to the runner's local filesystem — it never touches the server permanently.
+Use `automatonApi.uploadFile(file)` to send a file from the browser to the runner. The file is streamed to the runner's local filesystem — it never touches the server permanently.
 
-```html
-<input type="file" id="fileInput" accept="audio/*">
-<button onclick="handleUpload()">Convert</button>
+`downloadFile` is only needed when the controller produces a **file output** the user needs to save (e.g. a converted audio file, generated PDF, exported ZIP). If the controller just returns data (JSON, text, numbers), use `callController` and render the result normally — no `downloadFile` needed.
 
-<script>
-async function handleUpload() {
+### Pattern A — Immediate download (fires as soon as processing finishes)
+
+Use when the whole point of the action is to produce and save a file.
+
+```javascript
+async function handleConvert() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) return;
 
   try {
-    // Upload file to runner — returns { session_id }
+    // 1. Upload file to runner — returns { session_id }
     const { session_id } = await automatonApi.uploadFile(file);
 
-    // Pass session_id to controller — runner reads file from its local volume
+    // 2. Process on runner — controller writes output to {tempdir}/results/{session_id}/
+    const result = await automatonApi.callController('converter', 'convert', {
+      upload_session: session_id,
+      target_format: 'mp3'
+    });
+
+    // 3. Trigger save dialog immediately — downloadFile() handles auth automatically
+    await automatonApi.downloadFile(result.download_session, result.filename || 'output.mp3');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+```
+
+### Pattern B — Download link (user clicks when ready)
+
+Use when you want to show a summary or preview before the user saves the file, or when the download is optional.
+
+```javascript
+let downloadSession = null;
+
+async function handleConvert() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+
+  try {
+    const { session_id } = await automatonApi.uploadFile(file);
     const result = await automatonApi.callController('converter', 'convert', {
       upload_session: session_id
     });
 
-    // Trigger download of result
-    window.location.href = automatonApi.getDownloadUrl(result.download_session);
+    // Store session and reveal the download button — don't download yet
+    downloadSession = result.download_session;
+    document.getElementById('downloadBtn').classList.remove('hidden');
+    showToast('Ready! Click Download to save your file.', 'success');
   } catch (err) {
-    console.error('Error:', err.message);
+    showToast(err.message, 'error');
   }
 }
-</script>
+
+async function handleDownload() {
+  if (!downloadSession) return;
+  await automatonApi.downloadFile(downloadSession, 'output.mp3');
+}
 ```
 
-The Python controller receives `inputs['upload_session']` which is the session ID. The file is available at `/tmp/uploads/{session_id}/{filename}`. Write result files to `/tmp/results/{session_id}/` and return `{ download_session: session_id }`.
+```html
+<button onclick="handleConvert()">Convert</button>
+<button id="downloadBtn" class="hidden" onclick="handleDownload()">Download</button>
+```
+
+### Python controller (same for both patterns)
+
+The controller receives `inputs['upload_session']`. The file is at `{tempdir}/uploads/{session_id}/{filename}` where `tempdir = tempfile.gettempdir()`. Write results to `{tempdir}/results/{session_id}/`.
 
 ```python
-import os, subprocess
+import os, subprocess, tempfile
 
 def handle(action_name, inputs):
     session_id = inputs['upload_session']
-    uploads_dir = f'/tmp/uploads/{session_id}'
+    tmp = tempfile.gettempdir()
+    uploads_dir = os.path.join(tmp, 'uploads', session_id)
     
-    # Find the uploaded file
     files = os.listdir(uploads_dir)
     if not files:
         raise ValueError('No uploaded file found')
     
     input_path = os.path.join(uploads_dir, files[0])
     
-    # Write result to /tmp/results/{session_id}/
-    results_dir = f'/tmp/results/{session_id}'
+    results_dir = os.path.join(tmp, 'results', session_id)
     os.makedirs(results_dir, exist_ok=True)
     output_path = os.path.join(results_dir, 'output.mp3')
     
-    # Process — use subprocess for system tools
     subprocess.run(['ffmpeg', '-i', input_path, output_path], check=True)
     
-    return { 'download_session': session_id }
+    return { 'download_session': session_id, 'filename': 'output.mp3' }
 ```
 
 **Rules:**
 - ✅ DO use `automatonApi.uploadFile(file)` for user file uploads
-- ✅ DO use `automatonApi.getDownloadUrl(session_id)` for download links
-- ✅ DO write results to `/tmp/results/{session_id}/`
+- ✅ DO use `automatonApi.downloadFile(session_id, 'filename.ext')` to trigger file downloads — it handles auth automatically
+- ✅ DO write results to `os.path.join(tempfile.gettempdir(), 'results', session_id)` — works on both Linux and Windows
+- ✅ DO use Pattern A for simple convert-and-save flows; Pattern B when the user should decide when/whether to download
+- ❌ NEVER call `downloadFile` when the controller only returns data — just use `callController` and render the result
 - ❌ NEVER use base64 encoding for file transfer
 - ❌ NEVER use `POST /api/runner/files` (removed)
 

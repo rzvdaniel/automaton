@@ -32,6 +32,7 @@ import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
+import { tokenStorage } from '@/shared/services/api/axios-instance'
 import type { PublishAppRequest } from '../types/apps.types'
 import type { StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
@@ -298,9 +299,62 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
+// Token refresh request from preview iframe — reply with a guaranteed-fresh token.
+// The handler is async so it can proactively refresh the JWT if it has expired or is about to.
+async function handleTokenRequest(event: MessageEvent) {
+  const { requestId } = event.data
+  let token = tokenStorage.getAccessToken() ?? ''
+
+  if (isTokenExpired(token)) {
+    const refreshToken = tokenStorage.getRefreshToken()
+    if (refreshToken) {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/api/Token/RefreshAccessToken`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: refreshToken }),
+          }
+        )
+        if (response.ok) {
+          const data = await response.json()
+          tokenStorage.setAccessToken(data.accessToken)
+          tokenStorage.setRefreshToken(data.refreshToken)
+          token = data.accessToken
+        }
+      } catch {
+        // Best-effort; fall through with the stale token
+      }
+    }
+  }
+
+  ;(event.source as WindowProxy)?.postMessage(
+    { type: 'tokenResponse', requestId, token },
+    '*'
+  )
+}
+
+function isTokenExpired(token: string): boolean {
+  if (!token) return true
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    // Treat token as expired if it expires within the next 30 seconds
+    return payload.exp * 1000 < Date.now() + 30_000
+  } catch {
+    return true
+  }
+}
+
 // Handle preview iframe postMessage for console logging
 function handlePreviewMessage(event: MessageEvent) {
-  // Check if this is a step result message from our preview iframe
+  // Token refresh request from preview iframe — reply with a fresh access token
+  if (event.data?.type === 'requestToken') {
+    void handleTokenRequest(event)
+    return
+  }
+
+
   if (event.data?.type === 'automatonStepResult') {
     const message = event.data as StepResultMessage
     editorStore.addConsoleEntry({

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.StaticFiles;
 using Serilog;
 using System.Net.Sockets;
 using Automaton.Runner.Console.Connection;
@@ -810,7 +811,7 @@ public class HubService
     {
         try
         {
-            var dir = Path.Combine("/tmp", "uploads", chunk.SessionId);
+            var dir = Path.Combine(Path.GetTempPath(), "uploads", chunk.SessionId);
             Directory.CreateDirectory(dir);
             var filePath = Path.Combine(dir, chunk.FileName);
 
@@ -842,7 +843,7 @@ public class HubService
     {
         try
         {
-            var dir = Path.Combine("/tmp", "results", request.SessionId);
+            var dir = Path.Combine(Path.GetTempPath(), "results", request.SessionId);
             var files = Directory.Exists(dir) ? Directory.GetFiles(dir) : [];
 
             if (files.Length == 0)
@@ -889,24 +890,22 @@ public class HubService
         }
     }
 
-    private static string GetContentType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
+
+    private static string GetContentType(string fileName)
     {
-        ".mp3" => "audio/mpeg",
-        ".mp4" => "video/mp4",
-        ".wav" => "audio/wav",
-        ".pdf" => "application/pdf",
-        ".png" => "image/png",
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".zip" => "application/zip",
-        ".csv" => "text/csv",
-        ".json" => "application/json",
-        ".txt" => "text/plain",
-        _ => "application/octet-stream"
-    };
+        if (_contentTypeProvider.TryGetContentType(fileName, out var contentType))
+            return contentType;
+        return "application/octet-stream";
+    }
 
     private static void CleanupStaleTempFiles()
     {
-        foreach (var baseDir in new[] { "/tmp/uploads", "/tmp/results" })
+        foreach (var baseDir in new[]
+        {
+            Path.Combine(Path.GetTempPath(), "uploads"),
+            Path.Combine(Path.GetTempPath(), "results")
+        })
         {
             if (!Directory.Exists(baseDir)) continue;
             foreach (var dir in Directory.GetDirectories(baseDir))

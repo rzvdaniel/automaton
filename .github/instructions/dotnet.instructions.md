@@ -68,6 +68,48 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 - Test both success and failure paths — error handling is not optional
 - Arrange/Act/Assert structure; one logical assertion per test
 
+## Use Framework Utilities — Never Roll Your Own
+
+Do not write custom helper methods that duplicate functionality the framework already provides. Always prefer built-in APIs.
+
+**MIME / Content Types:**
+```csharp
+// ✅ DO — covers 400+ types, maintained by the framework
+var provider = new FileExtensionContentTypeProvider();
+if (!provider.TryGetContentType(fileName, out var contentType))
+    contentType = "application/octet-stream";
+
+// ❌ DON'T — hand-rolled switch that covers only a handful of types
+string GetContentType(string fileName) => Path.GetExtension(fileName) switch
+{
+    ".mp3" => "audio/mpeg",
+    ".pdf" => "application/pdf",
+    _ => "application/octet-stream"
+};
+```
+
+Other examples of framework APIs to prefer: `JsonSerializer` over manual JSON building, `Uri` over string concatenation, `Path.Combine` over `+` for paths, `Encoding` classes over manual byte conversion.
+
+## No Hardcoded System Paths
+
+Never hardcode OS-specific paths. Use framework APIs that resolve the correct path on every platform.
+
+**Temporary files:**
+```csharp
+// ✅ DO — works on Windows (%TEMP%) and Linux (/tmp/)
+var dir = Path.Combine(Path.GetTempPath(), "uploads", sessionId);
+
+// ❌ DON'T — Linux-only, breaks on Windows
+var dir = $"/tmp/uploads/{sessionId}";
+```
+
+**General path rules:**
+- `Path.GetTempPath()` for temp directories
+- `Environment.GetFolderPath(Environment.SpecialFolder.*)` for system folders
+- `AppContext.BaseDirectory` for app-relative paths
+- `Path.Combine(...)` always — never string-concatenate path segments
+- `Directory.CreateDirectory(path)` is idempotent — always safe to call before writing
+
 ## Naming
 
 - Classes: `PascalCase`
@@ -75,3 +117,66 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 - Private fields: `_camelCase`
 - Interfaces: `IPrefix`
 - Constants class: `static class XxxNames / XxxTypes / XxxModes`
+
+### File Paths and System Folders
+
+Never hardcode OS-specific paths like `/tmp`, `C:\Temp`, or any absolute directory. Use framework APIs that resolve correctly on every platform:
+
+```csharp
+// ✅ DO — works on Linux (/tmp/) and Windows (%TEMP%)
+var uploadsDir = Path.Combine(Path.GetTempPath(), "uploads", sessionId);
+
+// ❌ DON'T — Linux only
+var uploadsDir = $"/tmp/uploads/{sessionId}";
+
+// ❌ DON'T — Windows only
+var uploadsDir = $@"C:\Temp\uploads\{sessionId}";
+```
+
+Same applies in Python (used in runner controllers):
+```python
+# ✅ DO
+import tempfile, os
+uploads_dir = os.path.join(tempfile.gettempdir(), 'uploads', session_id)
+
+# ❌ DON'T
+uploads_dir = f'/tmp/uploads/{session_id}'
+```
+
+Other path APIs to use instead of hardcoded values:
+- `Path.GetTempPath()` — OS temp directory
+- `Environment.GetFolderPath(Environment.SpecialFolder.X)` — special folders
+- `AppContext.BaseDirectory` — app install/output directory
+- `Directory.GetCurrentDirectory()` — working directory
+
+### MIME Types / Content Types
+
+Never write a custom `GetContentType()` switch or dictionary. Use `FileExtensionContentTypeProvider` from `Microsoft.AspNetCore.StaticFiles` — it covers 400+ types and is always up to date:
+
+```csharp
+// ✅ DO
+using Microsoft.AspNetCore.StaticFiles;
+
+private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
+
+private static string GetContentType(string fileName)
+{
+    if (_contentTypeProvider.TryGetContentType(fileName, out var contentType))
+        return contentType;
+    return "application/octet-stream";
+}
+
+// ❌ DON'T — incomplete, unmaintainable, always missing types
+private static string GetContentType(string fileName) => Path.GetExtension(fileName) switch
+{
+    ".mp3" => "audio/mpeg",
+    ".pdf" => "application/pdf",
+    _ => "application/octet-stream"
+};
+```
+
+### General Rule
+
+Before writing any utility method that maps, converts, or resolves a well-known system concept (paths, MIME types, encodings, cultures, time zones, HTTP status codes), check whether the framework already provides it. It almost always does.
+
+
