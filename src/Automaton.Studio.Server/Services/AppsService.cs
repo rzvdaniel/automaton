@@ -391,7 +391,8 @@ public class AppsService
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
         entity.RequiresAuthentication = requiresAuthentication;
-        entity.ExecutionRunnerId = executionRunnerId;
+        if (executionRunnerId.HasValue)
+            entity.ExecutionRunnerId = executionRunnerId.Value;
         entity.Version++;
         entity.Updated = DateTime.UtcNow;
 
