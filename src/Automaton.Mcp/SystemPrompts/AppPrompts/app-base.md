@@ -105,64 +105,70 @@ function showToast(message, type = 'success') {
 - Smooth modal: `transition-opacity duration-200`
 - Skip-to-content link (`<a href="#main" class="sr-only focus:not-sr-only">Skip to content</a>`) for larger apps
 
-## RETURNING FILES (download URL pattern — always use for file outputs):
-When the app needs to return a file (audio, PDF, image, CSV, zip etc.), **always use the download URL pattern**. The runner uploads the file directly to the server — the browser then downloads it straight from the server without passing through SignalR. No size limit in practice.
+## UPLOADING FILES
 
-**Backend** — upload to server, return the download path:
-```python
-import os, io, requests
+Use `automatonApi.uploadFile(file)` to upload a file from the browser to the runner. The file is streamed to the runner's local filesystem — it never touches the server permanently.
 
-def upload_result_file(output_bytes: bytes, filename: str, mime_type: str) -> str:
-    """Upload a file to the Automaton server. Returns a server path (e.g. /api/apps/files/abc123)."""
-    server_url = os.environ.get('AUTOMATON_SERVER_URL', '').rstrip('/')
-    api_key = os.environ.get('AUTOMATON_API_KEY', '')
-    if not server_url or not api_key:
-        raise RuntimeError("AUTOMATON_SERVER_URL and AUTOMATON_API_KEY must be set in the runner environment.")
-    resp = requests.post(
-        f"{server_url}/api/runner/files",
-        headers={"X-API-Key": api_key},
-        files={"file": (filename, io.BytesIO(output_bytes), mime_type)},
-        timeout=60,
-        verify=False  # Runner may use a self-signed cert in dev/on-prem
-    )
-    resp.raise_for_status()
-    return resp.json()["downloadUrl"]  # Returns a path like /api/apps/files/abc123
+```html
+<input type="file" id="fileInput" accept="audio/*">
+<button onclick="handleUpload()">Convert</button>
 
-def handle(action_name: str, inputs: dict) -> dict:
-    try:
-        if action_name == 'convert':
-            # ... produce output_bytes (bytes) ...
-            download_url = upload_result_file(output_bytes, "output.mp3", "audio/mpeg")
-            return {"success": True, "data": {"download_url": download_url, "filename": "output.mp3"}, "error": ""}
-        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
-    except Exception as e:
-        return {"success": False, "data": None, "error": str(e)}
+<script>
+async function handleUpload() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+
+  try {
+    // Upload file to runner — returns { session_id }
+    const { session_id } = await automatonApi.uploadFile(file);
+
+    // Pass session_id to controller — runner reads file from its local volume
+    const result = await automatonApi.callController('converter', 'convert', {
+      upload_session: session_id
+    });
+
+    // Trigger download of result
+    window.location.href = automatonApi.getDownloadUrl(result.download_session);
+  } catch (err) {
+    console.error('Error:', err.message);
+  }
+}
+</script>
 ```
 
-**Frontend** — trigger download:
-```javascript
-try {
-    const { download_url, filename } = await automatonApi.callController('converter', 'convert', { ... });
-    // download_url is a server path (/api/apps/files/...) — prepend the base URL.
-    const a = Object.assign(document.createElement('a'), {
-        href: automatonApi.getBaseUrl() + download_url,
-        download: filename
-    });
-    document.body.appendChild(a); a.click(); a.remove();
-} catch (err) {
-    showToast(err.message, 'error');
-}
+The Python controller receives `inputs['upload_session']` which is the session ID. The file is available at `/tmp/uploads/{session_id}/{filename}`. Write result files to `/tmp/results/{session_id}/` and return `{ download_session: session_id }`.
+
+```python
+import os, subprocess
+
+def handle(action_name, inputs):
+    session_id = inputs['upload_session']
+    uploads_dir = f'/tmp/uploads/{session_id}'
+    
+    # Find the uploaded file
+    files = os.listdir(uploads_dir)
+    if not files:
+        raise ValueError('No uploaded file found')
+    
+    input_path = os.path.join(uploads_dir, files[0])
+    
+    # Write result to /tmp/results/{session_id}/
+    results_dir = f'/tmp/results/{session_id}'
+    os.makedirs(results_dir, exist_ok=True)
+    output_path = os.path.join(results_dir, 'output.mp3')
+    
+    # Process — use subprocess for system tools
+    subprocess.run(['ffmpeg', '-i', input_path, output_path], check=True)
+    
+    return { 'download_session': session_id }
 ```
 
 **Rules:**
-- ✅ Always use this pattern for any file the user should download
-- ✅ `download_url` is a path — always prefix with `automatonApi.getBaseUrl()` before using as `href` or `src`
-- ✅ Same applies to any server path returned for images, thumbnails, exports: `automatonApi.getBaseUrl() + result.image_url`
-- ✅ Works for audio, video, PDFs, images, CSVs, zip archives — no size limit
-- ✅ The download path expires in 15 minutes and is single-use
-- ❌ Do NOT use the path directly as `href` — it is not a full URL
-- ❌ Do NOT use base64 inline for files — it bloats the SignalR payload and breaks on larger files
-- ❌ External URLs (e.g. `https://example.com/image.png`) do NOT need prefixing — only server paths do
+- ✅ DO use `automatonApi.uploadFile(file)` for user file uploads
+- ✅ DO use `automatonApi.getDownloadUrl(session_id)` for download links
+- ✅ DO write results to `/tmp/results/{session_id}/`
+- ❌ NEVER use base64 encoding for file transfer
+- ❌ NEVER use `POST /api/runner/files` (removed)
 
 ## CALLING A CONTROLLER:
 `automatonApi.callController(controllerName, action, inputs)` is built into the platform — no setup, no import, no boilerplate.

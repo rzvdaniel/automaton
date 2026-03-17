@@ -14,11 +14,19 @@ public class AutomatonHub : Hub
 
     private readonly RunnerService runnerService;
     private readonly TunnelRequestRegistry tunnelRegistry;
+    private readonly FileUploadRegistry fileUploadRegistry;
+    private readonly FileDownloadRegistry fileDownloadRegistry;
 
-    public AutomatonHub(RunnerService runnerService, TunnelRequestRegistry tunnelRegistry)
+    public AutomatonHub(
+        RunnerService runnerService,
+        TunnelRequestRegistry tunnelRegistry,
+        FileUploadRegistry fileUploadRegistry,
+        FileDownloadRegistry fileDownloadRegistry)
     {
         this.runnerService = runnerService;
         this.tunnelRegistry = tunnelRegistry;
+        this.fileUploadRegistry = fileUploadRegistry;
+        this.fileDownloadRegistry = fileDownloadRegistry;
     }
 
     public override async Task OnConnectedAsync()
@@ -39,6 +47,26 @@ public class AutomatonHub : Hub
     public Task TunnelResponse(TunnelResponse response)
     {
         tunnelRegistry.TryComplete(response);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Called by the runner when all upload chunks have been written to its local filesystem.
+    /// </summary>
+    public Task FileUploadComplete(FileUploadCompleteMessage message)
+    {
+        fileUploadRegistry.TryComplete(message);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Called by the runner to deliver a chunk of a requested download file.
+    /// </summary>
+    public Task FileChunkReady(FileChunkReadyMessage message)
+    {
+        fileDownloadRegistry.TryWrite(message);
+        if (message.IsLast)
+            fileDownloadRegistry.Complete(message.SessionId);
         return Task.CompletedTask;
     }
 

@@ -8,5 +8,9 @@
         public const string TunnelRequest = "TunnelRequest";
         public const string TunnelResponse = "TunnelResponse";
         public const string Ping = "Ping";
+        public const string ReceiveFileChunk = "ReceiveFileChunk";
+        public const string FileUploadComplete = "FileUploadComplete";
+        public const string FetchFileChunk = "FetchFileChunk";
+        public const string FileChunkReady = "FileChunkReady";
     }
 }

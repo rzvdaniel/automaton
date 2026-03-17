@@ -22,7 +22,8 @@ public sealed class PlanMode : IConversationMode
         "For every non-trivial technical choice, ask yourself:\n" +
         "- **Python version compatibility**: does this library work on Python 3.13+? (e.g. `pydub` depends on `pyaudioop` which was removed in 3.13 — use `subprocess` + ffmpeg instead)\n" +
         "- **Binary dependencies**: does this require a system binary (ffmpeg, imagemagick, etc.)? Is it available on the runner?\n" +
-        "- **Data transfer**: how is data passed from frontend to backend? (files must be base64-encoded strings — the platform does not support binary uploads via callController)\n" +
+        "- **Data transfer**: how is data passed from frontend to backend? Use `automatonApi.uploadFile(file)` for file uploads — the file streams to the runner's volume and the session_id is passed to the controller. NEVER use base64 encoding for files.\n" +
+        "- **File transfer**: server is a pure proxy — files only reside on runner volume. Use uploadFile() + session_id for uploads, getDownloadUrl(session_id) for downloads. Python controller reads from /tmp/uploads/{session_id}/, writes results to /tmp/results/{session_id}/.\n" +
         "- **Exact implementation**: specify the exact Python stdlib or third-party approach, method names, and any gotchas\n\n" +
         "Each `techDecision` must be specific and actionable — not 'use pydub for audio' but 'use subprocess to call ffmpeg directly (`subprocess.run([\"ffmpeg\", \"-i\", input, output])`) — pydub is incompatible with Python 3.13+'.";
 

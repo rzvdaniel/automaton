@@ -21,6 +21,10 @@ public class HubService
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
     private const string PingMethod = "Ping";
+    private const string ReceiveFileChunkMethod = "ReceiveFileChunk";
+    private const string FileUploadCompleteMethod = "FileUploadComplete";
+    private const string FetchFileChunkMethod = "FetchFileChunk";
+    private const string FileChunkReadyMethod = "FileChunkReady";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -58,6 +62,7 @@ public class HubService
 
     public async Task<bool> ConnectAsync()
     {
+        CleanupStaleTempFiles();
         try
         {
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
@@ -291,6 +296,18 @@ public class HubService
             {
                 logger.Debug("Received ping from server");
                 return "Pong";
+            });
+
+            // Handle incoming file upload chunks — write to runner's local volume
+            connection.On<FileUploadChunk>(ReceiveFileChunkMethod, async (chunk) =>
+            {
+                await HandleReceiveFileChunkAsync(chunk);
+            });
+
+            // Handle file download chunk requests — read from runner's local volume and send back
+            connection.On<FetchFileChunkRequest>(FetchFileChunkMethod, async (request) =>
+            {
+                await HandleFetchFileChunkAsync(request);
             });
 
             // Handle connection events
@@ -787,5 +804,121 @@ public class HubService
     public bool IsConnected()
     {
         return connection?.State == HubConnectionState.Connected;
+    }
+
+    private async Task HandleReceiveFileChunkAsync(FileUploadChunk chunk)
+    {
+        try
+        {
+            var dir = Path.Combine("/tmp", "uploads", chunk.SessionId);
+            Directory.CreateDirectory(dir);
+            var filePath = Path.Combine(dir, chunk.FileName);
+
+            await using var fs = new FileStream(filePath,
+                chunk.ChunkIndex == 0 ? FileMode.Create : FileMode.Append,
+                FileAccess.Write, FileShare.None);
+            await fs.WriteAsync(chunk.Data);
+
+            logger.Debug("Upload chunk {Index} written: SessionId={SessionId} IsLast={IsLast}",
+                chunk.ChunkIndex, chunk.SessionId, chunk.IsLast);
+
+            if (chunk.IsLast)
+            {
+                logger.Information("Upload complete: SessionId={SessionId} Path={Path}", chunk.SessionId, filePath);
+                await connection!.SendAsync(FileUploadCompleteMethod, new FileUploadCompleteMessage
+                {
+                    SessionId = chunk.SessionId,
+                    LocalPath = filePath
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to handle upload chunk: SessionId={SessionId}", chunk.SessionId);
+        }
+    }
+
+    private async Task HandleFetchFileChunkAsync(FetchFileChunkRequest request)
+    {
+        try
+        {
+            var dir = Path.Combine("/tmp", "results", request.SessionId);
+            var files = Directory.Exists(dir) ? Directory.GetFiles(dir) : [];
+
+            if (files.Length == 0)
+            {
+                logger.Warning("No result file found for download: SessionId={SessionId}", request.SessionId);
+                await connection!.SendAsync(FileChunkReadyMethod, new FileChunkReadyMessage
+                {
+                    SessionId = request.SessionId,
+                    Data = [],
+                    IsLast = true,
+                    FileName = "error",
+                    ContentType = "application/octet-stream"
+                });
+                return;
+            }
+
+            var filePath = files[0];
+            var fileName = Path.GetFileName(filePath);
+            var contentType = GetContentType(fileName);
+
+            await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            fs.Seek(request.Offset, SeekOrigin.Begin);
+
+            var buffer = new byte[request.ChunkSize];
+            var bytesRead = await fs.ReadAsync(buffer);
+            var isLast = fs.Position >= fs.Length;
+            var data = bytesRead == request.ChunkSize ? buffer : buffer[..bytesRead];
+
+            logger.Debug("Download chunk sent: SessionId={SessionId} Offset={Offset} Bytes={Bytes} IsLast={IsLast}",
+                request.SessionId, request.Offset, bytesRead, isLast);
+
+            await connection!.SendAsync(FileChunkReadyMethod, new FileChunkReadyMessage
+            {
+                SessionId = request.SessionId,
+                Data = data,
+                IsLast = isLast,
+                FileName = fileName,
+                ContentType = contentType
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Failed to handle download chunk request: SessionId={SessionId}", request.SessionId);
+        }
+    }
+
+    private static string GetContentType(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".mp3" => "audio/mpeg",
+        ".mp4" => "video/mp4",
+        ".wav" => "audio/wav",
+        ".pdf" => "application/pdf",
+        ".png" => "image/png",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".zip" => "application/zip",
+        ".csv" => "text/csv",
+        ".json" => "application/json",
+        ".txt" => "text/plain",
+        _ => "application/octet-stream"
+    };
+
+    private static void CleanupStaleTempFiles()
+    {
+        foreach (var baseDir in new[] { "/tmp/uploads", "/tmp/results" })
+        {
+            if (!Directory.Exists(baseDir)) continue;
+            foreach (var dir in Directory.GetDirectories(baseDir))
+            {
+                try
+                {
+                    var created = Directory.GetCreationTimeUtc(dir);
+                    if (DateTime.UtcNow - created > TimeSpan.FromHours(1))
+                        Directory.Delete(dir, recursive: true);
+                }
+                catch { /* ignore cleanup errors */ }
+            }
+        }
     }
 }

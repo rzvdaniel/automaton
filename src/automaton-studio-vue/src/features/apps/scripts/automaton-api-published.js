@@ -63,9 +63,43 @@ async function callController(controllerName, actionName, inputs = {}) {
   return res.data;
 }
 
+async function uploadFile(file, { runnerNames = null } = {}) {
+  const url = `${BASE_URL}/api/web-apps/${encodeURIComponent(APP_SLUG)}/files/upload`;
+  console.log(`[AutomatonAPI] Uploading file: ${file.name} (${file.size} bytes)`);
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers = {};
+  if (AUTH_TOKEN) {
+    headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    credentials: AUTH_TOKEN ? 'same-origin' : 'include',
+    body: formData
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'File upload failed');
+  }
+
+  console.log(`[AutomatonAPI] Upload complete: session_id=${data.session_id}`);
+  return data; // { session_id }
+}
+
+function getDownloadUrl(sessionId) {
+  return `${BASE_URL}/api/web-apps/${encodeURIComponent(APP_SLUG)}/files/${sessionId}`;
+}
+
 window.automatonApi = {
   executeFlow,
   callController,
+  uploadFile,
+  getDownloadUrl,
   getAppId: () => null,
   getAppSlug: () => APP_SLUG,
   getBaseUrl: () => BASE_URL

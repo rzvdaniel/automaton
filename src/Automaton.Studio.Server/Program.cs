@@ -290,6 +290,8 @@ services.AddScoped<PublicAppsService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
 services.AddSingleton<TunnelRequestRegistry>();
+services.AddSingleton<FileUploadRegistry>();
+services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();

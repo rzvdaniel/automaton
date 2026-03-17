@@ -1,139 +1,318 @@
+using Automaton.Core.Models;
+using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Hubs;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
 
 /// <summary>
-/// Provides a short-lived file transfer relay between the runner's Python controllers and the browser.
+/// Provides file upload and download between the browser and the runner via chunked SignalR streaming.
 ///
-/// Flow:
-///   1. Runner Python controller processes a file (audio, PDF, image, etc.)
-///   2. Controller POSTs the file to POST /api/runner/files (authenticated with runner API key)
-///   3. Server stores it in memory with a 15-minute TTL and returns a download URL + token
-///   4. Python controller returns {"download_url": "..."} to the browser via the SignalR tunnel
-///   5. Browser hits GET /api/apps/files/{token} directly — no SignalR involved
+/// Upload flow:
+///   1. Browser POSTs multipart file to /api/web-apps/preview/{appId}/files/upload
+///      (or /api/web-apps/{slug}/files/upload for published apps)
+///   2. Server reads stream in 256 KB chunks, forwards each as ReceiveFileChunk via SignalR to the runner
+///   3. Runner writes chunks to /tmp/uploads/{sessionId}/{filename} on its docker volume
+///   4. Runner sends FileUploadComplete back via hub; server resolves TCS and returns { session_id }
+///   5. Browser passes session_id in callController inputs — file lives ONLY on runner volume
 ///
-/// This avoids routing large binary payloads through SignalR (the 50 MB limit does not apply).
+/// Download flow:
+///   1. Browser GETs /api/web-apps/preview/{appId}/files/{sessionId}
+///   2. Server sends FetchFileChunk to runner (offset=0, chunkSize=256KB)
+///   3. Runner reads from /tmp/results/{sessionId}/, sends FileChunkReady with bytes back
+///   4. Server pipes each chunk directly to Response.Body — never accumulates the file
+///   5. Repeat until IsLast=true
+///
+/// The server is a pure proxy. No bytes are written to server disk. No caches.
 /// </summary>
 [ApiController]
 [Route("api")]
 public class AppFilesController : ControllerBase
 {
-    // 50 MB — matches the SignalR MaximumReceiveMessageSize; avoids size surprises for users.
-    private const long MaxFileSizeBytes = 50L * 1024 * 1024;
+    private const int ChunkSize = 256 * 1024; // 256 KB
+    private const int UploadTimeoutMinutes = 10;
+    private const int DownloadChunkTimeoutSeconds = 30;
 
-    // Files expire after 15 minutes. The browser should download immediately after controller execution.
-    private static readonly TimeSpan FileTtl = TimeSpan.FromMinutes(15);
+    private readonly ApplicationDbContext dataContext;
+    private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly FileUploadRegistry uploadRegistry;
+    private readonly FileDownloadRegistry downloadRegistry;
+    private readonly ILogger<AppFilesController> logger;
 
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<AppFilesController> _logger;
-
-    public AppFilesController(IMemoryCache cache, ILogger<AppFilesController> logger)
+    public AppFilesController(
+        ApplicationDbContext dataContext,
+        IHubContext<AutomatonHub> automatonHub,
+        FileUploadRegistry uploadRegistry,
+        FileDownloadRegistry downloadRegistry,
+        ILogger<AppFilesController> logger)
     {
-        _cache = cache;
-        _logger = logger;
+        this.dataContext = dataContext;
+        this.automatonHub = automatonHub;
+        this.uploadRegistry = uploadRegistry;
+        this.downloadRegistry = downloadRegistry;
+        this.logger = logger;
+    }
+
+    // ── Upload ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Preview mode upload — requires JWT authentication.
+    /// </summary>
+    [HttpPost("web-apps/preview/{appId}/files/upload")]
+    [Authorize]
+    [RequestSizeLimit(200 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 200 * 1024 * 1024)]
+    public async Task<IActionResult> UploadPreview(Guid appId, IFormFile file, CancellationToken ct)
+    {
+        var ownerId = GetUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
+        return await UploadInternal(appId, ownerId, file, ct);
     }
 
     /// <summary>
-    /// Called by the runner's Python controller to store a processed result file.
-    /// Returns a short-lived download URL the browser can access directly.
-    /// Requires a runner API key (X-API-Key header or ?api_key= query param).
+    /// Published app upload — same auth as published controller execution.
     /// </summary>
-    [HttpPost("runner/files")]
-    [Authorize(Policy = "AllowApiKey")]
-    [RequestSizeLimit(50 * 1024 * 1024 + 4096)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 50 * 1024 * 1024)]
-    public async Task<IActionResult> UploadResultFile(
-        IFormFile file,
-        [FromForm] string? downloadFileName = null)
+    [HttpPost("web-apps/{slug}/files/upload")]
+    [AllowAnonymous]
+    [RequestSizeLimit(200 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 200 * 1024 * 1024)]
+    public async Task<IActionResult> UploadPublished(string slug, IFormFile file, CancellationToken ct)
+    {
+        var app = await dataContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .Where(a => a.PublicUrl == slug)
+            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
+            .FirstOrDefaultAsync(ct);
+
+        if (app is null)
+            return NotFound(new { error = "App not found." });
+
+        if (app.OwnerId is null)
+            return BadRequest(new { error = "App has no owner configured." });
+
+        return await UploadInternal(app.Id, app.OwnerId.Value, file, ct);
+    }
+
+    // ── Download ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Preview mode download — requires JWT authentication.
+    /// </summary>
+    [HttpGet("web-apps/preview/{appId}/files/{sessionId}")]
+    [Authorize]
+    public async Task DownloadPreview(Guid appId, string sessionId, CancellationToken ct)
+    {
+        var ownerId = GetUserId();
+        if (ownerId == Guid.Empty)
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
+        await DownloadInternal(appId, ownerId, sessionId, ct);
+    }
+
+    /// <summary>
+    /// Published app download — same auth as published controller execution.
+    /// </summary>
+    [HttpGet("web-apps/{slug}/files/{sessionId}")]
+    [AllowAnonymous]
+    public async Task DownloadPublished(string slug, string sessionId, CancellationToken ct)
+    {
+        var app = await dataContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .Where(a => a.PublicUrl == slug)
+            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
+            .FirstOrDefaultAsync(ct);
+
+        if (app is null)
+        {
+            Response.StatusCode = 404;
+            await Response.WriteAsJsonAsync(new { error = "App not found." }, ct);
+            return;
+        }
+
+        if (app.OwnerId is null)
+        {
+            Response.StatusCode = 400;
+            await Response.WriteAsJsonAsync(new { error = "App has no owner configured." }, ct);
+            return;
+        }
+
+        await DownloadInternal(app.Id, app.OwnerId.Value, sessionId, ct);
+    }
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    private async Task<IActionResult> UploadInternal(Guid appId, Guid ownerId, IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { error = "No file provided." });
 
-        if (file.Length > MaxFileSizeBytes)
-            return BadRequest(new { error = $"File size ({file.Length:N0} bytes) exceeds the {MaxFileSizeBytes / (1024 * 1024)} MB limit." });
+        var runner = await ResolveRunnerAsync(ownerId, appId);
+        if (runner is null)
+            return BadRequest(new { error = "No runner available. Please start your runner and configure it for this app." });
 
-        using var ms = new MemoryStream((int)file.Length);
-        await file.CopyToAsync(ms);
-        var data = ms.ToArray();
+        var (sessionId, completionTask) = uploadRegistry.Register(
+            TimeSpan.FromMinutes(UploadTimeoutMinutes), ct);
 
-        var token = Guid.NewGuid().ToString("N"); // 32 hex chars, no hyphens
-        var fileName = SanitizeFileName(downloadFileName ?? file.FileName);
+        var fileName = SanitizeFileName(file.FileName);
         var contentType = file.ContentType ?? "application/octet-stream";
 
-        _cache.Set(
-            $"app_file:{token}",
-            new TempFileEntry(fileName, contentType, data),
-            new MemoryCacheEntryOptions
+        logger.LogInformation(
+            "[AppFilesController] Upload started: SessionId={SessionId} AppId={AppId} Runner={Runner} File={File} Size={Size}",
+            sessionId, appId, runner.Name, fileName, file.Length);
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var buffer = new byte[ChunkSize];
+            int chunkIndex = 0;
+            int bytesRead;
+
+            while ((bytesRead = await stream.ReadAsync(buffer, ct)) > 0)
             {
-                AbsoluteExpirationRelativeToNow = FileTtl
-            });
+                var isLast = stream.Position >= stream.Length;
+                var chunkData = bytesRead == ChunkSize ? buffer : buffer[..bytesRead];
 
-        _logger.LogInformation(
-            "[AppFilesController] Runner stored temp file token={Token} name={FileName} size={Size} type={ContentType}",
-            token, fileName, data.Length, contentType);
+                var chunk = new FileUploadChunk
+                {
+                    SessionId = sessionId,
+                    ChunkIndex = chunkIndex++,
+                    Data = chunkData,
+                    IsLast = isLast,
+                    FileName = fileName,
+                    ContentType = contentType
+                };
 
-        // Return a path-only URL so the browser can resolve it against whatever origin it
-        // uses to reach the server. The runner calls this endpoint via AUTOMATON_SERVER_URL
-        // (e.g. http://host.docker.internal:7091) so Request.Host would be Docker-internal
-        // and unreachable from the browser. The frontend combines getBaseUrl() + downloadUrl.
-        var downloadUrl = $"/api/apps/files/{token}";
-        return Ok(new { token, downloadUrl, expiresInMinutes = (int)FileTtl.TotalMinutes });
+                await automatonHub.Clients.Client(runner.ConnectionId!)
+                    .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, ct);
+            }
+
+            // Wait for runner to ACK that all chunks are written to disk
+            await completionTask;
+
+            logger.LogInformation(
+                "[AppFilesController] Upload complete: SessionId={SessionId} Chunks={ChunkCount}",
+                sessionId, chunkIndex);
+
+            return Ok(new { session_id = sessionId });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "[AppFilesController] Upload failed: SessionId={SessionId} AppId={AppId}", sessionId, appId);
+            return StatusCode(500, new { error = ex.Message });
+        }
     }
 
-    /// <summary>
-    /// Browser downloads a previously uploaded result file by its one-time token.
-    /// The token is removed from cache after the first successful download.
-    /// No authentication required — the unguessable token (128-bit UUID) is the capability credential.
-    /// </summary>
-    [HttpGet("apps/files/{token}")]
-    [AllowAnonymous]
-    public IActionResult DownloadResultFile(string token)
+    private async Task DownloadInternal(Guid appId, Guid ownerId, string sessionId, CancellationToken ct)
     {
-        // Validate: must be exactly 32 lowercase hex chars (URI-safe, no path traversal, no cache key injection)
-        if (string.IsNullOrEmpty(token) || token.Length != 32 || !IsHex(token))
+        var runner = await ResolveRunnerAsync(ownerId, appId);
+        if (runner is null)
         {
-            _logger.LogWarning("[AppFilesController] Invalid token format: {Token}", token);
-            return BadRequest(new { error = "Invalid token." });
+            Response.StatusCode = 400;
+            await Response.WriteAsJsonAsync(new { error = "No runner available." }, ct);
+            return;
         }
 
-        var cacheKey = $"app_file:{token}";
-        if (!_cache.TryGetValue(cacheKey, out TempFileEntry? entry) || entry is null)
+        var channel = downloadRegistry.Register(sessionId);
+
+        logger.LogInformation(
+            "[AppFilesController] Download started: SessionId={SessionId} AppId={AppId} Runner={Runner}",
+            sessionId, appId, runner.Name);
+
+        try
         {
-            _logger.LogInformation("[AppFilesController] Token not found or expired: {Token}", token);
-            return NotFound(new { error = "File not found or the download link has expired." });
+            long offset = 0;
+            bool headerWritten = false;
+
+            while (true)
+            {
+                var request = new FetchFileChunkRequest
+                {
+                    SessionId = sessionId,
+                    Offset = offset,
+                    ChunkSize = ChunkSize
+                };
+
+                await automatonHub.Clients.Client(runner.ConnectionId!)
+                    .SendAsync(AutomatonHubMethods.FetchFileChunk, request, ct);
+
+                using var chunkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                chunkCts.CancelAfter(TimeSpan.FromSeconds(DownloadChunkTimeoutSeconds));
+
+                FileChunkReadyMessage chunk;
+                try
+                {
+                    chunk = await channel.Reader.ReadAsync(chunkCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    logger.LogWarning("[AppFilesController] Download chunk timeout: SessionId={SessionId}", sessionId);
+                    break;
+                }
+
+                if (!headerWritten)
+                {
+                    Response.ContentType = chunk.ContentType;
+                    Response.Headers.ContentDisposition =
+                        $"attachment; filename=\"{Uri.EscapeDataString(chunk.FileName)}\"";
+                    headerWritten = true;
+                }
+
+                await Response.Body.WriteAsync(chunk.Data, ct);
+                await Response.Body.FlushAsync(ct);
+
+                if (chunk.IsLast)
+                    break;
+
+                offset += chunk.Data.Length;
+            }
+
+            logger.LogInformation(
+                "[AppFilesController] Download complete: SessionId={SessionId}", sessionId);
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "[AppFilesController] Download failed: SessionId={SessionId} AppId={AppId}", sessionId, appId);
+        }
+        finally
+        {
+            downloadRegistry.Complete(sessionId);
+        }
+    }
 
-        // One-time download — remove immediately so the token cannot be replayed
-        _cache.Remove(cacheKey);
+    private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId)
+    {
+        return await dataContext.Runners
+            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
+            .Where(r => r.ConnectionId != null)
+            .Where(r => r.Id == dataContext.WebApps
+                .Where(a => a.Id == appId)
+                .Select(a => a.ExecutionRunnerId)
+                .FirstOrDefault())
+            .FirstOrDefaultAsync();
+    }
 
-        _logger.LogInformation(
-            "[AppFilesController] Token redeemed: {Token} name={FileName} size={Size}",
-            token, entry.FileName, entry.Data.Length);
-
-        return File(entry.Data, entry.ContentType, Uri.EscapeDataString(entry.FileName));
+    private Guid GetUserId()
+    {
+        var claim = User.Claims.FirstOrDefault(c => c.Type == "uid");
+        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 
     private static string SanitizeFileName(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "download";
-
-        // Strip directory components and null bytes
+        if (string.IsNullOrWhiteSpace(raw)) return "download";
         var name = Path.GetFileName(raw.Replace('\0', '_').Trim());
         return string.IsNullOrWhiteSpace(name) ? "download" : name;
     }
-
-    private static bool IsHex(string s)
-    {
-        foreach (var c in s)
-        {
-            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-                return false;
-        }
-        return true;
-    }
-
-    private sealed record TempFileEntry(string FileName, string ContentType, byte[] Data);
 }
