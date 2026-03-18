@@ -36,6 +36,7 @@ public class AiConversationController : BaseController
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IAppSystemPromptBuilder _appPromptBuilder;
     private readonly IPromptClassifierService _promptClassifier;
+    private readonly AppVersionService _appVersionService;
     private readonly ILogger<AiConversationController> _logger;
 
     public AiConversationController(
@@ -50,6 +51,7 @@ public class AiConversationController : BaseController
         IStepSystemPromptBuilder stepPromptBuilder,
         IAppSystemPromptBuilder appPromptBuilder,
         IPromptClassifierService promptClassifier,
+        AppVersionService appVersionService,
         ILogger<AiConversationController> logger)
     {
         _mcpClient = mcpClient;
@@ -63,6 +65,7 @@ public class AiConversationController : BaseController
         _stepPromptBuilder = stepPromptBuilder;
         _appPromptBuilder = appPromptBuilder;
         _promptClassifier = promptClassifier;
+        _appVersionService = appVersionService;
         _logger = logger;
     }
 
@@ -193,12 +196,39 @@ public class AiConversationController : BaseController
             }, userId);
             _logger.LogInformation("Saved user message to session {SessionId}", sessionId);
 
-            // 8. Collect updates for saving after conversation completes
+            // 8. Create a pre-generation snapshot for WebApp resources so users can roll back to
+            //    the state before this specific AI prompt — one checkpoint per generation.
+            if (request.ResourceType == ChatResourceType.WebApp.ToString() && request.ResourceId.HasValue)
+            {
+                try
+                {
+                    var summary = request.Message.Length > 100
+                        ? $"Before: \"{request.Message[..100]}...\""
+                        : $"Before: \"{request.Message}\"";
+
+                    await _appVersionService.CreateSnapshotAsync(
+                        request.ResourceId.Value,
+                        userId,
+                        AppVersionTrigger.NewGeneration,
+                        aiSessionId: sessionId,
+                        aiModel: model,
+                        aiGeneratedSummary: summary);
+
+                    _logger.LogInformation("Created pre-generation snapshot for app {AppId}", request.ResourceId.Value);
+                }
+                catch (Exception ex)
+                {
+                    // Non-fatal — versioning failure should not block the AI generation
+                    _logger.LogWarning(ex, "Failed to create pre-generation snapshot for app {AppId}", request.ResourceId.Value);
+                }
+            }
+
+            // 9. Collect updates for saving after conversation completes
             // We stream to client immediately, but only save to database AFTER conversation ends
             // This avoids DbContext threading issues (tool execution and chat history both use DbContext)
             var pendingUpdates = new List<ConversationUpdatedEvent>();
 
-            // 9. Subscribe to conversation updates - stream to client in real-time
+            // 10. Subscribe to conversation updates - stream to client in real-time
             EventHandler<ConversationUpdatedEvent> eventHandler = (sender, e) =>
             {
                 // Stream to client immediately (SSE write doesn't use DbContext)

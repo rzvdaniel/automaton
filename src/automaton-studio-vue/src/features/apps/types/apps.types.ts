@@ -295,7 +295,7 @@ export function getFileIcon(filePath: string): string {
 /**
  * App Version Trigger enum
  */
-export type AppVersionTrigger = 'NewSession' | 'ManualSave' | 'Publish' | 'Restore'
+export type AppVersionTrigger = 'ManualSave' | 'Publish' | 'Restore' | 'NewGeneration'
 
 /**
  * Basic version info for list view

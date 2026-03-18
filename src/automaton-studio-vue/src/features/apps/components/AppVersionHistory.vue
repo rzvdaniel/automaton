@@ -220,8 +220,8 @@ async function restoreVersion(versionNumber: number) {
  */
 function getTriggerLabel(trigger: string): string {
   switch (trigger) {
-    case 'NewSession':
-      return 'AI Chat'
+    case 'NewGeneration':
+      return 'AI Edit'
     case 'ManualSave':
       return 'Manual'
     case 'Publish':
@@ -238,8 +238,8 @@ function getTriggerLabel(trigger: string): string {
  */
 function getTriggerSeverity(trigger: string): string {
   switch (trigger) {
-    case 'NewSession':
-      return 'info'
+    case 'NewGeneration':
+      return 'secondary'
     case 'ManualSave':
       return 'primary'
     case 'Publish':
@@ -256,8 +256,8 @@ function getTriggerSeverity(trigger: string): string {
  */
 function getTriggerIcon(trigger: string): string {
   switch (trigger) {
-    case 'NewSession':
-      return 'pi pi-comments'
+    case 'NewGeneration':
+      return 'pi pi-sparkles'
     case 'ManualSave':
       return 'pi pi-save'
     case 'Publish':
