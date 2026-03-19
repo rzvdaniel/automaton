@@ -72,6 +72,20 @@ public abstract class AiConversationControllerBase : BaseController
     /// <summary>The ChatResourceType for session creation.</summary>
     protected abstract ChatResourceType ResourceType { get; }
 
+    /// <summary>
+    /// Called before the AI conversation starts. Subclasses may return an opaque token
+    /// (e.g. a snapshot ID) that is passed to <see cref="OnAfterConversationAsync"/>.
+    /// </summary>
+    protected virtual Task<object?> OnBeforeConversationAsync(
+        BaseStreamConversationRequest request, Guid userId, Guid sessionId) => Task.FromResult<object?>(null);
+
+    /// <summary>
+    /// Called after a successful AI conversation. <paramref name="token"/> is whatever
+    /// <see cref="OnBeforeConversationAsync"/> returned.
+    /// </summary>
+    protected virtual Task OnAfterConversationAsync(
+        BaseStreamConversationRequest request, Guid userId, ConversationResult result, object? token) => Task.CompletedTask;
+
     // ── Core streaming pipeline (shared) ─────────────────────────────────
 
     protected async Task ExecuteStreamAsync(
@@ -154,6 +168,9 @@ public abstract class AiConversationControllerBase : BaseController
             };
             _mcpClient.ConversationUpdated += eventHandler;
 
+            // 7a. Pre-conversation hook (e.g. create version snapshot)
+            var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
+
             // 7. Run conversation
             var conversationRequest = new ConversationRequest
             {
@@ -191,6 +208,9 @@ public abstract class AiConversationControllerBase : BaseController
                 var savedToolCallIds = new HashSet<string>();
                 foreach (var update in pendingUpdates)
                     await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
+
+                // 8b. Post-conversation hook (e.g. update version summary)
+                await OnAfterConversationAsync(request, userId, result, conversationToken);
 
                 await WriteEvent("done", new
                 {

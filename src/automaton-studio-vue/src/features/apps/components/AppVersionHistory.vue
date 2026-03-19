@@ -325,7 +325,7 @@ defineExpose({
       <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
       <p>No versions yet</p>
       <p class="text-sm text-color-secondary mb-3">
-        Versions are created when you start a new AI chat or manually create snapshots
+        Versions are created automatically before each AI edit, or manually via snapshots
       </p>
       <Button
         label="Create Snapshot"

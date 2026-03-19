@@ -27,6 +27,8 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly IAppSystemPromptBuilder _promptBuilder;
     private readonly IPromptClassifierService _promptClassifier;
     private readonly AppInstructionInjector _instructionInjector;
+    private readonly AppVersionService _appVersionService;
+    private readonly ISystemAiService _systemAiService;
 
     public AiAppConversationController(
         IAutomatonMcpClient mcpClient,
@@ -40,6 +42,8 @@ public class AiAppConversationController : AiConversationControllerBase
         IAppSystemPromptBuilder promptBuilder,
         IPromptClassifierService promptClassifier,
         AppInstructionInjector instructionInjector,
+        AppVersionService appVersionService,
+        ISystemAiService systemAiService,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
                rateLimitService, providerMetadataService, tokenBudgetService, logger)
@@ -48,11 +52,73 @@ public class AiAppConversationController : AiConversationControllerBase
         _promptBuilder        = promptBuilder;
         _promptClassifier     = promptClassifier;
         _instructionInjector  = instructionInjector;
+        _appVersionService    = appVersionService;
+        _systemAiService      = systemAiService;
     }
 
     protected override ChatResourceType ResourceType => ChatResourceType.WebApp;
 
     protected override IMcpToolProvider? GetToolProvider() => _toolProvider;
+
+    /// <summary>
+    /// Before the AI runs: snapshot the current app state so the user can roll back.
+    /// Skipped on the very first generation (nothing to preserve yet).
+    /// Returns the snapshot ID as the token, or null if skipped.
+    /// </summary>
+    protected override async Task<object?> OnBeforeConversationAsync(
+        BaseStreamConversationRequest request, Guid userId, Guid sessionId)
+    {
+        if (!request.ResourceId.HasValue) return null;
+
+        try
+        {
+            if (!_appVersionService.AppHasBeenGenerated(request.ResourceId.Value, userId))
+                return null;
+
+            var snapshot = await _appVersionService.CreateSnapshotAsync(
+                request.ResourceId.Value,
+                userId,
+                AppVersionTrigger.NewGeneration,
+                aiSessionId: sessionId);
+
+            _logger.LogInformation("Created pre-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, request.ResourceId.Value);
+            return snapshot.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create pre-generation snapshot for app {AppId}", request.ResourceId.Value);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// After the AI completes: update the snapshot summary with an AI-generated description.
+    /// </summary>
+    protected override async Task OnAfterConversationAsync(
+        BaseStreamConversationRequest request, Guid userId, ConversationResult result, object? token)
+    {
+        if (token is not Guid snapshotId || !_systemAiService.IsAvailable) return;
+
+        try
+        {
+            var lastAssistantMessage = result.Messages
+                .LastOrDefault(m => m.Role == "assistant")?.Content ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(lastAssistantMessage)) return;
+
+            var summary = await _systemAiService.SummarizeGenerationAsync(
+                request.Message,
+                lastAssistantMessage,
+                userId.ToString());
+
+            await _appVersionService.UpdateSummaryAsync(snapshotId, summary);
+            _logger.LogInformation("Updated version summary for snapshot {SnapshotId}", snapshotId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate AI summary for snapshot {SnapshotId}", token);
+        }
+    }
 
     /// <summary>
     /// Stream an AI conversation for Web App generation/editing.

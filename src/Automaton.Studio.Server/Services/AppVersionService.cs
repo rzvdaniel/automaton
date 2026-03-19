@@ -105,6 +105,32 @@ public class AppVersionService
         return appVersion;
     }
 
+    public async Task UpdateSummaryAsync(Guid appVersionId, string summary)
+    {
+        var version = await dataContext.AppVersions.FindAsync(appVersionId);
+        if (version == null)
+        {
+            logger.Warning("AppVersion {AppVersionId} not found when trying to update summary", appVersionId);
+            return;
+        }
+
+        version.Summary = summary;
+        await dataContext.SaveChangesAsync();
+
+        logger.Information("Updated summary for app version {AppVersionId}", appVersionId);
+    }
+
+    /// <summary>
+    /// Returns true if the app has already been generated at least once.
+    /// Uses _metadata.json as the reliable marker — AI always creates it on first generation.
+    /// </summary>
+    public bool AppHasBeenGenerated(Guid appId, Guid userId)
+    {
+        var appPath = fileStorageService.GetAppDirectoryPath(userId, appId);
+        var metadataPath = Path.Combine(appPath, "_metadata.json");
+        return File.Exists(metadataPath);
+    }
+
     public async Task<(List<AppVersion> Versions, int TotalCount)> GetVersionsAsync(Guid appId, int pageNumber = 1, int pageSize = 20)
     {
         var query = dataContext.AppVersions

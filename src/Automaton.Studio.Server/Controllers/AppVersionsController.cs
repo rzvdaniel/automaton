@@ -32,7 +32,7 @@ public class AppVersionsController : BaseController
 
     /// <summary>
     /// Manually create a version snapshot for an app.
-    /// Typically called on-demand; automatic snapshots are created when new AI chat sessions start.
+    /// Automatic snapshots are also created before each AI generation via AiAppConversationController.
     /// </summary>
     [HttpPost("snapshot")]
     public async Task<ActionResult<AppVersionDto>> CreateSnapshot(Guid appId, [FromBody] CreateVersionSnapshotRequest? request = null)

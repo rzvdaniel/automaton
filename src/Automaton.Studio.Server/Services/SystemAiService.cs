@@ -1,6 +1,7 @@
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Providers;
 using Automaton.Mcp.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -15,6 +16,7 @@ public class SystemAiService : ISystemAiService
     private readonly ISystemAiRateLimitService _rateLimitService;
     private readonly AiApiKeyService _aiApiKeyService;
     private readonly AiProviderMetadataService _providerMetadataService;
+    private readonly ITokenBudgetService _tokenBudgetService;
     private readonly ILogger<SystemAiService> _logger;
 
     public SystemAiService(
@@ -22,12 +24,14 @@ public class SystemAiService : ISystemAiService
         ISystemAiRateLimitService rateLimitService,
         AiApiKeyService aiApiKeyService,
         AiProviderMetadataService providerMetadataService,
+        ITokenBudgetService tokenBudgetService,
         ILogger<SystemAiService> logger)
     {
         _providerRegistry = providerRegistry;
         _rateLimitService = rateLimitService;
         _aiApiKeyService = aiApiKeyService;
         _providerMetadataService = providerMetadataService;
+        _tokenBudgetService = tokenBudgetService;
         _logger = logger;
     }
 
@@ -72,48 +76,37 @@ public class SystemAiService : ISystemAiService
     }
 
     /// <inheritdoc />
-    public async Task<string> SummarizeSessionAsync(string conversationHistory, string? userId = null)
+    public async Task<string> SummarizeGenerationAsync(string userPrompt, string aiResponse, string? userId = null)
     {
         var aiPrompt = $$"""
-            Analyze this AI chat session and summarize what was accomplished.
-            
+            Summarize what changes the AI made to a web app based on the user's request and the AI's response.
+
+            User requested: "{{userPrompt}}"
+
+            AI response: "{{aiResponse}}"
+
             Format your response as valid JSON with this exact structure:
             {
-              "overview": "1-2 sentence summary of the session",
+              "overview": "1-2 sentence summary of what was built or changed",
               "changes": [
-                "specific change or feature 1",
-                "specific change or feature 2",
-                ...
+                "specific change 1",
+                "specific change 2"
               ]
             }
 
-            Be thorough - include all significant features, fixes, and improvements.
-            For short sessions, 3-5 items is fine. For longer sessions, include as many items as relevant (up to 15-20).
-            Focus on WHAT was built/changed, not on the conversation itself.
+            Focus on WHAT was built/changed, not on the conversation.
+            Be specific — list individual elements, styles, or behaviors that were added or modified.
             Return ONLY the JSON, no markdown code blocks, no explanation.
-
-            Conversation:
-            {{conversationHistory}}
             """;
 
-        var systemPrompt = "You are a technical assistant that summarizes software development sessions. Always respond with valid JSON only, no additional text.";
+        var systemPrompt = "You are a technical assistant that summarizes web app code changes. Always respond with valid JSON only, no additional text.";
 
         var result = await CompleteAsync(aiPrompt, systemPrompt, userId);
 
-        // Clean up potential markdown code blocks
         result = result.Trim();
-        if (result.StartsWith("```json"))
-        {
-            result = result.Substring(7);
-        }
-        if (result.StartsWith("```"))
-        {
-            result = result.Substring(3);
-        }
-        if (result.EndsWith("```"))
-        {
-            result = result.Substring(0, result.Length - 3);
-        }
+        if (result.StartsWith("```json")) result = result[7..];
+        if (result.StartsWith("```")) result = result[3..];
+        if (result.EndsWith("```")) result = result[..^3];
 
         return result.Trim();
     }
@@ -122,34 +115,35 @@ public class SystemAiService : ISystemAiService
     public async Task<string> CompleteAsync(string prompt, string? systemPrompt = null, string? userId = null)
     {
         if (!IsAvailable)
-        {
             throw new InvalidOperationException("No active AI provider with API keys is configured.");
-        }
 
-        // Check rate limit using shared service
-        if (!string.IsNullOrEmpty(userId))
-        {
-            if (!_rateLimitService.CheckAndRecordRequest(userId))
-            {
-                throw new InvalidOperationException("Rate limit exceeded. Please try again later.");
-            }
-        }
+        if (!string.IsNullOrEmpty(userId) && !_rateLimitService.CheckAndRecordRequest(userId))
+            throw new InvalidOperationException("Rate limit exceeded. Please try again later.");
 
         var resolvedUserId = TryParseUserId(userId);
         var (providerName, model, apiKey) = await ResolveProviderAsync(resolvedUserId);
 
-        // Get the provider
         var provider = _providerRegistry.GetProvider(providerName);
         if (provider == null)
-        {
             throw new InvalidOperationException($"AI provider '{providerName}' is not available.");
-        }
 
         try
         {
             _logger.LogInformation(
                 "System AI request: Provider={Provider}, Model={Model}, UserId={UserId}",
                 providerName, model, userId ?? "anonymous");
+
+            // Capture token counts from provider events so system AI usage is billed
+            int capturedInput = 0, capturedOutput = 0;
+            EventHandler<ConversationUpdatedEvent> tokenCapture = (_, e) =>
+            {
+                foreach (var msg in e.Messages)
+                {
+                    if (msg.InputTokens.HasValue)  capturedInput  = msg.InputTokens.Value;
+                    if (msg.OutputTokens.HasValue) capturedOutput += msg.OutputTokens.Value;
+                }
+            };
+            provider.ConversationUpdated += tokenCapture;
 
             var request = new ConversationRequest
             {
@@ -158,23 +152,32 @@ public class SystemAiService : ISystemAiService
                 ApiKey = apiKey,
                 InitialMessage = prompt,
                 SystemPrompt = systemPrompt ?? string.Empty,
-                MaxIterations = 1, // No tool calls for simple completion
+                MaxIterations = 1,
                 MaxConsecutiveFailures = 1
             };
 
-            // Call with empty tools for simple completion
             var result = await provider.CallAsync(
                 request,
                 Enumerable.Empty<ProviderTool>(),
-                (_, _, _) => Task.FromResult(string.Empty), // No-op tool executor
+                (_, _, _) => Task.FromResult(string.Empty),
                 CancellationToken.None);
+
+            provider.ConversationUpdated -= tokenCapture;
+
+            // Record usage so system AI calls count toward the user's monthly budget
+            if ((capturedInput > 0 || capturedOutput > 0) && resolvedUserId.HasValue)
+            {
+                await _tokenBudgetService.RecordUsageAsync(
+                    resolvedUserId.Value, providerName, model, capturedInput, capturedOutput);
+
+                _logger.LogInformation(
+                    "System AI usage recorded: UserId={UserId}, Input={Input}, Output={Output}",
+                    userId, capturedInput, capturedOutput);
+            }
 
             _logger.LogInformation(
                 "System AI response completed: UserId={UserId}, ResponseLength={Length}",
                 userId ?? "anonymous", result.Length);
-
-            // TODO: Store token usage in database for quota tracking
-            // Token counts are logged by the provider, we can capture them via events if needed
 
             return result;
         }
