@@ -87,8 +87,6 @@ public class RestoreVersionRequest
 public class RestoreVersionResponse
 {
     public Guid AppId { get; set; }
-    public int RestoredFromVersion { get; set; }
-    public DateTime RestoredAt { get; set; }
     public string Message { get; set; } = string.Empty;
 }
 

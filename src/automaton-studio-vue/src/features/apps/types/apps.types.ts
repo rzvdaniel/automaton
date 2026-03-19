@@ -343,7 +343,5 @@ export interface RestoreVersionRequest {
  */
 export interface RestoreVersionResponse {
   appId: string
-  restoredFromVersion: number
-  restoredAt: string // ISO date string
   message: string
 }

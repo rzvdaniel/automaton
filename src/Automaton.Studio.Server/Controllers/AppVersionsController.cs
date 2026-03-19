@@ -223,8 +223,6 @@ public class AppVersionsController : BaseController
             var response = new RestoreVersionResponse
             {
                 AppId = appId,
-                RestoredFromVersion = versionNumber,
-                RestoredAt = DateTime.UtcNow,
                 Message = $"App restored to version {versionNumber}"
             };
 
