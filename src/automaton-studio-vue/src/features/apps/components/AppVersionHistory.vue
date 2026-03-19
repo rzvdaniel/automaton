@@ -192,12 +192,6 @@ async function restoreVersion(versionNumber: number) {
       isRestoringVersion.value = true
       try {
         await appsService.restoreVersion(props.appId, versionNumber)
-        toast.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: `Restored to version ${versionNumber}`,
-          life: 3000,
-        })
         emit('versionRestored', versionNumber)
         showVersionDetail.value = false
         await loadVersions()
