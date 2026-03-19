@@ -259,9 +259,9 @@ Instructions are persistent markdown files injected into every future session. T
 - After adding a new feature → update `design.md` or create `features.md`
 
 **How:**
-1. Use `write_instruction` with a descriptive filename (`design.md`, `backend.md`, `features.md`)
-2. Always include YAML frontmatter: `context: always` for key files, `context: on-request` for large reference docs
-3. Write the **full updated content** — `write_instruction` replaces the file, so always include everything
+1. For **small changes** (a color, a line, a bullet) → `update_instruction` with `oldText`/`newText` (no need to rewrite the whole file)
+2. For **new files or major rewrites** → `write_instruction` with the full content
+3. Always include YAML frontmatter: `context: always` for key files, `context: on-request` for large reference docs
 4. Be concise — capture *current state and decisions*, not code listings
 
 Example `design.md`:

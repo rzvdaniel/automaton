@@ -49,7 +49,7 @@ function goToPricing() {
 
 <template>
   <!-- Global PrimeVue components -->
-  <Toast />
+  <Toast position="bottom-right" />
   <ConfirmDialog />
 
   <!-- Plan limit upgrade dialog -->

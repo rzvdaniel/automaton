@@ -244,14 +244,7 @@ onMounted(async () => {
 watch(selectedRunnerId, async (newRunnerId) => {
   if (editorStore.currentApp && newRunnerId !== editorStore.currentApp.executionRunnerId) {
     try {
-      // Update the app's execution runner ID
       await editorStore.updateAppRunner(newRunnerId)
-      toast.add({
-        severity: 'success',
-        summary: 'Runner Updated',
-        detail: 'Execution runner has been updated',
-        life: 3000,
-      })
     } catch (err: unknown) {
       toast.add({
         severity: 'error',

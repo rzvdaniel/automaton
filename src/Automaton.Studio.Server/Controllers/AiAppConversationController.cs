@@ -64,46 +64,40 @@ public class AiAppConversationController : AiConversationControllerBase
     protected override IMcpToolProvider? GetToolProvider() => _toolProvider;
 
     /// <summary>
-    /// Before the AI runs: snapshot the current app state so the user can roll back.
-    /// Skipped on the very first generation (nothing to preserve yet).
-    /// Returns the snapshot ID as the token, or null if skipped.
+    /// Before the AI runs: check whether the app exists so we know to snapshot after.
+    /// Returns the resourceId as the token, or null if skipped.
     /// </summary>
-    protected override async Task<object?> OnBeforeConversationAsync(
+    protected override Task<object?> OnBeforeConversationAsync(
         BaseStreamConversationRequest request, Guid userId, Guid sessionId)
     {
-        if (!request.ResourceId.HasValue) return null;
+        if (!request.ResourceId.HasValue) return Task.FromResult<object?>(null);
+        if (!_appVersionService.AppHasBeenGenerated(request.ResourceId.Value, userId)) return Task.FromResult<object?>(null);
 
-        try
-        {
-            if (!_appVersionService.AppHasBeenGenerated(request.ResourceId.Value, userId))
-                return null;
-
-            var snapshot = await _appVersionService.CreateSnapshotAsync(
-                request.ResourceId.Value,
-                userId,
-                AppVersionTrigger.NewGeneration,
-                aiSessionId: sessionId);
-
-            _logger.LogInformation("Created pre-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, request.ResourceId.Value);
-            return snapshot.Id;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to create pre-generation snapshot for app {AppId}", request.ResourceId.Value);
-            return null;
-        }
+        // Pass (resourceId, sessionId) forward so OnAfterConversationAsync can snapshot post-generation
+        return Task.FromResult<object?>((request.ResourceId.Value, sessionId));
     }
 
     /// <summary>
-    /// After the AI completes: update the snapshot summary with an AI-generated description.
+    /// After the AI completes: snapshot the new state and summarize it.
+    /// Snapshot is taken post-generation so restoring Version N gives the state described by its summary.
     /// </summary>
     protected override async Task OnAfterConversationAsync(
         BaseStreamConversationRequest request, Guid userId, ConversationResult result, object? token)
     {
-        if (token is not Guid snapshotId || !_systemAiService.IsAvailable) return;
+        if (token is not (Guid resourceId, Guid sessionId)) return;
 
         try
         {
+            var snapshot = await _appVersionService.CreateSnapshotAsync(
+                resourceId,
+                userId,
+                AppVersionTrigger.NewGeneration,
+                aiSessionId: sessionId);
+
+            _logger.LogInformation("Created post-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, resourceId);
+
+            if (!_systemAiService.IsAvailable) return;
+
             var lastAssistantMessage = result.Messages
                 .LastOrDefault(m => m.Role == "assistant")?.Content ?? string.Empty;
 
@@ -114,12 +108,12 @@ public class AiAppConversationController : AiConversationControllerBase
                 lastAssistantMessage,
                 userId.ToString());
 
-            await _appVersionService.UpdateSummaryAsync(snapshotId, summary);
-            _logger.LogInformation("Updated version summary for snapshot {SnapshotId}", snapshotId);
+            await _appVersionService.UpdateSummaryAsync(snapshot.Id, summary);
+            _logger.LogInformation("Updated version summary for snapshot {SnapshotId}", snapshot.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to generate AI summary for snapshot {SnapshotId}", token);
+            _logger.LogWarning(ex, "Failed to create/summarize post-generation snapshot for app {AppId}", resourceId);
         }
     }
 
