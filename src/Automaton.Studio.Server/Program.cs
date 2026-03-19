@@ -348,6 +348,7 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.InstructionsTool>();
 // Instruction injector — injects .instructions/ files into system prompts
 services.AddScoped<Automaton.Studio.Server.Services.AppInstructionInjector>();
+services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();
 
 // MCP Client
 services.AddAutomatonMcpClient();

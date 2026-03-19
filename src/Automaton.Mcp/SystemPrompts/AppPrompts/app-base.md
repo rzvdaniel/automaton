@@ -246,3 +246,34 @@ if (res.success) { ... }
 - Controller files: `snake_case.py`
 - File paths: forward slashes (`styles/main.css`)
 - Action names: flat method name (`list`, `create`, `delete`)
+
+## APP INSTRUCTIONS (`.instructions/` folder) — MANDATORY:
+
+Instructions are persistent markdown files injected into every future session. They capture the current state of the app so the AI never treats an existing app as a blank slate.
+
+**RULE: You MUST call `write_instruction` at the end of EVERY session that modifies the app — no exceptions, even for tiny changes like a color tweak.**
+
+- After creating a new app → write `design.md` (theme, layout, color palette, component patterns, key features)
+- After any UI change (color, layout, animation, style) → update `design.md`
+- After adding backend logic → write/update `backend.md` (controller names, actions, data formats)
+- After adding a new feature → update `design.md` or create `features.md`
+
+**How:**
+1. Use `write_instruction` with a descriptive filename (`design.md`, `backend.md`, `features.md`)
+2. Always include YAML frontmatter: `context: always` for key files, `context: on-request` for large reference docs
+3. Write the **full updated content** — `write_instruction` replaces the file, so always include everything
+4. Be concise — capture *current state and decisions*, not code listings
+
+Example `design.md`:
+```markdown
+---
+context: always
+priority: high
+---
+# App Design
+
+**Theme**: Anime cartoon space — pastel purples, yellow stars, rounded fonts
+**Layout**: Single-page centered card, mobile-first, animated star background
+**Key features**: Audio format picker shown upfront; converted file shown as download link
+**Star animation**: CSS keyframe `twinkle`, yellow (#FFD700), slow 3-6s duration
+```

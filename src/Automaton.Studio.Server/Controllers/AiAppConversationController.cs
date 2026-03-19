@@ -29,6 +29,7 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly AppInstructionInjector _instructionInjector;
     private readonly AppVersionService _appVersionService;
     private readonly ISystemAiService _systemAiService;
+    private readonly AppMemoryService _appMemoryService;
 
     public AiAppConversationController(
         IAutomatonMcpClient mcpClient,
@@ -44,6 +45,7 @@ public class AiAppConversationController : AiConversationControllerBase
         AppInstructionInjector instructionInjector,
         AppVersionService appVersionService,
         ISystemAiService systemAiService,
+        AppMemoryService appMemoryService,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
                rateLimitService, providerMetadataService, tokenBudgetService, logger)
@@ -54,6 +56,7 @@ public class AiAppConversationController : AiConversationControllerBase
         _instructionInjector  = instructionInjector;
         _appVersionService    = appVersionService;
         _systemAiService      = systemAiService;
+        _appMemoryService     = appMemoryService;
     }
 
     protected override ChatResourceType ResourceType => ChatResourceType.WebApp;
@@ -161,6 +164,27 @@ public class AiAppConversationController : AiConversationControllerBase
             _logger.LogInformation(
                 "Adding continuation context for session {SessionId} ({Count} messages)", sessionId, history.Count);
             return $"{prompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+        }
+
+        // New session for an existing app — inject memory so the AI knows what has already been built
+        if (request.ResourceId.HasValue)
+        {
+            try
+            {
+                var memoryBlock = await _appMemoryService.BuildMemoryBlockAsync(
+                    request.ResourceId.Value, sessionId, userId);
+
+                if (memoryBlock is not null)
+                {
+                    _logger.LogInformation(
+                        "Injecting app memory block for new session on existing app {AppId}", request.ResourceId.Value);
+                    return $"{prompt}\n\n{memoryBlock}";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to build app memory block for app {AppId}", request.ResourceId.Value);
+            }
         }
 
         return prompt;
