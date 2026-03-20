@@ -433,12 +433,6 @@ async function handleSaveFile() {
 
   try {
     await editorStore.saveFile(editorStore.activeFilePath)
-    toast.add({
-      severity: 'success',
-      summary: 'Saved',
-      detail: 'File saved successfully',
-      life: 3000,
-    })
   } catch (err: unknown) {
     toast.add({
       severity: 'error',
