@@ -13,7 +13,6 @@ import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
-import ScrollPanel from 'primevue/scrollpanel'
 import Message from 'primevue/message'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
@@ -421,7 +420,7 @@ defineExpose({
     </div>
 
     <!-- Version list -->
-    <ScrollPanel v-else class="versions-scroll">
+    <div v-else class="versions-scroll">
       <div class="versions-list">
         <div
           v-for="version in versionList.versions"
@@ -488,7 +487,7 @@ defineExpose({
           <i v-if="isLoadingMore" class="pi pi-spin pi-spinner text-color-secondary"></i>
         </div>
       </div>
-    </ScrollPanel>
+    </div>
 
     <!-- Version detail dialog -->
     <Dialog
