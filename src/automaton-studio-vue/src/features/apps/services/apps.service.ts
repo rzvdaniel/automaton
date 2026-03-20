@@ -500,9 +500,9 @@ class AppsService {
    * Get version history for an app with pagination
    * GET /api/apps/{appId}/versions
    */
-  async getVersions(appId: string, pageNumber: number = 1, pageSize: number = 20) {
+  async getVersions(appId: string, pageNumber: number = 1, pageSize: number = 20, search?: string) {
     const { data } = await apiClient.get(`/api/apps/${appId}/versions`, {
-      params: { pageNumber, pageSize },
+      params: { pageNumber, pageSize, search: search || undefined },
     })
     return data
   }
