@@ -22,17 +22,28 @@ public class AiChatHistoryService : IAiChatHistoryService
         this.logger = Serilog.Log.ForContext<AiChatHistoryService>();
     }
 
-    public async Task<List<ChatSessionDto>> GetSessionsAsync(ChatResourceType resourceType, Guid resourceId, Guid userId)
+    public async Task<PagedResult<ChatSessionDto>> GetSessionsAsync(
+        ChatResourceType resourceType, Guid resourceId, Guid userId,
+        int page = 1, int pageSize = 20, string? search = null)
     {
         try
         {
-            var sessions = await dataContext.AiChatSessions
+            var query = dataContext.AiChatSessions
                 .Include(s => s.AiChatSessionUsers)
                 .Include(s => s.Messages)
                 .Where(s => s.ResourceType == resourceType &&
                            s.ResourceId == resourceId &&
-                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId));
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(s => s.Title.Contains(search));
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
                 .OrderByDescending(s => s.UpdatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(s => new ChatSessionDto
                 {
                     Id = s.Id,
@@ -53,7 +64,13 @@ public class AiChatHistoryService : IAiChatHistoryService
                 })
                 .ToListAsync();
 
-            return sessions;
+            return new PagedResult<ChatSessionDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
         }
         catch (Exception ex)
         {

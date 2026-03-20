@@ -9,6 +9,7 @@ import type {
   CreateChatSessionRequest,
   SaveChatMessageRequest,
   AppChatStats,
+  PagedResult,
 } from '@/shared/types/ai.types'
 
 function parseMetadata(metadata: string | null | undefined): any {
@@ -50,9 +51,12 @@ export const aiChatHistoryService = {
   async getSessions(
     resourceType: string,
     resourceId: string,
-  ): Promise<ChatSession[]> {
+    page = 1,
+    pageSize = 20,
+    search?: string,
+  ): Promise<PagedResult<ChatSession>> {
     const response = await axiosInstance.get('/api/AiChatHistory/sessions', {
-      params: { resourceType, resourceId },
+      params: { resourceType, resourceId, page, pageSize, search: search || undefined },
     })
     return response.data
   },

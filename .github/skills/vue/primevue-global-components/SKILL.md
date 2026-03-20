@@ -249,3 +249,51 @@ Is this a PrimeVue component?
 │     └─ NO → Safe to import locally (it's a UI component)
 └─ NO → Proceed normally
 ```
+
+---
+
+## Search Input with Clear Button
+
+Use PrimeVue's `IconField` + `InputIcon` to embed icons (including an interactive clear button) inside an `InputText`. This keeps sizing consistent and avoids the hover/size mismatch you get when overlaying an absolute-positioned `Button`.
+
+### ✅ Correct Pattern
+
+```vue
+<template>
+  <IconField>
+    <InputIcon
+      :class="searchQuery ? 'pi pi-times cursor-pointer' : 'pi pi-search'"
+      @click="searchQuery ? searchQuery = '' : undefined"
+    />
+    <InputText v-model="searchQuery" placeholder="Search..." size="small" class="w-full" />
+  </IconField>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+
+const searchQuery = ref('')
+</script>
+```
+
+- When empty → shows 🔍 search icon (non-interactive)
+- When populated → switches to ✕ icon; click clears the input
+- No custom CSS needed; icon is naturally sized to the input
+
+### ❌ Incorrect Pattern
+
+```vue
+<!-- DON'T: absolute-positioned Button overlay causes hover size issues -->
+<div style="position: relative">
+  <InputText v-model="searchQuery" style="padding-right: 2rem" />
+  <Button
+    v-if="searchQuery"
+    icon="pi pi-times"
+    style="position: absolute; right: 0.25rem"
+    @click="searchQuery = ''"
+  />
+</div>
+```
