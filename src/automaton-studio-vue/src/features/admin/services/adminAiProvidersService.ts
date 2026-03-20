@@ -13,6 +13,7 @@ import type {
   AiApiKeyAdmin,
   CreateAiApiKeyRequest,
   UpdateAiApiKeyRequest,
+  GlobalAiDefaults,
 } from '../types/admin.types'
 
 class AdminAiProvidersService {
@@ -57,6 +58,15 @@ class AdminAiProvidersService {
    */
   async deleteProvider(id: string): Promise<void> {
     await apiClient.delete(`/api/admin/ai-providers/${id}`)
+  }
+
+  /**
+   * Get the current global default and planning models (across all providers)
+   * GET /api/admin/ai-models/global-defaults
+   */
+  async getGlobalDefaults(): Promise<GlobalAiDefaults> {
+    const { data } = await apiClient.get<GlobalAiDefaults>('/api/admin/ai-models/global-defaults')
+    return data
   }
 
   /**

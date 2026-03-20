@@ -13,12 +13,14 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import Tag from 'primevue/tag'
+import Popover from 'primevue/popover'
 import { adminAiProvidersService } from '../services/adminAiProvidersService'
 import type {
   AiProviderAdmin,
   AiModelAdmin,
   CreateAiModelRequest,
   UpdateAiModelRequest,
+  GlobalAiDefaults,
 } from '../types/admin.types'
 
 const router = useRouter()
@@ -31,6 +33,7 @@ const provider = ref<AiProviderAdmin | null>(null)
 const models = ref<AiModelAdmin[]>([])
 const loading = ref(false)
 const error = ref('')
+const globalDefaults = ref<GlobalAiDefaults>({})
 
 // Dialog state
 const showDialog = ref(false)
@@ -59,6 +62,21 @@ const providerId = computed(() => route.params.providerId as string)
 
 const dialogHeader = computed(() => (editingModel.value ? 'Edit Model' : 'Add Model'))
 
+// Show info when the global default/planner belongs to a different provider
+const globalDefaultFromOtherProvider = computed(() => {
+  const d = globalDefaults.value.defaultModel
+  return d && d.aiProviderId !== providerId.value ? d : null
+})
+
+const globalPlannerFromOtherProvider = computed(() => {
+  const p = globalDefaults.value.planningModel
+  return p && p.aiProviderId !== providerId.value ? p : null
+})
+
+// Popover refs for override warning icons
+const defaultWarningPopover = ref()
+const plannerWarningPopover = ref()
+
 onMounted(async () => {
   await loadData()
 })
@@ -67,12 +85,14 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [providerData, modelsData] = await Promise.all([
+    const [providerData, modelsData, defaults] = await Promise.all([
       adminAiProvidersService.getProvider(providerId.value),
       adminAiProvidersService.getModelsByProvider(providerId.value),
+      adminAiProvidersService.getGlobalDefaults(),
     ])
     provider.value = providerData
     models.value = modelsData
+    globalDefaults.value = defaults
   } catch (err) {
     error.value = 'Failed to load provider data'
     console.error('Error loading data:', err)
@@ -403,7 +423,7 @@ function goBackToProviders() {
         </div>
 
         <!-- Status row -->
-        <div class="flex gap-4">
+        <div class="flex gap-4 flex-wrap">
           <div class="flex align-items-center gap-2">
             <Checkbox id="modelIsActive" v-model="formData.isActive" :binary="true" />
             <label for="modelIsActive">Active</label>
@@ -411,12 +431,34 @@ function goBackToProviders() {
           <div class="flex align-items-center gap-2">
             <Checkbox id="modelIsDefault" v-model="formData.isDefault" :binary="true" />
             <label for="modelIsDefault">Default model</label>
+            <template v-if="globalDefaultFromOtherProvider && !formData.isDefault">
+              <i
+                class="pi pi-exclamation-circle text-orange-500 cursor-pointer"
+                @click="defaultWarningPopover.toggle($event)"
+              />
+              <Popover ref="defaultWarningPopover" style="width: 220px">
+                <span class="text-sm">
+                  Currently: <strong>{{ globalDefaultFromOtherProvider.displayName }}</strong>
+                  ({{ globalDefaultFromOtherProvider.providerName }}) — enabling this will override it
+                </span>
+              </Popover>
+            </template>
           </div>
           <div class="flex align-items-center gap-2">
             <Checkbox id="modelIsPlanningModel" v-model="formData.isPlanningModel" :binary="true" />
-            <label for="modelIsPlanningModel" title="Used for the planning phase (plan mode) instead of the user's selected model">
-              Planning model
-            </label>
+            <label for="modelIsPlanningModel">Planning model</label>
+            <template v-if="globalPlannerFromOtherProvider && !formData.isPlanningModel">
+              <i
+                class="pi pi-exclamation-circle text-orange-500 cursor-pointer"
+                @click="plannerWarningPopover.toggle($event)"
+              />
+              <Popover ref="plannerWarningPopover" style="width: 220px">
+                <span class="text-sm">
+                  Currently: <strong>{{ globalPlannerFromOtherProvider.displayName }}</strong>
+                  ({{ globalPlannerFromOtherProvider.providerName }}) — enabling this will override it
+                </span>
+              </Popover>
+            </template>
           </div>
         </div>
 

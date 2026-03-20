@@ -123,6 +123,15 @@ export interface UpdateAiModelRequest {
 }
 
 /**
+ * Global AI defaults response
+ * Matches GlobalAiDefaultsResponse from backend
+ */
+export interface GlobalAiDefaults {
+  defaultModel?: AiModelAdmin
+  planningModel?: AiModelAdmin
+}
+
+/**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend
  */

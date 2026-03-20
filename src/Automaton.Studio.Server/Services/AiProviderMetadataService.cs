@@ -76,6 +76,34 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
+    /// Get the globally-designated default model (across all providers).
+    /// Returns null if no model has IsDefault=true anywhere.
+    /// </summary>
+    public async Task<(string ProviderName, string ModelId)?> GetGlobalDefaultModelAsync()
+    {
+        var result = await dbContext.AiModels
+            .Where(m => m.IsActive && m.IsDefault)
+            .Select(m => new { ProviderName = m.Provider.Name, m.ModelId })
+            .FirstOrDefaultAsync();
+
+        return result != null ? (result.ProviderName, result.ModelId) : null;
+    }
+
+    /// <summary>
+    /// Get the globally-designated planning model (across all providers).
+    /// Returns null if no model has IsPlanningModel=true anywhere.
+    /// </summary>
+    public async Task<(string ProviderName, string ModelId)?> GetGlobalPlanningModelAsync()
+    {
+        var result = await dbContext.AiModels
+            .Where(m => m.IsActive && m.IsPlanningModel)
+            .Select(m => new { ProviderName = m.Provider.Name, m.ModelId })
+            .FirstOrDefaultAsync();
+
+        return result != null ? (result.ProviderName, result.ModelId) : null;
+    }
+
+    /// <summary>
     /// Get the preferred model for a provider (default if set, otherwise first by sort order).
     /// </summary>
     public async Task<string?> GetPreferredModelAsync(string providerName)

@@ -190,24 +190,32 @@ public class SystemAiService : ISystemAiService
 
     private async Task<(string Provider, string Model, string ApiKey)> ResolveProviderAsync(Guid? userId)
     {
-        var providerName = await _aiApiKeyService.GetFirstProviderWithActiveKeyAsync();
-        if (string.IsNullOrWhiteSpace(providerName))
-        {
-            throw new InvalidOperationException("No active AI provider with API keys is configured.");
-        }
+        string providerName;
+        string model;
 
-        var model = await _providerMetadataService.GetPreferredModelAsync(providerName);
-        if (string.IsNullOrWhiteSpace(model))
+        // Prefer the globally-designated default model — it determines both provider and model
+        var globalDefault = await _providerMetadataService.GetGlobalDefaultModelAsync();
+        if (globalDefault.HasValue)
         {
-            throw new InvalidOperationException($"No active AI models configured for provider '{providerName}'.");
+            providerName = globalDefault.Value.ProviderName;
+            model = globalDefault.Value.ModelId;
+        }
+        else
+        {
+            // Fallback: first provider with an active API key, then its preferred model
+            providerName = await _aiApiKeyService.GetFirstProviderWithActiveKeyAsync();
+            if (string.IsNullOrWhiteSpace(providerName))
+                throw new InvalidOperationException("No active AI provider with API keys is configured.");
+
+            model = await _providerMetadataService.GetPreferredModelAsync(providerName);
+            if (string.IsNullOrWhiteSpace(model))
+                throw new InvalidOperationException($"No active AI models configured for provider '{providerName}'.");
         }
 
         var resolvedUserId = userId ?? Guid.Empty;
         var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(resolvedUserId, providerName);
         if (string.IsNullOrWhiteSpace(apiKey))
-        {
             throw new InvalidOperationException($"No active API key found for provider '{providerName}'.");
-        }
 
         return (providerName, model, apiKey);
     }

@@ -227,6 +227,63 @@ public class AdminAiProvidersController : ControllerBase
     #region Models
 
     /// <summary>
+    /// Get the current global default and planning models (across all providers)
+    /// </summary>
+    [HttpGet("~/api/admin/ai-models/global-defaults")]
+    public async Task<ActionResult<GlobalAiDefaultsResponse>> GetGlobalDefaults()
+    {
+        var defaultModel = await dbContext.AiModels
+            .Where(m => m.IsDefault)
+            .Select(m => new AiModelAdminResponse
+            {
+                Id = m.Id,
+                AiProviderId = m.AiProviderId,
+                ProviderName = m.Provider.Name,
+                ModelId = m.ModelId,
+                DisplayName = m.DisplayName,
+                IsDefault = m.IsDefault,
+                IsPlanningModel = m.IsPlanningModel,
+                IsActive = m.IsActive,
+                MaxTokens = m.MaxTokens,
+                SupportsStreaming = m.SupportsStreaming,
+                SupportsTools = m.SupportsTools,
+                SupportsVision = m.SupportsVision,
+                SortOrder = m.SortOrder,
+                CreatedAt = m.CreatedAt,
+                UpdatedAt = m.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        var planningModel = await dbContext.AiModels
+            .Where(m => m.IsPlanningModel)
+            .Select(m => new AiModelAdminResponse
+            {
+                Id = m.Id,
+                AiProviderId = m.AiProviderId,
+                ProviderName = m.Provider.Name,
+                ModelId = m.ModelId,
+                DisplayName = m.DisplayName,
+                IsDefault = m.IsDefault,
+                IsPlanningModel = m.IsPlanningModel,
+                IsActive = m.IsActive,
+                MaxTokens = m.MaxTokens,
+                SupportsStreaming = m.SupportsStreaming,
+                SupportsTools = m.SupportsTools,
+                SupportsVision = m.SupportsVision,
+                SortOrder = m.SortOrder,
+                CreatedAt = m.CreatedAt,
+                UpdatedAt = m.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        return Ok(new GlobalAiDefaultsResponse
+        {
+            DefaultModel = defaultModel,
+            PlanningModel = planningModel
+        });
+    }
+
+    /// <summary>
     /// Get all models for a provider
     /// </summary>
     [HttpGet("{providerId}/models")]
@@ -320,16 +377,29 @@ public class AdminAiProvidersController : ControllerBase
         if (existingModel != null)
             return BadRequest($"A model with ID '{request.ModelId}' already exists for this provider.");
 
-        // If this model is set as default, unset other defaults for this provider
+        // If this model is set as default, unset the global default across all providers
         if (request.IsDefault)
         {
             var existingDefaults = await dbContext.AiModels
-                .Where(m => m.AiProviderId == providerId && m.IsDefault)
+                .Where(m => m.IsDefault)
                 .ToListAsync();
 
             foreach (var model in existingDefaults)
             {
                 model.IsDefault = false;
+            }
+        }
+
+        // If this model is set as planning model, unset the global planning model across all providers
+        if (request.IsPlanningModel)
+        {
+            var existingPlanners = await dbContext.AiModels
+                .Where(m => m.IsPlanningModel)
+                .ToListAsync();
+
+            foreach (var model in existingPlanners)
+            {
+                model.IsPlanningModel = false;
             }
         }
 
@@ -404,16 +474,29 @@ public class AdminAiProvidersController : ControllerBase
             model.ModelId = request.ModelId;
         }
 
-        // If setting as default, unset other defaults for this provider
+        // If setting as default, unset the global default across all providers
         if (request.IsDefault == true && !model.IsDefault)
         {
             var existingDefaults = await dbContext.AiModels
-                .Where(m => m.AiProviderId == model.AiProviderId && m.IsDefault && m.Id != id)
+                .Where(m => m.IsDefault && m.Id != id)
                 .ToListAsync();
 
             foreach (var defaultModel in existingDefaults)
             {
                 defaultModel.IsDefault = false;
+            }
+        }
+
+        // If setting as planning model, unset the global planning model across all providers
+        if (request.IsPlanningModel == true && !model.IsPlanningModel)
+        {
+            var existingPlanners = await dbContext.AiModels
+                .Where(m => m.IsPlanningModel && m.Id != id)
+                .ToListAsync();
+
+            foreach (var plannerModel in existingPlanners)
+            {
+                plannerModel.IsPlanningModel = false;
             }
         }
 
@@ -704,6 +787,12 @@ public class AdminUpdateAiApiKeyRequest
     public string? ApiKey { get; set; }
     public string? Description { get; set; }
     public bool? IsActive { get; set; }
+}
+
+public class GlobalAiDefaultsResponse
+{
+    public AiModelAdminResponse? DefaultModel { get; set; }
+    public AiModelAdminResponse? PlanningModel { get; set; }
 }
 
 #endregion
