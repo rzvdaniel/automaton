@@ -71,6 +71,11 @@ public class VersionStepChangeDto
 public class CreateVersionSnapshotRequest
 {
     public string? Trigger { get; set; } = "ManualSave"; // Default to ManualSave if not specified
+    
+    /// <summary>
+    /// Optional user-provided summary for the snapshot. When provided, overrides the auto-generated summary.
+    /// </summary>
+    public string? Summary { get; set; }
 }
 
 /// <summary>

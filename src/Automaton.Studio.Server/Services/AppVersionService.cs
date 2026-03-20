@@ -27,7 +27,7 @@ public class AppVersionService
         AppVersionTrigger trigger,
         Guid? aiSessionId = null,
         string? aiModel = null,
-        string? aiGeneratedSummary = null)
+        string? summary = null)
     {
         var app = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -46,15 +46,15 @@ public class AppVersionService
         // Generate file change summary by comparing with previous version
         var filesChangeSummary = await GenerateFilesChangeSummaryAsync(appId, nextVersion);
         
-        // Use AI-generated summary if provided, otherwise generate from file changes
-        var summary = aiGeneratedSummary ?? await GenerateVersionSummaryAsync(appId, nextVersion, filesChangeSummary);
+        // Use provided summary if given, otherwise generate from file changes
+        var resolvedSummary = summary ?? await GenerateVersionSummaryAsync(appId, nextVersion, filesChangeSummary);
 
         var appVersion = new AppVersion
         {
             Id = Guid.NewGuid(),
             AppId = appId,
             VersionNumber = nextVersion,
-            Summary = summary,
+            Summary = resolvedSummary,
             Trigger = trigger,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId,
