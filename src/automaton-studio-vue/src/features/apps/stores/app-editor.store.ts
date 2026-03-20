@@ -652,8 +652,19 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         }
       }
 
-      // Refresh preview if index.html was affected
-      if (!affectedFiles || affectedFiles.includes('index.html')) {
+      // Refresh preview if any file that affects rendering was changed:
+      // index.html, CSS files, or JS files (they are all inlined/referenced by the preview)
+      // Refresh preview unless the file only affects backend/non-browser concerns
+      const affectsPreview = (f: string) =>
+        !f.includes('backend/') &&
+        !f.startsWith('versions/') &&
+        !f.startsWith('.plans/') &&
+        !f.startsWith('.instructions/')
+
+      const shouldRefresh =
+        !affectedFiles || affectedFiles.some(affectsPreview)
+
+      if (shouldRefresh) {
         await refreshPreview()
       }
     } catch (err: unknown) {
@@ -669,11 +680,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Open preview overlay
+   * Open preview overlay — always refreshes so the latest saved files are shown.
    */
   function openPreviewOverlay(): void {
     showPreviewOverlay.value = true
-    if (!previewUrl.value && currentApp.value) {
+    if (currentApp.value) {
       void refreshPreview()
     }
   }
