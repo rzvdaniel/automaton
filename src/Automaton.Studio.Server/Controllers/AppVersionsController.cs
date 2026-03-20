@@ -99,7 +99,8 @@ public class AppVersionsController : BaseController
     public async Task<ActionResult<AppVersionListDto>> ListVersions(
         Guid appId,
         [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null)
     {
         try
         {
@@ -110,7 +111,7 @@ public class AppVersionsController : BaseController
                 return NotFound(new { message = "App not found" });
             }
 
-            var result = await appVersionService.GetVersionsAsync(appId, pageNumber, pageSize);
+            var result = await appVersionService.GetVersionsAsync(appId, pageNumber, pageSize, search);
 
             var dto = new AppVersionListDto
             {

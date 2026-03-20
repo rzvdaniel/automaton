@@ -5,9 +5,11 @@
  * Provides chat interface for AI-assisted development with real backend integration
  * Can be used in any context: Apps, Flows, Steps, etc.
  */
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
@@ -59,7 +61,10 @@ const {
   sessions,
   activeSession,
   isLoadingSessions,
+  isLoadingMoreSessions,
+  hasMoreSessions,
   loadSessions,
+  loadMoreSessions,
   loadSessionMessages,
   createSession,
   activateSession,
@@ -95,24 +100,48 @@ const isPreparingSession = ref(false)
 // Combined "busy" flag: true when preparing the session OR when the AI is generating
 const isBusy = computed(() => isPreparingSession.value || isGenerating.value)
 const sortedSessions = computed(() => {
-  return [...sessions.value].sort((a, b) => {
-    // Active session first, then by creation date descending
-    if (a.isActive) return -1
-    if (b.isActive) return 1
-    return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime()
-  })
+  // Active session always floats to the top; the rest are already sorted by updatedAt from the server
+  const active = sessions.value.find(s => s.isActive)
+  const rest = sessions.value.filter(s => !s.isActive)
+  return active ? [active, ...rest] : rest
 })
 
 const latestSession = computed(() => sortedSessions.value[0] || null)
 
-// Filter sessions by search query
-const filteredSessions = computed(() => {
-  if (!sessionsSearchQuery.value.trim()) return sortedSessions.value
-  
-  const query = sessionsSearchQuery.value.toLowerCase()
-  return sortedSessions.value.filter(s => 
-    s.title?.toLowerCase().includes(query)
+// Search — server-side, debounced
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(sessionsSearchQuery, (value) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    void loadSessions(value.trim() || undefined)
+  }, 300)
+})
+
+// Infinite scroll sentinel
+const scrollSentinelRef = ref<HTMLElement | null>(null)
+let intersectionObserver: IntersectionObserver | null = null
+
+function setupIntersectionObserver() {
+  if (intersectionObserver) intersectionObserver.disconnect()
+  if (!scrollSentinelRef.value) return
+  intersectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMoreSessions.value) {
+        void loadMoreSessions()
+      }
+    },
+    { threshold: 0.1 }
   )
+  intersectionObserver.observe(scrollSentinelRef.value)
+}
+
+watch(scrollSentinelRef, (el) => {
+  if (el) setupIntersectionObserver()
+})
+
+onUnmounted(() => {
+  intersectionObserver?.disconnect()
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 })
 
 // UI state
@@ -463,6 +492,20 @@ function handleKeyPress(event: KeyboardEvent) {
             @click="handleResumeLastSession"
           />
         </div>
+        <div class="mt-2">
+          <IconField class="w-full">
+            <InputIcon
+              :class="sessionsSearchQuery ? 'pi pi-times cursor-pointer' : 'pi pi-search'"
+              @click="sessionsSearchQuery ? sessionsSearchQuery = '' : undefined"
+            />
+            <InputText
+              v-model="sessionsSearchQuery"
+              placeholder="Search sessions..."
+              size="small"
+              class="w-full"
+            />
+          </IconField>
+        </div>
       </div>
 
       <!-- Sessions List -->
@@ -485,7 +528,7 @@ function handleKeyPress(event: KeyboardEvent) {
 
         <div v-else class="sessions-list-container">
           <div
-            v-for="session in filteredSessions"
+            v-for="session in sortedSessions"
             :key="session.id"
             class="session-card"
             :class="{ active: session.id === activeSession?.id }"
@@ -527,6 +570,11 @@ function handleKeyPress(event: KeyboardEvent) {
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Infinite scroll sentinel -->
+          <div ref="scrollSentinelRef" class="scroll-sentinel">
+            <i v-if="isLoadingMoreSessions" class="pi pi-spin pi-spinner text-color-secondary"></i>
           </div>
         </div>
       </div>
@@ -893,6 +941,13 @@ function handleKeyPress(event: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.scroll-sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+  min-height: 1px;
 }
 
 .session-card {

@@ -9,9 +9,11 @@ namespace Automaton.Studio.Server.Services.Interfaces;
 public interface IAiChatHistoryService
 {
     /// <summary>
-    /// Get all chat sessions for a specific resource (Step or WebApp)
+    /// Get paginated chat sessions for a specific resource (Step or WebApp)
     /// </summary>
-    Task<List<ChatSessionDto>> GetSessionsAsync(ChatResourceType resourceType, Guid resourceId, Guid userId);
+    Task<PagedResult<ChatSessionDto>> GetSessionsAsync(
+        ChatResourceType resourceType, Guid resourceId, Guid userId,
+        int page = 1, int pageSize = 20, string? search = null);
 
     /// <summary>
     /// Get a specific chat session by ID

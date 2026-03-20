@@ -4,7 +4,7 @@
  * Displays app version history and allows restoration from previous versions
  * Shows timeline of snapshots with triggers and summaries
  */
-import { ref, onMounted, defineExpose, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, defineExpose, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
@@ -13,9 +13,10 @@ import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import ScrollPanel from 'primevue/scrollpanel'
 import Message from 'primevue/message'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 import { appsService } from '../services/apps.service'
 import type { AppVersion, AppVersionDetail, AppVersionList } from '../types/apps.types'
 
@@ -33,6 +34,7 @@ const toast = useToast()
 const confirm = useConfirm()
 
 const isLoading = ref(false)
+const isLoadingMore = ref(false)
 const isCreatingSnapshot = ref(false)
 const isRestoringVersion = ref(false)
 const versionList = ref<AppVersionList | null>(null)
@@ -40,16 +42,24 @@ const selectedVersion = ref<AppVersionDetail | null>(null)
 const showVersionDetail = ref(false)
 const showSnapshotDialog = ref(false)
 const snapshotSummary = ref('')
+const searchQuery = ref('')
+const versionsPageSize = 20
+
+const hasMore = computed(() => {
+  if (!versionList.value) return false
+  return versionList.value.versions.length < versionList.value.totalCount
+})
 
 /**
- * Load version history (exposed for parent component to call)
+ * Load version history page 1 (exposed for parent component to call)
  */
-const loadVersions = async () => {
+const loadVersions = async (search?: string) => {
   if (!props.appId) return
+  if (search !== undefined) searchQuery.value = search
 
   isLoading.value = true
   try {
-    const result = await appsService.getVersions(props.appId, 1, 50)
+    const result = await appsService.getVersions(props.appId, 1, versionsPageSize, searchQuery.value || undefined)
     versionList.value = result
   } catch (error: unknown) {
     toast.add({
@@ -62,6 +72,68 @@ const loadVersions = async () => {
     isLoading.value = false
   }
 }
+
+/**
+ * Append the next page (infinite scroll)
+ */
+async function loadMoreVersions() {
+  if (!props.appId || !versionList.value || !hasMore.value || isLoadingMore.value) return
+
+  isLoadingMore.value = true
+  const nextPage = versionList.value.pageNumber + 1
+  try {
+    const result = await appsService.getVersions(props.appId, nextPage, versionsPageSize, searchQuery.value || undefined)
+    versionList.value = {
+      ...result,
+      versions: [...versionList.value.versions, ...result.versions],
+    }
+  } catch (error: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error instanceof Error ? error.message : 'Failed to load more versions',
+      life: 5000,
+    })
+  } finally {
+    isLoadingMore.value = false
+  }
+}
+
+// Debounced search — watch covers both typing and the clear-button click
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchQuery, (value) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    void loadVersions(value.trim() || undefined)
+  }, 300)
+})
+
+// Infinite scroll sentinel
+const scrollSentinelRef = ref<HTMLElement | null>(null)
+let intersectionObserver: IntersectionObserver | null = null
+
+function setupIntersectionObserver() {
+  if (intersectionObserver) intersectionObserver.disconnect()
+  if (!scrollSentinelRef.value) return
+  intersectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMore.value) {
+        void loadMoreVersions()
+      }
+    },
+    { threshold: 0.1 }
+  )
+  intersectionObserver.observe(scrollSentinelRef.value)
+}
+
+watch(scrollSentinelRef, (el) => {
+  if (el) setupIntersectionObserver()
+})
+
+onUnmounted(() => {
+  intersectionObserver?.disconnect()
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+})
 
 /**
  * View version details
@@ -320,6 +392,22 @@ defineExpose({
 
     <Divider />
 
+    <!-- Search -->
+    <div class="px-2 pb-2">
+      <IconField class="w-full">
+        <InputIcon
+          :class="searchQuery ? 'pi pi-times cursor-pointer' : 'pi pi-search'"
+          @click="searchQuery ? (searchQuery = '') : undefined"
+        />
+        <InputText
+          v-model="searchQuery"
+          placeholder="Search versions..."
+          size="small"
+          class="w-full"
+        />
+      </IconField>
+    </div>
+
     <!-- Loading state -->
     <div v-if="isLoading" class="loading-state">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" stroke-width="4" />
@@ -343,7 +431,7 @@ defineExpose({
     </div>
 
     <!-- Version list -->
-    <ScrollPanel v-else class="versions-scroll">
+    <div v-else class="versions-scroll">
       <div class="versions-list">
         <div
           v-for="version in versionList.versions"
@@ -404,8 +492,13 @@ defineExpose({
             </div>
           </div>
         </div>
+
+        <!-- Infinite scroll sentinel -->
+        <div ref="scrollSentinelRef" class="scroll-sentinel">
+          <i v-if="isLoadingMore" class="pi pi-spin pi-spinner text-color-secondary"></i>
+        </div>
       </div>
-    </ScrollPanel>
+    </div>
 
     <!-- Version detail dialog -->
     <Dialog
@@ -640,6 +733,13 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.scroll-sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+  min-height: 1px;
 }
 
 .version-card {

@@ -131,16 +131,21 @@ public class AppVersionService
         return File.Exists(metadataPath);
     }
 
-    public async Task<(List<AppVersion> Versions, int TotalCount)> GetVersionsAsync(Guid appId, int pageNumber = 1, int pageSize = 20)
+    public async Task<(List<AppVersion> Versions, int TotalCount)> GetVersionsAsync(
+        Guid appId, int pageNumber = 1, int pageSize = 20, string? search = null)
     {
         var query = dataContext.AppVersions
             .Include(v => v.CreatedByUser)
-            .Where(v => v.AppId == appId)
-            .OrderByDescending(v => v.VersionNumber);
+            .Where(v => v.AppId == appId);
 
-        var totalCount = await query.CountAsync();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(v => v.Summary.Contains(search));
 
-        var versions = await query
+        var orderedQuery = query.OrderByDescending(v => v.VersionNumber);
+
+        var totalCount = await orderedQuery.CountAsync();
+
+        var versions = await orderedQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

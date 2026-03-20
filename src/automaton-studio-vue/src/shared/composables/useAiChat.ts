@@ -41,7 +41,13 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const sessions = ref<ChatSession[]>([])
   const activeSession = ref<ChatSession | null>(null)
   const isLoadingSessions = ref(false)
+  const isLoadingMoreSessions = ref(false)
   const isLoadingMessages = ref(false)
+  const sessionsTotalCount = ref(0)
+  const sessionsPage = ref(1)
+  const sessionsPageSize = 20
+  const hasMoreSessions = computed(() => sessions.value.length < sessionsTotalCount.value)
+  const sessionsSearch = ref('')
 
   // LocalStorage key for persisting user's model preference
   const AI_MODEL_PREFERENCE_KEY = 'ai_preferred_model'
@@ -177,23 +183,48 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   })
 
   /**
-   * Load all sessions for this resource
+   * Load sessions (page 1) — resets the list and applies optional search filter
    */
-  async function loadSessions() {
+  async function loadSessions(search?: string) {
     isLoadingSessions.value = true
+    sessionsPage.value = 1
+    sessionsSearch.value = search ?? ''
     try {
-      sessions.value = await aiChatHistoryService.getSessions(resourceType, resourceId)
+      const result = await aiChatHistoryService.getSessions(
+        resourceType, resourceId, 1, sessionsPageSize, sessionsSearch.value || undefined
+      )
+      sessions.value = result.items
+      sessionsTotalCount.value = result.totalCount
       
-      // Set active session if one exists
       const active = sessions.value.find((s) => s.isActive)
-      if (active) {
-        activeSession.value = active
-      }
+      if (active) activeSession.value = active
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load sessions'
       console.error('Error loading sessions:', err)
     } finally {
       isLoadingSessions.value = false
+    }
+  }
+
+  /**
+   * Append the next page of sessions (infinite scroll)
+   */
+  async function loadMoreSessions() {
+    if (!hasMoreSessions.value || isLoadingMoreSessions.value) return
+    isLoadingMoreSessions.value = true
+    const nextPage = sessionsPage.value + 1
+    try {
+      const result = await aiChatHistoryService.getSessions(
+        resourceType, resourceId, nextPage, sessionsPageSize, sessionsSearch.value || undefined
+      )
+      sessions.value = [...sessions.value, ...result.items]
+      sessionsTotalCount.value = result.totalCount
+      sessionsPage.value = nextPage
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load more sessions'
+      console.error('Error loading more sessions:', err)
+    } finally {
+      isLoadingMoreSessions.value = false
     }
   }
 
@@ -736,7 +767,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     sessions,
     activeSession,
     isLoadingSessions,
+    isLoadingMoreSessions,
     isLoadingMessages,
+    hasMoreSessions,
+    sessionsTotalCount,
 
     // Methods
     loadProviders,
@@ -746,6 +780,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
     // Session methods
     loadSessions,
+    loadMoreSessions,
     getOrCreateActiveSession,
     createSession,
     activateSession,

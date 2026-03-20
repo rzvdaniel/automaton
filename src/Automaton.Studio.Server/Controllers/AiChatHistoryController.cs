@@ -18,19 +18,19 @@ public class AiChatHistoryController : BaseController
     }
 
     /// <summary>
-    /// Get all chat sessions for a specific resource (Step or WebApp)
+    /// Get paginated chat sessions for a specific resource (Step or WebApp)
     /// </summary>
-    /// <param name="resourceType">Type of resource (CustomStep or WebApp)</param>
-    /// <param name="resourceId">ID of the resource</param>
-    /// <returns>List of chat sessions</returns>
     [HttpGet("sessions")]
-    public async Task<ActionResult<List<ChatSessionDto>>> GetSessions(
+    public async Task<ActionResult<PagedResult<ChatSessionDto>>> GetSessions(
         [FromQuery] ChatResourceType resourceType,
-        [FromQuery] Guid resourceId)
+        [FromQuery] Guid resourceId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null)
     {
         var userId = GetUserId();
-        var sessions = await chatHistoryService.GetSessionsAsync(resourceType, resourceId, userId);
-        return Ok(sessions);
+        var result = await chatHistoryService.GetSessionsAsync(resourceType, resourceId, userId, page, pageSize, search);
+        return Ok(result);
     }
 
     /// <summary>
