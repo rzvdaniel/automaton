@@ -51,6 +51,13 @@ async function loadRunners() {
   try {
     const { data } = await axios.get<Runner[]>('/api/runners')
     runners.value = data
+    // Auto-select when no runner is chosen and exactly one online runner exists
+    if (!props.modelValue) {
+      const onlineRunners = data.filter((r) => r.status === 'Online')
+      if (onlineRunners.length === 1) {
+        emit('update:modelValue', onlineRunners[0].id)
+      }
+    }
   } catch (error) {
     console.error('Failed to load runners:', error)
     toast.add({
