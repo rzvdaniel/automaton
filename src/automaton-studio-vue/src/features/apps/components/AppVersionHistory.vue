@@ -40,6 +40,8 @@ const isRestoringVersion = ref(false)
 const versionList = ref<AppVersionList | null>(null)
 const selectedVersion = ref<AppVersionDetail | null>(null)
 const showVersionDetail = ref(false)
+const showSnapshotDialog = ref(false)
+const snapshotSummary = ref('')
 const searchQuery = ref('')
 const versionsPageSize = 20
 
@@ -225,12 +227,21 @@ const parsedFileChanges = computed(() => {
 })
 
 /**
+ * Open the snapshot dialog to let the user enter a summary
+ */
+function openSnapshotDialog() {
+  snapshotSummary.value = ''
+  showSnapshotDialog.value = true
+}
+
+/**
  * Create a manual version snapshot
  */
 async function createSnapshot() {
+  showSnapshotDialog.value = false
   isCreatingSnapshot.value = true
   try {
-    await appsService.createVersionSnapshot(props.appId, 'ManualSave')
+    await appsService.createVersionSnapshot(props.appId, 'ManualSave', snapshotSummary.value || undefined)
     toast.add({
       severity: 'success',
       summary: 'Success',
@@ -375,7 +386,7 @@ defineExpose({
         rounded
         text
         :loading="isCreatingSnapshot"
-        @click="createSnapshot"
+        @click="openSnapshotDialog"
       />
     </div>
 
@@ -415,7 +426,7 @@ defineExpose({
         icon="pi pi-camera"
         size="small"
         :loading="isCreatingSnapshot"
-        @click="createSnapshot"
+        @click="openSnapshotDialog"
       />
     </div>
 
@@ -629,10 +640,52 @@ defineExpose({
         />
       </template>
     </Dialog>
+
+    <!-- Create Snapshot Dialog -->
+    <Dialog
+      v-model:visible="showSnapshotDialog"
+      modal
+      header="Create Snapshot"
+      :style="{ width: '420px' }"
+    >
+      <div class="snapshot-dialog">
+        <p class="text-color-secondary mb-3">
+          Create a manual snapshot of the current app state. Optionally add a summary to describe what changed.
+        </p>
+        <div class="field">
+          <label for="snapshotSummary" class="block font-semibold mb-2">Summary (optional)</label>
+          <InputText
+            id="snapshotSummary"
+            v-model="snapshotSummary"
+            placeholder="e.g. Added login form and navigation"
+            class="w-full"
+            autofocus
+            @keyup.enter="createSnapshot"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="Cancel"
+          text
+          @click="showSnapshotDialog = false"
+        />
+        <Button
+          label="Create Snapshot"
+          icon="pi pi-camera"
+          :loading="isCreatingSnapshot"
+          @click="createSnapshot"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
+.snapshot-dialog {
+  padding: 0.5rem 0;
+}
+
 .version-history-panel {
   display: flex;
   flex-direction: column;

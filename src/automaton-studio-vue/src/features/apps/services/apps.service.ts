@@ -520,9 +520,10 @@ class AppsService {
    * Create a manual version snapshot for an app
    * POST /api/apps/{appId}/versions/snapshot
    */
-  async createVersionSnapshot(appId: string, trigger?: string) {
+  async createVersionSnapshot(appId: string, trigger?: string, summary?: string) {
     const { data } = await apiClient.post(`/api/apps/${appId}/versions/snapshot`, {
       trigger: trigger || 'ManualSave',
+      summary: summary?.trim() || undefined,
     })
     return data
   }

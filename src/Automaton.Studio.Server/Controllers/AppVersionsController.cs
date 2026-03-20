@@ -65,7 +65,8 @@ public class AppVersionsController : BaseController
                 userId,
                 trigger,
                 aiSessionId: null,
-                aiModel: null
+                aiModel: null,
+                summary: string.IsNullOrWhiteSpace(request?.Summary) ? null : request.Summary
             );
 
             var dto = new AppVersionDto
