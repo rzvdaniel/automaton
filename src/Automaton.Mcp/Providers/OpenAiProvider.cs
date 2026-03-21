@@ -295,6 +295,7 @@ public class OpenAiProvider : IAiProvider
                 inputItems.AddRange(reusableItems);
 
                 var shouldStopDueToFailures = false;
+                var shouldBreakForApproval  = false;
                 foreach (var toolCall in response.ToolCalls)
                 {
                     var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
@@ -330,6 +331,9 @@ public class OpenAiProvider : IAiProvider
 
                     EmitToolCallCompleted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson, toolResult);
 
+                    if (ProviderHelpers.ToolResultAwaitsApproval(toolCall.Name, toolResult))
+                        shouldBreakForApproval = true; // reuse the existing break flag
+
                     inputItems.Add(new Dictionary<string, object?>
                     {
                         ["type"] = "function_call_output",
@@ -343,6 +347,9 @@ public class OpenAiProvider : IAiProvider
                     responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                     break;
                 }
+
+                if (shouldBreakForApproval)
+                    break;
             }
         }
         finally

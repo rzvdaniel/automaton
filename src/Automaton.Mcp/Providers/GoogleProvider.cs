@@ -189,7 +189,8 @@ public class GoogleProvider : IAiProvider
 
             // Execute each function call and collect results
             var functionResponseParts = new List<object>();
-            var shouldStop = false;
+            var shouldStop              = false;
+            var shouldBreakForApproval  = false;
 
             foreach (var funcCall in functionCalls)
             {
@@ -229,6 +230,9 @@ public class GoogleProvider : IAiProvider
 
                 EmitToolCallCompleted(request.ConversationId, callId, funcCall.Name, argsJson, toolResult);
 
+                if (ProviderHelpers.ToolResultAwaitsApproval(funcCall.Name, toolResult))
+                    shouldBreakForApproval = true;
+
                 functionResponseParts.Add(new Dictionary<string, object>
                 {
                     ["functionResponse"] = new Dictionary<string, object>
@@ -251,6 +255,9 @@ public class GoogleProvider : IAiProvider
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 break;
             }
+
+            if (shouldBreakForApproval)
+                break;
         }
 
         return responseBuilder.ToString().Trim();

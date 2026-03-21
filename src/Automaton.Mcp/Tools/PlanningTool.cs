@@ -206,10 +206,14 @@ public class PlanningTool : IMcpTool
                     : "Plan saved. Summarise it briefly in plain text and ask whether to proceed. Do NOT call any other tools until confirmed.";
             }
 
+            var pauseForHighStage = planType == "stage_complete" &&
+                                    nextStageInfo.HasValue &&
+                                    nextStageInfo.Value.Complexity == "high";
+
             var result = new
             {
                 instruction,
-                awaitingApproval = planType != "stage_complete",
+                awaitingApproval = planType != "stage_complete" || pauseForHighStage,
                 planType,
                 title,
                 summary,

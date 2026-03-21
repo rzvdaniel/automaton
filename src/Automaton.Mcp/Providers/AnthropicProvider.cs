@@ -188,6 +188,7 @@ public class AnthropicProvider : IAiProvider
             // Execute each tool and collect results
             var toolResults = new List<ContentBase>();
             var shouldStopDueToFailures = false;
+            var shouldBreakForApproval  = false;
 
             foreach (var toolUse in streamResult.ToolUseBlocks)
             {
@@ -229,6 +230,9 @@ public class AnthropicProvider : IAiProvider
                 // Emit tool execution completed
                 EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
 
+                if (ProviderHelpers.ToolResultAwaitsApproval(toolUse.Name, toolResult))
+                    shouldBreakForApproval = true;
+
                 // Add tool result - Content can be a string or List<ContentBase>
                 toolResults.Add(new ToolResultContent
                 {
@@ -256,6 +260,9 @@ public class AnthropicProvider : IAiProvider
                 Role = RoleType.User,
                 Content = toolResults
             });
+
+            if (shouldBreakForApproval)
+                break;
         }
 
         return responseBuilder.ToString().Trim();
