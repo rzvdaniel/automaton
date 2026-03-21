@@ -513,6 +513,13 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
               void sendMessage(userMessage, systemPrompt, context, true)
             }, 50)
           }
+
+          // Safety net: if this was a plan-mode re-send triggered by request_plan but
+          // the AI never called propose_plan (e.g. it was a question, not a code request),
+          // fall back to agent mode so the user isn't silently stuck.
+          if (modeForThisRequest === 'plan' && !proposePlanCompleted && !requestPlanTriggered) {
+            chatMode.value = 'agent'
+          }
         },
         onError: (data) => {
           error.value = data.error

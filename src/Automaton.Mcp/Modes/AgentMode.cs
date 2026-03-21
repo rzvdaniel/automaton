@@ -13,6 +13,7 @@ public sealed class AgentMode : IConversationMode
     public string SystemPromptSuffix =>
         "\n\n## COMPLEXITY ASSESSMENT — DO THIS FIRST\n" +
         "Before taking any action, assess whether the task is simple or complex:\n\n" +
+        "**If the user is asking a question or requesting an explanation — answer directly. Do NOT call `request_plan`.**\n\n" +
         "**Proceed directly** (read + write tools) for:\n" +
         "- Bug fixes or small corrections\n" +
         "- Adding/editing a single UI element or function\n" +
