@@ -20,8 +20,8 @@ public class AssessmentTool : IMcpTool
         Capability  = ToolCapability.Assessment,
         Description =
             """
-            MANDATORY: Call this as your FIRST action before reading or writing any file.
-            Assess the user's request and decide whether to proceed directly or propose a plan first.
+            Call this ONCE at the start of each user request, before taking any other action.
+            Assess what the user is asking and decide whether to proceed directly or propose a plan first.
 
             - Use "proceed" for: bug fixes, style tweaks, copy changes, single-function edits, anything obviously small and reversible.
             - Use "plan" for: new features, new files, backend + frontend changes together, database additions, architectural decisions, or anything the user describes as a "revamp" or major change.
