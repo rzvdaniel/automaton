@@ -14,7 +14,4 @@ public enum ToolCapability
 
     /// <summary>Plan lifecycle tools — propose_plan, stage_complete. Available in Plan mode only.</summary>
     Planning,
-
-    /// <summary>Mode-switching tools — switch_mode. Available in all modes.</summary>
-    ModeSwitch,
 }

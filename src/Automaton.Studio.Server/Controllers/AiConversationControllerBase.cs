@@ -29,6 +29,7 @@ public abstract class AiConversationControllerBase : BaseController
     protected readonly ISystemAiRateLimitService _rateLimitService;
     protected readonly AiProviderMetadataService _providerMetadataService;
     protected readonly ITokenBudgetService _tokenBudgetService;
+    protected readonly PreflightService _preflight;
     protected readonly ILogger _logger;
 
     protected AiConversationControllerBase(
@@ -39,6 +40,7 @@ public abstract class AiConversationControllerBase : BaseController
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
         ITokenBudgetService tokenBudgetService,
+        PreflightService preflight,
         ILogger logger)
     {
         _mcpClient = mcpClient;
@@ -48,6 +50,7 @@ public abstract class AiConversationControllerBase : BaseController
         _rateLimitService = rateLimitService;
         _providerMetadataService = providerMetadataService;
         _tokenBudgetService = tokenBudgetService;
+        _preflight = preflight;
         _logger = logger;
     }
 
@@ -170,6 +173,51 @@ public abstract class AiConversationControllerBase : BaseController
 
             // 7a. Pre-conversation hook (e.g. create version snapshot)
             var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
+
+            // 7b. Pre-flight check (agent mode only): decide whether to proceed or ask for clarification.
+            //     Modes are always user-controlled — pre-flight never switches them.
+            var effectiveMode = GetEffectiveMode(request);
+            if (string.Equals(effectiveMode, ConversationModes.Agent, StringComparison.OrdinalIgnoreCase))
+            {
+                var preflightResult = await _preflight.CheckAsync(
+                    provider, model, apiKey, request.Message, history, cancellationToken);
+
+                if (!preflightResult.Proceed)
+                {
+                    // Stream the clarifying question and stop — no tool loop runs
+                    var clarifyConvId = request.ConversationId ?? Guid.NewGuid().ToString();
+                    var clarifyMsg    = preflightResult.ClarifyMessage!;
+
+                    await WriteConversationEvent(new ConversationUpdatedEvent
+                    {
+                        ConversationId = clarifyConvId,
+                        Messages       = [new ConversationMessage("assistant", clarifyMsg)],
+                        Timestamp      = DateTime.UtcNow
+                    });
+
+                    // Persist both the user message and the AI clarifying response
+                    await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                    {
+                        SessionId   = sessionId,
+                        Role        = "user",
+                        Content     = request.Message,
+                        MessageType = ChatMessageType.Text,
+                        Metadata    = "{}"
+                    }, userId);
+
+                    await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                    {
+                        SessionId   = sessionId,
+                        Role        = "assistant",
+                        Content     = clarifyMsg,
+                        MessageType = ChatMessageType.Text,
+                        Metadata    = "{}"
+                    }, userId);
+
+                    await WriteEvent("done", new { conversationId = clarifyConvId, sessionId, model, success = true });
+                    return;
+                }
+            }
 
             // 7. Run conversation
             var conversationRequest = new ConversationRequest

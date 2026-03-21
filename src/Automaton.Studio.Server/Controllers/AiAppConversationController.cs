@@ -46,9 +46,10 @@ public class AiAppConversationController : AiConversationControllerBase
         AppVersionService appVersionService,
         ISystemAiService systemAiService,
         AppMemoryService appMemoryService,
+        PreflightService preflight,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
-               rateLimitService, providerMetadataService, tokenBudgetService, logger)
+               rateLimitService, providerMetadataService, tokenBudgetService, preflight, logger)
     {
         _toolProvider         = toolProvider;
         _promptBuilder        = promptBuilder;

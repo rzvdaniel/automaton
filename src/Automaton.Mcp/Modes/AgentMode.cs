@@ -13,14 +13,11 @@ public sealed class AgentMode : IConversationMode
     public string SystemPromptSuffix =>
         "\n\n## RULES\n" +
         "Proceed directly for all changes — bug fixes, small edits, and multi-file features alike.\n\n" +
-        "If the user asks a question or wants an explanation, answer directly without touching any files.\n\n" +
-        "If the task would genuinely benefit from a plan first, say so in plain text and suggest the user " +
-        "click the **Plan** button in the toolbar. Do NOT call any tool for this.";
+        "If the user asks a question or wants an explanation, answer directly without touching any files.";
 
     public int MaxToolIterations => 20;
 
-    /// <summary>Allow Read and Write tools; block Planning and ModeSwitch tools (plan mode only).</summary>
+    /// <summary>Allow Read and Write tools; block Planning tools (plan mode only).</summary>
     public bool IsToolAllowed(McpTool tool) =>
-        tool.Capability != ToolCapability.Planning &&
-        tool.Capability != ToolCapability.ModeSwitch;
+        tool.Capability != ToolCapability.Planning;
 }

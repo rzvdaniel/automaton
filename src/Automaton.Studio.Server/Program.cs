@@ -55,6 +55,7 @@ services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();
+services.AddScoped<PreflightService>();
 services.AddScoped<IAppExecutionLogService, AppExecutionLogService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -343,9 +344,6 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
 // Planning tool group — propose_plan
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.PlanningTool>();
-// Mode-switching tool — switch_mode
-services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
-                   Automaton.Mcp.Tools.ModeTool>();
 // Instructions tool group — read_instruction, write_instruction, list_instructions
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.InstructionsTool>();
