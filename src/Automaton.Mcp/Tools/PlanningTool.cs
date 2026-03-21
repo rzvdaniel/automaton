@@ -183,7 +183,7 @@ public class PlanningTool : IMcpTool
                     : "All stages are complete. Implementation is finished. STOP all tool calls immediately. Write a brief summary for the user and do nothing else.")
                 : isRefinement
                     ? "Plan updated successfully. You MUST now respond to the user with a brief message explaining what changed (e.g. 'I've added a footer section as Stage 4'). Do NOT call any more tools."
-                    : "Plan submitted. Reply with a short message like: 'Here\\'s the plan. Click **Implement Plan** when you\\'re ready, or tell me what to adjust.'";
+                    : "Plan saved. Respond to the user in plain text: briefly summarise the plan and ask whether to proceed with implementation. Do NOT call any other tools until the user confirms.";
 
             var result = new
             {

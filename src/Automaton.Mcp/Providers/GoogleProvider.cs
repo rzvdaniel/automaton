@@ -190,7 +190,6 @@ public class GoogleProvider : IAiProvider
             // Execute each function call and collect results
             var functionResponseParts = new List<object>();
             var shouldStop = false;
-            var planGate = new PlanGateTracker();
 
             foreach (var funcCall in functionCalls)
             {
@@ -202,8 +201,6 @@ public class GoogleProvider : IAiProvider
                 EmitToolCallStarted(request.ConversationId, callId, funcCall.Name, argsJson);
 
                 var toolResult = await executeToolAsync(callId, funcCall.Name, argsJson);
-
-                planGate.CheckToolResult(funcCall.Name, toolResult);
 
                 var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                 toolResult.StartsWith("Error executing tool") ||
@@ -254,9 +251,6 @@ public class GoogleProvider : IAiProvider
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 break;
             }
-
-            if (planGate.ShouldBreakLoop(request.Mode))
-                break;
         }
 
         return responseBuilder.ToString().Trim();

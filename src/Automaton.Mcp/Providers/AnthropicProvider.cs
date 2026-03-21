@@ -188,7 +188,6 @@ public class AnthropicProvider : IAiProvider
             // Execute each tool and collect results
             var toolResults = new List<ContentBase>();
             var shouldStopDueToFailures = false;
-            var planGate = new PlanGateTracker();
 
             foreach (var toolUse in streamResult.ToolUseBlocks)
             {
@@ -199,8 +198,6 @@ public class AnthropicProvider : IAiProvider
 
                 // Execute the tool
                 var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
-
-                planGate.CheckToolResult(toolUse.Name, toolResult);
 
                 // Track consecutive failures per tool
                 var isFailure = toolResult.StartsWith("Tool execution failed:") ||
@@ -251,13 +248,6 @@ public class AnthropicProvider : IAiProvider
                     Content = toolResults
                 });
                 break;
-            }
-
-            if (planGate.IsGated)
-            {
-                messages.Add(new Message { Role = RoleType.User, Content = toolResults });
-                if (planGate.ShouldBreakLoop(request.Mode))
-                    break;
             }
 
             // Add user message with tool results

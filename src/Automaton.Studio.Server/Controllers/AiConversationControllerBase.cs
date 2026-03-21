@@ -144,7 +144,14 @@ public abstract class AiConversationControllerBase : BaseController
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());
 
-            // 6. Collect events for post-conversation persistence
+            // 6. Pre-conversation hook (e.g. create version snapshot)
+            var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
+
+            // 7. Pre-flight check: decide whether to proceed with the tool loop or ask for clarification first.
+            var preflightResult = await _preflight.CheckAsync(
+                provider, model, apiKey, request.Message, history, cancellationToken);
+
+            // Subscribe to events AFTER pre-flight to avoid leaking the pre-flight LLM response into the SSE stream.
             var pendingUpdates = new List<ConversationUpdatedEvent>();
 
             EventHandler<ConversationUpdatedEvent> eventHandler = (_, e) =>
@@ -153,13 +160,6 @@ public abstract class AiConversationControllerBase : BaseController
                 lock (pendingUpdates) { pendingUpdates.Add(e); }
             };
             _mcpClient.ConversationUpdated += eventHandler;
-
-            // 7a. Pre-conversation hook (e.g. create version snapshot)
-            var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
-
-            // 7b. Pre-flight check: decide whether to proceed with the tool loop or ask for clarification first.
-            var preflightResult = await _preflight.CheckAsync(
-                provider, model, apiKey, request.Message, history, cancellationToken);
 
             if (!preflightResult.Proceed)
             {

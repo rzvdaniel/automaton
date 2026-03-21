@@ -295,7 +295,6 @@ public class OpenAiProvider : IAiProvider
                 inputItems.AddRange(reusableItems);
 
                 var shouldStopDueToFailures = false;
-                var planGate = new PlanGateTracker();
                 foreach (var toolCall in response.ToolCalls)
                 {
                     var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
@@ -303,8 +302,6 @@ public class OpenAiProvider : IAiProvider
                     EmitToolCallStarted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson);
 
                     var toolResult = await executeToolAsync(toolCall.Id, toolCall.Name, argsJson);
-
-                    planGate.CheckToolResult(toolCall.Name, toolResult);
 
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                     toolResult.StartsWith("Error executing tool") ||
@@ -346,9 +343,6 @@ public class OpenAiProvider : IAiProvider
                     responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                     break;
                 }
-
-                if (planGate.ShouldBreakLoop(request.Mode))
-                    break;
             }
         }
         finally
