@@ -20,7 +20,9 @@ public class AssessmentTool : IMcpTool
         Capability  = ToolCapability.Assessment,
         Description =
             """
-            Call this ONCE at the start of each user request, before taking any other action.
+            Call this ONCE at the start of a user request that involves making changes to the app (writing, editing, or creating files).
+            Do NOT call this for questions, explanations, discussions, or anything that doesn't require file changes — just answer those directly.
+
             Assess what the user is asking and decide whether to proceed directly or propose a plan first.
 
             - Use "proceed" for: bug fixes, style tweaks, copy changes, single-function edits, anything obviously small and reversible.
