@@ -5,22 +5,32 @@ using Automaton.Mcp.Tools;
 namespace Automaton.Mcp.Client.Providers;
 
 /// <summary>
-/// Tracks whether the propose_plan tool has returned an awaitingApproval result
+/// Tracks whether a planning tool result should halt the tool loop
 /// and determines whether the tool loop should break based on mode.
 /// Compose this into any AI provider to get consistent plan-gate behavior.
 /// </summary>
 public class PlanGateTracker
 {
-    /// <summary>True once propose_plan has returned awaitingApproval.</summary>
+    /// <summary>True once a gate condition has been triggered.</summary>
     public bool IsGated { get; private set; }
 
     /// <summary>
-    /// Inspects a tool result after execution. If the tool is propose_plan
-    /// and the result contains <c>awaitingApproval: true</c>, marks the gate as active.
+    /// Inspects a tool result after execution and activates the gate when:
+    /// - <c>request_plan</c> is called (always halts — AI must stop and let the system switch to plan mode)
+    /// - <c>propose_plan</c> returns <c>awaitingApproval: true</c>
     /// </summary>
     public void CheckToolResult(string toolName, string toolResult)
     {
-        if (toolName != PlanningTool.ProposePlanName || IsGated) return;
+        if (IsGated) return;
+
+        // request_plan signals the AI wants to switch to plan mode — always halt.
+        if (toolName == PlanningTool.RequestPlanName)
+        {
+            IsGated = true;
+            return;
+        }
+
+        if (toolName != PlanningTool.ProposePlanName) return;
 
         try
         {
