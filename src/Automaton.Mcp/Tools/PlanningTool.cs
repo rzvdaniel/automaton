@@ -35,12 +35,16 @@ public class PlanningTool : IMcpTool
                 Name = ProposePlanName,
                 Capability = ToolCapability.Planning,
                 Description = """
-                    Propose a plan before starting work on a new app.
-                    Use planType="implementation" to present the full plan (components, tech decisions, and build stages) for user approval.
-                    Use planType="stage_complete" to mark a stage as done and continue to the next.
-                    The plan is saved as a markdown file and the user must approve before implementation begins.
-                    IMPORTANT: After calling this tool, output zero text. The plan card renders automatically — stop and wait for user approval.
-                    Do not write any code or files until the user explicitly approves.
+                    Propose a plan before implementing a new app or significant feature.
+                    Call with planType="implementation" to present the full plan for user approval before writing any files.
+                    Call with planType="stage_complete" to mark the current stage done and automatically proceed to the next — no user confirmation needed between stages.
+
+                    Stage count guidelines (be conservative):
+                    - Small app (< 10 files, self-contained): 1–2 stages max, or a single "Build" stage
+                    - Medium app (10–30 files): 2–3 stages
+                    - Large app / complex integration: 3–5 stages
+
+                    After calling with planType="implementation", write ONE short plain-text message summarising the plan and asking whether to proceed. Do not call any other tools.
                     """,
                 InputSchema = JsonDocument.Parse("""
                     {
@@ -179,11 +183,11 @@ public class PlanningTool : IMcpTool
             // Plain-English instruction included in the result so the model knows exactly what to do next.
             var instruction = planType == "stage_complete"
                 ? (nextStageInfo.HasValue
-                    ? $"Stage complete. Now implement Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
-                    : "All stages are complete. Implementation is finished. STOP all tool calls immediately. Write a brief summary for the user and do nothing else.")
+                    ? $"Stage complete. Do NOT write any message to the user. Do NOT ask for confirmation. Immediately start implementing Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
+                    : "All stages complete. STOP all tool calls. Write ONE final summary for the user listing what was built.")
                 : isRefinement
-                    ? "Plan updated successfully. You MUST now respond to the user with a brief message explaining what changed (e.g. 'I've added a footer section as Stage 4'). Do NOT call any more tools."
-                    : "Plan saved. Respond to the user in plain text: briefly summarise the plan and ask whether to proceed with implementation. Do NOT call any other tools until the user confirms.";
+                    ? "Plan updated. Respond briefly explaining what changed. Do NOT call any more tools."
+                    : "Plan saved. Summarise it briefly in plain text and ask whether to proceed. Do NOT call any other tools until confirmed.";
 
             var result = new
             {

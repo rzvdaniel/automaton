@@ -55,7 +55,6 @@ services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();
-services.AddScoped<PreflightService>();
 services.AddScoped<IAppExecutionLogService, AppExecutionLogService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
