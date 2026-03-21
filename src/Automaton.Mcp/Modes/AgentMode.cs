@@ -14,9 +14,9 @@ public sealed class AgentMode : IConversationMode
         "\n\n## WHEN TO SUGGEST PLAN MODE\n" +
         "Proceed directly for all changes — bug fixes, small edits, and multi-file features alike.\n\n" +
         "If the user asks a question or wants an explanation, answer directly without touching any files.\n\n" +
-        "If the task is large enough that you think the user would benefit from reviewing an approach first " +
-        "(e.g. a significant new feature, a database addition, a full redesign), say so in plain text and " +
-        "suggest they switch to **Plan mode** using the button in the chat toolbar. Do not use any tool for this — just say it.";
+        "If the task is large enough that the user would benefit from reviewing an approach first " +
+        "(e.g. a significant new feature, a database addition, a full redesign), call `switch_mode(to: \"plan\")` " +
+        "then explain what you want to discuss before implementing. Do NOT call switch_mode for simple changes.";
 
     public int MaxToolIterations => 20;
 

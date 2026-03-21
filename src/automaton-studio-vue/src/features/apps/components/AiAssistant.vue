@@ -194,7 +194,9 @@ onMounted(async () => {
   // User can click on a session to open it
   
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
+  // Start in plan mode so the AI proposes an approach before writing code.
   if (props.initialPrompt) {
+    chatMode.value = 'plan'
     userInput.value = props.initialPrompt
     currentView.value = 'chat'
     // Small delay to ensure UI is ready

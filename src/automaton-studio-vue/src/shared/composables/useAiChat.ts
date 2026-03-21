@@ -683,6 +683,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
         }
+        // AI-driven mode switch: update chatMode immediately so the next user send uses the new mode
+        if (toolMessage.toolName === 'switch_mode' && (resultData?.switchedTo === 'agent' || resultData?.switchedTo === 'plan')) {
+          chatMode.value = resultData.switchedTo as 'agent' | 'plan'
+        }
       }
 
       // Notify tool execution callback with result
