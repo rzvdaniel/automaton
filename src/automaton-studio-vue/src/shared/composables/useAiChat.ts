@@ -428,8 +428,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
     // Capture mode before the request starts.
     const modeForThisRequest = chatMode.value
-    // Track whether propose_plan completed during this response.
-    let proposePlanCompleted = false
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -497,15 +495,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             }
           })
 
-          // After propose_plan completes in plan mode, auto-switch to agent so the
-          // user can confirm implementation with a single reply.
-          if (modeForThisRequest === 'plan' && proposePlanCompleted) {
-            chatMode.value = 'agent'
-          }
-
-          // Safety net: if this was a plan-mode send but the AI never called propose_plan,
-          // fall back to agent mode so the user isn't silently stuck.
-          if (modeForThisRequest === 'plan' && !proposePlanCompleted) {
+          // Fallback: always return to agent after a plan-mode send.
+          // If the AI called switch_mode, chatMode is already 'agent' — this is a no-op.
+          // If it forgot to call switch_mode, this prevents the user getting stuck in plan mode.
+          if (modeForThisRequest === 'plan') {
             chatMode.value = 'agent'
           }
         },
@@ -606,13 +599,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     if (update.toolResults && update.toolResults.length > 0) {
       for (const toolResult of update.toolResults) {
         handleToolResult(toolResult)
-        // Detect a successful propose_plan so we can auto-switch to agent
-        const raw = toolResult as any
-        const isSuccess = raw.isSuccess !== undefined ? raw.isSuccess : !toolResult.isError
-        const matchingCall = messages.value.find((m) => m.id === toolResult.toolCallId)
-        if (isSuccess && matchingCall?.toolName === 'propose_plan') {
-          proposePlanCompleted = true
-        }
       }
     }
   }
