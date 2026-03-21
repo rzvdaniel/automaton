@@ -29,8 +29,7 @@ public sealed class PlanMode : IConversationMode
 
     public int MaxToolIterations => 5;
 
-    /// <summary>Allow Read and Planning tools; block Write and ModeSwitch tools.</summary>
+    /// <summary>Allow Read and Planning tools; block Write tools.</summary>
     public bool IsToolAllowed(McpTool tool) =>
-        tool.Capability != ToolCapability.Write &&
-        tool.Capability != ToolCapability.ModeSwitch;
+        tool.Capability != ToolCapability.Write;
 }

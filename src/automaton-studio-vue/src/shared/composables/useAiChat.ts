@@ -55,7 +55,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Chat mode: defaults to 'agent'. Switches to 'plan' when the AI calls request_plan
+  // Chat mode: defaults to 'agent'. Switch to 'plan' via the toolbar button to plan before implementing.
   // (auto-detected complexity) or when the user manually toggles. Switches back to
   // 'agent' automatically after propose_plan completes.
   const chatMode = ref<'plan' | 'agent'>('agent')
@@ -254,7 +254,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       messages.value = serverMessages.filter((m: any) => m.role !== 'tool')
 
       // Always resume in agent mode — the user has prior context and can ask for planning explicitly
-      // or let the AI trigger it via request_plan if needed.
+      // or let the AI suggest it in plain text if needed.
       chatMode.value = 'agent'
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load messages'
@@ -430,8 +430,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     const modeForThisRequest = chatMode.value
     // Track whether propose_plan completed during this response.
     let proposePlanCompleted = false
-    // Track whether request_plan was called (AI-driven escalation to plan mode).
-    let requestPlanTriggered = false
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -505,19 +503,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             chatMode.value = 'agent'
           }
 
-          // If the AI called request_plan (complexity escalation), switch to plan mode
-          // and transparently re-send the original message so planning starts immediately.
-          if (requestPlanTriggered) {
-            chatMode.value = 'plan'
-            setTimeout(() => {
-              void sendMessage(userMessage, systemPrompt, context, true)
-            }, 50)
-          }
-
-          // Safety net: if this was a plan-mode re-send triggered by request_plan but
-          // the AI never called propose_plan (e.g. it was a question, not a code request),
+          // Safety net: if this was a plan-mode send but the AI never called propose_plan,
           // fall back to agent mode so the user isn't silently stuck.
-          if (modeForThisRequest === 'plan' && !proposePlanCompleted && !requestPlanTriggered) {
+          if (modeForThisRequest === 'plan' && !proposePlanCompleted) {
             chatMode.value = 'agent'
           }
         },
@@ -625,9 +613,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         if (isSuccess && matchingCall?.toolName === 'propose_plan') {
           proposePlanCompleted = true
         }
-        if (isSuccess && matchingCall?.toolName === 'request_plan') {
-          requestPlanTriggered = true
-        }
       }
     }
   }
@@ -697,9 +682,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
-        }
-        if (toolMessage.toolName === 'request_plan') {
-          toolMessage.content = `Switching to plan mode: ${resultData?.reason ?? 'complex task detected'}`
         }
       }
 

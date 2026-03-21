@@ -4,30 +4,23 @@ namespace Automaton.Mcp.Modes;
 
 /// <summary>
 /// Agent mode: full read/write access, no planning tools.
-/// Has request_plan to escalate to plan mode for complex tasks.
+/// Users switch to plan mode manually via the UI when they want to plan first.
 /// </summary>
 public sealed class AgentMode : IConversationMode
 {
     public string Name => ConversationModes.Agent;
 
     public string SystemPromptSuffix =>
-        "\n\n## COMPLEXITY ASSESSMENT — DO THIS FIRST\n" +
-        "Before taking any action, assess whether the task is simple or complex:\n\n" +
-        "**If the user is asking a question or requesting an explanation — answer directly. Do NOT call `request_plan`.**\n\n" +
-        "**Proceed directly** (read + write tools) for:\n" +
-        "- Bug fixes or small corrections\n" +
-        "- Adding/editing a single UI element or function\n" +
-        "- Straightforward changes where the approach is obvious\n\n" +
-        "**Call `request_plan` first** for:\n" +
-        "- New multi-file features or complete new sections\n" +
-        "- Architectural decisions (data flow, component structure, libraries)\n" +
-        "- Tasks with significant unknowns that require reading the codebase first\n" +
-        "- Anything that would benefit from staged, user-approved implementation\n\n" +
-        "After calling `request_plan`, STOP — do not call any other tools. The system restarts in plan mode automatically.";
+        "\n\n## WHEN TO SUGGEST PLAN MODE\n" +
+        "Proceed directly for all changes — bug fixes, small edits, and multi-file features alike.\n\n" +
+        "If the user asks a question or wants an explanation, answer directly without touching any files.\n\n" +
+        "If the task is large enough that you think the user would benefit from reviewing an approach first " +
+        "(e.g. a significant new feature, a database addition, a full redesign), say so in plain text and " +
+        "suggest they switch to **Plan mode** using the button in the chat toolbar. Do not use any tool for this — just say it.";
 
     public int MaxToolIterations => 20;
 
-    /// <summary>Allow Read, Write, and ModeSwitch tools; block Planning tools.</summary>
+    /// <summary>Allow Read and Write tools; block Planning tools (plan mode only).</summary>
     public bool IsToolAllowed(McpTool tool) =>
         tool.Capability != ToolCapability.Planning;
 }

@@ -14,9 +14,8 @@ namespace Automaton.Mcp.Tools;
 public class PlanningTool : IMcpTool
 {
     public const string ProposePlanName  = "propose_plan";
-    public const string RequestPlanName  = "request_plan";
 
-    private static readonly HashSet<string> HandledTools = [ProposePlanName, RequestPlanName];
+    private static readonly HashSet<string> HandledTools = [ProposePlanName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<PlanningTool> _logger;
@@ -100,31 +99,6 @@ public class PlanningTool : IMcpTool
                         "required": ["planType", "title", "summary"]
                     }
                     """)
-            },
-            new McpTool
-            {
-                Name = RequestPlanName,
-                Capability = ToolCapability.ModeSwitch,
-                Description = """
-                    Request a switch to plan mode when the user's task is complex enough to require planning first.
-                    Call this when the work involves: a new multi-file feature, architectural decisions, many unknowns,
-                    or anything that would benefit from explicit stages and user approval before implementation.
-                    For simple changes (bug fixes, small edits, single-element additions) — do NOT call this; just proceed.
-                    After calling request_plan, STOP immediately — do not call any other tools or write anything.
-                    The system will automatically switch to plan mode and restart the request.
-                    """,
-                InputSchema = JsonDocument.Parse("""
-                    {
-                        "type": "object",
-                        "properties": {
-                            "reason": {
-                                "type": "string",
-                                "description": "Brief explanation of why planning is needed for this task"
-                            }
-                        },
-                        "required": ["reason"]
-                    }
-                    """)
             }
         };
 
@@ -138,22 +112,11 @@ public class PlanningTool : IMcpTool
         return toolName switch
         {
             ProposePlanName => await ProposePlan(arguments, context),
-            RequestPlanName => RequestPlan(arguments),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
         };
     }
 
     // ── Handlers ─────────────────────────────────────────────────────────────
-
-    private static McpToolResult RequestPlan(JsonElement arguments)
-    {
-        var reason = arguments.TryGetProperty("reason", out var r) ? r.GetString() : "complex task";
-        return new McpToolResult
-        {
-            Success = true,
-            Content = JsonSerializer.Serialize(new { requestPlan = true, reason })
-        };
-    }
 
     private async Task<McpToolResult> ProposePlan(JsonElement arguments, Dictionary<string, object>? context)
     {
