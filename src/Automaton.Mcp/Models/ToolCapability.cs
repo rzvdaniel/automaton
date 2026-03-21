@@ -17,10 +17,4 @@ public enum ToolCapability
 
     /// <summary>Mode-switching tools — request_plan. Available in Agent mode only.</summary>
     ModeSwitch,
-
-    /// <summary>
-    /// Complexity assessment tool — assess_task. Available in Agent mode only.
-    /// Called as the mandatory first action to reason about task complexity before any read/write.
-    /// </summary>
-    Assessment,
 }

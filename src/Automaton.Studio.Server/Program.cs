@@ -340,9 +340,6 @@ services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                    Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.FileIoTool>();
-// Assessment tool — assess_task (mandatory first call in agent mode)
-services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
-                   Automaton.Mcp.Tools.AssessmentTool>();
 // Planning tool group — propose_plan
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.PlanningTool>();

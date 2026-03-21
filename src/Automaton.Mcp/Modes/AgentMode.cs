@@ -11,17 +11,22 @@ public sealed class AgentMode : IConversationMode
     public string Name => ConversationModes.Agent;
 
     public string SystemPromptSuffix =>
-        "\n\n## STEP 1 — ASSESS ONCE PER CHANGE REQUEST\n" +
-        "If the user is asking a **question or wants an explanation** — answer directly, do NOT call `assess_task`.\n\n" +
-        "If the user is asking you to **make a change** (add, edit, fix, create, refactor anything) — call `assess_task` once first:\n" +
-        "- If `recommendation` is **\"proceed\"**: implement immediately.\n" +
-        "- If `recommendation` is **\"plan\"**: the system switches to plan mode automatically — do NOT call any other tool.\n\n" +
-        "**Use \"plan\" for**: new features, new files, adding backend to a frontend-only app, database changes, anything described as a \"revamp\" or major change.\n" +
-        "**Use \"proceed\" for**: bug fixes, style tweaks, copy changes, single-function edits.";
+        "\n\n## COMPLEXITY ASSESSMENT — DO THIS FIRST\n" +
+        "Before taking any action, assess whether the task is simple or complex:\n\n" +
+        "**Proceed directly** (read + write tools) for:\n" +
+        "- Bug fixes or small corrections\n" +
+        "- Adding/editing a single UI element or function\n" +
+        "- Straightforward changes where the approach is obvious\n\n" +
+        "**Call `request_plan` first** for:\n" +
+        "- New multi-file features or complete new sections\n" +
+        "- Architectural decisions (data flow, component structure, libraries)\n" +
+        "- Tasks with significant unknowns that require reading the codebase first\n" +
+        "- Anything that would benefit from staged, user-approved implementation\n\n" +
+        "After calling `request_plan`, STOP — do not call any other tools. The system restarts in plan mode automatically.";
 
     public int MaxToolIterations => 20;
 
-    /// <summary>Allow Read, Write, Assessment, and ModeSwitch tools; block Planning tools.</summary>
+    /// <summary>Allow Read, Write, and ModeSwitch tools; block Planning tools.</summary>
     public bool IsToolAllowed(McpTool tool) =>
         tool.Capability != ToolCapability.Planning;
 }

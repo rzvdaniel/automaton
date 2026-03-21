@@ -23,23 +23,8 @@ public class PlanGateTracker
     {
         if (IsGated) return;
 
-        // request_plan and assess_task (with recommendation:"plan") both signal mode switch — always halt.
-        if (toolName == PlanningTool.RequestPlanName || toolName == AssessmentTool.AssessTaskName)
+        if (toolName == PlanningTool.RequestPlanName)
         {
-            // For assess_task, only gate when the result contains requestPlan:true
-            // (i.e., recommendation was "plan"). A "proceed" result must not break the loop.
-            if (toolName == AssessmentTool.AssessTaskName)
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(toolResult);
-                    if (!doc.RootElement.TryGetProperty("requestPlan", out var rp) ||
-                        rp.ValueKind != JsonValueKind.True)
-                        return; // recommendation was "proceed" — continue the loop
-                }
-                catch { return; }
-            }
-
             IsGated = true;
             return;
         }
