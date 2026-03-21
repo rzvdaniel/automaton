@@ -181,13 +181,30 @@ public class PlanningTool : IMcpTool
                 : null;
 
             // Plain-English instruction included in the result so the model knows exactly what to do next.
-            var instruction = planType == "stage_complete"
-                ? (nextStageInfo.HasValue
-                    ? $"Stage complete. Do NOT write any message to the user. Do NOT ask for confirmation. Immediately start implementing Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done."
-                    : "All stages complete. STOP all tool calls. Write ONE final summary for the user listing what was built.")
-                : isRefinement
+            string instruction;
+            if (planType == "stage_complete")
+            {
+                if (!nextStageInfo.HasValue)
+                {
+                    instruction = "All stages complete. STOP all tool calls. Write ONE final summary for the user listing what was built.";
+                }
+                else if (nextStageInfo.Value.Complexity == "high")
+                {
+                    // High-complexity stages: pause so the user can review before the AI continues.
+                    instruction = $"Stage complete. Briefly summarise what was built, then ask the user to confirm before you start Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Do NOT start that stage until they confirm.";
+                }
+                else
+                {
+                    // Low/medium stages: proceed automatically — no confirmation needed.
+                    instruction = $"Stage complete. Do NOT write any message. Do NOT ask for confirmation. Immediately start implementing Stage {nextStageInfo.Value.Index + 1}: {nextStageInfo.Value.Name} — {nextStageInfo.Value.Description}. Call stage_complete when done.";
+                }
+            }
+            else
+            {
+                instruction = isRefinement
                     ? "Plan updated. Respond briefly explaining what changed. Do NOT call any more tools."
                     : "Plan saved. Summarise it briefly in plain text and ask whether to proceed. Do NOT call any other tools until confirmed.";
+            }
 
             var result = new
             {
@@ -205,7 +222,7 @@ public class PlanningTool : IMcpTool
                 filesChanged  = planType == "stage_complete" ? GetStringArray(arguments, "filesChanged") : null,
                 hasMoreStages = nextStageInfo.HasValue,
                 nextStage = nextStageInfo.HasValue
-                    ? new { index = nextStageInfo.Value.Index, name = nextStageInfo.Value.Name, description = nextStageInfo.Value.Description }
+                    ? new { index = nextStageInfo.Value.Index, name = nextStageInfo.Value.Name, description = nextStageInfo.Value.Description, complexity = nextStageInfo.Value.Complexity }
                     : null,
             };
 
@@ -324,9 +341,9 @@ public class PlanningTool : IMcpTool
 
     /// <summary>
     /// Parse the first unchecked stage from the updated markdown.
-    /// Returns (name, description, index) or null if all stages are done.
+    /// Returns (name, description, complexity, index) or null if all stages are done.
     /// </summary>
-    private static (string Name, string Description, int Index)? FindNextStage(string markdown)
+    private static (string Name, string Description, string Complexity, int Index)? FindNextStage(string markdown)
     {
         // Lines look like: "- [ ] Stage N · StageName _(complexity: low)_"
         // followed optionally by "  > description"
@@ -344,10 +361,21 @@ public class PlanningTool : IMcpTool
             if (!int.TryParse(afterStage[..dotPos].Trim(), out var stageNum)) continue;
             var zeroBasedIndex = stageNum - 1;
 
-            // Extract name: between " · " and " _(complexity"
+            // Extract name and complexity: "Name _(complexity: high)_"
             var afterDot = afterStage[(dotPos + 3)..];
             var complexityPos = afterDot.IndexOf(" _(complexity");
             var name = complexityPos >= 0 ? afterDot[..complexityPos].Trim() : afterDot.Trim();
+
+            // Extract complexity value from "_(complexity: high)_"
+            var complexity = "medium";
+            if (complexityPos >= 0)
+            {
+                var complexityPart = afterDot[complexityPos..];
+                var colonPos = complexityPart.IndexOf(": ");
+                var closePos = complexityPart.IndexOf(")_");
+                if (colonPos >= 0 && closePos > colonPos)
+                    complexity = complexityPart[(colonPos + 2)..closePos].Trim().ToLowerInvariant();
+            }
 
             // Look for description on the next line
             var desc = string.Empty;
@@ -358,7 +386,7 @@ public class PlanningTool : IMcpTool
                     desc = nextLine[2..].Trim();
             }
 
-            return (name, desc, zeroBasedIndex);
+            return (name, desc, complexity, zeroBasedIndex);
         }
         return null;
     }
