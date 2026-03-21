@@ -55,11 +55,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Chat mode: defaults to 'agent'. Switch to 'plan' via the toolbar button to plan before implementing.
-  // (auto-detected complexity) or when the user manually toggles. Switches back to
-  // 'agent' automatically after propose_plan completes.
-  const chatMode = ref<'plan' | 'agent'>('agent')
-
   // Computed
   const hasMessages = computed(() => messages.value.length > 0)
   const currentProvider = computed(() =>
@@ -252,10 +247,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       
       // Skip role='tool' messages — raw tool output only needed by AI as context, not meaningful for users.
       messages.value = serverMessages.filter((m: any) => m.role !== 'tool')
-
-      // Always resume in agent mode — the user has prior context and can ask for planning explicitly
-      // or let the AI suggest it in plain text if needed.
-      chatMode.value = 'agent'
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load messages'
       console.error('Error loading messages:', err)
@@ -426,8 +417,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       await getOrCreateActiveSession()
     }
 
-    // Capture mode before the request starts.
-    const modeForThisRequest = chatMode.value
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -463,7 +452,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       resourceType: resourceType, // Top-level property for backend
       resourceId: resourceId, // Top-level property for backend
       language: context?.language,
-      mode: modeForThisRequest,
       context: {
         ...context, // Additional context (e.g., runnerId, appId)
       },
@@ -494,13 +482,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
               m.isStreaming = false
             }
           })
-
-          // Fallback: always return to agent after a plan-mode send.
-          // If the AI called switch_mode, chatMode is already 'agent' — this is a no-op.
-          // If it forgot to call switch_mode, this prevents the user getting stuck in plan mode.
-          if (modeForThisRequest === 'plan') {
-            chatMode.value = 'agent'
-          }
         },
         onError: (data) => {
           error.value = data.error
@@ -710,7 +691,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     error,
     hasMessages,
     currentProvider,
-    chatMode,
 
     // Session state
     sessions,

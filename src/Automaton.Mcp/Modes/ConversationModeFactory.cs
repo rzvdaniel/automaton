@@ -2,20 +2,15 @@ namespace Automaton.Mcp.Modes;
 
 /// <summary>
 /// Resolves a mode name string to its <see cref="IConversationMode"/> implementation.
-/// Add new modes here — callers need no changes.
+/// There is only one mode (agent). Plan mode has been removed — the AI decides when
+/// to call propose_plan based on task complexity.
 /// </summary>
 public static class ConversationModeFactory
 {
     private static readonly IConversationMode _agent = new AgentMode();
-    private static readonly IConversationMode _plan  = new PlanMode();
 
     /// <summary>
-    /// Returns the mode for the given name. Defaults to <see cref="AgentMode"/> for unknown values.
+    /// Always returns <see cref="AgentMode"/>. The mode parameter is ignored for backwards compatibility.
     /// </summary>
-    public static IConversationMode From(string? modeName) => modeName?.ToLowerInvariant() switch
-    {
-        ConversationModes.Plan  => _plan,
-        ConversationModes.Agent => _agent,
-        _                       => _agent,   // safe default
-    };
+    public static IConversationMode From(string? modeName) => _agent;
 }

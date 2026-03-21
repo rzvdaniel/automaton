@@ -63,12 +63,6 @@ public abstract class AiConversationControllerBase : BaseController
         Guid sessionId,
         List<ConversationMessage>? history);
 
-    /// <summary>
-    /// Returns the effective mode to use for system-prompt suffix selection.
-    /// Subclasses may override to downgrade the mode (e.g. Simple/Medium tiers always use "agent").
-    /// </summary>
-    protected virtual string GetEffectiveMode(BaseStreamConversationRequest request) => request.Mode;
-
     /// <summary>Return the tool provider to use for this resource type.</summary>
     protected abstract IMcpToolProvider? GetToolProvider();
 
@@ -117,17 +111,6 @@ public abstract class AiConversationControllerBase : BaseController
                 return;
             }
 
-            // In plan mode, prefer the designated planning model if one is configured
-            if (string.Equals(request.Mode, ConversationModes.Plan, StringComparison.OrdinalIgnoreCase))
-            {
-                var planningModel = await _providerMetadataService.GetPlanningModelAsync(provider);
-                if (!string.IsNullOrWhiteSpace(planningModel))
-                {
-                    _logger.LogInformation("Plan mode: overriding model {Model} with planning model {PlanningModel}", model, planningModel);
-                    model = planningModel;
-                }
-            }
-
             // Downgrade model if user has exceeded their monthly token allowance
             model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 
@@ -156,7 +139,7 @@ public abstract class AiConversationControllerBase : BaseController
 
             // 4. Build system prompt (delegated to subclass) + append mode-specific instructions
             var systemPrompt = await BuildSystemPromptAsync(request, userId, sessionId, history);
-            systemPrompt += ConversationModeFactory.From(GetEffectiveMode(request)).SystemPromptSuffix;
+            systemPrompt += ConversationModeFactory.From(null).SystemPromptSuffix;
 
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());
@@ -174,50 +157,45 @@ public abstract class AiConversationControllerBase : BaseController
             // 7a. Pre-conversation hook (e.g. create version snapshot)
             var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
 
-            // 7b. Pre-flight check (agent mode only): decide whether to proceed or ask for clarification.
-            //     Modes are always user-controlled — pre-flight never switches them.
-            var effectiveMode = GetEffectiveMode(request);
-            if (string.Equals(effectiveMode, ConversationModes.Agent, StringComparison.OrdinalIgnoreCase))
+            // 7b. Pre-flight check: decide whether to proceed with the tool loop or ask for clarification first.
+            var preflightResult = await _preflight.CheckAsync(
+                provider, model, apiKey, request.Message, history, cancellationToken);
+
+            if (!preflightResult.Proceed)
             {
-                var preflightResult = await _preflight.CheckAsync(
-                    provider, model, apiKey, request.Message, history, cancellationToken);
+                // Stream the clarifying question and stop — no tool loop runs
+                var clarifyConvId = request.ConversationId ?? Guid.NewGuid().ToString();
+                var clarifyMsg    = preflightResult.ClarifyMessage!;
 
-                if (!preflightResult.Proceed)
+                await WriteConversationEvent(new ConversationUpdatedEvent
                 {
-                    // Stream the clarifying question and stop — no tool loop runs
-                    var clarifyConvId = request.ConversationId ?? Guid.NewGuid().ToString();
-                    var clarifyMsg    = preflightResult.ClarifyMessage!;
+                    ConversationId = clarifyConvId,
+                    Messages       = [new ConversationMessage("assistant", clarifyMsg)],
+                    Timestamp      = DateTime.UtcNow
+                });
 
-                    await WriteConversationEvent(new ConversationUpdatedEvent
-                    {
-                        ConversationId = clarifyConvId,
-                        Messages       = [new ConversationMessage("assistant", clarifyMsg)],
-                        Timestamp      = DateTime.UtcNow
-                    });
+                // Persist both the user message and the AI clarifying response
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId   = sessionId,
+                    Role        = "user",
+                    Content     = request.Message,
+                    MessageType = ChatMessageType.Text,
+                    Metadata    = "{}"
+                }, userId);
 
-                    // Persist both the user message and the AI clarifying response
-                    await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                    {
-                        SessionId   = sessionId,
-                        Role        = "user",
-                        Content     = request.Message,
-                        MessageType = ChatMessageType.Text,
-                        Metadata    = "{}"
-                    }, userId);
+                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+                {
+                    SessionId   = sessionId,
+                    Role        = "assistant",
+                    Content     = clarifyMsg,
+                    MessageType = ChatMessageType.Text,
+                    Metadata    = "{}"
+                }, userId);
 
-                    await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                    {
-                        SessionId   = sessionId,
-                        Role        = "assistant",
-                        Content     = clarifyMsg,
-                        MessageType = ChatMessageType.Text,
-                        Metadata    = "{}"
-                    }, userId);
-
-                    await WriteEvent("done", new { conversationId = clarifyConvId, sessionId, model, success = true });
+                await WriteEvent("done", new { conversationId = clarifyConvId, sessionId, model, success = true });
                     return;
                 }
-            }
 
             // 7. Run conversation
             var conversationRequest = new ConversationRequest

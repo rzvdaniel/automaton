@@ -69,7 +69,6 @@ const {
   activateSession,
   updateSessionTitle,
   deleteSession,
-  chatMode,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
@@ -194,9 +193,7 @@ onMounted(async () => {
   // User can click on a session to open it
   
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
-  // Start in plan mode so the AI proposes an approach before writing code.
   if (props.initialPrompt) {
-    chatMode.value = 'plan'
     userInput.value = props.initialPrompt
     currentView.value = 'chat'
     // Small delay to ensure UI is ready
@@ -315,11 +312,6 @@ watch(
   },
   { deep: true }
 )
-
-// Set chat mode (plan / agent)
-function setChatMode(mode: 'plan' | 'agent') {
-  chatMode.value = mode
-}
 
 // Send message with optimistic UI
 async function sendMessage() {
@@ -583,10 +575,7 @@ function handleKeyPress(event: KeyboardEvent) {
             @keydown="handleKeyPress"
           />
           <div class="prompt-toolbar">
-            <div class="mode-toggle">
-              <button class="mode-btn" :class="{ active: chatMode === 'plan' }" @click="setChatMode('plan')">Plan</button>
-              <button class="mode-btn" :class="{ active: chatMode === 'agent' }" @click="setChatMode('agent')">Agent</button>
-            </div>
+
             <div class="prompt-right">
               <Select
                 v-if="availableModels.length > 0"
@@ -712,14 +701,8 @@ function handleKeyPress(event: KeyboardEvent) {
                 <div class="timeline-bullet regular">•</div>
                 <div v-if="gIdx < messageGroups.length - 1 || isBusy" class="timeline-connector"></div>
                 <div class="timeline-content">
-                  <!-- Plan approval card -->
-                  <PlanApprovalCard
-                    v-if="group.message.type === 'planApproval' && group.message.planData"
-                    :plan-data="group.message.planData"
-                    :on-send="(msg) => sendAiMessage(msg)"
-                  />
                   <!-- Instruction update notification -->
-                  <div v-else-if="group.message.type === 'instructionUpdate'" class="instruction-notification">
+                  <div v-if="group.message.type === 'instructionUpdate'" class="instruction-notification">
                     <i class="pi pi-file-edit"></i>
                     {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
@@ -784,10 +767,7 @@ function handleKeyPress(event: KeyboardEvent) {
             @keydown="handleKeyPress"
           />
           <div class="prompt-toolbar">
-            <div class="mode-toggle">
-              <button class="mode-btn" :class="{ active: chatMode === 'plan' }" @click="setChatMode('plan')">Plan</button>
-              <button class="mode-btn" :class="{ active: chatMode === 'agent' }" @click="setChatMode('agent')">Agent</button>
-            </div>
+
             <div class="prompt-right">
               <Select
                 v-if="availableModels.length > 0"
@@ -1375,41 +1355,6 @@ function handleKeyPress(event: KeyboardEvent) {
   border-top: 1px solid var(--p-surface-200);
 }
 
-.mode-toggle {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  background: var(--p-surface-100);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.mode-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--p-text-muted-color);
-  transition: background 0.15s, color 0.15s;
-  line-height: 1.5;
-}
-
-.mode-btn:hover {
-  color: var(--p-text-color);
-}
-
-.mode-btn.active {
-  background: var(--p-surface-0);
-  color: var(--p-text-color);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
 .prompt-right {
   display: flex;
   align-items: center;
@@ -1458,13 +1403,5 @@ function handleKeyPress(event: KeyboardEvent) {
   border-color: var(--p-surface-600);
 }
 
-:global(.app-dark) .mode-toggle {
-  background: var(--p-surface-700);
-}
-
-:global(.app-dark) .mode-btn.active {
-  background: var(--p-surface-600);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
 </style>
 
