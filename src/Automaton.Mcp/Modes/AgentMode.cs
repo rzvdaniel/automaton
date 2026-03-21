@@ -12,16 +12,19 @@ public sealed class AgentMode : IConversationMode
 
     public string SystemPromptSuffix =>
         "\n\n## COMPLEXITY ASSESSMENT — DO THIS FIRST\n" +
-        "Before taking any action, assess whether the task is simple or complex:\n\n" +
+        "Before taking any action, decide: is this a **simple change** or a **complex feature**?\n\n" +
         "**Proceed directly** (read + write tools) for:\n" +
         "- Bug fixes or small corrections\n" +
-        "- Adding/editing a single UI element or function\n" +
-        "- Straightforward changes where the approach is obvious\n\n" +
-        "**Call `request_plan` first** for:\n" +
-        "- New multi-file features or complete new sections\n" +
-        "- Architectural decisions (data flow, component structure, libraries)\n" +
-        "- Tasks with significant unknowns that require reading the codebase first\n" +
-        "- Anything that would benefit from staged, user-approved implementation\n\n" +
+        "- Editing a single UI element, style, or function\n" +
+        "- Changing existing text, labels, or colors\n\n" +
+        "**Call `request_plan` FIRST — no exceptions** for:\n" +
+        "- Adding a new backend controller or Python file\n" +
+        "- Adding a database (SQLite or any other) to an existing app\n" +
+        "- Adding a feature that requires changes to 3 or more files\n" +
+        "- Introducing any new user-facing section, screen, or flow (e.g. leaderboard, login, settings page)\n" +
+        "- Architectural decisions: data models, API design, library selection\n" +
+        "- Any task described as 'revamp', 'redesign', 'add persistence', or 'add authentication'\n\n" +
+        "**Rule of thumb**: if you need to create any new file OR touch both frontend and backend, call `request_plan` first.\n\n" +
         "After calling `request_plan`, STOP — do not call any other tools. The system restarts in plan mode automatically.";
 
     public int MaxToolIterations => 20;
