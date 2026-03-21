@@ -2,7 +2,7 @@
  * useAiChat Composable
  * Manages AI chat state and streaming conversations with session persistence
  */
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
 import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
@@ -55,18 +55,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
-  // Derived mode: use 'plan' for the very first message in a fresh session (no prior messages),
-  // 'agent' for all subsequent messages. The explicit toggle is removed — mode is automatic.
-  const chatMode = computed<'plan' | 'agent'>(() =>
-    messages.value.filter((m) => m.role === 'user').length === 0 ? 'plan' : 'agent',
-  )
-
-  // When stage_complete returns hasMoreStages:true, auto-send a continuation after the stream ends.
-  const pendingAutoContinu = ref(false)
-  const pendingNextStage = ref<{ index: number; name: string; description: string } | null>(null)
-
-  // Stored context for auto-continue (same systemPrompt/context as the last call).
-  const lastCallContext = ref<{ systemPrompt?: string; context?: Record<string, any> }>({})
+  // Chat mode: defaults to 'agent'. Switches to 'plan' when the AI calls request_plan
+  // (auto-detected complexity) or when the user manually toggles. Switches back to
+  // 'agent' automatically after propose_plan completes.
+  const chatMode = ref<'plan' | 'agent'>('agent')
 
   // Computed
   const hasMessages = computed(() => messages.value.length > 0)
@@ -261,19 +253,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       // Skip role='tool' messages — raw tool output only needed by AI as context, not meaningful for users.
       messages.value = serverMessages.filter((m: any) => m.role !== 'tool')
 
-      // Restore planApproval card type for all propose_plan messages that awaited approval.
-      // All plan types except stage_complete have awaitingApproval=true and render as inline cards.
-      for (const m of messages.value) {
-        if (m.toolName === 'propose_plan' && m.toolResult) {
-          try {
-            const result = typeof m.toolResult === 'string' ? JSON.parse(m.toolResult) : m.toolResult
-            if (result?.awaitingApproval === true) {
-              m.type = 'planApproval'
-              m.planData = result as import('../types/ai.types').PlanData
-            }
-          } catch { /* not JSON or not a plan */ }
-        }
-      }
+      // Always resume in agent mode — the user has prior context and can ask for planning explicitly
+      // or let the AI trigger it via request_plan if needed.
+      chatMode.value = 'agent'
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load messages'
       console.error('Error loading messages:', err)
@@ -432,7 +414,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
    * @param userMessageAlreadyAdded - set true when the caller has already pushed the user
    *   message into `messages` optimistically, so we don't add it a second time.
    */
-  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>, userMessageAlreadyAdded = false, modeOverride?: 'plan' | 'agent') {
+  async function sendMessage(userMessage: string, systemPrompt?: string, context?: Record<string, any>, userMessageAlreadyAdded = false) {
     if (!userMessage.trim() || isGenerating.value) return
     if (!selectedModel.value) {
       error.value = 'Please select an AI model'
@@ -444,11 +426,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       await getOrCreateActiveSession()
     }
 
-    // Capture mode BEFORE the user message is pushed — once it's in messages,
-    // chatMode (computed) flips to 'agent', so we'd always send 'agent' otherwise.
-    // A modeOverride lets callers that push the message themselves pass the pre-push mode.
-    const modeForThisRequest = modeOverride ?? chatMode.value
-
+    // Capture mode before the request starts.
+    const modeForThisRequest = chatMode.value
+    // Track whether propose_plan completed during this response.
+    let proposePlanCompleted = false
+    // Track whether request_plan was called (AI-driven escalation to plan mode).
+    let requestPlanTriggered = false
     // Add user message to chat (skip when caller already added it optimistically)
     const userChatMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -459,9 +442,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     if (!userMessageAlreadyAdded) {
       messages.value.push(userChatMessage)
     }
-
-    // Save context for potential auto-continue after stage_complete
-    lastCallContext.value = { systemPrompt, context }
 
     // Reset error
     error.value = null
@@ -519,26 +499,24 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             }
           })
 
-          // Auto-continue: stage_complete signalled more stages remain.
-          // Silently send the next trigger so the AI continues without user intervention.
-          if (pendingAutoContinu.value) {
-            pendingAutoContinu.value = false
-            const next = pendingNextStage.value
-            pendingNextStage.value = null
-            const { systemPrompt: sp, context: ctx } = lastCallContext.value
-            // Build a precise message so the AI knows exactly what to implement next.
-            const msg = next
-              ? `Implement Stage ${next.index + 1}: "${next.name}"${next.description ? ` — ${next.description}` : ''}. When done, call propose_plan(stage_complete, stageIndex=${next.index}).`
-              : 'Continue to the next stage.'
-            // Pass userMessageAlreadyAdded=true so the internal trigger isn't shown in the UI.
-            nextTick(() => sendMessage(msg, sp, ctx, true))
+          // After propose_plan completes in plan mode, auto-switch to agent so the
+          // user can confirm implementation with a single reply.
+          if (modeForThisRequest === 'plan' && proposePlanCompleted) {
+            chatMode.value = 'agent'
+          }
+
+          // If the AI called request_plan (complexity escalation), switch to plan mode
+          // and transparently re-send the original message so planning starts immediately.
+          if (requestPlanTriggered) {
+            chatMode.value = 'plan'
+            setTimeout(() => {
+              void sendMessage(userMessage, systemPrompt, context, true)
+            }, 50)
           }
         },
         onError: (data) => {
           error.value = data.error
           isGenerating.value = false
-          pendingAutoContinu.value = false
-          pendingNextStage.value = null
 
           // Add error message to chat
           messages.value.push({
@@ -551,15 +529,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         },
         onCancelled: () => {
           isGenerating.value = false
-          pendingAutoContinu.value = false
-          pendingNextStage.value = null
         },
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to send message'
       isGenerating.value = false
-      pendingAutoContinu.value = false
-      pendingNextStage.value = null
       console.error('Error sending message:', err)
     }
   }
@@ -637,6 +611,16 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     if (update.toolResults && update.toolResults.length > 0) {
       for (const toolResult of update.toolResults) {
         handleToolResult(toolResult)
+        // Detect a successful propose_plan so we can auto-switch to agent
+        const raw = toolResult as any
+        const isSuccess = raw.isSuccess !== undefined ? raw.isSuccess : !toolResult.isError
+        const matchingCall = messages.value.find((m) => m.id === toolResult.toolCallId)
+        if (isSuccess && matchingCall?.toolName === 'propose_plan') {
+          proposePlanCompleted = true
+        }
+        if (isSuccess && matchingCall?.toolName === 'request_plan') {
+          requestPlanTriggered = true
+        }
       }
     }
   }
@@ -703,22 +687,12 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
       // Upgrade message type for special tools
       if (!isError) {
-        if (toolMessage.toolName === 'propose_plan' && resultData?.awaitingApproval === true) {
-          // All plan types that await approval (implementation, refinements) render inline as a card
-          toolMessage.type = 'planApproval'
-          toolMessage.planData = resultData as import('../types/ai.types').PlanData
-          toolMessage.model = selectedModel.value || undefined
-        } else if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
+        if (toolMessage.toolName === 'write_instruction' && resultData?.notification) {
           toolMessage.type = 'instructionUpdate'
           toolMessage.instructionNotification = resultData.notification as string
-        } else if (
-          toolMessage.toolName === 'propose_plan' &&
-          resultData?.planType === 'stage_complete' &&
-          resultData?.hasMoreStages === true
-        ) {
-          // Signal auto-continuation with the exact next stage details.
-          pendingAutoContinu.value = true
-          pendingNextStage.value = resultData.nextStage ?? null
+        }
+        if (toolMessage.toolName === 'request_plan') {
+          toolMessage.content = `Switching to plan mode: ${resultData?.reason ?? 'complex task detected'}`
         }
       }
 

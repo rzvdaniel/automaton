@@ -15,7 +15,7 @@ public sealed class PlanMode : IConversationMode
         "You are in **plan mode**. Your primary action is `propose_plan`.\n" +
         "You may use read tools (read_file, list_files, search_file) to understand existing code, but do NOT loop on them.\n" +
         "IMPORTANT: When the user asks to add or change something, call `propose_plan` with the COMPLETE plan — include ALL existing stages plus the new changes. Never submit a partial plan with only the new addition.\n" +
-        "After calling `propose_plan`, ALWAYS reply with a short message. For the first plan: 'Click **Implement Plan** when ready.' For updates: describe what changed (e.g. 'I've added a footer section as Stage 4').\n" +
+        "After calling `propose_plan`, ALWAYS reply with a short message asking if the user wants to implement it. For example: 'The plan is ready — shall I implement it?' The UI will automatically switch to Agent mode so the user can confirm with a single reply.\n" +
         "Write tools are BLOCKED — calling them will fail every time. Do NOT retry.\n\n" +
         "## TECHNICAL DECISIONS — THINK DEEPLY:\n" +
         "The `techDecisions` field is the most important part of the plan. The implementation model that follows your plan is less capable — it will blindly use whatever library or approach you specify. You must do the research and reasoning upfront.\n\n" +
@@ -29,6 +29,8 @@ public sealed class PlanMode : IConversationMode
 
     public int MaxToolIterations => 5;
 
-    /// <summary>Allow Read and Planning tools; block Write tools.</summary>
-    public bool IsToolAllowed(McpTool tool) => tool.Capability != ToolCapability.Write;
+    /// <summary>Allow Read and Planning tools; block Write and ModeSwitch tools.</summary>
+    public bool IsToolAllowed(McpTool tool) =>
+        tool.Capability != ToolCapability.Write &&
+        tool.Capability != ToolCapability.ModeSwitch;
 }

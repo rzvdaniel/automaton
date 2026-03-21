@@ -15,7 +15,6 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
-import PlanApprovalCard from './PlanApprovalCard.vue'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
@@ -171,7 +170,6 @@ const messageGroups = computed<MessageGroup[]>(() => {
     const isGroupable =
       msg.role === 'assistant' &&
       msg.toolName &&
-      msg.type !== 'planApproval' &&
       msg.type !== 'instructionUpdate'
 
     if (isGroupable) {
@@ -316,6 +314,11 @@ watch(
   { deep: true }
 )
 
+// Set chat mode (plan / agent)
+function setChatMode(mode: 'plan' | 'agent') {
+  chatMode.value = mode
+}
+
 // Send message with optimistic UI
 async function sendMessage() {
   if (!userInput.value.trim() || isBusy.value) return
@@ -326,10 +329,6 @@ async function sendMessage() {
   // If we're in the sessions list view, always create a new session
   // If we're in chat view with no active session, also create one
   if (currentView.value === 'sessions' || !activeSession.value) {
-    // Capture the mode NOW, before anything is pushed to messages — chatMode is a
-    // computed that flips to 'agent' the moment a user message exists in the array.
-    const modeForThisMessage = chatMode.value
-
     // 1. Clear previous session state so chat view doesn't briefly show old data
     activeSession.value = null
     messages.value = []
@@ -374,9 +373,8 @@ async function sendMessage() {
       props.systemPrompt ||
       'You are an AI assistant helping with this task. Provide helpful, accurate responses based on the context provided.'
 
-    // 6. Send to AI — pass true so sendAiMessage doesn't add the user message a second time,
-    //    and pass the pre-push mode so backend gets 'plan' for the first message.
-    const sendPromise = sendAiMessage(messageContent, systemPrompt, context, true, modeForThisMessage)
+    // 6. Send to AI — pass true so sendAiMessage doesn't add the user message a second time.
+    const sendPromise = sendAiMessage(messageContent, systemPrompt, context, true)
     
     // Generate proper session name in parallel (don't await - let it run in background)
     generateAndUpdateSessionName(messageContent)
@@ -462,15 +460,6 @@ function handleKeyPress(event: KeyboardEvent) {
           </div>
           
           <div class="flex align-items-center gap-2">
-            <!-- Model Selector -->
-            <Select
-              v-if="availableModels.length > 0"
-              v-model="selectedModel"
-              :options="availableModels"
-              placeholder="Model"
-              size="small"
-              class="model-select"
-            />
             <Button
               v-tooltip.top="'New session'"
               icon="pi pi-plus"
@@ -591,27 +580,42 @@ function handleKeyPress(event: KeyboardEvent) {
             rows="2"
             @keydown="handleKeyPress"
           />
-          <div class="prompt-actions">
-            <Button
-              v-if="isBusy"
-              v-tooltip.top="'Cancel'"
-              icon="pi pi-stop-circle"
-              severity="danger"
-              size="small"
-              text
-              rounded
-              @click="cancelGeneration"
-            />
-            <Button
-              v-else
-              v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
-              icon="pi pi-send"
-              size="small"
-              text
-              rounded
-              :disabled="!userInput.trim() || !selectedModel"
-              @click="sendMessage"
-            />
+          <div class="prompt-toolbar">
+            <div class="mode-toggle">
+              <button class="mode-btn" :class="{ active: chatMode === 'plan' }" @click="setChatMode('plan')">Plan</button>
+              <button class="mode-btn" :class="{ active: chatMode === 'agent' }" @click="setChatMode('agent')">Agent</button>
+            </div>
+            <div class="prompt-right">
+              <Select
+                v-if="availableModels.length > 0"
+                v-model="selectedModel"
+                :options="availableModels"
+                placeholder="Model"
+                size="small"
+                class="model-select-inline"
+                :disabled="isBusy || availableModels.length === 0"
+              />
+              <Button
+                v-if="isBusy"
+                v-tooltip.top="'Cancel'"
+                icon="pi pi-stop-circle"
+                severity="danger"
+                size="small"
+                text
+                rounded
+                @click="cancelGeneration"
+              />
+              <Button
+                v-else
+                v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+                icon="pi pi-send"
+                size="small"
+                text
+                rounded
+                :disabled="!userInput.trim() || !selectedModel"
+                @click="sendMessage"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -641,18 +645,6 @@ function handleKeyPress(event: KeyboardEvent) {
               text
               class="p-button-text p-button-sm"
               @click="openRenameDialog(activeSession)"
-            />
-          </div>
-          
-          <!-- Model Selector -->
-          <div v-if="availableModels.length > 0" class="flex align-items-center gap-2">
-            <Select
-              v-model="selectedModel"
-              :options="availableModels"
-              placeholder="Model"
-              size="small"
-              class="model-select"
-              :disabled="isBusy || availableModels.length === 0"
             />
           </div>
         </div>
@@ -789,27 +781,42 @@ function handleKeyPress(event: KeyboardEvent) {
             rows="2"
             @keydown="handleKeyPress"
           />
-          <div class="prompt-actions">
-            <Button
-              v-if="isBusy"
-              v-tooltip.top="'Cancel'"
-              icon="pi pi-stop-circle"
-              severity="danger"
-              size="small"
-              text
-              rounded
-              @click="cancelGeneration"
-            />
-            <Button
-              v-else
-              v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
-              icon="pi pi-send"
-              size="small"
-              text
-              rounded
-              :disabled="!userInput.trim() || !selectedModel"
-              @click="sendMessage"
-            />
+          <div class="prompt-toolbar">
+            <div class="mode-toggle">
+              <button class="mode-btn" :class="{ active: chatMode === 'plan' }" @click="setChatMode('plan')">Plan</button>
+              <button class="mode-btn" :class="{ active: chatMode === 'agent' }" @click="setChatMode('agent')">Agent</button>
+            </div>
+            <div class="prompt-right">
+              <Select
+                v-if="availableModels.length > 0"
+                v-model="selectedModel"
+                :options="availableModels"
+                placeholder="Model"
+                size="small"
+                class="model-select-inline"
+                :disabled="isBusy || availableModels.length === 0"
+              />
+              <Button
+                v-if="isBusy"
+                v-tooltip.top="'Cancel'"
+                icon="pi pi-stop-circle"
+                severity="danger"
+                size="small"
+                text
+                rounded
+                @click="cancelGeneration"
+              />
+              <Button
+                v-else
+                v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+                icon="pi pi-send"
+                size="small"
+                text
+                rounded
+                :disabled="!userInput.trim() || !selectedModel"
+                @click="sendMessage"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1046,7 +1053,6 @@ function handleKeyPress(event: KeyboardEvent) {
   min-width: 120px;
   font-size: 0.875rem;
 }
-
 .error-banner {
   background-color: var(--p-red-100);
   color: var(--p-red-900);
@@ -1358,11 +1364,59 @@ function handleKeyPress(event: KeyboardEvent) {
   width: 100%;
 }
 
-.prompt-actions {
+.prompt-toolbar {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  margin-top: 2px;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--p-surface-200);
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--p-surface-100);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--p-text-muted-color);
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.5;
+}
+
+.mode-btn:hover {
+  color: var(--p-text-color);
+}
+
+.mode-btn.active {
+  background: var(--p-surface-0);
+  color: var(--p-text-color);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.prompt-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.model-select-inline {
+  min-width: 130px;
+  font-size: 0.75rem;
 }
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */
@@ -1396,6 +1450,19 @@ function handleKeyPress(event: KeyboardEvent) {
 
 :global(.app-dark) .prompt-box:focus-within {
   border-color: var(--p-primary-400);
+}
+
+:global(.app-dark) .prompt-toolbar {
+  border-color: var(--p-surface-600);
+}
+
+:global(.app-dark) .mode-toggle {
+  background: var(--p-surface-700);
+}
+
+:global(.app-dark) .mode-btn.active {
+  background: var(--p-surface-600);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 </style>
 
