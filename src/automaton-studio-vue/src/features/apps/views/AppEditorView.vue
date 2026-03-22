@@ -74,6 +74,7 @@ const activeLogsTab = ref<'build' | 'runtime'>('build')
 
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
+const buildLogsRef   = ref<{ reload: () => void } | null>(null)
 
 // Refresh runtime logs whenever the user navigates to that view
 watch([activeTab, activeLogsTab], ([tab, logsTab]) => {
@@ -604,6 +605,7 @@ async function handleVersionCreated() {
   if (versionHistoryRef.value?.loadVersions) {
     await versionHistoryRef.value.loadVersions()
   }
+  buildLogsRef.value?.reload()
 }
 
 // Handle version restored
@@ -934,7 +936,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           </button>
         </div>
         <div class="logs-view-content">
-          <AppBuildLogs v-if="activeLogsTab === 'build'" :app-id="resolvedAppId" />
+          <AppBuildLogs v-if="activeLogsTab === 'build'" ref="buildLogsRef" :app-id="resolvedAppId" />
           <AppRuntimeLogs ref="runtimeLogsRef" v-else :app-id="resolvedAppId" />
         </div>
       </div>

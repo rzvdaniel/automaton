@@ -186,6 +186,8 @@ function formatTokens(n?: number) {
 
 onMounted(loadSessions)
 watch(() => props.appId, loadSessions)
+
+defineExpose({ reload: loadSessions })
 </script>
 
 <template>
