@@ -28,6 +28,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-keys',
   },
   {
+    label: 'App Activity',
+    icon: 'pi pi-chart-line',
+    to: '/admin/app-activity',
+    routePrefix: '/admin/app-activity',
+  },
+  {
     label: 'Server Logs',
     icon: 'pi pi-list',
     to: '/admin/logs',

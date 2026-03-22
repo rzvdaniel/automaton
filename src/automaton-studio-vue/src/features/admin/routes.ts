@@ -10,6 +10,7 @@ import AdminModelsView from './views/AdminModelsView.vue'
 import AdminAiKeysView from './views/AdminAiKeysView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
+import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -62,6 +63,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminSubscriptionPlansView,
         meta: {
           title: 'Subscription Plans',
+        },
+      },
+      {
+        path: 'app-activity',
+        name: 'admin-app-activity',
+        component: AdminAppActivityView,
+        meta: {
+          title: 'App Activity',
         },
       },
     ],

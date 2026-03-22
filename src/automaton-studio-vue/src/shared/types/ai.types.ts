@@ -294,6 +294,26 @@ export interface AppChatStats {
 }
 
 // ============================================
+// Admin App Activity
+// ============================================
+
+/**
+ * Per-app AI activity summary for the admin dashboard.
+ * Aggregates across ALL users for a given app.
+ */
+export interface AppActivityItem {
+  appId: string
+  appName: string
+  totalPromptsSubmitted: number
+  totalApiCalls: number
+  totalTokens: number
+  inputTokens: number
+  outputTokens: number
+  sessionCount: number
+  lastActivityAt?: string
+}
+
+// ============================================
 // App Runtime Execution Logs
 // ============================================
 

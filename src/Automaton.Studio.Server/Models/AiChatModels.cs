@@ -144,3 +144,20 @@ public class AppChatStatsDto
     public int OutputTokens { get; set; }
     public int SessionCount { get; set; }
 }
+
+/// <summary>
+/// Per-app activity summary for the admin activity dashboard.
+/// Aggregates AI chat session stats across ALL users for a given app.
+/// </summary>
+public class AppActivityDto
+{
+    public Guid AppId { get; set; }
+    public string AppName { get; set; } = string.Empty;
+    public int TotalPromptsSubmitted { get; set; }
+    public int TotalApiCalls { get; set; }
+    public int TotalTokens { get; set; }
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public int SessionCount { get; set; }
+    public DateTime? LastActivityAt { get; set; }
+}
