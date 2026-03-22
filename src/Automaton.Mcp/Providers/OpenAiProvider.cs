@@ -1,4 +1,5 @@
 using Automaton.Mcp.Models;
+using Automaton.Mcp.SystemPrompts;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -240,7 +241,7 @@ public class OpenAiProvider : IAiProvider
         }).ToList();
 
         var responseBuilder = new StringBuilder();
-        var maxIterations = request.MaxIterations > 0 ? request.MaxIterations : 20;
+        var maxIterations = IterationLimits.Resolve(null, request.MaxIterations);
         var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

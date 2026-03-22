@@ -3,10 +3,11 @@ namespace Automaton.Studio.Server.Config;
 public class AiProvidersConfig
 {
     /// <summary>
-    /// Maximum number of tool call iterations before stopping.
-    /// Default: 20
+    /// Maximum number of LLM round-trips (iterations) before stopping.
+    /// 0 = use tier-based defaults (Simple: 15, Medium: 25, Large: 40, Enterprise: 60).
+    /// Set a positive value to override for all tiers.
     /// </summary>
-    public int MaxIterations { get; set; } = 20;
+    public int MaxIterations { get; set; } = 0;
 
     /// <summary>
     /// Maximum consecutive failures allowed for the same tool before stopping.

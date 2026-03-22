@@ -2,6 +2,7 @@ using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
+using Automaton.Mcp.SystemPrompts;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
@@ -30,6 +31,12 @@ public abstract class AiConversationControllerBase : BaseController
     protected readonly AiProviderMetadataService _providerMetadataService;
     protected readonly ITokenBudgetService _tokenBudgetService;
     protected readonly ILogger _logger;
+
+    /// <summary>
+    /// Set by subclasses during <see cref="BuildSystemPromptAsync"/> to influence the
+    /// iteration limit used for this conversation.
+    /// </summary>
+    protected ComplexityTier? _resolvedTier;
 
     protected AiConversationControllerBase(
         IAutomatonMcpClient mcpClient,
@@ -165,7 +172,7 @@ public abstract class AiConversationControllerBase : BaseController
                 ApiKey = apiKey,
                 ConversationHistory = history,
                 Context = BuildContextDictionary(request, userId),
-                MaxIterations = _aiProvidersConfig.MaxIterations,
+                MaxIterations = IterationLimits.Resolve(_resolvedTier, _aiProvidersConfig.MaxIterations),
                 MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
                 Mode = request.Mode
             };

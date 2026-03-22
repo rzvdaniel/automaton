@@ -22,11 +22,10 @@ public class ConversationRequest
     public Dictionary<string, object>? Context { get; set; }
 
     /// <summary>
-    /// Maximum number of tool call iterations before stopping.
-    /// Prevents infinite loops in AI tool execution.
-    /// Default: 20
+    /// Maximum number of LLM round-trips before stopping.
+    /// 0 = use <see cref="IterationLimits"/> tier-based defaults.
     /// </summary>
-    public int MaxIterations { get; set; } = 20;
+    public int MaxIterations { get; set; } = 0;
 
     /// <summary>
     /// Maximum consecutive failures allowed for the same tool before stopping.

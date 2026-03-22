@@ -133,6 +133,7 @@ public class AiAppConversationController : AiConversationControllerBase
         List<ConversationMessage>? history)
     {
         var tier       = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
+        _resolvedTier  = tier;
         var basePrompt = _promptBuilder.BuildSystemPrompt(tier);
 
         // Inject user instructions from .instructions/ folder (1000 token budget)
