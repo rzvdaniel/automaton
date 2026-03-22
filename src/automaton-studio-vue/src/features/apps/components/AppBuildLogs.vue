@@ -265,13 +265,6 @@ watch(() => props.appId, loadSessions)
               v-for="item in getAnnotatedMessages(sessionMessages[session.id])"
               :key="item.idx"
             >
-              <!-- API call divider -->
-              <div v-if="item.isNewApiCall" class="api-call-divider">
-                <span class="api-call-label">
-                  <i class="pi pi-send"></i> API Call #{{ item.apiCallNumber }}
-                </span>
-              </div>
-
               <!-- Message row -->
               <div
                 class="timeline-item"
@@ -287,6 +280,9 @@ watch(() => props.appId, loadSessions)
                       :severity="getMessageSeverity(item.msg)"
                       style="font-size: 0.7rem"
                     />
+                    <span v-if="item.apiCallNumber" class="api-call-badge">
+                      #{{ item.apiCallNumber }}
+                    </span>
                     <span v-if="item.msg.totalTokens" class="token-count">
                       {{ formatTokens(item.msg.totalTokens) }} tokens
                     </span>
@@ -431,34 +427,16 @@ watch(() => props.appId, loadSessions)
   gap: 0.4rem;
 }
 
-/* ── API call divider ─────────────────────────────────────────────────────── */
-.api-call-divider {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0.4rem 0 0.2rem;
-}
-
-.api-call-divider::before,
-.api-call-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background-color: var(--p-primary-color);
-  opacity: 0.3;
-}
-
-.api-call-label {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.65rem;
-  font-weight: 600;
+/* ── API call badge (inline, right of type tag) ───────────────────────────── */
+.api-call-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
   color: var(--p-primary-color);
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.8;
+  background-color: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p-primary-color) 30%, transparent);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  letter-spacing: 0.03em;
 }
 
 /* ── Timeline items ───────────────────────────────────────────────────────── */
