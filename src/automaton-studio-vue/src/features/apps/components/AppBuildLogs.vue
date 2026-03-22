@@ -25,7 +25,7 @@ async function loadSessions() {
   if (!props.appId) return
   isLoading.value = true
   try {
-    sessions.value = await aiChatHistoryService.getSessions('2', props.appId)
+    sessions.value = (await aiChatHistoryService.getSessions('2', props.appId)).items
   } catch (err) {
     console.error('Failed to load build sessions', err)
   } finally {
@@ -184,6 +184,9 @@ watch(() => props.appId, loadSessions)
           <div class="session-stats">
             <span class="stat">
               <i class="pi pi-comments"></i> {{ session.totalPromptsSubmitted }}
+            </span>
+            <span class="stat" title="LLM API calls this session">
+              <i class="pi pi-sync"></i> {{ session.totalApiCalls }}
             </span>
             <span class="stat">
               <i class="pi pi-bolt"></i> {{ formatTokens(session.totalTokens) }}

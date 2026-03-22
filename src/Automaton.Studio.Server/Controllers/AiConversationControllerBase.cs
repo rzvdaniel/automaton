@@ -353,6 +353,9 @@ public abstract class AiConversationControllerBase : BaseController
                     })
                 }, userId);
             }
+
+            if (update.ApiCallCount > 0)
+                await _chatHistoryService.IncrementApiCallsAsync(sessionId, userId, update.ApiCallCount);
         }
         catch (Exception ex)
         {

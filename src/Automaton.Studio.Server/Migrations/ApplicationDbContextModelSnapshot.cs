@@ -159,6 +159,10 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
+                    b.Property<int>("TotalApiCalls")
+                        .HasDefaultValue(0)
+                        .HasColumnType("int");
+
                     b.Property<int>("TotalInputTokens")
                         .HasColumnType("int");
 

@@ -22,6 +22,7 @@ public class ChatSessionDto
     
     // Usage metrics
     public int TotalPromptsSubmitted { get; set; }
+    public int TotalApiCalls { get; set; }
     public int TotalInputTokens { get; set; }
     public int TotalOutputTokens { get; set; }
     public int TotalTokens { get; set; }
@@ -137,6 +138,7 @@ public class ChatSessionStatsDto
 public class AppChatStatsDto
 {
     public int TotalPromptsSubmitted { get; set; }
+    public int TotalApiCalls { get; set; }
     public int TotalTokens { get; set; }
     public int InputTokens { get; set; }
     public int OutputTokens { get; set; }

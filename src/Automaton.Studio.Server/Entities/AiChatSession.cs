@@ -68,6 +68,12 @@ public class AiChatSession
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
+    /// Total number of LLM API calls made in this session (one per tool-loop iteration).
+    /// Unlike TotalPromptsSubmitted (user messages), this counts every round-trip to the provider.
+    /// </summary>
+    public int TotalApiCalls { get; set; } = 0;
+
+    /// <summary>
     /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
     /// Once set it is sticky — never downgraded within the same session.
     /// </summary>

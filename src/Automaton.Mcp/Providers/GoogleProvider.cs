@@ -260,6 +260,13 @@ public class GoogleProvider : IAiProvider
                 break;
         }
 
+        if (!string.IsNullOrEmpty(request.ConversationId) && iterationCount > 0)
+            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+            {
+                ConversationId = request.ConversationId,
+                ApiCallCount = iterationCount
+            });
+
         return responseBuilder.ToString().Trim();
     }
 

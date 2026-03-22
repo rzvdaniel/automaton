@@ -206,6 +206,7 @@ export interface ChatSession {
   
   // Usage metrics
   totalPromptsSubmitted: number
+  totalApiCalls: number
   totalInputTokens: number
   totalOutputTokens: number
   totalTokens: number
@@ -285,6 +286,7 @@ export interface ChatSessionStats {
  */
 export interface AppChatStats {
   totalPromptsSubmitted: number
+  totalApiCalls: number
   totalTokens: number
   inputTokens: number
   outputTokens: number

@@ -57,6 +57,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                     UpdatedAt = s.UpdatedAt,
                     MessageCount = s.Messages.Count,
                     TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalApiCalls = s.TotalApiCalls,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens,
@@ -101,6 +102,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                     UpdatedAt = s.UpdatedAt,
                     MessageCount = s.Messages.Count,
                     TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalApiCalls = s.TotalApiCalls,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens,
@@ -215,6 +217,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                     UpdatedAt = s.UpdatedAt,
                     MessageCount = s.Messages.Count,
                     TotalPromptsSubmitted = s.TotalPromptsSubmitted,
+                    TotalApiCalls = s.TotalApiCalls,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens
@@ -686,6 +689,28 @@ public class AiChatHistoryService : IAiChatHistoryService
         }
     }
 
+    public async Task IncrementApiCallsAsync(Guid sessionId, Guid userId, int count)
+    {
+        if (count <= 0) return;
+        try
+        {
+            var session = await dataContext.AiChatSessions
+                .Include(s => s.AiChatSessionUsers)
+                .FirstOrDefaultAsync(s => s.Id == sessionId &&
+                                         s.AiChatSessionUsers.Any(su => su.UserId == userId));
+
+            if (session == null) return;
+
+            session.TotalApiCalls += count;
+            session.UpdatedAt = DateTime.UtcNow;
+            await dataContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to increment API calls for session {SessionId}", sessionId);
+        }
+    }
+
     public async Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId)
     {
         try
@@ -725,6 +750,7 @@ public class AiChatHistoryService : IAiChatHistoryService
                 return new AppChatStatsDto
                 {
                     TotalPromptsSubmitted = 0,
+                    TotalApiCalls = 0,
                     TotalTokens = 0,
                     InputTokens = 0,
                     OutputTokens = 0,
@@ -736,6 +762,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             var stats = new AppChatStatsDto
             {
                 TotalPromptsSubmitted = sessions.Sum(s => s.TotalPromptsSubmitted),
+                TotalApiCalls = sessions.Sum(s => s.TotalApiCalls),
                 TotalTokens = sessions.Sum(s => s.TotalTokens),
                 InputTokens = sessions.Sum(s => s.TotalInputTokens),
                 OutputTokens = sessions.Sum(s => s.TotalOutputTokens),

@@ -85,4 +85,10 @@ public interface IAiChatHistoryService
     /// Used for AI turns that consist purely of tool calls (no text content to persist).
     /// </summary>
     Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens);
+
+    /// <summary>
+    /// Add LLM API call count to a session's running total.
+    /// Called once per provider CallAsync, with the total loop iterations made during that turn.
+    /// </summary>
+    Task IncrementApiCallsAsync(Guid sessionId, Guid userId, int count);
 }
