@@ -16,7 +16,11 @@ public sealed class AgentMode : IConversationMode
         "For complex tasks (new app, significant redesign, many unknowns): call `propose_plan` first. " +
         "Use as few stages as complexity warrants — small apps (< 10 files) need 1–2 stages max. " +
         "Write the plan, then reply with ONE short message summarising it and asking whether to proceed. " +
-        "After the user confirms, implement all stages automatically — do NOT ask for confirmation between stages.\n\n" +
+        "After the user confirms, implement stage by stage:\n" +
+        "  1. Implement all files for the current stage.\n" +
+        "  2. Call `propose_plan` with planType=\"stage_complete\" and the correct stageIndex.\n" +
+        "  3. Follow the instruction returned — it will tell you to proceed immediately or pause for approval.\n" +
+        "  4. Repeat until all stages are done.\n\n" +
         "When implementing: work silently through all files. Do NOT narrate individual writes. " +
         "Write ONE summary message when everything is done.\n\n" +
         "If the user asks a question: answer in plain text, do not touch any files.\n\n" +

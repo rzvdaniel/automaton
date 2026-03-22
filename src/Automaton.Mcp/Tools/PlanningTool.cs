@@ -37,14 +37,14 @@ public class PlanningTool : IMcpTool
                 Description = """
                     Propose a plan before implementing a new app or significant feature.
                     Call with planType="implementation" to present the full plan for user approval before writing any files.
-                    Call with planType="stage_complete" to mark the current stage done and automatically proceed to the next — no user confirmation needed between stages.
+                    Call with planType="stage_complete" AFTER finishing every stage — this marks it done in the plan file and returns the instruction for what to do next (auto-proceed or pause for approval). You MUST call this between every stage.
 
                     Stage count guidelines (be conservative):
                     - Small app (< 10 files, self-contained): 1–2 stages max, or a single "Build" stage
                     - Medium app (10–30 files): 2–3 stages
                     - Large app / complex integration: 3–5 stages
 
-                    After calling with planType="implementation", write ONE short plain-text message summarising the plan and asking whether to proceed. Do not call any other tools.
+                    After calling with planType="implementation", write ONE message rendering the full plan as markdown and asking whether to proceed. Do not call any other tools.
                     """,
                 InputSchema = JsonDocument.Parse("""
                     {
