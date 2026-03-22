@@ -12,13 +12,15 @@ public static class IterationLimits
     public const int Enterprise = 60;
 
     /// <summary>
-    /// Returns the tier-appropriate default, or <paramref name="configuredValue"/> if the
-    /// caller explicitly overrode it (positive non-zero value).
+    /// Resolves the iteration limit using this priority order:
+    /// 1. <paramref name="globalOverride"/> — positive value overrides everything
+    /// 2. <paramref name="tierOverride"/> — positive value overrides for this tier only
+    /// 3. Built-in tier constant (Simple/Medium/Large/Enterprise)
     /// </summary>
-    public static int Resolve(ComplexityTier? tier, int configuredValue = 0)
+    public static int Resolve(ComplexityTier? tier, int globalOverride = 0, int tierOverride = 0)
     {
-        if (configuredValue > 0)
-            return configuredValue;
+        if (globalOverride > 0) return globalOverride;
+        if (tierOverride   > 0) return tierOverride;
 
         return tier switch
         {

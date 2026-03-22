@@ -172,7 +172,10 @@ public abstract class AiConversationControllerBase : BaseController
                 ApiKey = apiKey,
                 ConversationHistory = history,
                 Context = BuildContextDictionary(request, userId),
-                MaxIterations = IterationLimits.Resolve(_resolvedTier, _aiProvidersConfig.MaxIterations),
+                MaxIterations = IterationLimits.Resolve(
+                    _resolvedTier,
+                    globalOverride: _aiProvidersConfig.MaxIterations,
+                    tierOverride:   _aiProvidersConfig.IterationLimits.For(_resolvedTier)),
                 MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
                 Mode = request.Mode
             };
