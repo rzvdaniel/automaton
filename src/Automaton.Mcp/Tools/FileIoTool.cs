@@ -79,8 +79,8 @@ public class FileIoTool : IMcpTool
             {
                 Name = DeleteFileName,
                 Capability = ToolCapability.Write,
-                Description = "Delete a file.",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
+                Description = "Delete a file. IMPORTANT: always call first WITHOUT confirmed=true to get a confirmation prompt. Only pass confirmed=true after the user explicitly approves the deletion.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"confirmed":{"type":"boolean","description":"Must be true to actually delete. Omit or set false for a preview."}},"required":["path"]}""")
             },
             new McpTool
             {
@@ -241,7 +241,21 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path = arguments.GetProperty("path").GetString()!;
+            var path      = arguments.GetProperty("path").GetString()!;
+            var confirmed = arguments.TryGetProperty("confirmed", out var c) && c.GetBoolean();
+
+            if (!confirmed)
+            {
+                var preview = JsonSerializer.Serialize(new
+                {
+                    awaitingApproval = true,
+                    action           = "delete_file",
+                    path,
+                    message          = $"About to permanently delete '{path}'. This cannot be undone. Call delete_file again with confirmed=true to proceed, or do nothing to cancel."
+                });
+                return new McpToolResult { Success = true, Content = preview };
+            }
+
             await fs.DeleteFileAsync(path);
             return new McpToolResult { Success = true, Content = $"File '{path}' deleted successfully" };
         }

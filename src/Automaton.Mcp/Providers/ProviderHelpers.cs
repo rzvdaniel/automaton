@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Automaton.Mcp.Tools;
 
 namespace Automaton.Mcp.Client.Providers;
 
@@ -10,13 +9,12 @@ internal static class ProviderHelpers
 {
     /// <summary>
     /// Returns true when a tool result signals that the tool loop must pause for user approval.
-    /// Currently this applies to <c>propose_plan</c> when <c>awaitingApproval: true</c> is returned —
-    /// either for a new plan submission or when transitioning into a high-complexity stage.
+    /// Any tool can signal this by including <c>"awaitingApproval": true</c> in its JSON result.
+    /// Currently used by <c>propose_plan</c> (new plans and high-complexity stage transitions)
+    /// and <c>delete_file</c> (irreversible deletion preview).
     /// </summary>
     internal static bool ToolResultAwaitsApproval(string toolName, string toolResult)
     {
-        if (toolName != PlanningTool.ProposePlanName) return false;
-
         try
         {
             using var doc = JsonDocument.Parse(toolResult);

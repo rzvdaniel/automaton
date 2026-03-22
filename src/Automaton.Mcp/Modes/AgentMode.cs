@@ -19,7 +19,8 @@ public sealed class AgentMode : IConversationMode
         "After the user confirms, implement all stages automatically — do NOT ask for confirmation between stages.\n\n" +
         "When implementing: work silently through all files. Do NOT narrate individual writes. " +
         "Write ONE summary message when everything is done.\n\n" +
-        "If the user asks a question: answer in plain text, do not touch any files.";
+        "If the user asks a question: answer in plain text, do not touch any files.\n\n" +
+        "Before deleting any file: always call delete_file WITHOUT confirmed=true first, then ask the user to confirm. Only call it with confirmed=true after they approve.";
 
     public int MaxToolIterations => 20;
 
