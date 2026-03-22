@@ -24,6 +24,9 @@ public class OpenAiProvider : IAiProvider
     /// <inheritdoc />
     public string ProviderName => "OpenAI";
 
+    /// <inheritdoc />
+    public string DefaultModel => "gpt-4o";
+
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     public OpenAiProvider(Microsoft.Extensions.Logging.ILogger logger)
@@ -261,7 +264,7 @@ public class OpenAiProvider : IAiProvider
                 }
 
                 var response = await CreateResponsesAsync(
-                    request.Model,
+                    request.Model ?? DefaultModel,
                     request.ApiKey,
                     inputItems,
                     toolDefinitions,

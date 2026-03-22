@@ -25,6 +25,9 @@ public class GoogleProvider : IAiProvider
     /// <inheritdoc />
     public string ProviderName => "Google";
 
+    /// <inheritdoc />
+    public string DefaultModel => "gemini-2.0-flash";
+
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     /// <summary>
@@ -117,7 +120,7 @@ public class GoogleProvider : IAiProvider
             const int emitIntervalMs = 100;
 
             await foreach (var chunk in StreamGenerateContentAsync(
-                request.Model ?? "gemini-2.0-flash",
+                request.Model ?? DefaultModel,
                 request.ApiKey,
                 request.SystemPrompt,
                 contents,

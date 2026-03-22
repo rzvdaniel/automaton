@@ -23,6 +23,12 @@ public interface IAiProvider
     string ProviderName { get; }
 
     /// <summary>
+    /// The default model used when <see cref="ConversationRequest.Model"/> is null or empty.
+    /// Every provider must declare a sensible default so callers never receive a null-model error.
+    /// </summary>
+    string DefaultModel { get; }
+
+    /// <summary>
     /// Event fired when conversation is updated during streaming
     /// </summary>
     event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;

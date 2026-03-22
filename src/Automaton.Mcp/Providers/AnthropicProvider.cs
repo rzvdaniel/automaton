@@ -27,6 +27,9 @@ public class AnthropicProvider : IAiProvider
     /// <inheritdoc />
     public string ProviderName => "Anthropic";
 
+    /// <inheritdoc />
+    public string DefaultModel => Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet;
+
     public event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     public AnthropicProvider(Microsoft.Extensions.Logging.ILogger logger)
@@ -128,7 +131,7 @@ public class AnthropicProvider : IAiProvider
             // Create the message parameters
             var messageParams = new MessageParameters
             {
-                Model = request.Model ?? Anthropic.SDK.Constants.AnthropicModels.Claude35Sonnet,
+                Model = request.Model ?? DefaultModel,
                 MaxTokens = 4096,
                 System = string.IsNullOrEmpty(request.SystemPrompt) ? null : new List<SystemMessage> { new SystemMessage(request.SystemPrompt) },
                 Messages = messages,
