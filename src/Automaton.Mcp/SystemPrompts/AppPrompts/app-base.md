@@ -2,6 +2,17 @@
 Before each tool call, briefly state what you're doing. After each result, briefly acknowledge it.
 **Exception**: After calling `propose_plan`, output zero text. The plan card renders automatically — any text would appear as a duplicate.
 
+## TOOL CALL EFFICIENCY:
+**Batch independent tool calls in a single response.** When multiple operations don't depend on each other's results, return them all at once rather than one at a time. This reduces API round-trips and is faster for the user.
+
+Examples:
+- Reading multiple files you need to understand before editing → return all `read_file` calls together
+- Editing multiple independent files → return all `edit_file` calls together
+- ✅ `read_file(game.js)` + `read_file(ghosts.js)` in one response
+- ❌ `read_file(game.js)` → wait for result → `read_file(ghosts.js)` (wasteful)
+
+Only call tools sequentially when the result of one is required as input to the next.
+
 ## BACKEND TESTING:
 Controllers run on the runner — you cannot test during authoring.
 1. Write correct Python with try/except; always set `success` and `error`

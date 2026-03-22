@@ -190,22 +190,29 @@ public class GoogleProvider : IAiProvider
                 ["parts"] = rawModelParts.Count > 0 ? (object)rawModelParts : new List<object>()
             });
 
-            // Execute each function call and collect results
+            // Execute all tool calls concurrently — results are order-independent
             var functionResponseParts = new List<object>();
             var shouldStop              = false;
             var shouldBreakForApproval  = false;
 
-            foreach (var funcCall in functionCalls)
+            var toolTasks = functionCalls.Select(async funcCall =>
             {
-                var callId = $"call_{Guid.NewGuid():N}";
+                var callId   = $"call_{Guid.NewGuid():N}";
                 var argsJson = funcCall.Args.ValueKind != JsonValueKind.Undefined
                     ? JsonSerializer.Serialize(funcCall.Args)
                     : "{}";
 
                 EmitToolCallStarted(request.ConversationId, callId, funcCall.Name, argsJson);
-
                 var toolResult = await executeToolAsync(callId, funcCall.Name, argsJson);
+                EmitToolCallCompleted(request.ConversationId, callId, funcCall.Name, argsJson, toolResult);
 
+                return (funcCall, callId, argsJson, toolResult);
+            });
+
+            var toolResults = await Task.WhenAll(toolTasks);
+
+            foreach (var (funcCall, callId, argsJson, toolResult) in toolResults)
+            {
                 var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                 toolResult.StartsWith("Error executing tool") ||
                                 toolResult.Contains("A second operation was started");
@@ -220,9 +227,6 @@ public class GoogleProvider : IAiProvider
                         _logger.LogWarning(
                             "Tool {ToolName} failed {FailCount} consecutive times, stopping",
                             funcCall.Name, consecutiveFailures[funcCall.Name]);
-
-                        toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[funcCall.Name]} times consecutively. " +
-                                      "Please stop calling this tool and inform the user about the issue.]";
                         shouldStop = true;
                     }
                 }
@@ -231,8 +235,6 @@ public class GoogleProvider : IAiProvider
                     consecutiveFailures[funcCall.Name] = 0;
                 }
 
-                EmitToolCallCompleted(request.ConversationId, callId, funcCall.Name, argsJson, toolResult);
-
                 if (ProviderHelpers.ToolResultAwaitsApproval(funcCall.Name, toolResult))
                     shouldBreakForApproval = true;
 
@@ -240,7 +242,7 @@ public class GoogleProvider : IAiProvider
                 {
                     ["functionResponse"] = new Dictionary<string, object>
                     {
-                        ["name"] = funcCall.Name,
+                        ["name"]     = funcCall.Name,
                         ["response"] = new Dictionary<string, object> { ["result"] = toolResult }
                     }
                 });

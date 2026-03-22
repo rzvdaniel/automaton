@@ -299,14 +299,21 @@ public class OpenAiProvider : IAiProvider
 
                 var shouldStopDueToFailures = false;
                 var shouldBreakForApproval  = false;
-                foreach (var toolCall in response.ToolCalls)
+
+                // Execute all tool calls concurrently — results are order-independent
+                var toolTasks = response.ToolCalls.Select(async toolCall =>
                 {
                     var argsJson = string.IsNullOrEmpty(toolCall.ArgumentsJson) ? "{}" : toolCall.ArgumentsJson;
-
                     EmitToolCallStarted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson);
-
                     var toolResult = await executeToolAsync(toolCall.Id, toolCall.Name, argsJson);
+                    EmitToolCallCompleted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson, toolResult);
+                    return (toolCall, argsJson, toolResult);
+                });
 
+                var toolResults = await Task.WhenAll(toolTasks);
+
+                foreach (var (toolCall, argsJson, toolResult) in toolResults)
+                {
                     var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                     toolResult.StartsWith("Error executing tool") ||
                                     toolResult.Contains("A second operation was started");
@@ -321,9 +328,6 @@ public class OpenAiProvider : IAiProvider
                             _logger.LogWarning(
                                 "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
                                 toolCall.Name, consecutiveFailures[toolCall.Name]);
-
-                            toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolCall.Name]} times consecutively. " +
-                                          "Please stop calling this tool and inform the user about the issue.]";
                             shouldStopDueToFailures = true;
                         }
                     }
@@ -332,16 +336,14 @@ public class OpenAiProvider : IAiProvider
                         consecutiveFailures[toolCall.Name] = 0;
                     }
 
-                    EmitToolCallCompleted(request.ConversationId, toolCall.Id, toolCall.Name, argsJson, toolResult);
-
                     if (ProviderHelpers.ToolResultAwaitsApproval(toolCall.Name, toolResult))
-                        shouldBreakForApproval = true; // reuse the existing break flag
+                        shouldBreakForApproval = true;
 
                     inputItems.Add(new Dictionary<string, object?>
                     {
-                        ["type"] = "function_call_output",
+                        ["type"]    = "function_call_output",
                         ["call_id"] = toolCall.CallId,
-                        ["output"] = toolResult
+                        ["output"]  = toolResult
                     });
                 }
 

@@ -188,22 +188,24 @@ public class AnthropicProvider : IAiProvider
                 Content = assistantContent
             });
 
-            // Execute each tool and collect results
-            var toolResults = new List<ContentBase>();
+            // Execute all tool calls concurrently — results are order-independent
+            var toolResultsList = new List<ContentBase>();
             var shouldStopDueToFailures = false;
             var shouldBreakForApproval  = false;
 
-            foreach (var toolUse in streamResult.ToolUseBlocks)
+            var toolTasks = streamResult.ToolUseBlocks.Select(async toolUse =>
             {
                 var argsJson = toolUse.Input != null ? JsonSerializer.Serialize(toolUse.Input) : "{}";
-
-                // Emit tool call started event
                 EmitToolCallStarted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson);
-
-                // Execute the tool
                 var toolResult = await executeToolAsync(toolUse.Id, toolUse.Name, argsJson);
+                EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
+                return (toolUse, argsJson, toolResult);
+            });
 
-                // Track consecutive failures per tool
+            var toolExecutionResults = await Task.WhenAll(toolTasks);
+
+            foreach (var (toolUse, argsJson, toolResult) in toolExecutionResults)
+            {
                 var isFailure = toolResult.StartsWith("Tool execution failed:") ||
                                toolResult.StartsWith("Error executing tool") ||
                                toolResult.Contains("A second operation was started");
@@ -218,31 +220,25 @@ public class AnthropicProvider : IAiProvider
                         _logger.LogWarning(
                             "Tool {ToolName} failed {FailCount} consecutive times, stopping conversation",
                             toolUse.Name, consecutiveFailures[toolUse.Name]);
-
-                        toolResult += $"\n\n[CRITICAL: This tool has failed {consecutiveFailures[toolUse.Name]} times consecutively. " +
-                                     "Please stop calling this tool and inform the user about the issue.]";
                         shouldStopDueToFailures = true;
                     }
                 }
                 else
                 {
-                    // Reset failure count on success
                     consecutiveFailures[toolUse.Name] = 0;
                 }
-
-                // Emit tool execution completed
-                EmitToolCallCompleted(request.ConversationId, toolUse.Id, toolUse.Name, argsJson, toolResult);
 
                 if (ProviderHelpers.ToolResultAwaitsApproval(toolUse.Name, toolResult))
                     shouldBreakForApproval = true;
 
-                // Add tool result - Content can be a string or List<ContentBase>
-                toolResults.Add(new ToolResultContent
+                toolResultsList.Add(new ToolResultContent
                 {
                     ToolUseId = toolUse.Id,
-                    Content = new List<ContentBase> { new TextContent { Text = toolResult } }
+                    Content   = new List<ContentBase> { new TextContent { Text = toolResult } }
                 });
             }
+
+            var toolResults = toolResultsList;
 
             // If we hit max failures, add a message and break
             if (shouldStopDueToFailures)
