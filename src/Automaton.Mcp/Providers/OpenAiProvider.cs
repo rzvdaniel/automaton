@@ -31,7 +31,7 @@ public class OpenAiProvider : IAiProvider
         _logger = logger;
     }
 
-    public async Task<string> CallAsync(
+    public async Task<ProviderResult> CallAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -177,7 +177,7 @@ public class OpenAiProvider : IAiProvider
         Timeout     = System.Threading.Timeout.InfiniteTimeSpan
     };
 
-    private async Task<string> CallResponsesAsync(
+    private async Task<ProviderResult> CallResponsesAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -360,14 +360,7 @@ public class OpenAiProvider : IAiProvider
             }
         }
 
-        if (!string.IsNullOrEmpty(request.ConversationId) && iterationCount > 0)
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                ApiCallCount = iterationCount
-            });
-
-        return responseBuilder.ToString().Trim();
+        return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
     private static Dictionary<string, object> CreateInputMessage(string role, string content)

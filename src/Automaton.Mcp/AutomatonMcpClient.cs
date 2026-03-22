@@ -136,6 +136,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             _logger.LogInformation("Calling AI provider {Provider} with model {Model}", request.Provider, request.Model);
             
             string responseText;
+            var apiCallCount = 0;
             
             // Check if we have a provider for the requested type (string-based lookup)
             var provider = _providerRegistry.GetProvider(request.Provider);
@@ -150,7 +151,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 request.MaxIterations = mode.MaxToolIterations;
 
                 // Call the provider
-                responseText = await provider.CallAsync(
+                var providerResult = await provider.CallAsync(
                     request,
                     providerTools,
                     async (toolCallId, toolName, argsJson) =>
@@ -166,6 +167,8 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                         return await ExecuteMcpToolAsync(toolCallId, toolName, argsJson, request);
                     },
                     cancellationToken);
+                responseText = providerResult.ResponseText;
+                apiCallCount = providerResult.ApiCallCount;
             }
             else
             {
@@ -189,6 +192,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 ToolCalls = allToolCalls,
                 ToolResults = allToolResults,
                 IsSuccess = true,
+                ApiCallCount = apiCallCount,
                 GeneratedCode = ExtractCodeFromMessages(conversationHistory)
             };
         }

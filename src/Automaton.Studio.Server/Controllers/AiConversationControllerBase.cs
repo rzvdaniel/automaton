@@ -192,6 +192,9 @@ public abstract class AiConversationControllerBase : BaseController
                 foreach (var update in pendingUpdates)
                     await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
 
+                if (result.ApiCallCount > 0)
+                    await _chatHistoryService.IncrementApiCallsAsync(sessionId, userId, result.ApiCallCount);
+
                 // 8b. Post-conversation hook (e.g. update version summary)
                 await OnAfterConversationAsync(request, userId, result, conversationToken);
 
@@ -353,9 +356,6 @@ public abstract class AiConversationControllerBase : BaseController
                     })
                 }, userId);
             }
-
-            if (update.ApiCallCount > 0)
-                await _chatHistoryService.IncrementApiCallsAsync(sessionId, userId, update.ApiCallCount);
         }
         catch (Exception ex)
         {

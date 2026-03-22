@@ -48,7 +48,7 @@ public class AnthropicProvider : IAiProvider
             "HttpClient",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
 
-    public async Task<string> CallAsync(
+    public async Task<ProviderResult> CallAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -83,7 +83,7 @@ public class AnthropicProvider : IAiProvider
         }
     }
 
-    private async Task<string> CallAnthropicAsync(
+    private async Task<ProviderResult> CallAnthropicAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -265,14 +265,7 @@ public class AnthropicProvider : IAiProvider
                 break;
         }
 
-        if (!string.IsNullOrEmpty(request.ConversationId) && iterationCount > 0)
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                ApiCallCount = iterationCount
-            });
-
-        return responseBuilder.ToString().Trim();
+        return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
     private List<Message> BuildMessages(ConversationRequest request)

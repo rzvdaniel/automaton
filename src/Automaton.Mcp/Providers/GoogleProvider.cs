@@ -41,7 +41,7 @@ public class GoogleProvider : IAiProvider
         _logger = logger;
     }
 
-    public async Task<string> CallAsync(
+    public async Task<ProviderResult> CallAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -75,7 +75,7 @@ public class GoogleProvider : IAiProvider
         }
     }
 
-    private async Task<string> CallGeminiAsync(
+    private async Task<ProviderResult> CallGeminiAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,
@@ -260,14 +260,7 @@ public class GoogleProvider : IAiProvider
                 break;
         }
 
-        if (!string.IsNullOrEmpty(request.ConversationId) && iterationCount > 0)
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                ApiCallCount = iterationCount
-            });
-
-        return responseBuilder.ToString().Trim();
+        return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
     /// <summary>

@@ -3,6 +3,16 @@ using Automaton.Mcp.Models;
 namespace Automaton.Mcp.Client.Providers;
 
 /// <summary>
+/// The result returned by every provider after a full conversation turn.
+/// <para>
+/// <see cref="ApiCallCount"/> is the number of round-trips made to the LLM during the turn
+/// (one per while-loop iteration). Placing it here — rather than in a streaming event — makes
+/// it a compiler-enforced contract: any new provider that doesn't return a count will not build.
+/// </para>
+/// </summary>
+public record ProviderResult(string ResponseText, int ApiCallCount);
+
+/// <summary>
 /// Interface for AI provider implementations (OpenAI, Anthropic, etc.)
 /// </summary>
 public interface IAiProvider
@@ -18,14 +28,18 @@ public interface IAiProvider
     event EventHandler<ConversationUpdatedEvent>? ConversationUpdated;
 
     /// <summary>
-    /// Calls the AI provider with the given request and tools
+    /// Calls the AI provider with the given request and tools.
     /// </summary>
     /// <param name="request">The conversation request</param>
     /// <param name="tools">Available MCP tools for the AI to use</param>
     /// <param name="executeToolAsync">Function to execute tool calls</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The response text from the AI</returns>
-    Task<string> CallAsync(
+    /// <returns>
+    /// A <see cref="ProviderResult"/> containing the response text and the number of LLM API
+    /// calls made. Returning an accurate <see cref="ProviderResult.ApiCallCount"/> is required —
+    /// it is stored in the database and shown in usage dashboards.
+    /// </returns>
+    Task<ProviderResult> CallAsync(
         ConversationRequest request,
         IEnumerable<ProviderTool> tools,
         Func<string, string, string, Task<string>> executeToolAsync,

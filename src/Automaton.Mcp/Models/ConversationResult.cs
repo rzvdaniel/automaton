@@ -12,4 +12,10 @@ public class ConversationResult
     public bool IsSuccess { get; set; }
     public string? ErrorMessage { get; set; }
     public string? GeneratedCode { get; set; }
+
+    /// <summary>
+    /// Total number of LLM API round-trips made during this turn (one per provider loop iteration).
+    /// Populated from <see cref="ProviderResult.ApiCallCount"/> returned by the provider.
+    /// </summary>
+    public int ApiCallCount { get; set; }
 }

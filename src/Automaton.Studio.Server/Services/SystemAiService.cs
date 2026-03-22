@@ -177,9 +177,9 @@ public class SystemAiService : ISystemAiService
 
             _logger.LogInformation(
                 "System AI response completed: UserId={UserId}, ResponseLength={Length}",
-                userId ?? "anonymous", result.Length);
+                userId ?? "anonymous", result.ResponseText.Length);
 
-            return result;
+            return result.ResponseText;
         }
         catch (Exception ex)
         {
