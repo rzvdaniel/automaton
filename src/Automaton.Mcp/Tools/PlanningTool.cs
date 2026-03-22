@@ -202,8 +202,8 @@ public class PlanningTool : IMcpTool
             else
             {
                 instruction = isRefinement
-                    ? "Plan updated. Respond briefly explaining what changed. Do NOT call any more tools."
-                    : "Plan saved. Summarise it briefly in plain text and ask whether to proceed. Do NOT call any other tools until confirmed.";
+                    ? "Plan updated. Re-render the full updated plan as markdown (title, summary, components, tech decisions, stages with complexity badges) then ask whether to proceed. Do NOT call any more tools."
+                    : "Plan saved. Render the full plan as markdown in your reply: start with the title and 1-sentence summary, then a **Components** section, a **Technical Decisions** section, and a **Stages** section listing each stage with its complexity (e.g. `_(complexity: medium)_`) and description. End with a short question asking whether to proceed. Do NOT call any other tools until confirmed.";
             }
 
             var pauseForHighStage = planType == "stage_complete" &&
