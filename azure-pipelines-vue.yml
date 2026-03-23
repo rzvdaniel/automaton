@@ -1,0 +1,70 @@
+# Vue Frontend Build Pipeline
+# Type-checks and builds src/automaton-studio-vue on every PR and push to main/develop.
+
+parameters:
+    - name: isRelease
+      displayName: Is a release build
+      default: false
+      type: boolean
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - src/automaton-studio-vue/*
+
+pr:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - src/automaton-studio-vue/*
+
+jobs:
+
+- job: AutomatonVue
+  displayName: 'Type-check and build Vue frontend'
+
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  variables:
+    vueSourcePath: 'src/automaton-studio-vue'
+
+  steps:
+  - checkout: self
+    displayName: 'Checkout repository'
+
+  - task: NodeTool@0
+    displayName: 'Use Node.js 20.x'
+    inputs:
+      versionSpec: '20.x'
+
+  - script: npm ci
+    displayName: 'Install dependencies'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/$(vueSourcePath)'
+
+  - script: npm run type-check
+    displayName: 'TypeScript type-check (vue-tsc)'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/$(vueSourcePath)'
+
+  - script: npm run lint
+    displayName: 'ESLint'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/$(vueSourcePath)'
+
+  - script: npm run build
+    displayName: 'Production build (Vite)'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/$(vueSourcePath)'
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Vue dist artifact'
+    condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+    inputs:
+      targetPath: '$(System.DefaultWorkingDirectory)/$(vueSourcePath)/dist'
+      artifact: 'Automaton.Vue'
+      publishLocation: 'pipeline'
