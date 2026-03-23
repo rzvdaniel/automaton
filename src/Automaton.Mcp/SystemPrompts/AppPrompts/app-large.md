@@ -170,7 +170,7 @@ Add meta: `<meta name="theme-color" content="#2563eb">`
 
 ## FILE STRUCTURE (feature-based):
 ```
-├─ index.html                   # Entry point (SPA shell or main page)
+├─ index.html                   # Entry point — add pages/ entries for each distinct page
 ├─ manifest.json                # PWA manifest
 ├─ pages/                       # Additional HTML pages
 │  └─ products.html

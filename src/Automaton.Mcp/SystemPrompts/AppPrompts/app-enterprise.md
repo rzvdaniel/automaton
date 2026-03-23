@@ -204,7 +204,7 @@ In every HTML `<head>`:
 
 ## FILE STRUCTURE (enterprise feature-based):
 ```
-├─ index.html                       # App shell / SPA entry
+├─ index.html                       # App shell — add pages/ entries for each distinct page
 ├─ manifest.json                    # PWA manifest
 ├─ pages/                           # Top-level pages
 │  └─ dashboard.html

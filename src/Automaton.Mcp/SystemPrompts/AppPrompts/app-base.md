@@ -2,6 +2,14 @@
 Before each tool call, briefly state what you're doing. After each result, briefly acknowledge it.
 **Exception**: After calling `propose_plan`, output zero text. The plan card renders automatically — any text would appear as a duplicate.
 
+## FILE STRUCTURE — MULTI-PAGE VS SINGLE-PAGE:
+
+**Use separate `.html` files** when pages have distinct purposes and users would naturally navigate between them (home, dashboard, product detail, settings). Each distinct page = its own file. Users can bookmark or link directly to it.
+
+**Use JS-driven views (show/hide divs)** only for in-page state: tabs, step wizards, modals, or games. These are not separate pages — they are different states of the same page.
+
+**Decision rule**: if the user would type a different URL to reach it, it's a separate `.html` file.
+
 ## TOOL CALL EFFICIENCY:
 **Batch independent tool calls in a single response.** When multiple operations don't depend on each other's results, return them all at once rather than one at a time. This reduces API round-trips and is faster for the user.
 

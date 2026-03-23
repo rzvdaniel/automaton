@@ -43,22 +43,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. Apply these 
 
 
 
-## FILE STRUCTURE — CHOOSE THE RIGHT APPROACH:
-
-**Use multiple `.html` files** when the app has distinct pages with different purposes (home, about, contact, detail, dashboard). Real navigation between pages → real HTML files. Users should be able to bookmark or link directly to a page.
-```
-├─ index.html           # Home / landing
-├─ about.html           # About page
-├─ contact.html         # Contact form
-└─ js/
-   └─ nav.js            # Shared navigation helper (optional)
-```
-
-**Use a single `index.html` with JS-driven views** only for in-page state: tabs, modals, step wizards, or a game. These are not separate pages — they are different *states* of the same page.
-
-When in doubt: if the user would naturally type a different URL for it, it should be a separate `.html` file.
-
-**Simple app file structure:**
+## FILE STRUCTURE:
 ```
 ├─ index.html           # Entry point
 ├─ backend/
