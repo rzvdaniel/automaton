@@ -147,16 +147,26 @@ function showToast(message, type = 'success') {
 - Hover/focus states and `transition-colors` on all interactive elements
 
 
+## FILE STRUCTURE — CHOOSE THE RIGHT APPROACH:
+
+**Use multiple `.html` files** when the app has distinct pages with different purposes (home, dashboard, detail, settings). Real navigation → real HTML files. Users should be able to bookmark or link directly.
+
+**Use JS-driven views (show/hide divs)** only for in-page state: tabs, multi-step forms, modals. These are not separate pages — they are different states of the same page.
+
+When in doubt: if the user would naturally type a different URL for it, make it a separate `.html` file.
+
+**Medium app file structure:**
 ```
-├─ index.html               # Entry point (may have multiple pages)
-├─ pages/                   # (optional) Additional pages
+├─ index.html               # Entry point (landing or main page)
+├─ pages/                   # Additional pages (one file per distinct page)
 │  └─ detail.html
 ├─ backend/
 │  └─ users.py              # Class-based controller (one per resource)
 ├─ styles/
 │  └─ main.css
 └─ js/
-   └─ app.js                # Main logic / page orchestration
+   ├─ app.js                # Main logic / page orchestration
+   └─ api.js                # (optional) Shared API calls
 ```
 
 ## TOOL SEQUENCE:
