@@ -188,42 +188,61 @@ public class AiAppConversationController : AiConversationControllerBase
     private async Task<ComplexityTier?> ResolveComplexityTierAsync(
         string userMessage, Guid sessionId, Guid userId, List<ConversationMessage>? history)
     {
-        // Continuation: load sticky tier from session
+        // Load stored tier (may be null for new sessions)
+        ComplexityTier? storedTier = null;
         if (history?.Count > 0)
         {
             try
             {
                 var session = await _chatHistoryService.GetSessionAsync(sessionId, userId);
                 if (session?.ComplexityTier != null &&
-                    Enum.TryParse<ComplexityTier>(session.ComplexityTier, ignoreCase: true, out var stored))
+                    Enum.TryParse<ComplexityTier>(session.ComplexityTier, ignoreCase: true, out var parsed))
                 {
-                    _logger.LogInformation("Using sticky tier {Tier} for session {SessionId}", stored, sessionId);
-                    return stored;
+                    storedTier = parsed;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to load sticky tier for session {SessionId}", sessionId);
+                _logger.LogWarning(ex, "Failed to load stored tier for session {SessionId}", sessionId);
             }
         }
 
-        // New session: classify and persist (fire-and-forget persistence)
+        // Classify the current request
+        ComplexityTier? newTier = null;
         try
         {
             var result = await _promptClassifier.ClassifyAsync(userMessage, userId.ToString());
+            newTier = result.Tier;
             _logger.LogInformation(
                 "Classified as {Tier} (confidence={Confidence}) for session {SessionId}",
                 result.Tier, result.Confidence, sessionId);
-
-            await _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, result.Tier.ToString(), userId);
-
-            return result.Tier;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Classification failed for session {SessionId}, using legacy prompt", sessionId);
-            return null;
+            _logger.LogWarning(ex, "Classification failed for session {SessionId}", sessionId);
         }
+
+        // Tier can only upgrade — take the higher of stored vs new
+        var resolved = Max(storedTier, newTier);
+        if (resolved == null)
+            return null;
+
+        if (resolved != storedTier)
+        {
+            _logger.LogInformation(
+                "Tier upgraded from {StoredTier} to {NewTier} for session {SessionId}",
+                storedTier?.ToString() ?? "none", resolved, sessionId);
+            await _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, resolved.ToString()!, userId);
+        }
+
+        return resolved;
+    }
+
+    private static ComplexityTier? Max(ComplexityTier? a, ComplexityTier? b)
+    {
+        if (a == null) return b;
+        if (b == null) return a;
+        return (ComplexityTier)Math.Max((int)a, (int)b);
     }
 }
 
