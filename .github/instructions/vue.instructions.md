@@ -120,11 +120,18 @@ Use the bordered-container pattern (same as GitHub Copilot, ChatGPT, Claude) for
 - Types/interfaces: `PascalCase`, exported from `types/` folder
 - Constants objects: `PascalCase` with `as const`
 
-## Post-Change Validation
+## Post-Change Validation — REQUIRED before marking a change complete
 
-After any Vue/TS change:
+**A Vue/TypeScript change is NOT done until `npm run type-check` passes with 0 errors.**
+
 ```bash
-npm run type-check   # catches type mismatches (vue-tsc)
+cd src/automaton-studio-vue
+npm run type-check   # vue-tsc — catches template + TS type mismatches
 npm run lint         # ESLint
 ```
-If type-check fails, fix it — do not suppress with `@ts-ignore`.
+
+Rules:
+- Run type-check after **every** edit to a `.vue`, `.ts`, or `.tsx` file
+- Fix every error — do not suppress with `@ts-ignore` or `// @ts-nocheck`
+- Errors in unrelated files you did not touch must also be fixed before completing
+- Only mark the task done after a clean type-check run
