@@ -51,7 +51,12 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 
 ## EF Core / Database
 
-- All schema changes require a migration: `dotnet ef migrations add <Name>`
+- All schema changes require a migration — **always use the CLI, never write migration files by hand**:
+  ```bash
+  dotnet ef migrations add <Name> --project src/Automaton.Studio.Server
+  ```
+  Hand-crafted migrations silently skip the required `.Designer.cs` companion file; EF then ignores the migration and `Database.Migrate()` fails at runtime with confusing column errors.
+- **Never run `dotnet ef database update`** — migrations are applied automatically at startup via `ApplyMigrations()` in `Program.cs`. Running it manually is redundant and may cause issues in CI/CD.
 - Never write raw SQL unless EF cannot express it
 - Use `AsNoTracking()` for read-only queries
 

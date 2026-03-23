@@ -434,3 +434,23 @@ This document will grow as we learn more. That's not a bug; it's the point. The 
 - **docs/** – Feature-specific technical documentation
 - **.github/skills/** – Reusable workflow guides for common development tasks
 - **src/automaton-studio-vue/REDESIGN_PLAN.md** – Complete Vue.js frontend specification
+
+
+---
+
+## Common Pitfalls & Lessons Learned
+
+### EF Core Migrations: Always Use the CLI
+
+**The mistake**: Writing migration files by hand to save time.
+
+**What happens**: EF Core migrations come in pairs — <Name>.cs and <Name>.Designer.cs. The designer file contains the full model snapshot EF uses to validate that your migration applies cleanly to the current schema. If you write the .cs file by hand and skip the designer, Database.Migrate() silently ignores your migration at startup. You get no error — just a runtime crash later when EF tries to query a column that doesn't exist yet.
+
+This is exactly the kind of bug that wastes hours: the migration *looks* like it ran, but the database is missing the column.
+
+**The fix**: Always use the CLI:
+```bash
+dotnet ef migrations add <Name> --project src/Automaton.Studio.Server
+```
+
+**You never need to run dotnet ef database update** — Program.cs calls ApplyMigrations() at startup, which runs dbContext.Database.Migrate() automatically. Running it manually is harmless but redundant. More importantly: don't run it in CI/CD thinking it's necessary — it isn't.
