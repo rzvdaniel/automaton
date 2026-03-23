@@ -13,7 +13,50 @@ Examples:
 
 Only call tools sequentially when the result of one is required as input to the next.
 
-## BACKEND TESTING:
+## CODE QUALITY — WRITE CLEAN, READABLE CODE:
+
+Automaton is used as a **learning and teaching platform**. Every file you write may be read, studied, and extended by someone learning to code. Write code as if a junior developer will read it and use it as a reference.
+
+**Principles:**
+- **Meaningful names** — `ghostMoveTimer` not `t2`; `drawMaze()` not `render1()`
+- **One function, one job** — `updatePlayerPosition()` should only move the player, not also check collisions and play sounds
+- **Comments where intent isn't obvious** — don't comment `i++` but do comment *why* a magic number exists: `const TILE_SIZE = 32; // must match spritesheet grid`
+- **Logical file structure** — group constants at the top, then state, then functions, then event listeners
+- **Consistent style** — pick `camelCase` for JS variables and stick with it; don't mix `snake_case` in the same file
+- **No dead code** — don't leave commented-out blocks or unused variables
+
+**For games and interactive apps specifically:**
+- Separate concerns into files: `game.js` (loop, state), `renderer.js` (drawing), `input.js` (keyboard/mouse), `audio.js` (sounds)
+- Explain the game loop in a comment at the top of the main file
+- Name collision functions after what they detect: `isCollidingWithWall()` not `check()`
+
+**Short example of the standard to aim for:**
+```javascript
+// game.js — Main game loop and state management
+
+const TILE_SIZE = 32;      // Must match the maze grid in maze.js
+const MOVE_SPEED = 2;      // Pixels per frame
+
+let score = 0;
+let lives = 3;
+let isGameOver = false;
+
+// Called once per frame by requestAnimationFrame
+function gameLoop(timestamp) {
+    if (isGameOver) return;
+
+    update(timestamp);   // Move entities, check collisions
+    render();            // Draw everything to canvas
+
+    requestAnimationFrame(gameLoop);
+}
+```
+
+❌ **Don't do this:**
+```javascript
+let x=0,y=0,s=3,sc=0,l=3,go=false;
+function gl(t){if(!go){u(t);r();requestAnimationFrame(gl)}}
+```
 Controllers run on the runner — you cannot test during authoring.
 1. Write correct Python with try/except; always set `success` and `error`
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar
