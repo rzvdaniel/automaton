@@ -1,8 +1,10 @@
 using System.Text;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -14,16 +16,15 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class AppMemoryService
 {
-    // ~600 tokens budget for the memory block — enough to be useful, cheap enough to always send.
-    private const int MaxChars = 2400;
-
     private readonly ApplicationDbContext _db;
     private readonly IAiChatHistoryService _chatHistory;
+    private readonly AppMemoryConfig _config;
 
-    public AppMemoryService(ApplicationDbContext db, IAiChatHistoryService chatHistory)
+    public AppMemoryService(ApplicationDbContext db, IAiChatHistoryService chatHistory, IOptions<AiProvidersConfig> options)
     {
         _db          = db;
         _chatHistory = chatHistory;
+        _config      = options.Value.AppMemory;
     }
 
     /// <summary>
@@ -67,7 +68,7 @@ public class AppMemoryService
             sb.AppendLine();
             foreach (var v in recentVersions)
             {
-                var summary = ShortenSummary(v.Summary, 200);
+                var summary = ShortenSummary(v.Summary, _config.SummaryMaxChars);
                 sb.AppendLine($"- **v{v.VersionNumber}** ({v.Trigger}, {v.CreatedAt:MMM d}): {summary}");
             }
             sb.AppendLine();
@@ -87,8 +88,8 @@ public class AppMemoryService
         var result = sb.ToString().Trim();
 
         // Hard cap — truncate if unusually large
-        if (result.Length > MaxChars)
-            result = result[..MaxChars] + "\n_(truncated)_";
+        if (result.Length > _config.BlockMaxChars)
+            result = result[.._config.BlockMaxChars] + "\n_(truncated)_";
 
         return result;
     }

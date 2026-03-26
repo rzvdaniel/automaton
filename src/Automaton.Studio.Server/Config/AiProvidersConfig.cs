@@ -24,6 +24,8 @@ public class AiProvidersConfig
     public IterationLimitsConfig IterationLimits { get; set; } = new();
 
     public Dictionary<string, AiProviderConfig> Providers { get; set; } = new();
+
+    public AppMemoryConfig AppMemory { get; set; } = new();
 }
 
 /// <summary>
@@ -52,6 +54,22 @@ public class AiProviderConfig
     public string DefaultModel { get; set; } = string.Empty;
     public List<string> SupportedModels { get; set; } = new();
     public bool Enabled { get; set; } = true;
+}
+
+/// <summary>
+/// Configures the App Memory Block injected into the system prompt for existing apps.
+/// </summary>
+public class AppMemoryConfig
+{
+    /// <summary>
+    /// Maximum characters for each individual version summary. Default: 200.
+    /// </summary>
+    public int SummaryMaxChars { get; set; } = 200;
+
+    /// <summary>
+    /// Hard character cap for the entire memory block. Default: 2400 (~600 tokens).
+    /// </summary>
+    public int BlockMaxChars { get; set; } = 2400;
 }
 
 public static class AiProvidersConfigExtensions
