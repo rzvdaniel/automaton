@@ -59,7 +59,9 @@ public class AppMemoryService
         sb.AppendLine("## App Memory");
         sb.AppendLine();
         sb.AppendLine("This app already exists. You are continuing work that has been done in previous sessions.");
-        sb.AppendLine("Read the existing files before making any changes. Make ONLY the changes the user requests — do not rewrite or replace files that are already correct.");
+        sb.AppendLine("Your instructions (above) describe the current design. Use them as your primary reference.");
+        sb.AppendLine("Read ONLY the specific files you intend to modify — do not read all files upfront.");
+        sb.AppendLine("Make ONLY the changes the user requests — do not rewrite or replace files that are already correct.");
         sb.AppendLine();
 
         if (recentVersions.Count > 0)
