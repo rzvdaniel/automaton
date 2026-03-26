@@ -129,16 +129,29 @@ public class AnthropicProvider : IAiProvider
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
                 break;
             }
-            // Create the message parameters
-            var messageParams = new MessageParameters
-            {
-                Model = request.Model ?? DefaultModel,
-                MaxTokens = 4096,
-                System = string.IsNullOrEmpty(request.SystemPrompt) ? null : new List<SystemMessage> { new SystemMessage(request.SystemPrompt) },
-                Messages = messages,
-                Tools = anthropicTools.Count > 0 ? anthropicTools : null,
-                Stream = true
-            };
+                // Create the message parameters.
+                // Cache the system prompt — it's identical on every iteration, so marking it
+                // with cache_control lets Anthropic reuse the KV cache instead of re-processing
+                // ~8,600 tokens every call. Cache hits count as 10% toward the rate limit.
+                var systemMessage = string.IsNullOrEmpty(request.SystemPrompt)
+                    ? null
+                    : new List<SystemMessage>
+                    {
+                        new SystemMessage(request.SystemPrompt)
+                        {
+                            CacheControl = new CacheControl { Type = CacheControlType.ephemeral }
+                        }
+                    };
+
+                var messageParams = new MessageParameters
+                {
+                    Model = request.Model ?? DefaultModel,
+                    MaxTokens = 4096,
+                    System = systemMessage,
+                    Messages = messages,
+                    Tools = anthropicTools.Count > 0 ? anthropicTools : null,
+                    Stream = true
+                };
 
             // Stream the response
             var streamResult = await StreamResponseAsync(
