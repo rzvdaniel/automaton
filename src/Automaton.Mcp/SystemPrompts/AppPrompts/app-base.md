@@ -311,20 +311,29 @@ if (res.success) { ... }
 
 ## APP INSTRUCTIONS (`.instructions/` folder) — MANDATORY:
 
-Instructions are persistent markdown files injected into every future session. They capture the current state of the app so the AI never treats an existing app as a blank slate.
+Instructions are persistent markdown files injected at the start of every future session.
+They are your **only persistent memory between sessions** — if you don't write them, the next session starts blind.
 
-**RULE: You MUST call `write_instruction` at the end of EVERY session that modifies the app — no exceptions, even for tiny changes like a color tweak.**
+**WRITE at the end of ANY session where you:**
+- Created the app for the first time
+- Changed the UI (color, layout, font, animation, style — even a single value)
+- Added or modified a feature, page, or component
+- Changed how the backend is called (endpoint, payload, response handling)
+- Made a design decision the user confirmed ("yes, keep it dark", "use cards not a table")
 
-- After creating a new app → write `design.md` (theme, layout, color palette, component patterns, key features)
-- After any UI change (color, layout, animation, style) → update `design.md`
-- After adding backend logic → write/update `backend.md` (controller names, actions, data formats)
-- After adding a new feature → update `design.md` or create `features.md`
+**SKIP only if the entire session was read-only** — e.g. user only asked questions, you only read files and answered, nothing was written to disk.
+
+**What to write:**
+- `design.md` — theme, colors, layout, animation, component patterns (update after any UI change)
+- `backend.md` — controller names, actions, payload shapes, auth approach (update after any API change)
+- `features.md` — feature list and status (update after adding/removing a feature)
+- Create additional files for large topics (e.g. `state.md`, `routing.md`)
 
 **How:**
-1. For **small changes** (a color, a line, a bullet) → `update_instruction` with `oldText`/`newText` (no need to rewrite the whole file)
-2. For **new files or major rewrites** → `write_instruction` with the full content
-3. Always include YAML frontmatter: `context: always` for key files, `context: on-request` for large reference docs
-4. Be concise — capture *current state and decisions*, not code listings
+1. **Small change** (one value, one line) → `update_instruction` with `oldText`/`newText`
+2. **New file or major rewrite** → `write_instruction` with full content
+3. Always include YAML frontmatter — `context: always` for key files, `context: on-request` for large reference docs
+4. Write *current state and decisions*, not code. Be concise.
 
 Example `design.md`:
 ```markdown
@@ -337,5 +346,5 @@ priority: high
 **Theme**: Anime cartoon space — pastel purples, yellow stars, rounded fonts
 **Layout**: Single-page centered card, mobile-first, animated star background
 **Key features**: Audio format picker shown upfront; converted file shown as download link
-**Star animation**: CSS keyframe `twinkle`, yellow (#FFD700), slow 3-6s duration
+**Star animation**: CSS keyframe `twinkle`, yellow (#FFD700), slow 3–6s duration
 ```
