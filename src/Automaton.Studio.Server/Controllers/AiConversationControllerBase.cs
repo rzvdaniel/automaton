@@ -118,6 +118,8 @@ public abstract class AiConversationControllerBase : BaseController
             // Downgrade model if user has exceeded their monthly token allowance
             model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 
+            var modelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(provider, model);
+
             var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -180,6 +182,7 @@ public abstract class AiConversationControllerBase : BaseController
                     globalOverride: _aiProvidersConfig.MaxIterations,
                     tierOverride:   _aiProvidersConfig.IterationLimits.For(_resolvedTier)),
                 MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
+                MaxTokens = modelMaxTokens,
                 Mode = request.Mode
             };
 

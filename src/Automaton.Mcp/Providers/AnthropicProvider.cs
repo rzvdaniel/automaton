@@ -165,7 +165,7 @@ public class AnthropicProvider : IAiProvider
                 var messageParams = new MessageParameters
                 {
                     Model = request.Model ?? DefaultModel,
-                    MaxTokens = 4096,
+                    MaxTokens = request.MaxTokens,
                     System = systemMessage,
                     Messages = messages,
                     Tools = anthropicTools.Count > 0 ? anthropicTools : null,

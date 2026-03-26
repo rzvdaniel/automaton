@@ -60,6 +60,12 @@ public class ConversationRequest
     public int MaxConsecutiveFailures { get; set; } = 3;
 
     /// <summary>
+    /// Maximum output tokens per response turn. Sourced from the AiModel.MaxTokens database field.
+    /// Defaults to 4096 if not set.
+    /// </summary>
+    public int MaxTokens { get; set; } = 4096;
+
+    /// <summary>
     /// Interaction mode: <see cref="ConversationModes.Plan"/> (read-only, propose_plan available)
     /// or <see cref="ConversationModes.Agent"/> (write tools, default).
     /// </summary>
