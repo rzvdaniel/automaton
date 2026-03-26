@@ -60,8 +60,8 @@ public abstract class AiConversationControllerBase : BaseController
 
     // ── Subclass hooks ────────────────────────────────────────────────────
 
-    /// <summary>Build the system prompt for the given request and session context.</summary>
-    protected abstract Task<string> BuildSystemPromptAsync(
+    /// <summary>Build the system prompt parts for the given request and session context.</summary>
+    protected abstract Task<SystemPromptParts> BuildSystemPromptAsync(
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
@@ -141,9 +141,11 @@ public abstract class AiConversationControllerBase : BaseController
             // 3. Load history
             var history = await LoadConversationHistoryAsync(sessionId, userId);
 
-            // 4. Build system prompt (delegated to subclass) + append mode-specific instructions
-            var systemPrompt = await BuildSystemPromptAsync(request, userId, sessionId, history);
-            systemPrompt += ConversationModeFactory.From(null).SystemPromptSuffix;
+            // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
+            var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, history);
+            var modePromptSuffix = ConversationModeFactory.From(null).SystemPromptSuffix;
+            // Append mode suffix to the base prompt so it stays within the cached block
+            var partsWithMode = promptParts with { BasePrompt = promptParts.BasePrompt + modePromptSuffix };
 
             // 5. Wire tool provider
             _mcpClient.SetToolProvider(GetToolProvider());
@@ -166,7 +168,8 @@ public abstract class AiConversationControllerBase : BaseController
             {
                 ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
                 InitialMessage = request.Message,
-                SystemPrompt = systemPrompt,
+                SystemPrompt = partsWithMode.Full,
+                SystemPromptParts = partsWithMode,
                 Provider = provider,
                 Model = model,
                 ApiKey = apiKey,

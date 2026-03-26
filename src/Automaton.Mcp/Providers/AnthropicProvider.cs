@@ -129,19 +129,38 @@ public class AnthropicProvider : IAiProvider
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Maximum tool call iterations reached]");
                 break;
             }
-                // Create the message parameters.
-                // Cache the system prompt — it's identical on every iteration, so marking it
-                // with cache_control lets Anthropic reuse the KV cache instead of re-processing
-                // ~8,600 tokens every call. Cache hits count as 10% toward the rate limit.
-                var systemMessage = string.IsNullOrEmpty(request.SystemPrompt)
-                    ? null
-                    : new List<SystemMessage>
+                // Build system messages with cache_control only on the stable base prompt.
+                // When SystemPromptParts is provided, we split into up to 3 blocks:
+                //   [0] base + tier prompt  → cache_control: ephemeral  (always identical, cached)
+                //   [1] instructionBlock    → no cache_control           (per-app, changes rarely)
+                //   [2] memoryBlock         → no cache_control           (per-session, always unique)
+                // The cache key covers the prefix up to the first breakpoint, so blocks [1] and [2]
+                // never invalidate the cache for block [0]. Cache hits count at 10% toward rate limits.
+                List<SystemMessage>? systemMessage = null;
+                if (request.SystemPromptParts is { } parts)
+                {
+                    systemMessage = new List<SystemMessage>
+                    {
+                        new SystemMessage(parts.BasePrompt)
+                        {
+                            CacheControl = new CacheControl { Type = CacheControlType.ephemeral }
+                        }
+                    };
+                    if (!string.IsNullOrWhiteSpace(parts.InstructionBlock))
+                        systemMessage.Add(new SystemMessage(parts.InstructionBlock));
+                    if (!string.IsNullOrWhiteSpace(parts.MemoryBlock))
+                        systemMessage.Add(new SystemMessage(parts.MemoryBlock));
+                }
+                else if (!string.IsNullOrEmpty(request.SystemPrompt))
+                {
+                    systemMessage = new List<SystemMessage>
                     {
                         new SystemMessage(request.SystemPrompt)
                         {
                             CacheControl = new CacheControl { Type = CacheControlType.ephemeral }
                         }
                     };
+                }
 
                 var messageParams = new MessageParameters
                 {

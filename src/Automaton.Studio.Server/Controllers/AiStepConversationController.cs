@@ -56,7 +56,7 @@ public class AiStepConversationController : AiConversationControllerBase
         CancellationToken cancellationToken) =>
         ExecuteStreamAsync(request, cancellationToken);
 
-    protected override Task<string> BuildSystemPromptAsync(
+    protected override Task<SystemPromptParts> BuildSystemPromptAsync(
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
@@ -69,11 +69,11 @@ public class AiStepConversationController : AiConversationControllerBase
         {
             _logger.LogInformation(
                 "Adding continuation context for step session {SessionId} ({Count} messages)", sessionId, history.Count);
-            return Task.FromResult(
-                $"{basePrompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.");
+            var withContinuation = basePrompt + "\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+            return Task.FromResult(new SystemPromptParts(withContinuation));
         }
 
-        return Task.FromResult(basePrompt);
+        return Task.FromResult(new SystemPromptParts(basePrompt));
     }
 
     protected override Dictionary<string, object> BuildContextDictionary(

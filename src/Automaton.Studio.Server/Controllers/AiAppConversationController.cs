@@ -155,7 +155,7 @@ public class AiAppConversationController : AiConversationControllerBase
         }
     }
 
-    protected override async Task<string> BuildSystemPromptAsync(
+    protected override async Task<SystemPromptParts> BuildSystemPromptAsync(
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
@@ -165,7 +165,7 @@ public class AiAppConversationController : AiConversationControllerBase
         _resolvedTier  = tier;
         var basePrompt = _promptBuilder.BuildSystemPrompt(tier);
 
-        // Inject user instructions from .instructions/ folder (1000 token budget)
+        // Inject user instructions from .instructions/ folder (configurable token budget)
         string? instructionBlock = null;
         if (request.ResourceId.HasValue)
         {
@@ -179,17 +179,15 @@ public class AiAppConversationController : AiConversationControllerBase
             }
         }
 
-        var prompt = instructionBlock is not null
-            ? $"{basePrompt}\n\n{instructionBlock}"
-            : basePrompt;
-
         _hadInstructionBlock = instructionBlock is not null;
 
         if (history?.Count > 0)
         {
             _logger.LogInformation(
                 "Adding continuation context for session {SessionId} ({Count} messages)", sessionId, history.Count);
-            return $"{prompt}\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+            const string continuationSuffix = "\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
+            // Continuation context goes into instructionBlock slot — it's per-session, not cached
+            return new SystemPromptParts(basePrompt, instructionBlock, continuationSuffix);
         }
 
         // New session for an existing app — inject memory so the AI knows what has already been built
@@ -204,7 +202,7 @@ public class AiAppConversationController : AiConversationControllerBase
                 {
                     _logger.LogInformation(
                         "Injecting app memory block for new session on existing app {AppId}", request.ResourceId.Value);
-                    return $"{prompt}\n\n{memoryBlock}";
+                    return new SystemPromptParts(basePrompt, instructionBlock, memoryBlock);
                 }
             }
             catch (Exception ex)
@@ -213,7 +211,7 @@ public class AiAppConversationController : AiConversationControllerBase
             }
         }
 
-        return prompt;
+        return new SystemPromptParts(basePrompt, instructionBlock);
     }
 
     private async Task<ComplexityTier?> ResolveComplexityTierAsync(
