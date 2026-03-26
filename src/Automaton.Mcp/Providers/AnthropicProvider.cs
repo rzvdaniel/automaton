@@ -433,7 +433,8 @@ public class AnthropicProvider : IAiProvider
                 {
                     result.InputTokens = streamEvent.Usage.InputTokens;
                     result.OutputTokens = streamEvent.Usage.OutputTokens;
-                    // Model is consistent across the stream, captured at start
+                    result.CacheCreationTokens = streamEvent.Usage.CacheCreationInputTokens;
+                    result.CacheReadTokens = streamEvent.Usage.CacheReadInputTokens;
                 }
 
                 // Handle text content
@@ -498,6 +499,21 @@ public class AnthropicProvider : IAiProvider
             var emitOutput = accumulatedOutputTokens + (result.OutputTokens ?? 0);
             EmitStreamingTextUpdate(conversationId, finalText, isComplete: true, inputTokens: emitInput, outputTokens: emitOutput > 0 ? emitOutput : null, model: result.Model);
             result.TextContent = finalText;
+        }
+
+        // Log Anthropic prompt cache stats
+        if (result.CacheReadTokens > 0 || result.CacheCreationTokens > 0)
+        {
+            _logger.LogInformation(
+                "Anthropic cache stats — read: {CacheRead} tokens, creation: {CacheCreation} tokens (saved ~{Saved} tokens from billing)",
+                result.CacheReadTokens ?? 0,
+                result.CacheCreationTokens ?? 0,
+                result.CacheReadTokens ?? 0);
+        }
+        else
+        {
+            _logger.LogDebug("Anthropic cache stats — no cache hit this request (creation: {CacheCreation})",
+                result.CacheCreationTokens ?? 0);
         }
 
         // Finalize tool use blocks
@@ -665,6 +681,10 @@ public class AnthropicProvider : IAiProvider
         public int? InputTokens { get; set; }
         public int? OutputTokens { get; set; }
         public string? Model { get; set; }
+
+        // Anthropic prompt caching stats (null when cache not involved)
+        public int? CacheCreationTokens { get; set; }
+        public int? CacheReadTokens { get; set; }
     }
 
     private class ToolUseBlockInfo
