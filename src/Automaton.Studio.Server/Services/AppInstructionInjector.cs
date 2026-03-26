@@ -1,4 +1,6 @@
 using System.Text;
+using Automaton.Studio.Server.Config;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 namespace Automaton.Studio.Server.Services;
@@ -15,16 +17,16 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class AppInstructionInjector
 {
-    private const int MaxTokens = 1000;
     private const int CharsPerToken = 4;
-    private const int MaxChars = MaxTokens * CharsPerToken;
 
     private readonly AppFileStorageService _storage;
+    private readonly AppInstructionsConfig _config;
     private readonly Serilog.ILogger _logger;
 
-    public AppInstructionInjector(AppFileStorageService storage)
+    public AppInstructionInjector(AppFileStorageService storage, IOptions<AiProvidersConfig> options)
     {
         _storage = storage;
+        _config  = options.Value.AppInstructions;
         _logger  = Log.ForContext<AppInstructionInjector>();
     }
 
@@ -87,7 +89,7 @@ public class AppInstructionInjector
         sb.AppendLine("The following instructions have been set for this project. Follow them consistently:");
         sb.AppendLine();
 
-        var remaining = MaxChars;
+        var remaining = _config.MaxTokens * CharsPerToken;
 
         foreach (var (_, path, filename) in ordered)
         {

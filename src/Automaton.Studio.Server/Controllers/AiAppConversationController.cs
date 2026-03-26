@@ -31,6 +31,9 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly ISystemAiService _systemAiService;
     private readonly AppMemoryService _appMemoryService;
 
+    // Set during BuildSystemPromptAsync; used in OnAfterConversationAsync to detect stale instructions.
+    private bool _hadInstructionBlock;
+
     public AiAppConversationController(
         IAutomatonMcpClient mcpClient,
         AiApiKeyService aiApiKeyService,
@@ -115,6 +118,8 @@ public class AiAppConversationController : AiConversationControllerBase
         {
             _logger.LogWarning(ex, "Failed to create/summarize post-generation snapshot for app {AppId}", resourceId);
         }
+
+        WarnIfInstructionsNotUpdated(resourceId, result);
     }
 
     /// <summary>
@@ -125,6 +130,30 @@ public class AiAppConversationController : AiConversationControllerBase
         [FromBody] StreamAppConversationRequest request,
         CancellationToken cancellationToken) =>
         ExecuteStreamAsync(request, cancellationToken);
+
+    /// <summary>
+    /// Logs a warning when the AI had instruction files injected (meaning the app is established)
+    /// but did not call write_instruction or update_instruction during the session.
+    /// This indicates instruction files may become stale over time.
+    /// </summary>
+    private void WarnIfInstructionsNotUpdated(Guid appId, ConversationResult result)
+    {
+        if (!_hadInstructionBlock) return; // First-time app or no instructions — nothing to warn about
+
+        var wroteInstructions = result.Messages.Any(m =>
+            m.Content.Contains("write_instruction",  StringComparison.OrdinalIgnoreCase) ||
+            m.Content.Contains("update_instruction", StringComparison.OrdinalIgnoreCase) ||
+            m.Content.Contains(".instructions/",     StringComparison.OrdinalIgnoreCase));
+
+        if (!wroteInstructions)
+        {
+            _logger.LogWarning(
+                "App {AppId}: session completed without updating instruction files. " +
+                "Instructions may become stale if the app was modified. " +
+                "The AI should call write_instruction or update_instruction at end of every modifying session.",
+                appId);
+        }
+    }
 
     protected override async Task<string> BuildSystemPromptAsync(
         BaseStreamConversationRequest request,
@@ -153,6 +182,8 @@ public class AiAppConversationController : AiConversationControllerBase
         var prompt = instructionBlock is not null
             ? $"{basePrompt}\n\n{instructionBlock}"
             : basePrompt;
+
+        _hadInstructionBlock = instructionBlock is not null;
 
         if (history?.Count > 0)
         {

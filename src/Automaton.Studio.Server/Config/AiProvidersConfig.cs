@@ -26,6 +26,8 @@ public class AiProvidersConfig
     public Dictionary<string, AiProviderConfig> Providers { get; set; } = new();
 
     public AppMemoryConfig AppMemory { get; set; } = new();
+
+    public AppInstructionsConfig AppInstructions { get; set; } = new();
 }
 
 /// <summary>
@@ -54,6 +56,18 @@ public class AiProviderConfig
     public string DefaultModel { get; set; } = string.Empty;
     public List<string> SupportedModels { get; set; } = new();
     public bool Enabled { get; set; } = true;
+}
+
+/// <summary>
+/// Configures the User Instructions block (.instructions/ files) injected into the system prompt.
+/// </summary>
+public class AppInstructionsConfig
+{
+    /// <summary>
+    /// Maximum tokens to inject from .instructions/ files. Default: 1000 (~4000 chars).
+    /// Increase for large/enterprise apps with detailed instruction sets.
+    /// </summary>
+    public int MaxTokens { get; set; } = 1000;
 }
 
 /// <summary>
