@@ -183,6 +183,8 @@ public abstract class AiConversationControllerBase : BaseController
                     tierOverride:   _aiProvidersConfig.IterationLimits.For(_resolvedTier)),
                 MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
                 MaxTokens = modelMaxTokens,
+                MaxRateLimitRetries = _aiProvidersConfig.RateLimitRetry.MaxRetries,
+                RateLimitRetryInitialDelaySeconds = _aiProvidersConfig.RateLimitRetry.InitialDelaySeconds,
                 Mode = request.Mode
             };
 

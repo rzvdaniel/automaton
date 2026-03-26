@@ -28,6 +28,8 @@ public class AiProvidersConfig
     public AppMemoryConfig AppMemory { get; set; } = new();
 
     public AppInstructionsConfig AppInstructions { get; set; } = new();
+
+    public RateLimitRetryConfig RateLimitRetry { get; set; } = new();
 }
 
 /// <summary>
@@ -84,6 +86,23 @@ public class AppMemoryConfig
     /// Hard character cap for the entire memory block. Default: 2400 (~600 tokens).
     /// </summary>
     public int BlockMaxChars { get; set; } = 2400;
+}
+
+/// <summary>
+/// Configures rate-limit retry behaviour for AI provider calls.
+/// </summary>
+public class RateLimitRetryConfig
+{
+    /// <summary>
+    /// Maximum number of retries on a rate-limit response. Default: 3.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial delay in seconds for exponential backoff. Subsequent retries double this value.
+    /// Default: 64s  (64 → 128 → 256). Minimum useful value for Anthropic Tier 1 (50K TPM limit).
+    /// </summary>
+    public int InitialDelaySeconds { get; set; } = 64;
 }
 
 public static class AiProvidersConfigExtensions

@@ -66,6 +66,16 @@ public class ConversationRequest
     public int MaxTokens { get; set; } = 4096;
 
     /// <summary>
+    /// Maximum retries on a rate-limit response. Sourced from AiProviders:RateLimitRetry:MaxRetries.
+    /// </summary>
+    public int MaxRateLimitRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial exponential backoff delay in seconds. Doubles on each retry (64 → 128 → 256).
+    /// </summary>
+    public int RateLimitRetryInitialDelaySeconds { get; set; } = 64;
+
+    /// <summary>
     /// Interaction mode: <see cref="ConversationModes.Plan"/> (read-only, propose_plan available)
     /// or <see cref="ConversationModes.Agent"/> (write tools, default).
     /// </summary>

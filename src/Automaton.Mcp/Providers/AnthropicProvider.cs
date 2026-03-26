@@ -4,6 +4,8 @@ using Anthropic.SDK.Messaging;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.SystemPrompts;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -172,32 +174,33 @@ public class AnthropicProvider : IAiProvider
                     Stream = true
                 };
 
-            // Stream the response, retrying on rate limit errors with exponential backoff
-            StreamResult streamResult;
-            var retryCount = 0;
-            const int maxRetries = 3;
-            while (true)
-            {
-                try
+            // Stream the response, retrying on rate limit errors with exponential backoff (via Polly)
+            var retryPipeline = new ResiliencePipelineBuilder()
+                .AddRetry(new RetryStrategyOptions
                 {
-                    streamResult = await StreamResponseAsync(
-                        client, messageParams, request.ConversationId, cancellationToken,
-                        accumulatedInputTokens: totalInputTokens,
-                        accumulatedOutputTokens: totalOutputTokens);
-                    break;
-                }
-                catch (Exception ex) when (IsRateLimitException(ex) && retryCount < maxRetries)
-                {
-                    retryCount++;
-                    var delaySeconds = (int)Math.Pow(2, retryCount + 5); // 64s, 128s, 256s
-                    _logger.LogWarning(
-                        "Anthropic rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
-                        retryCount, maxRetries, delaySeconds);
+                    MaxRetryAttempts = request.MaxRateLimitRetries,
+                    Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
+                    BackoffType       = DelayBackoffType.Exponential,
+                    UseJitter         = false,
+                    ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
+                    OnRetry           = args =>
+                    {
+                        var delaySecs = (int)args.RetryDelay.TotalSeconds;
+                        _logger.LogWarning(
+                            "Anthropic rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
+                            args.AttemptNumber, request.MaxRateLimitRetries, delaySecs);
+                        EmitRetryNotification(request.ConversationId, args.AttemptNumber, delaySecs);
+                        return ValueTask.CompletedTask;
+                    }
+                })
+                .Build();
 
-                    EmitRetryNotification(request.ConversationId, retryCount, delaySeconds);
-                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
-                }
-            }
+            var streamResult = await retryPipeline.ExecuteAsync(async ct =>
+                await StreamResponseAsync(
+                    client, messageParams, request.ConversationId, ct,
+                    accumulatedInputTokens: totalInputTokens,
+                    accumulatedOutputTokens: totalOutputTokens),
+                cancellationToken);
 
             // Accumulate tokens across iterations.
             // Anthropic reports inputTokens cumulatively — keep the latest value.
@@ -539,7 +542,7 @@ public class AnthropicProvider : IAiProvider
             Messages = new List<ConversationMessage>
             {
                 new ConversationMessage("assistant",
-                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/3)...")
+                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt})...")
             },
             ToolCalls = new List<ToolCall>(),
             ToolResults = new List<ToolResult>()
