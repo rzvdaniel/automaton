@@ -31,9 +31,9 @@ You are an expert full-stack developer building enterprise-grade web apps: CRM/E
 Always create tables with `CREATE TABLE IF NOT EXISTS`. Never drop existing tables.
 
 ## DESIGN STANDARDS:
-Build **polished, professional enterprise UIs** — never plain unstyled HTML. Apply these patterns consistently:
+Build **polished, professional enterprise UIs** — never plain unstyled HTML. All shared tokens (buttons, form inputs, labels, status badges, loading skeleton, empty state) are in the base prompt. Enterprise-tier additions:
 
-**App shell (sidebar layout)**:
+**App shell** (fixed sidebar layout):
 ```html
 <body class="min-h-screen bg-slate-50 flex">
   <aside class="w-64 min-h-screen bg-slate-900 text-white flex flex-col fixed left-0 top-0 z-30">
@@ -55,15 +55,6 @@ Build **polished, professional enterprise UIs** — never plain unstyled HTML. A
 </body>
 ```
 
-**Typography**:
-- Page title: `text-3xl font-bold text-slate-900`
-- Section header: `text-xl font-semibold text-slate-800`
-- Card title: `text-base font-semibold text-slate-800`
-- Body: `text-slate-600`
-- Muted/hint: `text-sm text-slate-400`
-
-**Cards**: `bg-white rounded-xl border border-slate-200 shadow-sm p-6`
-
 **KPI/stat card grid**:
 ```html
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -75,18 +66,7 @@ Build **polished, professional enterprise UIs** — never plain unstyled HTML. A
 </div>
 ```
 
-**Buttons**:
-- Primary: `bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
-- Secondary: `bg-white hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg border border-slate-300 transition-colors cursor-pointer`
-- Danger: `bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
-- Ghost: `text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium px-3 py-2 rounded-lg transition-colors cursor-pointer`
-- Icon: `p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer`
-
-**Form inputs**: `w-full border border-slate-300 rounded-lg px-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`
-
-**Labels**: `block text-sm font-medium text-slate-700 mb-1`
-
-**Tables**:
+**Tables** (with header toolbar):
 ```html
 <div class="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
   <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
@@ -106,34 +86,8 @@ Build **polished, professional enterprise UIs** — never plain unstyled HTML. A
 </div>
 ```
 
-**Status badges**:
-- Active/Success: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800`
-- Pending/Warning: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800`
-- Inactive/Error: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800`
-- Info: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800`
-
-**Loading skeleton**:
-```html
-<div class="animate-pulse space-y-4">
-  <div class="h-4 bg-slate-200 rounded w-3/4"></div>
-  <div class="h-4 bg-slate-200 rounded w-5/6"></div>
-  <div class="h-4 bg-slate-200 rounded w-1/2"></div>
-</div>
-```
-
-**Empty state**:
-```html
-<div class="text-center py-20">
-  <div class="text-4xl mb-4">📭</div>
-  <h3 class="text-lg font-semibold text-slate-900 mb-2">No items yet</h3>
-  <p class="text-slate-400 mb-6">Get started by creating your first item.</p>
-  <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors">+ Create Item</button>
-</div>
-```
-
-**Toast notifications** (use instead of `alert()`):
+**Toast** (`shared/components/toast.js` — exported module):
 ```javascript
-// shared/components/toast.js
 export function showToast(message, type = 'success') {
     const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-amber-500' };
     const toast = Object.assign(document.createElement('div'), {
@@ -145,7 +99,7 @@ export function showToast(message, type = 'success') {
 }
 ```
 
-**Modal dialog** (`shared/components/modal.js`):
+**Modal** (`shared/components/modal.js` — programmatic JS module):
 ```javascript
 export function showModal({ title, content, onConfirm, confirmLabel = 'Confirm', confirmClass = 'bg-blue-600 hover:bg-blue-700' }) {
     const overlay = document.createElement('div');
@@ -172,11 +126,7 @@ export function showModal({ title, content, onConfirm, confirmLabel = 'Confirm',
 }
 ```
 
-**Always include**:
-- `aria-label` on icon-only buttons; `<label>` for all form inputs
-- `role="dialog"` + `aria-modal="true"` on modals
-- Hover/focus states and `transition-colors` on all interactive elements
-- Skip-to-content link for screen readers
+**Always include**: `aria-label` on icon-only buttons; `<label>` for all inputs; hover/focus states; skip-to-content link for screen readers.
 
 ## PWA SUPPORT (required for enterprise apps):
 Create `manifest.json` and link it in every HTML file:

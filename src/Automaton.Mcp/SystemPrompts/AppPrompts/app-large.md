@@ -28,9 +28,9 @@ You are an expert full-stack developer building large web apps: multi-feature ap
 - **External DB**: Only if the user explicitly provides credentials during clarification.
 
 ## DESIGN STANDARDS:
-Build **polished, professional UIs** — never plain unstyled HTML. Apply these patterns consistently:
+Build **polished, professional UIs** — never plain unstyled HTML. All shared tokens (buttons, form inputs, labels, status badges, loading skeleton, empty state, toast) are in the base prompt. Large-tier additions:
 
-**Page structure**:
+**Page structure** (sidebar layout):
 ```html
 <body class="min-h-screen bg-slate-50">
   <div class="flex min-h-screen">
@@ -39,12 +39,6 @@ Build **polished, professional UIs** — never plain unstyled HTML. Apply these 
   </div>
 </body>
 ```
-
-**Typography**:
-- Page title: `text-3xl font-bold text-slate-900`
-- Section header: `text-xl font-semibold text-slate-800`
-- Body: `text-slate-600`
-- Muted/hint: `text-sm text-slate-400`
 
 **Navigation sidebar**:
 ```html
@@ -58,8 +52,6 @@ Build **polished, professional UIs** — never plain unstyled HTML. Apply these 
 </aside>
 ```
 
-**Cards**: `bg-white rounded-xl border border-slate-200 shadow-sm p-6`
-
 **Stat/metric card**:
 ```html
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
@@ -68,16 +60,6 @@ Build **polished, professional UIs** — never plain unstyled HTML. Apply these 
   <p class="text-sm text-green-600 mt-1">↑ 12% this month</p>
 </div>
 ```
-
-**Buttons**:
-- Primary: `bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
-- Secondary: `bg-white hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg border border-slate-300 transition-colors cursor-pointer`
-- Danger: `bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors cursor-pointer`
-- Icon button: `p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer`
-
-**Form inputs**: `w-full border border-slate-300 rounded-lg px-3 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`
-
-**Labels**: `block text-sm font-medium text-slate-700 mb-1`
 
 **Tables**:
 ```html
@@ -95,42 +77,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. Apply these 
 </div>
 ```
 
-**Status badges**:
-- Success: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800`
-- Warning: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800`
-- Error: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800`
-- Info: `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800`
-
-**Loading skeleton**:
-```html
-<div class="animate-pulse space-y-3">
-  <div class="h-4 bg-slate-200 rounded w-3/4"></div>
-  <div class="h-4 bg-slate-200 rounded w-1/2"></div>
-</div>
-```
-
-**Empty state**:
-```html
-<div class="text-center py-16">
-  <p class="text-slate-400 text-lg mb-4">No items yet</p>
-  <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors">Add your first item</button>
-</div>
-```
-
-**Toast notifications** (use instead of `alert()`):
-```javascript
-function showToast(message, type = 'success') {
-    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-amber-500' };
-    const toast = Object.assign(document.createElement('div'), {
-        className: `fixed bottom-4 right-4 ${colors[type] || colors.info} text-white px-5 py-3 rounded-lg shadow-lg z-50 text-sm font-medium`,
-        textContent: message
-    });
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3500);
-}
-```
-
-**Modal dialog pattern**:
+**Modal dialog**:
 ```html
 <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true">
   <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
@@ -138,7 +85,6 @@ function showToast(message, type = 'success') {
       <h2 class="text-xl font-semibold text-slate-900">Title</h2>
       <button onclick="closeModal()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" aria-label="Close">✕</button>
     </div>
-    <!-- content -->
     <div class="flex justify-end gap-3 mt-6">
       <button onclick="closeModal()" class="bg-white hover:bg-slate-50 text-slate-700 font-medium px-5 py-2.5 rounded-lg border border-slate-300 transition-colors">Cancel</button>
       <button onclick="confirmAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition-colors">Confirm</button>
@@ -147,10 +93,7 @@ function showToast(message, type = 'success') {
 </div>
 ```
 
-**Always include**:
-- `aria-label` on icon-only buttons; `<label>` for all form inputs
-- `role="dialog"` + `aria-modal="true"` on modals
-- Hover/focus states and `transition-colors` on all interactive elements
+**Always include**: `aria-label` on icon-only buttons; `<label>` for all form inputs; hover/focus states and `transition-colors` on interactive elements.
 
 ## PWA SUPPORT (optional but recommended):
 Add PWA support for installable apps. Create `manifest.json`:

@@ -153,11 +153,32 @@ public class AnthropicProvider : IAiProvider
                     Stream = true
                 };
 
-            // Stream the response
-            var streamResult = await StreamResponseAsync(
-                client, messageParams, request.ConversationId, cancellationToken,
-                accumulatedInputTokens: totalInputTokens,
-                accumulatedOutputTokens: totalOutputTokens);
+            // Stream the response, retrying on rate limit errors with exponential backoff
+            StreamResult streamResult;
+            var retryCount = 0;
+            const int maxRetries = 3;
+            while (true)
+            {
+                try
+                {
+                    streamResult = await StreamResponseAsync(
+                        client, messageParams, request.ConversationId, cancellationToken,
+                        accumulatedInputTokens: totalInputTokens,
+                        accumulatedOutputTokens: totalOutputTokens);
+                    break;
+                }
+                catch (Exception ex) when (IsRateLimitException(ex) && retryCount < maxRetries)
+                {
+                    retryCount++;
+                    var delaySeconds = (int)Math.Pow(2, retryCount + 5); // 64s, 128s, 256s
+                    _logger.LogWarning(
+                        "Anthropic rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
+                        retryCount, maxRetries, delaySeconds);
+
+                    EmitRetryNotification(request.ConversationId, retryCount, delaySeconds);
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+                }
+            }
 
             // Accumulate tokens across iterations.
             // Anthropic reports inputTokens cumulatively — keep the latest value.
@@ -484,6 +505,26 @@ public class AnthropicProvider : IAiProvider
         }
 
         return result;
+    }
+
+    private static bool IsRateLimitException(Exception ex) =>
+        ex.Message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("rate limited", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase);
+
+    private void EmitRetryNotification(string conversationId, int attempt, int delaySeconds)
+    {
+        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+        {
+            ConversationId = conversationId,
+            Messages = new List<ConversationMessage>
+            {
+                new ConversationMessage("assistant",
+                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/3)...")
+            },
+            ToolCalls = new List<ToolCall>(),
+            ToolResults = new List<ToolResult>()
+        });
     }
 
     private void EmitToolCallStarted(string conversationId, string toolCallId, string toolName, string argsJson)
