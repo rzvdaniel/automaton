@@ -53,6 +53,8 @@ export interface ConversationMessage {
   inputTokens?: number
   outputTokens?: number
   model?: string
+  /** Chain-of-thought from thinking models (e.g. Moonshot kimi-k2.5). Null for standard models. */
+  reasoningContent?: string
 }
 
 export interface StreamConversationRequest {
@@ -177,6 +179,9 @@ export interface ChatMessage {
   outputTokens?: number
   totalTokens?: number
   model?: string
+
+  /** Chain-of-thought from thinking models (e.g. Moonshot kimi-k2.5). Null for standard models. */
+  reasoningContent?: string
 }
 
 // ============================================

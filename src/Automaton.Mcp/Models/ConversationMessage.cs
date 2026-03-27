@@ -25,4 +25,10 @@ public record ConversationMessage(string Role, string Content)
     /// </summary>
     public int? CacheReadTokens { get; init; }
     public int? CacheCreationTokens { get; init; }
+
+    /// <summary>
+    /// Internal reasoning / chain-of-thought produced by thinking models (e.g. Moonshot kimi-k2.5).
+    /// Null for models that do not emit reasoning_content.
+    /// </summary>
+    public string? ReasoningContent { get; init; }
 }
