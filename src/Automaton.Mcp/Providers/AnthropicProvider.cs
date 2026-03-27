@@ -558,10 +558,17 @@ public class AnthropicProvider : IAiProvider
         return result;
     }
 
-    private static bool IsRateLimitException(Exception ex) =>
-        ex.Message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase) ||
-        ex.Message.Contains("rate limited", StringComparison.OrdinalIgnoreCase) ||
-        ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase);
+    private static bool IsRateLimitException(Exception ex)
+    {
+        var msg = ex.Message;
+        if (msg.Contains("insufficient_quota", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("quota_exceeded",     StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return msg.Contains("rate_limit",        StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("rate limited",      StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("429",               StringComparison.OrdinalIgnoreCase);
+    }
 
     private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
     {
