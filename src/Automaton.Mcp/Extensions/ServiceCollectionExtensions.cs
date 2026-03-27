@@ -33,9 +33,11 @@ public static class ServiceCollectionExtensions
             registry.Register(googleProvider);
 
             // Register Moonshot (Kimi) — OpenAI Chat Completions-compatible
+            // Uses the international endpoint. Keys from platform.moonshot.ai authenticate here.
+            // If using a China-region key (platform.moonshot.cn), change to https://api.moonshot.cn/v1
             var moonshotProvider = new OpenAiCompatibleProvider(
                 providerName: "Moonshot",
-                baseUrl: "https://api.moonshot.cn/v1",
+                baseUrl: "https://api.moonshot.ai/v1",
                 defaultModel: "kimi-k2-5",
                 logger: logger.CreateLogger("MoonshotProvider"));
             registry.Register(moonshotProvider);
