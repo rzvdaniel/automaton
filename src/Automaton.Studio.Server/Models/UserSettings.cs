@@ -20,6 +20,28 @@ public class UserSettingsDto
     /// </summary>
     [Range(10, 24, ErrorMessage = "Font size must be between 10 and 24")]
     public int FontSize { get; set; } = 14;
+
+    /// <summary>
+    /// User's preferred default AI model ID (e.g. "gpt-4o").
+    /// Falls back to the admin-configured global default when null.
+    /// </summary>
+    public string? DefaultAiModel { get; set; }
+
+    /// <summary>
+    /// Provider name that owns DefaultAiModel (e.g. "OpenAI").
+    /// </summary>
+    public string? DefaultAiProvider { get; set; }
+
+    /// <summary>
+    /// User's preferred planning AI model ID.
+    /// Falls back to the admin-configured global planning model when null.
+    /// </summary>
+    public string? DefaultPlanningModel { get; set; }
+
+    /// <summary>
+    /// Provider name that owns DefaultPlanningModel.
+    /// </summary>
+    public string? DefaultPlanningProvider { get; set; }
 }
 
 /// <summary>
@@ -39,4 +61,9 @@ public class UpdateUserSettingsRequest
     /// </summary>
     [Range(10, 24, ErrorMessage = "Font size must be between 10 and 24")]
     public int? FontSize { get; set; }
+
+    public string? DefaultAiModel { get; set; }
+    public string? DefaultAiProvider { get; set; }
+    public string? DefaultPlanningModel { get; set; }
+    public string? DefaultPlanningProvider { get; set; }
 }

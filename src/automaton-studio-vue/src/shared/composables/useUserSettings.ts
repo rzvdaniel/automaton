@@ -6,6 +6,10 @@ import type { ThemeMode, UserSettingsDto } from '@/features/settings/types/setti
 const DEFAULTS: UserSettingsDto = {
   theme: 'system',
   fontSize: 14,
+  defaultAiModel: undefined,
+  defaultAiProvider: undefined,
+  defaultPlanningModel: undefined,
+  defaultPlanningProvider: undefined,
 }
 
 const STORAGE_KEY = 'user-settings'
@@ -62,6 +66,10 @@ function loadFromStorage(): UserSettingsDto {
           ? parsed.theme
           : DEFAULTS.theme,
         fontSize: parsed.fontSize ?? DEFAULTS.fontSize,
+        defaultAiModel: parsed.defaultAiModel,
+        defaultAiProvider: parsed.defaultAiProvider,
+        defaultPlanningModel: parsed.defaultPlanningModel,
+        defaultPlanningProvider: parsed.defaultPlanningProvider,
       }
     }
   } catch (err) {
@@ -98,6 +106,10 @@ export function useUserSettings() {
       settings.value = {
         theme: serverSettings.theme,
         fontSize: serverSettings.fontSize,
+        defaultAiModel: serverSettings.defaultAiModel,
+        defaultAiProvider: serverSettings.defaultAiProvider,
+        defaultPlanningModel: serverSettings.defaultPlanningModel,
+        defaultPlanningProvider: serverSettings.defaultPlanningProvider,
       }
       saveToStorage(settings.value)
       isInitialized.value = true
@@ -180,6 +192,52 @@ export function useUserSettings() {
   }
 
   /**
+   * Set default AI model preference and persist to server
+   */
+  async function setDefaultAiModel(model: string | undefined, provider: string | undefined) {
+    const previousSettings = { ...settings.value }
+
+    settings.value = { ...settings.value, defaultAiModel: model, defaultAiProvider: provider }
+    saveToStorage(settings.value)
+
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({ defaultAiModel: model, defaultAiProvider: provider })
+      } catch (err) {
+        console.error('Failed to save default AI model setting:', err)
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
+  /**
+   * Set default planning model preference and persist to server
+   */
+  async function setDefaultPlanningModel(model: string | undefined, provider: string | undefined) {
+    const previousSettings = { ...settings.value }
+
+    settings.value = { ...settings.value, defaultPlanningModel: model, defaultPlanningProvider: provider }
+    saveToStorage(settings.value)
+
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({ defaultPlanningModel: model, defaultPlanningProvider: provider })
+      } catch (err) {
+        console.error('Failed to save default planning model setting:', err)
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
+  /**
    * Reset settings state (call on logout)
    */
   function resetSettings() {
@@ -191,6 +249,10 @@ export function useUserSettings() {
   // Computed convenience accessors
   const theme = computed(() => settings.value.theme)
   const fontSize = computed(() => settings.value.fontSize)
+  const defaultAiModel = computed(() => settings.value.defaultAiModel)
+  const defaultAiProvider = computed(() => settings.value.defaultAiProvider)
+  const defaultPlanningModel = computed(() => settings.value.defaultPlanningModel)
+  const defaultPlanningProvider = computed(() => settings.value.defaultPlanningProvider)
 
   return {
     // Read-only reactive settings object
@@ -200,6 +262,10 @@ export function useUserSettings() {
     theme,
     fontSize,
     isDark,
+    defaultAiModel,
+    defaultAiProvider,
+    defaultPlanningModel,
+    defaultPlanningProvider,
 
     // State
     isInitialized: readonly(isInitialized),
@@ -210,6 +276,8 @@ export function useUserSettings() {
     initializeSettings,
     setTheme,
     setFontSize,
+    setDefaultAiModel,
+    setDefaultPlanningModel,
     toggleDarkMode,
     setDarkMode,
     resetSettings,

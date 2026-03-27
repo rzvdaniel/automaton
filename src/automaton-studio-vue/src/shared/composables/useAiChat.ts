@@ -6,6 +6,7 @@ import { ref, computed, watch } from 'vue'
 import { aiConversationClient } from '../services/ai/ai-conversation-client'
 import { aiChatHistoryService } from '../services/api/ai-chat-history.service'
 import { getAvailableProviders } from '../services/ai/ai-providers-service'
+import { useUserSettings } from './useUserSettings'
 import type {
   ChatMessage,
   ChatSession,
@@ -28,6 +29,8 @@ export interface UseAiChatOptions {
 }
 
 export function useAiChat(resourceType: string, resourceId: string, options?: UseAiChatOptions) {
+  const { defaultAiModel, defaultAiProvider, defaultPlanningModel, defaultPlanningProvider } = useUserSettings()
+
   // State
   const messages = ref<ChatMessage[]>([])
   const isGenerating = ref(false)
@@ -49,7 +52,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const hasMoreSessions = computed(() => sessions.value.length < sessionsTotalCount.value)
   const sessionsSearch = ref('')
 
-  // LocalStorage key for persisting user's model preference
+  // LocalStorage key — kept for backward compatibility (read-only going forward)
   const AI_MODEL_PREFERENCE_KEY = 'ai_preferred_model'
 
   // Flag to prevent saving to localStorage during initialization
@@ -101,9 +104,29 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     // Set flag to prevent saving during initialization
     isInitializingModel.value = true
 
-    // Priority: localStorage > default model > first alphabetically
-    
-    // 1. Check localStorage for user's saved preference
+    // Priority:
+    // 1. User's server-saved preference (default or planning depending on resourceType)
+    // 2. localStorage (backward compat, read-only)
+    // 3. Admin global default model
+    // 4. First model alphabetically
+
+    const isPlanningContext = resourceType === 'plan'
+
+    const userPreferredModel = isPlanningContext
+      ? defaultPlanningModel.value
+      : defaultAiModel.value
+    const userPreferredProvider = isPlanningContext
+      ? defaultPlanningProvider.value
+      : defaultAiProvider.value
+
+    if (userPreferredModel && models.includes(userPreferredModel)) {
+      selectedModel.value = userPreferredModel
+      selectedProvider.value = userPreferredProvider || providerByModel.value.get(userPreferredModel) || ''
+      isInitializingModel.value = false
+      return
+    }
+
+    // 2. Backward compat: read from localStorage (no longer written going forward)
     const savedModel = localStorage.getItem(AI_MODEL_PREFERENCE_KEY)
     if (savedModel && models.includes(savedModel)) {
       selectedModel.value = savedModel
@@ -112,7 +135,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       return
     }
 
-    // 2. Use default model from backend (first provider with a default)
+    // 3. Admin-configured global default
     for (const provider of availableProviders.value) {
       if (provider.defaultModel && models.includes(provider.defaultModel)) {
         selectedModel.value = provider.defaultModel
@@ -122,7 +145,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       }
     }
 
-    // 3. Fallback to first model alphabetically
+    // 4. Fallback to first model alphabetically
     selectedModel.value = models[0]!
     selectedProvider.value = providerByModel.value.get(models[0]!) || ''
     isInitializingModel.value = false
@@ -156,12 +179,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     if (newModel) {
       // Update provider based on model
       selectedProvider.value = providerByModel.value.get(newModel) || ''
-      
-      // Only save user's preference to localStorage when not initializing
-      // This prevents overwriting during automatic model selection on page load
-      if (!isInitializingModel.value) {
-        localStorage.setItem(AI_MODEL_PREFERENCE_KEY, newModel)
-      }
     }
   })
 

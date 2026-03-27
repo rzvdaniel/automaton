@@ -24,6 +24,10 @@ public class UserSettingsService
     {
         public const string EditorFontSize = "editor.fontSize";
         public const string AppearanceTheme = "appearance.theme";
+        public const string DefaultAiModel = "ai.defaultModel";
+        public const string DefaultAiProvider = "ai.defaultProvider";
+        public const string DefaultPlanningModel = "ai.defaultPlanningModel";
+        public const string DefaultPlanningProvider = "ai.defaultPlanningProvider";
     }
 
     // Default values
@@ -185,11 +189,19 @@ public class UserSettingsService
     {
         var theme = await GetSettingAsync(userId, Keys.AppearanceTheme, Defaults.Theme);
         var fontSize = await GetSettingAsync(userId, Keys.EditorFontSize, Defaults.EditorFontSize);
+        var defaultAiModel = await GetSettingAsync<string?>(userId, Keys.DefaultAiModel, null);
+        var defaultAiProvider = await GetSettingAsync<string?>(userId, Keys.DefaultAiProvider, null);
+        var defaultPlanningModel = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningModel, null);
+        var defaultPlanningProvider = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningProvider, null);
 
         return new UserSettingsDto
         {
             Theme = theme,
-            FontSize = fontSize
+            FontSize = fontSize,
+            DefaultAiModel = defaultAiModel,
+            DefaultAiProvider = defaultAiProvider,
+            DefaultPlanningModel = defaultPlanningModel,
+            DefaultPlanningProvider = defaultPlanningProvider
         };
     }
 
@@ -198,18 +210,24 @@ public class UserSettingsService
     /// </summary>
     public async Task<UserSettingsDto> UpdateSettingsAsync(Guid userId, UpdateUserSettingsRequest request)
     {
-        // Only update fields that are provided
         if (request.Theme != null)
-        {
             await SetSettingAsync(userId, Keys.AppearanceTheme, request.Theme);
-        }
 
         if (request.FontSize.HasValue)
-        {
             await SetSettingAsync(userId, Keys.EditorFontSize, request.FontSize.Value);
-        }
 
-        // Return the full updated settings
+        if (request.DefaultAiModel != null)
+            await SetSettingAsync(userId, Keys.DefaultAiModel, request.DefaultAiModel);
+
+        if (request.DefaultAiProvider != null)
+            await SetSettingAsync(userId, Keys.DefaultAiProvider, request.DefaultAiProvider);
+
+        if (request.DefaultPlanningModel != null)
+            await SetSettingAsync(userId, Keys.DefaultPlanningModel, request.DefaultPlanningModel);
+
+        if (request.DefaultPlanningProvider != null)
+            await SetSettingAsync(userId, Keys.DefaultPlanningProvider, request.DefaultPlanningProvider);
+
         return await GetAllSettingsAsync(userId);
     }
 
@@ -220,6 +238,10 @@ public class UserSettingsService
     {
         _cache.Remove(GetCacheKey(userId, Keys.EditorFontSize));
         _cache.Remove(GetCacheKey(userId, Keys.AppearanceTheme));
+        _cache.Remove(GetCacheKey(userId, Keys.DefaultAiModel));
+        _cache.Remove(GetCacheKey(userId, Keys.DefaultAiProvider));
+        _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningModel));
+        _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningProvider));
     }
 
     private static string GetCacheKey(Guid userId, string key) => $"user_settings:{userId}:{key}";

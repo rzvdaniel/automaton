@@ -54,6 +54,24 @@ export interface UserSettingsDto {
    * Default: 14, Range: 10-24
    */
   fontSize: number
+
+  /**
+   * User's preferred default AI model ID.
+   * Falls back to the admin-configured global default when undefined.
+   */
+  defaultAiModel?: string
+
+  /** Provider name for the default AI model (e.g. "OpenAI"). */
+  defaultAiProvider?: string
+
+  /**
+   * User's preferred planning AI model ID.
+   * Falls back to the admin-configured global planning model when undefined.
+   */
+  defaultPlanningModel?: string
+
+  /** Provider name for the planning AI model. */
+  defaultPlanningProvider?: string
 }
 
 /**
@@ -63,4 +81,8 @@ export interface UserSettingsDto {
 export interface UpdateUserSettingsRequest {
   theme?: ThemeMode
   fontSize?: number
+  defaultAiModel?: string
+  defaultAiProvider?: string
+  defaultPlanningModel?: string
+  defaultPlanningProvider?: string
 }

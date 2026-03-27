@@ -8,6 +8,7 @@ import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
+import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
@@ -15,16 +16,24 @@ import { useToast } from 'primevue/usetoast'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
+import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
+import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 
 const {
   theme: themePreference,
   fontSize,
+  defaultAiModel,
+  defaultAiProvider,
+  defaultPlanningModel,
+  defaultPlanningProvider,
   isLoading: settingsLoading,
   isSaving: settingsSaving,
   setTheme,
   setFontSize,
+  setDefaultAiModel,
+  setDefaultPlanningModel,
 } = useUserSettings()
 const authStore = useAuthStore()
 const router = useRouter()
@@ -48,6 +57,23 @@ const accountSuccess = ref(false)
 // Local editor font size for input binding (synced from cached settings)
 const editorFontSize = ref(14)
 
+// AI preferences
+const aiProviders = ref<AiProvider[]>([])
+const aiModelsLoading = ref(false)
+
+const aiModelOptions = computed(() => {
+  const options: { label: string; value: string; provider: string }[] = []
+  for (const provider of aiProviders.value) {
+    for (const model of provider.supportedModels) {
+      options.push({ label: model, value: model, provider: provider.providerName })
+    }
+  }
+  return options
+})
+
+const selectedDefaultAiModel = ref<string | undefined>(undefined)
+const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
+
 onMounted(async () => {
   // Load user data from store
   if (authStore.user) {
@@ -60,12 +86,30 @@ onMounted(async () => {
   }
   // Sync local value from cached settings
   editorFontSize.value = fontSize.value
+  selectedDefaultAiModel.value = defaultAiModel.value
+  selectedDefaultPlanningModel.value = defaultPlanningModel.value
+
+  // Load AI providers for model dropdowns
+  aiModelsLoading.value = true
+  try {
+    const providers = await getAvailableProviders(true)
+    aiProviders.value = providers.filter(
+      (p) => (p.hasStoredKeys || p.hasEnvironmentKey) && p.supportedModels.length > 0,
+    )
+  } catch {
+    // Non-critical — dropdowns will be empty
+  } finally {
+    aiModelsLoading.value = false
+  }
 })
 
 // Keep local value in sync with cached settings
 watch(fontSize, (newSize) => {
   editorFontSize.value = newSize
 })
+
+watch(defaultAiModel, (v) => { selectedDefaultAiModel.value = v })
+watch(defaultPlanningModel, (v) => { selectedDefaultPlanningModel.value = v })
 
 // Check username availability
 async function checkUsernameAvailability() {
@@ -174,6 +218,39 @@ const themeOptions = ref([
   { label: 'Dark', value: 'dark', icon: 'pi pi-moon' },
   { label: 'System', value: 'system', icon: 'pi pi-desktop' },
 ])
+
+async function saveAiPreferences() {
+  try {
+    const aiModel = selectedDefaultAiModel.value
+    const aiProv = aiModel
+      ? (aiModelOptions.value.find((o) => o.value === aiModel)?.provider ?? '')
+      : undefined
+
+    const planModel = selectedDefaultPlanningModel.value
+    const planProv = planModel
+      ? (aiModelOptions.value.find((o) => o.value === planModel)?.provider ?? '')
+      : undefined
+
+    await Promise.all([
+      setDefaultAiModel(aiModel, aiProv),
+      setDefaultPlanningModel(planModel, planProv),
+    ])
+
+    toast.add({
+      severity: 'success',
+      summary: 'Settings Saved',
+      detail: 'AI preferences have been updated.',
+      life: 3000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: 'Could not save AI preferences.',
+      life: 5000,
+    })
+  }
+}
 
 async function saveEditorSettings() {
   try {
@@ -327,6 +404,14 @@ const passwordLoading = computed(() => passwordSaving.value)
                 :class="{ 'surface-hover': activeSection === 'appearance' }"
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
+              />
+              <Button
+                label="AI"
+                icon="pi pi-sparkles"
+                text
+                :class="{ 'surface-hover': activeSection === 'ai' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'ai'"
               />
               <Button
                 label="Notifications"
@@ -509,6 +594,69 @@ const passwordLoading = computed(() => passwordSaving.value)
                   :loading="settingsSaving"
                   :disabled="settingsSaving || settingsLoading"
                   @click="saveEditorSettings"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- AI Preferences Section -->
+        <Card v-if="activeSection === 'ai'">
+          <template #title>AI Preferences</template>
+          <template #content>
+            <div class="flex flex-column gap-5">
+              <p class="text-color-secondary m-0">
+                Set your preferred models. These override the admin defaults and apply across all AI assistants.
+              </p>
+
+              <!-- Default AI Model -->
+              <div class="flex flex-column gap-2">
+                <label for="defaultAiModel" class="font-medium">Default AI Model</label>
+                <Select
+                  id="defaultAiModel"
+                  v-model="selectedDefaultAiModel"
+                  :options="aiModelOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-group-label="provider"
+                  placeholder="Use admin default"
+                  show-clear
+                  :loading="aiModelsLoading"
+                  :disabled="settingsSaving || aiModelsLoading"
+                  class="w-full"
+                />
+                <small class="text-color-secondary">
+                  Used for chat, code generation, and general AI tasks.
+                </small>
+              </div>
+
+              <!-- Default Planning Model -->
+              <div class="flex flex-column gap-2">
+                <label for="defaultPlanningModel" class="font-medium">Default Planning Model</label>
+                <Select
+                  id="defaultPlanningModel"
+                  v-model="selectedDefaultPlanningModel"
+                  :options="aiModelOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Use admin default"
+                  show-clear
+                  :loading="aiModelsLoading"
+                  :disabled="settingsSaving || aiModelsLoading"
+                  class="w-full"
+                />
+                <small class="text-color-secondary">
+                  Used for multi-step planning and flow generation tasks.
+                </small>
+              </div>
+
+              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
+                <Button
+                  label="Save Changes"
+                  icon="pi pi-check"
+                  :loading="settingsSaving"
+                  :disabled="settingsSaving || aiModelsLoading"
+                  @click="saveAiPreferences"
                 />
               </div>
             </div>
