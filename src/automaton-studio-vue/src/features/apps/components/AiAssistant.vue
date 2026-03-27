@@ -1031,12 +1031,6 @@ function handleKeyPress(event: KeyboardEvent) {
   font-size: 0.875rem;
 }
 
-
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--p-red-200);
-}
-
 .messages-area {
   flex: 1;
   overflow-y: auto;
