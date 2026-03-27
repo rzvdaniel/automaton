@@ -562,8 +562,11 @@ public class AnthropicProvider : IAiProvider
     private static bool IsRateLimitException(Exception ex)
     {
         var msg = ex.Message;
-        if (msg.Contains("insufficient_quota", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("quota_exceeded",     StringComparison.OrdinalIgnoreCase))
+        if (msg.Contains("insufficient_quota",       StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("quota_exceeded",           StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("exceeded_current_quota",   StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("insufficient balance",     StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("suspended",                StringComparison.OrdinalIgnoreCase))
             return false;
 
         return msg.Contains("rate_limit",        StringComparison.OrdinalIgnoreCase) ||

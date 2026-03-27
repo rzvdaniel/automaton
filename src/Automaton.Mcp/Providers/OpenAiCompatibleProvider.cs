@@ -317,8 +317,11 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
     {
         var msg = ex.Message;
         // Exclude quota/billing errors — those are permanent and should not be retried.
-        if (msg.Contains("insufficient_quota", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("quota_exceeded",     StringComparison.OrdinalIgnoreCase))
+        if (msg.Contains("insufficient_quota",       StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("quota_exceeded",           StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("exceeded_current_quota",   StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("insufficient balance",     StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("suspended",                StringComparison.OrdinalIgnoreCase))
             return false;
 
         return msg.Contains("rate_limit",      StringComparison.OrdinalIgnoreCase) ||
