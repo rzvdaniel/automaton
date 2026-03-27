@@ -61,15 +61,23 @@ const editorFontSize = ref(14)
 const aiProviders = ref<AiProvider[]>([])
 const aiModelsLoading = ref(false)
 
-const aiModelOptions = computed(() => {
-  const options: { label: string; value: string; provider: string }[] = []
-  for (const provider of aiProviders.value) {
-    for (const model of provider.supportedModels) {
-      options.push({ label: model, value: model, provider: provider.providerName })
-    }
-  }
-  return options
-})
+const aiModelOptions = computed(() =>
+  aiProviders.value.map((provider) => ({
+    label: provider.displayName || provider.providerName,
+    providerName: provider.providerName,
+    items: provider.supportedModels.map((model) => ({ label: model, value: model })),
+  })),
+)
+
+const aiModelFlatOptions = computed(() =>
+  aiProviders.value.flatMap((provider) =>
+    provider.supportedModels.map((model) => ({
+      label: model,
+      value: model,
+      provider: provider.providerName,
+    })),
+  ),
+)
 
 const selectedDefaultAiModel = ref<string | undefined>(undefined)
 const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
@@ -223,12 +231,12 @@ async function saveAiPreferences() {
   try {
     const aiModel = selectedDefaultAiModel.value
     const aiProv = aiModel
-      ? (aiModelOptions.value.find((o) => o.value === aiModel)?.provider ?? '')
+      ? (aiModelFlatOptions.value.find((o) => o.value === aiModel)?.provider ?? '')
       : undefined
 
     const planModel = selectedDefaultPlanningModel.value
     const planProv = planModel
-      ? (aiModelOptions.value.find((o) => o.value === planModel)?.provider ?? '')
+      ? (aiModelFlatOptions.value.find((o) => o.value === planModel)?.provider ?? '')
       : undefined
 
     await Promise.all([
@@ -618,7 +626,8 @@ const passwordLoading = computed(() => passwordSaving.value)
                   :options="aiModelOptions"
                   option-label="label"
                   option-value="value"
-                  option-group-label="provider"
+                  option-group-label="label"
+                  option-group-children="items"
                   placeholder="Use admin default"
                   show-clear
                   :loading="aiModelsLoading"
@@ -639,6 +648,8 @@ const passwordLoading = computed(() => passwordSaving.value)
                   :options="aiModelOptions"
                   option-label="label"
                   option-value="value"
+                  option-group-label="label"
+                  option-group-children="items"
                   placeholder="Use admin default"
                   show-clear
                   :loading="aiModelsLoading"
