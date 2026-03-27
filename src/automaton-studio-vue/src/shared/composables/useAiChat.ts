@@ -531,29 +531,39 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           )
 
           if (existingMessage) {
-            // Check if this is a completely different message (not just streaming continuation)
-            // Detect if the new content doesn't START with the existing content
-            const isNewMessage = existingMessage.content.length > 50 &&
-                                !message.content.startsWith(existingMessage.content.substring(0, 30))
+            // Retry notifications (⏳) update the existing notification in-place so they
+            // don't accumulate separate bubbles for each retry attempt.
+            const isRetryNotification =
+              message.content.startsWith('⏳') && existingMessage.content.startsWith('⏳')
 
-            if (isNewMessage) {
-              console.log('[useAiChat] Detected new message (not streaming continuation), preserving existing message')
-
-              // Mark existing message as complete and stamp the model
-              existingMessage.isStreaming = false
-              existingMessage.model = selectedModel.value || undefined
-
-              // Add new message for the summary (will appear after tool messages)
-              messages.value.push({
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: message.content,
-                timestamp: new Date(),
-                isStreaming: true,
-              })
-            } else {
-              // Streaming continuation - update existing message
+            if (isRetryNotification) {
               existingMessage.content = message.content
+            } else {
+              // A streaming continuation always EXTENDS the current content (the backend
+              // sends the full accumulated text, not deltas).  If the new content doesn't
+              // start with everything we've already shown, it's a completely different
+              // message (e.g. the real AI reply arriving after a ⏳ retry notification).
+              const isNewMessage = !message.content.startsWith(existingMessage.content)
+
+              if (isNewMessage) {
+                console.log('[useAiChat] Detected new message (not streaming continuation), preserving existing message')
+
+                // Mark existing message as complete and stamp the model
+                existingMessage.isStreaming = false
+                existingMessage.model = selectedModel.value || undefined
+
+                // Add new message for the summary (will appear after tool messages)
+                messages.value.push({
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  content: message.content,
+                  timestamp: new Date(),
+                  isStreaming: true,
+                })
+              } else {
+                // Streaming continuation - update existing message
+                existingMessage.content = message.content
+              }
             }
           } else {
             // Add new assistant message
