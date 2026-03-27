@@ -501,7 +501,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         },
       })
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to send message'
+      error.value = 'Something went wrong. Please try again in a moment.'
       isGenerating.value = false
       console.error('Error sending message:', err)
     }

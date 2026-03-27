@@ -641,11 +641,6 @@ function handleKeyPress(event: KeyboardEvent) {
         </div>
       </div>
 
-      <!-- Error message -->
-      <div v-if="error" class="error-banner">
-        <i class="pi pi-exclamation-triangle mr-2"></i>
-        {{ error }}
-      </div>
 
       <!-- Messages area -->
       <div class="messages-area">
@@ -1035,11 +1030,8 @@ function handleKeyPress(event: KeyboardEvent) {
   min-width: 120px;
   font-size: 0.875rem;
 }
-.error-banner {
-  background-color: var(--p-red-100);
-  color: var(--p-red-900);
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+
+
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--p-red-200);
@@ -1371,11 +1363,8 @@ function handleKeyPress(event: KeyboardEvent) {
   border-color: var(--p-surface-700);
 }
 
-:global(.app-dark) .error-banner {
-  background-color: var(--p-red-900);
-  color: var(--p-red-100);
-  border-color: var(--p-red-800);
-}
+
+
 
 :global(.app-dark) .message-bubble {
   background-color: var(--p-primary-600);
