@@ -139,8 +139,9 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     {
                         var delaySecs = (int)args.RetryDelay.TotalSeconds;
                         _logger.LogWarning(
-                            "{Provider} rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
-                            ProviderName, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                            "{Provider} rate limit hit (attempt {Retry}/{MaxRetries}). Model={Model}, Retrying in {Delay}s. Reason: {Error}",
+                            ProviderName, args.AttemptNumber + 1, request.MaxRateLimitRetries,
+                            request.Model, delaySecs, args.Outcome.Exception?.Message);
                         EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
                         return ValueTask.CompletedTask;
                     }

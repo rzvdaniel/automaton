@@ -142,8 +142,9 @@ public class GoogleProvider : IAiProvider
                     {
                         var delaySecs = (int)args.RetryDelay.TotalSeconds;
                         _logger.LogWarning(
-                            "Gemini rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
-                            args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                            "Gemini rate limit hit (attempt {Retry}/{MaxRetries}). Model={Model}, Retrying in {Delay}s. Reason: {Error}",
+                            args.AttemptNumber + 1, request.MaxRateLimitRetries,
+                            request.Model, delaySecs, args.Outcome.Exception?.Message);
                         EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
                         return ValueTask.CompletedTask;
                     }
