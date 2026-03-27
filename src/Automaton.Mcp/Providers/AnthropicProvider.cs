@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tool = Anthropic.SDK.Common.Tool;
@@ -181,15 +182,22 @@ public class AnthropicProvider : IAiProvider
                     MaxRetryAttempts = request.MaxRateLimitRetries,
                     Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
                     BackoffType       = DelayBackoffType.Exponential,
-                    UseJitter         = false,
+                    UseJitter         = true,
                     ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
+                    DelayGenerator    = static args =>
+                    {
+                        // Honour Anthropic's retry-after header if present in the exception message
+                        if (TryParseRetryAfter(args.Outcome.Exception, out var retryAfter))
+                            return ValueTask.FromResult<TimeSpan?>(retryAfter);
+                        return ValueTask.FromResult<TimeSpan?>(null); // fall back to exponential
+                    },
                     OnRetry           = args =>
                     {
                         var delaySecs = (int)args.RetryDelay.TotalSeconds;
                         _logger.LogWarning(
                             "Anthropic rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
-                            args.AttemptNumber, request.MaxRateLimitRetries, delaySecs);
-                        EmitRetryNotification(request.ConversationId, args.AttemptNumber, delaySecs);
+                            args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                        EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
                         return ValueTask.CompletedTask;
                     }
                 })
@@ -555,7 +563,7 @@ public class AnthropicProvider : IAiProvider
         ex.Message.Contains("rate limited", StringComparison.OrdinalIgnoreCase) ||
         ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase);
 
-    private void EmitRetryNotification(string conversationId, int attempt, int delaySeconds)
+    private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
     {
         ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
         {
@@ -563,12 +571,35 @@ public class AnthropicProvider : IAiProvider
             Messages = new List<ConversationMessage>
             {
                 new ConversationMessage("assistant",
-                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt})...")
+                    $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/{maxRetries})...")
             },
             ToolCalls = new List<ToolCall>(),
             ToolResults = new List<ToolResult>()
         });
     }
+
+    /// <summary>
+    /// Attempts to extract a <c>retry-after</c> delay from the Anthropic SDK exception message.
+    /// Anthropic 429 responses often include "retry after N" or "please retry in N seconds" in the body.
+    /// </summary>
+    private static bool TryParseRetryAfter(Exception? ex, out TimeSpan retryAfter)
+    {
+        retryAfter = TimeSpan.Zero;
+        if (ex is null) return false;
+
+        // Pattern: "retry after 30" / "retry in 30 seconds" / "retry-after: 30"
+        var match = RetryAfterPattern.Match(ex.Message);
+        if (match.Success && int.TryParse(match.Groups["secs"].Value, out var secs) && secs > 0)
+        {
+            retryAfter = TimeSpan.FromSeconds(secs);
+            return true;
+        }
+        return false;
+    }
+
+    private static readonly Regex RetryAfterPattern = new(
+        @"retry[- ](?:after|in)\D*(?<secs>\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private void EmitToolCallStarted(string conversationId, string toolCallId, string toolName, string argsJson)
     {

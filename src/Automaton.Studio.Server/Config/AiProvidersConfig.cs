@@ -100,9 +100,10 @@ public class RateLimitRetryConfig
 
     /// <summary>
     /// Initial delay in seconds for exponential backoff. Subsequent retries double this value.
-    /// Default: 64s  (64 → 128 → 256). Minimum useful value for Anthropic Tier 1 (50K TPM limit).
+    /// Default: 30s  (30 → 60 → 120). The provider will use the <c>retry-after</c> header
+    /// from Anthropic's 429 response when available, overriding this value.
     /// </summary>
-    public int InitialDelaySeconds { get; set; } = 64;
+    public int InitialDelaySeconds { get; set; } = 30;
 }
 
 public static class AiProvidersConfigExtensions
