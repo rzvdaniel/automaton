@@ -405,7 +405,42 @@ public abstract class AiConversationControllerBase : BaseController
     }
 
     protected async Task WriteErrorEvent(string message) =>
-        await WriteEvent("error", new { error = message });
+        await WriteEvent("error", new { error = SanitizeErrorMessage(message) });
+
+    /// <summary>
+    /// Translates raw provider error messages to user-friendly text and strips
+    /// any sensitive data (API keys, org IDs) that must not reach the browser.
+    /// </summary>
+    private static string SanitizeErrorMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return message;
+
+        // Billing / quota errors — permanent, actionable by the user
+        if (message.Contains("exceeded_current_quota", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("insufficient_quota",     StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("quota_exceeded",         StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("insufficient balance",   StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("suspended",              StringComparison.OrdinalIgnoreCase))
+            return "Your AI provider account has insufficient balance. Please recharge your account or check your plan.";
+
+        // Authentication errors
+        if (message.Contains("invalid_authentication", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("401",                    StringComparison.OrdinalIgnoreCase))
+            return "Authentication failed. Please check your API key configuration.";
+
+        // Rate limit errors that somehow weren't retried
+        if (message.Contains("rate_limit",        StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("429",               StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Too Many Requests", StringComparison.OrdinalIgnoreCase))
+            return "The AI provider rate limit was exceeded. Please try again in a moment.";
+
+        // Strip API keys (ak_xxx pattern) and org IDs from any other message
+        // to prevent accidental credential leakage in unexpected error shapes.
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(
+            message, @"\b(ak[-_][A-Za-z0-9]+|org-[A-Za-z0-9]+)\b", "[redacted]");
+
+        return sanitized;
+    }
 
     protected async Task WriteEvent(string eventType, object data)
     {

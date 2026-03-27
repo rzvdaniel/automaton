@@ -484,10 +484,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           })
         },
         onError: (data) => {
-          error.value = data.error
           isGenerating.value = false
 
-          // Add error message to chat
+          // Add error message to chat — the in-chat message is the canonical error display;
+          // don't also set error.value to avoid showing the same message twice.
           messages.value.push({
             id: crypto.randomUUID(),
             role: 'assistant',
