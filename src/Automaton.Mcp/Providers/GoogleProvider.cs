@@ -1,11 +1,14 @@
 using Automaton.Mcp.Models;
 using Automaton.Mcp.SystemPrompts;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Automaton.Mcp.Client.Providers;
 
@@ -120,34 +123,78 @@ public class GoogleProvider : IAiProvider
             var lastEmitTime = DateTime.UtcNow;
             const int emitIntervalMs = 100;
 
-            await foreach (var chunk in StreamGenerateContentAsync(
-                request.Model ?? DefaultModel,
-                request.ApiKey,
-                request.SystemPrompt,
-                contents,
-                toolList,
-                cancellationToken))
-            {
-                if (chunk.InputTokens.HasValue) iterInputTokens = chunk.InputTokens;
-                if (chunk.OutputTokens.HasValue) iterOutputTokens = chunk.OutputTokens;
-                if (chunk.ModelVersion != null) modelVersion = chunk.ModelVersion;
-
-                if (!string.IsNullOrEmpty(chunk.TextDelta))
+            // Rate-limit retry pipeline — same strategy as Anthropic/OpenAI providers
+            var retryPipeline = new ResiliencePipelineBuilder()
+                .AddRetry(new RetryStrategyOptions
                 {
-                    currentText.Append(chunk.TextDelta);
-
-                    // Throttle streaming updates (same pattern as Anthropic)
-                    var now = DateTime.UtcNow;
-                    if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
+                    MaxRetryAttempts = request.MaxRateLimitRetries,
+                    Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
+                    BackoffType       = DelayBackoffType.Exponential,
+                    UseJitter         = true,
+                    ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
+                    DelayGenerator    = static args =>
                     {
-                        EmitStreamingTextUpdate(request.ConversationId, currentText.ToString(), isComplete: false);
-                        lastEmitTime = now;
+                        if (TryParseRetryAfter(args.Outcome.Exception, out var retryAfter))
+                            return ValueTask.FromResult<TimeSpan?>(retryAfter);
+                        return ValueTask.FromResult<TimeSpan?>(null);
+                    },
+                    OnRetry           = args =>
+                    {
+                        var delaySecs = (int)args.RetryDelay.TotalSeconds;
+                        _logger.LogWarning(
+                            "Gemini rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
+                            args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                        EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                        return ValueTask.CompletedTask;
                     }
-                }
+                })
+                .Build();
 
-                functionCalls.AddRange(chunk.FunctionCalls);
-                rawModelParts.AddRange(chunk.RawParts);
-            }
+            // Reset per-iteration accumulators before each retry
+            currentText.Clear();
+            functionCalls.Clear();
+            rawModelParts.Clear();
+            iterInputTokens = null;
+            iterOutputTokens = null;
+
+            await retryPipeline.ExecuteAsync(async ct =>
+            {
+                currentText.Clear();
+                functionCalls.Clear();
+                rawModelParts.Clear();
+                iterInputTokens = null;
+                iterOutputTokens = null;
+
+                await foreach (var chunk in StreamGenerateContentAsync(
+                    request.Model ?? DefaultModel,
+                    request.ApiKey,
+                    request.SystemPromptParts,
+                    request.SystemPrompt,
+                    request.MaxTokens,
+                    contents,
+                    toolList,
+                    ct))
+                {
+                    if (chunk.InputTokens.HasValue) iterInputTokens = chunk.InputTokens;
+                    if (chunk.OutputTokens.HasValue) iterOutputTokens = chunk.OutputTokens;
+                    if (chunk.ModelVersion != null) modelVersion = chunk.ModelVersion;
+
+                    if (!string.IsNullOrEmpty(chunk.TextDelta))
+                    {
+                        currentText.Append(chunk.TextDelta);
+
+                        var now = DateTime.UtcNow;
+                        if ((now - lastEmitTime).TotalMilliseconds >= emitIntervalMs)
+                        {
+                            EmitStreamingTextUpdate(request.ConversationId, currentText.ToString(), isComplete: false);
+                            lastEmitTime = now;
+                        }
+                    }
+
+                    functionCalls.AddRange(chunk.FunctionCalls);
+                    rawModelParts.AddRange(chunk.RawParts);
+                }
+            }, cancellationToken);
 
             // Accumulate tokens across iterations.
             // inputTokens is cumulative in Gemini (includes all prior turns) — keep the latest value.
@@ -276,12 +323,14 @@ public class GoogleProvider : IAiProvider
     private async IAsyncEnumerable<GeminiStreamChunk> StreamGenerateContentAsync(
         string model,
         string apiKey,
-        string? systemPrompt,
+        SystemPromptParts? promptParts,
+        string? systemPromptFallback,
+        int maxTokens,
         List<Dictionary<string, object>> contents,
         List<ProviderTool> tools,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var requestBody = BuildRequestBody(systemPrompt, contents, tools);
+        var requestBody = BuildRequestBody(promptParts, systemPromptFallback, maxTokens, contents, tools);
         var json = JsonSerializer.Serialize(requestBody);
 
         using var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
@@ -455,20 +504,40 @@ public class GoogleProvider : IAiProvider
     }
 
     private static Dictionary<string, object?> BuildRequestBody(
-        string? systemPrompt,
+        SystemPromptParts? promptParts,
+        string? systemPromptFallback,
+        int maxTokens,
         List<Dictionary<string, object>> contents,
         List<ProviderTool> tools)
     {
+        // Gemini's system_instruction is a single block — put only the stable BasePrompt here.
+        // InstructionBlock + MemoryBlock are prepended as the first user turn so they sit
+        // after the cached system_instruction prefix (implicit caching on Gemini 2.5+).
+        string? basePrompt   = promptParts?.BasePrompt ?? systemPromptFallback;
+        string? extraContext = BuildExtraContext(promptParts);
+
+        var effectiveContents = contents;
+        if (!string.IsNullOrWhiteSpace(extraContext))
+        {
+            // Inject a preamble user turn with per-app/session context before conversation history
+            effectiveContents = new List<Dictionary<string, object>>
+            {
+                new() { ["role"] = "user",  ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = extraContext } } },
+                new() { ["role"] = "model", ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = "Understood." } } }
+            };
+            effectiveContents.AddRange(contents);
+        }
+
         var requestBody = new Dictionary<string, object?>
         {
-            ["contents"] = contents
+            ["contents"] = effectiveContents
         };
 
-        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        if (!string.IsNullOrWhiteSpace(basePrompt))
         {
             requestBody["system_instruction"] = new Dictionary<string, object>
             {
-                ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = systemPrompt } }
+                ["parts"] = new List<object> { new Dictionary<string, object> { ["text"] = basePrompt } }
             };
         }
 
@@ -494,16 +563,62 @@ public class GoogleProvider : IAiProvider
             // thought_signature in function calls that must be echoed verbatim. Since streaming
             // can split parts across chunks making faithful reconstruction unreliable, we simply
             // turn thinking off for tool-calling turns — matching OpenAI/Anthropic behaviour.
-            requestBody["generationConfig"] = new Dictionary<string, object>
+            requestBody["generationConfig"] = new Dictionary<string, object?>
             {
-                ["thinkingConfig"] = new Dictionary<string, object>
-                {
-                    ["thinkingBudget"] = 0
-                }
+                ["thinkingConfig"] = new Dictionary<string, object> { ["thinkingBudget"] = 0 },
+                ["maxOutputTokens"] = maxTokens > 0 ? (object?)maxTokens : null
             };
+        }
+        else if (maxTokens > 0)
+        {
+            requestBody["generationConfig"] = new Dictionary<string, object?> { ["maxOutputTokens"] = maxTokens };
         }
 
         return requestBody;
+    }
+
+    private static string? BuildExtraContext(SystemPromptParts? parts)
+    {
+        if (parts == null) return null;
+        var segments = new[] { parts.InstructionBlock, parts.MemoryBlock }
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        var joined = string.Join("\n\n", segments);
+        return string.IsNullOrWhiteSpace(joined) ? null : joined;
+    }
+
+    private static bool IsRateLimitException(Exception ex) =>
+        ex.Message.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("Too Many Requests", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryParseRetryAfter(Exception? ex, out TimeSpan retryAfter)
+    {
+        retryAfter = TimeSpan.Zero;
+        if (ex is null) return false;
+        var match = RetryAfterPattern.Match(ex.Message);
+        if (match.Success && int.TryParse(match.Groups["secs"].Value, out var secs) && secs > 0)
+        {
+            retryAfter = TimeSpan.FromSeconds(secs);
+            return true;
+        }
+        return false;
+    }
+
+    private static readonly Regex RetryAfterPattern = new(
+        @"retry[- ](?:after|in)\D*(?<secs>\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
+    {
+        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+        {
+            ConversationId = conversationId,
+            Messages = [new ConversationMessage("assistant",
+                $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/{maxRetries})...")],
+            ToolCalls = [],
+            ToolResults = []
+        });
     }
 
     private static object BuildParameterSchema(string inputSchemaJson)
