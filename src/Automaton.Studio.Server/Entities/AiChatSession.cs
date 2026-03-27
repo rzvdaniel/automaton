@@ -79,6 +79,17 @@ public class AiChatSession
     /// </summary>
     public string? ComplexityTier { get; set; }
 
+    /// <summary>
+    /// Total tokens served from Anthropic prompt cache across this session.
+    /// Non-zero only for Anthropic provider sessions with prompt caching enabled.
+    /// </summary>
+    public int TotalCacheReadTokens { get; set; } = 0;
+
+    /// <summary>
+    /// Total tokens written into Anthropic prompt cache across this session.
+    /// </summary>
+    public int TotalCacheCreationTokens { get; set; } = 0;
+
     // Navigation properties
     public virtual ICollection<AiChatMessage> Messages { get; set; } = new List<AiChatMessage>();
     public virtual ICollection<AiChatSessionUser> AiChatSessionUsers { get; set; } = new List<AiChatSessionUser>();

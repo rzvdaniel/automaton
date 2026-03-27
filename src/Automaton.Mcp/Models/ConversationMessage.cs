@@ -19,4 +19,10 @@ public record ConversationMessage(string Role, string Content)
     public int? InputTokens { get; init; }
     public int? OutputTokens { get; init; }
     public string? Model { get; init; }
+
+    /// <summary>
+    /// Anthropic prompt cache stats (null for non-Anthropic providers or when cache is not involved)
+    /// </summary>
+    public int? CacheReadTokens { get; init; }
+    public int? CacheCreationTokens { get; init; }
 }

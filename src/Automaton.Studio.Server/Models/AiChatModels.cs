@@ -26,6 +26,8 @@ public class ChatSessionDto
     public int TotalInputTokens { get; set; }
     public int TotalOutputTokens { get; set; }
     public int TotalTokens { get; set; }
+    public int TotalCacheReadTokens { get; set; }
+    public int TotalCacheCreationTokens { get; set; }
 
     /// <summary>
     /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
@@ -80,6 +82,10 @@ public class SaveChatMessageRequest
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
     public string? Model { get; set; }
+
+    // Anthropic prompt cache stats
+    public int? CacheReadTokens { get; set; }
+    public int? CacheCreationTokens { get; set; }
 }
 
 /// <summary>
@@ -143,6 +149,8 @@ public class AppChatStatsDto
     public int InputTokens { get; set; }
     public int OutputTokens { get; set; }
     public int SessionCount { get; set; }
+    public int TotalCacheReadTokens { get; set; }
+    public int TotalCacheCreationTokens { get; set; }
 }
 
 /// <summary>

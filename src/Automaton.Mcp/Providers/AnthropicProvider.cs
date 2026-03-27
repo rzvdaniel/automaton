@@ -497,7 +497,12 @@ public class AnthropicProvider : IAiProvider
             // Use accumulated totals so multi-turn conversations report correct cumulative usage
             var emitInput = result.InputTokens.HasValue ? result.InputTokens : accumulatedInputTokens;
             var emitOutput = accumulatedOutputTokens + (result.OutputTokens ?? 0);
-            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true, inputTokens: emitInput, outputTokens: emitOutput > 0 ? emitOutput : null, model: result.Model);
+            EmitStreamingTextUpdate(conversationId, finalText, isComplete: true,
+                inputTokens: emitInput,
+                outputTokens: emitOutput > 0 ? emitOutput : null,
+                model: result.Model,
+                cacheReadTokens: result.CacheReadTokens,
+                cacheCreationTokens: result.CacheCreationTokens);
             result.TextContent = finalText;
         }
 
@@ -631,7 +636,7 @@ public class AnthropicProvider : IAiProvider
         }
     }
 
-    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete, int? inputTokens = null, int? outputTokens = null, string? model = null)
+    private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete, int? inputTokens = null, int? outputTokens = null, string? model = null, int? cacheReadTokens = null, int? cacheCreationTokens = null)
     {
         try
         {
@@ -652,7 +657,9 @@ public class AnthropicProvider : IAiProvider
                 IsStreaming = !isComplete,
                 InputTokens = isComplete ? inputTokens : null,
                 OutputTokens = isComplete ? outputTokens : null,
-                Model = isComplete ? model : null
+                Model = isComplete ? model : null,
+                CacheReadTokens = isComplete ? cacheReadTokens : null,
+                CacheCreationTokens = isComplete ? cacheCreationTokens : null,
             };
 
             ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent

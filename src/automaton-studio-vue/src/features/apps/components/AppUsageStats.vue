@@ -223,6 +223,15 @@ const hasData = computed(() => sessions.value.length > 0)
             <div class="stat-label">Sessions</div>
           </div>
         </div>
+        <div v-if="(stats?.totalCacheReadTokens ?? 0) > 0" class="stat-card stat-card--accent">
+          <div class="stat-icon">
+            <i class="pi pi-database"></i>
+          </div>
+          <div class="stat-body">
+            <div class="stat-value">{{ formatTokens(stats?.totalCacheReadTokens ?? 0) }}</div>
+            <div class="stat-label">Cache Saved</div>
+          </div>
+        </div>
       </div>
 
       <!-- Charts Row 1: Tokens per session + Token split -->
@@ -312,6 +321,11 @@ const hasData = computed(() => sessions.value.length > 0)
   border-radius: 8px;
   background: var(--p-surface-card);
   border: 1px solid var(--p-surface-border);
+}
+
+.stat-card--accent {
+  border-color: var(--p-green-300);
+  background: color-mix(in srgb, var(--p-green-500) 8%, var(--p-surface-card));
 }
 
 .stat-icon {

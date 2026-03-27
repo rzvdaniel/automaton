@@ -210,6 +210,8 @@ export interface ChatSession {
   totalInputTokens: number
   totalOutputTokens: number
   totalTokens: number
+  totalCacheReadTokens: number
+  totalCacheCreationTokens: number
 }
 
 export interface PagedResult<T> {
@@ -291,6 +293,8 @@ export interface AppChatStats {
   inputTokens: number
   outputTokens: number
   sessionCount: number
+  totalCacheReadTokens: number
+  totalCacheCreationTokens: number
 }
 
 // ============================================

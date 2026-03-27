@@ -84,7 +84,7 @@ public interface IAiChatHistoryService
     /// Add input/output token counts to a session's running totals without saving a message.
     /// Used for AI turns that consist purely of tool calls (no text content to persist).
     /// </summary>
-    Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens);
+    Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens, int? cacheReadTokens = null, int? cacheCreationTokens = null);
 
     /// <summary>
     /// Add LLM API call count to a session's running total.

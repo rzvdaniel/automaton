@@ -319,8 +319,8 @@ public abstract class AiConversationControllerBase : BaseController
                 // Token-only update (pure tool-call turn, no text) — accumulate tokens without saving a blank message.
                 if (string.IsNullOrEmpty(message.Content))
                 {
-                    if (message.InputTokens.HasValue || message.OutputTokens.HasValue)
-                        await _chatHistoryService.AccumulateTokensAsync(sessionId, userId, message.InputTokens, message.OutputTokens);
+                    if (message.InputTokens.HasValue || message.OutputTokens.HasValue || message.CacheReadTokens.HasValue || message.CacheCreationTokens.HasValue)
+                        await _chatHistoryService.AccumulateTokensAsync(sessionId, userId, message.InputTokens, message.OutputTokens, message.CacheReadTokens, message.CacheCreationTokens);
                     continue;
                 }
 
@@ -333,6 +333,8 @@ public abstract class AiConversationControllerBase : BaseController
                     InputTokens = message.InputTokens,
                     OutputTokens = message.OutputTokens,
                     Model = message.Model,
+                    CacheReadTokens = message.CacheReadTokens,
+                    CacheCreationTokens = message.CacheCreationTokens,
                     Metadata = "{}"
                 }, userId);
             }

@@ -61,6 +61,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens,
+                    TotalCacheReadTokens = s.TotalCacheReadTokens,
+                    TotalCacheCreationTokens = s.TotalCacheCreationTokens,
                     ComplexityTier = s.ComplexityTier
                 })
                 .ToListAsync();
@@ -106,6 +108,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens,
+                    TotalCacheReadTokens = s.TotalCacheReadTokens,
+                    TotalCacheCreationTokens = s.TotalCacheCreationTokens,
                     ComplexityTier = s.ComplexityTier
                 })
                 .FirstOrDefaultAsync();
@@ -220,7 +224,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalApiCalls = s.TotalApiCalls,
                     TotalInputTokens = s.TotalInputTokens,
                     TotalOutputTokens = s.TotalOutputTokens,
-                    TotalTokens = s.TotalTokens
+                    TotalTokens = s.TotalTokens,
+                    TotalCacheReadTokens = s.TotalCacheReadTokens,
+                    TotalCacheCreationTokens = s.TotalCacheCreationTokens
                 })
                 .FirstOrDefaultAsync();
 
@@ -494,6 +500,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                     session.TotalTokens += totalTokens.Value;
                 }
 
+                if (request.CacheReadTokens.HasValue) session.TotalCacheReadTokens += request.CacheReadTokens.Value;
+                if (request.CacheCreationTokens.HasValue) session.TotalCacheCreationTokens += request.CacheCreationTokens.Value;
+
                 // If this is a WebApp session, cascade updates to the app entity
                 if (session.ResourceType == ChatResourceType.WebApp)
                 {
@@ -656,9 +665,9 @@ public class AiChatHistoryService : IAiChatHistoryService
         }
     }
 
-    public async Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens)
+    public async Task AccumulateTokensAsync(Guid sessionId, Guid userId, int? inputTokens, int? outputTokens, int? cacheReadTokens = null, int? cacheCreationTokens = null)
     {
-        if (!inputTokens.HasValue && !outputTokens.HasValue) return;
+        if (!inputTokens.HasValue && !outputTokens.HasValue && !cacheReadTokens.HasValue && !cacheCreationTokens.HasValue) return;
         try
         {
             var session = await dataContext.AiChatSessions
@@ -672,6 +681,9 @@ public class AiChatHistoryService : IAiChatHistoryService
             if (outputTokens.HasValue) session.TotalOutputTokens += outputTokens.Value;
             if (inputTokens.HasValue || outputTokens.HasValue)
                 session.TotalTokens += (inputTokens ?? 0) + (outputTokens ?? 0);
+
+            if (cacheReadTokens.HasValue) session.TotalCacheReadTokens += cacheReadTokens.Value;
+            if (cacheCreationTokens.HasValue) session.TotalCacheCreationTokens += cacheCreationTokens.Value;
 
             session.UpdatedAt = DateTime.UtcNow;
             await dataContext.SaveChangesAsync();
@@ -766,7 +778,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                 TotalTokens = sessions.Sum(s => s.TotalTokens),
                 InputTokens = sessions.Sum(s => s.TotalInputTokens),
                 OutputTokens = sessions.Sum(s => s.TotalOutputTokens),
-                SessionCount = sessions.Count
+                SessionCount = sessions.Count,
+                TotalCacheReadTokens = sessions.Sum(s => s.TotalCacheReadTokens),
+                TotalCacheCreationTokens = sessions.Sum(s => s.TotalCacheCreationTokens)
             };
 
             return stats;

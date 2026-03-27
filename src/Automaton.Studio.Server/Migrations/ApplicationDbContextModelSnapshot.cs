@@ -162,6 +162,12 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<int>("TotalApiCalls")
                         .HasColumnType("int");
 
+                    b.Property<int>("TotalCacheCreationTokens")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalCacheReadTokens")
+                        .HasColumnType("int");
+
                     b.Property<int>("TotalInputTokens")
                         .HasColumnType("int");
 
