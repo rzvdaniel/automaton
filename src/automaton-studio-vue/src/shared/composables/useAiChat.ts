@@ -576,6 +576,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
                   content: message.content,
                   timestamp: new Date(),
                   isStreaming: true,
+                  reasoningContent: message.reasoningContent,
                 })
               } else {
                 // Streaming continuation - update existing message
@@ -590,6 +591,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
               content: message.content,
               timestamp: new Date(),
               isStreaming: true,
+              reasoningContent: message.reasoningContent,
             })
           }
         }

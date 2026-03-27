@@ -16,6 +16,7 @@ import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
+import ReasoningBlock from './ReasoningBlock.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
 // Props
@@ -702,9 +703,15 @@ function handleKeyPress(event: KeyboardEvent) {
                     {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
                   <!-- Regular AI message -->
-                  <div v-else class="message-text">
-                    {{ group.message.content }}
-                  </div>
+                  <template v-else>
+                    <ReasoningBlock
+                      v-if="group.message.reasoningContent"
+                      :content="group.message.reasoningContent"
+                    />
+                    <div class="message-text">
+                      {{ group.message.content }}
+                    </div>
+                  </template>
                   <!-- Model badge: only shown once model is resolved (not during streaming) -->
                   <span v-if="group.message.model && !group.message.isStreaming" class="message-model-badge">
                     <i class="pi pi-microchip-ai"></i>{{ group.message.model }}

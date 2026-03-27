@@ -163,7 +163,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     EmitStreamingText(request.ConversationId, finalText, isComplete: true,
                         inputTokens: totalInputTokens,
                         outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
-                        model: responseModel);
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText);
                     responseBuilder.AppendLine(finalText);
                 }
                 break;
@@ -175,7 +176,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 EmitStreamingText(request.ConversationId, finalText, isComplete: true,
                     inputTokens: totalInputTokens,
                     outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
-                    model: responseModel);
+                    model: responseModel,
+                    reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText);
             }
 
             // Append assistant message (with tool calls) to conversation.
@@ -476,7 +478,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
     }
 
     private void EmitStreamingText(string conversationId, string text, bool isComplete,
-        int? inputTokens = null, int? outputTokens = null, string? model = null)
+        int? inputTokens = null, int? outputTokens = null, string? model = null,
+        string? reasoningContent = null)
     {
         if (string.IsNullOrEmpty(text)) return;
 
@@ -485,7 +488,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             IsStreaming = !isComplete,
             InputTokens = isComplete ? inputTokens : null,
             OutputTokens = isComplete ? outputTokens : null,
-            Model = isComplete ? model : null
+            Model = isComplete ? model : null,
+            ReasoningContent = isComplete ? reasoningContent : null
         };
 
         ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
