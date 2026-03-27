@@ -53,10 +53,11 @@ async function sendMessage() {
       timestamp: new Date(),
     })
   } catch (error) {
+    console.error('Error sending message:', error)
     messages.value.push({
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: `Error: ${error instanceof Error ? error.message : 'Failed to process request. Please try again.'}`,
+      content: 'An error occurred while processing your request. Please try again.',
       timestamp: new Date(),
     })
   } finally {
