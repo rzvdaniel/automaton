@@ -139,7 +139,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 })
                 .Build();
 
-            (string finalText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)
+            (string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)
                 streamResult = default;
             await retryPipeline.ExecuteAsync(async ct =>
             {
@@ -151,6 +151,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (streamResult.outputTokens.HasValue) totalOutputTokens += streamResult.outputTokens.Value;
 
             var finalText = streamResult.finalText;
+            var reasoningText = streamResult.reasoningText;
             var toolCalls = streamResult.toolCalls;
             var responseModel = streamResult.responseModel ?? model;
 
@@ -177,15 +178,43 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     model: responseModel);
             }
 
-            // Append assistant message (with tool calls) to conversation
-            var assistantMessage = new AssistantChatMessage(
-                toolCalls.Select(tc => ChatToolCall.CreateFunctionToolCall(
-                    tc.Id, tc.FunctionName, BinaryData.FromString(tc.ArgumentsBuilder.ToString()))).ToList())
+            // Append assistant message (with tool calls) to conversation.
+            // Thinking models (e.g. Moonshot kimi-k2.5) require reasoning_content to be echoed
+            // back in the assistant message — the OpenAI SDK doesn't support this natively.
+            // We build raw JSON and round-trip through ModelReaderWriter so the field is preserved
+            // in SerializedAdditionalRawData and re-sent to the API on the next call.
+            ChatMessage assistantMessage;
+            if (!string.IsNullOrEmpty(reasoningText))
             {
-                Content = { }
-            };
-            if (!string.IsNullOrWhiteSpace(finalText))
-                assistantMessage.Content.Add(ChatMessageContentPart.CreateTextPart(finalText));
+                var toolCallNodes = toolCalls.Select(tc => new
+                {
+                    id = tc.Id,
+                    type = "function",
+                    function = new { name = tc.FunctionName, arguments = tc.ArgumentsBuilder.ToString() }
+                });
+                var msgJson = JsonSerializer.Serialize(new
+                {
+                    role = "assistant",
+                    reasoning_content = reasoningText,
+                    content = string.IsNullOrWhiteSpace(finalText) ? "" : finalText,
+                    tool_calls = toolCallNodes
+                });
+                assistantMessage = System.ClientModel.Primitives.ModelReaderWriter.Read<ChatMessage>(
+                    BinaryData.FromString(msgJson),
+                    System.ClientModel.Primitives.ModelReaderWriterOptions.Json)!;
+            }
+            else
+            {
+                var typed = new AssistantChatMessage(
+                    toolCalls.Select(tc => ChatToolCall.CreateFunctionToolCall(
+                        tc.Id, tc.FunctionName, BinaryData.FromString(tc.ArgumentsBuilder.ToString()))).ToList())
+                {
+                    Content = { }
+                };
+                if (!string.IsNullOrWhiteSpace(finalText))
+                    typed.Content.Add(ChatMessageContentPart.CreateTextPart(finalText));
+                assistantMessage = typed;
+            }
             messages.Add(assistantMessage);
 
             var shouldStop = false;
@@ -246,11 +275,12 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
-    private async Task<(string finalText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)>
+    private async Task<(string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)>
         StreamOnceAsync(ChatClient client, List<ChatMessage> messages, ChatCompletionOptions options,
             string conversationId, CancellationToken cancellationToken)
     {
         var currentText = new StringBuilder();
+        var reasoningText = new StringBuilder();
         var toolCallAccumulators = new Dictionary<int, ToolCallAccumulator>();
         int? inputTokens = null;
         int? outputTokens = null;
@@ -261,6 +291,32 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var streamingUpdate = client.CompleteChatStreamingAsync(messages, options, cancellationToken);
         await foreach (var chunk in streamingUpdate)
         {
+            // Extract reasoning_content from raw chunk JSON.
+            // Thinking models (e.g. Moonshot kimi-k2.5) emit it as a non-standard delta field
+            // that the OpenAI SDK ignores. We must capture it here so we can replay it back in
+            // the AssistantChatMessage when the model uses tools — the API rejects the message
+            // without it ("reasoning_content is missing in assistant tool call message").
+            try
+            {
+                var rawBytes = System.ClientModel.Primitives.ModelReaderWriter.Write(chunk,
+                    System.ClientModel.Primitives.ModelReaderWriterOptions.Json);
+                using var doc = JsonDocument.Parse(rawBytes);
+                if (doc.RootElement.TryGetProperty("choices", out var choices) &&
+                    choices.GetArrayLength() > 0 &&
+                    choices[0].TryGetProperty("delta", out var delta) &&
+                    delta.TryGetProperty("reasoning_content", out var rc) &&
+                    rc.ValueKind == JsonValueKind.String)
+                {
+                    var rcText = rc.GetString();
+                    if (!string.IsNullOrEmpty(rcText))
+                        reasoningText.Append(rcText);
+                }
+            }
+            catch
+            {
+                // Non-thinking models won't have this field — silently ignore
+            }
+
             foreach (var part in chunk.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
@@ -299,7 +355,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 responseModel = chunk.Model;
         }
 
-        return (currentText.ToString(),
+        return (currentText.ToString(), reasoningText.ToString(),
                 toolCallAccumulators.Values.OrderBy(t => t.Index).ToList(),
                 inputTokens, outputTokens, responseModel);
     }
