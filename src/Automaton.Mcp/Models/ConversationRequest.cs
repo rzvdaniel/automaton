@@ -4,8 +4,10 @@ namespace Automaton.Mcp.Models;
 
 /// <summary>
 /// Carries the system prompt split into stable and dynamic parts for provider-level caching.
-/// AnthropicProvider places cache_control only on <see cref="BasePrompt"/> so that the
-/// per-app instruction and per-session memory blocks never invalidate the cache.
+/// AnthropicProvider places cache_control only on <see cref="BasePrompt"/> (explicit caching).
+/// OpenAiCompatibleProvider sends each part as a separate SystemChatMessage so OpenAI's
+/// automatic prefix caching hits on the stable <see cref="BasePrompt"/> without being
+/// invalidated by per-app instructions or per-session memory.
 /// Other providers receive the concatenated <see cref="Full"/> string.
 /// </summary>
 public record SystemPromptParts(string BasePrompt, string? InstructionBlock = null, string? MemoryBlock = null)

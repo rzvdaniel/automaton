@@ -379,9 +379,21 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
     {
         var messages = new List<ChatMessage>();
 
-        var systemPrompt = request.SystemPromptParts?.Full ?? request.SystemPrompt;
-        if (!string.IsNullOrEmpty(systemPrompt))
-            messages.Add(new SystemChatMessage(systemPrompt));
+        // Split system prompt into separate messages so OpenAI's automatic prefix caching
+        // can hit on the stable BasePrompt. Sending them as one concatenated string would
+        // invalidate the cache on every request because InstructionBlock/MemoryBlock change.
+        if (request.SystemPromptParts != null)
+        {
+            messages.Add(new SystemChatMessage(request.SystemPromptParts.BasePrompt));
+            if (!string.IsNullOrWhiteSpace(request.SystemPromptParts.InstructionBlock))
+                messages.Add(new SystemChatMessage(request.SystemPromptParts.InstructionBlock));
+            if (!string.IsNullOrWhiteSpace(request.SystemPromptParts.MemoryBlock))
+                messages.Add(new SystemChatMessage(request.SystemPromptParts.MemoryBlock));
+        }
+        else if (!string.IsNullOrEmpty(request.SystemPrompt))
+        {
+            messages.Add(new SystemChatMessage(request.SystemPrompt));
+        }
 
         if (request.ConversationHistory?.Count > 0)
         {
