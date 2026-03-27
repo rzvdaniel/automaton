@@ -31,6 +31,14 @@ public static class ServiceCollectionExtensions
             // Register Google Gemini provider
             var googleProvider = new GoogleProvider(logger.CreateLogger("GoogleProvider"));
             registry.Register(googleProvider);
+
+            // Register Moonshot (Kimi) — OpenAI Chat Completions-compatible
+            var moonshotProvider = new OpenAiCompatibleProvider(
+                providerName: "Moonshot",
+                baseUrl: "https://api.moonshot.cn/v1",
+                defaultModel: "kimi-k2-5",
+                logger: logger.CreateLogger("MoonshotProvider"));
+            registry.Register(moonshotProvider);
             
             return registry;
         });
