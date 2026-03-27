@@ -66,18 +66,6 @@ public class GoogleProvider : IAiProvider
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling Google Gemini API");
-
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                Messages = new List<ConversationMessage>
-                {
-                    new ConversationMessage("assistant", $"Error: {ex.Message}")
-                },
-                ToolCalls = new List<ToolCall>(),
-                ToolResults = new List<ToolResult>()
-            });
-
             throw;
         }
     }

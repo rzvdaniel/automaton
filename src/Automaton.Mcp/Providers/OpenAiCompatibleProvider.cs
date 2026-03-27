@@ -59,15 +59,6 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calling {Provider} API", ProviderName);
-
-            ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
-            {
-                ConversationId = request.ConversationId,
-                Messages = [new ConversationMessage("assistant", $"Error: {ex.Message}")],
-                ToolCalls = [],
-                ToolResults = []
-            });
-
             throw;
         }
     }
