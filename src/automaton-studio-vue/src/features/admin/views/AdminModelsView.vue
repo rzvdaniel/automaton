@@ -504,7 +504,7 @@ function goBackToProviders() {
 
         <!-- Cost -->
         <div>
-          <label class="font-medium block mb-2">Cost per 1K Tokens</label>
+          <label class="font-medium block mb-2">Cost per 1M Tokens</label>
           <div class="flex gap-4">
             <div class="flex flex-column gap-2 flex-1">
               <label for="costInput" class="text-sm text-color-secondary">Input</label>
