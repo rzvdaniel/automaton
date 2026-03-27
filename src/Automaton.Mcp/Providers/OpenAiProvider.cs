@@ -1,10 +1,13 @@
 using Automaton.Mcp.Models;
 using Automaton.Mcp.SystemPrompts;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Automaton.Mcp.Client.Providers;
 
@@ -189,7 +192,17 @@ public class OpenAiProvider : IAiProvider
     {
         var inputItems = new List<object>();
 
-        if (!string.IsNullOrEmpty(request.SystemPrompt))
+        // Send each part as a separate system message so OpenAI's automatic prefix caching
+        // hits on the stable BasePrompt without being invalidated by per-app/session content.
+        if (request.SystemPromptParts != null)
+        {
+            inputItems.Add(CreateInputMessage("system", request.SystemPromptParts.BasePrompt));
+            if (!string.IsNullOrWhiteSpace(request.SystemPromptParts.InstructionBlock))
+                inputItems.Add(CreateInputMessage("system", request.SystemPromptParts.InstructionBlock));
+            if (!string.IsNullOrWhiteSpace(request.SystemPromptParts.MemoryBlock))
+                inputItems.Add(CreateInputMessage("system", request.SystemPromptParts.MemoryBlock));
+        }
+        else if (!string.IsNullOrEmpty(request.SystemPrompt))
         {
             inputItems.Add(CreateInputMessage("system", request.SystemPrompt));
         }
@@ -264,11 +277,40 @@ public class OpenAiProvider : IAiProvider
                     break;
                 }
 
-                var response = await CreateResponsesAsync(
-                    request.Model ?? DefaultModel,
-                    request.ApiKey,
-                    inputItems,
-                    toolDefinitions,
+                var retryPipeline = new ResiliencePipelineBuilder()
+                    .AddRetry(new RetryStrategyOptions
+                    {
+                        MaxRetryAttempts = request.MaxRateLimitRetries,
+                        Delay             = TimeSpan.FromSeconds(request.RateLimitRetryInitialDelaySeconds),
+                        BackoffType       = DelayBackoffType.Exponential,
+                        UseJitter         = true,
+                        ShouldHandle      = new PredicateBuilder().Handle<Exception>(IsRateLimitException),
+                        DelayGenerator    = static args =>
+                        {
+                            if (TryParseRetryAfter(args.Outcome.Exception, out var retryAfter))
+                                return ValueTask.FromResult<TimeSpan?>(retryAfter);
+                            return ValueTask.FromResult<TimeSpan?>(null);
+                        },
+                        OnRetry           = args =>
+                        {
+                            var delaySecs = (int)args.RetryDelay.TotalSeconds;
+                            _logger.LogWarning(
+                                "OpenAI rate limit hit (attempt {Retry}/{MaxRetries}). Retrying in {Delay}s",
+                                args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                            EmitRetryNotification(request.ConversationId, args.AttemptNumber + 1, request.MaxRateLimitRetries, delaySecs);
+                            return ValueTask.CompletedTask;
+                        }
+                    })
+                    .Build();
+
+                var response = await retryPipeline.ExecuteAsync(async ct =>
+                    await CreateResponsesAsync(
+                        request.Model ?? DefaultModel,
+                        request.ApiKey,
+                        request.MaxTokens,
+                        inputItems,
+                        toolDefinitions,
+                        ct),
                     cancellationToken);
 
                 // Accumulate tokens across iterations.
@@ -381,17 +423,21 @@ public class OpenAiProvider : IAiProvider
     private async Task<ResponsesApiResult> CreateResponsesAsync(
         string model,
         string apiKey,
+        int maxTokens,
         List<object> input,
         List<Dictionary<string, object?>> tools,
         CancellationToken cancellationToken)
     {
         var requestBody = new Dictionary<string, object?>
         {
-            ["model"] = model,
-            ["input"] = input,
-            ["tools"] = tools,
+            ["model"]       = model,
+            ["input"]       = input,
+            ["tools"]       = tools,
             ["tool_choice"] = tools.Count > 0 ? "auto" : "none"
         };
+
+        if (maxTokens > 0)
+            requestBody["max_output_tokens"] = maxTokens;
 
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "responses")
         {
@@ -552,6 +598,41 @@ public class OpenAiProvider : IAiProvider
         }
 
         return builder.ToString();
+    }
+
+    private static bool IsRateLimitException(Exception ex) =>
+        ex.Message.Contains("rate_limit", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("rate limited", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("429", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("Too Many Requests", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryParseRetryAfter(Exception? ex, out TimeSpan retryAfter)
+    {
+        retryAfter = TimeSpan.Zero;
+        if (ex is null) return false;
+        var match = RetryAfterPattern.Match(ex.Message);
+        if (match.Success && int.TryParse(match.Groups["secs"].Value, out var secs) && secs > 0)
+        {
+            retryAfter = TimeSpan.FromSeconds(secs);
+            return true;
+        }
+        return false;
+    }
+
+    private static readonly Regex RetryAfterPattern = new(
+        @"retry[- ](?:after|in)\D*(?<secs>\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
+    {
+        ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
+        {
+            ConversationId = conversationId,
+            Messages = [new ConversationMessage("assistant",
+                $"⏳ Rate limit reached. Retrying in {delaySeconds}s (attempt {attempt}/{maxRetries})...")],
+            ToolCalls = [],
+            ToolResults = []
+        });
     }
 
     private List<object> FilterOutputItemsForInput(List<JsonElement> outputItems)
