@@ -45,8 +45,8 @@ public class FileIoTool : IMcpTool
             {
                 Name = WriteFileName,
                 Capability = ToolCapability.Write,
-                Description = "Write a file. Creates directories as needed.",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}""")
+                Description = "Write a file with concrete content. Creates directories as needed. Empty/whitespace content is blocked by default to prevent accidental file wipes; pass allowEmpty=true only when intentionally writing a blank file.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"allowEmpty":{"type":"boolean","description":"Set true only when intentionally writing an empty/whitespace file."}},"required":["path","content"]}""")
             },
             new McpTool
             {
@@ -182,6 +182,27 @@ public class FileIoTool : IMcpTool
 
             var path    = pathProp.GetString()!;
             var content = contentProp.GetString()!;
+            var allowEmpty = arguments.TryGetProperty("allowEmpty", out var allowEmptyProp) &&
+                             allowEmptyProp.ValueKind == JsonValueKind.True;
+
+            if (string.IsNullOrWhiteSpace(content) && !allowEmpty)
+            {
+                var existingContent = await fs.ReadFileAsync(path);
+                if (!string.IsNullOrWhiteSpace(existingContent))
+                {
+                    return new McpToolResult
+                    {
+                        Success = false,
+                        Error = $"Refusing to overwrite non-empty file '{path}' with empty content. Provide full content, use edit_file for targeted edits, or call write_file with allowEmpty=true if this is intentional."
+                    };
+                }
+
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = "Refusing to write empty/whitespace content. Provide actual content or set allowEmpty=true if you intentionally want a blank file."
+                };
+            }
 
             await fs.WriteFileAsync(path, content);
 

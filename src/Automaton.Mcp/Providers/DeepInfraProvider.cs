@@ -181,6 +181,16 @@ public sealed class DeepInfraProvider : IAiProvider
                         cacheReadTokens: totalCacheReadTokens);
                     responseBuilder.AppendLine(finalText);
                 }
+                else if (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue)
+                {
+                    // Some providers return usage for tool-only turns without assistant text.
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
+                }
                 break;
             }
 
@@ -263,12 +273,36 @@ public sealed class DeepInfraProvider : IAiProvider
 
             if (shouldStop)
             {
+                if (string.IsNullOrWhiteSpace(finalText) &&
+                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
+                {
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
+                }
+
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 break;
             }
 
             if (shouldBreakForApproval)
+            {
+                if (string.IsNullOrWhiteSpace(finalText) &&
+                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
+                {
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
+                }
+
                 break;
+            }
         }
 
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
@@ -400,19 +434,24 @@ public sealed class DeepInfraProvider : IAiProvider
                 if (root.TryGetProperty("usage", out var usage) &&
                     usage.ValueKind == JsonValueKind.Object)
                 {
-                    if (usage.TryGetProperty("prompt_tokens", out var pt) && pt.ValueKind == JsonValueKind.Number)
-                        inputTokens = pt.GetInt32();
-                    if (usage.TryGetProperty("completion_tokens", out var ct) && ct.ValueKind == JsonValueKind.Number)
-                        outputTokens = ct.GetInt32();
+                    inputTokens ??= ReadUsageInt(usage, "prompt_tokens", "input_tokens", "input_token_count");
+                    outputTokens ??= ReadUsageInt(usage, "completion_tokens", "output_tokens", "output_token_count");
 
                     // Cache hit tokens — DeepInfra / Moonshot style
-                    if (usage.TryGetProperty("prompt_cache_hit_tokens", out var cht) && cht.ValueKind == JsonValueKind.Number)
-                        cacheReadTokens = cht.GetInt32();
+                    if (usage.TryGetProperty("prompt_cache_hit_tokens", out var cht) &&
+                        cht.ValueKind == JsonValueKind.Number &&
+                        cht.TryGetInt32(out var promptCacheHitTokens))
+                    {
+                        cacheReadTokens = promptCacheHitTokens;
+                    }
                     else if (usage.TryGetProperty("prompt_tokens_details", out var details) &&
                              details.ValueKind == JsonValueKind.Object &&
                              details.TryGetProperty("cached_tokens", out var cached) &&
-                             cached.ValueKind == JsonValueKind.Number)
-                        cacheReadTokens = cached.GetInt32();
+                             cached.ValueKind == JsonValueKind.Number &&
+                             cached.TryGetInt32(out var cachedTokens))
+                    {
+                        cacheReadTokens = cachedTokens;
+                    }
                 }
             }
             catch (JsonException)
@@ -527,7 +566,12 @@ public sealed class DeepInfraProvider : IAiProvider
         int? inputTokens = null, int? outputTokens = null, string? model = null,
         string? reasoningContent = null, int? cacheReadTokens = null)
     {
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrEmpty(text) &&
+            (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue && !cacheReadTokens.HasValue)))
+        {
+            return;
+        }
+
         var message = new ConversationMessage("assistant", text)
         {
             IsStreaming      = !isComplete,
@@ -615,6 +659,21 @@ public sealed class DeepInfraProvider : IAiProvider
             return true;
         }
         return false;
+    }
+
+    private static int? ReadUsageInt(JsonElement usage, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (usage.TryGetProperty(key, out var value) &&
+                value.ValueKind == JsonValueKind.Number &&
+                value.TryGetInt32(out var result))
+            {
+                return result;
+            }
+        }
+
+        return null;
     }
 
     // ─────────────────────────────────────────────────────────

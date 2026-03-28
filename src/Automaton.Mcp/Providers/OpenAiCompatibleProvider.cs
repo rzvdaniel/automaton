@@ -150,7 +150,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 .Build();
 
             (string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)
-                streamResult = default;
+                streamResult = (string.Empty, string.Empty, new List<ToolCallAccumulator>(), null, null, null, null);
             await retryPipeline.ExecuteAsync(async ct =>
             {
                 streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, request.StreamingTimeoutMinutes, ct);
@@ -179,6 +179,15 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                         reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
                         cacheReadTokens: totalCacheReadTokens);
                     responseBuilder.AppendLine(finalText);
+                }
+                else if (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue)
+                {
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
                 }
                 break;
             }
@@ -280,12 +289,36 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
             if (shouldStop)
             {
+                if (string.IsNullOrWhiteSpace(finalText) &&
+                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
+                {
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
+                }
+
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
                 break;
             }
 
             if (shouldBreakForApproval)
+            {
+                if (string.IsNullOrWhiteSpace(finalText) &&
+                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
+                {
+                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: totalInputTokens,
+                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        model: responseModel,
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
+                }
+
                 break;
+            }
         }
 
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
@@ -530,7 +563,11 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         int? inputTokens = null, int? outputTokens = null, string? model = null,
         string? reasoningContent = null, int? cacheReadTokens = null)
     {
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrEmpty(text) &&
+            (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue && !cacheReadTokens.HasValue)))
+        {
+            return;
+        }
 
         var message = new ConversationMessage("assistant", text)
         {
