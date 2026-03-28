@@ -16,10 +16,12 @@ public class FileIoTool : IMcpTool
     public const string WriteFileName  = "write_file";
     public const string EditFileName   = "edit_file";
     public const string DeleteFileName = "delete_file";
+    public const string RenameFileName = "rename_file";
+    public const string RenameFolderName = "rename_folder";
     public const string ListFilesName  = "list_files";
     public const string SearchFileName = "search_file";
 
-    private static readonly HashSet<string> HandledTools = [ReadFileName, WriteFileName, EditFileName, DeleteFileName, ListFilesName, SearchFileName];
+    private static readonly HashSet<string> HandledTools = [ReadFileName, WriteFileName, EditFileName, DeleteFileName, RenameFileName, RenameFolderName, ListFilesName, SearchFileName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<FileIoTool> _logger;
@@ -84,6 +86,20 @@ public class FileIoTool : IMcpTool
             },
             new McpTool
             {
+                Name = RenameFileName,
+                Capability = ToolCapability.Write,
+                Description = "Rename or move a file within the current scope.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"fromPath":{"type":"string"},"toPath":{"type":"string"},"overwrite":{"type":"boolean","description":"Set true to replace destination file if it exists."}},"required":["fromPath","toPath"]}""")
+            },
+            new McpTool
+            {
+                Name = RenameFolderName,
+                Capability = ToolCapability.Write,
+                Description = "Rename or move a folder within the current scope.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"fromPath":{"type":"string"},"toPath":{"type":"string"}},"required":["fromPath","toPath"]}""")
+            },
+            new McpTool
+            {
                 Name = ListFilesName,
                 Capability = ToolCapability.Read,
                 Description = "List all files in the current scope.",
@@ -124,6 +140,8 @@ public class FileIoTool : IMcpTool
             WriteFileName  => await WriteFile(fs, arguments),
             EditFileName   => await EditFile(fs, arguments),
             DeleteFileName => await DeleteFile(fs, arguments),
+            RenameFileName => await RenameFile(fs, arguments),
+            RenameFolderName => await RenameFolder(fs, arguments),
             ListFilesName  => await ListFiles(fs),
             SearchFileName => await SearchFile(fs, arguments),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
@@ -310,6 +328,61 @@ public class FileIoTool : IMcpTool
         {
             _logger.LogError(ex, "Error deleting file");
             return new McpToolResult { Success = false, Error = $"Failed to delete file: {ex.Message}" };
+        }
+    }
+
+    private async Task<McpToolResult> RenameFile(IScopedFileSystem fs, JsonElement arguments)
+    {
+        try
+        {
+            if (!arguments.TryGetProperty("fromPath", out var fromPathProp) || fromPathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'fromPath'." };
+            if (!arguments.TryGetProperty("toPath", out var toPathProp) || toPathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'toPath'." };
+
+            var fromPath = fromPathProp.GetString()!;
+            var toPath = toPathProp.GetString()!;
+            var overwrite = arguments.TryGetProperty("overwrite", out var overwriteProp) && overwriteProp.GetBoolean();
+
+            await fs.RenameFileAsync(fromPath, toPath, overwrite);
+
+            return new McpToolResult { Success = true, Content = $"Renamed file '{fromPath}' to '{toPath}'" };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new McpToolResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error renaming file");
+            return new McpToolResult { Success = false, Error = $"Failed to rename file: {ex.Message}" };
+        }
+    }
+
+    private async Task<McpToolResult> RenameFolder(IScopedFileSystem fs, JsonElement arguments)
+    {
+        try
+        {
+            if (!arguments.TryGetProperty("fromPath", out var fromPathProp) || fromPathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'fromPath'." };
+            if (!arguments.TryGetProperty("toPath", out var toPathProp) || toPathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'toPath'." };
+
+            var fromPath = fromPathProp.GetString()!;
+            var toPath = toPathProp.GetString()!;
+
+            await fs.RenameFolderAsync(fromPath, toPath);
+
+            return new McpToolResult { Success = true, Content = $"Renamed folder '{fromPath}' to '{toPath}'" };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new McpToolResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error renaming folder");
+            return new McpToolResult { Success = false, Error = $"Failed to rename folder: {ex.Message}" };
         }
     }
 

@@ -19,6 +19,16 @@ public interface IScopedFileSystem
     /// </summary>
     Task DeleteFileAsync(string relativePath);
 
+    /// <summary>
+    /// Renames or moves a file within the current scope.
+    /// </summary>
+    Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false);
+
+    /// <summary>
+    /// Renames or moves a folder within the current scope.
+    /// </summary>
+    Task RenameFolderAsync(string fromRelativePath, string toRelativePath);
+
     /// <summary>Lists all files in the scope.</summary>
     Task<IEnumerable<string>> ListFilesAsync();
 

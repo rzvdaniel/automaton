@@ -46,6 +46,63 @@ public class LocalScopedFileSystem : IScopedFileSystem
         return Task.CompletedTask;
     }
 
+    public virtual Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false)
+    {
+        if (string.IsNullOrWhiteSpace(fromRelativePath))
+            throw new InvalidOperationException("Source file path is required.");
+        if (string.IsNullOrWhiteSpace(toRelativePath))
+            throw new InvalidOperationException("Destination file path is required.");
+
+        var fromFull = ResolveSafe(fromRelativePath);
+        var toFull   = ResolveSafe(toRelativePath);
+
+        if (!File.Exists(fromFull))
+            throw new InvalidOperationException($"Source file '{fromRelativePath}' does not exist.");
+
+        if (Directory.Exists(toFull))
+            throw new InvalidOperationException($"Destination '{toRelativePath}' is a directory, not a file path.");
+
+        var toDir = Path.GetDirectoryName(toFull);
+        if (!string.IsNullOrEmpty(toDir))
+            Directory.CreateDirectory(toDir);
+
+        if (File.Exists(toFull))
+        {
+            if (!overwrite)
+                throw new InvalidOperationException($"Destination file '{toRelativePath}' already exists. Pass overwrite=true to replace it.");
+            File.Delete(toFull);
+        }
+
+        File.Move(fromFull, toFull);
+        return Task.CompletedTask;
+    }
+
+    public virtual Task RenameFolderAsync(string fromRelativePath, string toRelativePath)
+    {
+        if (string.IsNullOrWhiteSpace(fromRelativePath))
+            throw new InvalidOperationException("Source folder path is required.");
+        if (string.IsNullOrWhiteSpace(toRelativePath))
+            throw new InvalidOperationException("Destination folder path is required.");
+
+        var fromFull = ResolveSafe(fromRelativePath);
+        var toFull   = ResolveSafe(toRelativePath);
+
+        if (!Directory.Exists(fromFull))
+            throw new InvalidOperationException($"Source folder '{fromRelativePath}' does not exist.");
+
+        if (File.Exists(toFull))
+            throw new InvalidOperationException($"Destination '{toRelativePath}' is a file path, not a folder path.");
+        if (Directory.Exists(toFull))
+            throw new InvalidOperationException($"Destination folder '{toRelativePath}' already exists.");
+
+        var toParent = Path.GetDirectoryName(toFull);
+        if (!string.IsNullOrEmpty(toParent))
+            Directory.CreateDirectory(toParent);
+
+        Directory.Move(fromFull, toFull);
+        return Task.CompletedTask;
+    }
+
     public virtual Task<IEnumerable<string>> ListFilesAsync()
     {
         if (!Directory.Exists(RootPath))

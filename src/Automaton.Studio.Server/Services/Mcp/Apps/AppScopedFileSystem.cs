@@ -10,6 +10,8 @@ namespace Automaton.Studio.Server.Services.Mcp.Apps;
 /// </summary>
 public class AppScopedFileSystem : LocalScopedFileSystem
 {
+    private const string MainAppFile = "index.html";
+
     public AppScopedFileSystem(string appRootPath) : base(appRootPath) { }
 
     public override async Task WriteFileAsync(string relativePath, string content)
@@ -20,10 +22,31 @@ public class AppScopedFileSystem : LocalScopedFileSystem
 
     public override Task DeleteFileAsync(string relativePath)
     {
-        if (relativePath.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+        if (relativePath.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Cannot delete index.html — it is the main app file.");
 
         return base.DeleteFileAsync(relativePath);
+    }
+
+    public override Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false)
+    {
+        if (fromRelativePath.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot rename index.html — it is the main app file.");
+        if (toRelativePath.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot replace index.html via rename. Edit index.html directly instead.");
+        if (IsInternalVersionsPath(fromRelativePath) || IsInternalVersionsPath(toRelativePath))
+            throw new InvalidOperationException("Cannot rename files inside internal versions storage.");
+
+        AppFileStorageService.ValidateFileExtensionPublic(toRelativePath);
+        return base.RenameFileAsync(fromRelativePath, toRelativePath, overwrite);
+    }
+
+    public override Task RenameFolderAsync(string fromRelativePath, string toRelativePath)
+    {
+        if (IsInternalVersionsPath(fromRelativePath) || IsInternalVersionsPath(toRelativePath))
+            throw new InvalidOperationException("Cannot rename folders inside internal versions storage.");
+
+        return base.RenameFolderAsync(fromRelativePath, toRelativePath);
     }
 
     public override Task<IEnumerable<string>> ListFilesAsync()
@@ -40,6 +63,13 @@ public class AppScopedFileSystem : LocalScopedFileSystem
             .Select(f => Path.GetRelativePath(RootPath, f).Replace('\\', '/'));
 
         return Task.FromResult(files);
+    }
+
+    private static bool IsInternalVersionsPath(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        return normalized.Equals("versions", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("versions/", StringComparison.OrdinalIgnoreCase);
     }
 }
 
