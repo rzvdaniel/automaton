@@ -143,7 +143,11 @@ public class FileIoTool : IMcpTool
             var content = await fs.ReadFileAsync(path);
 
             if (content is null)
-                return new McpToolResult { Success = false, Error = $"File '{path}' not found" };
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"File '{path}' not found. Do NOT retry this path. Only read files that appear in the list_files result. Call list_files first if you are unsure what files exist."
+                };
 
             var lineCount = content.Count(c => c == '\n') + 1;
             if (lineCount >= LocalScopedFileSystem.LargeFileThreshold)
@@ -206,7 +210,11 @@ public class FileIoTool : IMcpTool
 
             var content = await fs.ReadFileAsync(path);
             if (content is null)
-                return new McpToolResult { Success = false, Error = $"File '{path}' not found" };
+                return new McpToolResult
+                {
+                    Success = false,
+                    Error = $"File '{path}' not found. Do NOT retry. Only edit files that appear in the list_files result."
+                };
 
             if (!arguments.TryGetProperty("edits", out var editsElement) || editsElement.ValueKind != JsonValueKind.Array)
                 return new McpToolResult { Success = false, Error = "Missing or invalid 'edits' array" };

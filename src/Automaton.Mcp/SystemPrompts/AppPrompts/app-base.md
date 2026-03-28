@@ -323,11 +323,13 @@ They are your **only persistent memory between sessions** — if you don't write
 
 **SKIP only if the entire session was read-only** — e.g. user only asked questions, you only read files and answered, nothing was written to disk.
 
-**What to write:**
-- `design.md` — theme, colors, layout, animation, component patterns (update after any UI change)
-- `backend.md` — controller names, actions, payload shapes, auth approach (update after any API change)
-- `features.md` — feature list and status (update after adding/removing a feature)
-- Create additional files for large topics (e.g. `state.md`, `routing.md`)
+**What to write (always under `.instructions/`):**
+- `.instructions/design.md` — theme, colors, layout, animation, component patterns (update after any UI change)
+- `.instructions/backend.md` — controller names, actions, payload shapes, auth approach (update after any API change)
+- `.instructions/features.md` — feature list and status (update after adding/removing a feature)
+- Create additional files for large topics (e.g. `.instructions/state.md`, `.instructions/routing.md`)
+
+**IMPORTANT — do NOT read or edit instruction files during bug fixes or modifications.** Instruction files live in `.instructions/` and are injected automatically. Only write them at the very end of a session to record what changed. Never read `design.md`, `backend.md`, or `features.md` as part of diagnosing or fixing a bug — read the actual source files (`index.html`, `js/*.js`, etc.) instead.
 
 **How:**
 1. **Small change** (one value, one line) → `update_instruction` with `oldText`/`newText`
@@ -335,7 +337,7 @@ They are your **only persistent memory between sessions** — if you don't write
 3. Always include YAML frontmatter — `context: always` for key files, `context: on-request` for large reference docs
 4. Write *current state and decisions*, not code. Be concise.
 
-Example `design.md`:
+Example `.instructions/design.md`:
 ```markdown
 ---
 context: always
