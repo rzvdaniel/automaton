@@ -311,7 +311,10 @@ if (res.success) { ... }
 
 ## APP INSTRUCTIONS (`.instructions/` folder) — MANDATORY:
 
-Instructions are persistent markdown files injected at the start of every future session.
+Instructions are persistent markdown files that the **system injects automatically** at the start of every session. You never need to read them with `read_file` — they are already in your context if they exist.
+
+**NEVER call `read_file` on any `.instructions/` file.** They either appear in your context automatically, or they don't exist yet. If they don't exist, that is normal for a new app — proceed without them.
+
 They are your **only persistent memory between sessions** — if you don't write them, the next session starts blind.
 
 **WRITE at the end of ANY session where you:**
@@ -329,7 +332,7 @@ They are your **only persistent memory between sessions** — if you don't write
 - `.instructions/features.md` — feature list and status (update after adding/removing a feature)
 - Create additional files for large topics (e.g. `.instructions/state.md`, `.instructions/routing.md`)
 
-**IMPORTANT — do NOT read or edit instruction files during bug fixes or modifications.** Instruction files live in `.instructions/` and are injected automatically. Only write them at the very end of a session to record what changed. Never read `design.md`, `backend.md`, or `features.md` as part of diagnosing or fixing a bug — read the actual source files (`index.html`, `js/*.js`, etc.) instead.
+**IMPORTANT — do NOT read or edit instruction files during bug fixes or modifications.** Only write them at the very end of a session to record what changed. To diagnose a bug, read the actual source files (`index.html`, `js/*.js`, etc.) — never `design.md`, `backend.md`, or `features.md`.
 
 **How:**
 1. **Small change** (one value, one line) → `update_instruction` with `oldText`/`newText`
