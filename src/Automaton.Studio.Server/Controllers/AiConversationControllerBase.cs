@@ -185,6 +185,7 @@ public abstract class AiConversationControllerBase : BaseController
                 MaxTokens = modelMaxTokens,
                 MaxRateLimitRetries = _aiProvidersConfig.RateLimitRetry.MaxRetries,
                 RateLimitRetryInitialDelaySeconds = _aiProvidersConfig.RateLimitRetry.InitialDelaySeconds,
+                StreamingTimeoutMinutes = _aiProvidersConfig.Streaming.TimeoutMinutes,
                 Mode = request.Mode
             };
 

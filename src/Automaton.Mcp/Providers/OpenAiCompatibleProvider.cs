@@ -144,7 +144,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 streamResult = default;
             await retryPipeline.ExecuteAsync(async ct =>
             {
-                streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, ct);
+                streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, request.StreamingTimeoutMinutes, ct);
             }, cancellationToken);
 
             // Accumulate tokens — input is cumulative (keep latest), output is additive, cache read is latest
@@ -284,7 +284,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
     private async Task<(string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)>
         StreamOnceAsync(ChatClient client, List<ChatMessage> messages, ChatCompletionOptions options,
-            string conversationId, CancellationToken cancellationToken)
+            string conversationId, int streamingTimeoutMinutes, CancellationToken cancellationToken)
     {
         var currentText = new StringBuilder();
         var reasoningText = new StringBuilder();
@@ -296,8 +296,12 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var lastEmitTime = DateTime.UtcNow;
         const int emitIntervalMs = 100;
 
-        var streamingUpdate = client.CompleteChatStreamingAsync(messages, options, cancellationToken);
-        await foreach (var chunk in streamingUpdate)
+        // Guard against providers that hang indefinitely (no first chunk, stream never closes).
+        using var streamTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        streamTimeoutCts.CancelAfter(TimeSpan.FromMinutes(streamingTimeoutMinutes));
+
+        var streamingUpdate = client.CompleteChatStreamingAsync(messages, options, streamTimeoutCts.Token);
+        await foreach (var chunk in streamingUpdate.WithCancellation(streamTimeoutCts.Token))
         {
             // Extract non-standard fields (reasoning_content, cache tokens) from raw chunk JSON.
             // The OpenAI SDK ignores provider-specific usage fields, so we parse raw JSON directly.

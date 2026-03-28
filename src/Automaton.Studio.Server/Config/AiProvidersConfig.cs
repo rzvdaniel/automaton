@@ -30,6 +30,8 @@ public class AiProvidersConfig
     public AppInstructionsConfig AppInstructions { get; set; } = new();
 
     public RateLimitRetryConfig RateLimitRetry { get; set; } = new();
+
+    public StreamingConfig Streaming { get; set; } = new();
 }
 
 /// <summary>
@@ -104,6 +106,19 @@ public class RateLimitRetryConfig
     /// from Anthropic's 429 response when available, overriding this value.
     /// </summary>
     public int InitialDelaySeconds { get; set; } = 30;
+}
+
+/// <summary>
+/// Configures streaming behaviour for AI provider calls.
+/// </summary>
+public class StreamingConfig
+{
+    /// <summary>
+    /// Maximum minutes to wait for a single streaming call to complete before cancelling.
+    /// Protects against providers that open the stream but never deliver chunks or close it.
+    /// Default: 5 minutes.
+    /// </summary>
+    public int TimeoutMinutes { get; set; } = 5;
 }
 
 public static class AiProvidersConfigExtensions

@@ -78,6 +78,13 @@ public class ConversationRequest
     public int RateLimitRetryInitialDelaySeconds { get; set; } = 64;
 
     /// <summary>
+    /// Maximum minutes to wait for a single streaming call to complete before cancelling.
+    /// Protects against providers that open the stream but never deliver chunks or close it.
+    /// Default: 5 minutes.
+    /// </summary>
+    public int StreamingTimeoutMinutes { get; set; } = 5;
+
+    /// <summary>
     /// Interaction mode: <see cref="ConversationModes.Plan"/> (read-only, propose_plan available)
     /// or <see cref="ConversationModes.Agent"/> (write tools, default).
     /// </summary>
