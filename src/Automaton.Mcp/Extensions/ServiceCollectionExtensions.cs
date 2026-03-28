@@ -10,12 +10,19 @@ namespace Automaton.Mcp.Client.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Add Automaton MCP client services to the service collection
+    /// Add Automaton MCP client services to the service collection.
+    /// <para>
+    /// Registers <see cref="AiProviderRegistry"/> under both its concrete type and the
+    /// <see cref="IAiProviderRegistry"/> interface so host applications can replace the
+    /// interface registration with a decorator (e.g., a DB-backed dynamic registry) while
+    /// still injecting the concrete registry to seed it with hardcoded providers.
+    /// </para>
     /// </summary>
     public static IServiceCollection AddAutomatonMcpClient(this IServiceCollection services)
     {
-        // Register the provider registry
-        services.AddSingleton<IAiProviderRegistry>(sp =>
+        // Register the concrete registry so host applications can inject it as a dependency
+        // in decorators without creating a second instance.
+        services.AddSingleton<AiProviderRegistry>(sp =>
         {
             var registry = new AiProviderRegistry();
             var logger = sp.GetRequiredService<ILoggerFactory>();
@@ -44,6 +51,9 @@ public static class ServiceCollectionExtensions
             
             return registry;
         });
+
+        // Default interface binding — host applications may replace this with a decorator.
+        services.AddSingleton<IAiProviderRegistry>(sp => sp.GetRequiredService<AiProviderRegistry>());
         
         // Register the MCP client (tool provider is set dynamically via SetToolProvider)
         services.AddScoped<IAutomatonMcpClient, AutomatonMcpClient>();

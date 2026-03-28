@@ -352,7 +352,9 @@ services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();
 
 // MCP Client
 services.AddAutomatonMcpClient();
-services.AddHostedService<Automaton.Studio.Server.Services.DynamicAiProviderLoaderService>();
+// Replace the default IAiProviderRegistry with the dynamic decorator that lazy-loads
+// OpenAI-compatible providers from the database on first use — no restart needed.
+services.AddSingleton<Automaton.Mcp.Client.IAiProviderRegistry, Automaton.Studio.Server.Services.DynamicAiProviderRegistry>();
 
 // AI Chat History Service
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
