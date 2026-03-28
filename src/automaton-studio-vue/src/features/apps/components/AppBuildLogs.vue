@@ -5,6 +5,7 @@
  * Displays each session as a collapsible card with a tool-call timeline inside.
  */
 import { ref, onMounted, watch } from 'vue'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
@@ -20,6 +21,89 @@ const expandedSessionId = ref<string | null>(null)
 const sessionMessages = ref<Record<string, ChatMessage[]>>({})
 const isLoading = ref(false)
 const loadingSessionId = ref<string | null>(null)
+const isExportingAll = ref(false)
+const exportingSessionId = ref<string | null>(null)
+
+const toast = useToast()
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = window.URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+async function exportAllSessions() {
+  if (!props.appId) return
+
+  isExportingAll.value = true
+  try {
+    const { blob, fileName } = await aiChatHistoryService.exportSessions('2', props.appId)
+    downloadBlob(blob, fileName)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Ready',
+      detail: 'All AI build sessions exported',
+      life: 3000,
+    })
+  } catch (err: unknown) {
+    console.error('Failed to export all build sessions', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: err instanceof Error ? err.message : 'Failed to export AI build sessions',
+      life: 5000,
+    })
+  } finally {
+    isExportingAll.value = false
+  }
+}
+
+async function exportSingleSession(session: ChatSession) {
+  exportingSessionId.value = session.id
+  try {
+    const full = await aiChatHistoryService.getSessionWithMessages(session.id)
+    const payload = {
+      resourceType: 'WebApp',
+      resourceId: props.appId,
+      exportedAtUtc: new Date().toISOString(),
+      sessionCount: 1,
+      sessions: [
+        {
+          session: full.session,
+          messages: full.messages,
+        },
+      ],
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const fileName = `ai-build-session-${session.id}-${timestamp}.json`
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    downloadBlob(blob, fileName)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Ready',
+      detail: `Session "${session.title || 'Untitled session'}" exported`,
+      life: 3000,
+    })
+  } catch (err: unknown) {
+    console.error('Failed to export session', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: err instanceof Error ? err.message : 'Failed to export session',
+      life: 5000,
+    })
+  } finally {
+    exportingSessionId.value = null
+  }
+}
 
 async function loadSessions() {
   if (!props.appId) return
@@ -196,16 +280,28 @@ defineExpose({ reload: loadSessions })
       <span class="build-logs-title">
         <i class="pi pi-history mr-2"></i>AI Build Sessions
       </span>
-      <Button
-        icon="pi pi-refresh"
-        text
-        rounded
-        severity="secondary"
-        size="small"
-        :loading="isLoading"
-        v-tooltip.bottom="'Refresh'"
-        @click="loadSessions"
-      />
+      <div class="header-actions">
+        <Button
+          icon="pi pi-download"
+          text
+          rounded
+          severity="secondary"
+          size="small"
+          :loading="isExportingAll"
+          v-tooltip.bottom="'Export all sessions as JSON'"
+          @click="exportAllSessions"
+        />
+        <Button
+          icon="pi pi-refresh"
+          text
+          rounded
+          severity="secondary"
+          size="small"
+          :loading="isLoading"
+          v-tooltip.bottom="'Refresh'"
+          @click="loadSessions"
+        />
+      </div>
     </div>
 
     <div v-if="isLoading" class="flex justify-content-center align-items-center py-5">
@@ -241,6 +337,16 @@ defineExpose({ reload: loadSessions })
             />
           </div>
           <div class="session-stats">
+            <Button
+              icon="pi pi-download"
+              text
+              rounded
+              severity="secondary"
+              size="small"
+              :loading="exportingSessionId === session.id"
+              v-tooltip.bottom="'Export this session as JSON'"
+              @click.stop="exportSingleSession(session)"
+            />
             <span class="stat">
               <i class="pi pi-comments"></i> {{ session.totalPromptsSubmitted }}
             </span>
@@ -344,6 +450,12 @@ defineExpose({ reload: loadSessions })
 .build-logs-title {
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .empty-state {

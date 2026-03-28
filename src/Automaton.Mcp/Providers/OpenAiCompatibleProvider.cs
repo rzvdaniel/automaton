@@ -21,8 +21,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 {
     private readonly ILogger _logger;
     private readonly string _baseUrl;
-
-    private const int MaxConversationHistoryMessages = 10;
+    private readonly int _maxConversationHistoryMessages;
 
     public string ProviderName { get; }
     public string DefaultModel { get; }
@@ -33,12 +32,18 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
     /// <param name="baseUrl">Base URL of the provider's OpenAI-compatible API (e.g. "https://api.moonshot.cn/v1").</param>
     /// <param name="defaultModel">Default model ID when ConversationRequest.Model is null.</param>
     /// <param name="logger">Logger instance.</param>
-    public OpenAiCompatibleProvider(string providerName, string baseUrl, string defaultModel, ILogger logger)
+    public OpenAiCompatibleProvider(
+        string providerName,
+        string baseUrl,
+        string defaultModel,
+        ILogger logger,
+        int maxConversationHistoryMessages = 30)
     {
         ProviderName = providerName;
         DefaultModel = defaultModel;
         _baseUrl = baseUrl.TrimEnd('/');
         _logger = logger;
+        _maxConversationHistoryMessages = maxConversationHistoryMessages > 0 ? maxConversationHistoryMessages : 30;
     }
 
     public async Task<ProviderResult> CallAsync(
@@ -105,6 +110,10 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
             if (request.MaxTokens > 0)
                 options.MaxOutputTokenCount = request.MaxTokens;
+            if (request.Temperature.HasValue)
+                options.Temperature = request.Temperature.Value;
+            if (request.TopP.HasValue)
+                options.TopP = request.TopP.Value;
 
             if (chatTools.Count > 0)
             {
@@ -476,7 +485,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         return chatTools;
     }
 
-    private static List<ChatMessage> BuildMessages(ConversationRequest request)
+    private List<ChatMessage> BuildMessages(ConversationRequest request)
     {
         var messages = new List<ChatMessage>();
 
@@ -499,8 +508,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         if (request.ConversationHistory?.Count > 0)
         {
             var history = request.ConversationHistory;
-            if (history.Count > MaxConversationHistoryMessages)
-                history = history.Skip(history.Count - MaxConversationHistoryMessages).ToList();
+            if (history.Count > _maxConversationHistoryMessages)
+                history = history.Skip(history.Count - _maxConversationHistoryMessages).ToList();
 
             foreach (var msg in history)
             {

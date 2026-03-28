@@ -89,4 +89,17 @@ public class ConversationRequest
     /// or <see cref="ConversationModes.Agent"/> (write tools, default).
     /// </summary>
     public string Mode { get; set; } = ConversationModes.Agent;
+
+    /// <summary>
+    /// Optional temperature override (0.0–2.0). Null means use the provider's default.
+    /// Lower values (0.0–0.3) produce more focused, deterministic output.
+    /// Higher values (0.7–1.0) produce more varied, creative output.
+    /// </summary>
+    public float? Temperature { get; set; }
+
+    /// <summary>
+    /// Optional top-p nucleus sampling override (0.0–1.0). Null means use the provider's default.
+    /// Alternative to temperature — controls diversity by limiting the cumulative probability mass.
+    /// </summary>
+    public float? TopP { get; set; }
 }

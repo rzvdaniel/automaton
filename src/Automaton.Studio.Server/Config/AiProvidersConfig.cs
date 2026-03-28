@@ -5,6 +5,12 @@ namespace Automaton.Studio.Server.Config;
 public class AiProvidersConfig
 {
     /// <summary>
+    /// Maximum number of conversation history messages included per request.
+    /// Higher values improve multi-turn coherence but increase token usage.
+    /// </summary>
+    public int MaxConversationHistoryMessages { get; set; } = 30;
+
+    /// <summary>
     /// Maximum number of LLM round-trips (iterations) before stopping.
     /// 0 = use tier-based defaults defined in <see cref="IterationLimits"/>.
     /// Set a positive value to override for all tiers.

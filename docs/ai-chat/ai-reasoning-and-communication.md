@@ -4,6 +4,11 @@
 
 This document describes how the AI Chat Panel displays AI activity, reasoning, and tool execution feedback to users. It covers the architecture, message types, and system prompt improvements made to enhance user visibility into AI operations.
 
+## Related Docs
+
+- [IterationLimits vs MaxConversationHistoryMessages](./ITERATION_LIMITS_VS_HISTORY_WINDOW.md) - Explains execution-loop limits vs history-context limits, and how to tune each.
+- [AI Provider Registry Resolution](./PROVIDER_REGISTRY_RESOLUTION.md) - Explains hardcoded vs dynamic provider lookup, cache behavior, and name-collision rules.
+
 ---
 
 ## Table of Contents

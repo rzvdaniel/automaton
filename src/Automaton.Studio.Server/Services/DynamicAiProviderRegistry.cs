@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Client.Providers;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
@@ -19,6 +21,7 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<DynamicAiProviderRegistry> _logger;
+    private readonly int _maxConversationHistoryMessages;
 
     /// <summary>Thread-safe cache of dynamically loaded providers.</summary>
     private readonly ConcurrentDictionary<string, IAiProvider> _dynamic =
@@ -28,12 +31,16 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
         AiProviderRegistry hardcoded,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory,
+        IOptions<AiProvidersConfig> aiProvidersConfig,
         ILogger<DynamicAiProviderRegistry> logger)
     {
         _hardcoded = hardcoded;
         _scopeFactory = scopeFactory;
         _loggerFactory = loggerFactory;
         _logger = logger;
+        _maxConversationHistoryMessages = aiProvidersConfig.Value.MaxConversationHistoryMessages > 0
+            ? aiProvidersConfig.Value.MaxConversationHistoryMessages
+            : 30;
     }
 
     /// <inheritdoc />
@@ -109,11 +116,21 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
                 return null;
             }
 
-            var provider = new OpenAiCompatibleProvider(
-                providerName: entity.Name,
-                baseUrl: entity.BaseUrl!,
-                defaultModel: defaultModel,
-                logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"));
+            // DeepInfra gets its own raw-HTTP provider for better instruction adherence,
+            // temperature/top_p control, and larger history window.
+            IAiProvider provider = entity.Name.Equals(DeepInfraProvider.ProviderKey, StringComparison.OrdinalIgnoreCase)
+                ? new DeepInfraProvider(
+                    providerName: entity.Name,
+                    baseUrl: entity.BaseUrl!,
+                    defaultModel: defaultModel,
+                    logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
+                    maxConversationHistoryMessages: _maxConversationHistoryMessages)
+                : new OpenAiCompatibleProvider(
+                    providerName: entity.Name,
+                    baseUrl: entity.BaseUrl!,
+                    defaultModel: defaultModel,
+                    logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
+                    maxConversationHistoryMessages: _maxConversationHistoryMessages);
 
             _logger.LogInformation(
                 "Dynamically loaded OpenAI-compatible provider '{Provider}' → {BaseUrl} (default model: {Model}).",

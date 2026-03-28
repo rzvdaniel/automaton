@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Automaton.Mcp.Client.Providers;
 
 namespace Automaton.Mcp.Client.Extensions;
@@ -26,6 +27,9 @@ public static class ServiceCollectionExtensions
         {
             var registry = new AiProviderRegistry();
             var logger = sp.GetRequiredService<ILoggerFactory>();
+            var configuration = sp.GetService<IConfiguration>();
+            var maxConversationHistoryMessages =
+                configuration?.GetValue<int?>("AiProviders:MaxConversationHistoryMessages") ?? 30;
             
             // Register OpenAI provider
             var openAiProvider = new OpenAiProvider(logger.CreateLogger("OpenAiProvider"));
@@ -41,12 +45,12 @@ public static class ServiceCollectionExtensions
 
             // Register Moonshot (Kimi) — OpenAI Chat Completions-compatible
             // Uses the international endpoint. Keys from platform.moonshot.ai authenticate here.
-            // If using a China-region key (platform.moonshot.cn), change to https://api.moonshot.cn/v1
             var moonshotProvider = new OpenAiCompatibleProvider(
                 providerName: "Moonshot",
                 baseUrl: "https://api.moonshot.ai/v1",
                 defaultModel: "kimi-k2-5",
-                logger: logger.CreateLogger("MoonshotProvider"));
+                logger: logger.CreateLogger("MoonshotProvider"),
+                maxConversationHistoryMessages: maxConversationHistoryMessages);
             registry.Register(moonshotProvider);
             
             return registry;
