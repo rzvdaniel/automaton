@@ -352,6 +352,7 @@ services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();
 
 // MCP Client
 services.AddAutomatonMcpClient();
+services.AddHostedService<Automaton.Studio.Server.Services.DynamicAiProviderLoaderService>();
 
 // AI Chat History Service
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
