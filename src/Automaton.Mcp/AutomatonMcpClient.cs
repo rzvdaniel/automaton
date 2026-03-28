@@ -142,6 +142,13 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
             var provider = _providerRegistry.GetProvider(request.Provider);
             if (provider != null)
             {
+                // Subscribe lazily so dynamic providers (loaded from the DB after this instance
+                // was constructed) also forward their ConversationUpdated events.
+                // Remove first to guarantee exactly one subscription even if the provider was
+                // already registered at construction time.
+                provider.ConversationUpdated -= OnProviderConversationUpdated;
+                provider.ConversationUpdated += OnProviderConversationUpdated;
+
                 // Get tools filtered for the current mode
                 var mode = ConversationModeFactory.From(request.Mode);
                 var providerTools = await CreateProviderToolsAsync(mode);
@@ -255,7 +262,19 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 return $"Error: No tool provider configured for executing {toolName}";
             }
 
-            var arguments = JsonDocument.Parse(string.IsNullOrEmpty(argumentsJson) ? "{}" : argumentsJson);
+            _logger.LogDebug("Executing tool {ToolName} with args: {ArgsJson}", toolName, argumentsJson);
+
+            JsonDocument arguments;
+            try
+            {
+                arguments = JsonDocument.Parse(string.IsNullOrEmpty(argumentsJson) ? "{}" : argumentsJson);
+            }
+            catch (Exception parseEx)
+            {
+                _logger.LogWarning("Tool {ToolName} received invalid JSON arguments: {ArgsJson}", toolName, argumentsJson);
+                return $"Tool call failed: the arguments JSON was malformed — {parseEx.Message}. " +
+                       $"Please retry {toolName} with correct JSON arguments.";
+            }
 
             // Inject conversation mode into tool context so tools can adapt behavior
             var toolContext = request.Context != null
@@ -289,7 +308,10 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
     public void Dispose()
     {
-        // Clean up resources
+        // Unsubscribe from all provider events to prevent event-listener leaks across scoped instances.
+        foreach (var provider in _providerRegistry.Providers.Values)
+            provider.ConversationUpdated -= OnProviderConversationUpdated;
+
         _conversations.Clear();
     }
 }
