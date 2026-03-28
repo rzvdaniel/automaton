@@ -38,8 +38,8 @@ public class FileIoTool : IMcpTool
             {
                 Name = ReadFileName,
                 Capability = ToolCapability.Read,
-                Description = "Read a file (e.g. 'index.html', 'styles/main.css', 'js/app.js')",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
+                Description = "Read a single file by its exact path (e.g. 'index.html' or 'styles/main.css'). One file per call — make parallel calls to read multiple files at once. Use paths exactly as returned by list_files.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string","description":"Exact relative path of the file to read, e.g. 'index.html' or 'js/game.js'"}},"required":["path"]}""")
             },
             new McpTool
             {
@@ -136,7 +136,10 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path    = arguments.GetProperty("path").GetString()!;
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'. Call read_file with {\"path\": \"<exact-file-path>\"}. Use list_files to see available paths." };
+
+            var path    = pathProp.GetString()!;
             var content = await fs.ReadFileAsync(path);
 
             if (content is null)
@@ -168,8 +171,13 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path    = arguments.GetProperty("path").GetString()!;
-            var content = arguments.GetProperty("content").GetString()!;
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+            if (!arguments.TryGetProperty("content", out var contentProp) || contentProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'content'." };
+
+            var path    = pathProp.GetString()!;
+            var content = contentProp.GetString()!;
 
             await fs.WriteFileAsync(path, content);
 
@@ -190,7 +198,10 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path   = arguments.GetProperty("path").GetString()!;
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+
+            var path   = pathProp.GetString()!;
             var dryRun = arguments.TryGetProperty("dryRun", out var dryRunProp) && dryRunProp.GetBoolean();
 
             var content = await fs.ReadFileAsync(path);
@@ -241,7 +252,10 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path      = arguments.GetProperty("path").GetString()!;
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+
+            var path      = pathProp.GetString()!;
             var confirmed = arguments.TryGetProperty("confirmed", out var c) && c.GetBoolean();
 
             if (!confirmed)
@@ -288,8 +302,13 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            var path         = arguments.GetProperty("path").GetString()!;
-            var pattern      = arguments.GetProperty("pattern").GetString()!;
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+            if (!arguments.TryGetProperty("pattern", out var patternProp) || patternProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'pattern'." };
+
+            var path         = pathProp.GetString()!;
+            var pattern      = patternProp.GetString()!;
             var useRegex     = arguments.TryGetProperty("useRegex", out var rx) && rx.GetBoolean();
             var contextLines = arguments.TryGetProperty("contextLines", out var cl) ? cl.GetInt32() : 3;
 
