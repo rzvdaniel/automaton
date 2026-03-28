@@ -161,6 +161,10 @@ async function handleSave() {
   try {
     if (editingModel.value) {
       const request: UpdateAiModelRequest = {
+        modelId:
+          formData.value.modelId !== editingModel.value.modelId
+            ? formData.value.modelId
+            : undefined,
         displayName: formData.value.displayName,
         description: formData.value.description || undefined,
         isActive: formData.value.isActive,
@@ -387,12 +391,14 @@ function goBackToProviders() {
           <InputText
             id="modelId"
             v-model="formData.modelId"
-            :disabled="!!editingModel"
             placeholder="e.g., gpt-4-turbo"
             :class="{ 'p-invalid': formErrors.modelId }"
           />
           <small v-if="!editingModel" class="text-color-secondary">
             Unique identifier used by the AI provider API
+          </small>
+          <small v-else class="text-orange-500">
+            Changing Model ID may impact existing settings that reference the previous ID.
           </small>
           <small v-if="formErrors.modelId" class="text-red-500">{{ formErrors.modelId }}</small>
         </div>

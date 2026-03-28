@@ -52,9 +52,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const hasMoreSessions = computed(() => sessions.value.length < sessionsTotalCount.value)
   const sessionsSearch = ref('')
 
-  // LocalStorage key — kept for backward compatibility (read-only going forward)
-  const AI_MODEL_PREFERENCE_KEY = 'ai_preferred_model'
-
   // Flag to prevent saving to localStorage during initialization
   const isInitializingModel = ref(false)
 
@@ -106,9 +103,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
 
     // Priority:
     // 1. User's server-saved preference (default or planning depending on resourceType)
-    // 2. localStorage (backward compat, read-only)
-    // 3. Admin global default model
-    // 4. First model alphabetically
+    // 2. Admin global default model
+    // 3. First model alphabetically
 
     const isPlanningContext = resourceType === 'plan'
 
@@ -126,16 +122,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       return
     }
 
-    // 2. Backward compat: read from localStorage (no longer written going forward)
-    const savedModel = localStorage.getItem(AI_MODEL_PREFERENCE_KEY)
-    if (savedModel && models.includes(savedModel)) {
-      selectedModel.value = savedModel
-      selectedProvider.value = providerByModel.value.get(savedModel) || ''
-      isInitializingModel.value = false
-      return
-    }
-
-    // 3. Admin-configured global default
+    // 2. Admin-configured global default
     for (const provider of availableProviders.value) {
       if (provider.defaultModel && models.includes(provider.defaultModel)) {
         selectedModel.value = provider.defaultModel
@@ -145,7 +132,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       }
     }
 
-    // 4. Fallback to first model alphabetically
+    // 3. Fallback to first model alphabetically
     selectedModel.value = models[0]!
     selectedProvider.value = providerByModel.value.get(models[0]!) || ''
     isInitializingModel.value = false

@@ -62,8 +62,68 @@ public class UpdateUserSettingsRequest
     [Range(10, 24, ErrorMessage = "Font size must be between 10 and 24")]
     public int? FontSize { get; set; }
 
-    public string? DefaultAiModel { get; set; }
-    public string? DefaultAiProvider { get; set; }
-    public string? DefaultPlanningModel { get; set; }
-    public string? DefaultPlanningProvider { get; set; }
+    private string? _defaultAiModel;
+    private string? _defaultAiProvider;
+    private string? _defaultPlanningModel;
+    private string? _defaultPlanningProvider;
+
+    /// <summary>
+    /// Whether DefaultAiModel was explicitly included in the request payload.
+    /// </summary>
+    public bool HasDefaultAiModel { get; private set; }
+
+    /// <summary>
+    /// Whether DefaultAiProvider was explicitly included in the request payload.
+    /// </summary>
+    public bool HasDefaultAiProvider { get; private set; }
+
+    /// <summary>
+    /// Whether DefaultPlanningModel was explicitly included in the request payload.
+    /// </summary>
+    public bool HasDefaultPlanningModel { get; private set; }
+
+    /// <summary>
+    /// Whether DefaultPlanningProvider was explicitly included in the request payload.
+    /// </summary>
+    public bool HasDefaultPlanningProvider { get; private set; }
+
+    public string? DefaultAiModel
+    {
+        get => _defaultAiModel;
+        set
+        {
+            HasDefaultAiModel = true;
+            _defaultAiModel = value;
+        }
+    }
+
+    public string? DefaultAiProvider
+    {
+        get => _defaultAiProvider;
+        set
+        {
+            HasDefaultAiProvider = true;
+            _defaultAiProvider = value;
+        }
+    }
+
+    public string? DefaultPlanningModel
+    {
+        get => _defaultPlanningModel;
+        set
+        {
+            HasDefaultPlanningModel = true;
+            _defaultPlanningModel = value;
+        }
+    }
+
+    public string? DefaultPlanningProvider
+    {
+        get => _defaultPlanningProvider;
+        set
+        {
+            HasDefaultPlanningProvider = true;
+            _defaultPlanningProvider = value;
+        }
+    }
 }

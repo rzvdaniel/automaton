@@ -66,10 +66,10 @@ function loadFromStorage(): UserSettingsDto {
           ? parsed.theme
           : DEFAULTS.theme,
         fontSize: parsed.fontSize ?? DEFAULTS.fontSize,
-        defaultAiModel: parsed.defaultAiModel,
-        defaultAiProvider: parsed.defaultAiProvider,
-        defaultPlanningModel: parsed.defaultPlanningModel,
-        defaultPlanningProvider: parsed.defaultPlanningProvider,
+        defaultAiModel: parsed.defaultAiModel ?? undefined,
+        defaultAiProvider: parsed.defaultAiProvider ?? undefined,
+        defaultPlanningModel: parsed.defaultPlanningModel ?? undefined,
+        defaultPlanningProvider: parsed.defaultPlanningProvider ?? undefined,
       }
     }
   } catch (err) {
@@ -106,10 +106,10 @@ export function useUserSettings() {
       settings.value = {
         theme: serverSettings.theme,
         fontSize: serverSettings.fontSize,
-        defaultAiModel: serverSettings.defaultAiModel,
-        defaultAiProvider: serverSettings.defaultAiProvider,
-        defaultPlanningModel: serverSettings.defaultPlanningModel,
-        defaultPlanningProvider: serverSettings.defaultPlanningProvider,
+        defaultAiModel: serverSettings.defaultAiModel ?? undefined,
+        defaultAiProvider: serverSettings.defaultAiProvider ?? undefined,
+        defaultPlanningModel: serverSettings.defaultPlanningModel ?? undefined,
+        defaultPlanningProvider: serverSettings.defaultPlanningProvider ?? undefined,
       }
       saveToStorage(settings.value)
       isInitialized.value = true
@@ -203,7 +203,11 @@ export function useUserSettings() {
     if (!isSaving.value) {
       isSaving.value = true
       try {
-        await userSettingsService.updateSettings({ defaultAiModel: model, defaultAiProvider: provider })
+        await userSettingsService.updateSettings({
+          // Send explicit clear markers so backend can clear persisted values.
+          defaultAiModel: model ?? '',
+          defaultAiProvider: provider ?? '',
+        })
       } catch (err) {
         console.error('Failed to save default AI model setting:', err)
         settings.value = previousSettings
@@ -226,7 +230,11 @@ export function useUserSettings() {
     if (!isSaving.value) {
       isSaving.value = true
       try {
-        await userSettingsService.updateSettings({ defaultPlanningModel: model, defaultPlanningProvider: provider })
+        await userSettingsService.updateSettings({
+          // Send explicit clear markers so backend can clear persisted values.
+          defaultPlanningModel: model ?? '',
+          defaultPlanningProvider: provider ?? '',
+        })
       } catch (err) {
         console.error('Failed to save default planning model setting:', err)
         settings.value = previousSettings

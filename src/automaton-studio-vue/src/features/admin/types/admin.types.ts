@@ -108,6 +108,7 @@ export interface CreateAiModelRequest {
  * Matches AdminUpdateAiModelRequest from backend
  */
 export interface UpdateAiModelRequest {
+  modelId?: string
   displayName?: string
   description?: string
   isActive?: boolean

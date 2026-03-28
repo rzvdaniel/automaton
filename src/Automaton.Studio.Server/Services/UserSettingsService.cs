@@ -216,17 +216,29 @@ public class UserSettingsService
         if (request.FontSize.HasValue)
             await SetSettingAsync(userId, Keys.EditorFontSize, request.FontSize.Value);
 
-        if (request.DefaultAiModel != null)
-            await SetSettingAsync(userId, Keys.DefaultAiModel, request.DefaultAiModel);
+        if (request.HasDefaultAiModel)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.DefaultAiModel,
+                string.IsNullOrWhiteSpace(request.DefaultAiModel) ? null : request.DefaultAiModel);
 
-        if (request.DefaultAiProvider != null)
-            await SetSettingAsync(userId, Keys.DefaultAiProvider, request.DefaultAiProvider);
+        if (request.HasDefaultAiProvider)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.DefaultAiProvider,
+                string.IsNullOrWhiteSpace(request.DefaultAiProvider) ? null : request.DefaultAiProvider);
 
-        if (request.DefaultPlanningModel != null)
-            await SetSettingAsync(userId, Keys.DefaultPlanningModel, request.DefaultPlanningModel);
+        if (request.HasDefaultPlanningModel)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.DefaultPlanningModel,
+                string.IsNullOrWhiteSpace(request.DefaultPlanningModel) ? null : request.DefaultPlanningModel);
 
-        if (request.DefaultPlanningProvider != null)
-            await SetSettingAsync(userId, Keys.DefaultPlanningProvider, request.DefaultPlanningProvider);
+        if (request.HasDefaultPlanningProvider)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.DefaultPlanningProvider,
+                string.IsNullOrWhiteSpace(request.DefaultPlanningProvider) ? null : request.DefaultPlanningProvider);
 
         return await GetAllSettingsAsync(userId);
     }
