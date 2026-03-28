@@ -87,6 +87,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
         int? totalInputTokens = null;
         int totalOutputTokens = 0;
+        int? totalCacheReadTokens = null;
 
         while (true)
         {
@@ -139,16 +140,17 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 })
                 .Build();
 
-            (string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)
+            (string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)
                 streamResult = default;
             await retryPipeline.ExecuteAsync(async ct =>
             {
                 streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, ct);
             }, cancellationToken);
 
-            // Accumulate tokens — input is cumulative (keep latest), output is additive
+            // Accumulate tokens — input is cumulative (keep latest), output is additive, cache read is latest
             if (streamResult.inputTokens.HasValue) totalInputTokens = streamResult.inputTokens;
             if (streamResult.outputTokens.HasValue) totalOutputTokens += streamResult.outputTokens.Value;
+            if (streamResult.cacheReadTokens.HasValue) totalCacheReadTokens = streamResult.cacheReadTokens;
 
             var finalText = streamResult.finalText;
             var reasoningText = streamResult.reasoningText;
@@ -158,13 +160,15 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (toolCalls.Count == 0)
             {
                 // Final response — no more tool calls
+                LogCacheStats(totalCacheReadTokens, totalInputTokens);
                 if (!string.IsNullOrWhiteSpace(finalText))
                 {
                     EmitStreamingText(request.ConversationId, finalText, isComplete: true,
                         inputTokens: totalInputTokens,
                         outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
                         model: responseModel,
-                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText);
+                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                        cacheReadTokens: totalCacheReadTokens);
                     responseBuilder.AppendLine(finalText);
                 }
                 break;
@@ -177,7 +181,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     inputTokens: totalInputTokens,
                     outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
                     model: responseModel,
-                    reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText);
+                    reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
+                    cacheReadTokens: totalCacheReadTokens);
             }
 
             // Append assistant message (with tool calls) to conversation.
@@ -277,7 +282,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
-    private async Task<(string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel)>
+    private async Task<(string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)>
         StreamOnceAsync(ChatClient client, List<ChatMessage> messages, ChatCompletionOptions options,
             string conversationId, CancellationToken cancellationToken)
     {
@@ -286,6 +291,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var toolCallAccumulators = new Dictionary<int, ToolCallAccumulator>();
         int? inputTokens = null;
         int? outputTokens = null;
+        int? cacheReadTokens = null;
         string? responseModel = null;
         var lastEmitTime = DateTime.UtcNow;
         const int emitIntervalMs = 100;
@@ -293,17 +299,21 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var streamingUpdate = client.CompleteChatStreamingAsync(messages, options, cancellationToken);
         await foreach (var chunk in streamingUpdate)
         {
-            // Extract reasoning_content from raw chunk JSON.
-            // Thinking models (e.g. Moonshot kimi-k2.5) emit it as a non-standard delta field
-            // that the OpenAI SDK ignores. We must capture it here so we can replay it back in
-            // the AssistantChatMessage when the model uses tools — the API rejects the message
-            // without it ("reasoning_content is missing in assistant tool call message").
+            // Extract non-standard fields (reasoning_content, cache tokens) from raw chunk JSON.
+            // The OpenAI SDK ignores provider-specific usage fields, so we parse raw JSON directly.
+            //
+            // Cache field locations by provider:
+            //   Kimi/Moonshot  → usage.prompt_cache_hit_tokens
+            //   OpenAI         → usage.prompt_tokens_details.cached_tokens
             try
             {
                 var rawBytes = System.ClientModel.Primitives.ModelReaderWriter.Write(chunk,
                     System.ClientModel.Primitives.ModelReaderWriterOptions.Json);
                 using var doc = JsonDocument.Parse(rawBytes);
-                if (doc.RootElement.TryGetProperty("choices", out var choices) &&
+                var root = doc.RootElement;
+
+                // reasoning_content — thinking models (e.g. kimi-k2.5)
+                if (root.TryGetProperty("choices", out var choices) &&
                     choices.GetArrayLength() > 0 &&
                     choices[0].TryGetProperty("delta", out var delta) &&
                     delta.TryGetProperty("reasoning_content", out var rc) &&
@@ -313,10 +323,25 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     if (!string.IsNullOrEmpty(rcText))
                         reasoningText.Append(rcText);
                 }
+
+                // Cache hit tokens — usage chunk (last chunk in stream)
+                if (root.TryGetProperty("usage", out var usage))
+                {
+                    // Kimi/Moonshot: prompt_cache_hit_tokens
+                    if (usage.TryGetProperty("prompt_cache_hit_tokens", out var kimiCache) &&
+                        kimiCache.ValueKind == JsonValueKind.Number)
+                        cacheReadTokens = kimiCache.GetInt32();
+
+                    // OpenAI: prompt_tokens_details.cached_tokens
+                    else if (usage.TryGetProperty("prompt_tokens_details", out var details) &&
+                             details.TryGetProperty("cached_tokens", out var oaiCache) &&
+                             oaiCache.ValueKind == JsonValueKind.Number)
+                        cacheReadTokens = oaiCache.GetInt32();
+                }
             }
             catch
             {
-                // Non-thinking models won't have this field — silently ignore
+                // Non-standard fields absent in some providers — silently ignore
             }
 
             foreach (var part in chunk.ContentUpdate)
@@ -359,7 +384,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
         return (currentText.ToString(), reasoningText.ToString(),
                 toolCallAccumulators.Values.OrderBy(t => t.Index).ToList(),
-                inputTokens, outputTokens, responseModel);
+                inputTokens, outputTokens, responseModel, cacheReadTokens);
     }
 
     private static bool IsRateLimitException(Exception ex)
@@ -395,6 +420,17 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
     private static readonly Regex RetryAfterPattern = new(
         @"retry[- ](?:after|in)\D*(?<secs>\d+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private void LogCacheStats(int? cacheReadTokens, int? totalInputTokens)
+    {
+        if (cacheReadTokens > 0)
+            _logger.LogDebug(
+                "{Provider} cache hit — read: {CacheRead} tokens (saved ~{Saved} tokens from billing)",
+                ProviderName, cacheReadTokens, cacheReadTokens);
+        else
+            _logger.LogDebug("{Provider} cache stats — no cache hit this request (input: {Input} tokens)",
+                ProviderName, totalInputTokens ?? 0);
+    }
 
     private void EmitRetryNotification(string conversationId, int attempt, int maxRetries, int delaySeconds)
     {
@@ -479,7 +515,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
     private void EmitStreamingText(string conversationId, string text, bool isComplete,
         int? inputTokens = null, int? outputTokens = null, string? model = null,
-        string? reasoningContent = null)
+        string? reasoningContent = null, int? cacheReadTokens = null)
     {
         if (string.IsNullOrEmpty(text)) return;
 
@@ -489,7 +525,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             InputTokens = isComplete ? inputTokens : null,
             OutputTokens = isComplete ? outputTokens : null,
             Model = isComplete ? model : null,
-            ReasoningContent = isComplete ? reasoningContent : null
+            ReasoningContent = isComplete ? reasoningContent : null,
+            CacheReadTokens = isComplete ? cacheReadTokens : null
         };
 
         ConversationUpdated?.Invoke(this, new ConversationUpdatedEvent
