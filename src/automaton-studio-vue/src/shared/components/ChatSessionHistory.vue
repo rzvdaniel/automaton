@@ -40,6 +40,8 @@ const confirm = useConfirm()
 const isLoading = ref(false)
 const sessions = ref<ChatSession[]>([])
 const searchQuery = ref('')
+const isExporting = ref(false)
+const exportingSessionId = ref<string | null>(null)
 
 // Dialog state
 const showNewSessionDialog = ref(false)
@@ -85,7 +87,8 @@ async function loadSessions() {
 
   isLoading.value = true
   try {
-    sessions.value = await aiChatHistoryService.getSessions(props.resourceType, props.resourceId)
+    const result = await aiChatHistoryService.getSessions(props.resourceType, props.resourceId)
+    sessions.value = result.items
   } catch (error: unknown) {
     toast.add({
       severity: 'error',
@@ -95,6 +98,95 @@ async function loadSessions() {
     })
   } finally {
     isLoading.value = false
+  }
+}
+
+/**
+ * Export all sessions/messages for this resource to a JSON file.
+ */
+async function exportSessions() {
+  if (!props.resourceId) return
+
+  isExporting.value = true
+  try {
+    const { blob, fileName } = await aiChatHistoryService.exportSessions(props.resourceType, props.resourceId)
+
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Ready',
+      detail: 'Chat sessions exported successfully',
+      life: 3000,
+    })
+  } catch (error: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: error instanceof Error ? error.message : 'Failed to export chat sessions',
+      life: 5000,
+    })
+  } finally {
+    isExporting.value = false
+  }
+}
+
+/**
+ * Export a single session with all its messages to JSON.
+ */
+async function exportSession(session: ChatSession) {
+  exportingSessionId.value = session.id
+  try {
+    const full = await aiChatHistoryService.getSessionWithMessages(session.id)
+
+    const payload = {
+      resourceType: props.resourceType,
+      resourceId: props.resourceId,
+      exportedAtUtc: new Date().toISOString(),
+      sessionCount: 1,
+      sessions: [
+        {
+          session: full.session,
+          messages: full.messages,
+        },
+      ],
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const fileName = `ai-chat-session-${session.id}-${timestamp}.json`
+
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Ready',
+      detail: `Session "${session.title}" exported successfully`,
+      life: 3000,
+    })
+  } catch (error: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: error instanceof Error ? error.message : 'Failed to export this session',
+      life: 5000,
+    })
+  } finally {
+    exportingSessionId.value = null
   }
 }
 
@@ -326,14 +418,25 @@ defineExpose({
         <i class="pi pi-comments text-lg"></i>
         <h3>{{ title }}</h3>
       </div>
-      <Button
-        v-tooltip.left="'New chat session'"
-        icon="pi pi-plus"
-        size="small"
-        rounded
-        text
-        @click="showNewSessionDialog = true"
-      />
+      <div class="header-actions">
+        <Button
+          v-tooltip.left="'Export sessions as JSON'"
+          icon="pi pi-download"
+          size="small"
+          rounded
+          text
+          :loading="isExporting"
+          @click="exportSessions"
+        />
+        <Button
+          v-tooltip.left="'New chat session'"
+          icon="pi pi-plus"
+          size="small"
+          rounded
+          text
+          @click="showNewSessionDialog = true"
+        />
+      </div>
     </div>
 
     <Divider />
@@ -413,6 +516,14 @@ defineExpose({
 
           <template #footer>
             <div class="card-actions" @click.stop>
+              <Button
+                v-tooltip.top="'Export this session'"
+                icon="pi pi-download"
+                size="small"
+                text
+                :loading="exportingSessionId === session.id"
+                @click="exportSession(session)"
+              />
               <Button
                 v-tooltip.top="'Rename'"
                 icon="pi pi-pencil"
@@ -527,6 +638,12 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .header-title h3 {

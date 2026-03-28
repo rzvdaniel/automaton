@@ -76,6 +76,11 @@ public interface IAiChatHistoryService
     Task<AppChatStatsDto?> GetAppChatStatsAsync(Guid appId, Guid userId);
 
     /// <summary>
+    /// Export all chat sessions and messages for a specific resource.
+    /// </summary>
+    Task<ChatSessionExportDto> ExportResourceSessionsAsync(ChatResourceType resourceType, Guid resourceId, Guid userId);
+
+    /// <summary>
     /// Persist the complexity tier for a session (sticky — only upgrades, never downgrades).
     /// </summary>
     Task UpdateSessionComplexityTierAsync(Guid sessionId, string tier, Guid userId);

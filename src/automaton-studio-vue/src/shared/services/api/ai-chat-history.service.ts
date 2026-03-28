@@ -62,6 +62,31 @@ export const aiChatHistoryService = {
   },
 
   /**
+   * Export all sessions/messages for a resource as a downloadable JSON file
+   */
+  async exportSessions(
+    resourceType: string,
+    resourceId: string,
+  ): Promise<{ blob: Blob; fileName: string }> {
+    const response = await axiosInstance.get(
+      '/api/AiChatHistory/sessions/export',
+      {
+        params: { resourceType, resourceId },
+        responseType: 'blob',
+      },
+    )
+
+    const disposition = response.headers['content-disposition'] as string | undefined
+    const fileNameMatch = disposition?.match(/filename="?([^\"]+)"?/i)
+    const fileName = fileNameMatch?.[1] || `ai-chat-sessions-${resourceType.toLowerCase()}-${resourceId}.json`
+
+    return {
+      blob: response.data,
+      fileName,
+    }
+  },
+
+  /**
    * Get a specific session by ID
    */
   async getSession(sessionId: string): Promise<ChatSession> {

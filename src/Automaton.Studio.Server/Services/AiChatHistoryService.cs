@@ -792,4 +792,75 @@ public class AiChatHistoryService : IAiChatHistoryService
         }
     }
 
+    public async Task<ChatSessionExportDto> ExportResourceSessionsAsync(ChatResourceType resourceType, Guid resourceId, Guid userId)
+    {
+        try
+        {
+            var sessionEntities = await dataContext.AiChatSessions
+                .Include(s => s.AiChatSessionUsers)
+                .Include(s => s.Messages)
+                .Where(s => s.ResourceType == resourceType &&
+                           s.ResourceId == resourceId &&
+                           s.AiChatSessionUsers.Any(su => su.UserId == userId))
+                .OrderByDescending(s => s.UpdatedAt)
+                .ToListAsync();
+
+            var sessions = sessionEntities.Select(session => new ChatSessionExportItemDto
+            {
+                Session = new ChatSessionDto
+                {
+                    Id = session.Id,
+                    ResourceType = session.ResourceType,
+                    ResourceId = session.ResourceId,
+                    Title = session.Title,
+                    Provider = session.Provider,
+                    Model = session.Model,
+                    IsActive = session.IsActive,
+                    CreatedAt = session.CreatedAt,
+                    UpdatedAt = session.UpdatedAt,
+                    MessageCount = session.Messages.Count,
+                    TotalPromptsSubmitted = session.TotalPromptsSubmitted,
+                    TotalApiCalls = session.TotalApiCalls,
+                    TotalInputTokens = session.TotalInputTokens,
+                    TotalOutputTokens = session.TotalOutputTokens,
+                    TotalTokens = session.TotalTokens,
+                    TotalCacheReadTokens = session.TotalCacheReadTokens,
+                    TotalCacheCreationTokens = session.TotalCacheCreationTokens,
+                    ComplexityTier = session.ComplexityTier
+                },
+                Messages = session.Messages
+                    .OrderBy(m => m.CreatedAt)
+                    .Select(m => new ChatMessageDto
+                    {
+                        Id = m.Id,
+                        SessionId = m.SessionId,
+                        Role = m.Role,
+                        Content = m.Content,
+                        MessageType = m.MessageType,
+                        Metadata = m.Metadata,
+                        InputTokens = m.InputTokens,
+                        OutputTokens = m.OutputTokens,
+                        TotalTokens = m.TotalTokens,
+                        Model = m.Model,
+                        CreatedAt = m.CreatedAt
+                    })
+                    .ToList()
+            }).ToList();
+
+            return new ChatSessionExportDto
+            {
+                ResourceType = resourceType,
+                ResourceId = resourceId,
+                ExportedAtUtc = DateTime.UtcNow,
+                SessionCount = sessions.Count,
+                Sessions = sessions
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Error exporting chat sessions for resource {ResourceType} {ResourceId}", resourceType, resourceId);
+            throw;
+        }
+    }
+
 }

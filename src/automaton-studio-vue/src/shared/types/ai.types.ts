@@ -231,6 +231,19 @@ export interface ChatSessionWithMessages extends ChatSession {
   messages: ChatMessage[]
 }
 
+export interface ChatSessionExportItem {
+  session: ChatSession
+  messages: ChatMessage[]
+}
+
+export interface ChatSessionExport {
+  resourceType: ChatResourceType
+  resourceId: string
+  exportedAtUtc: string
+  sessionCount: number
+  sessions: ChatSessionExportItem[]
+}
+
 export interface CreateChatSessionRequest {
   resourceType: ChatResourceType
   resourceId: string

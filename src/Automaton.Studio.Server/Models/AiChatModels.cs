@@ -126,6 +126,27 @@ public class ChatSessionWithMessagesDto
 }
 
 /// <summary>
+/// One exported AI chat session with all messages.
+/// </summary>
+public class ChatSessionExportItemDto
+{
+    public ChatSessionDto Session { get; set; } = new();
+    public List<ChatMessageDto> Messages { get; set; } = new();
+}
+
+/// <summary>
+/// Export payload for all chat sessions tied to a resource.
+/// </summary>
+public class ChatSessionExportDto
+{
+    public ChatResourceType ResourceType { get; set; }
+    public Guid ResourceId { get; set; }
+    public DateTime ExportedAtUtc { get; set; }
+    public int SessionCount { get; set; }
+    public List<ChatSessionExportItemDto> Sessions { get; set; } = new();
+}
+
+/// <summary>
 /// DTO for AI chat session statistics (for display in app editor header)
 /// </summary>
 public class ChatSessionStatsDto

@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -31,6 +32,26 @@ public class AiChatHistoryController : BaseController
         var userId = GetUserId();
         var result = await chatHistoryService.GetSessionsAsync(resourceType, resourceId, userId, page, pageSize, search);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Export all chat sessions and messages for a specific resource as JSON.
+    /// </summary>
+    [HttpGet("sessions/export")]
+    public async Task<IActionResult> ExportSessions(
+        [FromQuery] ChatResourceType resourceType,
+        [FromQuery] Guid resourceId)
+    {
+        var userId = GetUserId();
+        var export = await chatHistoryService.ExportResourceSessionsAsync(resourceType, resourceId, userId);
+
+        var json = JsonSerializer.Serialize(export, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        var fileName = $"ai-chat-sessions-{resourceType.ToString().ToLowerInvariant()}-{resourceId}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json";
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", fileName);
     }
 
     /// <summary>
