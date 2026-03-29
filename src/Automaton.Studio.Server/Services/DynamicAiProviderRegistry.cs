@@ -116,21 +116,12 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
                 return null;
             }
 
-            // DeepInfra gets its own raw-HTTP provider for better instruction adherence,
-            // temperature/top_p control, and larger history window.
-            IAiProvider provider = entity.Name.Equals(DeepInfraProvider.ProviderKey, StringComparison.OrdinalIgnoreCase)
-                ? new DeepInfraProvider(
-                    providerName: entity.Name,
-                    baseUrl: entity.BaseUrl!,
-                    defaultModel: defaultModel,
-                    logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
-                    maxConversationHistoryMessages: _maxConversationHistoryMessages)
-                : new OpenAiCompatibleProvider(
-                    providerName: entity.Name,
-                    baseUrl: entity.BaseUrl!,
-                    defaultModel: defaultModel,
-                    logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
-                    maxConversationHistoryMessages: _maxConversationHistoryMessages);
+            IAiProvider provider = new OpenAiCompatibleProvider(
+                providerName: entity.Name,
+                baseUrl: entity.BaseUrl!,
+                defaultModel: defaultModel,
+                logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
+                maxConversationHistoryMessages: _maxConversationHistoryMessages);
 
             _logger.LogInformation(
                 "Dynamically loaded OpenAI-compatible provider '{Provider}' → {BaseUrl} (default model: {Model}).",
