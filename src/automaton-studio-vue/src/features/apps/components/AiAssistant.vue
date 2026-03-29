@@ -11,13 +11,13 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Textarea from 'primevue/textarea'
-import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import { ConversationMode } from '@/shared/types/ai.types'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
+import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
 // Props
@@ -27,12 +27,16 @@ const props = withDefaults(
     resourceId: string
     runnerId?: string | null
     initialPrompt?: string
+    initialMode?: string
+    initialModel?: string
     systemPrompt?: string
     suggestions?: string[]
   }>(),
   {
     runnerId: null,
     initialPrompt: undefined,
+    initialMode: undefined,
+    initialModel: undefined,
     systemPrompt: undefined,
     suggestions: () => [],
   },
@@ -78,12 +82,6 @@ const {
     emit('toolExecuted', toolName, args, result)
   },
 })
-
-// Mode toggle helper
-const isAutonomous = computed(() => conversationMode.value === ConversationMode.Autonomous)
-function toggleMode() {
-  conversationMode.value = isAutonomous.value ? ConversationMode.HumanInTheMiddle : ConversationMode.Autonomous
-}
 
 // View state: 'sessions' (list view) or 'chat' (detail view)
 const currentView = ref<'sessions' | 'chat'>('sessions')
@@ -197,6 +195,15 @@ onMounted(async () => {
   
   // Load sessions but don't create one automatically
   await loadSessions()
+
+  // Apply initial mode/model from query params (set by the "Generate App" flow)
+  // Must run after loadProviders() so availableModels is populated
+  if (props.initialMode) {
+    conversationMode.value = props.initialMode as typeof conversationMode.value
+  }
+  if (props.initialModel && availableModels.value.includes(props.initialModel)) {
+    selectedModel.value = props.initialModel
+  }
 
   // Always stay in sessions list view by default
   // User can click on a session to open it
@@ -586,24 +593,12 @@ function handleKeyPress(event: KeyboardEvent) {
           <div class="prompt-toolbar">
 
             <div class="prompt-right">
-              <Button
-                v-tooltip.top="isAutonomous ? 'Autonomous: AI builds everything without pausing. Click to switch.' : 'Human-in-the-middle: AI proposes plans and waits for approval. Click to switch.'"
-                :label="isAutonomous ? 'Auto' : 'HITM'"
-                :icon="isAutonomous ? 'pi pi-bolt' : 'pi pi-users'"
-                :severity="isAutonomous ? 'contrast' : 'secondary'"
-                size="small"
-                text
+              <AiModeModelSelector
+                v-model:mode="conversationMode"
+                v-model:model="selectedModel"
+                :available-models="availableModels"
                 :disabled="isBusy"
-                @click="toggleMode"
-              />
-              <Select
-                v-if="availableModels.length > 0"
-                v-model="selectedModel"
-                :options="availableModels"
-                placeholder="Model"
-                size="small"
-                class="model-select-inline"
-                :disabled="isBusy || availableModels.length === 0"
+                compact
               />
               <Button
                 v-if="isBusy"
@@ -788,24 +783,12 @@ function handleKeyPress(event: KeyboardEvent) {
           <div class="prompt-toolbar">
 
             <div class="prompt-right">
-              <Button
-                v-tooltip.top="isAutonomous ? 'Autonomous: AI builds everything without pausing. Click to switch.' : 'Human-in-the-middle: AI proposes plans and waits for approval. Click to switch.'"
-                :label="isAutonomous ? 'Auto' : 'HITM'"
-                :icon="isAutonomous ? 'pi pi-bolt' : 'pi pi-users'"
-                :severity="isAutonomous ? 'contrast' : 'secondary'"
-                size="small"
-                text
+              <AiModeModelSelector
+                v-model:mode="conversationMode"
+                v-model:model="selectedModel"
+                :available-models="availableModels"
                 :disabled="isBusy"
-                @click="toggleMode"
-              />
-              <Select
-                v-if="availableModels.length > 0"
-                v-model="selectedModel"
-                :options="availableModels"
-                placeholder="Model"
-                size="small"
-                class="model-select-inline"
-                :disabled="isBusy || availableModels.length === 0"
+                compact
               />
               <Button
                 v-if="isBusy"

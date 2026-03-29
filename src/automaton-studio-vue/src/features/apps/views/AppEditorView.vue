@@ -52,6 +52,8 @@ const resolvedAppId = computed(() => editorStore.currentApp?.id || appId.value)
 // Capture initial prompt once at setup time — using ref so clearing the URL query
 // via router.replace() doesn't wipe the value before AiAssistant.onMounted reads it.
 const initialPrompt = ref(route.query.prompt as string | undefined)
+const initialMode  = ref(route.query.mode  as string | undefined)
+const initialModel = ref(route.query.model as string | undefined)
 
 // Dialog visibility
 const showPublishDialog = ref(false)
@@ -1041,6 +1043,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 :resource-id="resolvedAppId"
                 :runner-id="selectedRunnerId"
                 :initial-prompt="initialPrompt"
+                :initial-mode="initialMode"
+                :initial-model="initialModel"
                 :system-prompt="aiSystemPrompt"
                 :suggestions="aiSuggestions"
                 @tool-executed="handleAiToolExecuted"

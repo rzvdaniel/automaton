@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -19,6 +19,10 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
+import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
+import { ConversationMode } from '@/shared/types/ai.types'
+import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App } from '../types/apps.types'
 
 const router = useRouter()
@@ -26,9 +30,49 @@ const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
+const { defaultAiModel } = useUserSettings()
 
 // AI generation state
 const aiDescription = ref('')
+const aiMode = ref<string>(ConversationMode.Autonomous)
+const aiModel = ref<string>('')
+const aiAvailableModels = ref<string[]>([])
+const isLoadingModels = ref(false)
+
+onMounted(async () => {
+  isLoadingModels.value = true
+  try {
+    const providers = await getAvailableProviders()
+    const models: string[] = []
+    for (const p of providers) {
+      for (const m of p.supportedModels) {
+        if (!models.includes(m)) models.push(m)
+      }
+    }
+    aiAvailableModels.value = models.sort((a, b) => a.localeCompare(b))
+
+    // Priority: 1. user's saved preference, 2. admin default model, 3. first alphabetically
+    if (defaultAiModel.value && models.includes(defaultAiModel.value)) {
+      aiModel.value = defaultAiModel.value
+    } else {
+      let foundDefault = false
+      for (const p of providers) {
+        if (p.defaultModel && models.includes(p.defaultModel)) {
+          aiModel.value = p.defaultModel
+          foundDefault = true
+          break
+        }
+      }
+      if (!foundDefault && models.length > 0) {
+        aiModel.value = models[0]!
+      }
+    }
+  } catch {
+    // Models unavailable — user can still type the prompt
+  } finally {
+    isLoadingModels.value = false
+  }
+})
 
 // View mode state
 const viewMode = ref('grid')
@@ -111,9 +155,12 @@ const handleGenerateApp = async () => {
       name: appName,
     })
 
-    // Navigate to editor with the prompt as query param
+    // Navigate to editor with prompt, mode, and model as query params
     const prompt = encodeURIComponent(aiDescription.value.trim())
-    router.push(`/apps/${app.id}?prompt=${prompt}`)
+    const query: Record<string, string> = { prompt }
+    if (aiMode.value)  query.mode  = aiMode.value
+    if (aiModel.value) query.model = aiModel.value
+    router.push({ path: `/apps/${app.id}`, query })
 
     // Clear the description
     aiDescription.value = ''
@@ -313,11 +360,12 @@ const handleRetry = async () => {
               @keydown="(e: KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateApp() } }"
             />
             <div class="flex align-items-center justify-content-between mt-3">
-              <div class="text-color-secondary text-sm">
-                <span class="font-medium">Examples:</span>
-                "Employee directory with search" •
-                "Invoice generator with PDF export"
-              </div>
+              <AiModeModelSelector
+                v-model:mode="aiMode"
+                v-model:model="aiModel"
+                :available-models="aiAvailableModels"
+                :loading="isLoadingModels"
+              />
               <Button
                 label="Generate App"
                 icon="pi pi-sparkles"
