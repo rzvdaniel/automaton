@@ -1,7 +1,5 @@
-using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -12,7 +10,7 @@ public class AiProviderMetadataService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiProviderMetadataService> logger;
-    private readonly AiProvidersConfig aiProvidersConfig;
+    private readonly IAiProvidersSettingsService settingsService;
 
     // Known fallback defaults when database has no default set
     private static readonly Dictionary<string, string> FallbackDefaults = new(StringComparer.OrdinalIgnoreCase)
@@ -22,11 +20,11 @@ public class AiProviderMetadataService
         ["Google"] = "gemini-1.5-pro"
     };
 
-    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger, IOptions<AiProvidersConfig> aiProvidersConfig)
+    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger, IAiProvidersSettingsService settingsService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
-        this.aiProvidersConfig = aiProvidersConfig.Value;
+        this.settingsService = settingsService;
     }
 
     /// <summary>
@@ -154,7 +152,8 @@ public class AiProviderMetadataService
             .Select(m => (int?)m.MaxTokens)
             .FirstOrDefaultAsync();
 
-        return maxTokens ?? aiProvidersConfig.DefaultMaxOutputTokens;
+        var config = await settingsService.GetEffectiveConfigAsync();
+        return maxTokens ?? config.DefaultMaxOutputTokens;
     }
 
     /// <summary>

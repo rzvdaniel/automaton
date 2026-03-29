@@ -14,6 +14,7 @@ import type {
   CreateAiApiKeyRequest,
   UpdateAiApiKeyRequest,
   GlobalAiDefaults,
+  AiProvidersOperationalConfig,
 } from '../types/admin.types'
 
 class AdminAiProvidersService {
@@ -157,6 +158,24 @@ class AdminAiProvidersService {
    */
   async deleteApiKey(keyId: string): Promise<void> {
     await apiClient.delete(`/api/admin/ai-keys/${keyId}`)
+  }
+
+  /**
+   * Get current AI operational settings (iteration limits, token caps, etc.)
+   * GET /api/admin/ai-settings
+   */
+  async getAiSettings(): Promise<AiProvidersOperationalConfig> {
+    const { data } = await apiClient.get<AiProvidersOperationalConfig>('/api/admin/ai-settings')
+    return data
+  }
+
+  /**
+   * Save AI operational settings. Changes take effect immediately.
+   * PUT /api/admin/ai-settings
+   */
+  async saveAiSettings(settings: AiProvidersOperationalConfig): Promise<AiProvidersOperationalConfig> {
+    const { data } = await apiClient.put<AiProvidersOperationalConfig>('/api/admin/ai-settings', settings)
+    return data
   }
 }
 

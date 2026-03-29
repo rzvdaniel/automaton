@@ -16,7 +16,9 @@ import type {
   ConversationMessage,
   ToolCall,
   ToolResult,
+  ConversationModeType,
 } from '../types/ai.types'
+import { ConversationMode } from '../types/ai.types'
 
 export interface UseAiChatOptions {
   /**
@@ -39,6 +41,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const availableProviders = ref<AiProvider[]>([])
   const error = ref<string | null>(null)
   const conversationId = ref<string | null>(null)
+  const conversationMode = ref<ConversationModeType>(ConversationMode.Autonomous)
 
   // Session state
   const sessions = ref<ChatSession[]>([])
@@ -456,6 +459,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       resourceType: resourceType, // Top-level property for backend
       resourceId: resourceId, // Top-level property for backend
       language: context?.language,
+      mode: conversationMode.value,
       context: {
         ...context, // Additional context (e.g., runnerId, appId)
       },
@@ -707,6 +711,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     error,
     hasMessages,
     currentProvider,
+    conversationMode,
 
     // Session state
     sessions,

@@ -2,14 +2,12 @@ using Automaton.Mcp.Client;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
-using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Services.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -29,14 +27,14 @@ public class AiStepConversationController : AiConversationControllerBase
         IAutomatonMcpClient mcpClient,
         AiApiKeyService aiApiKeyService,
         IAiChatHistoryService chatHistoryService,
-        IOptions<AiProvidersConfig> aiProvidersConfig,
+        IAiProvidersSettingsService settingsService,
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
         ITokenBudgetService tokenBudgetService,
         StepMcpToolProvider toolProvider,
         IStepSystemPromptBuilder promptBuilder,
         ILogger<AiStepConversationController> logger)
-        : base(mcpClient, aiApiKeyService, chatHistoryService, aiProvidersConfig,
+        : base(mcpClient, aiApiKeyService, chatHistoryService, settingsService,
                rateLimitService, providerMetadataService, tokenBudgetService, logger)
     {
         _toolProvider = toolProvider;

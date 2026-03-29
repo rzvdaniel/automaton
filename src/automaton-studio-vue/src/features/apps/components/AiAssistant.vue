@@ -15,6 +15,7 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
+import { ConversationMode } from '@/shared/types/ai.types'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
@@ -70,12 +71,19 @@ const {
   activateSession,
   updateSessionTitle,
   deleteSession,
+  conversationMode,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: (toolName, args, result) => {
     emit('toolExecuted', toolName, args, result)
   },
 })
+
+// Mode toggle helper
+const isAutonomous = computed(() => conversationMode.value === ConversationMode.Autonomous)
+function toggleMode() {
+  conversationMode.value = isAutonomous.value ? ConversationMode.HumanInTheMiddle : ConversationMode.Autonomous
+}
 
 // View state: 'sessions' (list view) or 'chat' (detail view)
 const currentView = ref<'sessions' | 'chat'>('sessions')
@@ -578,6 +586,16 @@ function handleKeyPress(event: KeyboardEvent) {
           <div class="prompt-toolbar">
 
             <div class="prompt-right">
+              <Button
+                v-tooltip.top="isAutonomous ? 'Autonomous: AI builds everything without pausing. Click to switch.' : 'Human-in-the-middle: AI proposes plans and waits for approval. Click to switch.'"
+                :label="isAutonomous ? 'Auto' : 'HITM'"
+                :icon="isAutonomous ? 'pi pi-bolt' : 'pi pi-users'"
+                :severity="isAutonomous ? 'contrast' : 'secondary'"
+                size="small"
+                text
+                :disabled="isBusy"
+                @click="toggleMode"
+              />
               <Select
                 v-if="availableModels.length > 0"
                 v-model="selectedModel"
@@ -615,7 +633,6 @@ function handleKeyPress(event: KeyboardEvent) {
 
     <!-- Chat View (Session Detail) -->
     <template v-else>
-      <!-- Header with Back Button and Model Selector -->
       <div class="ai-header">
         <div class="flex align-items-center justify-content-between w-full gap-2">
           <div class="flex align-items-center gap-2">
@@ -771,6 +788,16 @@ function handleKeyPress(event: KeyboardEvent) {
           <div class="prompt-toolbar">
 
             <div class="prompt-right">
+              <Button
+                v-tooltip.top="isAutonomous ? 'Autonomous: AI builds everything without pausing. Click to switch.' : 'Human-in-the-middle: AI proposes plans and waits for approval. Click to switch.'"
+                :label="isAutonomous ? 'Auto' : 'HITM'"
+                :icon="isAutonomous ? 'pi pi-bolt' : 'pi pi-users'"
+                :severity="isAutonomous ? 'contrast' : 'secondary'"
+                size="small"
+                text
+                :disabled="isBusy"
+                @click="toggleMode"
+              />
               <Select
                 v-if="availableModels.length > 0"
                 v-model="selectedModel"

@@ -5,7 +5,6 @@ using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 namespace Automaton.Studio.Server.Controllers.Admin;
 
 /// <summary>
@@ -19,18 +18,18 @@ public class AdminAiProvidersController : ControllerBase
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AdminAiProvidersController> logger;
     private readonly AiApiKeyService aiApiKeyService;
-    private readonly AiProvidersConfig aiProvidersConfig;
+    private readonly IAiProvidersSettingsService settingsService;
 
     public AdminAiProvidersController(
         ApplicationDbContext dbContext,
         ILogger<AdminAiProvidersController> logger,
         AiApiKeyService aiApiKeyService,
-        IOptions<AiProvidersConfig> aiProvidersConfig)
+        IAiProvidersSettingsService settingsService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.aiApiKeyService = aiApiKeyService;
-        this.aiProvidersConfig = aiProvidersConfig.Value;
+        this.settingsService = settingsService;
     }
 
     #region Providers
@@ -285,7 +284,7 @@ public class AdminAiProvidersController : ControllerBase
         {
             DefaultModel = defaultModel,
             PlanningModel = planningModel,
-            DefaultMaxOutputTokens = aiProvidersConfig.DefaultMaxOutputTokens
+            DefaultMaxOutputTokens = (await settingsService.GetEffectiveConfigAsync()).DefaultMaxOutputTokens
         });
     }
 
@@ -419,7 +418,7 @@ public class AdminAiProvidersController : ControllerBase
             IsActive = request.IsActive,
             IsDefault = request.IsDefault,
             IsPlanningModel = request.IsPlanningModel,
-            MaxTokens = request.MaxTokens ?? aiProvidersConfig.DefaultMaxOutputTokens,
+            MaxTokens = request.MaxTokens ?? (await settingsService.GetEffectiveConfigAsync()).DefaultMaxOutputTokens,
             SupportsStreaming = request.SupportsStreaming,
             SupportsTools = request.SupportsTools,
             SupportsVision = request.SupportsVision,
@@ -662,6 +661,68 @@ public class AdminAiProvidersController : ControllerBase
     }
 
     #endregion
+
+    #region Operational Settings
+
+    /// <summary>
+    /// Get the current operational AI settings (iteration limits, token caps, etc.).
+    /// Returns the DB-persisted values if set, otherwise the appsettings.json defaults.
+    /// </summary>
+    [HttpGet("~/api/admin/ai-settings")]
+    public async Task<ActionResult<AiProvidersOperationalConfigResponse>> GetAiSettings()
+    {
+        var settings = await settingsService.GetOperationalSettingsAsync();
+        return Ok(MapToResponse(settings));
+    }
+
+    /// <summary>
+    /// Save operational AI settings to the database.
+    /// Changes take effect immediately — no server restart required.
+    /// </summary>
+    [HttpPut("~/api/admin/ai-settings")]
+    public async Task<ActionResult<AiProvidersOperationalConfigResponse>> SaveAiSettings(
+        [FromBody] SaveAiSettingsRequest request)
+    {
+        var settings = new AiProvidersOperationalConfig
+        {
+            MaxConversationHistoryMessages = request.MaxConversationHistoryMessages,
+            MaxIterations                  = request.MaxIterations,
+            MaxConsecutiveFailures         = request.MaxConsecutiveFailures,
+            DefaultMaxOutputTokens         = request.DefaultMaxOutputTokens,
+            IterationLimits = new()
+            {
+                Simple     = request.IterationLimits.Simple,
+                Medium     = request.IterationLimits.Medium,
+                Large      = request.IterationLimits.Large,
+                Enterprise = request.IterationLimits.Enterprise,
+                Autonomous = request.IterationLimits.Autonomous
+            }
+        };
+
+        await settingsService.SaveOperationalSettingsAsync(settings);
+
+        logger.LogInformation("AI operational settings updated by admin");
+
+        return Ok(MapToResponse(settings));
+    }
+
+    private static AiProvidersOperationalConfigResponse MapToResponse(AiProvidersOperationalConfig s) => new()
+    {
+        MaxConversationHistoryMessages = s.MaxConversationHistoryMessages,
+        MaxIterations                  = s.MaxIterations,
+        MaxConsecutiveFailures         = s.MaxConsecutiveFailures,
+        DefaultMaxOutputTokens         = s.DefaultMaxOutputTokens,
+        IterationLimits = new()
+        {
+            Simple     = s.IterationLimits.Simple,
+            Medium     = s.IterationLimits.Medium,
+            Large      = s.IterationLimits.Large,
+            Enterprise = s.IterationLimits.Enterprise,
+            Autonomous = s.IterationLimits.Autonomous
+        }
+    };
+
+    #endregion
 }
 
 #region DTOs
@@ -800,6 +861,33 @@ public class GlobalAiDefaultsResponse
     public AiModelAdminResponse? DefaultModel { get; set; }
     public AiModelAdminResponse? PlanningModel { get; set; }
     public int DefaultMaxOutputTokens { get; set; }
+}
+
+public class IterationLimitsConfigResponse
+{
+    public int Simple     { get; set; }
+    public int Medium     { get; set; }
+    public int Large      { get; set; }
+    public int Enterprise { get; set; }
+    public int Autonomous { get; set; }
+}
+
+public class AiProvidersOperationalConfigResponse
+{
+    public int MaxConversationHistoryMessages { get; set; }
+    public int MaxIterations                  { get; set; }
+    public int MaxConsecutiveFailures         { get; set; }
+    public int DefaultMaxOutputTokens         { get; set; }
+    public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
+}
+
+public class SaveAiSettingsRequest
+{
+    public int MaxConversationHistoryMessages { get; set; }
+    public int MaxIterations                  { get; set; }
+    public int MaxConsecutiveFailures         { get; set; }
+    public int DefaultMaxOutputTokens         { get; set; }
+    public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
 }
 
 #endregion

@@ -4,6 +4,19 @@
  */
 
 // ============================================
+// Conversation Modes
+// ============================================
+
+export const ConversationMode = {
+  /** AI implements everything autonomously without pausing for user approval. Default. */
+  Autonomous: 'autonomous',
+  /** AI proposes a plan, waits for confirmation, then implements stage by stage. */
+  HumanInTheMiddle: 'human-in-the-middle',
+} as const
+
+export type ConversationModeType = (typeof ConversationMode)[keyof typeof ConversationMode]
+
+// ============================================
 // AI Providers and Models
 // ============================================
 
@@ -69,8 +82,8 @@ export interface StreamConversationRequest {
   resourceType?: string
   resourceId?: string
   language?: string
-  /** "plan" (read-only + propose_plan) or "agent" (write tools, default) */
-  mode?: string
+  /** Conversation mode: "autonomous" (default) or "human-in-the-middle". */
+  mode?: ConversationModeType | string
 }
 
 // ============================================

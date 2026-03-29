@@ -50,6 +50,21 @@ public class AiProvidersConfig
 }
 
 /// <summary>
+/// The subset of <see cref="AiProvidersConfig"/> that can be modified at runtime
+/// via the admin UI and is persisted in <c>Settings["AiProviders"]</c> as JSON.
+/// Infrastructure config (Providers, AppMemory, AppInstructions, RateLimitRetry, Streaming)
+/// stays in appsettings.json only.
+/// </summary>
+public class AiProvidersOperationalConfig
+{
+    public int MaxConversationHistoryMessages { get; set; } = 30;
+    public int MaxIterations                  { get; set; } = 0;
+    public int MaxConsecutiveFailures         { get; set; } = 3;
+    public int DefaultMaxOutputTokens         { get; set; } = 65536;
+    public IterationLimitsConfig IterationLimits { get; set; } = new();
+}
+
+/// <summary>
 /// Per-complexity-tier maximum iteration overrides. 0 = use the hardcoded default.
 /// </summary>
 public class IterationLimitsConfig
@@ -58,6 +73,11 @@ public class IterationLimitsConfig
     public int Medium     { get; set; } = 0;
     public int Large      { get; set; } = 0;
     public int Enterprise { get; set; } = 0;
+
+    /// <summary>
+    /// Override for Autonomous mode. 0 = use the built-in default (500).
+    /// </summary>
+    public int Autonomous { get; set; } = 0;
 
     /// <summary>Returns the configured override for <paramref name="tier"/>, or 0 if not set.</summary>
     public int For(ComplexityTier? tier) => tier switch

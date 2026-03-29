@@ -12,7 +12,13 @@ public static class IterationLimits
     public const int Enterprise = 60;
 
     /// <summary>
-    /// Resolves the iteration limit using this priority order:
+    /// Default iteration limit for Autonomous mode. High enough to complete complex
+    /// multi-file apps without human intervention.
+    /// </summary>
+    public const int Autonomous = 500;
+
+    /// <summary>
+    /// Resolves the iteration limit for HumanInTheMiddle (tier-based) mode:
     /// 1. <paramref name="globalOverride"/> — positive value overrides everything
     /// 2. <paramref name="tierOverride"/> — positive value overrides for this tier only
     /// 3. Built-in tier constant (Simple/Medium/Large/Enterprise)
@@ -29,5 +35,18 @@ public static class IterationLimits
             ComplexityTier.Enterprise => Enterprise,
             _                         => Medium   // null or Medium
         };
+    }
+
+    /// <summary>
+    /// Resolves the iteration limit for Autonomous mode:
+    /// 1. <paramref name="globalOverride"/> — positive admin cap overrides everything
+    /// 2. <paramref name="autonomousOverride"/> — admin-configured autonomous limit
+    /// 3. Built-in <see cref="Autonomous"/> constant (500)
+    /// </summary>
+    public static int ResolveForAutonomous(int globalOverride = 0, int autonomousOverride = 0)
+    {
+        if (globalOverride    > 0) return globalOverride;
+        if (autonomousOverride > 0) return autonomousOverride;
+        return Autonomous;
     }
 }

@@ -8,6 +8,7 @@ import AdminLayout from './views/AdminLayout.vue'
 import AdminProvidersView from './views/AdminProvidersView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
 import AdminAiKeysView from './views/AdminAiKeysView.vue'
+import AdminAiSettingsView from './views/AdminAiSettingsView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
@@ -47,6 +48,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminAiKeysView,
         meta: {
           title: 'API Keys',
+        },
+      },
+      {
+        path: 'ai-settings',
+        name: 'admin-ai-settings',
+        component: AdminAiSettingsView,
+        meta: {
+          title: 'AI Settings',
         },
       },
       {

@@ -10,7 +10,6 @@ using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
 
@@ -26,7 +25,7 @@ public abstract class AiConversationControllerBase : BaseController
     protected readonly IAutomatonMcpClient _mcpClient;
     protected readonly AiApiKeyService _aiApiKeyService;
     protected readonly IAiChatHistoryService _chatHistoryService;
-    protected readonly AiProvidersConfig _aiProvidersConfig;
+    protected readonly IAiProvidersSettingsService _settingsService;
     protected readonly ISystemAiRateLimitService _rateLimitService;
     protected readonly AiProviderMetadataService _providerMetadataService;
     protected readonly ITokenBudgetService _tokenBudgetService;
@@ -42,7 +41,7 @@ public abstract class AiConversationControllerBase : BaseController
         IAutomatonMcpClient mcpClient,
         AiApiKeyService aiApiKeyService,
         IAiChatHistoryService chatHistoryService,
-        IOptions<AiProvidersConfig> aiProvidersConfig,
+        IAiProvidersSettingsService settingsService,
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
         ITokenBudgetService tokenBudgetService,
@@ -51,7 +50,7 @@ public abstract class AiConversationControllerBase : BaseController
         _mcpClient = mcpClient;
         _aiApiKeyService = aiApiKeyService;
         _chatHistoryService = chatHistoryService;
-        _aiProvidersConfig = aiProvidersConfig.Value;
+        _settingsService = settingsService;
         _rateLimitService = rateLimitService;
         _providerMetadataService = providerMetadataService;
         _tokenBudgetService = tokenBudgetService;
@@ -118,6 +117,8 @@ public abstract class AiConversationControllerBase : BaseController
             // Downgrade model if user has exceeded their monthly token allowance
             model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 
+            var aiConfig = await _settingsService.GetEffectiveConfigAsync();
+
             var modelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(provider, model);
 
             var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
@@ -145,7 +146,8 @@ public abstract class AiConversationControllerBase : BaseController
 
             // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
             var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, history);
-            var modePromptSuffix = ConversationModeFactory.From(null).SystemPromptSuffix;
+            var mode = ConversationModeFactory.From(request.Mode);
+            var modePromptSuffix = mode.SystemPromptSuffix;
             // Append mode suffix to the base prompt so it stays within the cached block
             var partsWithMode = promptParts with { BasePrompt = promptParts.BasePrompt + modePromptSuffix };
 
@@ -177,15 +179,19 @@ public abstract class AiConversationControllerBase : BaseController
                 ApiKey = apiKey,
                 ConversationHistory = history,
                 Context = BuildContextDictionary(request, userId),
-                MaxIterations = IterationLimits.Resolve(
-                    _resolvedTier,
-                    globalOverride: _aiProvidersConfig.MaxIterations,
-                    tierOverride:   _aiProvidersConfig.IterationLimits.For(_resolvedTier)),
-                MaxConsecutiveFailures = _aiProvidersConfig.MaxConsecutiveFailures,
+                MaxIterations = mode.Name == ConversationModes.Autonomous
+                    ? IterationLimits.ResolveForAutonomous(
+                        globalOverride:     aiConfig.MaxIterations,
+                        autonomousOverride: aiConfig.IterationLimits.Autonomous)
+                    : IterationLimits.Resolve(
+                        _resolvedTier,
+                        globalOverride: aiConfig.MaxIterations,
+                        tierOverride:   aiConfig.IterationLimits.For(_resolvedTier)),
+                MaxConsecutiveFailures = aiConfig.MaxConsecutiveFailures,
                 MaxTokens = modelMaxTokens,
-                MaxRateLimitRetries = _aiProvidersConfig.RateLimitRetry.MaxRetries,
-                RateLimitRetryInitialDelaySeconds = _aiProvidersConfig.RateLimitRetry.InitialDelaySeconds,
-                StreamingTimeoutMinutes = _aiProvidersConfig.Streaming.TimeoutMinutes,
+                MaxRateLimitRetries = aiConfig.RateLimitRetry.MaxRetries,
+                RateLimitRetryInitialDelaySeconds = aiConfig.RateLimitRetry.InitialDelaySeconds,
+                StreamingTimeoutMinutes = aiConfig.Streaming.TimeoutMinutes,
                 Mode = request.Mode
             };
 

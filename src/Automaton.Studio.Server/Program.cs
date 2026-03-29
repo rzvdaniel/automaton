@@ -49,6 +49,7 @@ services.AddDatabaseDeveloperPageExceptionFilter();
 
 // Register AI Providers Configuration
 services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSection("AiProviders"));
+services.AddSingleton<IAiProvidersSettingsService, AiProvidersSettingsService>();
 
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));

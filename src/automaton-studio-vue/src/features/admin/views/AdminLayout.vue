@@ -22,6 +22,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-providers',
   },
   {
+    label: 'AI Settings',
+    icon: 'pi pi-sliders-h',
+    to: '/admin/ai-settings',
+    routePrefix: '/admin/ai-settings',
+  },
+  {
     label: 'AI API Keys',
     icon: 'pi pi-key',
     to: '/admin/ai-keys',

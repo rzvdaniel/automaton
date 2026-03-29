@@ -134,6 +134,30 @@ export interface GlobalAiDefaults {
 }
 
 /**
+ * Iteration limits config (per-complexity-tier)
+ * Matches IterationLimitsConfigResponse from backend
+ */
+export interface IterationLimitsConfig {
+  simple: number
+  medium: number
+  large: number
+  enterprise: number
+  autonomous: number
+}
+
+/**
+ * AI providers operational config
+ * Matches AiProvidersOperationalConfigResponse from backend
+ */
+export interface AiProvidersOperationalConfig {
+  maxConversationHistoryMessages: number
+  maxIterations: number
+  maxConsecutiveFailures: number
+  defaultMaxOutputTokens: number
+  iterationLimits: IterationLimitsConfig
+}
+
+/**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend
  */
