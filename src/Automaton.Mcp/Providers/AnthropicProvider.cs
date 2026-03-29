@@ -109,6 +109,10 @@ public class AnthropicProvider : IAiProvider
         int? totalInputTokens = null;
         int totalOutputTokens = 0;
 
+        // When propose_plan returns awaitingApproval, suppress tools on the next iteration
+        // so the LLM can present the plan and ask for user confirmation.
+        var breakAfterPlanPresentation = false;
+
         while (true)
         {
             // Check iteration limit
@@ -158,7 +162,7 @@ public class AnthropicProvider : IAiProvider
                     MaxTokens = request.MaxTokens,
                     System = systemMessage,
                     Messages = messages,
-                    Tools = anthropicTools.Count > 0 ? anthropicTools : null,
+                    Tools = (!breakAfterPlanPresentation && anthropicTools.Count > 0) ? anthropicTools : null,
                     Stream = true
                 };
 
@@ -314,7 +318,10 @@ public class AnthropicProvider : IAiProvider
             });
 
             if (shouldBreakForApproval)
-                break;
+            {
+                breakAfterPlanPresentation = true;
+                continue;
+            }
         }
 
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);

@@ -142,7 +142,7 @@ public class AiProviderMetadataService
     /// <summary>
     /// Returns the MaxTokens configured for the specified model, or <paramref name="fallback"/> if not found.
     /// </summary>
-    public async Task<int> GetModelMaxTokensAsync(string providerName, string modelId, int fallback = 4096)
+    public async Task<int> GetModelMaxTokensAsync(string providerName, string modelId, int fallback = 16384)
     {
         var maxTokens = await dbContext.AiModels
             .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)

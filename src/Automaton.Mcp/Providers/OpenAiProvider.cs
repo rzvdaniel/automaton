@@ -252,6 +252,10 @@ public class OpenAiProvider : IAiProvider
         int? totalInputTokens = null;
         int totalOutputTokens = 0;
 
+        // When propose_plan returns awaitingApproval, suppress tools on the next iteration
+        // so the LLM can present the plan and ask for user confirmation.
+        var breakAfterPlanPresentation = false;
+
         try
         {
             while (true)
@@ -297,7 +301,7 @@ public class OpenAiProvider : IAiProvider
                         request.ApiKey,
                         request.MaxTokens,
                         inputItems,
-                        toolDefinitions,
+                        breakAfterPlanPresentation ? [] : toolDefinitions,
                         ct),
                     cancellationToken);
 
@@ -385,7 +389,10 @@ public class OpenAiProvider : IAiProvider
                 }
 
                 if (shouldBreakForApproval)
-                    break;
+                {
+                    breakAfterPlanPresentation = true;
+                    continue;
+                }
             }
         }
         finally

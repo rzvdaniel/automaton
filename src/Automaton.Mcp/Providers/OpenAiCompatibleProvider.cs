@@ -94,6 +94,10 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         int totalOutputTokens = 0;
         int? totalCacheReadTokens = null;
 
+        // When propose_plan returns awaitingApproval, suppress tools on the next iteration
+        // so the LLM can present the plan and ask for user confirmation.
+        var breakAfterPlanPresentation = false;
+
         while (true)
         {
             iterationCount++;
@@ -104,7 +108,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 break;
             }
 
-            var options = chatTools.Count > 0
+            var options = chatTools.Count > 0 && !breakAfterPlanPresentation
                 ? new ChatCompletionOptions { Tools = { } }
                 : new ChatCompletionOptions();
 
@@ -115,7 +119,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (request.TopP.HasValue)
                 options.TopP = request.TopP.Value;
 
-            if (chatTools.Count > 0)
+            if (chatTools.Count > 0 && !breakAfterPlanPresentation)
             {
                 foreach (var tool in chatTools)
                     options.Tools.Add(tool);
@@ -306,18 +310,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
             if (shouldBreakForApproval)
             {
-                if (string.IsNullOrWhiteSpace(finalText) &&
-                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
-                {
-                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
-                        inputTokens: totalInputTokens,
-                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
-                        model: responseModel,
-                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                        cacheReadTokens: totalCacheReadTokens);
-                }
-
-                break;
+                breakAfterPlanPresentation = true;
+                continue;
             }
         }
 

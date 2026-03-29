@@ -117,6 +117,10 @@ public sealed class DeepInfraProvider : IAiProvider
         int totalOutputTokens = 0;
         int? totalCacheReadTokens = null;
 
+        // When propose_plan returns awaitingApproval, suppress tools on the next iteration
+        // so the LLM can present the plan and ask for user confirmation.
+        var breakAfterPlanPresentation = false;
+
         while (true)
         {
             iterationCount++;
@@ -156,7 +160,7 @@ public sealed class DeepInfraProvider : IAiProvider
             StreamResult streamResult = new(string.Empty, string.Empty, [], null, null, null, null);
             await retryPipeline.ExecuteAsync(async ct =>
             {
-                streamResult = await StreamOnceAsync(request, model, messages, toolList, ct);
+                streamResult = await StreamOnceAsync(request, model, messages, breakAfterPlanPresentation ? [] : toolList, ct);
             }, cancellationToken);
 
             if (streamResult.InputTokens.HasValue) totalInputTokens = streamResult.InputTokens;
@@ -290,18 +294,8 @@ public sealed class DeepInfraProvider : IAiProvider
 
             if (shouldBreakForApproval)
             {
-                if (string.IsNullOrWhiteSpace(finalText) &&
-                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
-                {
-                    EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
-                        inputTokens: totalInputTokens,
-                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
-                        model: responseModel,
-                        reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                        cacheReadTokens: totalCacheReadTokens);
-                }
-
-                break;
+                breakAfterPlanPresentation = true;
+                continue;
             }
         }
 

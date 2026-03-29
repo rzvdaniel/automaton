@@ -92,6 +92,10 @@ public class GoogleProvider : IAiProvider
         int totalOutputTokens = 0;
         string? modelVersion = null;
 
+        // When propose_plan returns awaitingApproval, suppress tools on the next iteration
+        // so the LLM can present the plan and ask for user confirmation.
+        var breakAfterPlanPresentation = false;
+
         while (true)
         {
             iterationCount++;
@@ -161,7 +165,7 @@ public class GoogleProvider : IAiProvider
                     request.SystemPrompt,
                     request.MaxTokens,
                     contents,
-                    toolList,
+                    breakAfterPlanPresentation ? [] : toolList,
                     ct))
                 {
                     if (chunk.InputTokens.HasValue) iterInputTokens = chunk.InputTokens;
@@ -299,7 +303,10 @@ public class GoogleProvider : IAiProvider
             }
 
             if (shouldBreakForApproval)
-                break;
+            {
+                breakAfterPlanPresentation = true;
+                continue;
+            }
         }
 
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
