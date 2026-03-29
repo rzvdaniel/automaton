@@ -18,10 +18,11 @@ public class FileIoTool : IMcpTool
     public const string DeleteFileName = "delete_file";
     public const string RenameFileName = "rename_file";
     public const string RenameFolderName = "rename_folder";
+    public const string DeleteFolderName = "delete_folder";
     public const string ListFilesName  = "list_files";
     public const string SearchFileName = "search_file";
 
-    private static readonly HashSet<string> HandledTools = [ReadFileName, WriteFileName, EditFileName, DeleteFileName, RenameFileName, RenameFolderName, ListFilesName, SearchFileName];
+    private static readonly HashSet<string> HandledTools = [ReadFileName, WriteFileName, EditFileName, DeleteFileName, RenameFileName, RenameFolderName, DeleteFolderName, ListFilesName, SearchFileName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<FileIoTool> _logger;
@@ -47,7 +48,7 @@ public class FileIoTool : IMcpTool
             {
                 Name = WriteFileName,
                 Capability = ToolCapability.Write,
-                Description = "Write a file with concrete content. Creates directories as needed. Empty/whitespace content is blocked by default to prevent accidental file wipes; pass allowEmpty=true only when intentionally writing a blank file.",
+                Description = "Write a file with concrete content. Overwrites the file if it already exists — never delete a file before writing it. Creates directories as needed. Empty/whitespace content is blocked by default to prevent accidental file wipes; pass allowEmpty=true only when intentionally writing a blank file.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"allowEmpty":{"type":"boolean","description":"Set true only when intentionally writing an empty/whitespace file."}},"required":["path","content"]}""")
             },
             new McpTool
@@ -81,8 +82,15 @@ public class FileIoTool : IMcpTool
             {
                 Name = DeleteFileName,
                 Capability = ToolCapability.Write,
-                Description = "Delete a file. IMPORTANT: always call first WITHOUT confirmed=true to get a confirmation prompt. Only pass confirmed=true after the user explicitly approves the deletion.",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"},"confirmed":{"type":"boolean","description":"Must be true to actually delete. Omit or set false for a preview."}},"required":["path"]}""")
+                Description = "Delete one or more files permanently. Only use when the user explicitly asks to remove files — never call this to replace file content (use write_file instead, which overwrites).",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"paths":{"type":"array","items":{"type":"string"},"description":"One or more file paths to delete."}},"required":["paths"]}""")
+            },
+            new McpTool
+            {
+                Name = DeleteFolderName,
+                Capability = ToolCapability.Write,
+                Description = "Delete a folder and all its contents. Only use when the user explicitly asks to remove a folder.",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}""")
             },
             new McpTool
             {
@@ -139,8 +147,9 @@ public class FileIoTool : IMcpTool
             ReadFileName   => await ReadFile(fs, arguments),
             WriteFileName  => await WriteFile(fs, arguments),
             EditFileName   => await EditFile(fs, arguments),
-            DeleteFileName => await DeleteFile(fs, arguments),
-            RenameFileName => await RenameFile(fs, arguments),
+            DeleteFileName   => await DeleteFile(fs, arguments),
+            DeleteFolderName => await DeleteFolder(fs, arguments),
+            RenameFileName   => await RenameFile(fs, arguments),
             RenameFolderName => await RenameFolder(fs, arguments),
             ListFilesName  => await ListFiles(fs),
             SearchFileName => await SearchFile(fs, arguments),
@@ -299,26 +308,19 @@ public class FileIoTool : IMcpTool
     {
         try
         {
-            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
-                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+            if (!arguments.TryGetProperty("paths", out var pathsProp) || pathsProp.ValueKind != JsonValueKind.Array)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'paths' (array of file paths)." };
 
-            var path      = pathProp.GetString()!;
-            var confirmed = arguments.TryGetProperty("confirmed", out var c) && c.GetBoolean();
-
-            if (!confirmed)
+            var deleted = new List<string>();
+            foreach (var el in pathsProp.EnumerateArray())
             {
-                var preview = JsonSerializer.Serialize(new
-                {
-                    awaitingApproval = true,
-                    action           = "delete_file",
-                    path,
-                    message          = $"About to permanently delete '{path}'. This cannot be undone. Call delete_file again with confirmed=true to proceed, or do nothing to cancel."
-                });
-                return new McpToolResult { Success = true, Content = preview };
+                var path = el.GetString();
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                await fs.DeleteFileAsync(path);
+                deleted.Add(path);
             }
 
-            await fs.DeleteFileAsync(path);
-            return new McpToolResult { Success = true, Content = $"File '{path}' deleted successfully" };
+            return new McpToolResult { Success = true, Content = $"Deleted {deleted.Count} file(s): {string.Join(", ", deleted)}" };
         }
         catch (InvalidOperationException ex)
         {
@@ -328,6 +330,28 @@ public class FileIoTool : IMcpTool
         {
             _logger.LogError(ex, "Error deleting file");
             return new McpToolResult { Success = false, Error = $"Failed to delete file: {ex.Message}" };
+        }
+    }
+
+    private async Task<McpToolResult> DeleteFolder(IScopedFileSystem fs, JsonElement arguments)
+    {
+        try
+        {
+            if (!arguments.TryGetProperty("path", out var pathProp) || pathProp.ValueKind != JsonValueKind.String)
+                return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
+
+            var path = pathProp.GetString()!;
+            await fs.DeleteFolderAsync(path);
+            return new McpToolResult { Success = true, Content = $"Folder '{path}' deleted successfully" };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new McpToolResult { Success = false, Error = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting folder");
+            return new McpToolResult { Success = false, Error = $"Failed to delete folder: {ex.Message}" };
         }
     }
 

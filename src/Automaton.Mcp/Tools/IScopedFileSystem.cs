@@ -20,6 +20,12 @@ public interface IScopedFileSystem
     Task DeleteFileAsync(string relativePath);
 
     /// <summary>
+    /// Deletes a folder and all its contents.
+    /// Throws <see cref="InvalidOperationException"/> for protected folders.
+    /// </summary>
+    Task DeleteFolderAsync(string relativePath);
+
+    /// <summary>
     /// Renames or moves a file within the current scope.
     /// </summary>
     Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false);

@@ -46,6 +46,13 @@ public class LocalScopedFileSystem : IScopedFileSystem
         return Task.CompletedTask;
     }
 
+    public virtual Task DeleteFolderAsync(string relativePath)
+    {
+        var full = ResolveSafe(relativePath);
+        if (Directory.Exists(full)) Directory.Delete(full, recursive: true);
+        return Task.CompletedTask;
+    }
+
     public virtual Task RenameFileAsync(string fromRelativePath, string toRelativePath, bool overwrite = false)
     {
         if (string.IsNullOrWhiteSpace(fromRelativePath))

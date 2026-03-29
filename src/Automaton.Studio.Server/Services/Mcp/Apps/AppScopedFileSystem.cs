@@ -49,6 +49,14 @@ public class AppScopedFileSystem : LocalScopedFileSystem
         return base.RenameFolderAsync(fromRelativePath, toRelativePath);
     }
 
+    public override Task DeleteFolderAsync(string relativePath)
+    {
+        if (IsInternalVersionsPath(relativePath))
+            throw new InvalidOperationException("Cannot delete the internal versions storage folder.");
+
+        return base.DeleteFolderAsync(relativePath);
+    }
+
     public override Task<IEnumerable<string>> ListFilesAsync()
     {
         if (!Directory.Exists(RootPath))
