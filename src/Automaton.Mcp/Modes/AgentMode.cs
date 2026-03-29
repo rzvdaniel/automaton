@@ -11,6 +11,5 @@ public sealed class AgentMode : IConversationMode
 
     public string Name => ConversationModes.Agent;
     public string SystemPromptSuffix => _inner.SystemPromptSuffix;
-    public int MaxToolIterations => _inner.MaxToolIterations;
     public bool IsToolAllowed(McpTool tool) => _inner.IsToolAllowed(tool);
 }

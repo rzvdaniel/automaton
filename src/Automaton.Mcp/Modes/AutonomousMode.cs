@@ -25,7 +25,5 @@ public sealed class AutonomousMode : IConversationMode
         "If the user asks a question: answer in plain text, do not touch any files.\n\n" +
         "Before deleting any file: always call delete_file WITHOUT confirmed=true first, then ask the user to confirm. Only call it with confirmed=true after they approve.";
 
-    public int MaxToolIterations => 20;
-
     public bool IsToolAllowed(McpTool tool) => true;
 }

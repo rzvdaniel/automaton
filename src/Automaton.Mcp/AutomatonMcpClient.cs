@@ -154,9 +154,6 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 var providerTools = await CreateProviderToolsAsync(mode);
                 var allowedToolNames = new HashSet<string>(providerTools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
 
-                // Apply mode-specific iteration limit
-                request.MaxIterations = mode.MaxToolIterations;
-
                 // Call the provider
                 var providerResult = await provider.CallAsync(
                     request,
