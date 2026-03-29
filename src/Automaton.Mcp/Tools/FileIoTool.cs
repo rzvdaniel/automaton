@@ -55,7 +55,7 @@ public class FileIoTool : IMcpTool
             {
                 Name = EditFileName,
                 Capability = ToolCapability.Write,
-                Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText. Use dryRun=true to preview without saving.",
+                Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText.",
                 InputSchema = JsonDocument.Parse("""
                     {
                         "type": "object",
@@ -71,8 +71,7 @@ public class FileIoTool : IMcpTool
                                     },
                                     "required": ["oldText", "newText"]
                                 }
-                            },
-                            "dryRun": { "type": "boolean" }
+                            }
                         },
                         "required": ["path", "edits"]
                     }
@@ -178,16 +177,7 @@ public class FileIoTool : IMcpTool
 
             var lineCount = content.Count(c => c == '\n') + 1;
             if (lineCount >= LocalScopedFileSystem.LargeFileThreshold)
-            {
-                // Return hint as a separate JSON field so it is never part of the file content.
-                // The AI reads `content` for the file text and `note` as metadata — they stay separate.
-                var json = JsonSerializer.Serialize(new
-                {
-                    note    = $"File has {lineCount} lines. For targeted edits prefer search_file + edit_file to avoid re-reading.",
-                    content
-                });
-                return new McpToolResult { Success = true, Content = json };
-            }
+                content = $"[NOTE: {lineCount} lines — for targeted edits prefer search_file + edit_file]\n\n" + content;
 
             return new McpToolResult { Success = true, Content = content };
         }
@@ -242,7 +232,6 @@ public class FileIoTool : IMcpTool
                 return new McpToolResult { Success = false, Error = "Missing required argument 'path'." };
 
             var path   = pathProp.GetString()!;
-            var dryRun = arguments.TryGetProperty("dryRun", out var dryRunProp) && dryRunProp.GetBoolean();
 
             var content = await fs.ReadFileAsync(path);
             if (content is null)
@@ -257,7 +246,6 @@ public class FileIoTool : IMcpTool
 
             var updated      = content;
             var appliedCount = 0;
-            var summary      = new StringBuilder();
 
             foreach (var edit in editsElement.EnumerateArray())
             {
@@ -274,16 +262,12 @@ public class FileIoTool : IMcpTool
                 var idx = updated.IndexOf(oldText, StringComparison.Ordinal);
                 updated = updated[..idx] + newText + updated[(idx + oldText.Length)..];
 
-                summary.AppendLine($"- Edit {appliedCount + 1}: replaced {oldText.Split('\n').Length} line(s) with {newText.Split('\n').Length} line(s)");
                 appliedCount++;
             }
 
-            if (dryRun)
-                return new McpToolResult { Success = true, Content = $"[Dry run] {appliedCount} edit(s) would be applied to '{path}':\n{summary}" };
-
             await fs.WriteFileAsync(path, updated);
 
-            return new McpToolResult { Success = true, Content = $"Applied {appliedCount} edit(s) to '{path}':\n{summary}" };
+            return new McpToolResult { Success = true, Content = $"Applied {appliedCount} edit(s) to '{path}'" };
         }
         catch (Exception ex)
         {
