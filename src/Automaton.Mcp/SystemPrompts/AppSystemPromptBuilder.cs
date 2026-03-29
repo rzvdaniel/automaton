@@ -31,6 +31,10 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-enterprise.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
+    private static readonly Lazy<string> PlanningPrompt = new(
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-planning.md"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
 
     public AppSystemPromptBuilder(IStepSystemPromptBuilder stepPromptBuilder)
@@ -54,6 +58,13 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 
         return $"{BasePrompt.Value}\n\n{tierPrompt}";
     }
+
+    /// <summary>
+    /// Wraps <paramref name="baseSystemPrompt"/> with the planning-phase instruction block
+    /// loaded from <c>app-planning.md</c>.
+    /// </summary>
+    public string BuildPlanningPhaseSystemPrompt(string baseSystemPrompt) =>
+        $"{baseSystemPrompt}\n\n{PlanningPrompt.Value}";
 
     private static string LoadEmbeddedResource(string resourceName)
     {

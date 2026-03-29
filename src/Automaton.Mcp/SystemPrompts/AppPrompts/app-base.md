@@ -65,6 +65,117 @@ function gameLoop(timestamp) {
 let x=0,y=0,s=3,sc=0,l=3,go=false;
 function gl(t){if(!go){u(t);r();requestAnimationFrame(gl)}}
 ```
+
+## HTML & CSS ARCHITECTURE — STRUCTURE FOR LEARNING:
+
+Well-structured HTML and CSS communicates intent and teaches professional patterns. Model your markup like production apps a student migh study and learn from.
+
+### Semantic HTML — use the right element for the job
+
+```html
+<!-- ✅ Communicates structure at a glance -->
+<header>...</header>
+<nav>...</nav>
+<main id="main">
+  <section class="dashboard">...</section>
+  <article class="card">...</article>
+</main>
+<footer>...</footer>
+<dialog id="confirm-modal">...</dialog>   <!-- modals -->
+<details><summary>FAQ item</summary>...</details>  <!-- accordions -->
+
+<!-- ❌ Every element is a div — no structure -->
+<div class="top"><div class="menu">...</div></div>
+<div class="content"><div class="stuff">...</div></div>
+```
+
+Rules:
+- `<button>` for actions, `<a href="...">` for navigation — never swap them
+- `<dialog>` for modals instead of a `<div class="modal">` hack
+- `<table>` for tabular data (use `<thead>`, `<tbody>`, `<th scope="col">`)
+
+### BEM-like CSS naming — names that show relationships
+
+```css
+/* Block — the standalone component */
+.card { background: white; border-radius: 8px; }
+
+/* Element — a part of .card, always written block__element */
+.card__title  { font-size: 1.25rem; font-weight: 600; }
+.card__body   { padding: 1rem; color: #475569; }
+.card__footer { border-top: 1px solid #e2e8f0; }
+
+/* Modifier — a variation of the block, written block--modifier */
+.card--featured { border: 2px solid #3b82f6; }
+.btn--danger    { background: #dc2626; }
+```
+
+This makes it immediately clear which CSS belongs to which component and how elements relate.
+
+### Organise CSS with labelled section comments
+
+Even in a single file, divide styles into named regions — a future reader can jump straight to what they need:
+
+```css
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+/* ============================================================
+   FORMS
+   ============================================================ */
+```
+
+### Use data attributes for JavaScript hooks — never select by CSS class
+
+CSS classes are for styling. When JS needs to find an element, use a `data-*` attribute. This decouples presentation from behaviour — a designer can rename `.btn--primary` freely without breaking your JS.
+
+```html
+<!-- ✅ data attribute = JS hook; class = visual style -->
+<button class="btn btn--primary" data-action="save" data-item-id="42">Save</button>
+<ul data-list="results"></ul>
+
+<!-- in JS -->
+document.querySelector('[data-action="save"]').addEventListener('click', handleSave);
+document.querySelector('[data-list="results"]').innerHTML = renderItems(items);
+
+<!-- ❌ fragile — CSS rename breaks JS -->
+document.querySelector('.btn--primary').addEventListener('click', handleSave);
+```
+
+### When splitting JS across multiple files — one role per file
+
+For any app that uses separate `.js` files (not inline `<script>`), split by role:
+
+| File | Role | Contains |
+|------|------|----------|
+| `js/state.js` | Things that *are* | Constants, initial data, shared state |
+| `js/api.js` | Things that *fetch* | All `automatonApi` calls, one function per endpoint |
+| `js/ui.js` | Things that *draw* | DOM update functions, `render*()` functions |
+| `js/events.js` | Things that *react* | Event listeners, wired up after all modules load |
+
+Each file starts with a one-line comment declaring its role:
+```javascript
+// api.js — All data-fetching. One async function per automatonApi endpoint.
+```
+
+Load order in HTML: `state.js` → `api.js` → `ui.js` → `events.js` (each depends on the previous).
 Controllers run on the runner — you cannot test during authoring.
 1. Write correct Python with try/except; always set `success` and `error`
 2. After writing, remind user to click **"Deploy Backend"** in the toolbar

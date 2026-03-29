@@ -29,6 +29,7 @@ public abstract class AiConversationControllerBase : BaseController
     protected readonly ISystemAiRateLimitService _rateLimitService;
     protected readonly AiProviderMetadataService _providerMetadataService;
     protected readonly ITokenBudgetService _tokenBudgetService;
+    protected readonly IAppSystemPromptBuilder _appPromptBuilder;
     protected readonly ILogger _logger;
 
     /// <summary>
@@ -45,6 +46,7 @@ public abstract class AiConversationControllerBase : BaseController
         ISystemAiRateLimitService rateLimitService,
         AiProviderMetadataService providerMetadataService,
         ITokenBudgetService tokenBudgetService,
+        IAppSystemPromptBuilder appPromptBuilder,
         ILogger logger)
     {
         _mcpClient = mcpClient;
@@ -54,6 +56,7 @@ public abstract class AiConversationControllerBase : BaseController
         _rateLimitService = rateLimitService;
         _providerMetadataService = providerMetadataService;
         _tokenBudgetService = tokenBudgetService;
+        _appPromptBuilder = appPromptBuilder;
         _logger = logger;
     }
 
@@ -557,8 +560,9 @@ public abstract class AiConversationControllerBase : BaseController
         "Include:\n" +
         "- **Every file** to be created or modified, with exact relative paths\n" +
         "- **Directory structure**: complete file tree of what will exist after implementation\n" +
-        "- **CSS design**: exact colors (hex/rgb), class names, layout approach (grid/flex), responsive breakpoints\n" +
-        "- **JavaScript/TypeScript architecture**: module responsibilities, key function signatures, data flow\n" +
+        "- **CSS design**: exact colors (hex/rgb), class names (use BEM-like naming: `.card__title`, `.btn--danger`), layout approach (grid/flex), responsive breakpoints\n" +
+        "- **JavaScript/TypeScript architecture**: module responsibilities split by role (state / api / rendering / events), key function signatures, data flow\n" +
+        "- **HTML structure**: semantic elements (`<header>`, `<nav>`, `<main>`, `<dialog>`, etc.), data attributes used as JS hooks (`data-action`, `data-id`)\n" +
         "- **Data structures**: interfaces, types, schema definitions with exact field names and types\n" +
         "- **Component hierarchy**: parent-child relationships, props, events\n" +
         "- **API contracts**: endpoint URLs, HTTP methods, request/response shapes\n" +

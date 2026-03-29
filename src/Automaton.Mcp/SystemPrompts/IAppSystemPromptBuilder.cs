@@ -10,4 +10,9 @@ public interface IAppSystemPromptBuilder
     /// Falls back to the legacy single prompt when tier is null.
     /// </summary>
     string BuildSystemPrompt(ComplexityTier? tier = null);
+
+    /// <summary>
+    /// Wraps <paramref name="baseSystemPrompt"/> with the planning-phase instruction block.
+    /// </summary>
+    string BuildPlanningPhaseSystemPrompt(string baseSystemPrompt);
 }

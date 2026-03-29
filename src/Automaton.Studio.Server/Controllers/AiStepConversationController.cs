@@ -33,9 +33,10 @@ public class AiStepConversationController : AiConversationControllerBase
         ITokenBudgetService tokenBudgetService,
         StepMcpToolProvider toolProvider,
         IStepSystemPromptBuilder promptBuilder,
+        IAppSystemPromptBuilder appPromptBuilder,
         ILogger<AiStepConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, settingsService,
-               rateLimitService, providerMetadataService, tokenBudgetService, logger)
+               rateLimitService, providerMetadataService, tokenBudgetService, appPromptBuilder, logger)
     {
         _toolProvider = toolProvider;
         _promptBuilder = promptBuilder;

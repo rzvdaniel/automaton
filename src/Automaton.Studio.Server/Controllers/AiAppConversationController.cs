@@ -49,7 +49,7 @@ public class AiAppConversationController : AiConversationControllerBase
         AppMemoryService appMemoryService,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, settingsService,
-               rateLimitService, providerMetadataService, tokenBudgetService, logger)
+               rateLimitService, providerMetadataService, tokenBudgetService, promptBuilder, logger)
     {
         _toolProvider         = toolProvider;
         _promptBuilder        = promptBuilder;

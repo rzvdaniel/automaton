@@ -24,6 +24,7 @@
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-medium.md" />
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-large.md" />
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-enterprise.md" />
+    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-planning.md" />
   </ItemGroup>
 
 </Project>

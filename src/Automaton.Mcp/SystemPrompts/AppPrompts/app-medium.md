@@ -105,6 +105,37 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared d
    └─ api.js                # (optional) Shared API calls
 ```
 
+## JAVASCRIPT STRUCTURE:
+
+For any JS file over ~60 lines, divide it into named regions with section comments:
+
+```javascript
+// ── CONSTANTS & STATE ─────────────────────────────────────────────────────
+// Things that *are* — data, initial values, configuration
+
+const API_BASE = '/api';
+let items = [];
+
+// ── API CALLS ─────────────────────────────────────────────────────────────
+// Things that *fetch* — all calls to automatonApi go here
+
+async function fetchItems() { ... }
+async function saveItem(data) { ... }
+
+// ── RENDERING ─────────────────────────────────────────────────────────────
+// Things that *draw* — functions that update the DOM
+
+function renderItemList(items) { ... }
+function renderEmptyState() { ... }
+
+// ── EVENT LISTENERS ───────────────────────────────────────────────────────
+// Things that *react* — wired up last, after all functions are defined
+
+document.getElementById('add-btn').addEventListener('click', handleAdd);
+```
+
+A reader should be able to jump to the section they care about without reading the whole file.
+
 ## TOOL SEQUENCE:
 
 **With backend:**
