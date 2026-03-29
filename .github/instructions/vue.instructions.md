@@ -54,6 +54,24 @@ Keep stores lean. Colocate all feature logic within the feature folder.
 - Services are plain functions that return typed promises — no business logic
 - Always handle errors with try/catch and show toast notifications via `useToast()`
 
+## No Hardcoded Configuration Values (Critical)
+
+**Never hardcode values in the UI that are owned by the backend** — limits, defaults, thresholds, and any operator-configurable number must come from the API, not be copy-pasted into Vue components.
+
+- **Form defaults**: populate from the relevant API response, not from a magic number
+- **Display limits**: fetch from config endpoint; use a safe local fallback only as a last resort
+- **If you find yourself typing a number like `4096`, `32768`, `65536`** in a `.vue` or `.ts` file, stop — ask where that value lives on the backend and pipe it through the API instead
+
+```ts
+// ✅ DO — use the value returned by the backend
+maxTokens: globalDefaults.value.defaultMaxOutputTokens ?? 65536  // 65536 is last-resort only
+
+// ❌ DON'T — hardcode the value directly
+maxTokens: 65536
+```
+
+When a backend response doesn't yet include the value you need, **add it to the response DTO** rather than duplicating the constant on the frontend.
+
 ## Toast / Notifications (Critical)
 
 - **Never add `<Toast />` to any component other than `App.vue`** — `<Toast />` is registered globally in `App.vue` and must appear exactly once in the entire app. Adding it in any view or child component causes every `toast.add()` call to render duplicate notifications.

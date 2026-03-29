@@ -1,9 +1,11 @@
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 namespace Automaton.Studio.Server.Controllers.Admin;
 
 /// <summary>
@@ -17,15 +19,18 @@ public class AdminAiProvidersController : ControllerBase
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AdminAiProvidersController> logger;
     private readonly AiApiKeyService aiApiKeyService;
+    private readonly AiProvidersConfig aiProvidersConfig;
 
     public AdminAiProvidersController(
         ApplicationDbContext dbContext,
         ILogger<AdminAiProvidersController> logger,
-        AiApiKeyService aiApiKeyService)
+        AiApiKeyService aiApiKeyService,
+        IOptions<AiProvidersConfig> aiProvidersConfig)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.aiApiKeyService = aiApiKeyService;
+        this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
     #region Providers
@@ -279,7 +284,8 @@ public class AdminAiProvidersController : ControllerBase
         return Ok(new GlobalAiDefaultsResponse
         {
             DefaultModel = defaultModel,
-            PlanningModel = planningModel
+            PlanningModel = planningModel,
+            DefaultMaxOutputTokens = aiProvidersConfig.DefaultMaxOutputTokens
         });
     }
 
@@ -413,7 +419,7 @@ public class AdminAiProvidersController : ControllerBase
             IsActive = request.IsActive,
             IsDefault = request.IsDefault,
             IsPlanningModel = request.IsPlanningModel,
-            MaxTokens = request.MaxTokens,
+            MaxTokens = request.MaxTokens ?? aiProvidersConfig.DefaultMaxOutputTokens,
             SupportsStreaming = request.SupportsStreaming,
             SupportsTools = request.SupportsTools,
             SupportsVision = request.SupportsVision,
@@ -737,7 +743,7 @@ public class AdminCreateAiModelRequest
     public bool IsActive { get; set; } = true;
     public bool IsDefault { get; set; } = false;
     public bool IsPlanningModel { get; set; } = false;
-    public int MaxTokens { get; set; } = 4096;
+    public int? MaxTokens { get; set; }
     public bool SupportsStreaming { get; set; } = true;
     public bool SupportsTools { get; set; } = false;
     public bool SupportsVision { get; set; } = false;
@@ -793,6 +799,7 @@ public class GlobalAiDefaultsResponse
 {
     public AiModelAdminResponse? DefaultModel { get; set; }
     public AiModelAdminResponse? PlanningModel { get; set; }
+    public int DefaultMaxOutputTokens { get; set; }
 }
 
 #endregion

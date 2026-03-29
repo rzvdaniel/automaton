@@ -130,6 +130,7 @@ export interface UpdateAiModelRequest {
 export interface GlobalAiDefaults {
   defaultModel?: AiModelAdmin
   planningModel?: AiModelAdmin
+  defaultMaxOutputTokens?: number
 }
 
 /**

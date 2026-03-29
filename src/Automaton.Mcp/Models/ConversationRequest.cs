@@ -63,9 +63,10 @@ public class ConversationRequest
 
     /// <summary>
     /// Maximum output tokens per response turn. Sourced from the AiModel.MaxTokens database field.
-    /// Defaults to 4096 if not set.
+    /// Defaults to <c>AiProvidersConfig.DefaultMaxOutputTokens</c> (configurable, default 32768) if not set.
+    /// This field is always overridden by <c>AiConversationControllerBase</c> before the request is dispatched.
     /// </summary>
-    public int MaxTokens { get; set; } = 4096;
+    public int MaxTokens { get; set; } = 65536;
 
     /// <summary>
     /// Maximum retries on a rate-limit response. Sourced from AiProviders:RateLimitRetry:MaxRetries.

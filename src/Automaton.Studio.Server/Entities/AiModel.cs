@@ -38,7 +38,7 @@ public class AiModel
     /// </summary>
     public bool IsPlanningModel { get; set; } = false;
 
-    public int MaxTokens { get; set; } = 4096;
+    public int MaxTokens { get; set; } = 65536;
 
     public bool SupportsStreaming { get; set; } = true;
 

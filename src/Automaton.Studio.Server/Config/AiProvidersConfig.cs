@@ -24,6 +24,15 @@ public class AiProvidersConfig
     public int MaxConsecutiveFailures { get; set; } = 3;
 
     /// <summary>
+    /// Default maximum output tokens per response turn. Used in two places:
+    /// (1) as the default when a new AI model is created via the admin API;
+    /// (2) as the runtime fallback when the model is not found in the database.
+    /// The per-model value stored in <c>AiModel.MaxTokens</c> always takes precedence at runtime.
+    /// Default: 65536 (64K) — covers all modern frontier models including Claude 3.7 and Gemini 2.5 Pro.
+    /// </summary>
+    public int DefaultMaxOutputTokens { get; set; } = 65536;
+
+    /// <summary>
     /// Per-tier iteration limits. Zero values fall back to the built-in defaults
     /// in <see cref="Automaton.Mcp.SystemPrompts.IterationLimits"/>.
     /// </summary>

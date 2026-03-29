@@ -1,5 +1,7 @@
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -10,6 +12,7 @@ public class AiProviderMetadataService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<AiProviderMetadataService> logger;
+    private readonly AiProvidersConfig aiProvidersConfig;
 
     // Known fallback defaults when database has no default set
     private static readonly Dictionary<string, string> FallbackDefaults = new(StringComparer.OrdinalIgnoreCase)
@@ -19,10 +22,11 @@ public class AiProviderMetadataService
         ["Google"] = "gemini-1.5-pro"
     };
 
-    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger)
+    public AiProviderMetadataService(ApplicationDbContext dbContext, ILogger<AiProviderMetadataService> logger, IOptions<AiProvidersConfig> aiProvidersConfig)
     {
         this.dbContext = dbContext;
         this.logger = logger;
+        this.aiProvidersConfig = aiProvidersConfig.Value;
     }
 
     /// <summary>
@@ -140,16 +144,17 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
-    /// Returns the MaxTokens configured for the specified model, or <paramref name="fallback"/> if not found.
+    /// Returns the MaxTokens configured for the specified model.
+    /// Falls back to <c>AiProvidersConfig.DefaultMaxOutputTokens</c> when the model is not found in the database.
     /// </summary>
-    public async Task<int> GetModelMaxTokensAsync(string providerName, string modelId, int fallback = 16384)
+    public async Task<int> GetModelMaxTokensAsync(string providerName, string modelId)
     {
         var maxTokens = await dbContext.AiModels
             .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)
             .Select(m => (int?)m.MaxTokens)
             .FirstOrDefaultAsync();
 
-        return maxTokens ?? fallback;
+        return maxTokens ?? aiProvidersConfig.DefaultMaxOutputTokens;
     }
 
     /// <summary>
