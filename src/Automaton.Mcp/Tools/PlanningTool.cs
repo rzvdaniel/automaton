@@ -14,8 +14,9 @@ namespace Automaton.Mcp.Tools;
 public class PlanningTool : IMcpTool
 {
     public const string ProposePlanName  = "propose_plan";
+    public const string UpdatePlanName   = "update_plan";
 
-    private static readonly HashSet<string> HandledTools = [ProposePlanName];
+    private static readonly HashSet<string> HandledTools = [ProposePlanName, UpdatePlanName];
 
     private readonly IScopedFileSystemFactory _fileSystemFactory;
     private readonly ILogger<PlanningTool> _logger;
@@ -103,6 +104,32 @@ public class PlanningTool : IMcpTool
                         "required": ["planType", "title", "summary"]
                     }
                     """)
+            },
+            new McpTool
+            {
+                Name = UpdatePlanName,
+                Capability = ToolCapability.Write,
+                Description = "Partially update the implementation plan (.plans/IMPLEMENTATION.md) by replacing a specific piece of text. Use this when requirements change, a stage needs rewording, a new tech decision is added, or a new stage is inserted. Use read_file on '.plans/IMPLEMENTATION.md' first to get the exact current text, then call update_plan with the exact oldText to replace. If oldText is not found the tool returns an error.",
+                InputSchema = JsonDocument.Parse("""
+                    {
+                        "type": "object",
+                        "properties": {
+                            "oldText": {
+                                "type": "string",
+                                "description": "Exact text to find in the plan. Must match verbatim — use read_file first to confirm."
+                            },
+                            "newText": {
+                                "type": "string",
+                                "description": "Replacement text."
+                            },
+                            "reason": {
+                                "type": "string",
+                                "description": "Brief reason for the change (e.g. 'added caching stage', 'updated tech decision for auth')."
+                            }
+                        },
+                        "required": ["oldText", "newText"]
+                    }
+                    """)
             }
         };
 
@@ -116,6 +143,7 @@ public class PlanningTool : IMcpTool
         return toolName switch
         {
             ProposePlanName => await ProposePlan(arguments, context),
+            UpdatePlanName  => await UpdatePlan(arguments, context),
             _ => new McpToolResult { Success = false, Error = $"Unknown tool: {toolName}" }
         };
     }
@@ -180,6 +208,11 @@ public class PlanningTool : IMcpTool
                 ? FindNextStage(markdownContent)
                 : null;
 
+            // In autonomous planning phase the model must stop after writing the plan.
+            var isAutonomousPlanningPhase =
+                context?.TryGetValue("planningPhase", out var ppVal) == true &&
+                string.Equals(ppVal?.ToString(), "autonomous", StringComparison.OrdinalIgnoreCase);
+
             // Plain-English instruction included in the result so the model knows exactly what to do next.
             string instruction;
             if (planType == "stage_complete")
@@ -201,9 +234,16 @@ public class PlanningTool : IMcpTool
             }
             else
             {
-                instruction = isRefinement
-                    ? "Plan updated. Re-render the full updated plan as markdown (title, summary, components, tech decisions, stages with complexity badges) then ask whether to proceed. Do NOT call any more tools."
-                    : "Plan saved. Render the full plan as markdown in your reply: start with the title and 1-sentence summary, then a **Components** section, a **Technical Decisions** section, and a **Stages** section listing each stage with its complexity (e.g. `_(complexity: medium)_`) and description. End with a short question asking whether to proceed. Do NOT call any other tools until confirmed.";
+                if (isAutonomousPlanningPhase)
+                {
+                    instruction = "Plan saved. Your planning task is complete. Write ONE brief confirmation sentence and stop.";
+                }
+                else
+                {
+                    instruction = isRefinement
+                        ? "Plan updated. Re-render the full updated plan as markdown (title, summary, components, tech decisions, stages with complexity badges) then ask whether to proceed. Do NOT call any more tools."
+                        : "Plan saved. Render the full plan as markdown in your reply: start with the title and 1-sentence summary, then a **Components** section, a **Technical Decisions** section, and a **Stages** section listing each stage with its complexity (e.g. `_(complexity: medium)_`) and description. End with a short question asking whether to proceed. Do NOT call any other tools until confirmed.";
+                }
             }
 
             var pauseForHighStage = planType == "stage_complete" &&
@@ -213,7 +253,8 @@ public class PlanningTool : IMcpTool
             var result = new
             {
                 instruction,
-                awaitingApproval = planType != "stage_complete" || pauseForHighStage,
+                // In autonomous planning phase never pause — implementation starts immediately after.
+                awaitingApproval = !isAutonomousPlanningPhase && (planType != "stage_complete" || pauseForHighStage),
                 planType,
                 title,
                 summary,
@@ -240,6 +281,52 @@ public class PlanningTool : IMcpTool
         {
             _logger.LogError(ex, "Error executing propose_plan");
             return new McpToolResult { Success = false, Error = $"Failed to propose plan: {ex.Message}" };
+        }
+    }
+
+    private async Task<McpToolResult> UpdatePlan(JsonElement arguments, Dictionary<string, object>? context)
+    {
+        try
+        {
+            var oldText = arguments.GetProperty("oldText").GetString()!;
+            var newText = arguments.GetProperty("newText").GetString()!;
+            var reason  = arguments.TryGetProperty("reason", out var r) ? r.GetString() : null;
+            var fs      = _fileSystemFactory.Create(arguments, context);
+
+            const string planPath = ".plans/IMPLEMENTATION.md";
+            var existing = await fs.ReadFileAsync(planPath);
+
+            if (existing is null)
+                return new McpToolResult { Success = false, Error = "No plan found at .plans/IMPLEMENTATION.md. Create one first with propose_plan." };
+
+            if (!existing.Contains(oldText, StringComparison.Ordinal))
+                return new McpToolResult { Success = false, Error = "oldText not found in the plan. Use read_file on '.plans/IMPLEMENTATION.md' to get the exact current content, then retry." };
+
+            var updated = existing.Replace(oldText, newText, StringComparison.Ordinal);
+
+            // Append a change-log entry at the bottom so there is an audit trail
+            if (!string.IsNullOrWhiteSpace(reason))
+                updated += $"\n---\n_Plan updated on {DateTime.UtcNow:yyyy-MM-dd}: {reason}_\n";
+
+            await fs.WriteFileAsync(planPath, updated);
+            _logger.LogInformation("Updated plan file {Path}", planPath);
+
+            return new McpToolResult
+            {
+                Success = true,
+                Content = JsonSerializer.Serialize(new
+                {
+                    updated      = true,
+                    path         = planPath,
+                    reason,
+                    notification = $"📋 Plan updated{(reason != null ? $" — {reason}" : "")}"
+                })
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating plan");
+            return new McpToolResult { Success = false, Error = $"Failed to update plan: {ex.Message}" };
         }
     }
 

@@ -24,6 +24,7 @@ const settings = ref<AiProvidersOperationalConfig>({
     large: 40,
     enterprise: 60,
     autonomous: 0,
+    planning: 0,
   },
 })
 
@@ -212,6 +213,17 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.autonomous"
                     :min="0"
                     :max="10000"
+                    showButtons
+                    class="w-full"
+                  />
+                </div>
+                <div class="col-12 field">
+                  <label class="font-medium block mb-1">Planning</label>
+                  <small class="text-color-secondary block mb-1">Default: 5. 0 = use built-in default. Max iterations for the autonomous planning phase (Phase 1).</small>
+                  <InputNumber
+                    v-model="settings.iterationLimits.planning"
+                    :min="0"
+                    :max="50"
                     showButtons
                     class="w-full"
                   />

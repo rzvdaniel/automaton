@@ -143,6 +143,7 @@ export interface IterationLimitsConfig {
   large: number
   enterprise: number
   autonomous: number
+  planning: number
 }
 
 /**

@@ -1,6 +1,16 @@
 # Human-in-the-Loop (HITL)
 
-Automaton's AI chat uses a **Human-in-the-Loop** pattern to balance autonomous execution with user control. The AI proceeds automatically for safe, reversible work and pauses for user approval before anything complex, risky, or irreversible.
+> **This document has been renamed.**
+> See [human-in-the-loop-mode.md](human-in-the-loop-mode.md) for the current version.
+
+Automaton's AI chat supports two execution modes:
+
+| Mode | Behaviour |
+|------|-----------|
+| **Human-in-the-Loop (HITL)** | AI pauses at plan review and high-complexity stages for user approval |
+| **Autonomous** | AI plans and implements end-to-end without any confirmation gates — see [autonomous-mode.md](autonomous-mode.md) |
+
+This document covers the HITL (Human-in-the-Loop) mode. The pattern balances autonomous execution with user control: the AI proceeds automatically for safe, reversible work and pauses for approval before anything complex, risky, or irreversible.
 
 ---
 
@@ -124,7 +134,8 @@ The AI is instructed to keep stage counts conservative (enforced in `AgentMode.S
 | `src/Automaton.Mcp/Providers/GoogleProvider.cs` | Gemini loop-break implementation |
 | `src/Automaton.Mcp/Providers/OpenAiProvider.cs` | OpenAI loop-break implementation |
 | `src/Automaton.Mcp/Providers/AnthropicProvider.cs` | Anthropic loop-break implementation |
-| `src/Automaton.Mcp/Modes/AgentMode.cs` | System prompt rules: when to plan, when to auto-proceed, deletion confirmation |
+| `src/Automaton.Mcp/Modes/HumanInTheMiddleMode.cs` | System prompt rules for HITL: when to plan, when to auto-proceed, deletion confirmation |
+| `docs/ai-chat/autonomous-mode.md` | Documentation for the Autonomous two-phase planning mode |
 
 ---
 

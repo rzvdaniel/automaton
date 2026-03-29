@@ -79,6 +79,11 @@ public class IterationLimitsConfig
     /// </summary>
     public int Autonomous { get; set; } = 0;
 
+    /// <summary>
+    /// Override for the autonomous planning phase (Phase 1). 0 = use the built-in default (5).
+    /// </summary>
+    public int Planning { get; set; } = 0;
+
     /// <summary>Returns the configured override for <paramref name="tier"/>, or 0 if not set.</summary>
     public int For(ComplexityTier? tier) => tier switch
     {

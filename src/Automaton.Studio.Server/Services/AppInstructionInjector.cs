@@ -1,5 +1,6 @@
 using System.Text;
 using Automaton.Studio.Server.Config;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Options;
 using Serilog;
 
@@ -12,6 +13,7 @@ namespace Automaton.Studio.Server.Services;
 ///   - _index.md is always injected (if it exists) — it's the summary file, kept short
 ///   - Files with context: always in their YAML frontmatter are injected in full
 ///   - Files with context: on-request are NOT injected — the AI reads them via read_instruction
+///   - Files with applyTo: "glob,glob" are only injected when the app contains files matching those globs
 ///   - Hard cap of 1000 tokens (approximated as 4 chars/token) total across all injected files
 ///   - Files are prioritized: high → medium → low (frontmatter priority field)
 /// </summary>
@@ -46,6 +48,14 @@ public class AppInstructionInjector
         if (files.Length == 0)
             return null;
 
+        // Build a relative-path list of all non-instruction files in the app directory
+        // so we can evaluate applyTo glob patterns against them.
+        var appFiles = Directory
+            .GetFiles(appDir, "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(appDir, f).Replace('\\', '/'))
+            .Where(f => !f.StartsWith(".instructions/", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         // Always inject _index.md first (it's a short summary)
         var ordered = new List<(int priority, string path, string filename)>();
 
@@ -65,6 +75,16 @@ public class AppInstructionInjector
             var context = meta.GetValueOrDefault("context", "always");
             if (!context.Equals("always", StringComparison.OrdinalIgnoreCase))
                 continue; // on-request files are skipped here
+
+            // applyTo: comma-separated glob patterns — only inject when the app contains matching files
+            if (meta.TryGetValue("applyTo", out var applyTo) && !string.IsNullOrWhiteSpace(applyTo))
+            {
+                if (!MatchesAnyFile(applyTo, appFiles))
+                {
+                    _logger.Debug("Skipping {File}: applyTo '{ApplyTo}' matched no app files", filename, applyTo);
+                    continue;
+                }
+            }
 
             var priorityStr = meta.GetValueOrDefault("priority", "medium");
             var priority = priorityStr.ToLower() switch
@@ -117,6 +137,25 @@ public class AppInstructionInjector
 
         _logger.Debug("Injecting {Chars} chars of instructions for app {AppId}", result.Length, appId);
         return result;
+    }
+
+    // ── Glob matching ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns true if any file in <paramref name="relativeFilePaths"/> matches at least one
+    /// glob pattern in the comma-separated <paramref name="applyToPatterns"/> string.
+    /// Uses <see cref="Microsoft.Extensions.FileSystemGlobbing.Matcher"/> — same engine as MSBuild.
+    /// </summary>
+    private static bool MatchesAnyFile(string applyToPatterns, IEnumerable<string> relativeFilePaths)
+    {
+        var patterns = applyToPatterns
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        foreach (var pattern in patterns)
+            matcher.AddInclude(pattern);
+
+        return relativeFilePaths.Any(f => matcher.Match(f).HasMatches);
     }
 
     // ── YAML frontmatter parsing ─────────────────────────────────────────────

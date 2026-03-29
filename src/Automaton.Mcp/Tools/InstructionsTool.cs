@@ -63,7 +63,7 @@ public class InstructionsTool : IMcpTool
                             },
                             "content": {
                                 "type": "string",
-                                "description": "Full markdown content. Include YAML frontmatter with priority (high|medium|low) and context (always|on-request)."
+                                "description": "Full markdown content. Start with YAML frontmatter. Supported fields: priority (high|medium|low), context (always|on-request), applyTo (comma-separated glob patterns e.g. '**/*.css,**/*.html'). Use applyTo to scope an instruction to specific file types — it will only be injected when the app contains files matching those patterns. Omit applyTo to apply the instruction unconditionally. Example frontmatter: ---\npriority: high\ncontext: always\napplyTo: \"**/*.css,**/*.html\"\n---"
                             },
                             "reason": {
                                 "type": "string",
