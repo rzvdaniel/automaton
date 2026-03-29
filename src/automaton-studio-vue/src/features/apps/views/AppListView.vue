@@ -156,8 +156,8 @@ const handleGenerateApp = async () => {
     })
 
     // Navigate to editor with prompt, mode, and model as query params
-    const prompt = encodeURIComponent(aiDescription.value.trim())
-    const query: Record<string, string> = { prompt }
+    // Vue Router encodes query params automatically — don't call encodeURIComponent
+    const query: Record<string, string> = { prompt: aiDescription.value.trim() }
     if (aiMode.value)  query.mode  = aiMode.value
     if (aiModel.value) query.model = aiModel.value
     router.push({ path: `/apps/${app.id}`, query })
