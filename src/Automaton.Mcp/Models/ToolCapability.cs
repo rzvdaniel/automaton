@@ -12,6 +12,6 @@ public enum ToolCapability
     /// <summary>Modifies the file system — write, edit, delete, rename, instructions.</summary>
     Write,
 
-    /// <summary>Plan lifecycle tools — propose_plan, stage_complete. Available in Plan mode only.</summary>
+    /// <summary>Plan lifecycle tools — propose_plan. Available in Plan mode only.</summary>
     Planning,
 }
