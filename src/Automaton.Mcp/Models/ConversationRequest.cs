@@ -86,10 +86,10 @@ public class ConversationRequest
     public int StreamingTimeoutMinutes { get; set; } = 5;
 
     /// <summary>
-    /// Interaction mode: <see cref="ConversationModes.Plan"/> (read-only, propose_plan available)
-    /// or <see cref="ConversationModes.Agent"/> (write tools, default).
+    /// Interaction mode: <see cref="ConversationModes.Autonomous"/> (default)
+    /// or <see cref="ConversationModes.HumanInTheMiddle"/> (plan then implement).
     /// </summary>
-    public string Mode { get; set; } = ConversationModes.Agent;
+    public string Mode { get; set; } = ConversationModes.Autonomous;
 
     /// <summary>
     /// Optional temperature override (0.0–2.0). Null means use the provider's default.

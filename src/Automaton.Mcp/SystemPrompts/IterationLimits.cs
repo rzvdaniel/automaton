@@ -18,12 +18,6 @@ public static class IterationLimits
     public const int Autonomous = 500;
 
     /// <summary>
-    /// Default iteration limit for the autonomous planning phase (Phase 1).
-    /// Kept low — planning only needs one <c>propose_plan</c> call plus minimal reasoning.
-    /// </summary>
-    public const int Planning = 5;
-
-    /// <summary>
     /// Resolves the iteration limit for HumanInTheMiddle (tier-based) mode:
     /// 1. <paramref name="globalOverride"/> — positive value overrides everything
     /// 2. <paramref name="tierOverride"/> — positive value overrides for this tier only
@@ -54,16 +48,5 @@ public static class IterationLimits
         if (globalOverride    > 0) return globalOverride;
         if (autonomousOverride > 0) return autonomousOverride;
         return Autonomous;
-    }
-
-    /// <summary>
-    /// Resolves the iteration limit for the autonomous planning phase:
-    /// 1. <paramref name="planningOverride"/> — admin-configured planning limit
-    /// 2. Built-in <see cref="Planning"/> constant (5)
-    /// </summary>
-    public static int ResolveForPlanning(int planningOverride = 0)
-    {
-        if (planningOverride > 0) return planningOverride;
-        return Planning;
     }
 }

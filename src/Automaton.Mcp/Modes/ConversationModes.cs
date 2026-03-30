@@ -13,13 +13,7 @@ public static class ConversationModes
 
     /// <summary>
     /// Human-in-the-middle mode — AI proposes a plan, waits for user confirmation,
-    /// then implements stage by stage with optional approval gates.
+    /// then implements.
     /// </summary>
     public const string HumanInTheMiddle = "human-in-the-middle";
-
-    /// <summary>Legacy: Full agent mode (maps to HumanInTheMiddle).</summary>
-    public const string Agent = "agent";
-
-    /// <summary>Legacy: Read-only planning mode (maps to HumanInTheMiddle).</summary>
-    public const string Plan = "plan";
 }

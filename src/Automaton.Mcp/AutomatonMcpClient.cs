@@ -163,10 +163,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                         if (!allowedToolNames.Contains(toolName))
                         {
                             _logger.LogWarning("Tool '{ToolName}' is not available in '{Mode}' mode — call rejected", toolName, request.Mode);
-                            var modeMsg = request.Mode == ConversationModes.Plan
-                                ? $"Tool '{toolName}' is not available in plan mode. Write tools are blocked. Stop calling write tools. Tell the user the plan is ready and ask if they want to implement it — the UI will automatically switch to Agent mode."
-                                : $"Tool '{toolName}' is not available in {request.Mode} mode.";
-                            return $"{{\"error\":\"{modeMsg}\"}}";
+                            return $"{{\"error\":\"Tool '{toolName}' is not available in {request.Mode} mode.\"}}";
                         }
                         return await ExecuteMcpToolAsync(toolCallId, toolName, argsJson, request);
                     },

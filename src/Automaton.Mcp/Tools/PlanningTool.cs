@@ -75,13 +75,11 @@ public class PlanningTool : IMcpTool
             var fs = _fileSystemFactory.Create(arguments, context);
             const string planFilePath = ".plans/IMPLEMENTATION.md";
 
-            var isInPlanMode = context?.TryGetValue("mode", out var modeVal) == true
-                               && string.Equals(modeVal?.ToString(), "plan", StringComparison.OrdinalIgnoreCase);
             var existingPlan = await fs.ReadFileAsync(planFilePath);
             var isRefinement = existingPlan != null;
 
-            // In agent mode, if a plan already exists redirect to implementation.
-            if (!isInPlanMode && isRefinement)
+            // If a plan already exists redirect to implementation.
+            if (isRefinement)
             {
                 return new McpToolResult
                 {
@@ -94,23 +92,13 @@ public class PlanningTool : IMcpTool
             await fs.WriteFileAsync(planFilePath, markdown);
             _logger.LogInformation("Wrote implementation plan to {Path}", planFilePath);
 
-            var isAutonomousPlanningPhase =
-                context?.TryGetValue("planningPhase", out var ppVal) == true &&
-                string.Equals(ppVal?.ToString(), "autonomous", StringComparison.OrdinalIgnoreCase);
-
-            string instruction = isAutonomousPlanningPhase
-                ? "Plan saved. Your planning task is complete. Write ONE brief confirmation sentence and stop."
-                : isRefinement
-                    ? "Plan updated. Re-render the updated plan as markdown then ask whether to proceed. Do NOT call any more tools."
-                    : "Plan saved. Render the plan as markdown and ask whether to proceed. Do NOT call any other tools until confirmed.";
-
             return new McpToolResult
             {
                 Success = true,
                 Content = JsonSerializer.Serialize(new
                 {
-                    instruction,
-                    awaitingApproval = !isAutonomousPlanningPhase,
+                    instruction = "Plan saved. Render the plan as markdown and ask whether to proceed. Do NOT call any other tools until confirmed.",
+                    awaitingApproval = true,
                     planFile = planFilePath
                 })
             };

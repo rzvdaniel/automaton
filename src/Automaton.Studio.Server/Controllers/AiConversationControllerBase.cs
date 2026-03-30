@@ -170,28 +170,6 @@ public abstract class AiConversationControllerBase : BaseController
             };
             _mcpClient.ConversationUpdated += eventHandler;
 
-            // 8a. Autonomous planning phase — run planning model first if one is configured.
-            //     Events flow through the existing eventHandler, so the user sees the plan being written in real-time.
-            if (mode.Name == ConversationModes.Autonomous)
-            {
-                var planWasGenerated = await RunAutonomousPlanningPhaseAsync(
-                    request, userId, aiConfig, promptParts.BasePrompt, cancellationToken);
-
-                if (planWasGenerated)
-                {
-                    // Tell the implementation model to read and follow the plan that was just written.
-                    partsWithMode = partsWithMode with
-                    {
-                        BasePrompt = partsWithMode.BasePrompt +
-                            "\n\n## FOLLOW THE IMPLEMENTATION PLAN\n" +
-                            "A detailed implementation plan has already been prepared for this task. " +
-                            "Call `read_file` on `.plans/IMPLEMENTATION.md` as your FIRST action. " +
-                            "Implement every file, structure, and decision specified in the plan exactly. " +
-                            "Do NOT call `propose_plan` — the plan is already written."
-                    };
-                }
-            }
-
             // 8. Run conversation
             var conversationRequest = new ConversationRequest
             {
@@ -457,120 +435,7 @@ public abstract class AiConversationControllerBase : BaseController
         }
     }
 
-    // ── Autonomous planning phase ─────────────────────────────────────────
 
-    /// <summary>
-    /// Runs a short planning conversation using the globally configured planning model.
-    /// The model calls <c>propose_plan</c> once to write <c>.plans/IMPLEMENTATION.md</c>,
-    /// then stops. Events are forwarded through the existing ConversationUpdated subscription
-    /// so the user sees the plan in real-time.
-    /// </summary>
-    /// <returns>
-    /// <c>true</c> if a plan file was successfully written; <c>false</c> if there is no
-    /// planning model configured, the API key is missing, or the planning phase fails.
-    /// </returns>
-    private async Task<bool> RunAutonomousPlanningPhaseAsync(
-        BaseStreamConversationRequest request,
-        Guid userId,
-        AiProvidersConfig aiConfig,
-        string baseSystemPrompt,
-        CancellationToken cancellationToken)
-    {
-        var planningModel = await _providerMetadataService.GetGlobalPlanningModelAsync();
-        if (planningModel is null)
-        {
-            _logger.LogDebug("No planning model configured — skipping autonomous planning phase");
-            return false;
-        }
-
-        var planningApiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, planningModel.Value.ProviderName);
-        if (string.IsNullOrEmpty(planningApiKey))
-        {
-            _logger.LogWarning(
-                "No API key for planning provider '{Provider}' — skipping planning phase",
-                planningModel.Value.ProviderName);
-            return false;
-        }
-
-        var planningSystemPrompt = BuildPlanningPhaseSystemPrompt(baseSystemPrompt);
-        var planningModelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(
-            planningModel.Value.ProviderName, planningModel.Value.ModelId);
-
-        var planningRequest = new ConversationRequest
-        {
-            ConversationId = Guid.NewGuid().ToString(),
-            InitialMessage = request.Message,
-            SystemPrompt = planningSystemPrompt,
-            SystemPromptParts = new SystemPromptParts(planningSystemPrompt),
-            Provider = planningModel.Value.ProviderName,
-            Model = planningModel.Value.ModelId,
-            ApiKey = planningApiKey,
-            ConversationHistory = null,
-            Context = new Dictionary<string, object>
-            {
-                ["planningPhase"] = "autonomous",
-                ["contextId"]     = request.ResourceId?.ToString() ?? string.Empty,
-                ["resourceId"]    = (object)(request.ResourceId ?? Guid.Empty),
-                ["userId"]        = userId,
-            },
-            MaxIterations = IterationLimits.ResolveForPlanning(aiConfig.IterationLimits.Planning),
-            MaxConsecutiveFailures = aiConfig.MaxConsecutiveFailures,
-            MaxTokens = planningModelMaxTokens,
-            MaxRateLimitRetries = aiConfig.RateLimitRetry.MaxRetries,
-            RateLimitRetryInitialDelaySeconds = aiConfig.RateLimitRetry.InitialDelaySeconds,
-            StreamingTimeoutMinutes = aiConfig.Streaming.TimeoutMinutes,
-            Mode = ConversationModes.Autonomous,
-        };
-
-        _logger.LogInformation(
-            "Starting autonomous planning phase: provider={Provider}, model={Model}",
-            planningModel.Value.ProviderName, planningModel.Value.ModelId);
-
-        var planResult = await _mcpClient.StartConversationAsync(planningRequest, cancellationToken);
-
-        if (!planResult.IsSuccess)
-        {
-            _logger.LogWarning(
-                "Autonomous planning phase failed: {Error} — proceeding without plan",
-                planResult.ErrorMessage);
-            return false;
-        }
-
-        _logger.LogInformation("Autonomous planning phase completed successfully");
-        return true;
-    }
-
-    /// <summary>
-    /// Builds a system prompt for the planning phase by appending detailed planning
-    /// instructions to the app-specific base prompt.
-    /// </summary>
-    private static string BuildPlanningPhaseSystemPrompt(string baseSystemPrompt) =>
-        baseSystemPrompt + "\n\n" +
-        "## PLANNING PHASE — YOUR ONLY JOB\n\n" +
-        "You are in the PLANNING PHASE. A separate AI agent will implement what you plan.\n\n" +
-        "Your task:\n" +
-        "1. Analyse the user's request thoroughly\n" +
-        "2. Call `propose_plan` ONCE with a comprehensive, highly detailed implementation plan\n" +
-        "3. After `propose_plan` returns, write ONE brief confirmation sentence\n" +
-        "4. STOP — do not call any further tools, do not write any files\n\n" +
-        "---\n\n" +
-        "## PLAN QUALITY REQUIREMENTS\n\n" +
-        "The plan must be detailed enough that a separate AI agent " +
-        "(with no additional context) can implement the task perfectly from it alone.\n\n" +
-        "Include:\n" +
-        "- **Every file** to be created or modified, with exact relative paths\n" +
-        "- **Directory structure**: complete file tree of what will exist after implementation\n" +
-        "- **CSS design**: exact colors (hex/rgb), class names (use BEM-like naming: `.card__title`, `.btn--danger`), layout approach (grid/flex), responsive breakpoints\n" +
-        "- **JavaScript/TypeScript architecture**: module responsibilities split by role (state / api / rendering / events), key function signatures, data flow\n" +
-        "- **HTML structure**: semantic elements (`<header>`, `<nav>`, `<main>`, `<dialog>`, etc.), data attributes used as JS hooks (`data-action`, `data-id`)\n" +
-        "- **Data structures**: interfaces, types, schema definitions with exact field names and types\n" +
-        "- **Component hierarchy**: parent-child relationships, props, events\n" +
-        "- **API contracts**: endpoint URLs, HTTP methods, request/response shapes\n" +
-        "- **Import/load order**: which files import which, in what order they must load\n" +
-        "- **Technical decisions**: chosen libraries, patterns, and the reason for each\n" +
-        "- **Known pitfalls**: specific edge cases to handle (e.g. 'dispose event listeners on unmount')\n" +
-        "- **Exact content**: for small configuration or boilerplate files, include the full file content\n\n" +
-        "CRITICAL: The more detail you provide, the better the implementation will be.";
 }
 
 // ── Shared base request ───────────────────────────────────────────────────
@@ -588,6 +453,6 @@ public abstract class BaseStreamConversationRequest
     public Dictionary<string, object>? Context { get; set; }
     public Guid? SessionId { get; set; }
     public Guid? ResourceId { get; set; }
-    /// <summary>"plan" or "agent" (default)</summary>
-    public string Mode { get; set; } = ConversationModes.Agent;
+    /// <summary>Autonomous or human-in-the-middle (default: autonomous)</summary>
+    public string Mode { get; set; } = ConversationModes.Autonomous;
 }

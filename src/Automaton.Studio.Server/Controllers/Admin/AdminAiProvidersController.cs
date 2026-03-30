@@ -695,8 +695,7 @@ public class AdminAiProvidersController : ControllerBase
                 Medium     = request.IterationLimits.Medium,
                 Large      = request.IterationLimits.Large,
                 Enterprise = request.IterationLimits.Enterprise,
-                Autonomous = request.IterationLimits.Autonomous,
-                Planning   = request.IterationLimits.Planning
+                Autonomous = request.IterationLimits.Autonomous
             }
         };
 
@@ -719,8 +718,7 @@ public class AdminAiProvidersController : ControllerBase
             Medium     = s.IterationLimits.Medium,
             Large      = s.IterationLimits.Large,
             Enterprise = s.IterationLimits.Enterprise,
-            Autonomous = s.IterationLimits.Autonomous,
-            Planning   = s.IterationLimits.Planning
+            Autonomous = s.IterationLimits.Autonomous
         }
     };
 
@@ -872,7 +870,6 @@ public class IterationLimitsConfigResponse
     public int Large      { get; set; }
     public int Enterprise { get; set; }
     public int Autonomous { get; set; }
-    public int Planning   { get; set; }
 }
 
 public class AiProvidersOperationalConfigResponse
