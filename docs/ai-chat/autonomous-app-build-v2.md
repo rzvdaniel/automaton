@@ -12,6 +12,11 @@ Enable users to **watch AI build and test apps live inside App Editor**:
 
 AI must be able to interact with the preview app (click/type/navigate/read) and use logs/assertions to fix issues iteratively.
 
+Related implementation details for preview isolation and persistence-safe testing:
+
+- [Preview Test Run Isolation (`testRunId`) — How It Works](./preview-test-run-isolation.md)
+- [Mock Backend in Preview Testing](./mock-backend-preview-testing.md)
+
 ---
 
 ## Guiding Principles (OO + Clean + Extensible)

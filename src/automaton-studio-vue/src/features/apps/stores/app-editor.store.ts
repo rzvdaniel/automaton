@@ -29,6 +29,7 @@ export type UiLogFilter = typeof UiLogFilter[keyof typeof UiLogFilter]
 export const useAppEditorStore = defineStore('appEditor', () => {
   const authStore = useAuthStore()
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const PREVIEW_BACKEND_MODE_STORAGE_KEY = 'app-editor-preview-backend-mode'
 
   // ============================================
   // State
@@ -51,6 +52,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Preview URL for iframe (HTTP-based preview)
   const previewUrl = ref('')
+  const previewTestRunId = ref('')
+  const previewUseMockBackend = ref(loadPreviewBackendMode())
 
   // Preview warning message (missing assets, etc.)
   const previewWarning = ref<string | null>(null)
@@ -79,6 +82,26 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // ============================================
   // Computed
   // ============================================
+
+  function loadPreviewBackendMode(): boolean {
+    try {
+      const value = localStorage.getItem(PREVIEW_BACKEND_MODE_STORAGE_KEY)
+      return value !== 'real'
+    } catch {
+      return true
+    }
+  }
+
+  function persistPreviewBackendMode(useMock: boolean): void {
+    try {
+      localStorage.setItem(
+        PREVIEW_BACKEND_MODE_STORAGE_KEY,
+        useMock ? 'mock' : 'real',
+      )
+    } catch {
+      // non-critical persistence error
+    }
+  }
 
   /**
    * Currently active file object
@@ -382,7 +405,16 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Use current index.html from files (not stale htmlContent from app definition)
       const currentIndexHtml = previewFiles['index.html'] || undefined
-      previewHtml.value = await appsService.getPreviewHtml(currentApp.value.id, currentIndexHtml)
+      if (!previewTestRunId.value) {
+        previewTestRunId.value = `preview-${currentApp.value.id}-${Date.now()}`
+      }
+
+      previewHtml.value = await appsService.getPreviewHtml(
+        currentApp.value.id,
+        currentIndexHtml,
+        previewTestRunId.value,
+        previewUseMockBackend.value,
+      )
       
       // Upload preview content to server for HTTP-based serving
       await appsService.uploadPreviewContent(currentApp.value.id, previewHtml.value, previewFiles)
@@ -392,6 +424,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     } finally {
       isLoadingPreview.value = false
     }
+  }
+
+  function setPreviewBackendMode(mode: 'mock' | 'real'): void {
+    previewUseMockBackend.value = mode !== 'real'
+    persistPreviewBackendMode(previewUseMockBackend.value)
   }
 
   async function buildPreviewFiles(appId: string): Promise<Record<string, string>> {
@@ -757,6 +794,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     openFiles.value = []
     activeFilePath.value = null
     previewHtml.value = ''
+    previewUrl.value = ''
+    previewTestRunId.value = ''
+    previewUseMockBackend.value = loadPreviewBackendMode()
     previewMode.value = 'desktop'
     isLoading.value = false
     isSaving.value = false
@@ -795,6 +835,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     activeFilePath,
     previewHtml,
     previewUrl,
+    previewTestRunId,
+    previewUseMockBackend,
     previewWarning,
     previewMode,
     isLoading,
@@ -826,6 +868,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     createFile,
     deleteFile,
     refreshPreview,
+    setPreviewBackendMode,
     setPreviewMode,
     setPreviewWarning,
     publishApp,

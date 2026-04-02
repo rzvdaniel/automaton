@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -112,12 +113,19 @@ public class AppsControllerExecutionController : ControllerBase
                 return Unauthorized(new { error = "Authentication required" });
             }
 
+            var inputs = request.Inputs != null
+                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            ApplyTestRunIdInput(inputs, request.TestRunId);
+            var useMockBackend = request.UseMockBackend == true;
+
             var result = await controllerExecutionService.ExecuteActionAsync(
                 app,
                 controllerName,
                 actionName,
-                request.Inputs ?? new Dictionary<string, JsonElement>(),
+                inputs,
                 request.RunnerNames,
+                useMockBackend,
                 cancellationToken);
 
             sw.Stop();
@@ -218,12 +226,19 @@ public class AppsControllerExecutionController : ControllerBase
                 return StatusCode(500, new { error = "App configuration error: no owner" });
             }
 
+            var inputs = request.Inputs != null
+                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            ApplyTestRunIdInput(inputs, request.TestRunId);
+            var useMockBackend = request.UseMockBackend != false;
+
             var result = await controllerExecutionService.ExecuteActionAsync(
                 app,
                 controllerName,
                 actionName,
-                request.Inputs ?? new Dictionary<string, JsonElement>(),
+                inputs,
                 request.RunnerNames,
+                useMockBackend,
                 cancellationToken);
 
             sw.Stop();
@@ -287,5 +302,32 @@ public class AppsControllerExecutionController : ControllerBase
         {
             // Best-effort; don't rethrow
         }
+    }
+
+    private void ApplyTestRunIdInput(
+        Dictionary<string, JsonElement> inputs,
+        string? bodyTestRunId)
+    {
+        var testRunId = ResolveTestRunId(bodyTestRunId);
+        if (string.IsNullOrWhiteSpace(testRunId))
+            return;
+
+        using var doc = JsonDocument.Parse($"\"{testRunId}\"");
+        inputs[AppExecutionContextKeys.TestRunIdInput] = doc.RootElement.Clone();
+    }
+
+    private string? ResolveTestRunId(string? bodyTestRunId)
+    {
+        if (!string.IsNullOrWhiteSpace(bodyTestRunId))
+            return bodyTestRunId.Trim();
+
+        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
+        {
+            var headerValue = headerValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(headerValue))
+                return headerValue.Trim();
+        }
+
+        return null;
     }
 }

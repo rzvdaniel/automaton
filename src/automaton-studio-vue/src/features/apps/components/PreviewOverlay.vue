@@ -7,6 +7,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
+import ToggleButton from 'primevue/togglebutton'
+import Tag from 'primevue/tag'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
@@ -23,6 +25,16 @@ const previewModes = ref([
 
 // Current viewport size
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
+const isMockBackendEnabled = computed({
+  get: () => editorStore.previewUseMockBackend,
+  set: (value: boolean) => {
+    editorStore.setPreviewBackendMode(value ? 'mock' : 'real')
+    void editorStore.refreshPreview()
+  },
+})
+const backendModeLabel = computed(() =>
+  editorStore.previewUseMockBackend ? 'Mock Backend' : 'Real Backend',
+)
 
 // Initial load
 onMounted(() => {
@@ -85,20 +97,36 @@ onUnmounted(() => {
         </div>
 
         <div class="header-center">
-          <SelectButton
-            :model-value="editorStore.previewMode"
-            :options="previewModes"
-            option-value="value"
-            :allow-empty="false"
-            @update:model-value="handleModeChange"
-          >
-            <template #option="{ option }">
-              <div class="flex align-items-center gap-2">
-                <i :class="option.icon"></i>
-                <span>{{ option.label }}</span>
-              </div>
-            </template>
-          </SelectButton>
+          <div class="header-center-controls">
+            <Tag
+              :value="backendModeLabel"
+              :severity="editorStore.previewUseMockBackend ? 'warning' : 'success'"
+              rounded
+            />
+            <ToggleButton
+              v-model="isMockBackendEnabled"
+              on-label="Mock"
+              off-label="Real"
+              on-icon="pi pi-clone"
+              off-icon="pi pi-server"
+              :disabled="editorStore.isLoadingPreview"
+              aria-label="Toggle preview backend mode"
+            />
+            <SelectButton
+              :model-value="editorStore.previewMode"
+              :options="previewModes"
+              option-value="value"
+              :allow-empty="false"
+              @update:model-value="handleModeChange"
+            >
+              <template #option="{ option }">
+                <div class="flex align-items-center gap-2">
+                  <i :class="option.icon"></i>
+                  <span>{{ option.label }}</span>
+                </div>
+              </template>
+            </SelectButton>
+          </div>
         </div>
 
         <div class="header-right">
@@ -224,6 +252,12 @@ onUnmounted(() => {
 .header-center {
   display: flex;
   justify-content: center;
+}
+
+.header-center-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .header-right {

@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
+import ToggleButton from 'primevue/togglebutton'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { computed, ref } from 'vue'
@@ -143,6 +144,16 @@ function handleSplitterResizing(): void {
 }
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
+const isMockBackendEnabled = computed({
+  get: () => editorStore.previewUseMockBackend,
+  set: (value: boolean) => {
+    editorStore.setPreviewBackendMode(value ? 'mock' : 'real')
+    void editorStore.refreshPreview()
+  },
+})
+const backendModeLabel = computed(() =>
+  editorStore.previewUseMockBackend ? 'Mock Backend' : 'Real Backend',
+)
 
 const previewViewportStyle = computed(() => {
   if (editorStore.previewMode === 'desktop') {
@@ -179,6 +190,20 @@ const previewViewportStyle = computed(() => {
         </div>
       </div>
       <div class="flex align-items-center gap-2">
+        <Tag
+          :value="backendModeLabel"
+          :severity="editorStore.previewUseMockBackend ? 'warning' : 'success'"
+          rounded
+        />
+        <ToggleButton
+          v-model="isMockBackendEnabled"
+          on-label="Mock"
+          off-label="Real"
+          on-icon="pi pi-clone"
+          off-icon="pi pi-server"
+          :disabled="editorStore.isLoadingPreview"
+          aria-label="Toggle preview backend mode"
+        />
         <SelectButton
           :model-value="editorStore.previewMode"
           :options="previewModes"

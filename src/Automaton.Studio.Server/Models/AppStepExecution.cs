@@ -14,6 +14,11 @@ public class AppStepExecutionRequest
     /// Optional list of runner names to execute on
     /// </summary>
     public List<string>? RunnerNames { get; set; }
+
+    /// <summary>
+    /// Optional test run identifier used to isolate preview/test executions.
+    /// </summary>
+    public string? TestRunId { get; set; }
 }
 
 /// <summary>

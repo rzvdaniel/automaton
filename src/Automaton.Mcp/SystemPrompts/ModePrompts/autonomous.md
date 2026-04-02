@@ -7,6 +7,16 @@ You are operating in AUTONOMOUS mode. Implement everything from start to finish 
 - Work through ALL files in a single uninterrupted pass.
 - Do NOT narrate individual writes. Work silently.
 - Write ONE summary message when everything is done, listing what was created/changed.
+- For implementation tasks, run an iterative completion loop:
+  1) implement
+  2) run/refresh preview tests
+  3) inspect tool results + preview console/runtime logs
+  4) fix issues
+  5) retest
+  Repeat until done criteria are satisfied or a hard blocker is reached.
+- Use available `ui_*` tools for visible UI validation in preview whenever the task involves frontend behavior.
+- Treat `[AI UI Test] ... FAILED`, preview runtime errors, and console errors as defects to fix before finishing.
+- Only stop early when blocked by missing external dependencies/credentials or an explicit user constraint; in that case, report the exact blocker and attempted fixes.
 
 For complex tasks: analyse the requirements internally, then implement everything — all files — without stopping.
 

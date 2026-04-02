@@ -166,6 +166,7 @@ public class AppsControllerExecutionService
         string actionName,
         Dictionary<string, JsonElement> inputs,
         List<string>? runnerNames,
+        bool useMockBackend,
         CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
@@ -174,6 +175,15 @@ public class AppsControllerExecutionService
         try
         {
             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Starting controller action execution for app '{app.Name}'");
+
+            if (useMockBackend)
+            {
+                var mockResult = await TryExecuteMockActionAsync(app, controllerName, actionName, inputs, logs, cancellationToken);
+                if (mockResult != null)
+                {
+                    return mockResult;
+                }
+            }
 
             var runners = await ResolveRunnersAsync(app, runnerNames);
 
@@ -226,6 +236,70 @@ public class AppsControllerExecutionService
                 Error = ex.Message
             };
         }
+    }
+
+    private async Task<AppControllerActionResponse?> TryExecuteMockActionAsync(
+        PublishedAppInfo app,
+        string controllerName,
+        string actionName,
+        Dictionary<string, JsonElement> inputs,
+        List<string> logs,
+        CancellationToken cancellationToken)
+    {
+        var ownerId = app.OwnerId;
+        if (ownerId == null)
+            return null;
+
+        var mockContent = await fileStorageService.ReadAppFileAsync(
+            ownerId.Value,
+            app.Id,
+            $"backend\\mocks\\{controllerName}.{actionName}.json");
+
+        if (string.IsNullOrWhiteSpace(mockContent))
+        {
+            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Mock not found for {controllerName}.{actionName}; falling back to runner execution");
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var mockDoc = JsonDocument.Parse(mockContent);
+        var root = mockDoc.RootElement;
+
+        var success = root.TryGetProperty("success", out var successElement)
+            ? successElement.ValueKind == JsonValueKind.True
+            : true;
+        var error = root.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.String
+            ? errorElement.GetString()
+            : null;
+        var status = root.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.String
+            ? statusElement.GetString()
+            : (success ? "Completed" : "Failed");
+        var mockData = root.TryGetProperty("data", out var dataElement)
+            ? dataElement.Clone()
+            : (JsonElement?)null;
+
+        logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executed mock backend response from backend\\mocks\\{controllerName}.{actionName}.json");
+
+        // Attach request inputs for visibility/debugging in preview logs
+        if (inputs.Count > 0)
+        {
+            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Mock inputs: {JsonSerializer.Serialize(inputs)}");
+        }
+
+        return new AppControllerActionResponse
+        {
+            Success = success,
+            ControllerName = controllerName,
+            ActionName = actionName,
+            Status = status ?? "Unknown",
+            RunnerCount = 0,
+            ExecutedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            Data = mockData,
+            Logs = logs,
+            Error = error
+        };
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

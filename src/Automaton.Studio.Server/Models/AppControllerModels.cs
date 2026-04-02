@@ -43,6 +43,8 @@ public class AppControllerActionRequest
 {
     public Dictionary<string, JsonElement>? Inputs { get; set; }
     public List<string>? RunnerNames { get; set; }
+    public string? TestRunId { get; set; }
+    public bool? UseMockBackend { get; set; }
 }
 
 public class AppControllerActionResponse

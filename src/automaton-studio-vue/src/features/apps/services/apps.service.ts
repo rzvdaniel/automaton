@@ -396,7 +396,12 @@ class AppsService {
    * Returns the app HTML with the Automaton API script injected
    * The preview makes direct fetch calls to the backend with the auth token
    */
-  async getPreviewHtml(id: string, rawHtml?: string): Promise<string> {
+  async getPreviewHtml(
+    id: string,
+    rawHtml?: string,
+    testRunId?: string,
+    useMockBackend = true,
+  ): Promise<string> {
     const app = await this.get(id)
     let html = rawHtml || app.definition?.htmlContent || this.getDefaultHtml()
 
@@ -409,7 +414,14 @@ class AppsService {
     html = html.replace(/<script\b[^>]*>[\s\S]*?\(function\s*\(\s*window\s*,\s*APP_(?:ID|SLUG)\b[\s\S]*?<\/script>/gi, '')
 
     // Inject preview API that makes direct fetch calls
-    const previewScript = buildPreviewApiScript(id, baseUrl, token)
+    const resolvedTestRunId = testRunId || `preview-${id}-${Date.now()}`
+    const previewScript = buildPreviewApiScript(
+      id,
+      baseUrl,
+      token,
+      resolvedTestRunId,
+      useMockBackend,
+    )
 
     // Inject base tag for resolving relative paths to app files in preview
     const appBaseUrl = `${baseUrl}/app-preview/${app.userId}/${id}/`

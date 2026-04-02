@@ -13,6 +13,9 @@
 const APP_ID = '__APP_ID__';
 const BASE_URL = '__BASE_URL__';
 const AUTH_TOKEN = '__AUTH_TOKEN__';
+const TEST_RUN_ID = '__TEST_RUN_ID__';
+const TEST_RUN_HEADER = 'X-Automaton-Test-Run-Id';
+let USE_MOCK_BACKEND = __USE_MOCK_BACKEND__;
 
 console.log('[AutomatonAPI] Preview mode initialized for app:', APP_ID);
 
@@ -74,7 +77,8 @@ async function apiCall(path, method, body) {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${AUTH_TOKEN}`
+      'Authorization': `Bearer ${AUTH_TOKEN}`,
+      [TEST_RUN_HEADER]: TEST_RUN_ID
     }
   };
 
@@ -99,7 +103,12 @@ async function executeFlow(flowIdentifier, { inputs = {}, runnerNames = null } =
   const path = `/api/web-apps/preview/${APP_ID}/flows/${encodeURIComponent(flowIdentifier)}/execute`;
 
   try {
-    const result = await apiCall(path, 'POST', { inputs, runnerNames });
+    const result = await apiCall(path, 'POST', {
+      inputs,
+      runnerNames,
+      testRunId: TEST_RUN_ID,
+      useMockBackend: USE_MOCK_BACKEND
+    });
     sendResultToConsole('flow', flowIdentifier, inputs, result, Date.now() - startTime, true);
     return result;
   } catch (err) {
@@ -113,7 +122,12 @@ async function executeController(controllerName, actionName, { inputs = {}, runn
   const path = `/api/web-apps/preview/${APP_ID}/controllers/${encodeURIComponent(controllerName)}/actions/${encodeURIComponent(actionName)}/execute`;
 
   try {
-    const result = await apiCall(path, 'POST', { inputs, runnerNames });
+    const result = await apiCall(path, 'POST', {
+      inputs,
+      runnerNames,
+      testRunId: TEST_RUN_ID,
+      useMockBackend: USE_MOCK_BACKEND
+    });
     sendResultToConsole('controller', `${controllerName}.${actionName}`, inputs, result, Date.now() - startTime, true);
     return result;
   } catch (err) {
@@ -232,7 +246,13 @@ window.automatonApi = {
   downloadFile,
   getAppId: () => APP_ID,
   getAppSlug: () => null,
-  getBaseUrl: () => BASE_URL
+  getBaseUrl: () => BASE_URL,
+  getTestRunId: () => TEST_RUN_ID,
+  getBackendMode: () => (USE_MOCK_BACKEND ? 'mock' : 'real'),
+  setBackendMode: (mode) => {
+    USE_MOCK_BACKEND = String(mode).toLowerCase() !== 'real';
+    return USE_MOCK_BACKEND ? 'mock' : 'real';
+  }
 };
 
 window.addEventListener('error', (event) => {

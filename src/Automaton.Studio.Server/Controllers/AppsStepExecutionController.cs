@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -70,10 +71,15 @@ public class AppsStepExecutionController : ControllerBase
             }
 
             // 3. Execute the step
+            var inputs = request.Inputs != null
+                ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            ApplyTestRunIdInput(inputs, request.TestRunId);
+
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
                 stepIdentifier,
-                request.Inputs ?? new Dictionary<string, string>(),
+                inputs,
                 request.RunnerNames,
                 cancellationToken);
 
@@ -135,10 +141,15 @@ public class AppsStepExecutionController : ControllerBase
             }
 
             // 2. Execute the step
+            var inputs = request.Inputs != null
+                ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            ApplyTestRunIdInput(inputs, request.TestRunId);
+
             var result = await stepExecutionService.ExecuteStepForAppAsync(
                 app,
                 stepIdentifier,
-                request.Inputs ?? new Dictionary<string, string>(),
+                inputs,
                 request.RunnerNames,
                 cancellationToken);
 
@@ -219,5 +230,29 @@ public class AppsStepExecutionController : ControllerBase
             logger.Error(ex, "Failed to list steps for app preview: {AppId}", appId);
             return StatusCode(500, new { error = "Failed to list steps" });
         }
+    }
+
+    private void ApplyTestRunIdInput(Dictionary<string, string> inputs, string? bodyTestRunId)
+    {
+        var testRunId = ResolveTestRunId(bodyTestRunId);
+        if (string.IsNullOrWhiteSpace(testRunId))
+            return;
+
+        inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
+    }
+
+    private string? ResolveTestRunId(string? bodyTestRunId)
+    {
+        if (!string.IsNullOrWhiteSpace(bodyTestRunId))
+            return bodyTestRunId.Trim();
+
+        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
+        {
+            var headerValue = headerValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(headerValue))
+                return headerValue.Trim();
+        }
+
+        return null;
     }
 }

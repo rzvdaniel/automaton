@@ -1,5 +1,6 @@
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -107,12 +108,22 @@ public class AppsFlowExecutionController : ControllerBase
             return NotFound(new { message = "Flow not found" });
         }
 
-        if (request.Inputs != null && request.Inputs.Any())
+        var inputs = request.Inputs != null
+            ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var testRunId = ResolveTestRunId(request.TestRunId);
+        if (!string.IsNullOrWhiteSpace(testRunId))
         {
-            var missingInputs = ApplyInputVariables(flowToExecute, request.Inputs);
+            inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
+        }
+
+        if (inputs.Any())
+        {
+            var missingInputs = ApplyInputVariables(flowToExecute, inputs);
             if (missingInputs.Any())
             {
-                // Log once with context (flowId and appSlug) — do not leak secret values
+                // Log once with context (flowId and appSlug) ï¿½ do not leak secret values
                 logger.LogWarning("Missing input variables for flow {FlowId} (appSlug: {AppSlug}): {MissingKeys}",
                     flowId, appSlug, string.Join(", ", missingInputs));
             }
@@ -148,6 +159,105 @@ public class AppsFlowExecutionController : ControllerBase
 
         logger.LogInformation("Flow execution complete: FlowId={FlowId}, Success={Success}, AppSlug={AppSlug}, OwnerId={OwnerId}",
             flowId, success, appSlug, ownerId);
+
+        return Ok(new WebAppFlowExecutionResponse
+        {
+            Success = success,
+            FlowId = flowId,
+            Status = firstResult?.Status.ToString() ?? "Unknown",
+            RunnerCount = results.Count(),
+            ExecutedAt = DateTime.UtcNow,
+            Message = success ? "Flow executed successfully" : "Flow execution failed or incomplete",
+            OutputVariables = firstResult?.OutputVariables ?? [],
+            Logs = firstResult?.Logs
+        });
+    }
+
+    /// <summary>
+    /// Execute a flow in preview mode (by app ID, requires auth).
+    /// </summary>
+    [HttpPost("preview/{appId:guid}/flows/{flowIdentifier}/execute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ExecuteFlowPreview(
+        Guid appId,
+        string flowIdentifier,
+        [FromBody] WebAppFlowExecutionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        request ??= new WebAppFlowExecutionRequest();
+
+        logger.LogInformation("Preview flow execution request for app '{AppId}', identifier '{FlowIdentifier}'",
+            appId, flowIdentifier);
+
+        var webApp = await appsService.GetAppInfoByIdAsync(appId, cancellationToken);
+        if (webApp == null)
+            return NotFound(new { message = "Web app not found" });
+
+        if (webApp.OwnerId == null)
+        {
+            logger.LogError("Web app '{AppId}' has no owner", appId);
+            return StatusCode(500, new { message = "Web app configuration error: no owner" });
+        }
+
+        var ownerId = webApp.OwnerId.Value;
+        var ownerFlowsService = flowsServiceFactory.CreateForUser(ownerId);
+
+        Guid flowId;
+        if (!Guid.TryParse(flowIdentifier, out flowId))
+        {
+            var resolved = await ownerFlowsService.ResolveFlowNameToId(flowIdentifier, cancellationToken);
+            if (resolved == null)
+            {
+                logger.LogWarning("Preview flow name '{FlowName}' not found for owner {OwnerId}", flowIdentifier, ownerId);
+                return NotFound(new { message = $"Flow '{flowIdentifier}' not found" });
+            }
+            flowId = resolved.Value;
+        }
+
+        var flowToExecute = ownerFlowsService.Get(flowId);
+        if (flowToExecute == null)
+            return NotFound(new { message = "Flow not found" });
+
+        var inputs = request.Inputs != null
+            ? new Dictionary<string, string>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var testRunId = ResolveTestRunId(request.TestRunId);
+        if (!string.IsNullOrWhiteSpace(testRunId))
+            inputs[AppExecutionContextKeys.TestRunIdInput] = testRunId;
+
+        if (inputs.Any())
+        {
+            var missingInputs = ApplyInputVariables(flowToExecute, inputs);
+            if (missingInputs.Any())
+            {
+                logger.LogWarning("Missing preview input variables for flow {FlowId} (appId: {AppId}): {MissingKeys}",
+                    flowId, appId, string.Join(", ", missingInputs));
+            }
+        }
+
+        var allRunners = await runnerService.List(cancellationToken);
+        var onlineRunners = allRunners.Where(r => r.Status == RunnerStatus.Online).ToList();
+        if (!onlineRunners.Any())
+            return BadRequest(new { success = false, message = "No online runners available to execute the flow" });
+
+        List<Guid> selectedRunnerIds;
+        try
+        {
+            selectedRunnerIds = SelectRunners(onlineRunners, request.RunnerNames, webApp.ExecutionRunnerId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message });
+        }
+
+        var results = await ownerFlowsService.Execute(flowId, selectedRunnerIds, cancellationToken);
+        var firstResult = results.FirstOrDefault();
+        var success = firstResult?.Status == WorkflowStatus.Success;
 
         return Ok(new WebAppFlowExecutionResponse
         {
@@ -214,6 +324,21 @@ public class AppsFlowExecutionController : ControllerBase
 
         throw new InvalidOperationException("No runner specified. Provide RunnerNames or set an execution runner on the app.");
     }
+
+    private string? ResolveTestRunId(string? bodyTestRunId)
+    {
+        if (!string.IsNullOrWhiteSpace(bodyTestRunId))
+            return bodyTestRunId.Trim();
+
+        if (Request.Headers.TryGetValue(AppExecutionContextKeys.TestRunIdHeader, out var headerValues))
+        {
+            var headerValue = headerValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(headerValue))
+                return headerValue.Trim();
+        }
+
+        return null;
+    }
 }
 
 /// <summary>
@@ -231,6 +356,11 @@ public class WebAppFlowExecutionRequest
     /// If not specified, the first available online runner will be used.
     /// </summary>
     public List<string>? RunnerNames { get; set; }
+
+    /// <summary>
+    /// Optional test run identifier used to isolate preview/test executions.
+    /// </summary>
+    public string? TestRunId { get; set; }
 }
 
 /// <summary>
