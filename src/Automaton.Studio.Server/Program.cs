@@ -347,6 +347,9 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
 // Instructions tool group — read_instruction, write_instruction, list_instructions
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.InstructionsTool>();
+// UI automation tool group — emits client-action envelopes for preview interactions
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
+                   Automaton.Mcp.Tools.UiAutomationTool>();
 // Instruction injector — injects .instructions/ files into system prompts
 services.AddScoped<Automaton.Studio.Server.Services.AppInstructionInjector>();
 services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();

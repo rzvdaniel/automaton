@@ -177,13 +177,13 @@ onUnmounted(() => {
           @click="toggleAutoRefresh"
         />
         <Button
+          v-tooltip.bottom="'Refresh'"
           icon="pi pi-refresh"
           text
           rounded
           severity="secondary"
           size="small"
           :loading="isLoading"
-          v-tooltip.bottom="'Refresh'"
           @click="loadLogs"
         />
       </div>

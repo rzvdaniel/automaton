@@ -282,23 +282,23 @@ defineExpose({ reload: loadSessions })
       </span>
       <div class="header-actions">
         <Button
+          v-tooltip.bottom="'Export all sessions as JSON'"
           icon="pi pi-download"
           text
           rounded
           severity="secondary"
           size="small"
           :loading="isExportingAll"
-          v-tooltip.bottom="'Export all sessions as JSON'"
           @click="exportAllSessions"
         />
         <Button
+          v-tooltip.bottom="'Refresh'"
           icon="pi pi-refresh"
           text
           rounded
           severity="secondary"
           size="small"
           :loading="isLoading"
-          v-tooltip.bottom="'Refresh'"
           @click="loadSessions"
         />
       </div>
@@ -338,13 +338,13 @@ defineExpose({ reload: loadSessions })
           </div>
           <div class="session-stats">
             <Button
+              v-tooltip.bottom="'Export this session as JSON'"
               icon="pi pi-download"
               text
               rounded
               severity="secondary"
               size="small"
               :loading="exportingSessionId === session.id"
-              v-tooltip.bottom="'Export this session as JSON'"
               @click.stop="exportSingleSession(session)"
             />
             <span class="stat">

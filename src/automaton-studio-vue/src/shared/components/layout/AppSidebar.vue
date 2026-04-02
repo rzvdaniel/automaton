@@ -160,7 +160,7 @@ const sidebarClass = computed(() => ({
         </div>
         <ProgressBar
           :value="usagePercent"
-          :showValue="false"
+          :show-value="false"
           style="height: 4px"
           :class="{
             'progress-warn': usageSeverity === 'warn',

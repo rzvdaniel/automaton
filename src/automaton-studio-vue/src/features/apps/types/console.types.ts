@@ -42,3 +42,29 @@ export interface StepResultMessage {
     source: 'preview' | 'ai-test'
   }
 }
+
+export const UiLogLevel = {
+  Info: 'info',
+  Warn: 'warn',
+  Error: 'error',
+} as const
+
+export type UiLogLevel = typeof UiLogLevel[keyof typeof UiLogLevel]
+
+export interface UiLogEntry {
+  id: string
+  timestamp: Date
+  level: UiLogLevel
+  message: string
+  source: 'preview-console' | 'preview-runtime' | 'preview-network'
+}
+
+export interface PreviewConsoleMessage {
+  type: 'previewConsoleEvent'
+  data: {
+    level: UiLogLevel
+    message: string
+    timestamp: string
+    source: 'preview-console' | 'preview-runtime' | 'preview-network'
+  }
+}

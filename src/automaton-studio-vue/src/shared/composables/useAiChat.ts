@@ -27,7 +27,7 @@ export interface UseAiChatOptions {
    * @param args - Arguments passed to the tool
    * @param result - Result returned from the tool (if available)
    */
-  onToolExecuted?: (toolName: string, args: any, result?: any) => void | Promise<void>
+  onToolExecuted?: (toolName: string, args: any, result?: any) => any | Promise<any>
 }
 
 export function useAiChat(resourceType: string, resourceId: string, options?: UseAiChatOptions) {
@@ -675,7 +675,39 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       // Notify tool execution callback with result
       if (options?.onToolExecuted && toolMessage.toolName) {
         try {
-          options.onToolExecuted(toolMessage.toolName, toolMessage.toolArgs || {}, resultData)
+          const feedback = options.onToolExecuted(toolMessage.toolName, toolMessage.toolArgs || {}, resultData)
+          if (feedback) {
+            Promise.resolve(feedback)
+              .then((resolvedFeedback) => {
+                if (!resolvedFeedback) {
+                  return
+                }
+
+                const uiFeedback = resolvedFeedback as {
+                  success: boolean
+                  action: string
+                  details?: string
+                  value?: string
+                  error?: string
+                  logCount?: number
+                  snapshotTitle?: string
+                }
+
+                messages.value.push({
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  type: 'uiTestResult',
+                  content: uiFeedback.success
+                    ? `UI check passed: ${uiFeedback.action}`
+                    : `UI check failed: ${uiFeedback.action}`,
+                  timestamp: new Date(),
+                  uiTestResult: uiFeedback,
+                })
+              })
+              .catch((err) => {
+                console.error('Error resolving tool execution feedback:', err)
+              })
+          }
         } catch (err) {
           console.error('Error in onToolExecuted callback:', err)
         }

@@ -92,7 +92,7 @@ async function saveSettings() {
                   v-model="settings.maxConversationHistoryMessages"
                   :min="1"
                   :max="200"
-                  showButtons
+                  show-buttons
                   class="w-full"
                 />
               </div>
@@ -108,7 +108,7 @@ async function saveSettings() {
                   v-model="settings.maxConsecutiveFailures"
                   :min="1"
                   :max="20"
-                  showButtons
+                  show-buttons
                   class="w-full"
                 />
               </div>
@@ -126,7 +126,7 @@ async function saveSettings() {
                   :min="1024"
                   :max="200000"
                   :step="1024"
-                  showButtons
+                  show-buttons
                   class="w-full"
                 />
               </div>
@@ -158,7 +158,7 @@ async function saveSettings() {
                   v-model="settings.maxIterations"
                   :min="0"
                   :max="1000"
-                  showButtons
+                  show-buttons
                   class="w-full"
                 />
               </div>
@@ -172,7 +172,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.simple"
                     :min="0"
                     :max="500"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>
@@ -182,7 +182,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.medium"
                     :min="0"
                     :max="500"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>
@@ -192,7 +192,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.large"
                     :min="0"
                     :max="500"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>
@@ -202,7 +202,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.enterprise"
                     :min="0"
                     :max="500"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>
@@ -213,7 +213,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.autonomous"
                     :min="0"
                     :max="10000"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>
@@ -224,7 +224,7 @@ async function saveSettings() {
                     v-model="settings.iterationLimits.planning"
                     :min="0"
                     :max="50"
-                    showButtons
+                    show-buttons
                     class="w-full"
                   />
                 </div>

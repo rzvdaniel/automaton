@@ -124,9 +124,9 @@ function exportCsv() {
     <DataTable
       v-else
       :value="filtered"
-      :sortField="'totalTokens'"
-      :sortOrder="-1"
-      removableSort
+      :sort-field="'totalTokens'"
+      :sort-order="-1"
+      removable-sort
       striped-rows
       :row-class="(row: AppActivityItem) => ({ 'high-usage-row': isHighUsage(row) })"
       class="activity-table"

@@ -19,6 +19,7 @@ import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
+import { UiAutomationAction } from '../services/preview-automation-bridge'
 
 // Props
 const props = withDefaults(
@@ -176,7 +177,8 @@ const messageGroups = computed<MessageGroup[]>(() => {
     const isGroupable =
       msg.role === 'assistant' &&
       msg.toolName &&
-      msg.type !== 'instructionUpdate'
+      msg.type !== 'instructionUpdate' &&
+      msg.type !== 'uiTestResult'
 
     if (isGroupable) {
       toolBatch.push(msg)
@@ -372,6 +374,7 @@ async function sendMessage() {
     const context: Record<string, any> = {
       resourceType: props.resourceType,
       resourceId: props.resourceId,
+      ...buildUiAutomationContext(),
     }
     
     if (props.runnerId) {
@@ -402,6 +405,7 @@ async function sendMessage() {
     const context: Record<string, any> = {
       resourceType: props.resourceType,
       resourceId: props.resourceId,
+      ...buildUiAutomationContext(),
     }
     
     if (props.runnerId) {
@@ -447,6 +451,24 @@ async function generateAndUpdateSessionName(messageContent: string) {
 
 function handleSuggestion(suggestion: string) {
   userInput.value = suggestion
+}
+
+function buildUiAutomationContext() {
+  const recentUiResults = [...messages.value]
+    .filter((message) => message.type === 'uiTestResult' && message.uiTestResult)
+    .slice(-8)
+    .map((message) => ({
+      action: message.uiTestResult?.action,
+      success: message.uiTestResult?.success,
+      details: message.uiTestResult?.details,
+      error: message.uiTestResult?.error,
+      timestamp: message.timestamp.toISOString(),
+    }))
+
+  return {
+    availableUiAutomationTools: Object.values(UiAutomationAction),
+    recentUiAutomationResults: recentUiResults,
+  }
 }
 
 function handleKeyPress(event: KeyboardEvent) {
@@ -586,7 +608,7 @@ function handleKeyPress(event: KeyboardEvent) {
             placeholder="Ask AI a question..."
             class="prompt-textarea"
             :disabled="isBusy"
-            :autoResize="true"
+            :auto-resize="true"
             rows="2"
             @keydown="handleKeyPress"
           />
@@ -714,6 +736,24 @@ function handleKeyPress(event: KeyboardEvent) {
                     <i class="pi pi-file-edit"></i>
                     {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
+                  <div v-else-if="group.message.type === 'uiTestResult'" class="ui-test-notification" :class="{ error: !group.message.uiTestResult?.success }">
+                    <div class="font-semibold mb-1">
+                      <i :class="group.message.uiTestResult?.success ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-500'"></i>
+                      {{ group.message.content }}
+                    </div>
+                    <div v-if="group.message.uiTestResult?.details" class="text-sm">
+                      {{ group.message.uiTestResult.details }}
+                    </div>
+                    <div v-if="group.message.uiTestResult?.value" class="text-xs text-color-secondary mt-1">
+                      Value: {{ group.message.uiTestResult.value }}
+                    </div>
+                    <div v-if="group.message.uiTestResult?.snapshotTitle" class="text-xs text-color-secondary mt-1">
+                      Snapshot: {{ group.message.uiTestResult.snapshotTitle }}
+                    </div>
+                    <div v-if="group.message.uiTestResult?.error" class="text-xs text-red-400 mt-1">
+                      {{ group.message.uiTestResult.error }}
+                    </div>
+                  </div>
                   <!-- Regular AI message -->
                   <template v-else>
                     <ReasoningBlock
@@ -776,7 +816,7 @@ function handleKeyPress(event: KeyboardEvent) {
             placeholder="Describe what you want..."
             class="prompt-textarea"
             :disabled="isBusy"
-            :autoResize="true"
+            :auto-resize="true"
             rows="2"
             @keydown="handleKeyPress"
           />
@@ -1254,6 +1294,18 @@ function handleKeyPress(event: KeyboardEvent) {
   font-style: italic;
 }
 
+.ui-test-notification {
+  border: 1px solid var(--p-green-200);
+  background: var(--p-green-50);
+  border-radius: var(--p-border-radius);
+  padding: 0.6rem 0.75rem;
+}
+
+.ui-test-notification.error {
+  border-color: var(--p-red-200);
+  background: var(--p-red-50);
+}
+
 .tool-call-icon.executing {
   color: var(--p-blue-500);
   font-size: 0.7rem;
@@ -1404,4 +1456,3 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 </style>
-

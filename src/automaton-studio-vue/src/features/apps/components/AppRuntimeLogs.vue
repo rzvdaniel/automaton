@@ -128,13 +128,13 @@ defineExpose({ loadLogs })
       <div class="filter-right">
         <span class="text-color-secondary text-sm">{{ totalCount }} records</span>
         <Button
+          v-tooltip.bottom="'Refresh'"
           icon="pi pi-refresh"
           text
           rounded
           severity="secondary"
           size="small"
           :loading="isLoading"
-          v-tooltip.bottom="'Refresh'"
           @click="loadLogs"
         />
       </div>

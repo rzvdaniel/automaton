@@ -210,7 +210,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <Button label="New Plan" icon="pi pi-plus" size="small" @click="openCreatePlan" />
       </div>
 
-      <DataTable :value="plans" :loading="loadingPlans" stripedRows>
+      <DataTable :value="plans" :loading="loadingPlans" striped-rows>
         <Column field="name" header="Plan" />
         <Column field="description" header="Description" />
         <Column header="Price" style="width:110px">
@@ -256,7 +256,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <div class="text-color-secondary text-sm">Assign subscription plans to users</div>
       </div>
 
-      <DataTable :value="users" :loading="loadingUsers" stripedRows :globalFilterFields="['email', 'name', 'planName']">
+      <DataTable :value="users" :loading="loadingUsers" striped-rows :global-filter-fields="['email', 'name', 'planName']">
         <Column field="email" header="User" sortable />
         <Column header="Plan" sortable>
           <template #body="{ data }">
@@ -308,7 +308,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
           currency="USD"
           :min="0"
           :max="100000"
-          :minFractionDigits="2"
+          :min-fraction-digits="2"
           class="w-full"
           placeholder="0.00 = Free"
         />
@@ -322,7 +322,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
           currency="USD"
           :min="0"
           :max="100000"
-          :minFractionDigits="2"
+          :min-fraction-digits="2"
           class="w-full"
         />
         <small class="text-color-secondary">How much of that is passed through to AI providers.</small>
@@ -338,18 +338,18 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <small class="text-color-secondary">Recurring price linked to the product above.</small>
       </div>
       <div class="flex align-items-center gap-2">
-        <Checkbox v-model="planForm.isDefault" :binary="true" inputId="isDefault" />
+        <Checkbox v-model="planForm.isDefault" :binary="true" input-id="isDefault" />
         <label for="isDefault" class="text-sm">Set as default plan for new users</label>
       </div>
 
       <div class="font-medium text-sm mt-1">Feature Access</div>
       <div class="flex flex-column gap-2 pl-1">
         <div class="flex align-items-center gap-2">
-          <Checkbox v-model="planForm.canCreateProjects" :binary="true" inputId="canProjects" />
+          <Checkbox v-model="planForm.canCreateProjects" :binary="true" input-id="canProjects" />
           <label for="canProjects" class="text-sm">Can create Projects</label>
         </div>
         <div class="flex align-items-center gap-2">
-          <Checkbox v-model="planForm.canCreateOrganizations" :binary="true" inputId="canOrgs" />
+          <Checkbox v-model="planForm.canCreateOrganizations" :binary="true" input-id="canOrgs" />
           <label for="canOrgs" class="text-sm">Can create Organizations</label>
         </div>
       </div>
@@ -379,8 +379,8 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
         <Select
           v-model="selectedPlanId"
           :options="planOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Select a plan"
           class="w-full"
         />

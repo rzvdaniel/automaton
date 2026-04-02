@@ -29,14 +29,20 @@ import ConsolePanel from '../components/ConsolePanel.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
+import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import type { PublishAppRequest } from '../types/apps.types'
-import type { StepResultMessage } from '../types/console.types'
+import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { AppChatStats } from '@/shared/types/ai.types'
+import {
+  executeUiAutomationAction,
+  UiAutomationAction,
+  type UiAutomationResult,
+} from '../services/preview-automation-bridge'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,6 +76,30 @@ const selectedRunnerId = ref<string | null>(null)
 
 // Active view tab (code, settings, console, or logs)
 const activeTab = ref<'code' | 'settings' | 'console' | 'logs'>('code')
+const BUILD_VIEW_MODE_STORAGE_KEY = 'app-editor-build-view-mode'
+type BuildViewMode = 'visual' | 'code'
+
+function loadBuildViewMode(): BuildViewMode {
+  try {
+    const saved = localStorage.getItem(BUILD_VIEW_MODE_STORAGE_KEY)
+    if (saved === 'visual' || saved === 'code') {
+      return saved
+    }
+  } catch {
+    // Fallback to default
+  }
+  return 'visual'
+}
+
+const buildViewMode = ref<BuildViewMode>(loadBuildViewMode())
+
+watch(buildViewMode, (mode) => {
+  try {
+    localStorage.setItem(BUILD_VIEW_MODE_STORAGE_KEY, mode)
+  } catch {
+    // Ignore storage write errors
+  }
+})
 
 // Active sub-tab in logs view
 const activeLogsTab = ref<'build' | 'runtime'>('build')
@@ -374,6 +404,18 @@ function handlePreviewMessage(event: MessageEvent) {
     } else {
       editorStore.setPreviewWarning('Missing preview asset: a referenced file could not be loaded')
     }
+  }
+
+  if (event.data?.type === 'previewConsoleEvent') {
+    const message = event.data as PreviewConsoleMessage
+    const level = message.data.level
+    editorStore.addUiLogEntry({
+      id: crypto.randomUUID(),
+      timestamp: new Date(message.data.timestamp),
+      level,
+      message: message.data.message,
+      source: message.data.source,
+    })
   }
 }
 
@@ -696,10 +738,66 @@ async function handleSessionNameGenerated(name: string) {
 async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   console.log('[AppEditor] AI tool executed:', { toolName, args, result })
 
+  const uiActionNames = new Set<string>([
+    UiAutomationAction.Navigate,
+    UiAutomationAction.Click,
+    UiAutomationAction.Type,
+    UiAutomationAction.ReadText,
+    UiAutomationAction.WaitFor,
+    UiAutomationAction.Assert,
+    UiAutomationAction.GetPageSnapshot,
+    UiAutomationAction.GetConsoleLogs,
+  ])
+
+  if (uiActionNames.has(toolName)) {
+    const envelope = result && typeof result === 'object' ? (result as Record<string, unknown>) : null
+    const actionArgs =
+      envelope && typeof envelope.arguments === 'object'
+        ? (envelope.arguments as Record<string, unknown>)
+        : ((args ?? {}) as Record<string, unknown>)
+
+    const actionResult: UiAutomationResult = await executeUiAutomationAction(
+      toolName as UiAutomationAction,
+      actionArgs,
+      () => editorStore.uiLogEntries,
+    )
+
+    const level = actionResult.success ? 'info' : 'error'
+    const summary = actionResult.success
+      ? `[AI UI Test] ${toolName} OK`
+      : `[AI UI Test] ${toolName} FAILED`
+
+    const detailsParts = [
+      actionResult.details,
+      actionResult.value ? `Value: ${actionResult.value}` : undefined,
+      actionResult.snapshot ? `Snapshot: "${actionResult.snapshot.title}"` : undefined,
+      actionResult.logs ? `Logs: ${actionResult.logs.length}` : undefined,
+      actionResult.error ? `Error: ${actionResult.error}` : undefined,
+    ].filter(Boolean)
+
+    editorStore.addUiLogEntry({
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      level,
+      source: 'preview-runtime',
+      message: `${summary}${detailsParts.length > 0 ? ` — ${detailsParts.join(' | ')}` : ''}`,
+    })
+
+    return {
+      success: actionResult.success,
+      action: toolName,
+      details: actionResult.details,
+      value: actionResult.value,
+      error: actionResult.error,
+      logCount: actionResult.logs?.length,
+      snapshotTitle: actionResult.snapshot?.title,
+    }
+  }
+
   // propose_plan, write_instruction, update_instruction write files internally — just refresh the tree
   if (toolName === 'propose_plan' || toolName === 'write_instruction' || toolName === 'update_instruction') {
     await editorStore.refreshFileTree()
-    return
+    return null
   }
 
   const fileModificationTools = [
@@ -722,13 +820,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       affectedFiles.push('index.html')
     } else if (toolName === 'delete_file' && args.path) {
       await editorStore.refreshFileTree()
-      return
+      return null
     }
 
     // Refresh files after AI update
     await editorStore.refreshFilesAfterAiUpdate(affectedFiles)
 
   }
+
+  return null
 }
 </script>
 
@@ -774,7 +874,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               />
               <Tag v-else value="Draft" severity="warn" />
             </div>
-            <!-- Tab buttons for Code/Console/Settings -->
+            <!-- Tab buttons for Build/Console/Settings -->
             <div class="view-tabs">
               <button
                 class="view-tab"
@@ -782,7 +882,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 @click="activeTab = 'code'"
               >
                 <i class="pi pi-code"></i>
-                Code
+                Build
               </button>
               <button
                 class="view-tab"
@@ -818,6 +918,24 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         <div class="header-right">
           <!-- Runner Selector (only in code view) -->
           <template v-if="activeTab === 'code'">
+            <div class="build-mode-toggle">
+              <button
+                class="view-tab"
+                :class="{ active: buildViewMode === 'visual' }"
+                @click="buildViewMode = 'visual'"
+              >
+                <i class="pi pi-eye"></i>
+                Visual
+              </button>
+              <button
+                class="view-tab"
+                :class="{ active: buildViewMode === 'code' }"
+                @click="buildViewMode = 'code'"
+              >
+                <i class="pi pi-file-edit"></i>
+                Code
+              </button>
+            </div>
             <div class="flex align-items-center gap-2">
               <label class="text-sm text-color-secondary">Runner:</label>
               <RunnerSelector
@@ -855,7 +973,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               @click="editorStore.openPreviewOverlay()"
             />
             <Button
-              v-if="editorStore.hasUnsavedChanges"
+              v-if="editorStore.hasUnsavedChanges && buildViewMode === 'code'"
               label="Save All"
               icon="pi pi-save"
               :loading="editorStore.isSaving"
@@ -893,13 +1011,13 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           />
           <div v-if="editorStore.hasBackendFolder" class="deploy-backend-wrapper">
             <Button
+              v-tooltip.bottom="'Push backend scripts to runner'"
               label="Deploy Backend"
               icon="pi pi-server"
               outlined
               severity="secondary"
               :loading="editorStore.isDeployingBackend"
               :disabled="editorStore.isDeployingBackend"
-              v-tooltip.bottom="'Push backend scripts to runner'"
               @click="handleDeployBackend"
             />
             <span class="deploy-status-label" :class="{ 'deploy-status-label--hidden': !editorStore.deployStatusMessage }">
@@ -939,13 +1057,73 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </div>
         <div class="logs-view-content">
           <AppBuildLogs v-if="activeLogsTab === 'build'" ref="buildLogsRef" :app-id="resolvedAppId" />
-          <AppRuntimeLogs ref="runtimeLogsRef" v-else :app-id="resolvedAppId" />
+          <AppRuntimeLogs v-else ref="runtimeLogsRef" :app-id="resolvedAppId" />
         </div>
       </div>
 
-      <!-- Code Editor View - Main editor layout with resizable splitters -->
+      <!-- Build Visual View -->
+      <div v-show="activeTab === 'code' && buildViewMode === 'visual'" class="build-visual-view">
+        <Splitter
+          class="editor-layout"
+          layout="horizontal"
+          :gutter-size="8"
+          @resizeend="handleSplitterResize"
+        >
+          <SplitterPanel :size="75" :min-size="40" class="splitter-panel">
+            <BuildVisualWorkspace />
+          </SplitterPanel>
+          <SplitterPanel :size="25" :min-size="15" class="splitter-panel">
+            <div class="right-panel-container">
+              <div class="right-panel-header">
+                <button
+                  class="right-panel-tab"
+                  :class="{ active: rightPanelMode === 'aiAssistant' }"
+                  @click="rightPanelMode = 'aiAssistant'"
+                >
+                  <i class="pi pi-sparkles"></i>
+                  <span>AI Assistant</span>
+                </button>
+                <button
+                  class="right-panel-tab"
+                  :class="{ active: rightPanelMode === 'versionHistory' }"
+                  @click="rightPanelMode = 'versionHistory'"
+                >
+                  <i class="pi pi-history"></i>
+                  <span>History</span>
+                </button>
+              </div>
+              <div class="ai-sidebar">
+                <AiAssistant
+                  v-show="rightPanelMode === 'aiAssistant'"
+                  resource-type="WebApp"
+                  :resource-id="resolvedAppId"
+                  :runner-id="selectedRunnerId"
+                  :initial-prompt="initialPrompt"
+                  :initial-mode="initialMode"
+                  :initial-model="initialModel"
+                  :system-prompt="aiSystemPrompt"
+                  :suggestions="aiSuggestions"
+                  @tool-executed="handleAiToolExecuted"
+                  @session-created="handleVersionCreated"
+                  @chat-message-sent="refreshChatStats"
+                  @session-name-generated="handleSessionNameGenerated"
+                />
+                <AppVersionHistory
+                  v-show="rightPanelMode === 'versionHistory'"
+                  ref="versionHistoryRef"
+                  :app-id="resolvedAppId"
+                  @version-restored="handleVersionRestored"
+                  @version-created="handleVersionCreated"
+                />
+              </div>
+            </div>
+          </SplitterPanel>
+        </Splitter>
+      </div>
+
+      <!-- Build Code View - Main editor layout with resizable splitters -->
       <Splitter
-        v-show="activeTab === 'code'"
+        v-show="activeTab === 'code' && buildViewMode === 'code'"
         class="editor-layout"
         layout="horizontal"
         :gutter-size="8"
@@ -1295,6 +1473,21 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   gap: 0.5rem;
 }
 
+.build-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  border: 1px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+}
+
+.build-visual-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .editor-layout {
   display: flex;
   flex: 1;
@@ -1399,6 +1592,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 }
 
 :global(.app-dark) .editor-header {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .build-mode-toggle {
   border-color: var(--p-surface-700);
 }
 

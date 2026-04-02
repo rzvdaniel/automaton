@@ -136,6 +136,7 @@ export type ChatMessageType =
   | 'text'
   | 'reasoning'
   | 'toolExecution'
+  | 'uiTestResult'
   | 'codeSuccess'
   | 'codeError'
   | 'generating'
@@ -169,6 +170,7 @@ export interface ChatMessage {
   toolArgs?: any
   toolStatus?: 'executing' | 'completed' | 'error'
   toolResult?: any
+  uiTestResult?: UiToolExecutionFeedback
   
   // For plan approval cards
   planData?: PlanData
@@ -195,6 +197,16 @@ export interface ChatMessage {
 
   /** Chain-of-thought from thinking models (e.g. Moonshot kimi-k2.5). Null for standard models. */
   reasoningContent?: string
+}
+
+export interface UiToolExecutionFeedback {
+  success: boolean
+  action: string
+  details?: string
+  value?: string
+  error?: string
+  logCount?: number
+  snapshotTitle?: string
 }
 
 // ============================================

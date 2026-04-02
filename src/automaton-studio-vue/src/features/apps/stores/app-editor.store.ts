@@ -15,6 +15,16 @@ import type {
 } from '../types/apps.types'
 import { getLanguageFromExtension } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
+import type { UiLogEntry } from '../types/console.types'
+
+export const UiLogFilter = {
+  All: 'all',
+  Errors: 'errors',
+  Console: 'console',
+  Runtime: 'runtime',
+} as const
+
+export type UiLogFilter = typeof UiLogFilter[keyof typeof UiLogFilter]
 
 export const useAppEditorStore = defineStore('appEditor', () => {
   const authStore = useAuthStore()
@@ -63,6 +73,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Console entries for step execution results
   const consoleEntries = ref<ConsoleEntry[]>([])
+  const uiLogEntries = ref<UiLogEntry[]>([])
+  const uiLogFilter = ref<UiLogFilter>(UiLogFilter.All)
 
   // ============================================
   // Computed
@@ -714,6 +726,21 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     consoleEntries.value = []
   }
 
+  function addUiLogEntry(entry: UiLogEntry): void {
+    uiLogEntries.value.unshift(entry)
+    if (uiLogEntries.value.length > 200) {
+      uiLogEntries.value = uiLogEntries.value.slice(0, 200)
+    }
+  }
+
+  function clearUiLogs(): void {
+    uiLogEntries.value = []
+  }
+
+  function setUiLogFilter(filter: UiLogFilter): void {
+    uiLogFilter.value = filter
+  }
+
   /**
    * Clear error
    */
@@ -737,6 +764,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     error.value = null
     showPreviewOverlay.value = false
     consoleEntries.value = []
+    uiLogEntries.value = []
+    uiLogFilter.value = UiLogFilter.All
   }
 
   /**
@@ -775,6 +804,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     error,
     showPreviewOverlay,
     consoleEntries,
+    uiLogEntries,
+    uiLogFilter,
 
     // Computed
     activeFile,
@@ -812,6 +843,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     closePreviewOverlay,
     addConsoleEntry,
     clearConsole,
+    addUiLogEntry,
+    clearUiLogs,
+    setUiLogFilter,
     clearError,
     reset,
   }

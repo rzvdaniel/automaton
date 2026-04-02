@@ -63,7 +63,7 @@
     </template>
 
     <!-- Actions: implementation plan gets "Implement Plan"; stage_complete gets Continue/Stop -->
-    <div class="plan-actions" v-if="planData.awaitingApproval">
+    <div v-if="planData.awaitingApproval" class="plan-actions">
       <template v-if="planData.planType === 'implementation'">
         <Button
           label="Implement Plan"

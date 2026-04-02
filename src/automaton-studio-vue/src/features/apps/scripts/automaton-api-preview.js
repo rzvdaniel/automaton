@@ -16,6 +16,56 @@ const AUTH_TOKEN = '__AUTH_TOKEN__';
 
 console.log('[AutomatonAPI] Preview mode initialized for app:', APP_ID);
 
+function safeSerialize(value) {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function emitPreviewConsoleEvent(level, source, args) {
+  try {
+    const message = Array.isArray(args)
+      ? args.map((item) => safeSerialize(item)).join(' ')
+      : safeSerialize(args);
+
+    window.parent.postMessage({
+      type: 'previewConsoleEvent',
+      data: {
+        level,
+        message,
+        timestamp: new Date().toISOString(),
+        source
+      }
+    }, '*');
+  } catch {
+    // Do not break preview execution if telemetry emit fails
+  }
+}
+
+const originalConsole = {
+  log: console.log.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console)
+};
+
+console.log = (...args) => {
+  originalConsole.log(...args);
+  emitPreviewConsoleEvent('info', 'preview-console', args);
+};
+
+console.warn = (...args) => {
+  originalConsole.warn(...args);
+  emitPreviewConsoleEvent('warn', 'preview-console', args);
+};
+
+console.error = (...args) => {
+  originalConsole.error(...args);
+  emitPreviewConsoleEvent('error', 'preview-console', args);
+};
+
 async function apiCall(path, method, body) {
   const url = BASE_URL + path;
   console.log(`[AutomatonAPI] ${method} ${url}`);
@@ -204,5 +254,17 @@ window.addEventListener('error', (event) => {
     // Ignore preview error reporting failures
   }
 }, true);
+
+window.addEventListener('error', (event) => {
+  emitPreviewConsoleEvent('error', 'preview-runtime', [
+    event.message || 'Runtime error',
+    event.filename ? `at ${event.filename}:${event.lineno || 0}:${event.colno || 0}` : ''
+  ]);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason?.message || event.reason || 'Unhandled promise rejection';
+  emitPreviewConsoleEvent('error', 'preview-runtime', [reason]);
+});
 
 console.log('[AutomatonAPI] Ready!');

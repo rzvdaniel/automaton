@@ -92,7 +92,7 @@ async function goToPortal() {
             </div>
             <ProgressBar
               :value="usagePercent"
-              :showValue="false"
+              :show-value="false"
               class="billing-progress mb-2"
               :class="`progress-${usageSeverity}`"
             />
