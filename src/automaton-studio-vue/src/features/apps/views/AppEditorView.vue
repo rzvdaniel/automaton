@@ -181,6 +181,7 @@ function normalizeSizes(sizes: number[]): number[] {
 }
 
 const panelSizes = ref<number[]>(normalizeSizes(loadPanelSizes()))
+const isVisualResizing = ref(false)
 
 // Handle splitter resize
 function handleSplitterResize(event: any) {
@@ -190,6 +191,11 @@ function handleSplitterResize(event: any) {
     panelSizes.value = normalized
     savePanelSizes(normalized)
   }
+  isVisualResizing.value = false
+}
+
+function handleSplitterResizing() {
+  isVisualResizing.value = true
 }
 
 // Active tab in editor
@@ -1067,10 +1073,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           class="editor-layout"
           layout="horizontal"
           :gutter-size="8"
+          @resize="handleSplitterResizing"
           @resizeend="handleSplitterResize"
         >
           <SplitterPanel :size="75" :min-size="40" class="splitter-panel">
-            <BuildVisualWorkspace />
+            <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" />
           </SplitterPanel>
           <SplitterPanel :size="25" :min-size="15" class="splitter-panel">
             <div class="right-panel-container">
@@ -1493,6 +1500,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  height: 100%;
 }
 
 /* Splitter panel styles */

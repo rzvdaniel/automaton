@@ -2,11 +2,22 @@
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
-import { computed } from 'vue'
+import Splitter from 'primevue/splitter'
+import SplitterPanel from 'primevue/splitterpanel'
+import { computed, ref } from 'vue'
 import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
 import LiveUiLogPanel from './LiveUiLogPanel.vue'
+
+const props = withDefaults(
+  defineProps<{
+    suspendHeavyRendering?: boolean
+  }>(),
+  {
+    suspendHeavyRendering: false,
+  },
+)
 
 const editorStore = useAppEditorStore()
 
@@ -55,6 +66,101 @@ function focusPassedLogs() {
 const isPassFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.Runtime)
 const isFailFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.Errors)
 const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.All)
+
+const SPLITTER_STORAGE_KEY = 'app-editor-build-visual-splitter'
+const defaultSplitterSizes = [74, 26]
+
+function normalizeSizes(sizes: number[]): number[] {
+  if (!Array.isArray(sizes) || sizes.length !== 2) {
+    return defaultSplitterSizes
+  }
+
+  const total = sizes.reduce((sum, size) => sum + size, 0)
+  if (total <= 0) {
+    return defaultSplitterSizes
+  }
+
+  return sizes.map((size) => Math.round((size / total) * 10000) / 100)
+}
+
+function loadSplitterSizes(): number[] {
+  try {
+    const raw = localStorage.getItem(SPLITTER_STORAGE_KEY)
+    if (!raw) {
+      return defaultSplitterSizes
+    }
+
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed) && parsed.every((value) => typeof value === 'number')) {
+      return normalizeSizes(parsed as number[])
+    }
+  } catch {
+    // fallback to defaults
+  }
+
+  return defaultSplitterSizes
+}
+
+function saveSplitterSizes(sizes: number[]): void {
+  try {
+    localStorage.setItem(SPLITTER_STORAGE_KEY, JSON.stringify(sizes))
+  } catch {
+    // non-critical persistence error
+  }
+}
+
+const splitterSizes = ref<number[]>(loadSplitterSizes())
+const splitterRenderKey = ref(0)
+const isLocalResizing = ref(false)
+
+function handleSplitterResize(event: { sizes?: number[] }): void {
+  if (!event.sizes || !Array.isArray(event.sizes)) {
+    return
+  }
+
+  const normalized = normalizeSizes(event.sizes)
+  splitterSizes.value = normalized
+  saveSplitterSizes(normalized)
+  isLocalResizing.value = false
+}
+
+if (splitterSizes.value.length === 2) {
+  saveSplitterSizes(splitterSizes.value)
+}
+
+function setSplitterPreset(previewSize: number, logsSize: number): void {
+  splitterSizes.value = normalizeSizes([previewSize, logsSize])
+  saveSplitterSizes(splitterSizes.value)
+  splitterRenderKey.value += 1
+}
+
+function maximizePreview(): void {
+  setSplitterPreset(90, 10)
+}
+
+function handleSplitterResizing(): void {
+  isLocalResizing.value = true
+}
+
+const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
+
+const previewViewportStyle = computed(() => {
+  if (editorStore.previewMode === 'desktop') {
+    return {
+      width: '100%',
+      height: '100%',
+      maxWidth: currentSize.value.width,
+      maxHeight: '100%',
+    }
+  }
+
+  return {
+    width: currentSize.value.width,
+    height: currentSize.value.height,
+    maxWidth: '100%',
+    maxHeight: '100%',
+  }
+})
 </script>
 
 <template>
@@ -94,38 +200,63 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
           :loading="editorStore.isLoadingPreview"
           @click="editorStore.refreshPreview()"
         />
-      </div>
-    </div>
-
-    <div class="preview-content">
-      <div
-        class="preview-viewport"
-        :class="editorStore.previewMode"
-        :style="{
-          width: currentSize.width,
-          height: currentSize.height,
-        }"
-      >
-        <div v-if="editorStore.isLoadingPreview" class="preview-loading">
-          <i class="pi pi-spin pi-spinner text-3xl"></i>
-          <p class="mt-2">Loading preview...</p>
-        </div>
-        <div v-else-if="!editorStore.previewUrl" class="preview-empty">
-          <i class="pi pi-eye-slash text-3xl text-color-secondary"></i>
-          <p class="mt-2 text-color-secondary">No preview available</p>
-        </div>
-        <iframe
-          v-else
-          :key="editorStore.previewUrl"
-          :src="editorStore.previewUrl"
-          class="preview-iframe"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-          title="App Preview"
+        <Button
+          icon="pi pi-arrows-alt-v"
+          text
+          severity="secondary"
+          v-tooltip.bottom="'Maximize Preview (90/10)'"
+          @click="maximizePreview"
         />
       </div>
     </div>
 
-    <LiveUiLogPanel class="logs-panel" />
+    <Splitter
+      :key="splitterRenderKey"
+      class="visual-splitter"
+      layout="vertical"
+      :gutter-size="8"
+      @resize="handleSplitterResizing"
+      @resizeend="handleSplitterResize"
+    >
+      <SplitterPanel :size="splitterSizes[0]" :min-size="45" class="splitter-panel">
+        <div class="preview-content">
+          <div
+            class="preview-viewport"
+            :class="editorStore.previewMode"
+            :style="previewViewportStyle"
+          >
+            <div v-if="isHeavyRenderingSuspended" class="preview-loading">
+              <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
+              <p class="mt-2 text-color-secondary">Resizing preview...</p>
+            </div>
+            <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
+              <i class="pi pi-spin pi-spinner text-3xl"></i>
+              <p class="mt-2">Loading preview...</p>
+            </div>
+            <div v-else-if="!editorStore.previewUrl" class="preview-empty">
+              <i class="pi pi-eye-slash text-3xl text-color-secondary"></i>
+              <p class="mt-2 text-color-secondary">No preview available</p>
+            </div>
+            <iframe
+              v-else
+              :key="editorStore.previewUrl"
+              :src="editorStore.previewUrl"
+              class="preview-iframe"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
+              title="App Preview"
+            />
+          </div>
+        </div>
+      </SplitterPanel>
+
+      <SplitterPanel :size="splitterSizes[1]" :min-size="12" class="splitter-panel">
+        <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
+          <i class="pi pi-arrows-v text-color-secondary"></i>
+          <span class="text-sm text-color-secondary">Resizing logs...</span>
+        </div>
+        <LiveUiLogPanel v-else class="logs-panel" />
+      </SplitterPanel>
+    </Splitter>
   </div>
 </template>
 
@@ -146,6 +277,16 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
   flex-shrink: 0;
 }
 
+.visual-splitter {
+  flex: 1;
+  min-height: 0;
+}
+
+.splitter-panel {
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
 .preview-content {
   flex: 1;
   min-height: 0;
@@ -154,6 +295,7 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
   align-items: center;
   overflow: auto;
   padding: 0.75rem;
+  height: 100%;
 }
 
 .ui-test-summary {
@@ -187,8 +329,7 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
   overflow: hidden;
   background: var(--p-surface-0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  max-width: 100%;
-  max-height: 100%;
+  min-height: 0;
 }
 
 .preview-iframe {
@@ -208,8 +349,16 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
 }
 
 .logs-panel {
-  height: 280px;
-  flex-shrink: 0;
+  height: 100%;
+}
+
+.logs-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-top: 1px solid var(--p-surface-200);
 }
 
 :global(.app-dark) .preview-header {
@@ -219,5 +368,25 @@ const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter
 :global(.app-dark) .preview-viewport {
   border-color: var(--p-surface-700);
   background: var(--p-surface-900);
+}
+
+:global(.app-dark) .logs-placeholder {
+  border-color: var(--p-surface-700);
+}
+
+:global(.build-visual-workspace .p-splitter-gutter) {
+  background-color: var(--p-surface-200);
+}
+
+:global(.build-visual-workspace .p-splitter-gutter:hover) {
+  background-color: var(--p-primary-300);
+}
+
+:global(.app-dark .build-visual-workspace .p-splitter-gutter) {
+  background-color: var(--p-surface-700);
+}
+
+:global(.app-dark .build-visual-workspace .p-splitter-gutter:hover) {
+  background-color: var(--p-primary-600);
 }
 </style>
