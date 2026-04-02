@@ -27,12 +27,102 @@ export interface UiAutomationResult {
   error?: string
 }
 
+const PREVIEW_AUTOMATION_TIMEOUT_MS = 12000
+
+function getPreviewIframe(): HTMLIFrameElement | null {
+  return (
+    document.querySelector<HTMLIFrameElement>('.build-visual-workspace .preview-iframe')
+    ?? document.querySelector<HTMLIFrameElement>('.preview-overlay .preview-iframe')
+  )
+}
+
 function getPreviewDocument(): Document | null {
-  const iframe = document.querySelector<HTMLIFrameElement>('.build-visual-workspace .preview-iframe')
-  if (!iframe?.contentWindow?.document) {
+  const iframe = getPreviewIframe()
+  if (!iframe?.contentWindow) {
     return null
   }
-  return iframe.contentWindow.document
+
+  try {
+    return iframe.contentWindow.document
+  } catch {
+    // Cross-origin frame; direct DOM access is blocked. Caller should fallback to postMessage bridge.
+    return null
+  }
+}
+
+function isCrossOriginFrame(iframe: HTMLIFrameElement | null): boolean {
+  if (!iframe?.contentWindow) {
+    return false
+  }
+
+  try {
+    void iframe.contentWindow.document
+    return false
+  } catch {
+    return true
+  }
+}
+
+async function executeViaPostMessageBridge(
+  action: UiAutomationAction,
+  args: Record<string, unknown>,
+): Promise<UiAutomationResult> {
+  const iframe = getPreviewIframe()
+  const targetWindow = iframe?.contentWindow
+  if (!targetWindow) {
+    return { success: false, action, error: 'Preview iframe is not available.' }
+  }
+
+  const requestId = crypto.randomUUID()
+  const timeoutMs = Math.max(
+    PREVIEW_AUTOMATION_TIMEOUT_MS,
+    Number(args.timeoutMs ?? 0) + 2000,
+  )
+
+  return new Promise<UiAutomationResult>((resolve) => {
+    const timeoutHandle = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage)
+      resolve({
+        success: false,
+        action,
+        error: `Timed out waiting for preview automation response (${timeoutMs}ms).`,
+      })
+    }, timeoutMs)
+
+    function onMessage(event: MessageEvent) {
+      const data = event.data as {
+        type?: string
+        requestId?: string
+        result?: UiAutomationResult
+      }
+
+      if (data?.type !== 'previewAutomationResponse' || data.requestId !== requestId) {
+        return
+      }
+
+      window.clearTimeout(timeoutHandle)
+      window.removeEventListener('message', onMessage)
+      resolve(
+        data.result ?? {
+          success: false,
+          action,
+          error: 'Preview automation returned an empty response.',
+        },
+      )
+    }
+
+    window.addEventListener('message', onMessage)
+
+    targetWindow.postMessage(
+      {
+        type: 'previewAutomationRequest',
+        requestId,
+        action,
+        args,
+      },
+      '*',
+    )
+  })
 }
 
 async function waitForSelector(
@@ -57,6 +147,14 @@ export async function executeUiAutomationAction(
   args: Record<string, unknown>,
   getUiLogs: () => UiLogEntry[],
 ): Promise<UiAutomationResult> {
+  const iframe = getPreviewIframe()
+  const requiresDomAccess = action !== UiAutomationAction.GetConsoleLogs
+  const useBridge = requiresDomAccess && isCrossOriginFrame(iframe)
+
+  if (useBridge) {
+    return executeViaPostMessageBridge(action, args)
+  }
+
   const doc = getPreviewDocument()
 
   if (action !== UiAutomationAction.GetConsoleLogs && !doc) {

@@ -154,6 +154,114 @@ function sendResultToConsole(type, name, inputs, result, duration, success) {
   }
 }
 
+async function waitForSelector(selector, timeoutMs = 3000, intervalMs = 100) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const found = document.querySelector(selector);
+    if (found) return found;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return null;
+}
+
+async function executePreviewAutomationAction(action, args = {}) {
+  try {
+    switch (action) {
+      case 'ui_navigate': {
+        const url = String(args.url || '').trim();
+        if (!url) return { success: false, action, error: "Missing required argument 'url'" };
+        window.location.assign(url);
+        return { success: true, action, details: `Navigated to ${url}` };
+      }
+      case 'ui_click': {
+        const selector = String(args.selector || '').trim();
+        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };
+        const element = document.querySelector(selector);
+        if (!element) return { success: false, action, error: `Element not found for selector: ${selector}` };
+        element.click();
+        return { success: true, action, details: `Clicked ${selector}` };
+      }
+      case 'ui_type': {
+        const selector = String(args.selector || '').trim();
+        const text = String(args.text || '');
+        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };
+        const element = document.querySelector(selector);
+        if (!element || (element.tagName !== 'INPUT' && element.tagName !== 'TEXTAREA')) {
+          return { success: false, action, error: `Input element not found for selector: ${selector}` };
+        }
+        element.focus();
+        element.value = text;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        return { success: true, action, details: `Typed into ${selector}` };
+      }
+      case 'ui_read_text': {
+        const selector = String(args.selector || '').trim();
+        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };
+        const element = document.querySelector(selector);
+        if (!element) return { success: false, action, error: `Element not found for selector: ${selector}` };
+        const value = (element.textContent || '').trim();
+        return { success: true, action, value, details: `Read text from ${selector}` };
+      }
+      case 'ui_wait_for': {
+        const selector = String(args.selector || '').trim();
+        const timeoutMs = Number(args.timeoutMs || 3000);
+        const intervalMs = Number(args.intervalMs || 100);
+        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };
+        const found = await waitForSelector(selector, timeoutMs, intervalMs);
+        if (!found) {
+          return { success: false, action, error: `Timed out waiting for selector: ${selector} (${timeoutMs}ms)` };
+        }
+        return { success: true, action, details: `Selector appeared: ${selector}` };
+      }
+      case 'ui_assert': {
+        const selector = String(args.selector || '').trim();
+        const exists = args.exists === undefined ? true : Boolean(args.exists);
+        const containsText = args.containsText === undefined ? undefined : String(args.containsText);
+        const equalsText = args.equalsText === undefined ? undefined : String(args.equalsText);
+        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };
+
+        const element = document.querySelector(selector);
+        const found = Boolean(element);
+        if (exists !== found) {
+          return { success: false, action, error: `Assertion failed for ${selector}: expected exists=${exists}, actual=${found}` };
+        }
+
+        if (element && containsText !== undefined) {
+          const text = (element.textContent || '').trim();
+          if (!text.includes(containsText)) {
+            return { success: false, action, error: `Assertion failed for ${selector}: text does not include "${containsText}"` };
+          }
+        }
+
+        if (element && equalsText !== undefined) {
+          const text = (element.textContent || '').trim();
+          if (text !== equalsText) {
+            return { success: false, action, error: `Assertion failed for ${selector}: expected "${equalsText}", got "${text}"` };
+          }
+        }
+
+        return { success: true, action, details: `Assertion passed for ${selector}` };
+      }
+      case 'ui_get_page_snapshot': {
+        const maxChars = Math.max(100, Number(args.maxChars || 1000));
+        const title = document.title || '';
+        const url = window.location.href || '';
+        const bodyText = (document.body?.innerText || '').slice(0, maxChars);
+        return { success: true, action, details: `Snapshot captured (${bodyText.length} chars)`, snapshot: { title, url, bodyText } };
+      }
+      default:
+        return { success: false, action, error: `Unsupported UI action in preview bridge: ${action}` };
+    }
+  } catch (err) {
+    return {
+      success: false,
+      action,
+      error: err && err.message ? err.message : 'Unknown UI automation error'
+    };
+  }
+}
+
 async function callController(controllerName, actionName, inputs = {}) {
   const res = await executeController(controllerName, actionName, { inputs });
   if (!res.success) throw new Error(res.error || 'Request failed');
@@ -285,6 +393,21 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason?.message || event.reason || 'Unhandled promise rejection';
   emitPreviewConsoleEvent('error', 'preview-runtime', [reason]);
+});
+
+window.addEventListener('message', async (event) => {
+  const payload = event.data || {};
+  if (payload.type !== 'previewAutomationRequest' || !payload.requestId) {
+    return;
+  }
+
+  const result = await executePreviewAutomationAction(payload.action, payload.args || {});
+
+  window.parent.postMessage({
+    type: 'previewAutomationResponse',
+    requestId: payload.requestId,
+    result
+  }, '*');
 });
 
 console.log('[AutomatonAPI] Ready!');
