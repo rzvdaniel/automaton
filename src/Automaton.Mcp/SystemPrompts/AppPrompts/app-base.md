@@ -122,31 +122,6 @@ This makes it immediately clear which CSS belongs to which component and how ele
 
 Even in a single file, divide styles into named regions — a future reader can jump straight to what they need:
 
-```css
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
-
-/* ============================================================
-   LAYOUT
-   ============================================================ */
-
-/* ============================================================
-   NAVIGATION
-   ============================================================ */
-
-/* ============================================================
-   CARDS
-   ============================================================ */
-
-/* ============================================================
-   BUTTONS
-   ============================================================ */
-
-/* ============================================================
-   FORMS
-   ============================================================ */
-```
 
 ### Use data attributes for JavaScript hooks — never select by CSS class
 
@@ -164,6 +139,10 @@ document.querySelector('[data-list="results"]').innerHTML = renderItems(items);
 <!-- ❌ fragile — CSS rename breaks JS -->
 document.querySelector('.btn--primary').addEventListener('click', handleSave);
 ```
+
+### Browser JavaScript module rule (MANDATORY)
+
+Frontend browser modules must use ESM only; never generate CommonJS (require, module.exports, exports.*)
 
 ### When splitting JS across multiple files — one role per file
 
