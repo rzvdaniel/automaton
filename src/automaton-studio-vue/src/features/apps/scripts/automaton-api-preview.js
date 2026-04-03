@@ -164,14 +164,36 @@ async function waitForSelector(selector, timeoutMs = 3000, intervalMs = 100) {
   return null;
 }
 
+function resolveSafePreviewNavigationTarget(targetUrl) {
+  const trimmed = String(targetUrl || '').trim();
+  if (!trimmed) return null;
+
+  try {
+    const resolved = new URL(trimmed, window.location.href);
+    const sameOrigin = resolved.origin === window.location.origin;
+    const inPreviewPath = resolved.pathname.includes('/app-preview/');
+    return sameOrigin && inPreviewPath ? resolved.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 async function executePreviewAutomationAction(action, args = {}) {
   try {
     switch (action) {
       case 'ui_navigate': {
         const url = String(args.url || '').trim();
         if (!url) return { success: false, action, error: "Missing required argument 'url'" };
-        window.location.assign(url);
-        return { success: true, action, details: `Navigated to ${url}` };
+        const safeTarget = resolveSafePreviewNavigationTarget(url);
+        if (!safeTarget) {
+          return {
+            success: false,
+            action,
+            error: 'Blocked ui_navigate outside preview app scope. Use relative app URLs only.'
+          };
+        }
+        window.location.assign(safeTarget);
+        return { success: true, action, details: `Navigated to ${safeTarget}` };
       }
       case 'ui_click': {
         const selector = String(args.selector || '').trim();

@@ -309,6 +309,8 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
   5) rerun tests
 - Continue until all done criteria pass.
 - Do not claim completion while `[AI UI Test]` failures or runtime errors remain.
+- For `ui_navigate`, only use app-relative preview targets (e.g. `index.html`, `pages/level1.html`, `?mode=test`, `#section`).
+- Never navigate UI tests to API/server root URLs (e.g. `/`, `/swagger`, base server URL) because that exits the app preview context.
 - If blocked, report exact blocker + what was attempted.
 
 ## FINAL RESPONSE:

@@ -142,6 +142,25 @@ async function waitForSelector(
   return null
 }
 
+function resolveSafePreviewNavigationTarget(
+  previewWindow: Window,
+  targetUrl: string,
+): string | null {
+  const trimmed = targetUrl.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const resolved = new URL(trimmed, previewWindow.location.href)
+    const sameOrigin = resolved.origin === previewWindow.location.origin
+    const inPreviewPath = resolved.pathname.includes('/app-preview/')
+    return sameOrigin && inPreviewPath ? resolved.toString() : null
+  } catch {
+    return null
+  }
+}
+
 export async function executeUiAutomationAction(
   action: UiAutomationAction,
   args: Record<string, unknown>,
@@ -168,8 +187,17 @@ export async function executeUiAutomationAction(
         if (!url) return { success: false, action, error: "Missing required argument 'url'" }
         const win = doc!.defaultView
         if (!win) return { success: false, action, error: 'Preview window is not available' }
-        win.location.assign(url)
-        return { success: true, action, details: `Navigated to ${url}` }
+        const safeTarget = resolveSafePreviewNavigationTarget(win, url)
+        if (!safeTarget) {
+          return {
+            success: false,
+            action,
+            error:
+              'Blocked ui_navigate outside preview app scope. Use a relative app URL like "index.html", "pages/level1.html", "?mode=test", or "#section".',
+          }
+        }
+        win.location.assign(safeTarget)
+        return { success: true, action, details: `Navigated to ${safeTarget}` }
       }
       case UiAutomationAction.Click: {
         const selector = String(args.selector ?? '').trim()
