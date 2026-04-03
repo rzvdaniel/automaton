@@ -42,6 +42,12 @@ public class UserSettingsDto
     /// Provider name that owns DefaultPlanningModel.
     /// </summary>
     public string? DefaultPlanningProvider { get; set; }
+
+    /// <summary>
+    /// Enables verbose AI chat debug rendering in the UI.
+    /// This is display-only and does not change the AI payload sent by the app.
+    /// </summary>
+    public bool ShowAiDebugDetails { get; set; } = false;
 }
 
 /// <summary>
@@ -66,6 +72,7 @@ public class UpdateUserSettingsRequest
     private string? _defaultAiProvider;
     private string? _defaultPlanningModel;
     private string? _defaultPlanningProvider;
+    private bool? _showAiDebugDetails;
 
     /// <summary>
     /// Whether DefaultAiModel was explicitly included in the request payload.
@@ -86,6 +93,11 @@ public class UpdateUserSettingsRequest
     /// Whether DefaultPlanningProvider was explicitly included in the request payload.
     /// </summary>
     public bool HasDefaultPlanningProvider { get; private set; }
+
+    /// <summary>
+    /// Whether ShowAiDebugDetails was explicitly included in the request payload.
+    /// </summary>
+    public bool HasShowAiDebugDetails { get; private set; }
 
     public string? DefaultAiModel
     {
@@ -124,6 +136,16 @@ public class UpdateUserSettingsRequest
         {
             HasDefaultPlanningProvider = true;
             _defaultPlanningProvider = value;
+        }
+    }
+
+    public bool? ShowAiDebugDetails
+    {
+        get => _showAiDebugDetails;
+        set
+        {
+            HasShowAiDebugDetails = true;
+            _showAiDebugDetails = value;
         }
     }
 }

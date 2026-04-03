@@ -11,6 +11,7 @@ const props = defineProps<{
   toolResult?: unknown
   toolStatus?: 'executing' | 'completed' | 'error'
   error?: string
+  showDebugDetails?: boolean
 }>()
 
 interface ToolDetailPolicy {
@@ -46,15 +47,7 @@ const toolExtensionComponent = computed(() => {
   return toolDetailsExtensions[name as keyof typeof toolDetailsExtensions] ?? null
 })
 
-const isDebugMode = computed(() => {
-  if (import.meta.env.DEV) return true
-  if (typeof window === 'undefined') return false
-
-  const fromQuery = new URLSearchParams(window.location.search).get('aiToolDetailsDebug')
-  if (fromQuery === '1' || fromQuery === 'true') return true
-
-  return window.localStorage.getItem('aiToolDetailsDebug') === '1'
-})
+const isDebugMode = computed(() => props.showDebugDetails === true)
 
 const defaultPolicy: ToolDetailPolicy = {
   instructions: 'trim',
@@ -188,14 +181,14 @@ const resultDisplay = computed(() => {
       <div class="tool-json-label">Instructions</div>
       <pre class="tool-json-content">{{ instructionsDisplay.content }}</pre>
       <div v-if="instructionsDisplay.trimmed" class="tool-json-hint">
-        Trimmed for production view. Enable debug mode to see full payload.
+        Trimmed for normal view. Enable AI debug details in Settings to see full payload.
       </div>
     </div>
 
     <div v-if="resultDisplay.hidden" class="tool-json-block">
       <div class="tool-json-label">Result</div>
       <div class="tool-json-hint">
-        Hidden in production view. Enable debug mode to see full payload.
+        Hidden in normal view. Enable AI debug details in Settings to see full payload.
       </div>
     </div>
 
@@ -203,7 +196,7 @@ const resultDisplay = computed(() => {
       <div class="tool-json-label">Result</div>
       <pre class="tool-json-content">{{ resultDisplay.content }}</pre>
       <div v-if="resultDisplay.trimmed" class="tool-json-hint">
-        Trimmed for production view. Enable debug mode to see full payload.
+        Trimmed for normal view. Enable AI debug details in Settings to see full payload.
       </div>
     </div>
   </div>

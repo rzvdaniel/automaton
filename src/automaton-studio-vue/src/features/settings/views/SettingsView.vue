@@ -28,12 +28,14 @@ const {
   defaultAiProvider,
   defaultPlanningModel,
   defaultPlanningProvider,
+  showAiDebugDetails,
   isLoading: settingsLoading,
   isSaving: settingsSaving,
   setTheme,
   setFontSize,
   setDefaultAiModel,
   setDefaultPlanningModel,
+  setShowAiDebugDetails,
 } = useUserSettings()
 const authStore = useAuthStore()
 const router = useRouter()
@@ -81,6 +83,7 @@ const aiModelFlatOptions = computed(() =>
 
 const selectedDefaultAiModel = ref<string | undefined>(undefined)
 const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
+const aiDebugDetailsEnabled = ref(false)
 
 onMounted(async () => {
   // Load user data from store
@@ -96,6 +99,7 @@ onMounted(async () => {
   editorFontSize.value = fontSize.value
   selectedDefaultAiModel.value = defaultAiModel.value
   selectedDefaultPlanningModel.value = defaultPlanningModel.value
+  aiDebugDetailsEnabled.value = showAiDebugDetails.value
 
   // Load AI providers for model dropdowns
   aiModelsLoading.value = true
@@ -118,6 +122,7 @@ watch(fontSize, (newSize) => {
 
 watch(defaultAiModel, (v) => { selectedDefaultAiModel.value = v })
 watch(defaultPlanningModel, (v) => { selectedDefaultPlanningModel.value = v })
+watch(showAiDebugDetails, (v) => { aiDebugDetailsEnabled.value = v })
 
 // Check username availability
 async function checkUsernameAvailability() {
@@ -239,10 +244,11 @@ async function saveAiPreferences() {
       ? (aiModelFlatOptions.value.find((o) => o.value === planModel)?.provider ?? '')
       : undefined
 
-    await Promise.all([
-      setDefaultAiModel(aiModel, aiProv),
-      setDefaultPlanningModel(planModel, planProv),
-    ])
+    // Save sequentially: settings composable uses a shared isSaving gate.
+    // Parallel calls can skip updates and leave some values unsaved.
+    await setDefaultAiModel(aiModel, aiProv)
+    await setDefaultPlanningModel(planModel, planProv)
+    await setShowAiDebugDetails(aiDebugDetailsEnabled.value)
 
     toast.add({
       severity: 'success',
@@ -659,6 +665,27 @@ const passwordLoading = computed(() => passwordSaving.value)
                 <small class="text-color-secondary">
                   Used for multi-step planning and flow generation tasks.
                 </small>
+              </div>
+
+              <!-- AI Chat Debug Rendering -->
+              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="pr-3">
+                  <div class="font-medium">Show AI Debug Details</div>
+                  <div class="text-color-secondary text-sm">
+                    Display verbose tool instructions/results and UI check messages in AI chat. This only changes what is shown, not what is sent to AI.
+                  </div>
+                </div>
+                <SelectButton
+                  :model-value="aiDebugDetailsEnabled"
+                  :options="[
+                    { label: 'Off', value: false },
+                    { label: 'On', value: true },
+                  ]"
+                  option-label="label"
+                  option-value="value"
+                  :disabled="settingsSaving || aiModelsLoading"
+                  @update:model-value="(v) => aiDebugDetailsEnabled = Boolean(v)"
+                />
               </div>
 
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">

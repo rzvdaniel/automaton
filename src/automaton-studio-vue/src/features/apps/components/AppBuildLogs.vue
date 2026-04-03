@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
 import ToolExecutionDetails from '@/shared/components/ToolExecutionDetails.vue'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
@@ -26,6 +27,7 @@ const isExportingAll = ref(false)
 const exportingSessionId = ref<string | null>(null)
 
 const toast = useToast()
+const { showAiDebugDetails } = useUserSettings()
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = window.URL.createObjectURL(blob)
@@ -402,11 +404,13 @@ defineExpose({ reload: loadSessions })
                       {{ JSON.stringify(item.msg.toolArgs).slice(0, 120) }}{{ JSON.stringify(item.msg.toolArgs).length > 120 ? '…' : '' }}
                     </span>
                     <ToolExecutionDetails
+                      v-if="showAiDebugDetails"
                       :tool-name="item.msg.toolName"
                       :tool-args="item.msg.toolArgs"
                       :tool-result="item.msg.toolResult"
                       :tool-status="item.msg.toolStatus"
                       :error="item.msg.error"
+                      :show-debug-details="showAiDebugDetails"
                     />
                   </div>
                   <div v-else-if="item.msg.content" class="message-excerpt">

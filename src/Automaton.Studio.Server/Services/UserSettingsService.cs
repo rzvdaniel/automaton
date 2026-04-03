@@ -28,6 +28,7 @@ public class UserSettingsService
         public const string DefaultAiProvider = "ai.defaultProvider";
         public const string DefaultPlanningModel = "ai.defaultPlanningModel";
         public const string DefaultPlanningProvider = "ai.defaultPlanningProvider";
+        public const string ShowAiDebugDetails = "ai.showDebugDetails";
     }
 
     // Default values
@@ -193,6 +194,7 @@ public class UserSettingsService
         var defaultAiProvider = await GetSettingAsync<string?>(userId, Keys.DefaultAiProvider, null);
         var defaultPlanningModel = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningModel, null);
         var defaultPlanningProvider = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningProvider, null);
+        var showAiDebugDetails = await GetSettingAsync(userId, Keys.ShowAiDebugDetails, false);
 
         return new UserSettingsDto
         {
@@ -201,7 +203,8 @@ public class UserSettingsService
             DefaultAiModel = defaultAiModel,
             DefaultAiProvider = defaultAiProvider,
             DefaultPlanningModel = defaultPlanningModel,
-            DefaultPlanningProvider = defaultPlanningProvider
+            DefaultPlanningProvider = defaultPlanningProvider,
+            ShowAiDebugDetails = showAiDebugDetails
         };
     }
 
@@ -240,6 +243,9 @@ public class UserSettingsService
                 Keys.DefaultPlanningProvider,
                 string.IsNullOrWhiteSpace(request.DefaultPlanningProvider) ? null : request.DefaultPlanningProvider);
 
+        if (request.HasShowAiDebugDetails && request.ShowAiDebugDetails.HasValue)
+            await SetSettingAsync(userId, Keys.ShowAiDebugDetails, request.ShowAiDebugDetails.Value);
+
         return await GetAllSettingsAsync(userId);
     }
 
@@ -254,6 +260,7 @@ public class UserSettingsService
         _cache.Remove(GetCacheKey(userId, Keys.DefaultAiProvider));
         _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningModel));
         _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningProvider));
+        _cache.Remove(GetCacheKey(userId, Keys.ShowAiDebugDetails));
     }
 
     private static string GetCacheKey(Guid userId, string key) => $"user_settings:{userId}:{key}";

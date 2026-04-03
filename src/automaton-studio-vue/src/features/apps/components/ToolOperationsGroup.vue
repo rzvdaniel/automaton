@@ -10,6 +10,7 @@ import ToolExecutionDetails from '@/shared/components/ToolExecutionDetails.vue'
 
 const props = defineProps<{
   operations: ChatMessage[]
+  showDebugDetails?: boolean
 }>()
 
 const manualToggle = ref<boolean | null>(null)
@@ -126,13 +127,14 @@ const summary = computed(() => {
         />
         <span class="op-label">{{ getLabel(op) }}</span>
         <ToolExecutionDetails
-          v-if="op.toolStatus !== 'executing'"
+          v-if="showDebugDetails && op.toolStatus !== 'executing'"
           class="op-details"
           :tool-name="op.toolName"
           :tool-args="op.toolArgs"
           :tool-result="op.toolResult"
           :tool-status="op.toolStatus"
           :error="op.error"
+          :show-debug-details="showDebugDetails"
         />
       </div>
     </div>

@@ -72,6 +72,9 @@ export interface UserSettingsDto {
 
   /** Provider name for the planning AI model. */
   defaultPlanningProvider?: string
+
+  /** Enables verbose AI chat debug rendering in UI (display-only). */
+  showAiDebugDetails?: boolean
 }
 
 /**
@@ -85,4 +88,5 @@ export interface UpdateUserSettingsRequest {
   defaultAiProvider?: string
   defaultPlanningModel?: string
   defaultPlanningProvider?: string
+  showAiDebugDetails?: boolean
 }

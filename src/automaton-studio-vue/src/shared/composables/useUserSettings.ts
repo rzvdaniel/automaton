@@ -10,6 +10,7 @@ const DEFAULTS: UserSettingsDto = {
   defaultAiProvider: undefined,
   defaultPlanningModel: undefined,
   defaultPlanningProvider: undefined,
+  showAiDebugDetails: false,
 }
 
 const STORAGE_KEY = 'user-settings'
@@ -70,6 +71,7 @@ function loadFromStorage(): UserSettingsDto {
         defaultAiProvider: parsed.defaultAiProvider ?? undefined,
         defaultPlanningModel: parsed.defaultPlanningModel ?? undefined,
         defaultPlanningProvider: parsed.defaultPlanningProvider ?? undefined,
+        showAiDebugDetails: parsed.showAiDebugDetails ?? false,
       }
     }
   } catch (err) {
@@ -110,6 +112,7 @@ export function useUserSettings() {
         defaultAiProvider: serverSettings.defaultAiProvider ?? undefined,
         defaultPlanningModel: serverSettings.defaultPlanningModel ?? undefined,
         defaultPlanningProvider: serverSettings.defaultPlanningProvider ?? undefined,
+        showAiDebugDetails: serverSettings.showAiDebugDetails ?? false,
       }
       saveToStorage(settings.value)
       isInitialized.value = true
@@ -245,6 +248,28 @@ export function useUserSettings() {
     }
   }
 
+  async function setShowAiDebugDetails(enabled: boolean) {
+    const previousSettings = { ...settings.value }
+
+    settings.value = { ...settings.value, showAiDebugDetails: enabled }
+    saveToStorage(settings.value)
+
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({
+          showAiDebugDetails: enabled,
+        })
+      } catch (err) {
+        console.error('Failed to save AI debug detail setting:', err)
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
   /**
    * Reset settings state (call on logout)
    */
@@ -261,6 +286,7 @@ export function useUserSettings() {
   const defaultAiProvider = computed(() => settings.value.defaultAiProvider)
   const defaultPlanningModel = computed(() => settings.value.defaultPlanningModel)
   const defaultPlanningProvider = computed(() => settings.value.defaultPlanningProvider)
+  const showAiDebugDetails = computed(() => settings.value.showAiDebugDetails ?? false)
 
   return {
     // Read-only reactive settings object
@@ -274,6 +300,7 @@ export function useUserSettings() {
     defaultAiProvider,
     defaultPlanningModel,
     defaultPlanningProvider,
+    showAiDebugDetails,
 
     // State
     isInitialized: readonly(isInitialized),
@@ -286,6 +313,7 @@ export function useUserSettings() {
     setFontSize,
     setDefaultAiModel,
     setDefaultPlanningModel,
+    setShowAiDebugDetails,
     toggleDarkMode,
     setDarkMode,
     resetSettings,

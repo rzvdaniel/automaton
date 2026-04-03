@@ -14,6 +14,7 @@ import Textarea from 'primevue/textarea'
 import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { ConversationMode } from '@/shared/types/ai.types'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
@@ -56,6 +57,8 @@ const emit = defineEmits<{
   (e: 'chatMessageSent'): void
   (e: 'sessionNameGenerated', name: string): void
 }>()
+
+const { showAiDebugDetails } = useUserSettings()
 
 // AI Chat composable with tool execution callback
 const {
@@ -182,12 +185,16 @@ const messageGroups = computed<MessageGroup[]>(() => {
   }
 
   for (const msg of messages.value) {
+    if (!showAiDebugDetails.value && msg.type === 'uiTestResult') {
+      continue
+    }
+
     // Groupable: regular tool execution (not special cards like planApproval/instructionUpdate)
     const isGroupable =
       msg.role === 'assistant' &&
       msg.toolName &&
       msg.type !== 'instructionUpdate' &&
-      msg.type !== 'uiTestResult'
+      (showAiDebugDetails.value || msg.type !== 'uiTestResult')
 
     if (isGroupable) {
       toolBatch.push(msg)
@@ -771,7 +778,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 <div class="timeline-bullet tool">•</div>
                 <div v-if="gIdx < messageGroups.length - 1 || isBusy" class="timeline-connector"></div>
                 <div class="timeline-content">
-                  <ToolOperationsGroup :operations="group.messages" />
+                  <ToolOperationsGroup :operations="group.messages" :show-debug-details="showAiDebugDetails" />
                 </div>
               </div>
             </div>
@@ -793,7 +800,11 @@ function handleKeyPress(event: KeyboardEvent) {
                     <i class="pi pi-file-edit"></i>
                     {{ group.message.instructionNotification || 'Instructions updated.' }}
                   </div>
-                  <div v-else-if="group.message.type === 'uiTestResult'" class="ui-test-notification" :class="{ error: !group.message.uiTestResult?.success }">
+                  <div
+                    v-else-if="group.message.type === 'uiTestResult' && showAiDebugDetails"
+                    class="ui-test-notification"
+                    :class="{ error: !group.message.uiTestResult?.success }"
+                  >
                     <div class="font-semibold mb-1">
                       <i :class="group.message.uiTestResult?.success ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-500'"></i>
                       {{ group.message.content }}
