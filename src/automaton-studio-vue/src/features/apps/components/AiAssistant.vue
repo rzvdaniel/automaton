@@ -113,6 +113,7 @@ const deleteConfirmationSessionId = ref<string | null>(null)
 const sessionsSearchQuery = ref('')
 const isGeneratingSessionName = ref(false) // Track when session name is being generated
 const isResumingSession = ref(false)
+const contextStartNotice = ref<string | null>(null)
 // True while we're setting up a brand-new session before the AI starts streaming.
 // Drives loading indicators immediately on submit so the user doesn't wait.
 const isPreparingSession = ref(false)
@@ -233,6 +234,7 @@ onMounted(async () => {
   
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
+    contextStartNotice.value = 'New app context started from Apps prompt.'
     userInput.value = props.initialPrompt
     currentView.value = 'chat'
     emit('initialPromptConsumed')
@@ -749,6 +751,20 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Messages area -->
       <div class="messages-area">
+        <div v-if="contextStartNotice" class="context-start-notice">
+          <div class="context-start-notice__content">
+            <i class="pi pi-info-circle"></i>
+            <span>{{ contextStartNotice }}</span>
+          </div>
+          <Button
+            icon="pi pi-times"
+            text
+            rounded
+            size="small"
+            class="context-start-notice__close"
+            @click="contextStartNotice = null"
+          />
+        </div>
         <!-- Empty state -->
         <div v-if="!hasMessages" class="empty-state">
           <i class="pi pi-sparkles text-3xl text-color-secondary mb-2"></i>
@@ -1166,6 +1182,30 @@ function handleKeyPress(event: KeyboardEvent) {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+}
+
+.context-start-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--p-surface-300);
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+}
+
+.context-start-notice__content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.context-start-notice__close {
+  flex: 0 0 auto;
 }
 
 .empty-state {
