@@ -251,8 +251,18 @@ const previewViewportStyle = computed(() => {
             :style="previewViewportStyle"
           >
             <div v-if="isHeavyRenderingSuspended" class="preview-loading">
-              <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
-              <p class="mt-2 text-color-secondary">Resizing preview...</p>
+              <iframe
+                v-if="editorStore.previewUrl"
+                :key="editorStore.previewUrl"
+                :src="editorStore.previewUrl"
+                class="preview-iframe"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
+                title="App Preview"
+              />
+              <div class="preview-resize-overlay">
+                <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
+                <p class="mt-2 text-color-secondary">Resizing preview...</p>
+              </div>
             </div>
             <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
               <i class="pi pi-spin pi-spinner text-3xl"></i>
@@ -371,6 +381,18 @@ const previewViewportStyle = computed(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.preview-resize-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--p-surface-0) 80%, transparent);
+  pointer-events: none;
 }
 
 .logs-panel {

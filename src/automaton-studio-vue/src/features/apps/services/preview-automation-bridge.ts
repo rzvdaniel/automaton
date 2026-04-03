@@ -296,7 +296,7 @@ export async function executeUiAutomationAction(
         }
       }
       case UiAutomationAction.GetConsoleLogs: {
-        const logs = getUiLogs().slice(0, 50).map((entry) => ({
+        const logs = getUiLogs().slice(0, 500).map((entry) => ({
           timestamp: entry.timestamp,
           level: entry.level,
           source: entry.source,

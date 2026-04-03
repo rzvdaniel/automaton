@@ -49,9 +49,15 @@ function emitPreviewConsoleEvent(level, source, args) {
 }
 
 const originalConsole = {
+  debug: console.debug.bind(console),
   log: console.log.bind(console),
   warn: console.warn.bind(console),
   error: console.error.bind(console)
+};
+
+console.debug = (...args) => {
+  originalConsole.debug(...args);
+  emitPreviewConsoleEvent('debug', 'preview-console', args);
 };
 
 console.log = (...args) => {

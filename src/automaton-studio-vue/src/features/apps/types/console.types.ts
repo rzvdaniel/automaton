@@ -44,6 +44,7 @@ export interface StepResultMessage {
 }
 
 export const UiLogLevel = {
+  Debug: 'debug',
   Info: 'info',
   Warn: 'warn',
   Error: 'error',

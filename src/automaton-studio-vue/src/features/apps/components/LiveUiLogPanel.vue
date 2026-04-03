@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import SelectButton from 'primevue/selectbutton'
@@ -27,6 +27,8 @@ const entries = computed(() => {
       return all
   }
 })
+const compactMode = ref(true)
+const compactEntries = computed(() => entries.value.slice(0, 250))
 
 function formatTime(date: Date): string {
   return new Date(date).toLocaleTimeString('en-US', {
@@ -50,9 +52,39 @@ function sourceSeverity(source: string): 'secondary' | 'info' | 'warn' {
 }
 
 function levelClass(level: string): string {
+  if (level === 'debug') return 'text-blue-400'
   if (level === 'error') return 'text-red-500'
   if (level === 'warn') return 'text-orange-500'
   return 'text-color-secondary'
+}
+
+function formatIso(date: Date): string {
+  return new Date(date).toISOString()
+}
+
+function downloadLogsAsJson(): void {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    totalEntries: entries.value.length,
+    filter: editorStore.uiLogFilter,
+    logs: entries.value.map((entry) => ({
+      id: entry.id,
+      timestamp: formatIso(entry.timestamp),
+      level: entry.level,
+      source: entry.source,
+      message: entry.message,
+    })),
+  }
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `live-ui-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  anchor.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
 }
 </script>
 
@@ -65,6 +97,23 @@ function levelClass(level: string): string {
         <Tag :value="editorStore.uiLogEntries.length.toString()" severity="secondary" rounded />
       </div>
       <div class="flex align-items-center gap-2">
+        <Button
+          icon="pi pi-compress"
+          text
+          severity="secondary"
+          size="small"
+          :label="compactMode ? 'Compact' : 'Expanded'"
+          @click="compactMode = !compactMode"
+        />
+        <Button
+          v-if="entries.length > 0"
+          icon="pi pi-download"
+          text
+          severity="secondary"
+          size="small"
+          label="JSON"
+          @click="downloadLogsAsJson"
+        />
         <SelectButton
           :model-value="editorStore.uiLogFilter"
           :options="filterOptions"
@@ -90,8 +139,13 @@ function levelClass(level: string): string {
         <span class="text-color-secondary text-sm">No live logs yet</span>
       </div>
       <div v-else class="entries">
-        <div v-for="entry in entries" :key="entry.id" class="entry">
-          <div class="entry-meta">
+        <div
+          v-for="entry in compactMode ? compactEntries : entries"
+          :key="entry.id"
+          class="entry"
+          :class="{ compact: compactMode }"
+        >
+          <div v-if="!compactMode" class="entry-meta">
             <span class="entry-time">{{ formatTime(entry.timestamp) }}</span>
             <Tag :value="sourceLabel(entry.source)" :severity="sourceSeverity(entry.source)" size="small" />
           </div>
@@ -146,6 +200,22 @@ function levelClass(level: string): string {
   border-radius: var(--p-border-radius);
   padding: 0.5rem;
   background: var(--p-surface-50);
+}
+
+.entry.compact {
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 1px solid var(--p-surface-200);
+  border-radius: 0;
+}
+
+.entry.compact .entry-message {
+  font-size: 0.76rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .entry-meta {
