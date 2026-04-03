@@ -6,6 +6,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import type { ChatMessage } from '@/shared/types/ai.types'
+import ToolExecutionDetails from '@/shared/components/ToolExecutionDetails.vue'
 
 const props = defineProps<{
   operations: ChatMessage[]
@@ -124,6 +125,15 @@ const summary = computed(() => {
           class="pi pi-times op-icon error"
         />
         <span class="op-label">{{ getLabel(op) }}</span>
+        <ToolExecutionDetails
+          v-if="op.toolStatus !== 'executing'"
+          class="op-details"
+          :tool-name="op.toolName"
+          :tool-args="op.toolArgs"
+          :tool-result="op.toolResult"
+          :tool-status="op.toolStatus"
+          :error="op.error"
+        />
       </div>
     </div>
   </div>
@@ -181,7 +191,8 @@ const summary = computed(() => {
 
 .tool-op-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 0.4rem;
   padding: 0.2rem 0.6rem 0.2rem 1.4rem;
   font-size: 0.75rem;
@@ -209,6 +220,12 @@ const summary = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.op-details {
+  margin-left: 1.05rem;
+  width: calc(100% - 1.05rem);
 }
 
 /* Dark mode */

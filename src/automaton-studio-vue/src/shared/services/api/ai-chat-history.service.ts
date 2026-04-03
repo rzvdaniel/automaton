@@ -29,7 +29,7 @@ function mapMessageType(serverType: string | undefined): ChatMessage['type'] {
 
 function mapServerMessage(m: any): ChatMessage {
   const meta = parseMetadata(m.metadata)
-  return {
+  const mapped: ChatMessage & { toolCallId?: string } = {
     id: m.id || crypto.randomUUID(),
     role: m.role,
     content: m.content,
@@ -42,6 +42,12 @@ function mapServerMessage(m: any): ChatMessage {
     outputTokens: m.outputTokens,
     model: m.model,
   }
+
+  if (meta?.toolCallId) {
+    mapped.toolCallId = String(meta.toolCallId)
+  }
+
+  return mapped
 }
 
 export const aiChatHistoryService = {
@@ -103,7 +109,39 @@ export const aiChatHistoryService = {
     const response = await axiosInstance.get(
       `/api/AiChatHistory/sessions/${sessionId}/messages`,
     )
-    return (response.data as any[]).map(mapServerMessage)
+    const mappedMessages = (response.data as any[]).map(mapServerMessage)
+
+    // Stitch role='tool' messages back into their originating ToolExecution message
+    // so history views can show what the tool actually read/returned.
+    const toolExecutionsByCallId = new Map<string, ChatMessage>()
+    for (const message of mappedMessages) {
+      if (message.type === 'toolExecution') {
+        const toolCallId = (message as ChatMessage & { toolCallId?: string }).toolCallId
+        if (toolCallId) {
+          toolExecutionsByCallId.set(toolCallId, message)
+        }
+      }
+    }
+
+    for (const message of mappedMessages) {
+      if (message.role !== 'tool') continue
+
+      const toolCallId = (message as ChatMessage & { toolCallId?: string }).toolCallId
+      if (!toolCallId) continue
+
+      const executionMessage = toolExecutionsByCallId.get(toolCallId)
+      if (!executionMessage) continue
+
+      executionMessage.toolResult = message.content
+      if (message.type === 'codeError') {
+        executionMessage.toolStatus = 'error'
+        executionMessage.error = message.content || 'Tool execution failed'
+      } else if (executionMessage.toolStatus !== 'error') {
+        executionMessage.toolStatus = 'completed'
+      }
+    }
+
+    return mappedMessages
   },
 
   /**

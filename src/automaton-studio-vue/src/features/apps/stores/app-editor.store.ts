@@ -78,6 +78,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const consoleEntries = ref<ConsoleEntry[]>([])
   const uiLogEntries = ref<UiLogEntry[]>([])
   const uiLogFilter = ref<UiLogFilter>(UiLogFilter.All)
+  const uiLogFingerprintWindow = ref<string[]>([])
+
+  const UI_LOG_FINGERPRINT_WINDOW_SIZE = 120
+
+  function buildUiLogFingerprint(entry: UiLogEntry): string {
+    return `${entry.source}|${entry.level}|${entry.message.trim()}`
+  }
 
   // ============================================
   // Computed
@@ -764,6 +771,17 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   function addUiLogEntry(entry: UiLogEntry): void {
+    // De-duplicate repeated messages by content fingerprint (more reliable than timestamp heuristics)
+    const fingerprint = buildUiLogFingerprint(entry)
+    if (uiLogFingerprintWindow.value.includes(fingerprint)) {
+      return
+    }
+
+    uiLogFingerprintWindow.value.unshift(fingerprint)
+    if (uiLogFingerprintWindow.value.length > UI_LOG_FINGERPRINT_WINDOW_SIZE) {
+      uiLogFingerprintWindow.value = uiLogFingerprintWindow.value.slice(0, UI_LOG_FINGERPRINT_WINDOW_SIZE)
+    }
+
     uiLogEntries.value.unshift(entry)
     if (uiLogEntries.value.length > 200) {
       uiLogEntries.value = uiLogEntries.value.slice(0, 200)
@@ -772,6 +790,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   function clearUiLogs(): void {
     uiLogEntries.value = []
+    uiLogFingerprintWindow.value = []
   }
 
   function setUiLogFilter(filter: UiLogFilter): void {
@@ -805,6 +824,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     showPreviewOverlay.value = false
     consoleEntries.value = []
     uiLogEntries.value = []
+    uiLogFingerprintWindow.value = []
     uiLogFilter.value = UiLogFilter.All
   }
 

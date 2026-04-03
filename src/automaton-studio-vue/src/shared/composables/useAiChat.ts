@@ -691,6 +691,11 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
                   error?: string
                   logCount?: number
                   snapshotTitle?: string
+                  toolResult?: unknown
+                }
+
+                if (uiFeedback.toolResult !== undefined) {
+                  toolMessage.toolResult = uiFeedback.toolResult
                 }
 
                 messages.value.push({

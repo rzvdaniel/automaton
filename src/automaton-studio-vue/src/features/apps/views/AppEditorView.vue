@@ -415,11 +415,26 @@ function handlePreviewMessage(event: MessageEvent) {
   if (event.data?.type === 'previewConsoleEvent') {
     const message = event.data as PreviewConsoleMessage
     const level = message.data.level
+    const content = message.data.message
+
+    // New preview runtime session marker (emitted on app bootstrap).
+    // Clear old entries so logs remain scoped to current preview run.
+    if (content === '[AutomatonAPI] Ready!') {
+      editorStore.clearUiLogs()
+      editorStore.addUiLogEntry({
+        id: crypto.randomUUID(),
+        timestamp: new Date(message.data.timestamp),
+        level: 'info',
+        source: 'preview-runtime',
+        message: '[Automaton] Preview restarted — log window reset',
+      })
+    }
+
     editorStore.addUiLogEntry({
       id: crypto.randomUUID(),
       timestamp: new Date(message.data.timestamp),
       level,
-      message: message.data.message,
+      message: content,
       source: message.data.source,
     })
   }
@@ -762,6 +777,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         ? (envelope.arguments as Record<string, unknown>)
         : ((args ?? {}) as Record<string, unknown>)
 
+    // New navigation starts a fresh diagnostic window.
+    // This keeps AI context focused on current-run errors after preview refresh.
+    if (toolName === UiAutomationAction.Navigate) {
+      editorStore.clearUiLogs()
+    }
+
     const actionResult: UiAutomationResult = await executeUiAutomationAction(
       toolName as UiAutomationAction,
       actionArgs,
@@ -797,6 +818,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       error: actionResult.error,
       logCount: actionResult.logs?.length,
       snapshotTitle: actionResult.snapshot?.title,
+      toolResult: actionResult,
     }
   }
 
@@ -1110,6 +1132,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                   :initial-model="initialModel"
                   :system-prompt="aiSystemPrompt"
                   :suggestions="aiSuggestions"
+                  :ui-logs="editorStore.uiLogEntries"
+                  :tool-execution-handler="handleAiToolExecuted"
                   @tool-executed="handleAiToolExecuted"
                   @session-created="handleVersionCreated"
                   @chat-message-sent="refreshChatStats"
@@ -1232,6 +1256,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 :initial-model="initialModel"
                 :system-prompt="aiSystemPrompt"
                 :suggestions="aiSuggestions"
+                :ui-logs="editorStore.uiLogEntries"
+                :tool-execution-handler="handleAiToolExecuted"
                 @tool-executed="handleAiToolExecuted"
                 @session-created="handleVersionCreated"
                 @chat-message-sent="refreshChatStats"

@@ -9,6 +9,7 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
+import ToolExecutionDetails from '@/shared/components/ToolExecutionDetails.vue'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
@@ -400,6 +401,13 @@ defineExpose({ reload: loadSessions })
                     <span v-if="item.msg.toolArgs" class="tool-args">
                       {{ JSON.stringify(item.msg.toolArgs).slice(0, 120) }}{{ JSON.stringify(item.msg.toolArgs).length > 120 ? '…' : '' }}
                     </span>
+                    <ToolExecutionDetails
+                      :tool-name="item.msg.toolName"
+                      :tool-args="item.msg.toolArgs"
+                      :tool-result="item.msg.toolResult"
+                      :tool-status="item.msg.toolStatus"
+                      :error="item.msg.error"
+                    />
                   </div>
                   <div v-else-if="item.msg.content" class="message-excerpt">
                     <template v-if="expandedMessages.has(item.idx)">

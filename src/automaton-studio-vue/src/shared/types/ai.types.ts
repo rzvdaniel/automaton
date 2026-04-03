@@ -207,6 +207,7 @@ export interface UiToolExecutionFeedback {
   error?: string
   logCount?: number
   snapshotTitle?: string
+  toolResult?: unknown
 }
 
 // ============================================
