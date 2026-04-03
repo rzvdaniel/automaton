@@ -56,6 +56,7 @@ const emit = defineEmits<{
   (e: 'sessionCreated'): void
   (e: 'chatMessageSent'): void
   (e: 'sessionNameGenerated', name: string): void
+  (e: 'initialPromptConsumed'): void
 }>()
 
 const { showAiDebugDetails } = useUserSettings()
@@ -213,6 +214,10 @@ onMounted(async () => {
   
   // Load sessions but don't create one automatically
   await loadSessions()
+  if (activeSession.value?.id) {
+    await loadSessionMessages(activeSession.value.id)
+    currentView.value = 'chat'
+  }
 
   // Apply initial mode/model from query params (set by the "Generate App" flow)
   // Must run after loadProviders() so availableModels is populated
@@ -230,6 +235,7 @@ onMounted(async () => {
   if (props.initialPrompt) {
     userInput.value = props.initialPrompt
     currentView.value = 'chat'
+    emit('initialPromptConsumed')
     // Small delay to ensure UI is ready
     setTimeout(() => {
       sendMessage()

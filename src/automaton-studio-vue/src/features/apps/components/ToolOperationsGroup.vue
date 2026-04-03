@@ -196,7 +196,7 @@ const summary = computed(() => {
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 0.4rem;
-  padding: 0.2rem 0.6rem 0.2rem 1.4rem;
+  padding: 0.1rem 0.4rem 0.1rem 0.4rem;
   font-size: 0.75rem;
   color: var(--p-text-color);
 }

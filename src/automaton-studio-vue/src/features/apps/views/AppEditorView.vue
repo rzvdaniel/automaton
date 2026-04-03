@@ -53,7 +53,9 @@ const editorStore = useAppEditorStore()
 // Get app ID from route
 const appId = computed(() => route.params.id as string)
 
-const resolvedAppId = computed(() => editorStore.currentApp?.id || appId.value)
+// Always prefer route app ID to avoid leaking previous app chat context/memory.
+// The store may still hold the previously opened app until loadApp finishes.
+const resolvedAppId = computed(() => appId.value || editorStore.currentApp?.id || '')
 
 // Capture initial prompt once at setup time — using ref so clearing the URL query
 // via router.replace() doesn't wipe the value before AiAssistant.onMounted reads it.
@@ -755,6 +757,10 @@ async function handleSessionNameGenerated(name: string) {
   }
 }
 
+function handleInitialPromptConsumed() {
+  initialPrompt.value = undefined
+}
+
 // Handle AI tool execution for real-time file updates
 async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   console.log('[AppEditor] AI tool executed:', { toolName, args, result })
@@ -1123,7 +1129,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               </div>
               <div class="ai-sidebar">
                 <AiAssistant
-                  v-show="rightPanelMode === 'aiAssistant'"
+                  v-if="rightPanelMode === 'aiAssistant'"
+                  :key="`ai-assistant-${resolvedAppId}-visual`"
                   resource-type="WebApp"
                   :resource-id="resolvedAppId"
                   :runner-id="selectedRunnerId"
@@ -1137,6 +1144,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                   @session-created="handleVersionCreated"
                   @chat-message-sent="refreshChatStats"
                   @session-name-generated="handleSessionNameGenerated"
+                  @initial-prompt-consumed="handleInitialPromptConsumed"
                 />
                 <AppVersionHistory
                   v-show="rightPanelMode === 'versionHistory'"
@@ -1246,7 +1254,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             <!-- Right panel content -->
             <div class="ai-sidebar">
               <AiAssistant
-                v-show="rightPanelMode === 'aiAssistant'"
+                v-if="rightPanelMode === 'aiAssistant'"
+                :key="`ai-assistant-${resolvedAppId}-code`"
                 resource-type="WebApp"
                 :resource-id="resolvedAppId"
                 :runner-id="selectedRunnerId"
@@ -1260,6 +1269,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                 @session-created="handleVersionCreated"
                 @chat-message-sent="refreshChatStats"
                 @session-name-generated="handleSessionNameGenerated"
+                @initial-prompt-consumed="handleInitialPromptConsumed"
               />
               <AppVersionHistory
                 v-show="rightPanelMode === 'versionHistory'"
