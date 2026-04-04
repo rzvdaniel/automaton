@@ -215,6 +215,10 @@ onMounted(async () => {
   
   // Load sessions but don't create one automatically
   await loadSessions()
+  if (activeSession.value?.id) {
+    await loadSessionMessages(activeSession.value.id)
+    currentView.value = 'chat'
+  }
 
   // Apply initial mode/model from query params (set by the "Generate App" flow)
   // Must run after loadProviders() so availableModels is populated
