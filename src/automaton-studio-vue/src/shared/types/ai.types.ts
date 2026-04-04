@@ -26,6 +26,7 @@ export interface AiProvider {
   description?: string
   iconName?: string
   apiKeyHelpUrl?: string
+  isActive?: boolean
   hasStoredKeys: boolean
   storedKeyCount: number
   hasEnvironmentKey: boolean

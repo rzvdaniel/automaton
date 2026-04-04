@@ -237,6 +237,7 @@ public class AiApiKeyService
                 Description = dbProvider.Description,
                 IconName = dbProvider.IconName,
                 ApiKeyHelpUrl = dbProvider.ApiKeyHelpUrl,
+                IsActive = dbProvider.IsActive,
                 HasStoredKeys = storedKeysForProvider.Any(),
                 StoredKeyCount = storedKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
@@ -361,6 +362,7 @@ public class AiProviderInfo
     /// URL where users can get their API key
     /// </summary>
     public string? ApiKeyHelpUrl { get; set; }
+    public bool IsActive { get; set; }
 
     public bool HasStoredKeys { get; set; }
     public int StoredKeyCount { get; set; }

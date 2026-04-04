@@ -38,6 +38,7 @@ const formData = ref<CreateAiProviderRequest>({
   displayName: '',
   description: '',
   baseUrl: '',
+  isActive: true,
   requiresApiKey: true,
   environmentKeyName: '',
   apiKeyHelpUrl: '',
@@ -74,6 +75,7 @@ function openCreateDialog() {
     displayName: '',
     description: '',
     baseUrl: '',
+    isActive: true,
     requiresApiKey: true,
     environmentKeyName: '',
     apiKeyHelpUrl: '',
@@ -91,6 +93,7 @@ function openEditDialog(provider: AiProviderAdmin) {
     displayName: provider.displayName,
     description: provider.description,
     baseUrl: provider.baseUrl,
+    isActive: provider.isActive,
     requiresApiKey: provider.requiresApiKey,
     environmentKeyName: provider.environmentKeyName,
     apiKeyHelpUrl: provider.apiKeyHelpUrl,
@@ -151,7 +154,7 @@ async function handleUpdate() {
       displayName: formData.value.displayName,
       description: formData.value.description,
       baseUrl: formData.value.baseUrl,
-      isActive: selectedProvider.value.isActive,
+      isActive: formData.value.isActive,
       requiresApiKey: formData.value.requiresApiKey,
       environmentKeyName: formData.value.environmentKeyName,
       apiKeyHelpUrl: formData.value.apiKeyHelpUrl,
@@ -224,6 +227,32 @@ function viewModels(provider: AiProviderAdmin) {
 function getStatusSeverity(isActive: boolean) {
   return isActive ? 'success' : 'warning'
 }
+
+async function toggleProviderVisibility(provider: AiProviderAdmin) {
+  try {
+    const updateRequest: UpdateAiProviderRequest = {
+      isActive: !provider.isActive,
+    }
+
+    await adminAiProvidersService.updateProvider(provider.id, updateRequest)
+    toast.add({
+      severity: 'success',
+      summary: provider.isActive ? 'Provider hidden' : 'Provider shown',
+      detail: `${provider.displayName} is now ${provider.isActive ? 'hidden' : 'visible'} in chat selectors.`,
+      life: 3000,
+    })
+    await loadProviders()
+  } catch (error: unknown) {
+    console.error('Error toggling provider visibility:', error)
+    const axiosError = error as { response?: { data?: { message?: string } } }
+    toast.add({
+      severity: 'error',
+      summary: 'Update Failed',
+      detail: axiosError?.response?.data?.message || 'Failed to update provider visibility',
+      life: 3000,
+    })
+  }
+}
 </script>
 
 <template>
@@ -282,12 +311,12 @@ function getStatusSeverity(isActive: boolean) {
 
           <Column field="isActive" header="Status" style="width: 100px">
             <template #body="{ data }">
-              <Tag
-                :value="data.isActive ? 'Active' : 'Inactive'"
-                :severity="getStatusSeverity(data.isActive)"
-              />
-            </template>
-          </Column>
+                <Tag
+                  :value="data.isActive ? 'Visible' : 'Hidden'"
+                  :severity="getStatusSeverity(data.isActive)"
+                />
+              </template>
+            </Column>
 
           <Column field="modelCount" header="Models" style="width: 120px">
             <template #body="{ data }">
@@ -322,6 +351,15 @@ function getStatusSeverity(isActive: boolean) {
                   size="small"
                   title="Manage models"
                   @click="viewModels(data)"
+                />
+                <Button
+                  :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                  text
+                  rounded
+                  :severity="data.isActive ? 'secondary' : 'success'"
+                  size="small"
+                  :title="data.isActive ? 'Hide provider from chat selectors' : 'Show provider in chat selectors'"
+                  @click="toggleProviderVisibility(data)"
                 />
                 <Button
                   icon="pi pi-trash"
@@ -385,6 +423,11 @@ function getStatusSeverity(isActive: boolean) {
         <div class="flex flex-column gap-2">
           <label for="baseUrl" class="font-medium">Base URL</label>
           <InputText id="baseUrl" v-model="formData.baseUrl" placeholder="https://api.example.com" />
+        </div>
+
+        <div class="flex align-items-center gap-2">
+          <Checkbox id="providerIsActive" v-model="formData.isActive" :binary="true" />
+          <label for="providerIsActive">Visible in chat selectors</label>
         </div>
 
         <div class="flex align-items-center gap-2">
@@ -463,6 +506,11 @@ function getStatusSeverity(isActive: boolean) {
         <div class="flex flex-column gap-2">
           <label for="editBaseUrl" class="font-medium">Base URL</label>
           <InputText id="editBaseUrl" v-model="formData.baseUrl" />
+        </div>
+
+        <div class="flex align-items-center gap-2">
+          <Checkbox id="editProviderIsActive" v-model="formData.isActive" :binary="true" />
+          <label for="editProviderIsActive">Visible in chat selectors</label>
         </div>
 
         <div class="flex align-items-center gap-2">
