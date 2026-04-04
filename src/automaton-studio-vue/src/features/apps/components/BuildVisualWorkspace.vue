@@ -277,6 +277,7 @@ const previewViewportStyle = computed(() => {
               :key="editorStore.previewUrl"
               :src="editorStore.previewUrl"
               class="preview-iframe"
+              :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="App Preview"
             />
@@ -315,11 +316,14 @@ const previewViewportStyle = computed(() => {
 .visual-splitter {
   flex: 1;
   min-height: 0;
+  contain: layout style paint;
+  will-change: auto;
 }
 
 .splitter-panel {
   min-height: 0 !important;
   overflow: hidden;
+  will-change: flex-basis;
 }
 
 .preview-content {
@@ -365,12 +369,17 @@ const previewViewportStyle = computed(() => {
   background: var(--p-surface-0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   min-height: 0;
+  transform: translateZ(0);
 }
 
 .preview-iframe {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.preview-iframe--no-pointer {
+  pointer-events: none;
 }
 
 .preview-loading,
@@ -382,6 +391,14 @@ const previewViewportStyle = computed(() => {
   align-items: center;
   justify-content: center;
   position: relative;
+}
+
+.preview-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  z-index: 10;
 }
 
 .preview-resize-overlay {

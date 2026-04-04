@@ -1400,6 +1400,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   min-height: 0;
   overflow: hidden;
   height: 100%;
+  contain: layout style paint;
+  will-change: auto;
 }
 
 .no-pointer-events {
@@ -1560,6 +1562,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   min-height: 0;
   overflow: hidden;
   height: 100%;
+  contain: layout style paint;
+  will-change: auto;
 }
 
 /* Splitter panel styles */
@@ -1568,6 +1572,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
   flex-direction: column !important;
   min-width: 0 !important;
   overflow: hidden !important;
+  will-change: flex-basis;
 }
 
 .file-panel {
