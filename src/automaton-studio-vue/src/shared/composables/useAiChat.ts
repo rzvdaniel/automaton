@@ -87,6 +87,19 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     return map
   })
 
+  const modelDisplayNames = computed<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    for (const provider of availableProviders.value) {
+      const labels = provider.modelDisplayNames || {}
+      for (const model of provider.supportedModels) {
+        if (!map[model]) {
+          map[model] = labels[model] || model
+        }
+      }
+    }
+    return map
+  })
+
   function ensureValidModelSelection() {
     const models = availableModels.value
     
@@ -745,6 +758,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     selectedModel,
     availableProviders,
     availableModels,
+    modelDisplayNames,
     error,
     hasMessages,
     currentProvider,

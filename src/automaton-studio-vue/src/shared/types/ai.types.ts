@@ -31,6 +31,7 @@ export interface AiProvider {
   storedKeyCount: number
   hasEnvironmentKey: boolean
   supportedModels: string[]
+  modelDisplayNames?: Record<string, string>
   defaultModel?: string // The default model marked in admin (IsDefault = true)
   storedKeys?: AiApiKey[]
 }

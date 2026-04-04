@@ -256,6 +256,13 @@ public class AiApiKeyService
                     .ThenBy(m => m.SortOrder)
                     .Select(m => m.ModelId)
                     .ToList(),
+                ModelDisplayNames = dbProvider.Models
+                    .Where(m => !string.IsNullOrWhiteSpace(m.ModelId))
+                    .GroupBy(m => m.ModelId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => string.IsNullOrWhiteSpace(g.First().DisplayName) ? g.Key : g.First().DisplayName
+                    ),
                 DefaultModel = dbProvider.Models
                     .Where(m => m.IsDefault)
                     .Select(m => m.ModelId)
@@ -369,6 +376,11 @@ public class AiProviderInfo
     public bool HasEnvironmentKey { get; set; }
     public List<AiApiKeyModel> StoredKeys { get; set; } = new();
     public List<string> SupportedModels { get; set; } = new();
+
+    /// <summary>
+    /// Mapping from model identifier to admin-configured display name.
+    /// </summary>
+    public Dictionary<string, string> ModelDisplayNames { get; set; } = new();
     
     /// <summary>
     /// The default model for this provider (marked as IsDefault in database)

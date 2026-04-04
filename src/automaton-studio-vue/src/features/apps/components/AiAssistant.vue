@@ -67,6 +67,7 @@ const {
   isGenerating,
   selectedModel,
   availableModels,
+  modelDisplayNames,
   error,
   hasMessages,
   loadProviders,
@@ -127,6 +128,11 @@ const sortedSessions = computed(() => {
 })
 
 const latestSession = computed(() => sortedSessions.value[0] || null)
+
+const getModelDisplayName = (modelId?: string | null) => {
+  if (!modelId) return ''
+  return modelDisplayNames.value[modelId] || modelId
+}
 
 // Search — server-side, debounced
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -691,6 +697,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 v-model:mode="conversationMode"
                 v-model:model="selectedModel"
                 :available-models="availableModels"
+                :model-display-names="modelDisplayNames"
                 :disabled="isBusy"
                 compact
               />
@@ -856,7 +863,7 @@ function handleKeyPress(event: KeyboardEvent) {
                   </template>
                   <!-- Model badge: only shown once model is resolved (not during streaming) -->
                   <span v-if="group.message.model && !group.message.isStreaming" class="message-model-badge">
-                    <i class="pi pi-microchip-ai"></i>{{ group.message.model }}
+                    <i class="pi pi-microchip-ai"></i>{{ getModelDisplayName(group.message.model) }}
                   </span>
                 </div>
               </div>
@@ -917,6 +924,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 v-model:mode="conversationMode"
                 v-model:model="selectedModel"
                 :available-models="availableModels"
+                :model-display-names="modelDisplayNames"
                 :disabled="isBusy"
                 compact
               />

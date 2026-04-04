@@ -9,6 +9,7 @@ const props = withDefaults(
     mode: string
     model: string
     availableModels: string[]
+    modelDisplayNames?: Record<string, string>
     disabled?: boolean
     loading?: boolean
     /**
@@ -30,6 +31,12 @@ const emit = defineEmits<{
 }>()
 
 const isAutonomous = computed(() => props.mode === ConversationMode.Autonomous)
+const modelOptions = computed(() =>
+  props.availableModels.map((value) => ({
+    value,
+    label: props.modelDisplayNames?.[value] || value,
+  })),
+)
 
 function toggleMode() {
   emit('update:mode', isAutonomous.value ? ConversationMode.HumanInTheMiddle : ConversationMode.Autonomous)
@@ -56,7 +63,9 @@ function toggleMode() {
     <Select
       v-if="availableModels.length > 0 || loading"
       :model-value="model"
-      :options="availableModels"
+      :options="modelOptions"
+      option-label="label"
+      option-value="value"
       :placeholder="compact ? 'Model' : 'Select model'"
       size="small"
       :class="compact ? 'model-select-inline' : 'w-14rem'"

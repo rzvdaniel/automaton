@@ -37,6 +37,7 @@ const aiDescription = ref('')
 const aiMode = ref<string>(ConversationMode.Autonomous)
 const aiModel = ref<string>('')
 const aiAvailableModels = ref<string[]>([])
+const aiModelDisplayNames = ref<Record<string, string>>({})
 const isLoadingModels = ref(false)
 
 onMounted(async () => {
@@ -44,12 +45,18 @@ onMounted(async () => {
   try {
     const providers = await getAvailableProviders()
     const models: string[] = []
+    const displayNames: Record<string, string> = {}
     for (const p of providers) {
+      const providerDisplayNames = p.modelDisplayNames || {}
       for (const m of p.supportedModels) {
         if (!models.includes(m)) models.push(m)
+        if (!displayNames[m]) {
+          displayNames[m] = providerDisplayNames[m] || m
+        }
       }
     }
     aiAvailableModels.value = models.sort((a, b) => a.localeCompare(b))
+    aiModelDisplayNames.value = displayNames
 
     // Priority: 1. user's saved preference, 2. admin default model, 3. first alphabetically
     if (defaultAiModel.value && models.includes(defaultAiModel.value)) {
@@ -364,6 +371,7 @@ const handleRetry = async () => {
                 v-model:mode="aiMode"
                 v-model:model="aiModel"
                 :available-models="aiAvailableModels"
+                :model-display-names="aiModelDisplayNames"
                 :loading="isLoadingModels"
               />
               <Button
