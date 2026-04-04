@@ -249,6 +249,30 @@ function confirmDelete(model: AiModelAdmin) {
 function goBackToProviders() {
   router.push({ name: 'admin-providers' })
 }
+
+async function toggleModelVisibility(model: AiModelAdmin) {
+  try {
+    const request: UpdateAiModelRequest = {
+      isActive: !model.isActive,
+    }
+    await adminAiProvidersService.updateModel(model.id, request)
+    toast.add({
+      severity: 'success',
+      summary: model.isActive ? 'Model hidden' : 'Model shown',
+      detail: `${model.displayName} is now ${model.isActive ? 'hidden' : 'visible'} in chat selectors.`,
+      life: 3000,
+    })
+    await loadData()
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { message?: string } } }
+    toast.add({
+      severity: 'error',
+      summary: 'Update Failed',
+      detail: axiosError?.response?.data?.message || 'Failed to update model visibility',
+      life: 3000,
+    })
+  }
+}
 </script>
 
 <template>
@@ -340,7 +364,7 @@ function goBackToProviders() {
             <template #body="{ data }">
               <div class="flex flex-column gap-1">
                 <Tag
-                  :value="data.isActive ? 'Active' : 'Inactive'"
+                  :value="data.isActive ? 'Visible' : 'Hidden'"
                   :severity="data.isActive ? 'success' : 'warning'"
                 />
                 <Tag v-if="data.isDefault" value="Default" severity="contrast" class="text-xs" />
@@ -360,6 +384,15 @@ function goBackToProviders() {
                   size="small"
                   title="Edit model"
                   @click="openEditDialog(data)"
+                />
+                <Button
+                  :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                  text
+                  rounded
+                  :severity="data.isActive ? 'secondary' : 'success'"
+                  size="small"
+                  :title="data.isActive ? 'Hide model from chat selectors' : 'Show model in chat selectors'"
+                  @click="toggleModelVisibility(data)"
                 />
                 <Button
                   icon="pi pi-trash"

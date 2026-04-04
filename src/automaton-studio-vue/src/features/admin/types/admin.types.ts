@@ -47,6 +47,7 @@ export interface CreateAiProviderRequest {
  * Matches AdminUpdateAiProviderRequest from backend
  */
 export interface UpdateAiProviderRequest {
+  name?: string
   displayName?: string
   description?: string
   baseUrl?: string
@@ -271,4 +272,3 @@ export interface UserPlan {
 export interface AssignPlanRequest {
   planId?: string
 }
-
