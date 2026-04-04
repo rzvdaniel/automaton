@@ -1129,7 +1129,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               </div>
               <div class="ai-sidebar">
                 <AiAssistant
-                  v-if="rightPanelMode === 'aiAssistant'"
+                  v-show="rightPanelMode === 'aiAssistant'"
                   :key="`ai-assistant-${resolvedAppId}-visual`"
                   resource-type="WebApp"
                   :resource-id="resolvedAppId"
@@ -1254,7 +1254,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
             <!-- Right panel content -->
             <div class="ai-sidebar">
               <AiAssistant
-                v-if="rightPanelMode === 'aiAssistant'"
+                v-show="rightPanelMode === 'aiAssistant'"
                 :key="`ai-assistant-${resolvedAppId}-code`"
                 resource-type="WebApp"
                 :resource-id="resolvedAppId"
