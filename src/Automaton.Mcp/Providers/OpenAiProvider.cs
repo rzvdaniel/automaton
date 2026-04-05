@@ -305,10 +305,9 @@ public class OpenAiProvider : IAiProvider
                         ct),
                     cancellationToken);
 
-                // Accumulate tokens across iterations.
-                // OpenAI reports inputTokens cumulatively — keep the latest value.
-                // outputTokens is per-call — sum across iterations.
-                if (response.InputTokens.HasValue) totalInputTokens = response.InputTokens;
+                // Accumulate tokens across all iterations — input and output are per-call values.
+                // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
+                if (response.InputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + response.InputTokens.Value;
                 if (response.OutputTokens.HasValue) totalOutputTokens += response.OutputTokens.Value;
 
                 if (response.ToolCalls.Count == 0)
@@ -323,10 +322,12 @@ public class OpenAiProvider : IAiProvider
                     break;
                 }
 
+                // Emit text without token counts — tokens are only reported on the final turn
+                // to avoid double-counting cumulative totals across iterations.
                 if (!string.IsNullOrWhiteSpace(response.OutputText))
                 {
                     EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
-                        inputTokens: totalInputTokens, outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null, model: response.Model);
+                        inputTokens: null, outputTokens: null, model: response.Model);
                 }
 
                 var reusableItems = FilterOutputItemsForInput(response.OutputItems);

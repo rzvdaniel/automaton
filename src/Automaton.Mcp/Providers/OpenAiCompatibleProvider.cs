@@ -160,10 +160,11 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, request.StreamingTimeoutMinutes, ct);
             }, cancellationToken);
 
-            // Accumulate tokens — input is cumulative (keep latest), output is additive, cache read is latest
-            if (streamResult.inputTokens.HasValue) totalInputTokens = streamResult.inputTokens;
+            // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
+            // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
+            if (streamResult.inputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + streamResult.inputTokens.Value;
             if (streamResult.outputTokens.HasValue) totalOutputTokens += streamResult.outputTokens.Value;
-            if (streamResult.cacheReadTokens.HasValue) totalCacheReadTokens = streamResult.cacheReadTokens;
+            if (streamResult.cacheReadTokens.HasValue) totalCacheReadTokens = (totalCacheReadTokens ?? 0) + streamResult.cacheReadTokens.Value;
 
             var finalText = streamResult.finalText;
             var reasoningText = streamResult.reasoningText;
@@ -196,15 +197,17 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 break;
             }
 
-            // Emit partial text before executing tools
+            // Emit partial text before executing tools.
+            // Tokens are intentionally omitted here — they are reported only on the final turn so
+            // the server's += accumulator receives the complete billing total exactly once.
             if (!string.IsNullOrWhiteSpace(finalText))
             {
                 EmitStreamingText(request.ConversationId, finalText, isComplete: true,
-                    inputTokens: totalInputTokens,
-                    outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                    inputTokens: null,
+                    outputTokens: null,
                     model: responseModel,
                     reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                    cacheReadTokens: totalCacheReadTokens);
+                    cacheReadTokens: null);
             }
 
             // Append assistant message (with tool calls) to conversation.

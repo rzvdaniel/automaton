@@ -189,10 +189,9 @@ public class GoogleProvider : IAiProvider
                 }
             }, cancellationToken);
 
-            // Accumulate tokens across iterations.
-            // inputTokens is cumulative in Gemini (includes all prior turns) — keep the latest value.
-            // outputTokens is per-call — sum them.
-            if (iterInputTokens.HasValue) totalInputTokens = iterInputTokens;
+            // Accumulate tokens across all iterations — input and output are per-call values.
+            // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
+            if (iterInputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + iterInputTokens.Value;
             if (iterOutputTokens.HasValue) totalOutputTokens += iterOutputTokens.Value;
 
             var textContent = currentText.ToString();
@@ -210,17 +209,12 @@ public class GoogleProvider : IAiProvider
             }
 
             // Emit text portion before tool calls (if any).
-            // Pass accumulated tokens so usage is recorded even for intermediate turns.
+            // Tokens are intentionally omitted here — they are reported only on the final turn so
+            // the server's += accumulator receives the complete billing total exactly once.
             if (!string.IsNullOrWhiteSpace(textContent))
             {
                 EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                    inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
-            }
-            else if (totalInputTokens.HasValue || totalOutputTokens > 0)
-            {
-                // Pure tool-call turn (no text) — emit a token-only update so usage is still recorded.
-                EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
-                    inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
+                    inputTokens: null, outputTokens: null, model: modelVersion ?? request.Model);
             }
 
             // Add model response back to contents using raw parts verbatim.

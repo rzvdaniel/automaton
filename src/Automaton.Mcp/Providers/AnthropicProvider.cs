@@ -103,11 +103,12 @@ public class AnthropicProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
 
-        // Accumulate tokens across iterations.
-        // Anthropic reports inputTokens cumulatively — keep the latest value.
-        // outputTokens is per-call — sum across iterations.
+        // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
+        // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
         int? totalInputTokens = null;
         int totalOutputTokens = 0;
+        int? totalCacheReadTokens = null;
+        int? totalCacheCreationTokens = null;
 
         // When propose_plan returns awaitingApproval, suppress tools on the next iteration
         // so the LLM can present the plan and ask for user confirmation.
@@ -199,14 +200,16 @@ public class AnthropicProvider : IAiProvider
                 await StreamResponseAsync(
                     client, messageParams, request.ConversationId, ct,
                     accumulatedInputTokens: totalInputTokens,
-                    accumulatedOutputTokens: totalOutputTokens),
+                    accumulatedOutputTokens: totalOutputTokens,
+                    accumulatedCacheReadTokens: totalCacheReadTokens,
+                    accumulatedCacheCreationTokens: totalCacheCreationTokens),
                 cancellationToken);
 
-            // Accumulate tokens across iterations.
-            // Anthropic reports inputTokens cumulatively — keep the latest value.
-            // outputTokens is per-call — sum across iterations.
-            if (streamResult.InputTokens.HasValue) totalInputTokens = streamResult.InputTokens;
+            // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
+            if (streamResult.InputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + streamResult.InputTokens.Value;
             if (streamResult.OutputTokens.HasValue) totalOutputTokens += streamResult.OutputTokens.Value;
+            if (streamResult.CacheReadTokens.HasValue) totalCacheReadTokens = (totalCacheReadTokens ?? 0) + streamResult.CacheReadTokens.Value;
+            if (streamResult.CacheCreationTokens.HasValue) totalCacheCreationTokens = (totalCacheCreationTokens ?? 0) + streamResult.CacheCreationTokens.Value;
 
             // If there's text content, add it to the response
             if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
@@ -415,7 +418,9 @@ public class AnthropicProvider : IAiProvider
         string conversationId,
         CancellationToken cancellationToken,
         int? accumulatedInputTokens = null,
-        int accumulatedOutputTokens = 0)
+        int accumulatedOutputTokens = 0,
+        int? accumulatedCacheReadTokens = null,
+        int? accumulatedCacheCreationTokens = null)
     {
         var result = new StreamResult { Model = messageParams.Model };
         var currentText = new StringBuilder();
@@ -495,18 +500,45 @@ public class AnthropicProvider : IAiProvider
 
         // Finalize text content
         var finalText = currentText.ToString();
+
+        // Only emit tokens on the final turn (StopReason != "tool_use") to avoid double-counting.
+        // The final turn carries the full accumulated billing total for all iterations.
+        var isFinalTurn = result.StopReason != "tool_use";
+        int? emitInput = null;
+        int? emitOutput = null;
+        int? emitCacheRead = null;
+        int? emitCacheCreation = null;
+        if (isFinalTurn)
+        {
+            var totalIn = (accumulatedInputTokens ?? 0) + (result.InputTokens ?? 0);
+            emitInput = totalIn > 0 ? totalIn : null;
+            var totalOut = accumulatedOutputTokens + (result.OutputTokens ?? 0);
+            emitOutput = totalOut > 0 ? totalOut : null;
+            var totalCache = (accumulatedCacheReadTokens ?? 0) + (result.CacheReadTokens ?? 0);
+            emitCacheRead = totalCache > 0 ? totalCache : null;
+            var totalCreation = (accumulatedCacheCreationTokens ?? 0) + (result.CacheCreationTokens ?? 0);
+            emitCacheCreation = totalCreation > 0 ? totalCreation : null;
+        }
+
         if (!string.IsNullOrWhiteSpace(finalText))
         {
-            // Use accumulated totals so multi-turn conversations report correct cumulative usage
-            var emitInput = result.InputTokens.HasValue ? result.InputTokens : accumulatedInputTokens;
-            var emitOutput = accumulatedOutputTokens + (result.OutputTokens ?? 0);
             EmitStreamingTextUpdate(conversationId, finalText, isComplete: true,
                 inputTokens: emitInput,
-                outputTokens: emitOutput > 0 ? emitOutput : null,
+                outputTokens: emitOutput,
                 model: result.Model,
-                cacheReadTokens: result.CacheReadTokens,
-                cacheCreationTokens: result.CacheCreationTokens);
+                cacheReadTokens: emitCacheRead,
+                cacheCreationTokens: emitCacheCreation);
             result.TextContent = finalText;
+        }
+        else if (isFinalTurn && (emitInput.HasValue || emitOutput.HasValue || emitCacheRead.HasValue))
+        {
+            // Final turn with no text — emit a token-only event so billing totals are still recorded.
+            EmitStreamingTextUpdate(conversationId, string.Empty, isComplete: true,
+                inputTokens: emitInput,
+                outputTokens: emitOutput,
+                model: result.Model,
+                cacheReadTokens: emitCacheRead,
+                cacheCreationTokens: emitCacheCreation);
         }
 
         // Log Anthropic prompt cache stats
