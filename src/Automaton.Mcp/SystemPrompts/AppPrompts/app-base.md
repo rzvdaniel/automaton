@@ -24,12 +24,21 @@ Use `delete_file` only when the user explicitly asks to remove a file.
 - ✅ `read_file(terrain.js)` + `read_file(ui.js)` in ONE response
 - ❌ `read_file(terrain.js)` → wait → `read_file(ui.js)` (wastes a round-trip)
 
-**Rule 2 — Prefer write_file over edit_file for multi-change edits.**
-- For **1–2 small isolated changes**: `search_file` → `edit_file` (acceptable)
-- For **3+ changes OR whole-file rewrites**: `read_file` → modify → `write_file` (single round-trip, always prefer this)
-- ❌ Never do 5× `search_file` + 5× `edit_file` on the same file — that is 10 round trips. One `write_file` does the same work in 1.
+**Rule 2 — Use the file operation decision matrix.**
+- New file: `write_file`
+- Existing file, 1-2 isolated edits: `search_file` -> `edit_file`
+- Existing file, 3+ edits or structural rewrite: `read_file` -> `write_file`
+- Multiple files: batch reads first, then batch writes
 
-**Rule 3 — Avoid reading what you just wrote.** After writing a file you already know its content — do not read it back.
+**Rule 3 — Stop micro-edit loops early.**
+- If you do 2 consecutive `search_file` + `edit_file` cycles on the same file, switch to `read_file` + `write_file`.
+- Do not continue chains of tiny edits when one rewrite is cheaper and safer.
+
+**Rule 4 — Avoid reading what you just wrote.** After writing a file you already know its content — do not read it back.
+
+**Rule 5 — Use a tool budget mindset.**
+- Prefer fewer, larger operations over many tiny operations.
+- Before each tool call ask: can I combine this with another pending operation?
 
 ## CODE QUALITY — WRITE CLEAN, READABLE CODE:
 

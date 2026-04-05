@@ -85,11 +85,8 @@ public class GoogleProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // Accumulate tokens across all iterations.
-        // Gemini reports promptTokenCount cumulatively (keep the last/largest value).
-        // candidatesTokenCount is per-call, so we sum across iterations.
-        int? totalInputTokens = null;
-        int totalOutputTokens = 0;
+        // Accumulate billed totals across iterations and emit once on the final turn.
+        var tokenUsage = new TokenUsageAccumulator();
         string? modelVersion = null;
 
         // When propose_plan returns awaitingApproval, suppress tools on the next iteration
@@ -191,8 +188,7 @@ public class GoogleProvider : IAiProvider
 
             // Accumulate tokens across all iterations — input and output are per-call values.
             // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
-            if (iterInputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + iterInputTokens.Value;
-            if (iterOutputTokens.HasValue) totalOutputTokens += iterOutputTokens.Value;
+            tokenUsage.Add(iterInputTokens, iterOutputTokens);
 
             var textContent = currentText.ToString();
 
@@ -202,8 +198,14 @@ public class GoogleProvider : IAiProvider
                 if (!string.IsNullOrWhiteSpace(textContent))
                 {
                     EmitStreamingTextUpdate(request.ConversationId, textContent, isComplete: true,
-                        inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelVersion ?? request.Model);
+                        inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: modelVersion ?? request.Model);
                     responseBuilder.AppendLine(textContent);
+                }
+                else if (tokenUsage.HasAny)
+                {
+                    // Final turn can be tool-only with no assistant text; emit token-only usage.
+                    EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
+                        inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: modelVersion ?? request.Model);
                 }
                 break;
             }
@@ -650,7 +652,11 @@ public class GoogleProvider : IAiProvider
     private void EmitStreamingTextUpdate(string conversationId, string text, bool isComplete,
         int? inputTokens = null, int? outputTokens = null, string? model = null)
     {
-        if (string.IsNullOrEmpty(conversationId) || string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(conversationId))
+            return;
+
+        if (string.IsNullOrEmpty(text) &&
+            (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue)))
             return;
 
         var message = new ConversationMessage("assistant", text)

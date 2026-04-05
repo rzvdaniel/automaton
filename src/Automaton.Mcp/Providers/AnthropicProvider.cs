@@ -103,12 +103,8 @@ public class AnthropicProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool
 
-        // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
-        // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
-        int? totalInputTokens = null;
-        int totalOutputTokens = 0;
-        int? totalCacheReadTokens = null;
-        int? totalCacheCreationTokens = null;
+        // Accumulate billed totals across iterations and emit once on the final turn.
+        var tokenUsage = new TokenUsageAccumulator();
 
         // When propose_plan returns awaitingApproval, suppress tools on the next iteration
         // so the LLM can present the plan and ask for user confirmation.
@@ -199,17 +195,18 @@ public class AnthropicProvider : IAiProvider
             var streamResult = await retryPipeline.ExecuteAsync(async ct =>
                 await StreamResponseAsync(
                     client, messageParams, request.ConversationId, ct,
-                    accumulatedInputTokens: totalInputTokens,
-                    accumulatedOutputTokens: totalOutputTokens,
-                    accumulatedCacheReadTokens: totalCacheReadTokens,
-                    accumulatedCacheCreationTokens: totalCacheCreationTokens),
+                    accumulatedInputTokens: tokenUsage.InputTokens,
+                    accumulatedOutputTokens: tokenUsage.OutputTokens,
+                    accumulatedCacheReadTokens: tokenUsage.CacheReadTokens,
+                    accumulatedCacheCreationTokens: tokenUsage.CacheCreationTokens),
                 cancellationToken);
 
             // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
-            if (streamResult.InputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + streamResult.InputTokens.Value;
-            if (streamResult.OutputTokens.HasValue) totalOutputTokens += streamResult.OutputTokens.Value;
-            if (streamResult.CacheReadTokens.HasValue) totalCacheReadTokens = (totalCacheReadTokens ?? 0) + streamResult.CacheReadTokens.Value;
-            if (streamResult.CacheCreationTokens.HasValue) totalCacheCreationTokens = (totalCacheCreationTokens ?? 0) + streamResult.CacheCreationTokens.Value;
+            tokenUsage.Add(
+                streamResult.InputTokens,
+                streamResult.OutputTokens,
+                cacheReadTokens: streamResult.CacheReadTokens,
+                cacheCreationTokens: streamResult.CacheCreationTokens);
 
             // If there's text content, add it to the response
             if (!string.IsNullOrWhiteSpace(streamResult.TextContent))
@@ -714,7 +711,8 @@ public class AnthropicProvider : IAiProvider
                 return;
             }
 
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text) &&
+                (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue && !cacheReadTokens.HasValue && !cacheCreationTokens.HasValue)))
             {
                 _logger.LogDebug("EmitStreamingTextUpdate called with null/empty text, skipping");
                 return;

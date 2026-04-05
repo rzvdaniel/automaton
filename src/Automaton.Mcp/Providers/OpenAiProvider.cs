@@ -136,7 +136,8 @@ public class OpenAiProvider : IAiProvider
                 return;
             }
 
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text) &&
+                (!isComplete || (!inputTokens.HasValue && !outputTokens.HasValue)))
             {
                 _logger.LogDebug("EmitStreamingTextUpdate called with null/empty text, skipping");
                 return;
@@ -246,11 +247,8 @@ public class OpenAiProvider : IAiProvider
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // Accumulate tokens across iterations.
-        // OpenAI reports inputTokens cumulatively — keep the latest value.
-        // outputTokens is per-call — sum across iterations.
-        int? totalInputTokens = null;
-        int totalOutputTokens = 0;
+        // Accumulate billed totals across iterations and emit once on the final turn.
+        var tokenUsage = new TokenUsageAccumulator();
 
         // When propose_plan returns awaitingApproval, suppress tools on the next iteration
         // so the LLM can present the plan and ask for user confirmation.
@@ -307,16 +305,21 @@ public class OpenAiProvider : IAiProvider
 
                 // Accumulate tokens across all iterations — input and output are per-call values.
                 // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
-                if (response.InputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + response.InputTokens.Value;
-                if (response.OutputTokens.HasValue) totalOutputTokens += response.OutputTokens.Value;
+                tokenUsage.Add(response.InputTokens, response.OutputTokens);
 
                 if (response.ToolCalls.Count == 0)
                 {
                     if (!string.IsNullOrWhiteSpace(response.OutputText))
                     {
                         EmitStreamingTextUpdate(request.ConversationId, response.OutputText, isComplete: true,
-                            inputTokens: totalInputTokens, outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null, model: response.Model);
+                            inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: response.Model);
                         responseBuilder.AppendLine(response.OutputText);
+                    }
+                    else if (tokenUsage.HasAny)
+                    {
+                        // Final turn can be tool-only with no assistant text; emit token-only usage.
+                        EmitStreamingTextUpdate(request.ConversationId, string.Empty, isComplete: true,
+                            inputTokens: tokenUsage.InputTokens, outputTokens: tokenUsage.OutputTokensOrNull, model: response.Model);
                     }
 
                     break;

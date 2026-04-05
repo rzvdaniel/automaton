@@ -90,9 +90,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var responseBuilder = new StringBuilder();
 
-        int? totalInputTokens = null;
-        int totalOutputTokens = 0;
-        int? totalCacheReadTokens = null;
+        var tokenUsage = new TokenUsageAccumulator();
 
         // When propose_plan returns awaitingApproval, suppress tools on the next iteration
         // so the LLM can present the plan and ask for user confirmation.
@@ -162,9 +160,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
             // Accumulate tokens across all iterations — input, output, and cache are all per-call values.
             // Tokens are only emitted once on the final turn so the server accumulates the full billing total.
-            if (streamResult.inputTokens.HasValue) totalInputTokens = (totalInputTokens ?? 0) + streamResult.inputTokens.Value;
-            if (streamResult.outputTokens.HasValue) totalOutputTokens += streamResult.outputTokens.Value;
-            if (streamResult.cacheReadTokens.HasValue) totalCacheReadTokens = (totalCacheReadTokens ?? 0) + streamResult.cacheReadTokens.Value;
+            tokenUsage.Add(streamResult.inputTokens, streamResult.outputTokens, cacheReadTokens: streamResult.cacheReadTokens);
 
             var finalText = streamResult.finalText;
             var reasoningText = streamResult.reasoningText;
@@ -174,25 +170,25 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (toolCalls.Count == 0)
             {
                 // Final response — no more tool calls
-                LogCacheStats(totalCacheReadTokens, totalInputTokens);
+                LogCacheStats(tokenUsage.CacheReadTokens, tokenUsage.InputTokens);
                 if (!string.IsNullOrWhiteSpace(finalText))
                 {
                     EmitStreamingText(request.ConversationId, finalText, isComplete: true,
-                        inputTokens: totalInputTokens,
-                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        inputTokens: tokenUsage.InputTokens,
+                        outputTokens: tokenUsage.OutputTokensOrNull,
                         model: responseModel,
                         reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                        cacheReadTokens: totalCacheReadTokens);
+                        cacheReadTokens: tokenUsage.CacheReadTokens);
                     responseBuilder.AppendLine(finalText);
                 }
-                else if (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue)
+                else if (tokenUsage.HasAny)
                 {
                     EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
-                        inputTokens: totalInputTokens,
-                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        inputTokens: tokenUsage.InputTokens,
+                        outputTokens: tokenUsage.OutputTokensOrNull,
                         model: responseModel,
                         reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                        cacheReadTokens: totalCacheReadTokens);
+                        cacheReadTokens: tokenUsage.CacheReadTokens);
                 }
                 break;
             }
@@ -297,14 +293,14 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (shouldStop)
             {
                 if (string.IsNullOrWhiteSpace(finalText) &&
-                    (totalInputTokens.HasValue || totalOutputTokens > 0 || totalCacheReadTokens.HasValue))
+                    tokenUsage.HasAny)
                 {
                     EmitStreamingText(request.ConversationId, string.Empty, isComplete: true,
-                        inputTokens: totalInputTokens,
-                        outputTokens: totalOutputTokens > 0 ? totalOutputTokens : null,
+                        inputTokens: tokenUsage.InputTokens,
+                        outputTokens: tokenUsage.OutputTokensOrNull,
                         model: responseModel,
                         reasoningContent: string.IsNullOrEmpty(reasoningText) ? null : reasoningText,
-                        cacheReadTokens: totalCacheReadTokens);
+                        cacheReadTokens: tokenUsage.CacheReadTokens);
                 }
 
                 responseBuilder.AppendLine("\n\n[Conversation stopped: Tool repeatedly failed]");
