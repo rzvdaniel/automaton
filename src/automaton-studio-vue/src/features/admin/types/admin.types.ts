@@ -147,6 +147,13 @@ export interface IterationLimitsConfig {
   planning: number
 }
 
+export interface HistoryCompactionConfig {
+  recentMessages: number
+  maxSummaryEntries: number
+  maxSummaryChars: number
+  maxEntryChars: number
+}
+
 /**
  * AI providers operational config
  * Matches AiProvidersOperationalConfigResponse from backend
@@ -157,6 +164,7 @@ export interface AiProvidersOperationalConfig {
   maxConsecutiveFailures: number
   defaultMaxOutputTokens: number
   iterationLimits: IterationLimitsConfig
+  historyCompaction: HistoryCompactionConfig
 }
 
 /**

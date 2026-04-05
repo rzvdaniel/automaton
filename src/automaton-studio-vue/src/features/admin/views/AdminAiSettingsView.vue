@@ -26,6 +26,12 @@ const settings = ref<AiProvidersOperationalConfig>({
     autonomous: 0,
     planning: 0,
   },
+  historyCompaction: {
+    recentMessages: 12,
+    maxSummaryEntries: 30,
+    maxSummaryChars: 3500,
+    maxEntryChars: 220,
+  },
 })
 
 onMounted(async () => {
@@ -95,6 +101,56 @@ async function saveSettings() {
                   show-buttons
                   class="w-full"
                 />
+              </div>
+
+              <Divider />
+
+              <div class="field">
+                <label class="font-medium block mb-1">Compaction Recent Messages</label>
+                <p class="text-color-secondary text-sm mb-2">
+                  Number of most recent raw chat messages to keep when older history is compacted.
+                </p>
+                <InputNumber
+                  v-model="settings.historyCompaction.recentMessages"
+                  :min="1"
+                  :max="100"
+                  show-buttons
+                  class="w-full"
+                />
+              </div>
+
+              <div class="grid">
+                <div class="col-6 field">
+                  <label class="font-medium block mb-1">Max Summary Entries</label>
+                  <InputNumber
+                    v-model="settings.historyCompaction.maxSummaryEntries"
+                    :min="1"
+                    :max="200"
+                    show-buttons
+                    class="w-full"
+                  />
+                </div>
+                <div class="col-6 field">
+                  <label class="font-medium block mb-1">Max Entry Chars</label>
+                  <InputNumber
+                    v-model="settings.historyCompaction.maxEntryChars"
+                    :min="50"
+                    :max="1000"
+                    show-buttons
+                    class="w-full"
+                  />
+                </div>
+                <div class="col-12 field">
+                  <label class="font-medium block mb-1">Max Summary Chars</label>
+                  <InputNumber
+                    v-model="settings.historyCompaction.maxSummaryChars"
+                    :min="500"
+                    :max="10000"
+                    :step="100"
+                    show-buttons
+                    class="w-full"
+                  />
+                </div>
               </div>
 
               <Divider />

@@ -132,6 +132,7 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         MaxConsecutiveFailures         = op.MaxConsecutiveFailures,
         DefaultMaxOutputTokens         = op.DefaultMaxOutputTokens,
         IterationLimits                = op.IterationLimits,
+        HistoryCompaction              = op.HistoryCompaction,
         // Infrastructure config — stays from appsettings, not editable via admin UI
         Providers       = _baseline.Providers,
         AppMemory       = _baseline.AppMemory,
@@ -146,6 +147,7 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         MaxIterations                  = cfg.MaxIterations,
         MaxConsecutiveFailures         = cfg.MaxConsecutiveFailures,
         DefaultMaxOutputTokens         = cfg.DefaultMaxOutputTokens,
-        IterationLimits                = cfg.IterationLimits
+        IterationLimits                = cfg.IterationLimits,
+        HistoryCompaction              = cfg.HistoryCompaction
     };
 }

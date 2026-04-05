@@ -47,6 +47,12 @@ public class AiProvidersConfig
     public RateLimitRetryConfig RateLimitRetry { get; set; } = new();
 
     public StreamingConfig Streaming { get; set; } = new();
+
+    /// <summary>
+    /// Controls server-side history compaction when conversation history exceeds
+    /// <see cref="MaxConversationHistoryMessages"/>.
+    /// </summary>
+    public HistoryCompactionConfig HistoryCompaction { get; set; } = new();
 }
 
 /// <summary>
@@ -62,6 +68,30 @@ public class AiProvidersOperationalConfig
     public int MaxConsecutiveFailures         { get; set; } = 3;
     public int DefaultMaxOutputTokens         { get; set; } = 65536;
     public IterationLimitsConfig IterationLimits { get; set; } = new();
+    public HistoryCompactionConfig HistoryCompaction { get; set; } = new();
+}
+
+public class HistoryCompactionConfig
+{
+    /// <summary>
+    /// Number of latest raw messages kept after compaction (plus one summary message).
+    /// </summary>
+    public int RecentMessages { get; set; } = 12;
+
+    /// <summary>
+    /// Maximum number of summarized bullet entries generated from older turns.
+    /// </summary>
+    public int MaxSummaryEntries { get; set; } = 30;
+
+    /// <summary>
+    /// Maximum total characters of the generated summary block.
+    /// </summary>
+    public int MaxSummaryChars { get; set; } = 3500;
+
+    /// <summary>
+    /// Maximum characters per summarized entry.
+    /// </summary>
+    public int MaxEntryChars { get; set; } = 220;
 }
 
 /// <summary>

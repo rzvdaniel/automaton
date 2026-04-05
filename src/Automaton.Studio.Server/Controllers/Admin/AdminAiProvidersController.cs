@@ -696,6 +696,13 @@ public class AdminAiProvidersController : ControllerBase
                 Large      = request.IterationLimits.Large,
                 Enterprise = request.IterationLimits.Enterprise,
                 Autonomous = request.IterationLimits.Autonomous
+            },
+            HistoryCompaction = new()
+            {
+                RecentMessages   = request.HistoryCompaction.RecentMessages,
+                MaxSummaryEntries = request.HistoryCompaction.MaxSummaryEntries,
+                MaxSummaryChars  = request.HistoryCompaction.MaxSummaryChars,
+                MaxEntryChars    = request.HistoryCompaction.MaxEntryChars
             }
         };
 
@@ -719,6 +726,13 @@ public class AdminAiProvidersController : ControllerBase
             Large      = s.IterationLimits.Large,
             Enterprise = s.IterationLimits.Enterprise,
             Autonomous = s.IterationLimits.Autonomous
+        },
+        HistoryCompaction = new()
+        {
+            RecentMessages    = s.HistoryCompaction.RecentMessages,
+            MaxSummaryEntries = s.HistoryCompaction.MaxSummaryEntries,
+            MaxSummaryChars   = s.HistoryCompaction.MaxSummaryChars,
+            MaxEntryChars     = s.HistoryCompaction.MaxEntryChars
         }
     };
 
@@ -879,6 +893,7 @@ public class AiProvidersOperationalConfigResponse
     public int MaxConsecutiveFailures         { get; set; }
     public int DefaultMaxOutputTokens         { get; set; }
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
+    public HistoryCompactionConfigResponse HistoryCompaction { get; set; } = new();
 }
 
 public class SaveAiSettingsRequest
@@ -888,6 +903,15 @@ public class SaveAiSettingsRequest
     public int MaxConsecutiveFailures         { get; set; }
     public int DefaultMaxOutputTokens         { get; set; }
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
+    public HistoryCompactionConfigResponse HistoryCompaction { get; set; } = new();
+}
+
+public class HistoryCompactionConfigResponse
+{
+    public int RecentMessages { get; set; }
+    public int MaxSummaryEntries { get; set; }
+    public int MaxSummaryChars { get; set; }
+    public int MaxEntryChars { get; set; }
 }
 
 #endregion

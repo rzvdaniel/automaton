@@ -146,9 +146,13 @@ public abstract class AiConversationControllerBase : BaseController
 
             // 3. Load history
             var history = await LoadConversationHistoryAsync(sessionId, userId);
+            var compactedHistory = ConversationHistoryCompactor.Compact(
+                history,
+                aiConfig.MaxConversationHistoryMessages,
+                aiConfig.HistoryCompaction);
 
             // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
-            var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, history);
+            var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, compactedHistory);
             var mode = ConversationModeFactory.From(request.Mode);
             var modePromptSuffix = mode.SystemPromptSuffix;
             // Append mode suffix to the base prompt so it stays within the cached block
@@ -180,7 +184,7 @@ public abstract class AiConversationControllerBase : BaseController
                 Provider = provider,
                 Model = model,
                 ApiKey = apiKey,
-                ConversationHistory = history,
+                ConversationHistory = compactedHistory,
                 Context = BuildContextDictionary(request, userId),
                 MaxIterations = mode.Name == ConversationModes.Autonomous
                     ? IterationLimits.ResolveForAutonomous(
