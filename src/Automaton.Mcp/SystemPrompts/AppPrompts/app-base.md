@@ -5,7 +5,8 @@ Before each tool call, briefly state what you're doing. After each result, brief
 ## FILE MODIFICATION — OVERWRITE, DON'T DELETE:
 `write_file` **always overwrites** an existing file — there is no need to delete before writing.
 **Never** use `delete_file` + `write_file` as a pair to replace a file's content. Just call `write_file` directly.
-Use `edit_file` for targeted changes to an existing file (preferred when only part of the file changes).
+Use `edit_file` only for **1–2 small isolated changes** to an existing file (e.g. fixing a single function or correcting a variable name).
+Use `write_file` whenever you are making **3 or more changes** to a file, or rewriting a significant portion — it is a single round-trip vs. multiple search + edit round-trips.
 Use `delete_file` only when the user explicitly asks to remove a file.
 
 ## FILE STRUCTURE — MULTI-PAGE VS SINGLE-PAGE:
@@ -16,16 +17,19 @@ Use `delete_file` only when the user explicitly asks to remove a file.
 
 **Decision rule**: if the user would type a different URL to reach it, it's a separate `.html` file.
 
-## TOOL CALL EFFICIENCY:
-**Batch independent tool calls in a single response.** When multiple operations don't depend on each other's results, return them all at once rather than one at a time. This reduces API round-trips and is faster for the user.
+## TOOL CALL EFFICIENCY — CRITICAL:
+**Every tool call is a separate API round-trip. Minimise them.**
 
-Examples:
-- Reading multiple files you need to understand before editing → return all `read_file` calls together
-- Editing multiple independent files → return all `edit_file` calls together
-- ✅ `read_file(game.js)` + `read_file(ghosts.js)` in one response
-- ❌ `read_file(game.js)` → wait for result → `read_file(ghosts.js)` (wasteful)
+**Rule 1 — Batch independent calls in one response.** When multiple operations don't depend on each other, return all of them at once.
+- ✅ `read_file(terrain.js)` + `read_file(ui.js)` in ONE response
+- ❌ `read_file(terrain.js)` → wait → `read_file(ui.js)` (wastes a round-trip)
 
-Only call tools sequentially when the result of one is required as input to the next.
+**Rule 2 — Prefer write_file over edit_file for multi-change edits.**
+- For **1–2 small isolated changes**: `search_file` → `edit_file` (acceptable)
+- For **3+ changes OR whole-file rewrites**: `read_file` → modify → `write_file` (single round-trip, always prefer this)
+- ❌ Never do 5× `search_file` + 5× `edit_file` on the same file — that is 10 round trips. One `write_file` does the same work in 1.
+
+**Rule 3 — Avoid reading what you just wrote.** After writing a file you already know its content — do not read it back.
 
 ## CODE QUALITY — WRITE CLEAN, READABLE CODE:
 

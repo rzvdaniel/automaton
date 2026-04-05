@@ -55,7 +55,7 @@ public class FileIoTool : IMcpTool
             {
                 Name = EditFileName,
                 Capability = ToolCapability.Write,
-                Description = "Make targeted edits to a file by replacing specific text fragments. Preferred over write_file for modifications — only changes what needs changing. Each edit replaces oldText with newText.",
+                Description = "Make 1–2 small targeted edits to a file by replacing specific text fragments. ONLY use this for a few isolated changes. If you need to make 3 or more changes to a file, use write_file with the full updated content instead — it is faster and avoids multiple round-trips. Each edit replaces oldText with newText.",
                 InputSchema = JsonDocument.Parse("""
                     {
                         "type": "object",
@@ -116,7 +116,7 @@ public class FileIoTool : IMcpTool
             {
                 Name = SearchFileName,
                 Capability = ToolCapability.Read,
-                Description = "Search for lines matching a pattern inside a file. Returns each match with surrounding context lines — use the returned text verbatim as oldText in edit_file for guaranteed accuracy. Prefer this over read_file for large files when you only need to find and change specific sections.",
+                Description = "Search for lines matching a pattern inside a file. Returns each match with surrounding context lines — use the returned text verbatim as oldText in edit_file for guaranteed accuracy.",
                 InputSchema = JsonDocument.Parse("""
                     {
                         "type": "object",
@@ -177,7 +177,7 @@ public class FileIoTool : IMcpTool
 
             var lineCount = content.Count(c => c == '\n') + 1;
             if (lineCount >= LocalScopedFileSystem.LargeFileThreshold)
-                content = $"[NOTE: {lineCount} lines — for targeted edits prefer search_file + edit_file]\n\n" + content;
+                content = $"[NOTE: {lineCount} lines \u2014 rewrite with write_file when making multiple changes]\n\n" + content;
 
             return new McpToolResult { Success = true, Content = content };
         }
