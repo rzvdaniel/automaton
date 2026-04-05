@@ -11,10 +11,6 @@ namespace Automaton.Studio.Server.Services;
 public static class ConversationHistoryCompactor
 {
     private const int DefaultMaxHistoryMessages = 30;
-    private const int DefaultRecentMessages = 12;
-    private const int MaxSummaryEntries = 30;
-    private const int MaxSummaryChars = 3500;
-    private const int MaxEntryChars = 220;
 
     public static List<ConversationMessage>? Compact(
         List<ConversationMessage>? history,
@@ -35,10 +31,26 @@ public static class ConversationHistoryCompactor
         if (maxHistory <= 2)
             return history.TakeLast(maxHistory).ToList();
 
-        var recentMessages = settings?.RecentMessages > 0 ? settings.RecentMessages : DefaultRecentMessages;
-        var maxSummaryEntries = settings?.MaxSummaryEntries > 0 ? settings.MaxSummaryEntries : MaxSummaryEntries;
-        var maxSummaryChars = settings?.MaxSummaryChars > 0 ? settings.MaxSummaryChars : MaxSummaryChars;
-        var maxEntryChars = settings?.MaxEntryChars > 0 ? settings.MaxEntryChars : MaxEntryChars;
+        var recentMessages = ClampOrDefault(
+            settings?.RecentMessages,
+            HistoryCompactionDefaults.RecentMessages,
+            HistoryCompactionBounds.MinRecentMessages,
+            HistoryCompactionBounds.MaxRecentMessages);
+        var maxSummaryEntries = ClampOrDefault(
+            settings?.MaxSummaryEntries,
+            HistoryCompactionDefaults.MaxSummaryEntries,
+            HistoryCompactionBounds.MinMaxSummaryEntries,
+            HistoryCompactionBounds.MaxMaxSummaryEntries);
+        var maxSummaryChars = ClampOrDefault(
+            settings?.MaxSummaryChars,
+            HistoryCompactionDefaults.MaxSummaryChars,
+            HistoryCompactionBounds.MinMaxSummaryChars,
+            HistoryCompactionBounds.MaxMaxSummaryChars);
+        var maxEntryChars = ClampOrDefault(
+            settings?.MaxEntryChars,
+            HistoryCompactionDefaults.MaxEntryChars,
+            HistoryCompactionBounds.MinMaxEntryChars,
+            HistoryCompactionBounds.MaxMaxEntryChars);
 
         var recentCount = Math.Min(recentMessages, maxHistory - 1);
         var olderCount = history.Count - recentCount;
@@ -114,5 +126,13 @@ public static class ConversationHistoryCompactor
 
         return string.Join(' ', text
             .Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private static int ClampOrDefault(int? value, int defaultValue, int min, int max)
+    {
+        if (!value.HasValue || value.Value <= 0)
+            return defaultValue;
+
+        return Math.Clamp(value.Value, min, max);
     }
 }

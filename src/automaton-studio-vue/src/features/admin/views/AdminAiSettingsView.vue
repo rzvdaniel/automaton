@@ -110,6 +110,9 @@ async function saveSettings() {
                 <p class="text-color-secondary text-sm mb-2">
                   Number of most recent raw chat messages to keep when older history is compacted.
                 </p>
+                <p class="text-color-secondary text-xs mb-2">
+                  Allowed range: 1-100
+                </p>
                 <InputNumber
                   v-model="settings.historyCompaction.recentMessages"
                   :min="1"
@@ -122,6 +125,9 @@ async function saveSettings() {
               <div class="grid">
                 <div class="col-6 field">
                   <label class="font-medium block mb-1">Max Summary Entries</label>
+                  <p class="text-color-secondary text-xs mb-2">
+                    Allowed range: 1-200
+                  </p>
                   <InputNumber
                     v-model="settings.historyCompaction.maxSummaryEntries"
                     :min="1"
@@ -132,6 +138,9 @@ async function saveSettings() {
                 </div>
                 <div class="col-6 field">
                   <label class="font-medium block mb-1">Max Entry Chars</label>
+                  <p class="text-color-secondary text-xs mb-2">
+                    Allowed range: 50-1000
+                  </p>
                   <InputNumber
                     v-model="settings.historyCompaction.maxEntryChars"
                     :min="50"
@@ -142,6 +151,9 @@ async function saveSettings() {
                 </div>
                 <div class="col-12 field">
                   <label class="font-medium block mb-1">Max Summary Chars</label>
+                  <p class="text-color-secondary text-xs mb-2">
+                    Allowed range: 500-10000
+                  </p>
                   <InputNumber
                     v-model="settings.historyCompaction.maxSummaryChars"
                     :min="500"

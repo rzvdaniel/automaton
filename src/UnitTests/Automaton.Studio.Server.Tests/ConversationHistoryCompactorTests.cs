@@ -84,4 +84,35 @@ public class ConversationHistoryCompactorTests
         Assert.That(compacted[0].Content, Does.Contain("Conversation summary of earlier turns"));
         Assert.That(compacted[^1].Content, Is.EqualTo("long-message-12"));
     }
+
+    [Test]
+    public void Compact_WhenSettingsOutOfBounds_ShouldClampToSafeLimits()
+    {
+        var longOlderMessage = new string('x', 3000);
+        var history = new List<ConversationMessage>
+        {
+            new("user", longOlderMessage),
+            new("assistant", "mid"),
+            new("assistant", "latest-1"),
+            new("user", "latest-2")
+        };
+
+        var compacted = ConversationHistoryCompactor.Compact(
+            history,
+            maxConversationHistoryMessages: 3,
+            settings: new HistoryCompactionConfig
+            {
+                RecentMessages = 9999,
+                MaxSummaryEntries = 9999,
+                MaxSummaryChars = 999999,
+                MaxEntryChars = 999999
+            });
+
+        Assert.That(compacted, Is.Not.Null);
+        Assert.That(compacted!.Count, Is.EqualTo(3));
+        Assert.That(compacted[0].Content, Does.Contain("Conversation summary of earlier turns"));
+        Assert.That(compacted[0].Content, Does.Not.Contain(new string('x', 1500)));
+        Assert.That(compacted[1].Content, Is.EqualTo("latest-1"));
+        Assert.That(compacted[2].Content, Is.EqualTo("latest-2"));
+    }
 }

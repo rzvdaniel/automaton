@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -683,6 +684,8 @@ public class AdminAiProvidersController : ControllerBase
     public async Task<ActionResult<AiProvidersOperationalConfigResponse>> SaveAiSettings(
         [FromBody] SaveAiSettingsRequest request)
     {
+        var normalizedHistoryCompaction = NormalizeHistoryCompaction(request.HistoryCompaction);
+
         var settings = new AiProvidersOperationalConfig
         {
             MaxConversationHistoryMessages = request.MaxConversationHistoryMessages,
@@ -699,10 +702,10 @@ public class AdminAiProvidersController : ControllerBase
             },
             HistoryCompaction = new()
             {
-                RecentMessages   = request.HistoryCompaction.RecentMessages,
-                MaxSummaryEntries = request.HistoryCompaction.MaxSummaryEntries,
-                MaxSummaryChars  = request.HistoryCompaction.MaxSummaryChars,
-                MaxEntryChars    = request.HistoryCompaction.MaxEntryChars
+                RecentMessages   = normalizedHistoryCompaction.RecentMessages,
+                MaxSummaryEntries = normalizedHistoryCompaction.MaxSummaryEntries,
+                MaxSummaryChars  = normalizedHistoryCompaction.MaxSummaryChars,
+                MaxEntryChars    = normalizedHistoryCompaction.MaxEntryChars
             }
         };
 
@@ -735,6 +738,29 @@ public class AdminAiProvidersController : ControllerBase
             MaxEntryChars     = s.HistoryCompaction.MaxEntryChars
         }
     };
+
+    private static HistoryCompactionConfig NormalizeHistoryCompaction(HistoryCompactionConfigRequest request)
+    {
+        return new HistoryCompactionConfig
+        {
+            RecentMessages = Math.Clamp(
+                request.RecentMessages,
+                HistoryCompactionBounds.MinRecentMessages,
+                HistoryCompactionBounds.MaxRecentMessages),
+            MaxSummaryEntries = Math.Clamp(
+                request.MaxSummaryEntries,
+                HistoryCompactionBounds.MinMaxSummaryEntries,
+                HistoryCompactionBounds.MaxMaxSummaryEntries),
+            MaxSummaryChars = Math.Clamp(
+                request.MaxSummaryChars,
+                HistoryCompactionBounds.MinMaxSummaryChars,
+                HistoryCompactionBounds.MaxMaxSummaryChars),
+            MaxEntryChars = Math.Clamp(
+                request.MaxEntryChars,
+                HistoryCompactionBounds.MinMaxEntryChars,
+                HistoryCompactionBounds.MaxMaxEntryChars)
+        };
+    }
 
     #endregion
 }
@@ -903,7 +929,23 @@ public class SaveAiSettingsRequest
     public int MaxConsecutiveFailures         { get; set; }
     public int DefaultMaxOutputTokens         { get; set; }
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
-    public HistoryCompactionConfigResponse HistoryCompaction { get; set; } = new();
+    [Required]
+    public HistoryCompactionConfigRequest HistoryCompaction { get; set; } = new();
+}
+
+public class HistoryCompactionConfigRequest
+{
+    [Range(HistoryCompactionBounds.MinRecentMessages, HistoryCompactionBounds.MaxRecentMessages)]
+    public int RecentMessages { get; set; }
+
+    [Range(HistoryCompactionBounds.MinMaxSummaryEntries, HistoryCompactionBounds.MaxMaxSummaryEntries)]
+    public int MaxSummaryEntries { get; set; }
+
+    [Range(HistoryCompactionBounds.MinMaxSummaryChars, HistoryCompactionBounds.MaxMaxSummaryChars)]
+    public int MaxSummaryChars { get; set; }
+
+    [Range(HistoryCompactionBounds.MinMaxEntryChars, HistoryCompactionBounds.MaxMaxEntryChars)]
+    public int MaxEntryChars { get; set; }
 }
 
 public class HistoryCompactionConfigResponse

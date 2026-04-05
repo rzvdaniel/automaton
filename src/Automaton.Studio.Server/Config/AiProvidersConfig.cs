@@ -76,22 +76,45 @@ public class HistoryCompactionConfig
     /// <summary>
     /// Number of latest raw messages kept after compaction (plus one summary message).
     /// </summary>
-    public int RecentMessages { get; set; } = 12;
+    public int RecentMessages { get; set; } = HistoryCompactionDefaults.RecentMessages;
 
     /// <summary>
     /// Maximum number of summarized bullet entries generated from older turns.
     /// </summary>
-    public int MaxSummaryEntries { get; set; } = 30;
+    public int MaxSummaryEntries { get; set; } = HistoryCompactionDefaults.MaxSummaryEntries;
 
     /// <summary>
     /// Maximum total characters of the generated summary block.
     /// </summary>
-    public int MaxSummaryChars { get; set; } = 3500;
+    public int MaxSummaryChars { get; set; } = HistoryCompactionDefaults.MaxSummaryChars;
 
     /// <summary>
     /// Maximum characters per summarized entry.
     /// </summary>
-    public int MaxEntryChars { get; set; } = 220;
+    public int MaxEntryChars { get; set; } = HistoryCompactionDefaults.MaxEntryChars;
+}
+
+public static class HistoryCompactionDefaults
+{
+    public const int RecentMessages = 12;
+    public const int MaxSummaryEntries = 30;
+    public const int MaxSummaryChars = 3500;
+    public const int MaxEntryChars = 220;
+}
+
+public static class HistoryCompactionBounds
+{
+    public const int MinRecentMessages = 1;
+    public const int MaxRecentMessages = 100;
+
+    public const int MinMaxSummaryEntries = 1;
+    public const int MaxMaxSummaryEntries = 200;
+
+    public const int MinMaxSummaryChars = 500;
+    public const int MaxMaxSummaryChars = 10000;
+
+    public const int MinMaxEntryChars = 50;
+    public const int MaxMaxEntryChars = 1000;
 }
 
 /// <summary>
