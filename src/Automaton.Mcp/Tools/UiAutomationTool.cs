@@ -107,7 +107,7 @@ public class UiAutomationTool : IMcpTool
             {
                 Name = GetConsoleLogsName,
                 Capability = ToolCapability.Read,
-                Description = "Get captured browser console/runtime logs from the preview app.",
+                Description = "Get captured browser console/runtime logs from the preview app. Use this after significant UI changes and before declaring completion; inspect returned logs for issues and fix them.",
                 InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
             }
         };

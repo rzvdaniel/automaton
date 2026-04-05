@@ -296,11 +296,13 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
 - Execute iterative loop:
   1) implement/update code
   2) run visible preview tests with `ui_*` tools
-  3) read preview console/runtime logs and UI test outcomes
+  3) call `ui_get_console_logs` and read UI test outcomes
   4) fix discovered defects
   5) rerun tests
 - Continue until all done criteria pass.
-- Do not claim completion while `[AI UI Test]` failures or runtime errors remain.
+- After every significant UI change, run `ui_get_console_logs` before moving on.
+- Before final completion, run `ui_get_console_logs` one last time and fix any issues found in logs.
+- Do not claim completion while `[AI UI Test]` failures or unresolved console/runtime issues remain.
 - For `ui_navigate`, only use app-relative preview targets (e.g. `index.html`, `pages/level1.html`, `?mode=test`, `#section`).
 - Never navigate UI tests to API/server root URLs (e.g. `/`, `/swagger`, base server URL) because that exits the app preview context.
 - If blocked, report exact blocker + what was attempted.
