@@ -2,7 +2,7 @@
 /**
  * AppSettings.vue
  * Settings panel for app configuration
- * Includes: Basic info, Publishing, Runner, Appearance, Usage
+ * Includes: Basic info, Publishing, Runner, Appearance
  */
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -15,7 +15,6 @@ import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
-import AppUsageStats from './AppUsageStats.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { appsService } from '../services/apps.service'
@@ -28,7 +27,7 @@ const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'usage'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance'>('basic')
 
 // Local form state
 const name = ref('')
@@ -353,14 +352,6 @@ function handleDelete() {
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
               />
-              <Button
-                label="Usage"
-                icon="pi pi-chart-bar"
-                text
-                :class="{ 'surface-hover': activeSection === 'usage' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'usage'"
-              />
             </div>
           </template>
         </Card>
@@ -665,14 +656,6 @@ function handleDelete() {
                 />
               </div>
             </div>
-          </template>
-        </Card>
-
-        <!-- Usage Stats -->
-        <Card v-if="activeSection === 'usage'">
-          <template #title>AI Usage Statistics</template>
-          <template #content>
-            <AppUsageStats v-if="app" :app-id="app.id" />
           </template>
         </Card>
 

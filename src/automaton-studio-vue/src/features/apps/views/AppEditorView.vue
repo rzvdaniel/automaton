@@ -29,6 +29,7 @@ import ConsolePanel from '../components/ConsolePanel.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
+import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
@@ -76,8 +77,8 @@ const appNameAutoUpdated = ref(false)
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
 
-// Active view tab (code, settings, console, or logs)
-const activeTab = ref<'code' | 'settings' | 'console' | 'logs'>('code')
+// Active view tab (code, console, logs, usage, or settings)
+const activeTab = ref<'code' | 'settings' | 'console' | 'logs' | 'usage'>('code')
 const BUILD_VIEW_MODE_STORAGE_KEY = 'app-editor-build-view-mode'
 type BuildViewMode = 'visual' | 'code'
 
@@ -995,6 +996,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
               </button>
               <button
                 class="view-tab"
+                :class="{ active: activeTab === 'usage' }"
+                @click="activeTab = 'usage'"
+              >
+                <i class="pi pi-chart-line"></i>
+                Usage
+              </button>
+              <button
+                class="view-tab"
                 :class="{ active: activeTab === 'settings' }"
                 @click="activeTab = 'settings'"
               >
@@ -1117,11 +1126,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
         </div>
       </div>
 
-      <!-- Settings View -->
-      <div v-show="activeTab === 'settings'" class="settings-view">
-        <AppSettings />
-      </div>
-
       <!-- Console View -->
       <div v-show="activeTab === 'console'" class="console-view">
         <ConsolePanel />
@@ -1156,6 +1160,16 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           />
           <AppRuntimeLogs v-else ref="runtimeLogsRef" :app-id="resolvedAppId" />
         </div>
+      </div>
+
+      <!-- Usage View -->
+      <div v-show="activeTab === 'usage'" class="usage-view">
+        <AppUsageStats :app-id="resolvedAppId" />
+      </div>
+
+      <!-- Settings View -->
+      <div v-show="activeTab === 'settings'" class="settings-view">
+        <AppSettings />
       </div>
 
       <!-- Build View - single shared layout for Visual and Code modes -->
@@ -1481,6 +1495,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
 .settings-view {
   flex: 1;
   overflow: hidden;
+}
+
+.usage-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
 /* Deploy backend button + inline status */
