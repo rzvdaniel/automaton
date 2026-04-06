@@ -11,6 +11,7 @@ const DEFAULTS: UserSettingsDto = {
   defaultPlanningModel: undefined,
   defaultPlanningProvider: undefined,
   showAiDebugDetails: false,
+  appVerificationStrategy: undefined,
 }
 
 const STORAGE_KEY = 'user-settings'
@@ -72,6 +73,7 @@ function loadFromStorage(): UserSettingsDto {
         defaultPlanningModel: parsed.defaultPlanningModel ?? undefined,
         defaultPlanningProvider: parsed.defaultPlanningProvider ?? undefined,
         showAiDebugDetails: parsed.showAiDebugDetails ?? false,
+        appVerificationStrategy: parsed.appVerificationStrategy ?? undefined,
       }
     }
   } catch (err) {
@@ -113,6 +115,7 @@ export function useUserSettings() {
         defaultPlanningModel: serverSettings.defaultPlanningModel ?? undefined,
         defaultPlanningProvider: serverSettings.defaultPlanningProvider ?? undefined,
         showAiDebugDetails: serverSettings.showAiDebugDetails ?? false,
+        appVerificationStrategy: serverSettings.appVerificationStrategy ?? undefined,
       }
       saveToStorage(settings.value)
       isInitialized.value = true
@@ -270,6 +273,28 @@ export function useUserSettings() {
     }
   }
 
+  async function setAppVerificationStrategy(strategy: string | undefined) {
+    const previousSettings = { ...settings.value }
+
+    settings.value = { ...settings.value, appVerificationStrategy: strategy }
+    saveToStorage(settings.value)
+
+    if (!isSaving.value) {
+      isSaving.value = true
+      try {
+        await userSettingsService.updateSettings({
+          appVerificationStrategy: strategy ?? '',
+        })
+      } catch (err) {
+        console.error('Failed to save app verification strategy setting:', err)
+        settings.value = previousSettings
+        saveToStorage(previousSettings)
+      } finally {
+        isSaving.value = false
+      }
+    }
+  }
+
   /**
    * Reset settings state (call on logout)
    */
@@ -287,6 +312,7 @@ export function useUserSettings() {
   const defaultPlanningModel = computed(() => settings.value.defaultPlanningModel)
   const defaultPlanningProvider = computed(() => settings.value.defaultPlanningProvider)
   const showAiDebugDetails = computed(() => settings.value.showAiDebugDetails ?? false)
+  const appVerificationStrategy = computed(() => settings.value.appVerificationStrategy)
 
   return {
     // Read-only reactive settings object
@@ -301,6 +327,7 @@ export function useUserSettings() {
     defaultPlanningModel,
     defaultPlanningProvider,
     showAiDebugDetails,
+    appVerificationStrategy,
 
     // State
     isInitialized: readonly(isInitialized),
@@ -314,6 +341,7 @@ export function useUserSettings() {
     setDefaultAiModel,
     setDefaultPlanningModel,
     setShowAiDebugDetails,
+    setAppVerificationStrategy,
     toggleDarkMode,
     setDarkMode,
     resetSettings,

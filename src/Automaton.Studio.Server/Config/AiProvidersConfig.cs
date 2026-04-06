@@ -33,6 +33,17 @@ public class AiProvidersConfig
     public int DefaultMaxOutputTokens { get; set; } = 65536;
 
     /// <summary>
+    /// Default verification strategy for app generation prompts.
+    /// Allowed values: continuous, balanced, final-gate.
+    /// </summary>
+    public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
+
+    /// <summary>
+    /// Whether users can override the default verification strategy in personal settings.
+    /// </summary>
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
+
+    /// <summary>
     /// Per-tier iteration limits. Zero values fall back to the built-in defaults
     /// in <see cref="Automaton.Mcp.SystemPrompts.IterationLimits"/>.
     /// </summary>
@@ -67,6 +78,8 @@ public class AiProvidersOperationalConfig
     public int MaxIterations                  { get; set; } = 0;
     public int MaxConsecutiveFailures         { get; set; } = 3;
     public int DefaultMaxOutputTokens         { get; set; } = 65536;
+    public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
     public IterationLimitsConfig IterationLimits { get; set; } = new();
     public HistoryCompactionConfig HistoryCompaction { get; set; } = new();
 }

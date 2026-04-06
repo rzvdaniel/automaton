@@ -3,12 +3,14 @@ using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Mcp.SystemPrompts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -17,6 +19,15 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class OrganizationService : IOrganizationService
 {
+    private static class OrganizationSettingKeys
+    {
+        public static string AppVerificationDefaultStrategy(Guid organizationId) =>
+            $"organization:{organizationId}:ai.verification.defaultStrategy";
+
+        public static string AppVerificationAllowUserOverride(Guid organizationId) =>
+            $"organization:{organizationId}:ai.verification.allowUserOverride";
+    }
+
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
     private readonly IEmailService emailService;
@@ -94,6 +105,7 @@ public class OrganizationService : IOrganizationService
 
         // Get user's role in the organization
         var userRole = await GetUserRoleAsync(organizationId, UserId, cancellationToken);
+        var verificationSettings = await GetOrganizationVerificationPolicyAsync(organizationId, cancellationToken);
 
         return new OrganizationDto
         {
@@ -112,7 +124,9 @@ public class OrganizationService : IOrganizationService
             IsActive = organization.IsActive,
             MemberCount = organization.Members.Count(m => m.IsActive),
             ProjectCount = organization.Projects.Count(p => p.IsActive),
-            CurrentUserRole = userRole
+            CurrentUserRole = userRole,
+            AppVerificationDefaultStrategy = verificationSettings.DefaultStrategy,
+            AppVerificationAllowUserOverride = verificationSettings.AllowUserOverride
         };
     }
 
@@ -212,11 +226,102 @@ public class OrganizationService : IOrganizationService
         organization.PrimaryColor = request.PrimaryColor;
         organization.UpdatedAt = DateTime.UtcNow;
 
+        await UpsertJsonSettingAsync(
+            OrganizationSettingKeys.AppVerificationDefaultStrategy(organizationId),
+            NormalizeVerificationStrategy(request.AppVerificationDefaultStrategy),
+            "Organization-level default app verification strategy",
+            cancellationToken);
+
+        await UpsertJsonSettingAsync(
+            OrganizationSettingKeys.AppVerificationAllowUserOverride(organizationId),
+            request.AppVerificationAllowUserOverride,
+            "Organization-level toggle for allowing user verification strategy overrides",
+            cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("User {UserId} updated organization {OrganizationId}", UserId, organizationId);
 
         return await GetOrganizationAsync(organizationId, cancellationToken);
+    }
+
+    private async Task<(string? DefaultStrategy, bool AllowUserOverride)> GetOrganizationVerificationPolicyAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        var defaultStrategy = await ReadJsonSettingAsync<string>(
+            OrganizationSettingKeys.AppVerificationDefaultStrategy(organizationId),
+            cancellationToken);
+
+        var allowUserOverride = await ReadJsonSettingAsync<bool?>(
+            OrganizationSettingKeys.AppVerificationAllowUserOverride(organizationId),
+            cancellationToken);
+
+        return (
+            NormalizeVerificationStrategy(defaultStrategy),
+            allowUserOverride ?? true);
+    }
+
+    private async Task<T?> ReadJsonSettingAsync<T>(string key, CancellationToken cancellationToken)
+    {
+        var setting = await dbContext.Settings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+
+        if (setting == null)
+            return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(setting.Value);
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private async Task UpsertJsonSettingAsync<T>(
+        string key,
+        T value,
+        string description,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.Settings.FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+        var json = JsonSerializer.Serialize(value);
+
+        if (existing == null)
+        {
+            dbContext.Settings.Add(new Setting
+            {
+                Key = key,
+                Value = json,
+                Description = description,
+                UpdatedAt = DateTime.UtcNow
+            });
+            return;
+        }
+
+        existing.Value = json;
+        existing.Description = description;
+        existing.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? NormalizeVerificationStrategy(string? strategy)
+    {
+        if (string.IsNullOrWhiteSpace(strategy))
+            return null;
+
+        if (strategy.Equals(AppVerificationStrategyNames.Continuous, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.Continuous;
+
+        if (strategy.Equals(AppVerificationStrategyNames.FinalGate, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.FinalGate;
+
+        if (strategy.Equals(AppVerificationStrategyNames.Balanced, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.Balanced;
+
+        return null;
     }
 
     public async Task<bool> DeleteOrganizationAsync(Guid organizationId, CancellationToken cancellationToken = default)

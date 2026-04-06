@@ -19,6 +19,7 @@ import { authService } from '@/features/auth/services/auth.service'
 import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
 import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
+import { AppVerificationStrategy } from '../types/settings.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 
 const {
@@ -29,6 +30,7 @@ const {
   defaultPlanningModel,
   defaultPlanningProvider,
   showAiDebugDetails,
+  appVerificationStrategy,
   isLoading: settingsLoading,
   isSaving: settingsSaving,
   setTheme,
@@ -36,6 +38,7 @@ const {
   setDefaultAiModel,
   setDefaultPlanningModel,
   setShowAiDebugDetails,
+  setAppVerificationStrategy,
 } = useUserSettings()
 const authStore = useAuthStore()
 const router = useRouter()
@@ -84,6 +87,12 @@ const aiModelFlatOptions = computed(() =>
 const selectedDefaultAiModel = ref<string | undefined>(undefined)
 const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
 const aiDebugDetailsEnabled = ref(false)
+const selectedAppVerificationStrategy = ref<string | undefined>(undefined)
+const appVerificationStrategyOptions = [
+  { label: 'Balanced', value: AppVerificationStrategy.Balanced },
+  { label: 'Continuous', value: AppVerificationStrategy.Continuous },
+  { label: 'Final Gate', value: AppVerificationStrategy.FinalGate },
+]
 
 onMounted(async () => {
   // Load user data from store
@@ -100,6 +109,7 @@ onMounted(async () => {
   selectedDefaultAiModel.value = defaultAiModel.value
   selectedDefaultPlanningModel.value = defaultPlanningModel.value
   aiDebugDetailsEnabled.value = showAiDebugDetails.value
+  selectedAppVerificationStrategy.value = appVerificationStrategy.value
 
   // Load AI providers for model dropdowns
   aiModelsLoading.value = true
@@ -123,6 +133,7 @@ watch(fontSize, (newSize) => {
 watch(defaultAiModel, (v) => { selectedDefaultAiModel.value = v })
 watch(defaultPlanningModel, (v) => { selectedDefaultPlanningModel.value = v })
 watch(showAiDebugDetails, (v) => { aiDebugDetailsEnabled.value = v })
+watch(appVerificationStrategy, (v) => { selectedAppVerificationStrategy.value = v })
 
 // Check username availability
 async function checkUsernameAvailability() {
@@ -249,6 +260,7 @@ async function saveAiPreferences() {
     await setDefaultAiModel(aiModel, aiProv)
     await setDefaultPlanningModel(planModel, planProv)
     await setShowAiDebugDetails(aiDebugDetailsEnabled.value)
+    await setAppVerificationStrategy(selectedAppVerificationStrategy.value)
 
     toast.add({
       severity: 'success',
@@ -686,6 +698,24 @@ const passwordLoading = computed(() => passwordSaving.value)
                   :disabled="settingsSaving || aiModelsLoading"
                   @update:model-value="(v) => aiDebugDetailsEnabled = Boolean(v)"
                 />
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="appVerificationStrategy" class="font-medium">App Verification Strategy</label>
+                <Select
+                  id="appVerificationStrategy"
+                  v-model="selectedAppVerificationStrategy"
+                  :options="appVerificationStrategyOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Use organization/admin default"
+                  show-clear
+                  :disabled="settingsSaving"
+                  class="w-full"
+                />
+                <small class="text-color-secondary">
+                  Personal override for how aggressively the app builder verifies each step.
+                </small>
               </div>
 
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">

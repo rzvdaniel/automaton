@@ -5,6 +5,8 @@ import Card from 'primevue/card'
 import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 import Divider from 'primevue/divider'
+import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import { adminAiProvidersService } from '../services/adminAiProvidersService'
 import type { AiProvidersOperationalConfig } from '../types/admin.types'
 
@@ -18,6 +20,8 @@ const settings = ref<AiProvidersOperationalConfig>({
   maxIterations: 0,
   maxConsecutiveFailures: 3,
   defaultMaxOutputTokens: 65536,
+  appVerificationDefaultStrategy: 'balanced',
+  appVerificationAllowUserOverride: true,
   iterationLimits: {
     simple: 15,
     medium: 25,
@@ -214,6 +218,42 @@ async function saveSettings() {
             </p>
 
             <div class="flex flex-column gap-4">
+              <div class="field">
+                <label class="font-medium block mb-1">Default App Verification Strategy</label>
+                <p class="text-color-secondary text-sm mb-2">
+                  Baseline strategy when no organization or user override is applied.
+                </p>
+                <Select
+                  v-model="settings.appVerificationDefaultStrategy"
+                  :options="[
+                    { label: 'Balanced', value: 'balanced' },
+                    { label: 'Continuous', value: 'continuous' },
+                    { label: 'Final Gate', value: 'final-gate' },
+                  ]"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </div>
+
+              <div class="field">
+                <label class="font-medium block mb-1">Allow User Override</label>
+                <p class="text-color-secondary text-sm mb-2">
+                  If enabled, users can select a personal app verification strategy.
+                </p>
+                <SelectButton
+                  v-model="settings.appVerificationAllowUserOverride"
+                  :options="[
+                    { label: 'Disabled', value: false },
+                    { label: 'Enabled', value: true },
+                  ]"
+                  option-label="label"
+                  option-value="value"
+                />
+              </div>
+
+              <Divider />
+
               <div class="field">
                 <label class="font-medium block mb-1">
                   Global Override

@@ -55,7 +55,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     /// <summary>
     /// Build a system prompt for the given complexity tier.
     /// </summary>
-    public string BuildSystemPrompt(ComplexityTier? tier = null)
+    public string BuildSystemPrompt(ComplexityTier? tier = null, string? verificationStrategyName = null)
     {
         var tierPrompt = tier switch
         {
@@ -66,7 +66,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             _                         => MediumPrompt.Value
         };
 
-        var verificationBlock = ResolveVerificationPromptBlock();
+        var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
         return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{verificationBlock}";
     }
 
@@ -77,9 +77,12 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     public string BuildPlanningPhaseSystemPrompt(string baseSystemPrompt) =>
         $"{baseSystemPrompt}\n\n{PlanningPrompt.Value}";
 
-    private string ResolveVerificationPromptBlock()
+    private string ResolveVerificationPromptBlock(string? preferredStrategyName)
     {
-        var requested = Environment.GetEnvironmentVariable(VerificationStrategyEnvVar);
+        var requested = string.IsNullOrWhiteSpace(preferredStrategyName)
+            ? Environment.GetEnvironmentVariable(VerificationStrategyEnvVar)
+            : preferredStrategyName;
+
         var resolvedName = string.IsNullOrWhiteSpace(requested)
             ? AppVerificationStrategyNames.Balanced
             : requested.Trim();

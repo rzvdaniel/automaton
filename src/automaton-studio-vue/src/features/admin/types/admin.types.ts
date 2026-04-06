@@ -163,6 +163,8 @@ export interface AiProvidersOperationalConfig {
   maxIterations: number
   maxConsecutiveFailures: number
   defaultMaxOutputTokens: number
+  appVerificationDefaultStrategy: string
+  appVerificationAllowUserOverride: boolean
   iterationLimits: IterationLimitsConfig
   historyCompaction: HistoryCompactionConfig
 }

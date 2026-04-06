@@ -38,6 +38,7 @@ public abstract class AiConversationControllerBase : BaseController
     /// iteration limit used for this conversation.
     /// </summary>
     protected ComplexityTier? _resolvedTier;
+    protected string? _effectiveVerificationStrategy;
 
     protected AiConversationControllerBase(
         IAutomatonMcpClient mcpClient,
@@ -103,6 +104,7 @@ public abstract class AiConversationControllerBase : BaseController
 
         Guid userId = Guid.Empty;
         Guid? sessionId = null;
+        _effectiveVerificationStrategy = null;
         var pendingUpdates = new ConcurrentQueue<ConversationUpdatedEvent>();
         EventHandler<ConversationUpdatedEvent>? eventHandler = null;
 
@@ -215,6 +217,8 @@ public abstract class AiConversationControllerBase : BaseController
             //    Usage counters (tokens/API calls) are persisted on failure/cancellation separately.
             if (result.IsSuccess)
             {
+                await EnsureStrategyMarkerMessageAsync(resolvedSessionId, userId);
+
                 // Save user message first (before AI responses to preserve chronological order)
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
                 {
@@ -240,6 +244,7 @@ public abstract class AiConversationControllerBase : BaseController
                     conversationId = result.ConversationId,
                     sessionId,
                     model,
+                    effectiveVerificationStrategy = _effectiveVerificationStrategy,
                     success = true
                 });
             }
@@ -489,6 +494,30 @@ public abstract class AiConversationControllerBase : BaseController
         await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
     }
 
+    private async Task EnsureStrategyMarkerMessageAsync(Guid sessionId, Guid userId)
+    {
+        if (string.IsNullOrWhiteSpace(_effectiveVerificationStrategy))
+            return;
+
+        const string prefix = "Verification strategy: ";
+        var existingMessages = await _chatHistoryService.GetMessagesAsync(sessionId, userId);
+        var hasMarker = existingMessages.Any(m =>
+            m.Role.Equals("system", StringComparison.OrdinalIgnoreCase) &&
+            m.Content.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+        if (hasMarker)
+            return;
+
+        await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+        {
+            SessionId = sessionId,
+            Role = "system",
+            Content = $"{prefix}{_effectiveVerificationStrategy}",
+            MessageType = ChatMessageType.System,
+            Metadata = "{}"
+        }, userId);
+    }
+
     // ── SSE writing ───────────────────────────────────────────────────────
 
     private async Task WriteConversationEvent(ConversationUpdatedEvent update)
@@ -501,7 +530,8 @@ public abstract class AiConversationControllerBase : BaseController
                 messages = update.Messages,
                 toolCalls = update.ToolCalls,
                 toolResults = update.ToolResults,
-                timestamp = update.Timestamp
+                timestamp = update.Timestamp,
+                effectiveVerificationStrategy = _effectiveVerificationStrategy
             });
         }
         catch (Exception ex)

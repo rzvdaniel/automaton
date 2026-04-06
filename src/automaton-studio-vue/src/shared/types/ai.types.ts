@@ -100,12 +100,14 @@ export interface SseConversationUpdate {
   toolCalls: ToolCall[]
   toolResults: ToolResult[]
   timestamp: string
+  effectiveVerificationStrategy?: string
 }
 
 export interface SseDoneEvent {
   conversationId: string
   sessionId?: string
   model?: string
+  effectiveVerificationStrategy?: string
   success: boolean
 }
 
@@ -248,6 +250,7 @@ export interface ChatSession {
   effectiveInputTokens: number
   cacheHitRate: number
   cacheHitPercent: number
+  effectiveVerificationStrategy?: string
 }
 
 export interface PagedResult<T> {

@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Automaton.Mcp.SystemPrompts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
@@ -29,6 +30,7 @@ public class UserSettingsService
         public const string DefaultPlanningModel = "ai.defaultPlanningModel";
         public const string DefaultPlanningProvider = "ai.defaultPlanningProvider";
         public const string ShowAiDebugDetails = "ai.showDebugDetails";
+        public const string AppVerificationStrategy = "ai.appVerificationStrategy";
     }
 
     // Default values
@@ -195,6 +197,7 @@ public class UserSettingsService
         var defaultPlanningModel = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningModel, null);
         var defaultPlanningProvider = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningProvider, null);
         var showAiDebugDetails = await GetSettingAsync(userId, Keys.ShowAiDebugDetails, false);
+        var appVerificationStrategy = await GetSettingAsync<string?>(userId, Keys.AppVerificationStrategy, null);
 
         return new UserSettingsDto
         {
@@ -204,7 +207,8 @@ public class UserSettingsService
             DefaultAiProvider = defaultAiProvider,
             DefaultPlanningModel = defaultPlanningModel,
             DefaultPlanningProvider = defaultPlanningProvider,
-            ShowAiDebugDetails = showAiDebugDetails
+            ShowAiDebugDetails = showAiDebugDetails,
+            AppVerificationStrategy = NormalizeVerificationStrategy(appVerificationStrategy)
         };
     }
 
@@ -246,6 +250,12 @@ public class UserSettingsService
         if (request.HasShowAiDebugDetails && request.ShowAiDebugDetails.HasValue)
             await SetSettingAsync(userId, Keys.ShowAiDebugDetails, request.ShowAiDebugDetails.Value);
 
+        if (request.HasAppVerificationStrategy)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.AppVerificationStrategy,
+                NormalizeVerificationStrategy(request.AppVerificationStrategy));
+
         return await GetAllSettingsAsync(userId);
     }
 
@@ -261,6 +271,24 @@ public class UserSettingsService
         _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningModel));
         _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningProvider));
         _cache.Remove(GetCacheKey(userId, Keys.ShowAiDebugDetails));
+        _cache.Remove(GetCacheKey(userId, Keys.AppVerificationStrategy));
+    }
+
+    private static string? NormalizeVerificationStrategy(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (value.Equals(AppVerificationStrategyNames.Continuous, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.Continuous;
+
+        if (value.Equals(AppVerificationStrategyNames.FinalGate, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.FinalGate;
+
+        if (value.Equals(AppVerificationStrategyNames.Balanced, StringComparison.OrdinalIgnoreCase))
+            return AppVerificationStrategyNames.Balanced;
+
+        return null;
     }
 
     private static string GetCacheKey(Guid userId, string key) => $"user_settings:{userId}:{key}";

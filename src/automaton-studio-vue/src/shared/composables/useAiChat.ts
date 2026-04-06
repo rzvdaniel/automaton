@@ -490,6 +490,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             activeSession.value.id = data.sessionId
           }
 
+          if (data.effectiveVerificationStrategy && activeSession.value) {
+            activeSession.value.effectiveVerificationStrategy = data.effectiveVerificationStrategy
+          }
+
           // Mark all streaming messages as complete and stamp the actual model used.
           // (data.model comes from the backend — may differ from selectedModel due to plan mode override, token budget, etc.)
           // IMPORTANT: only stamp messages that were actively streaming — NOT old history messages
@@ -532,6 +536,10 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
    * Handle conversation update from SSE stream
    */
   function handleConversationUpdate(update: SseConversationUpdate) {
+    if (update.effectiveVerificationStrategy && activeSession.value) {
+      activeSession.value.effectiveVerificationStrategy = update.effectiveVerificationStrategy
+    }
+
     // Process new messages
     if (update.messages && update.messages.length > 0) {
       for (const message of update.messages) {

@@ -29,6 +29,8 @@ public class UpdateOrganizationRequest
     public string? RequireEmailDomain { get; set; }
     public string? LogoUrl { get; set; }
     public string? PrimaryColor { get; set; }
+    public string? AppVerificationDefaultStrategy { get; set; }
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
 }
 
 /// <summary>
@@ -52,6 +54,8 @@ public class OrganizationDto
     public int MemberCount { get; set; }
     public int ProjectCount { get; set; }
     public OrganizationRole? CurrentUserRole { get; set; }
+    public string? AppVerificationDefaultStrategy { get; set; }
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
 }
 
 /// <summary>

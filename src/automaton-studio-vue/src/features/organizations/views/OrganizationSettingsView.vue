@@ -8,6 +8,8 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
+import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import type { OrganizationDto, UpdateOrganizationRequest } from '../types'
 import { OrganizationRole } from '../types'
 
@@ -32,6 +34,8 @@ const settingsForm = ref<UpdateOrganizationRequest>({
   requireEmailDomain: '',
   logoUrl: '',
   primaryColor: '',
+  appVerificationDefaultStrategy: undefined,
+  appVerificationAllowUserOverride: true,
 })
 
 // Load organization on mount
@@ -65,6 +69,8 @@ async function loadOrganization() {
         requireEmailDomain: organization.value.requireEmailDomain || '',
         logoUrl: organization.value.logoUrl || '',
         primaryColor: organization.value.primaryColor || '',
+        appVerificationDefaultStrategy: organization.value.appVerificationDefaultStrategy || undefined,
+        appVerificationAllowUserOverride: organization.value.appVerificationAllowUserOverride,
       }
     }
   } catch (error) {
@@ -214,6 +220,47 @@ function navigateBack() {
                 placeholder="#1976D2"
               />
               <small class="text-muted">Hex color code for branding (e.g., #1976D2)</small>
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <Card class="mt-3">
+        <template #title>AI Verification Policy</template>
+        <template #content>
+          <div class="flex flex-column gap-3">
+            <div class="flex flex-column gap-2">
+              <label for="org-verification-strategy" class="font-semibold">Default Strategy</label>
+              <Select
+                id="org-verification-strategy"
+                v-model="settingsForm.appVerificationDefaultStrategy"
+                :options="[
+                  { label: 'Use Global Default', value: undefined },
+                  { label: 'Balanced', value: 'balanced' },
+                  { label: 'Continuous', value: 'continuous' },
+                  { label: 'Final Gate', value: 'final-gate' },
+                ]"
+                option-label="label"
+                option-value="value"
+                class="w-full"
+              />
+              <small class="text-muted">Used for apps inside this organization unless user override is allowed and set.</small>
+            </div>
+
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+              <div>
+                <div class="font-semibold">Allow User Override</div>
+                <div class="text-muted text-sm">Allow members to choose a personal verification strategy in their settings.</div>
+              </div>
+              <SelectButton
+                v-model="settingsForm.appVerificationAllowUserOverride"
+                :options="[
+                  { label: 'Disabled', value: false },
+                  { label: 'Enabled', value: true },
+                ]"
+                option-label="label"
+                option-value="value"
+              />
             </div>
           </div>
         </template>

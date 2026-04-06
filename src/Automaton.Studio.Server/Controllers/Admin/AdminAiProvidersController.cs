@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
+using Automaton.Mcp.SystemPrompts;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -692,6 +693,8 @@ public class AdminAiProvidersController : ControllerBase
             MaxIterations                  = request.MaxIterations,
             MaxConsecutiveFailures         = request.MaxConsecutiveFailures,
             DefaultMaxOutputTokens         = request.DefaultMaxOutputTokens,
+            AppVerificationDefaultStrategy = request.AppVerificationDefaultStrategy,
+            AppVerificationAllowUserOverride = request.AppVerificationAllowUserOverride,
             IterationLimits = new()
             {
                 Simple     = request.IterationLimits.Simple,
@@ -722,6 +725,8 @@ public class AdminAiProvidersController : ControllerBase
         MaxIterations                  = s.MaxIterations,
         MaxConsecutiveFailures         = s.MaxConsecutiveFailures,
         DefaultMaxOutputTokens         = s.DefaultMaxOutputTokens,
+        AppVerificationDefaultStrategy = s.AppVerificationDefaultStrategy,
+        AppVerificationAllowUserOverride = s.AppVerificationAllowUserOverride,
         IterationLimits = new()
         {
             Simple     = s.IterationLimits.Simple,
@@ -918,6 +923,8 @@ public class AiProvidersOperationalConfigResponse
     public int MaxIterations                  { get; set; }
     public int MaxConsecutiveFailures         { get; set; }
     public int DefaultMaxOutputTokens         { get; set; }
+    public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
     public HistoryCompactionConfigResponse HistoryCompaction { get; set; } = new();
 }
@@ -928,6 +935,8 @@ public class SaveAiSettingsRequest
     public int MaxIterations                  { get; set; }
     public int MaxConsecutiveFailures         { get; set; }
     public int DefaultMaxOutputTokens         { get; set; }
+    public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
+    public bool AppVerificationAllowUserOverride { get; set; } = true;
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
     [Required]
     public HistoryCompactionConfigRequest HistoryCompaction { get; set; } = new();

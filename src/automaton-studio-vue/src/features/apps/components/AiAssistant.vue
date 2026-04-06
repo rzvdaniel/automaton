@@ -139,6 +139,19 @@ const getModelDisplayName = (modelId?: string | null) => {
   return modelDisplayNames.value[modelId] || modelId
 }
 
+const formatVerificationStrategy = (strategy?: string | null) => {
+  switch (strategy?.toLowerCase()) {
+    case 'continuous':
+      return 'Continuous'
+    case 'final-gate':
+      return 'Final Gate'
+    case 'balanced':
+      return 'Balanced'
+    default:
+      return strategy || ''
+  }
+}
+
 // Search — server-side, debounced
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 watch(sessionsSearchQuery, (value) => {
@@ -769,6 +782,10 @@ function handleKeyPress(event: KeyboardEvent) {
               @click="openRenameDialog(activeSession)"
             />
           </div>
+          <div v-if="activeSession?.effectiveVerificationStrategy" class="header-strategy-badge">
+            <i class="pi pi-shield"></i>
+            <span>Strategy: {{ formatVerificationStrategy(activeSession.effectiveVerificationStrategy) }}</span>
+          </div>
         </div>
       </div>
 
@@ -917,6 +934,12 @@ function handleKeyPress(event: KeyboardEvent) {
           <div class="metric-breakdown">
             <span class="text-xs text-color-secondary">
               {{ formatTokens(activeSession.totalInputTokens) }} in / {{ formatTokens(activeSession.totalOutputTokens) }} out
+            </span>
+          </div>
+          <div v-if="activeSession.effectiveVerificationStrategy" class="metric-separator"></div>
+          <div v-if="activeSession.effectiveVerificationStrategy" class="metric-breakdown">
+            <span class="text-xs text-color-secondary">
+              Strategy: {{ formatVerificationStrategy(activeSession.effectiveVerificationStrategy) }}
             </span>
           </div>
         </div>
@@ -1196,6 +1219,25 @@ function handleKeyPress(event: KeyboardEvent) {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
+}
+
+.header-strategy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--p-primary-300);
+  background-color: var(--p-primary-50);
+  color: var(--p-primary-900);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+:global(.app-dark) .header-strategy-badge {
+  border-color: color-mix(in srgb, var(--p-primary-400) 55%, transparent);
+  background-color: color-mix(in srgb, var(--p-primary-900) 25%, transparent);
+  color: var(--p-primary-100);
 }
 
 .model-select {

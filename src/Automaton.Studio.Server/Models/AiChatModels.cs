@@ -36,6 +36,12 @@ public class ChatSessionDto
     /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
     /// </summary>
     public string? ComplexityTier { get; set; }
+
+    /// <summary>
+    /// Effective verification strategy resolved for this session.
+    /// Values: continuous, balanced, final-gate.
+    /// </summary>
+    public string? EffectiveVerificationStrategy { get; set; }
 }
 
 /// <summary>

@@ -131,6 +131,8 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         MaxIterations                  = op.MaxIterations,
         MaxConsecutiveFailures         = op.MaxConsecutiveFailures,
         DefaultMaxOutputTokens         = op.DefaultMaxOutputTokens,
+        AppVerificationDefaultStrategy = op.AppVerificationDefaultStrategy,
+        AppVerificationAllowUserOverride = op.AppVerificationAllowUserOverride,
         IterationLimits                = op.IterationLimits,
         HistoryCompaction              = op.HistoryCompaction,
         // Infrastructure config — stays from appsettings, not editable via admin UI
@@ -147,6 +149,8 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         MaxIterations                  = cfg.MaxIterations,
         MaxConsecutiveFailures         = cfg.MaxConsecutiveFailures,
         DefaultMaxOutputTokens         = cfg.DefaultMaxOutputTokens,
+        AppVerificationDefaultStrategy = cfg.AppVerificationDefaultStrategy,
+        AppVerificationAllowUserOverride = cfg.AppVerificationAllowUserOverride,
         IterationLimits                = cfg.IterationLimits,
         HistoryCompaction              = cfg.HistoryCompaction
     };

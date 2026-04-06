@@ -48,6 +48,12 @@ public class UserSettingsDto
     /// This is display-only and does not change the AI payload sent by the app.
     /// </summary>
     public bool ShowAiDebugDetails { get; set; } = false;
+
+    /// <summary>
+    /// Optional user override for app verification strategy.
+    /// Allowed values: continuous, balanced, final-gate.
+    /// </summary>
+    public string? AppVerificationStrategy { get; set; }
 }
 
 /// <summary>
@@ -73,6 +79,7 @@ public class UpdateUserSettingsRequest
     private string? _defaultPlanningModel;
     private string? _defaultPlanningProvider;
     private bool? _showAiDebugDetails;
+    private string? _appVerificationStrategy;
 
     /// <summary>
     /// Whether DefaultAiModel was explicitly included in the request payload.
@@ -98,6 +105,11 @@ public class UpdateUserSettingsRequest
     /// Whether ShowAiDebugDetails was explicitly included in the request payload.
     /// </summary>
     public bool HasShowAiDebugDetails { get; private set; }
+
+    /// <summary>
+    /// Whether AppVerificationStrategy was explicitly included in the request payload.
+    /// </summary>
+    public bool HasAppVerificationStrategy { get; private set; }
 
     public string? DefaultAiModel
     {
@@ -146,6 +158,16 @@ public class UpdateUserSettingsRequest
         {
             HasShowAiDebugDetails = true;
             _showAiDebugDetails = value;
+        }
+    }
+
+    public string? AppVerificationStrategy
+    {
+        get => _appVerificationStrategy;
+        set
+        {
+            HasAppVerificationStrategy = true;
+            _appVerificationStrategy = value;
         }
     }
 }

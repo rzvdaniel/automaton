@@ -21,6 +21,15 @@ export interface UpdateEditorSettingsRequest {
  */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
+export const AppVerificationStrategy = {
+  Continuous: 'continuous',
+  Balanced: 'balanced',
+  FinalGate: 'final-gate',
+} as const
+
+export type AppVerificationStrategyType =
+  typeof AppVerificationStrategy[keyof typeof AppVerificationStrategy]
+
 /**
  * User appearance settings
  */
@@ -75,6 +84,9 @@ export interface UserSettingsDto {
 
   /** Enables verbose AI chat debug rendering in UI (display-only). */
   showAiDebugDetails?: boolean
+
+  /** Optional user override for app verification strategy. */
+  appVerificationStrategy?: AppVerificationStrategyType
 }
 
 /**
@@ -89,4 +101,5 @@ export interface UpdateUserSettingsRequest {
   defaultPlanningModel?: string
   defaultPlanningProvider?: string
   showAiDebugDetails?: boolean
+  appVerificationStrategy?: string
 }

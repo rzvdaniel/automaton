@@ -28,6 +28,7 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly AppVersionService _appVersionService;
     private readonly ISystemAiService _systemAiService;
     private readonly AppMemoryService _appMemoryService;
+    private readonly IAppVerificationStrategyResolver _appVerificationStrategyResolver;
 
     // Set during BuildSystemPromptAsync; used in OnAfterConversationAsync to detect stale instructions.
     private bool _hadInstructionBlock;
@@ -47,6 +48,7 @@ public class AiAppConversationController : AiConversationControllerBase
         AppVersionService appVersionService,
         ISystemAiService systemAiService,
         AppMemoryService appMemoryService,
+        IAppVerificationStrategyResolver appVerificationStrategyResolver,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, settingsService,
                rateLimitService, providerMetadataService, tokenBudgetService, promptBuilder, logger)
@@ -58,6 +60,7 @@ public class AiAppConversationController : AiConversationControllerBase
         _appVersionService    = appVersionService;
         _systemAiService      = systemAiService;
         _appMemoryService     = appMemoryService;
+        _appVerificationStrategyResolver = appVerificationStrategyResolver;
     }
 
     protected override ChatResourceType ResourceType => ChatResourceType.WebApp;
@@ -161,7 +164,12 @@ public class AiAppConversationController : AiConversationControllerBase
     {
         var tier       = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
         _resolvedTier  = tier;
-        var basePrompt = _promptBuilder.BuildSystemPrompt(tier);
+        var strategyName = await _appVerificationStrategyResolver.ResolveEffectiveStrategyAsync(
+            userId,
+            request.ResourceId,
+            CancellationToken.None);
+        _effectiveVerificationStrategy = strategyName;
+        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName);
 
         // Inject user instructions from .instructions/ folder (configurable token budget)
         string? instructionBlock = null;

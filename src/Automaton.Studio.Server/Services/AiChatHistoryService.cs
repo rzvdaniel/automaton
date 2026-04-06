@@ -9,6 +9,8 @@ namespace Automaton.Studio.Server.Services;
 
 public class AiChatHistoryService : IAiChatHistoryService
 {
+    private const string VerificationStrategyPrefix = "Verification strategy: ";
+
     private readonly ApplicationDbContext dataContext;
     private readonly ITokenBudgetService tokenBudgetService;
     private readonly Serilog.ILogger logger;
@@ -66,7 +68,12 @@ public class AiChatHistoryService : IAiChatHistoryService
                     EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
                     CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
                     CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0,
-                    ComplexityTier = s.ComplexityTier
+                    ComplexityTier = s.ComplexityTier,
+                    EffectiveVerificationStrategy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -116,7 +123,12 @@ public class AiChatHistoryService : IAiChatHistoryService
                     EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
                     CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
                     CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0,
-                    ComplexityTier = s.ComplexityTier
+                    ComplexityTier = s.ComplexityTier,
+                    EffectiveVerificationStrategy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault()
                 })
                 .FirstOrDefaultAsync();
 
@@ -235,7 +247,12 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalCacheCreationTokens = s.TotalCacheCreationTokens,
                     EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
                     CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
-                    CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0
+                    CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0,
+                    EffectiveVerificationStrategy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault()
                 })
                 .FirstOrDefaultAsync();
 
@@ -331,7 +348,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                 TotalCacheCreationTokens = 0,
                 EffectiveInputTokens = 0,
                 CacheHitRate = 0,
-                CacheHitPercent = 0
+                CacheHitPercent = 0,
+                EffectiveVerificationStrategy = null
             };
         }
         catch (Exception ex)

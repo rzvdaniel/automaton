@@ -162,6 +162,19 @@ function getTierSeverity(tier?: string): 'success' | 'info' | 'warn' | 'danger' 
   }
 }
 
+function getStrategyLabel(strategy?: string): string {
+  switch (strategy?.toLowerCase()) {
+    case 'continuous':
+      return 'Continuous'
+    case 'final-gate':
+      return 'Final Gate'
+    case 'balanced':
+      return 'Balanced'
+    default:
+      return strategy || ''
+  }
+}
+
 function getMessageTypeLabel(msg: ChatMessage): string {
   // For tool calls: show generic "Tool Call" — the tool name is rendered separately below
   if (msg.type === 'toolExecution') return 'Tool Call'
@@ -345,6 +358,12 @@ defineExpose({ reload: loadSessions })
               v-if="session.complexityTier"
               :value="session.complexityTier"
               :severity="getTierSeverity(session.complexityTier)"
+              class="session-tier-tag"
+            />
+            <Tag
+              v-if="session.effectiveVerificationStrategy"
+              :value="`Strategy: ${getStrategyLabel(session.effectiveVerificationStrategy)}`"
+              severity="secondary"
               class="session-tier-tag"
             />
             <Tag

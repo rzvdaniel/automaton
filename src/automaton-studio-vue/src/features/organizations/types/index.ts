@@ -32,6 +32,8 @@ export interface OrganizationDto {
   memberCount: number;
   projectCount: number;
   currentUserRole?: OrganizationRoleType;
+  appVerificationDefaultStrategy?: string;
+  appVerificationAllowUserOverride: boolean;
 }
 
 /**
@@ -103,6 +105,8 @@ export interface UpdateOrganizationRequest {
   requireEmailDomain?: string;
   logoUrl?: string;
   primaryColor?: string;
+  appVerificationDefaultStrategy?: string;
+  appVerificationAllowUserOverride: boolean;
 }
 
 /**
