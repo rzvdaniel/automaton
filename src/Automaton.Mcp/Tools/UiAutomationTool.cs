@@ -107,8 +107,27 @@ public class UiAutomationTool : IMcpTool
             {
                 Name = GetConsoleLogsName,
                 Capability = ToolCapability.Read,
-                Description = "Get captured browser console/runtime logs from the preview app. Use this after significant UI changes and before declaring completion; inspect returned logs for issues and fix them.",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{}}""")
+                                Description = "Get captured browser console/runtime logs from the preview app. Use this after significant UI changes and before declaring completion. Prefer focused calls like { minLevel: 'warn', limit: 120 }. If logSummary.hasBlockingIssues is true, fix those errors before declaring completion.",
+                                InputSchema = JsonDocument.Parse("""
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "minLevel": {
+                                                    "type": "string",
+                                                    "enum": ["debug", "info", "warn", "error"],
+                                                    "description": "Minimum log level to return. Default: warn"
+                                                },
+                                                "limit": {
+                                                    "type": "number",
+                                                    "description": "Maximum number of log rows to return (20-300). Default: 120"
+                                                },
+                                                "maxMessageChars": {
+                                                    "type": "number",
+                                                    "description": "Maximum characters per log message before truncation (80-600). Default: 260"
+                                                }
+                                            }
+                                        }
+                                        """)
             }
         };
 

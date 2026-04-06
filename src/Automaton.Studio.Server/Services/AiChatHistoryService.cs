@@ -63,6 +63,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalTokens = s.TotalTokens,
                     TotalCacheReadTokens = s.TotalCacheReadTokens,
                     TotalCacheCreationTokens = s.TotalCacheCreationTokens,
+                    EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
+                    CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
+                    CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0,
                     ComplexityTier = s.ComplexityTier
                 })
                 .ToListAsync();
@@ -110,6 +113,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalTokens = s.TotalTokens,
                     TotalCacheReadTokens = s.TotalCacheReadTokens,
                     TotalCacheCreationTokens = s.TotalCacheCreationTokens,
+                    EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
+                    CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
+                    CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0,
                     ComplexityTier = s.ComplexityTier
                 })
                 .FirstOrDefaultAsync();
@@ -226,7 +232,10 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalOutputTokens = s.TotalOutputTokens,
                     TotalTokens = s.TotalTokens,
                     TotalCacheReadTokens = s.TotalCacheReadTokens,
-                    TotalCacheCreationTokens = s.TotalCacheCreationTokens
+                    TotalCacheCreationTokens = s.TotalCacheCreationTokens,
+                    EffectiveInputTokens = Math.Max(0, s.TotalInputTokens - s.TotalCacheReadTokens),
+                    CacheHitRate = s.TotalInputTokens > 0 ? Math.Min(1.0, (double)s.TotalCacheReadTokens / s.TotalInputTokens) : 0,
+                    CacheHitPercent = s.TotalInputTokens > 0 ? Math.Min(100.0, ((double)s.TotalCacheReadTokens / s.TotalInputTokens) * 100.0) : 0
                 })
                 .FirstOrDefaultAsync();
 
@@ -317,7 +326,12 @@ public class AiChatHistoryService : IAiChatHistoryService
                 TotalPromptsSubmitted = 0,
                 TotalInputTokens = 0,
                 TotalOutputTokens = 0,
-                TotalTokens = 0
+                TotalTokens = 0,
+                TotalCacheReadTokens = 0,
+                TotalCacheCreationTokens = 0,
+                EffectiveInputTokens = 0,
+                CacheHitRate = 0,
+                CacheHitPercent = 0
             };
         }
         catch (Exception ex)
@@ -771,16 +785,21 @@ public class AiChatHistoryService : IAiChatHistoryService
             }
 
             // Aggregate stats across all sessions
+            var totalInputTokens = sessions.Sum(s => s.TotalInputTokens);
+            var totalCacheReadTokens = sessions.Sum(s => s.TotalCacheReadTokens);
             var stats = new AppChatStatsDto
             {
                 TotalPromptsSubmitted = sessions.Sum(s => s.TotalPromptsSubmitted),
                 TotalApiCalls = sessions.Sum(s => s.TotalApiCalls),
                 TotalTokens = sessions.Sum(s => s.TotalTokens),
-                InputTokens = sessions.Sum(s => s.TotalInputTokens),
+                InputTokens = totalInputTokens,
                 OutputTokens = sessions.Sum(s => s.TotalOutputTokens),
                 SessionCount = sessions.Count,
-                TotalCacheReadTokens = sessions.Sum(s => s.TotalCacheReadTokens),
-                TotalCacheCreationTokens = sessions.Sum(s => s.TotalCacheCreationTokens)
+                TotalCacheReadTokens = totalCacheReadTokens,
+                TotalCacheCreationTokens = sessions.Sum(s => s.TotalCacheCreationTokens),
+                EffectiveInputTokens = Math.Max(0, totalInputTokens - totalCacheReadTokens),
+                CacheHitRate = totalInputTokens > 0 ? Math.Min(1.0, (double)totalCacheReadTokens / totalInputTokens) : 0,
+                CacheHitPercent = totalInputTokens > 0 ? Math.Min(100.0, ((double)totalCacheReadTokens / totalInputTokens) * 100.0) : 0
             };
 
             return stats;
@@ -826,6 +845,9 @@ public class AiChatHistoryService : IAiChatHistoryService
                     TotalTokens = session.TotalTokens,
                     TotalCacheReadTokens = session.TotalCacheReadTokens,
                     TotalCacheCreationTokens = session.TotalCacheCreationTokens,
+                    EffectiveInputTokens = Math.Max(0, session.TotalInputTokens - session.TotalCacheReadTokens),
+                    CacheHitRate = session.TotalInputTokens > 0 ? Math.Min(1.0, (double)session.TotalCacheReadTokens / session.TotalInputTokens) : 0,
+                    CacheHitPercent = session.TotalInputTokens > 0 ? Math.Min(100.0, ((double)session.TotalCacheReadTokens / session.TotalInputTokens) * 100.0) : 0,
                     ComplexityTier = session.ComplexityTier
                 },
                 Messages = session.Messages

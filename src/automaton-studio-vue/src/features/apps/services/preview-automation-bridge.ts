@@ -19,6 +19,20 @@ export interface UiAutomationResult {
   details?: string
   value?: string
   logs?: Array<Pick<UiLogEntry, 'timestamp' | 'level' | 'source' | 'message'>>
+  logSummary?: {
+    totalLogs: number
+    returnedLogs: number
+    droppedLogs: number
+    levelCounts: {
+      debug: number
+      info: number
+      warn: number
+      error: number
+    }
+    hasBlockingIssues: boolean
+    blockingIssueCount: number
+    blockingIssues: Array<Pick<UiLogEntry, 'timestamp' | 'level' | 'source' | 'message'>>
+  }
   snapshot?: {
     title: string
     url: string
@@ -28,6 +42,71 @@ export interface UiAutomationResult {
 }
 
 const PREVIEW_AUTOMATION_TIMEOUT_MS = 12000
+
+const UI_LOG_LEVEL_RANK: Record<UiLogEntry['level'], number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+}
+
+function normalizeUiLogLevel(value: unknown): UiLogEntry['level'] {
+  if (typeof value !== 'string') {
+    return 'warn'
+  }
+
+  const normalized = value.toLowerCase()
+  if (normalized === 'debug' || normalized === 'info' || normalized === 'warn' || normalized === 'error') {
+    return normalized
+  }
+
+  return 'warn'
+}
+
+function buildUiLogSummary(logs: UiLogEntry[], returnedLogs: UiAutomationResult['logs']): UiAutomationResult['logSummary'] {
+  const levelCounts = {
+    debug: 0,
+    info: 0,
+    warn: 0,
+    error: 0,
+  }
+
+  for (const entry of logs) {
+    levelCounts[entry.level] += 1
+  }
+
+  const blockingIssues = logs
+    .filter((entry) => entry.level === 'error')
+    .slice(0, 20)
+    .map((entry) => ({
+      timestamp: entry.timestamp,
+      level: entry.level,
+      source: entry.source,
+      message: entry.message,
+    }))
+
+  const returnedCount = returnedLogs?.length ?? 0
+  const droppedLogs = Math.max(0, logs.length - returnedCount)
+
+  return {
+    totalLogs: logs.length,
+    returnedLogs: returnedCount,
+    droppedLogs,
+    levelCounts,
+    hasBlockingIssues: blockingIssues.length > 0,
+    blockingIssueCount: blockingIssues.length,
+    blockingIssues,
+  }
+}
+
+function truncateLogMessage(message: string, maxChars: number): string {
+  const normalized = message.trim().replace(/\s+/g, ' ')
+  if (normalized.length <= maxChars) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxChars - 1))}…`
+}
 
 function getPreviewIframe(): HTMLIFrameElement | null {
   return (
@@ -296,13 +375,34 @@ export async function executeUiAutomationAction(
         }
       }
       case UiAutomationAction.GetConsoleLogs: {
-        const logs = getUiLogs().slice(0, 500).map((entry) => ({
+        const requestedLimit = Number(args.limit ?? 120)
+        const limit = Math.min(300, Math.max(20, Number.isFinite(requestedLimit) ? requestedLimit : 120))
+        const minLevel = normalizeUiLogLevel(args.minLevel)
+        const maxMessageCharsRequested = Number(args.maxMessageChars ?? 260)
+        const maxMessageChars = Math.min(600, Math.max(80, Number.isFinite(maxMessageCharsRequested) ? maxMessageCharsRequested : 260))
+
+        const allLogs = getUiLogs()
+        const filteredLogs = allLogs.filter((entry) => UI_LOG_LEVEL_RANK[entry.level] >= UI_LOG_LEVEL_RANK[minLevel])
+
+        const logs = filteredLogs.slice(0, limit).map((entry) => ({
           timestamp: entry.timestamp,
           level: entry.level,
           source: entry.source,
-          message: entry.message,
+          message: truncateLogMessage(entry.message, maxMessageChars),
         }))
-        return { success: true, action, logs, details: `Collected ${logs.length} log entries` }
+
+        const summary = buildUiLogSummary(filteredLogs, logs)
+        const details = summary.hasBlockingIssues
+          ? `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. Blocking errors detected: ${summary.blockingIssueCount}.`
+          : `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. No blocking errors detected.`
+
+        return {
+          success: true,
+          action,
+          logs,
+          logSummary: summary,
+          details,
+        }
       }
       default:
         return { success: false, action, error: `Unsupported UI action: ${action}` }

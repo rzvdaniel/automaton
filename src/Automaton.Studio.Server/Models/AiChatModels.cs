@@ -28,6 +28,9 @@ public class ChatSessionDto
     public int TotalTokens { get; set; }
     public int TotalCacheReadTokens { get; set; }
     public int TotalCacheCreationTokens { get; set; }
+    public int EffectiveInputTokens { get; set; }
+    public double CacheHitRate { get; set; }
+    public double CacheHitPercent { get; set; }
 
     /// <summary>
     /// The detected complexity tier for this session (Simple, Medium, Large, Enterprise).
@@ -151,6 +154,9 @@ public class AppChatStatsDto
     public int SessionCount { get; set; }
     public int TotalCacheReadTokens { get; set; }
     public int TotalCacheCreationTokens { get; set; }
+    public int EffectiveInputTokens { get; set; }
+    public double CacheHitRate { get; set; }
+    public double CacheHitPercent { get; set; }
 }
 
 /// <summary>

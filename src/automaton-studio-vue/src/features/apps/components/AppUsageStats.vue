@@ -67,6 +67,10 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`
+}
+
 // Ordered by creation for chronological charts
 const orderedSessions = computed(() =>
   [...sessions.value].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
@@ -230,6 +234,24 @@ const hasData = computed(() => sessions.value.length > 0)
           <div class="stat-body">
             <div class="stat-value">{{ formatTokens(stats?.totalCacheReadTokens ?? 0) }}</div>
             <div class="stat-label">Cache Saved</div>
+          </div>
+        </div>
+        <div v-if="(stats?.totalCacheReadTokens ?? 0) > 0" class="stat-card stat-card--accent">
+          <div class="stat-icon">
+            <i class="pi pi-percentage"></i>
+          </div>
+          <div class="stat-body">
+            <div class="stat-value">{{ formatPercent(stats?.cacheHitPercent ?? 0) }}</div>
+            <div class="stat-label">Cache Hit</div>
+          </div>
+        </div>
+        <div v-if="(stats?.totalCacheReadTokens ?? 0) > 0" class="stat-card">
+          <div class="stat-icon">
+            <i class="pi pi-filter"></i>
+          </div>
+          <div class="stat-body">
+            <div class="stat-value">{{ formatTokens(stats?.effectiveInputTokens ?? 0) }}</div>
+            <div class="stat-label">Fresh Input</div>
           </div>
         </div>
       </div>

@@ -300,8 +300,10 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
   4) fix discovered defects
   5) rerun tests
 - Continue until all done criteria pass.
-- After every significant UI change, run `ui_get_console_logs` before moving on.
-- Before final completion, run `ui_get_console_logs` one last time and fix any issues found in logs.
+- For routine checks, call `ui_get_console_logs` with focused args to reduce noise/tokens: `{ "minLevel": "warn", "limit": 120 }`.
+- Before final completion, always call `ui_get_console_logs` with `{ "minLevel": "error", "limit": 120 }`.
+- Treat `logSummary.hasBlockingIssues === true` as not done: fix errors, then rerun checks.
+- Warnings are not automatic blockers, but fix actionable framework warnings when straightforward (e.g. obvious Three.js misuse/deprecation).
 - Do not claim completion while `[AI UI Test]` failures or unresolved console/runtime issues remain.
 - For `ui_navigate`, only use app-relative preview targets (e.g. `index.html`, `pages/level1.html`, `?mode=test`, `#section`).
 - Never navigate UI tests to API/server root URLs (e.g. `/`, `/swagger`, base server URL) because that exits the app preview context.
