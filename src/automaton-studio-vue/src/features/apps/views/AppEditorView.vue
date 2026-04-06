@@ -37,7 +37,7 @@ import { tokenStorage } from '@/shared/services/api/axios-instance'
 import type { PublishAppRequest } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
-import type { AppChatStats } from '@/shared/types/ai.types'
+import type { AppChatStats, ChatSession, ChatMessage } from '@/shared/types/ai.types'
 import {
   executeUiAutomationAction,
   UiAutomationAction,
@@ -109,6 +109,11 @@ const activeLogsTab = ref<'build' | 'runtime'>('build')
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 const buildLogsRef   = ref<{ reload: () => void } | null>(null)
+
+// Live AI chat mirror used by Logs -> AI Build Logs so it reflects in-progress streaming state.
+const liveBuildSession = ref<ChatSession | null>(null)
+const liveBuildMessages = ref<ChatMessage[]>([])
+const liveBuildIsBusy = ref(false)
 
 // Refresh runtime logs whenever the user navigates to that view
 watch([activeTab, activeLogsTab], ([tab, logsTab]) => {
@@ -716,6 +721,16 @@ async function handleVersionCreated() {
   buildLogsRef.value?.reload()
 }
 
+function handleLiveChatStateUpdated(payload: {
+  activeSession: ChatSession | null
+  messages: ChatMessage[]
+  isBusy: boolean
+}) {
+  liveBuildSession.value = payload.activeSession
+  liveBuildMessages.value = payload.messages
+  liveBuildIsBusy.value = payload.isBusy
+}
+
 // Handle version restored
 async function handleVersionRestored(versionNumber: number) {
   try {
@@ -1131,7 +1146,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
           </button>
         </div>
         <div class="logs-view-content">
-          <AppBuildLogs v-if="activeLogsTab === 'build'" ref="buildLogsRef" :app-id="resolvedAppId" />
+          <AppBuildLogs
+            v-if="activeLogsTab === 'build'"
+            ref="buildLogsRef"
+            :app-id="resolvedAppId"
+            :live-active-session="liveBuildSession"
+            :live-messages="liveBuildMessages"
+            :live-is-busy="liveBuildIsBusy"
+          />
           <AppRuntimeLogs v-else ref="runtimeLogsRef" :app-id="resolvedAppId" />
         </div>
       </div>
@@ -1265,6 +1287,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
                   @chat-message-sent="refreshChatStats"
                   @session-name-generated="handleSessionNameGenerated"
                   @initial-prompt-consumed="handleInitialPromptConsumed"
+                  @live-chat-state-updated="handleLiveChatStateUpdated"
                 />
                 <AppVersionHistory
                   v-show="rightPanelMode === 'versionHistory'"

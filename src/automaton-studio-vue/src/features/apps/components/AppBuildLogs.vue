@@ -4,7 +4,7 @@
  * Shows AI build session timeline for the current app.
  * Displays each session as a collapsible card with a tool-call timeline inside.
  */
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -16,6 +16,9 @@ import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 
 const props = defineProps<{
   appId: string
+  liveActiveSession?: ChatSession | null
+  liveMessages?: ChatMessage[]
+  liveIsBusy?: boolean
 }>()
 
 const sessions = ref<ChatSession[]>([])
@@ -190,6 +193,38 @@ function getMessageSeverity(msg: ChatMessage): 'success' | 'info' | 'warn' | 'da
 
 const expandedMessages = ref<Set<number>>(new Set())
 
+const displayedSessions = computed(() => {
+  const liveSession = props.liveActiveSession
+  if (!liveSession) {
+    return sessions.value
+  }
+
+  const existingIndex = sessions.value.findIndex((session) => session.id === liveSession.id)
+  if (existingIndex === -1) {
+    return [liveSession, ...sessions.value]
+  }
+
+  const merged = [...sessions.value]
+  merged[existingIndex] = {
+    ...merged[existingIndex],
+    ...liveSession,
+  }
+
+  return merged
+})
+
+function isLiveSession(sessionId: string): boolean {
+  return props.liveActiveSession?.id === sessionId
+}
+
+function getVisibleSessionMessages(sessionId: string): ChatMessage[] {
+  if (isLiveSession(sessionId) && (props.liveMessages?.length ?? 0) > 0) {
+    return props.liveMessages ?? []
+  }
+
+  return sessionMessages.value[sessionId] ?? []
+}
+
 function toggleMessageExpand(idx: number) {
   if (expandedMessages.value.has(idx)) {
     expandedMessages.value.delete(idx)
@@ -318,7 +353,7 @@ defineExpose({ reload: loadSessions })
 
     <div v-else class="sessions-list">
       <div
-        v-for="session in sessions"
+        v-for="session in displayedSessions"
         :key="session.id"
         class="session-card"
         :class="{ expanded: expandedSessionId === session.id }"
@@ -336,6 +371,12 @@ defineExpose({ reload: loadSessions })
               v-if="session.complexityTier"
               :value="session.complexityTier"
               :severity="getTierSeverity(session.complexityTier)"
+              class="session-tier-tag"
+            />
+            <Tag
+              v-if="isLiveSession(session.id) && props.liveIsBusy"
+              value="Live"
+              severity="info"
               class="session-tier-tag"
             />
           </div>
@@ -371,9 +412,9 @@ defineExpose({ reload: loadSessions })
             <ProgressSpinner style="width: 24px; height: 24px" />
           </div>
 
-          <div v-else-if="sessionMessages[session.id]" class="timeline">
+          <div v-else-if="getVisibleSessionMessages(session.id).length > 0" class="timeline">
             <template
-              v-for="item in getAnnotatedMessages(sessionMessages[session.id])"
+              v-for="item in getAnnotatedMessages(getVisibleSessionMessages(session.id))"
               :key="item.idx"
             >
               <!-- Message row -->
@@ -432,9 +473,16 @@ defineExpose({ reload: loadSessions })
               </div>
             </template>
 
-            <div v-if="getAnnotatedMessages(sessionMessages[session.id]).length === 0" class="text-color-secondary text-sm py-2">
+            <div v-if="getAnnotatedMessages(getVisibleSessionMessages(session.id)).length === 0" class="text-color-secondary text-sm py-2">
               No messages found in this session.
             </div>
+          </div>
+
+          <div
+            v-else-if="isLiveSession(session.id) && props.liveIsBusy"
+            class="text-color-secondary text-sm py-2"
+          >
+            Live generation in progress...
           </div>
         </div>
       </div>

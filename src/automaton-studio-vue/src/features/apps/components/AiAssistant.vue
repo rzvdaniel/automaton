@@ -57,6 +57,11 @@ const emit = defineEmits<{
   (e: 'chatMessageSent'): void
   (e: 'sessionNameGenerated', name: string): void
   (e: 'initialPromptConsumed'): void
+  (e: 'liveChatStateUpdated', payload: {
+    activeSession: ChatSession | null
+    messages: ChatMessage[]
+    isBusy: boolean
+  }): void
 }>()
 
 const { showAiDebugDetails } = useUserSettings()
@@ -359,6 +364,18 @@ watch(
     }
   },
   { deep: true }
+)
+
+watch(
+  [activeSession, messages, isBusy],
+  () => {
+    emit('liveChatStateUpdated', {
+      activeSession: activeSession.value ?? null,
+      messages: [...messages.value],
+      isBusy: isBusy.value,
+    })
+  },
+  { deep: true, immediate: true },
 )
 
 // Send message with optimistic UI
