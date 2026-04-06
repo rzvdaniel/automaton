@@ -304,6 +304,8 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
 - Before final completion, always call `ui_get_console_logs` with `{ "minLevel": "error", "limit": 120 }`.
 - Treat `logSummary.hasBlockingIssues === true` as not done: fix errors, then rerun checks.
 - Warnings are not automatic blockers, but fix actionable framework warnings when straightforward (e.g. obvious Three.js misuse/deprecation).
+- **Priority rule**: when blocking issues exist (`[AI UI Test] ... FAILED`, runtime errors, or `logSummary.hasBlockingIssues === true`), do not switch to documentation/cleanup tasks. Stay in fix loop until blockers are resolved.
+- **No detours**: while blockers exist, do NOT call `write_instruction`/`update_instruction` and do NOT edit `.instructions/design.md`, `.instructions/features.md`, or `.instructions/backend.md`.
 - Do not claim completion while `[AI UI Test]` failures or unresolved console/runtime issues remain.
 - For `ui_navigate`, only use app-relative preview targets (e.g. `index.html`, `pages/level1.html`, `?mode=test`, `#section`).
 - Never navigate UI tests to API/server root URLs (e.g. `/`, `/swagger`, base server URL) because that exits the app preview context.
@@ -525,6 +527,11 @@ They are your **only persistent memory between sessions** — if you don't write
 - Create additional files for large topics (e.g. `.instructions/state.md`, `.instructions/routing.md`)
 
 **IMPORTANT — do NOT read or edit instruction files during bug fixes or modifications.** Only write them at the very end of a session to record what changed. To diagnose a bug, read the actual source files (`index.html`, `js/*.js`, etc.) — never `design.md`, `backend.md`, or `features.md`.
+
+**Hard gate before writing any `.instructions/*` file:**
+- Latest `ui_get_console_logs` check (error-level) must report no blocking issues.
+- No unresolved `[AI UI Test] ... FAILED` entries may remain.
+- If either condition fails, return to code fixes immediately; defer documentation updates.
 
 **How:**
 1. **Small change** (one value, one line) → `update_instruction` with `oldText`/`newText`
