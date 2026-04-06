@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 
@@ -10,6 +12,8 @@ namespace Automaton.Mcp.SystemPrompts;
 /// </summary>
 public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 {
+    private const string VerificationStrategyEnvVar = "AUTOMATON_APP_VERIFICATION_STRATEGY";
+
     // Tiered prompts — base is always prepended to each tier
     private static readonly Lazy<string> BasePrompt = new(
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-base.md"),
@@ -36,10 +40,16 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
+    private readonly IReadOnlyDictionary<string, IAppVerificationPromptStrategy> _verificationStrategies;
 
-    public AppSystemPromptBuilder(IStepSystemPromptBuilder stepPromptBuilder)
+    public AppSystemPromptBuilder(
+        IStepSystemPromptBuilder stepPromptBuilder,
+        IEnumerable<IAppVerificationPromptStrategy> verificationStrategies)
     {
         _stepPromptBuilder = stepPromptBuilder;
+        _verificationStrategies = verificationStrategies
+            .GroupBy(strategy => strategy.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -56,7 +66,8 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             _                         => MediumPrompt.Value
         };
 
-        return $"{BasePrompt.Value}\n\n{tierPrompt}";
+        var verificationBlock = ResolveVerificationPromptBlock();
+        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{verificationBlock}";
     }
 
     /// <summary>
@@ -65,6 +76,30 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     /// </summary>
     public string BuildPlanningPhaseSystemPrompt(string baseSystemPrompt) =>
         $"{baseSystemPrompt}\n\n{PlanningPrompt.Value}";
+
+    private string ResolveVerificationPromptBlock()
+    {
+        var requested = Environment.GetEnvironmentVariable(VerificationStrategyEnvVar);
+        var resolvedName = string.IsNullOrWhiteSpace(requested)
+            ? AppVerificationStrategyNames.Balanced
+            : requested.Trim();
+
+        if (_verificationStrategies.TryGetValue(resolvedName, out var strategy))
+        {
+            return strategy.BuildPromptBlock();
+        }
+
+        if (_verificationStrategies.TryGetValue(AppVerificationStrategyNames.Balanced, out var balanced))
+        {
+            return balanced.BuildPromptBlock();
+        }
+
+        return
+            """
+## VERIFICATION STRATEGY
+- Use focused verification and ensure runtime errors are fixed before completion.
+""";
+    }
 
     private static string LoadEmbeddedResource(string resourceName)
     {

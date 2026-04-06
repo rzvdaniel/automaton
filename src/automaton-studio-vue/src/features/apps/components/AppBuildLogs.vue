@@ -238,17 +238,13 @@ function toggleMessageExpand(idx: number) {
 interface AnnotatedMessage {
   msg: ChatMessage
   idx: number
-  /** 1-based LLM API call number this message belongs to (undefined for user messages) */
-  apiCallNumber?: number
-  /** True when this message is the first in a new LLM API call — renders the divider */
-  isNewApiCall: boolean
+  /** 1-based tool-call sequence number for toolExecution messages. */
+  toolCallNumber?: number
 }
 
 /**
- * Annotates messages with which LLM iteration they belong to.
- *
- * Rule: a new API call starts when a toolExecution or final assistant text message
- * appears after either the user message (call #1) or a batch of tool results (calls #2+).
+ * Annotates messages with a stable, monotonic Tool Call # counter.
+ * This avoids ambiguous API-iteration inference in mixed live/persisted timelines.
  */
 function getAnnotatedMessages(messages: ChatMessage[]): AnnotatedMessage[] {
   const filtered = messages.filter(m =>
@@ -261,40 +257,18 @@ function getAnnotatedMessages(messages: ChatMessage[]): AnnotatedMessage[] {
   )
 
   const result: AnnotatedMessage[] = []
-  let apiCallNum = 0
-  let awaitingNextCall = true // true after user message or tool results batch
+  let toolCallNum = 0
 
   for (let i = 0; i < filtered.length; i++) {
     const msg = filtered[i]
 
-    if (msg.role === 'user') {
-      result.push({ msg, idx: i, isNewApiCall: false })
-      awaitingNextCall = true
+    if (msg.type === 'toolExecution') {
+      toolCallNum++
+      result.push({ msg, idx: i, toolCallNumber: toolCallNum })
       continue
     }
 
-    const isToolCall = msg.type === 'toolExecution'
-    const isToolResult = msg.type === 'codeSuccess' || msg.type === 'codeError'
-    const isAssistantText = msg.role === 'assistant' && (msg.type === 'text' || !msg.type)
-
-    let isNewApiCall = false
-
-    if (awaitingNextCall && (isToolCall || isAssistantText)) {
-      apiCallNum++
-      isNewApiCall = true
-      awaitingNextCall = false
-    }
-
-    // After the last tool result in a batch, the next call boundary is ready
-    if (isToolResult) {
-      // Peek: if next non-result message is a tool call or assistant text, mark boundary
-      const next = filtered[i + 1]
-      if (!next || next.type === 'toolExecution' || (next.role === 'assistant' && (next.type === 'text' || !next.type))) {
-        awaitingNextCall = true
-      }
-    }
-
-    result.push({ msg, idx: i, apiCallNumber: apiCallNum, isNewApiCall })
+    result.push({ msg, idx: i })
   }
 
   return result
@@ -432,8 +406,8 @@ defineExpose({ reload: loadSessions })
                       :severity="getMessageSeverity(item.msg)"
                       style="font-size: 0.7rem"
                     />
-                    <span v-if="item.apiCallNumber" class="api-call-badge">
-                      #{{ item.apiCallNumber }}
+                    <span v-if="item.toolCallNumber" class="api-call-badge">
+                      #{{ item.toolCallNumber }}
                     </span>
                     <span v-if="item.msg.totalTokens" class="token-count">
                       {{ formatTokens(item.msg.totalTokens) }} tokens

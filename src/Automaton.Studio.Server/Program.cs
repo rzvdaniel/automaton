@@ -331,6 +331,9 @@ services.AddScoped<AiProviderMetadataService>();
 
 // System Prompt Builders for AI Chat
 services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.ContinuousVerificationPromptStrategy>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.BalancedVerificationPromptStrategy>();
+services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.FinalGateVerificationPromptStrategy>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
 // MCP Tool Providers for AI Chat
