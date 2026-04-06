@@ -10,6 +10,7 @@ using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 
@@ -100,9 +101,14 @@ public abstract class AiConversationControllerBase : BaseController
         Response.Headers.Append("Connection", "keep-alive");
         Response.Headers.Append("X-Accel-Buffering", "no");
 
+        Guid userId = Guid.Empty;
+        Guid? sessionId = null;
+        var pendingUpdates = new ConcurrentQueue<ConversationUpdatedEvent>();
+        EventHandler<ConversationUpdatedEvent>? eventHandler = null;
+
         try
         {
-            var userId = GetUserId();
+            userId = GetUserId();
 
             // 1. Resolve provider/model/key
             var provider = request.Provider;
@@ -142,17 +148,18 @@ public abstract class AiConversationControllerBase : BaseController
                 userId, provider, model);
 
             // 2. Resolve session
-            var sessionId = await ResolveSessionAsync(request, userId, provider, model);
+            sessionId = await ResolveSessionAsync(request, userId, provider, model);
+            var resolvedSessionId = sessionId.Value;
 
             // 3. Load history
-            var history = await LoadConversationHistoryAsync(sessionId, userId);
+            var history = await LoadConversationHistoryAsync(resolvedSessionId, userId);
             var compactedHistory = ConversationHistoryCompactor.Compact(
                 history,
                 aiConfig.MaxConversationHistoryMessages,
                 aiConfig.HistoryCompaction);
 
             // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
-            var promptParts = await BuildSystemPromptAsync(request, userId, sessionId, compactedHistory);
+            var promptParts = await BuildSystemPromptAsync(request, userId, resolvedSessionId, compactedHistory);
             var mode = ConversationModeFactory.From(request.Mode);
             var modePromptSuffix = mode.SystemPromptSuffix;
             // Append mode suffix to the base prompt so it stays within the cached block
@@ -162,15 +169,13 @@ public abstract class AiConversationControllerBase : BaseController
             _mcpClient.SetToolProvider(GetToolProvider());
 
             // 6. Pre-conversation hook (e.g. create version snapshot)
-            var conversationToken = await OnBeforeConversationAsync(request, userId, sessionId);
+            var conversationToken = await OnBeforeConversationAsync(request, userId, resolvedSessionId);
 
             // 7. Subscribe to events and run conversation
-            var pendingUpdates = new List<ConversationUpdatedEvent>();
-
-            EventHandler<ConversationUpdatedEvent> eventHandler = (_, e) =>
+            eventHandler = (_, e) =>
             {
                 _ = WriteConversationEvent(e);
-                lock (pendingUpdates) { pendingUpdates.Add(e); }
+                pendingUpdates.Enqueue(e);
             };
             _mcpClient.ConversationUpdated += eventHandler;
 
@@ -204,16 +209,16 @@ public abstract class AiConversationControllerBase : BaseController
 
             var result = await _mcpClient.StartConversationAsync(conversationRequest, cancellationToken);
 
-            _mcpClient.ConversationUpdated -= eventHandler;
+            var updatesSnapshot = new List<ConversationUpdatedEvent>(pendingUpdates.ToArray());
 
-            // 8. Persist only on success — failed/cancelled attempts save nothing,
-            //    so orphaned user messages and partial AI responses don't pollute history.
+            // 8. Persist chat messages only on success so aborted attempts don't pollute history.
+            //    Usage counters (tokens/API calls) are persisted on failure/cancellation separately.
             if (result.IsSuccess)
             {
                 // Save user message first (before AI responses to preserve chronological order)
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
                 {
-                    SessionId = sessionId,
+                    SessionId = resolvedSessionId,
                     Role = "user",
                     Content = request.Message,
                     MessageType = ChatMessageType.Text,
@@ -221,11 +226,11 @@ public abstract class AiConversationControllerBase : BaseController
                 }, userId);
 
                 var savedToolCallIds = new HashSet<string>();
-                foreach (var update in pendingUpdates)
-                    await SaveConversationUpdateAsync(update, sessionId, userId, savedToolCallIds);
+                foreach (var update in updatesSnapshot)
+                    await SaveConversationUpdateAsync(update, resolvedSessionId, userId, savedToolCallIds);
 
                 if (result.ApiCallCount > 0)
-                    await _chatHistoryService.IncrementApiCallsAsync(sessionId, userId, result.ApiCallCount);
+                    await _chatHistoryService.IncrementApiCallsAsync(resolvedSessionId, userId, result.ApiCallCount);
 
                 // 8b. Post-conversation hook (e.g. update version summary)
                 await OnAfterConversationAsync(request, userId, result, conversationToken);
@@ -240,18 +245,34 @@ public abstract class AiConversationControllerBase : BaseController
             }
             else
             {
+                // Persist usage metrics even when generation fails so spent tokens are not lost.
+                await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
+
                 await WriteErrorEvent(result.ErrorMessage ?? "Conversation failed");
             }
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation("AI conversation stream cancelled");
+
+            // Client cancelled/closed stream — still persist consumed token usage.
+            await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
+
             await WriteEvent("cancelled", new { message = "Stream cancelled by client" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during AI conversation stream");
+
+            // Persist token usage for unexpected failures as best-effort accounting.
+            await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
+
             await WriteErrorEvent(ex.Message);
+        }
+        finally
+        {
+            if (eventHandler != null)
+                _mcpClient.ConversationUpdated -= eventHandler;
         }
     }
 
@@ -395,6 +416,77 @@ public abstract class AiConversationControllerBase : BaseController
         {
             _logger.LogError(ex, "Error saving conversation update for session {SessionId}", sessionId);
         }
+    }
+
+    private async Task FlushPendingTokenUsageAsync(
+        IReadOnlyList<ConversationUpdatedEvent> updates,
+        Guid sessionId,
+        Guid userId)
+    {
+        if (updates.Count == 0)
+            return;
+
+        var inputTokens = 0;
+        var outputTokens = 0;
+        var cacheReadTokens = 0;
+        var cacheCreationTokens = 0;
+        var hasAny = false;
+
+        foreach (var update in updates)
+        {
+            foreach (var message in update.Messages)
+            {
+                if (message.InputTokens.HasValue)
+                {
+                    inputTokens += message.InputTokens.Value;
+                    hasAny = true;
+                }
+
+                if (message.OutputTokens.HasValue)
+                {
+                    outputTokens += message.OutputTokens.Value;
+                    hasAny = true;
+                }
+
+                if (message.CacheReadTokens.HasValue)
+                {
+                    cacheReadTokens += message.CacheReadTokens.Value;
+                    hasAny = true;
+                }
+
+                if (message.CacheCreationTokens.HasValue)
+                {
+                    cacheCreationTokens += message.CacheCreationTokens.Value;
+                    hasAny = true;
+                }
+            }
+        }
+
+        if (!hasAny)
+            return;
+
+        await _chatHistoryService.AccumulateTokensAsync(
+            sessionId,
+            userId,
+            inputTokens > 0 ? inputTokens : null,
+            outputTokens > 0 ? outputTokens : null,
+            cacheReadTokens > 0 ? cacheReadTokens : null,
+            cacheCreationTokens > 0 ? cacheCreationTokens : null);
+    }
+
+    private async Task FlushPendingTokenUsageIfPossibleAsync(
+        Guid? sessionId,
+        Guid userId,
+        ConcurrentQueue<ConversationUpdatedEvent> pendingUpdates)
+    {
+        if (!sessionId.HasValue || userId == Guid.Empty)
+            return;
+
+        var updatesSnapshot = pendingUpdates.ToArray();
+        if (updatesSnapshot.Length == 0)
+            return;
+
+        await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
     }
 
     // ── SSE writing ───────────────────────────────────────────────────────
