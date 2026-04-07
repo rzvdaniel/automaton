@@ -133,9 +133,8 @@ public class AiAppConversationController : AiConversationControllerBase
         ExecuteStreamAsync(request, cancellationToken);
 
     /// <summary>
-    /// Logs a warning when the AI had instruction files injected (meaning the app is established)
-    /// but did not call write_instruction or update_instruction during the session.
-    /// This indicates instruction files may become stale over time.
+    /// Logs at debug level when instruction files were injected but not updated in this session.
+    /// Instruction updates are optional and should not block normal implementation workflows.
     /// </summary>
     private void WarnIfInstructionsNotUpdated(Guid appId, ConversationResult result)
     {
@@ -148,10 +147,9 @@ public class AiAppConversationController : AiConversationControllerBase
 
         if (!wroteInstructions)
         {
-            _logger.LogWarning(
+            _logger.LogDebug(
                 "App {AppId}: session completed without updating instruction files. " +
-                "Instructions may become stale if the app was modified. " +
-                "The AI should call write_instruction or update_instruction at end of every modifying session.",
+                "This is acceptable unless the user explicitly requested instruction updates.",
                 appId);
         }
     }

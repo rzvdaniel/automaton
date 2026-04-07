@@ -77,7 +77,8 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 
         var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
         var executionPolicyBlock = ResolveExecutionPolicyPromptBlock(executionPolicyName);
-        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{verificationBlock}\n\n{executionPolicyBlock}";
+        var precedenceGuardBlock = BuildPrecedenceGuardBlock();
+        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{precedenceGuardBlock}\n\n{verificationBlock}\n\n{executionPolicyBlock}";
     }
 
     /// <summary>
@@ -140,6 +141,13 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 - Use tools intentionally and avoid unnecessary tool churn.
 """;
     }
+
+    private static string BuildPrecedenceGuardBlock() =>
+        """
+## INSTRUCTION PRECEDENCE
+- Resolve conflicts by priority: explicit user request > verification strategy block > execution policy block > tier/base guidance.
+- Do not follow lower-priority guidance when it conflicts with higher-priority directives.
+""";
 
     private static string LoadEmbeddedResource(string resourceName)
     {

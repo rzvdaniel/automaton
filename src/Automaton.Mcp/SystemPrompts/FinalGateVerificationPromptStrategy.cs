@@ -13,6 +13,7 @@ public sealed class FinalGateVerificationPromptStrategy : IAppVerificationPrompt
 - Minimize verification during implementation unless a visible runtime defect appears.
 - Implement core behavior first, then run one consolidated verification pass near completion.
 - Final pass must include ui_get_console_logs at error-level and required ui_assert checks.
+- A ui_* response that only contains `clientExecutionRequired: true` is not a passed check; verification requires concrete runtime results.
 - If blocking errors appear, enter fix/retest loop until clean.
 """;
 }

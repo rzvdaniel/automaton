@@ -14,5 +14,6 @@ public sealed class BalancedVerificationPromptStrategy : IAppVerificationPromptS
 - Prefer one mid-run checkpoint after core functionality is wired, then a final verification gate.
 - Mid-run checkpoint: use focused checks (e.g., ui_wait_for/ui_assert + ui_get_console_logs warn+).
 - Final gate: run ui_get_console_logs with error-level; blocking errors must be fixed before completion.
+- Checks are valid only when ui_* tools return concrete runtime output; `clientExecutionRequired: true` alone is not a pass.
 """;
 }
