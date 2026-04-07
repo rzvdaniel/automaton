@@ -44,6 +44,17 @@ public class AiProvidersConfig
     public bool AppVerificationAllowUserOverride { get; set; } = true;
 
     /// <summary>
+    /// Default execution policy for app generation prompts.
+    /// Allowed values: default, lean-tools.
+    /// </summary>
+    public string AppExecutionDefaultPolicy { get; set; } = AppExecutionPolicyNames.Default;
+
+    /// <summary>
+    /// Whether users can override the default execution policy in personal settings.
+    /// </summary>
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
+
+    /// <summary>
     /// Per-tier iteration limits. Zero values fall back to the built-in defaults
     /// in <see cref="Automaton.Mcp.SystemPrompts.IterationLimits"/>.
     /// </summary>
@@ -80,6 +91,8 @@ public class AiProvidersOperationalConfig
     public int DefaultMaxOutputTokens         { get; set; } = 65536;
     public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
     public bool AppVerificationAllowUserOverride { get; set; } = true;
+    public string AppExecutionDefaultPolicy { get; set; } = AppExecutionPolicyNames.Default;
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
     public IterationLimitsConfig IterationLimits { get; set; } = new();
     public HistoryCompactionConfig HistoryCompaction { get; set; } = new();
 }

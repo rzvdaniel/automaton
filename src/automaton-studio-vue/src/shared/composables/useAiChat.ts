@@ -493,6 +493,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
           if (data.effectiveVerificationStrategy && activeSession.value) {
             activeSession.value.effectiveVerificationStrategy = data.effectiveVerificationStrategy
           }
+          if (data.effectiveExecutionPolicy && activeSession.value) {
+            activeSession.value.effectiveExecutionPolicy = data.effectiveExecutionPolicy
+          }
 
           // Mark all streaming messages as complete and stamp the actual model used.
           // (data.model comes from the backend — may differ from selectedModel due to plan mode override, token budget, etc.)
@@ -538,6 +541,9 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   function handleConversationUpdate(update: SseConversationUpdate) {
     if (update.effectiveVerificationStrategy && activeSession.value) {
       activeSession.value.effectiveVerificationStrategy = update.effectiveVerificationStrategy
+    }
+    if (update.effectiveExecutionPolicy && activeSession.value) {
+      activeSession.value.effectiveExecutionPolicy = update.effectiveExecutionPolicy
     }
 
     // Process new messages

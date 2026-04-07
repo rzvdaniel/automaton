@@ -168,8 +168,13 @@ public class AiAppConversationController : AiConversationControllerBase
             userId,
             request.ResourceId,
             CancellationToken.None);
+        var executionPolicyName = await _appVerificationStrategyResolver.ResolveEffectiveExecutionPolicyAsync(
+            userId,
+            request.ResourceId,
+            CancellationToken.None);
         _effectiveVerificationStrategy = strategyName;
-        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName);
+        _effectiveExecutionPolicy = executionPolicyName;
+        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName, executionPolicyName);
 
         // Inject user instructions from .instructions/ folder (configurable token budget)
         string? instructionBlock = null;

@@ -695,6 +695,8 @@ public class AdminAiProvidersController : ControllerBase
             DefaultMaxOutputTokens         = request.DefaultMaxOutputTokens,
             AppVerificationDefaultStrategy = request.AppVerificationDefaultStrategy,
             AppVerificationAllowUserOverride = request.AppVerificationAllowUserOverride,
+            AppExecutionDefaultPolicy = request.AppExecutionDefaultPolicy,
+            AppExecutionAllowUserOverride = request.AppExecutionAllowUserOverride,
             IterationLimits = new()
             {
                 Simple     = request.IterationLimits.Simple,
@@ -727,6 +729,8 @@ public class AdminAiProvidersController : ControllerBase
         DefaultMaxOutputTokens         = s.DefaultMaxOutputTokens,
         AppVerificationDefaultStrategy = s.AppVerificationDefaultStrategy,
         AppVerificationAllowUserOverride = s.AppVerificationAllowUserOverride,
+        AppExecutionDefaultPolicy = s.AppExecutionDefaultPolicy,
+        AppExecutionAllowUserOverride = s.AppExecutionAllowUserOverride,
         IterationLimits = new()
         {
             Simple     = s.IterationLimits.Simple,
@@ -925,6 +929,8 @@ public class AiProvidersOperationalConfigResponse
     public int DefaultMaxOutputTokens         { get; set; }
     public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
     public bool AppVerificationAllowUserOverride { get; set; } = true;
+    public string AppExecutionDefaultPolicy { get; set; } = AppExecutionPolicyNames.Default;
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
     public HistoryCompactionConfigResponse HistoryCompaction { get; set; } = new();
 }
@@ -937,6 +943,8 @@ public class SaveAiSettingsRequest
     public int DefaultMaxOutputTokens         { get; set; }
     public string AppVerificationDefaultStrategy { get; set; } = AppVerificationStrategyNames.Balanced;
     public bool AppVerificationAllowUserOverride { get; set; } = true;
+    public string AppExecutionDefaultPolicy { get; set; } = AppExecutionPolicyNames.Default;
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
     public IterationLimitsConfigResponse IterationLimits { get; set; } = new();
     [Required]
     public HistoryCompactionConfigRequest HistoryCompaction { get; set; } = new();

@@ -42,6 +42,12 @@ public class ChatSessionDto
     /// Values: continuous, balanced, final-gate.
     /// </summary>
     public string? EffectiveVerificationStrategy { get; set; }
+
+    /// <summary>
+    /// Effective execution policy resolved for this session.
+    /// Values: default, lean-tools.
+    /// </summary>
+    public string? EffectiveExecutionPolicy { get; set; }
 }
 
 /// <summary>

@@ -9,6 +9,7 @@ namespace Automaton.Studio.Server.Services;
 public interface IAppVerificationStrategyResolver
 {
     Task<string> ResolveEffectiveStrategyAsync(Guid userId, Guid? appId, CancellationToken cancellationToken = default);
+    Task<string> ResolveEffectiveExecutionPolicyAsync(Guid userId, Guid? appId, CancellationToken cancellationToken = default);
 }
 
 public static class AppVerificationStrategySettingKeys
@@ -18,6 +19,12 @@ public static class AppVerificationStrategySettingKeys
 
     public static string OrganizationAllowUserOverride(Guid organizationId) =>
         $"organization:{organizationId}:ai.verification.allowUserOverride";
+
+    public static string OrganizationDefaultExecutionPolicy(Guid organizationId) =>
+        $"organization:{organizationId}:ai.execution.defaultPolicy";
+
+    public static string OrganizationAllowUserExecutionOverride(Guid organizationId) =>
+        $"organization:{organizationId}:ai.execution.allowUserOverride";
 }
 
 public class AppVerificationStrategyResolver : IAppVerificationStrategyResolver
@@ -45,10 +52,13 @@ public class AppVerificationStrategyResolver : IAppVerificationStrategyResolver
         var globalDefault = NormalizeStrategy(globalSettings.AppVerificationDefaultStrategy);
         var globalAllowUserOverride = globalSettings.AppVerificationAllowUserOverride;
 
-        var userPreference = NormalizeStrategy(await _userSettingsService.GetSettingAsync<string?>(
+        var userPreferenceRaw = await _userSettingsService.GetSettingAsync<string?>(
             userId,
             UserSettingsService.Keys.AppVerificationStrategy,
-            null));
+            null);
+        var userPreference = string.IsNullOrWhiteSpace(userPreferenceRaw)
+            ? null
+            : NormalizeStrategy(userPreferenceRaw);
 
         // Non-organization users: user preference first (if allowed), then global default.
         if (!appId.HasValue)
@@ -80,6 +90,56 @@ public class AppVerificationStrategyResolver : IAppVerificationStrategyResolver
             ?? globalDefault;
 
         var orgAllowUserOverride = await GetOrganizationAllowUserOverrideAsync(organizationId.Value, cancellationToken)
+            ?? globalAllowUserOverride;
+
+        return ResolveWithOverride(orgDefault, orgAllowUserOverride, userPreference);
+    }
+
+    public async Task<string> ResolveEffectiveExecutionPolicyAsync(
+        Guid userId,
+        Guid? appId,
+        CancellationToken cancellationToken = default)
+    {
+        var globalSettings = await _aiProvidersSettingsService.GetOperationalSettingsAsync();
+        var globalDefault = NormalizeExecutionPolicy(globalSettings.AppExecutionDefaultPolicy);
+        var globalAllowUserOverride = globalSettings.AppExecutionAllowUserOverride;
+
+        var userPreferenceRaw = await _userSettingsService.GetSettingAsync<string?>(
+            userId,
+            UserSettingsService.Keys.AppExecutionPolicy,
+            null);
+        var userPreference = string.IsNullOrWhiteSpace(userPreferenceRaw)
+            ? null
+            : NormalizeExecutionPolicy(userPreferenceRaw);
+
+        if (!appId.HasValue)
+        {
+            return ResolveWithOverride(globalDefault, globalAllowUserOverride, userPreference);
+        }
+
+        var organizationId = await ResolveOrganizationIdAsync(appId.Value, cancellationToken);
+        if (!organizationId.HasValue)
+        {
+            return ResolveWithOverride(globalDefault, globalAllowUserOverride, userPreference);
+        }
+
+        var isMember = await _dbContext.OrganizationMembers
+            .AsNoTracking()
+            .AnyAsync(
+                m => m.OrganizationId == organizationId.Value &&
+                     m.UserId == userId &&
+                     m.IsActive,
+                cancellationToken);
+
+        if (!isMember)
+        {
+            return ResolveWithOverride(globalDefault, globalAllowUserOverride, userPreference);
+        }
+
+        var orgDefault = await GetOrganizationDefaultExecutionPolicyAsync(organizationId.Value, cancellationToken)
+            ?? globalDefault;
+
+        var orgAllowUserOverride = await GetOrganizationAllowUserExecutionOverrideAsync(organizationId.Value, cancellationToken)
             ?? globalAllowUserOverride;
 
         return ResolveWithOverride(orgDefault, orgAllowUserOverride, userPreference);
@@ -147,6 +207,50 @@ public class AppVerificationStrategyResolver : IAppVerificationStrategyResolver
         }
     }
 
+    private async Task<string?> GetOrganizationDefaultExecutionPolicyAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        var key = AppVerificationStrategySettingKeys.OrganizationDefaultExecutionPolicy(organizationId);
+        var value = await _dbContext.Settings
+            .AsNoTracking()
+            .Where(s => s.Key == key)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            return NormalizeExecutionPolicy(JsonSerializer.Deserialize<string>(value));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<bool?> GetOrganizationAllowUserExecutionOverrideAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        var key = AppVerificationStrategySettingKeys.OrganizationAllowUserExecutionOverride(organizationId);
+        var value = await _dbContext.Settings
+            .AsNoTracking()
+            .Where(s => s.Key == key)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<bool>(value);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string ResolveWithOverride(string @default, bool allowUserOverride, string? userPreference)
     {
         if (allowUserOverride && !string.IsNullOrWhiteSpace(userPreference))
@@ -169,5 +273,18 @@ public class AppVerificationStrategyResolver : IAppVerificationStrategyResolver
             return AppVerificationStrategyNames.FinalGate;
 
         return AppVerificationStrategyNames.Balanced;
+    }
+
+    private static string NormalizeExecutionPolicy(string? value)
+    {
+        var candidate = value?.Trim();
+
+        if (string.IsNullOrWhiteSpace(candidate))
+            return AppExecutionPolicyNames.Default;
+
+        if (candidate.Equals(AppExecutionPolicyNames.LeanTools, StringComparison.OrdinalIgnoreCase))
+            return AppExecutionPolicyNames.LeanTools;
+
+        return AppExecutionPolicyNames.Default;
     }
 }

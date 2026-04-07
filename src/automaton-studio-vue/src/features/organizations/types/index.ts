@@ -34,6 +34,8 @@ export interface OrganizationDto {
   currentUserRole?: OrganizationRoleType;
   appVerificationDefaultStrategy?: string;
   appVerificationAllowUserOverride: boolean;
+  appExecutionDefaultPolicy?: string;
+  appExecutionAllowUserOverride: boolean;
 }
 
 /**
@@ -107,6 +109,8 @@ export interface UpdateOrganizationRequest {
   primaryColor?: string;
   appVerificationDefaultStrategy?: string;
   appVerificationAllowUserOverride: boolean;
+  appExecutionDefaultPolicy?: string;
+  appExecutionAllowUserOverride: boolean;
 }
 
 /**

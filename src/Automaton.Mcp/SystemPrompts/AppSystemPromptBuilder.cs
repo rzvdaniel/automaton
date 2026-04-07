@@ -13,6 +13,7 @@ namespace Automaton.Mcp.SystemPrompts;
 public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 {
     private const string VerificationStrategyEnvVar = "AUTOMATON_APP_VERIFICATION_STRATEGY";
+    private const string ExecutionPolicyEnvVar = "AUTOMATON_APP_EXECUTION_POLICY";
 
     // Tiered prompts — base is always prepended to each tier
     private static readonly Lazy<string> BasePrompt = new(
@@ -41,21 +42,29 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IReadOnlyDictionary<string, IAppVerificationPromptStrategy> _verificationStrategies;
+    private readonly IReadOnlyDictionary<string, IAppExecutionPolicyPromptStrategy> _executionPolicies;
 
     public AppSystemPromptBuilder(
         IStepSystemPromptBuilder stepPromptBuilder,
-        IEnumerable<IAppVerificationPromptStrategy> verificationStrategies)
+        IEnumerable<IAppVerificationPromptStrategy> verificationStrategies,
+        IEnumerable<IAppExecutionPolicyPromptStrategy> executionPolicies)
     {
         _stepPromptBuilder = stepPromptBuilder;
         _verificationStrategies = verificationStrategies
             .GroupBy(strategy => strategy.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        _executionPolicies = executionPolicies
+            .GroupBy(policy => policy.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Build a system prompt for the given complexity tier.
     /// </summary>
-    public string BuildSystemPrompt(ComplexityTier? tier = null, string? verificationStrategyName = null)
+    public string BuildSystemPrompt(
+        ComplexityTier? tier = null,
+        string? verificationStrategyName = null,
+        string? executionPolicyName = null)
     {
         var tierPrompt = tier switch
         {
@@ -67,7 +76,8 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         };
 
         var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
-        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{verificationBlock}";
+        var executionPolicyBlock = ResolveExecutionPolicyPromptBlock(executionPolicyName);
+        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{verificationBlock}\n\n{executionPolicyBlock}";
     }
 
     /// <summary>
@@ -101,6 +111,33 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             """
 ## VERIFICATION STRATEGY
 - Use focused verification and ensure runtime errors are fixed before completion.
+""";
+    }
+
+    private string ResolveExecutionPolicyPromptBlock(string? preferredPolicyName)
+    {
+        var requested = string.IsNullOrWhiteSpace(preferredPolicyName)
+            ? Environment.GetEnvironmentVariable(ExecutionPolicyEnvVar)
+            : preferredPolicyName;
+
+        var resolvedName = string.IsNullOrWhiteSpace(requested)
+            ? AppExecutionPolicyNames.Default
+            : requested.Trim();
+
+        if (_executionPolicies.TryGetValue(resolvedName, out var policy))
+        {
+            return policy.BuildPromptBlock();
+        }
+
+        if (_executionPolicies.TryGetValue(AppExecutionPolicyNames.Default, out var @default))
+        {
+            return @default.BuildPromptBlock();
+        }
+
+        return
+            """
+## EXECUTION POLICY
+- Use tools intentionally and avoid unnecessary tool churn.
 """;
     }
 

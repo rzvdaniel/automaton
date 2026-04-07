@@ -39,6 +39,7 @@ public abstract class AiConversationControllerBase : BaseController
     /// </summary>
     protected ComplexityTier? _resolvedTier;
     protected string? _effectiveVerificationStrategy;
+    protected string? _effectiveExecutionPolicy;
 
     protected AiConversationControllerBase(
         IAutomatonMcpClient mcpClient,
@@ -105,6 +106,7 @@ public abstract class AiConversationControllerBase : BaseController
         Guid userId = Guid.Empty;
         Guid? sessionId = null;
         _effectiveVerificationStrategy = null;
+        _effectiveExecutionPolicy = null;
         var pendingUpdates = new ConcurrentQueue<ConversationUpdatedEvent>();
         EventHandler<ConversationUpdatedEvent>? eventHandler = null;
 
@@ -217,7 +219,7 @@ public abstract class AiConversationControllerBase : BaseController
             //    Usage counters (tokens/API calls) are persisted on failure/cancellation separately.
             if (result.IsSuccess)
             {
-                await EnsureStrategyMarkerMessageAsync(resolvedSessionId, userId);
+                await EnsurePolicyMarkerMessagesAsync(resolvedSessionId, userId);
 
                 // Save user message first (before AI responses to preserve chronological order)
                 await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
@@ -245,6 +247,7 @@ public abstract class AiConversationControllerBase : BaseController
                     sessionId,
                     model,
                     effectiveVerificationStrategy = _effectiveVerificationStrategy,
+                    effectiveExecutionPolicy = _effectiveExecutionPolicy,
                     success = true
                 });
             }
@@ -494,13 +497,35 @@ public abstract class AiConversationControllerBase : BaseController
         await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
     }
 
-    private async Task EnsureStrategyMarkerMessageAsync(Guid sessionId, Guid userId)
+    private async Task EnsurePolicyMarkerMessagesAsync(Guid sessionId, Guid userId)
     {
-        if (string.IsNullOrWhiteSpace(_effectiveVerificationStrategy))
+        var existingMessages = await _chatHistoryService.GetMessagesAsync(sessionId, userId);
+
+        await EnsureSinglePolicyMarkerMessageAsync(
+            sessionId,
+            userId,
+            existingMessages,
+            "Verification strategy: ",
+            _effectiveVerificationStrategy);
+
+        await EnsureSinglePolicyMarkerMessageAsync(
+            sessionId,
+            userId,
+            existingMessages,
+            "Execution policy: ",
+            _effectiveExecutionPolicy);
+    }
+
+    private async Task EnsureSinglePolicyMarkerMessageAsync(
+        Guid sessionId,
+        Guid userId,
+        IReadOnlyList<ChatMessageDto> existingMessages,
+        string prefix,
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
             return;
 
-        const string prefix = "Verification strategy: ";
-        var existingMessages = await _chatHistoryService.GetMessagesAsync(sessionId, userId);
         var hasMarker = existingMessages.Any(m =>
             m.Role.Equals("system", StringComparison.OrdinalIgnoreCase) &&
             m.Content.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
@@ -512,7 +537,7 @@ public abstract class AiConversationControllerBase : BaseController
         {
             SessionId = sessionId,
             Role = "system",
-            Content = $"{prefix}{_effectiveVerificationStrategy}",
+            Content = $"{prefix}{value}",
             MessageType = ChatMessageType.System,
             Metadata = "{}"
         }, userId);
@@ -531,7 +556,8 @@ public abstract class AiConversationControllerBase : BaseController
                 toolCalls = update.ToolCalls,
                 toolResults = update.ToolResults,
                 timestamp = update.Timestamp,
-                effectiveVerificationStrategy = _effectiveVerificationStrategy
+                effectiveVerificationStrategy = _effectiveVerificationStrategy,
+                effectiveExecutionPolicy = _effectiveExecutionPolicy
             });
         }
         catch (Exception ex)

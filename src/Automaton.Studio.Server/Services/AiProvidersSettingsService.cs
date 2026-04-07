@@ -133,6 +133,8 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         DefaultMaxOutputTokens         = op.DefaultMaxOutputTokens,
         AppVerificationDefaultStrategy = op.AppVerificationDefaultStrategy,
         AppVerificationAllowUserOverride = op.AppVerificationAllowUserOverride,
+        AppExecutionDefaultPolicy = op.AppExecutionDefaultPolicy,
+        AppExecutionAllowUserOverride = op.AppExecutionAllowUserOverride,
         IterationLimits                = op.IterationLimits,
         HistoryCompaction              = op.HistoryCompaction,
         // Infrastructure config — stays from appsettings, not editable via admin UI
@@ -151,6 +153,8 @@ public class AiProvidersSettingsService : IAiProvidersSettingsService
         DefaultMaxOutputTokens         = cfg.DefaultMaxOutputTokens,
         AppVerificationDefaultStrategy = cfg.AppVerificationDefaultStrategy,
         AppVerificationAllowUserOverride = cfg.AppVerificationAllowUserOverride,
+        AppExecutionDefaultPolicy = cfg.AppExecutionDefaultPolicy,
+        AppExecutionAllowUserOverride = cfg.AppExecutionAllowUserOverride,
         IterationLimits                = cfg.IterationLimits,
         HistoryCompaction              = cfg.HistoryCompaction
     };

@@ -10,6 +10,7 @@ namespace Automaton.Studio.Server.Services;
 public class AiChatHistoryService : IAiChatHistoryService
 {
     private const string VerificationStrategyPrefix = "Verification strategy: ";
+    private const string ExecutionPolicyPrefix = "Execution policy: ";
 
     private readonly ApplicationDbContext dataContext;
     private readonly ITokenBudgetService tokenBudgetService;
@@ -73,6 +74,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                         .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
                         .OrderBy(m => m.CreatedAt)
                         .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault(),
+                    EffectiveExecutionPolicy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(ExecutionPolicyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(ExecutionPolicyPrefix.Length))
                         .FirstOrDefault()
                 })
                 .ToListAsync();
@@ -128,6 +134,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                         .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
                         .OrderBy(m => m.CreatedAt)
                         .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault(),
+                    EffectiveExecutionPolicy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(ExecutionPolicyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(ExecutionPolicyPrefix.Length))
                         .FirstOrDefault()
                 })
                 .FirstOrDefaultAsync();
@@ -252,6 +263,11 @@ public class AiChatHistoryService : IAiChatHistoryService
                         .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
                         .OrderBy(m => m.CreatedAt)
                         .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault(),
+                    EffectiveExecutionPolicy = s.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(ExecutionPolicyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(ExecutionPolicyPrefix.Length))
                         .FirstOrDefault()
                 })
                 .FirstOrDefaultAsync();
@@ -349,7 +365,8 @@ public class AiChatHistoryService : IAiChatHistoryService
                 EffectiveInputTokens = 0,
                 CacheHitRate = 0,
                 CacheHitPercent = 0,
-                EffectiveVerificationStrategy = null
+                EffectiveVerificationStrategy = null,
+                EffectiveExecutionPolicy = null
             };
         }
         catch (Exception ex)
@@ -866,7 +883,17 @@ public class AiChatHistoryService : IAiChatHistoryService
                     EffectiveInputTokens = Math.Max(0, session.TotalInputTokens - session.TotalCacheReadTokens),
                     CacheHitRate = session.TotalInputTokens > 0 ? Math.Min(1.0, (double)session.TotalCacheReadTokens / session.TotalInputTokens) : 0,
                     CacheHitPercent = session.TotalInputTokens > 0 ? Math.Min(100.0, ((double)session.TotalCacheReadTokens / session.TotalInputTokens) * 100.0) : 0,
-                    ComplexityTier = session.ComplexityTier
+                    ComplexityTier = session.ComplexityTier,
+                    EffectiveVerificationStrategy = session.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(VerificationStrategyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(VerificationStrategyPrefix.Length))
+                        .FirstOrDefault(),
+                    EffectiveExecutionPolicy = session.Messages
+                        .Where(m => m.Role == "system" && m.MessageType == ChatMessageType.System && m.Content.StartsWith(ExecutionPolicyPrefix))
+                        .OrderBy(m => m.CreatedAt)
+                        .Select(m => m.Content.Substring(ExecutionPolicyPrefix.Length))
+                        .FirstOrDefault()
                 },
                 Messages = session.Messages
                     .OrderBy(m => m.CreatedAt)

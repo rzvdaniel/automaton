@@ -26,6 +26,12 @@ public class OrganizationService : IOrganizationService
 
         public static string AppVerificationAllowUserOverride(Guid organizationId) =>
             $"organization:{organizationId}:ai.verification.allowUserOverride";
+
+        public static string AppExecutionDefaultPolicy(Guid organizationId) =>
+            $"organization:{organizationId}:ai.execution.defaultPolicy";
+
+        public static string AppExecutionAllowUserOverride(Guid organizationId) =>
+            $"organization:{organizationId}:ai.execution.allowUserOverride";
     }
 
     private readonly ApplicationDbContext dbContext;
@@ -106,6 +112,7 @@ public class OrganizationService : IOrganizationService
         // Get user's role in the organization
         var userRole = await GetUserRoleAsync(organizationId, UserId, cancellationToken);
         var verificationSettings = await GetOrganizationVerificationPolicyAsync(organizationId, cancellationToken);
+        var executionSettings = await GetOrganizationExecutionPolicyAsync(organizationId, cancellationToken);
 
         return new OrganizationDto
         {
@@ -126,7 +133,9 @@ public class OrganizationService : IOrganizationService
             ProjectCount = organization.Projects.Count(p => p.IsActive),
             CurrentUserRole = userRole,
             AppVerificationDefaultStrategy = verificationSettings.DefaultStrategy,
-            AppVerificationAllowUserOverride = verificationSettings.AllowUserOverride
+            AppVerificationAllowUserOverride = verificationSettings.AllowUserOverride,
+            AppExecutionDefaultPolicy = executionSettings.DefaultPolicy,
+            AppExecutionAllowUserOverride = executionSettings.AllowUserOverride
         };
     }
 
@@ -238,6 +247,18 @@ public class OrganizationService : IOrganizationService
             "Organization-level toggle for allowing user verification strategy overrides",
             cancellationToken);
 
+        await UpsertJsonSettingAsync(
+            OrganizationSettingKeys.AppExecutionDefaultPolicy(organizationId),
+            NormalizeExecutionPolicy(request.AppExecutionDefaultPolicy),
+            "Organization-level default app execution policy",
+            cancellationToken);
+
+        await UpsertJsonSettingAsync(
+            OrganizationSettingKeys.AppExecutionAllowUserOverride(organizationId),
+            request.AppExecutionAllowUserOverride,
+            "Organization-level toggle for allowing user execution policy overrides",
+            cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.Information("User {UserId} updated organization {OrganizationId}", UserId, organizationId);
@@ -259,6 +280,23 @@ public class OrganizationService : IOrganizationService
 
         return (
             NormalizeVerificationStrategy(defaultStrategy),
+            allowUserOverride ?? true);
+    }
+
+    private async Task<(string? DefaultPolicy, bool AllowUserOverride)> GetOrganizationExecutionPolicyAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken)
+    {
+        var defaultPolicy = await ReadJsonSettingAsync<string>(
+            OrganizationSettingKeys.AppExecutionDefaultPolicy(organizationId),
+            cancellationToken);
+
+        var allowUserOverride = await ReadJsonSettingAsync<bool?>(
+            OrganizationSettingKeys.AppExecutionAllowUserOverride(organizationId),
+            cancellationToken);
+
+        return (
+            NormalizeExecutionPolicy(defaultPolicy),
             allowUserOverride ?? true);
     }
 
@@ -320,6 +358,20 @@ public class OrganizationService : IOrganizationService
 
         if (strategy.Equals(AppVerificationStrategyNames.Balanced, StringComparison.OrdinalIgnoreCase))
             return AppVerificationStrategyNames.Balanced;
+
+        return null;
+    }
+
+    private static string? NormalizeExecutionPolicy(string? policy)
+    {
+        if (string.IsNullOrWhiteSpace(policy))
+            return null;
+
+        if (policy.Equals(AppExecutionPolicyNames.LeanTools, StringComparison.OrdinalIgnoreCase))
+            return AppExecutionPolicyNames.LeanTools;
+
+        if (policy.Equals(AppExecutionPolicyNames.Default, StringComparison.OrdinalIgnoreCase))
+            return AppExecutionPolicyNames.Default;
 
         return null;
     }

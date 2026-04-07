@@ -19,7 +19,7 @@ import { authService } from '@/features/auth/services/auth.service'
 import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
 import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
-import { AppVerificationStrategy } from '../types/settings.types'
+import { AppExecutionPolicy, AppVerificationStrategy } from '../types/settings.types'
 import ApiKeysSection from '../components/ApiKeysSection.vue'
 
 const {
@@ -31,6 +31,7 @@ const {
   defaultPlanningProvider,
   showAiDebugDetails,
   appVerificationStrategy,
+  appExecutionPolicy,
   isLoading: settingsLoading,
   isSaving: settingsSaving,
   setTheme,
@@ -39,6 +40,7 @@ const {
   setDefaultPlanningModel,
   setShowAiDebugDetails,
   setAppVerificationStrategy,
+  setAppExecutionPolicy,
 } = useUserSettings()
 const authStore = useAuthStore()
 const router = useRouter()
@@ -88,10 +90,15 @@ const selectedDefaultAiModel = ref<string | undefined>(undefined)
 const selectedDefaultPlanningModel = ref<string | undefined>(undefined)
 const aiDebugDetailsEnabled = ref(false)
 const selectedAppVerificationStrategy = ref<string | undefined>(undefined)
+const selectedAppExecutionPolicy = ref<string | undefined>(undefined)
 const appVerificationStrategyOptions = [
   { label: 'Balanced', value: AppVerificationStrategy.Balanced },
   { label: 'Continuous', value: AppVerificationStrategy.Continuous },
   { label: 'Final Gate', value: AppVerificationStrategy.FinalGate },
+]
+const appExecutionPolicyOptions = [
+  { label: 'Default', value: AppExecutionPolicy.Default },
+  { label: 'Lean Tools', value: AppExecutionPolicy.LeanTools },
 ]
 
 onMounted(async () => {
@@ -110,6 +117,7 @@ onMounted(async () => {
   selectedDefaultPlanningModel.value = defaultPlanningModel.value
   aiDebugDetailsEnabled.value = showAiDebugDetails.value
   selectedAppVerificationStrategy.value = appVerificationStrategy.value
+  selectedAppExecutionPolicy.value = appExecutionPolicy.value
 
   // Load AI providers for model dropdowns
   aiModelsLoading.value = true
@@ -134,6 +142,7 @@ watch(defaultAiModel, (v) => { selectedDefaultAiModel.value = v })
 watch(defaultPlanningModel, (v) => { selectedDefaultPlanningModel.value = v })
 watch(showAiDebugDetails, (v) => { aiDebugDetailsEnabled.value = v })
 watch(appVerificationStrategy, (v) => { selectedAppVerificationStrategy.value = v })
+watch(appExecutionPolicy, (v) => { selectedAppExecutionPolicy.value = v })
 
 // Check username availability
 async function checkUsernameAvailability() {
@@ -261,6 +270,7 @@ async function saveAiPreferences() {
     await setDefaultPlanningModel(planModel, planProv)
     await setShowAiDebugDetails(aiDebugDetailsEnabled.value)
     await setAppVerificationStrategy(selectedAppVerificationStrategy.value)
+    await setAppExecutionPolicy(selectedAppExecutionPolicy.value)
 
     toast.add({
       severity: 'success',
@@ -715,6 +725,24 @@ const passwordLoading = computed(() => passwordSaving.value)
                 />
                 <small class="text-color-secondary">
                   Personal override for how aggressively the app builder verifies each step.
+                </small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="appExecutionPolicy" class="font-medium">App Execution Policy</label>
+                <Select
+                  id="appExecutionPolicy"
+                  v-model="selectedAppExecutionPolicy"
+                  :options="appExecutionPolicyOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Use organization/admin default"
+                  show-clear
+                  :disabled="settingsSaving"
+                  class="w-full"
+                />
+                <small class="text-color-secondary">
+                  Personal override for tool-call efficiency behavior during app generation.
                 </small>
               </div>
 

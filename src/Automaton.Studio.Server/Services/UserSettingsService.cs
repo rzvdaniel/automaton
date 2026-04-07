@@ -31,6 +31,7 @@ public class UserSettingsService
         public const string DefaultPlanningProvider = "ai.defaultPlanningProvider";
         public const string ShowAiDebugDetails = "ai.showDebugDetails";
         public const string AppVerificationStrategy = "ai.appVerificationStrategy";
+        public const string AppExecutionPolicy = "ai.appExecutionPolicy";
     }
 
     // Default values
@@ -198,6 +199,7 @@ public class UserSettingsService
         var defaultPlanningProvider = await GetSettingAsync<string?>(userId, Keys.DefaultPlanningProvider, null);
         var showAiDebugDetails = await GetSettingAsync(userId, Keys.ShowAiDebugDetails, false);
         var appVerificationStrategy = await GetSettingAsync<string?>(userId, Keys.AppVerificationStrategy, null);
+        var appExecutionPolicy = await GetSettingAsync<string?>(userId, Keys.AppExecutionPolicy, null);
 
         return new UserSettingsDto
         {
@@ -208,7 +210,8 @@ public class UserSettingsService
             DefaultPlanningModel = defaultPlanningModel,
             DefaultPlanningProvider = defaultPlanningProvider,
             ShowAiDebugDetails = showAiDebugDetails,
-            AppVerificationStrategy = NormalizeVerificationStrategy(appVerificationStrategy)
+            AppVerificationStrategy = NormalizeVerificationStrategy(appVerificationStrategy),
+            AppExecutionPolicy = NormalizeExecutionPolicy(appExecutionPolicy)
         };
     }
 
@@ -256,6 +259,12 @@ public class UserSettingsService
                 Keys.AppVerificationStrategy,
                 NormalizeVerificationStrategy(request.AppVerificationStrategy));
 
+        if (request.HasAppExecutionPolicy)
+            await SetSettingAsync<string?>(
+                userId,
+                Keys.AppExecutionPolicy,
+                NormalizeExecutionPolicy(request.AppExecutionPolicy));
+
         return await GetAllSettingsAsync(userId);
     }
 
@@ -272,6 +281,7 @@ public class UserSettingsService
         _cache.Remove(GetCacheKey(userId, Keys.DefaultPlanningProvider));
         _cache.Remove(GetCacheKey(userId, Keys.ShowAiDebugDetails));
         _cache.Remove(GetCacheKey(userId, Keys.AppVerificationStrategy));
+        _cache.Remove(GetCacheKey(userId, Keys.AppExecutionPolicy));
     }
 
     private static string? NormalizeVerificationStrategy(string? value)
@@ -287,6 +297,20 @@ public class UserSettingsService
 
         if (value.Equals(AppVerificationStrategyNames.Balanced, StringComparison.OrdinalIgnoreCase))
             return AppVerificationStrategyNames.Balanced;
+
+        return null;
+    }
+
+    private static string? NormalizeExecutionPolicy(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (value.Equals(AppExecutionPolicyNames.LeanTools, StringComparison.OrdinalIgnoreCase))
+            return AppExecutionPolicyNames.LeanTools;
+
+        if (value.Equals(AppExecutionPolicyNames.Default, StringComparison.OrdinalIgnoreCase))
+            return AppExecutionPolicyNames.Default;
 
         return null;
     }

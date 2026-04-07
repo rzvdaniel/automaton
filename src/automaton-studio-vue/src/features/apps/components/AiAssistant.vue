@@ -152,6 +152,17 @@ const formatVerificationStrategy = (strategy?: string | null) => {
   }
 }
 
+const formatExecutionPolicy = (policy?: string | null) => {
+  switch (policy?.toLowerCase()) {
+    case 'lean-tools':
+      return 'Lean Tools'
+    case 'default':
+      return 'Default'
+    default:
+      return policy || ''
+  }
+}
+
 // Search — server-side, debounced
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 watch(sessionsSearchQuery, (value) => {
@@ -782,9 +793,18 @@ function handleKeyPress(event: KeyboardEvent) {
               @click="openRenameDialog(activeSession)"
             />
           </div>
-          <div v-if="activeSession?.effectiveVerificationStrategy" class="header-strategy-badge">
+          <div
+            v-if="activeSession?.effectiveVerificationStrategy || activeSession?.effectiveExecutionPolicy"
+            class="header-strategy-badge"
+          >
             <i class="pi pi-shield"></i>
-            <span>Strategy: {{ formatVerificationStrategy(activeSession.effectiveVerificationStrategy) }}</span>
+            <span v-if="activeSession?.effectiveVerificationStrategy">
+              Strategy: {{ formatVerificationStrategy(activeSession.effectiveVerificationStrategy) }}
+            </span>
+            <span v-if="activeSession?.effectiveVerificationStrategy && activeSession?.effectiveExecutionPolicy" class="text-separator">|</span>
+            <span v-if="activeSession?.effectiveExecutionPolicy">
+              Policy: {{ formatExecutionPolicy(activeSession.effectiveExecutionPolicy) }}
+            </span>
           </div>
         </div>
       </div>
@@ -940,6 +960,12 @@ function handleKeyPress(event: KeyboardEvent) {
           <div v-if="activeSession.effectiveVerificationStrategy" class="metric-breakdown">
             <span class="text-xs text-color-secondary">
               Strategy: {{ formatVerificationStrategy(activeSession.effectiveVerificationStrategy) }}
+            </span>
+          </div>
+          <div v-if="activeSession.effectiveExecutionPolicy" class="metric-separator"></div>
+          <div v-if="activeSession.effectiveExecutionPolicy" class="metric-breakdown">
+            <span class="text-xs text-color-secondary">
+              Policy: {{ formatExecutionPolicy(activeSession.effectiveExecutionPolicy) }}
             </span>
           </div>
         </div>

@@ -36,6 +36,8 @@ const settingsForm = ref<UpdateOrganizationRequest>({
   primaryColor: '',
   appVerificationDefaultStrategy: undefined,
   appVerificationAllowUserOverride: true,
+  appExecutionDefaultPolicy: undefined,
+  appExecutionAllowUserOverride: true,
 })
 
 // Load organization on mount
@@ -71,6 +73,8 @@ async function loadOrganization() {
         primaryColor: organization.value.primaryColor || '',
         appVerificationDefaultStrategy: organization.value.appVerificationDefaultStrategy || undefined,
         appVerificationAllowUserOverride: organization.value.appVerificationAllowUserOverride,
+        appExecutionDefaultPolicy: organization.value.appExecutionDefaultPolicy || undefined,
+        appExecutionAllowUserOverride: organization.value.appExecutionAllowUserOverride,
       }
     }
   } catch (error) {
@@ -254,6 +258,46 @@ function navigateBack() {
               </div>
               <SelectButton
                 v-model="settingsForm.appVerificationAllowUserOverride"
+                :options="[
+                  { label: 'Disabled', value: false },
+                  { label: 'Enabled', value: true },
+                ]"
+                option-label="label"
+                option-value="value"
+              />
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <Card class="mt-3">
+        <template #title>AI Execution Policy</template>
+        <template #content>
+          <div class="flex flex-column gap-3">
+            <div class="flex flex-column gap-2">
+              <label for="org-execution-policy" class="font-semibold">Default Policy</label>
+              <Select
+                id="org-execution-policy"
+                v-model="settingsForm.appExecutionDefaultPolicy"
+                :options="[
+                  { label: 'Use Global Default', value: undefined },
+                  { label: 'Default', value: 'default' },
+                  { label: 'Lean Tools', value: 'lean-tools' },
+                ]"
+                option-label="label"
+                option-value="value"
+                class="w-full"
+              />
+              <small class="text-muted">Used for apps inside this organization unless user override is allowed and set.</small>
+            </div>
+
+            <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+              <div>
+                <div class="font-semibold">Allow User Override</div>
+                <div class="text-muted text-sm">Allow members to choose a personal execution policy in their settings.</div>
+              </div>
+              <SelectButton
+                v-model="settingsForm.appExecutionAllowUserOverride"
                 :options="[
                   { label: 'Disabled', value: false },
                   { label: 'Enabled', value: true },

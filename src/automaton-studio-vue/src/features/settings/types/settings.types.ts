@@ -30,6 +30,14 @@ export const AppVerificationStrategy = {
 export type AppVerificationStrategyType =
   typeof AppVerificationStrategy[keyof typeof AppVerificationStrategy]
 
+export const AppExecutionPolicy = {
+  Default: 'default',
+  LeanTools: 'lean-tools',
+} as const
+
+export type AppExecutionPolicyType =
+  typeof AppExecutionPolicy[keyof typeof AppExecutionPolicy]
+
 /**
  * User appearance settings
  */
@@ -87,6 +95,9 @@ export interface UserSettingsDto {
 
   /** Optional user override for app verification strategy. */
   appVerificationStrategy?: AppVerificationStrategyType
+
+  /** Optional user override for app execution policy. */
+  appExecutionPolicy?: AppExecutionPolicyType
 }
 
 /**
@@ -102,4 +113,5 @@ export interface UpdateUserSettingsRequest {
   defaultPlanningProvider?: string
   showAiDebugDetails?: boolean
   appVerificationStrategy?: string
+  appExecutionPolicy?: string
 }

@@ -175,6 +175,17 @@ function getStrategyLabel(strategy?: string): string {
   }
 }
 
+function getExecutionPolicyLabel(policy?: string): string {
+  switch (policy?.toLowerCase()) {
+    case 'lean-tools':
+      return 'Lean Tools'
+    case 'default':
+      return 'Default'
+    default:
+      return policy || ''
+  }
+}
+
 function getMessageTypeLabel(msg: ChatMessage): string {
   // For tool calls: show generic "Tool Call" — the tool name is rendered separately below
   if (msg.type === 'toolExecution') return 'Tool Call'
@@ -363,6 +374,12 @@ defineExpose({ reload: loadSessions })
             <Tag
               v-if="session.effectiveVerificationStrategy"
               :value="`Strategy: ${getStrategyLabel(session.effectiveVerificationStrategy)}`"
+              severity="secondary"
+              class="session-tier-tag"
+            />
+            <Tag
+              v-if="session.effectiveExecutionPolicy"
+              :value="`Policy: ${getExecutionPolicyLabel(session.effectiveExecutionPolicy)}`"
               severity="secondary"
               class="session-tier-tag"
             />

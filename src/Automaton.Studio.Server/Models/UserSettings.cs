@@ -54,6 +54,12 @@ public class UserSettingsDto
     /// Allowed values: continuous, balanced, final-gate.
     /// </summary>
     public string? AppVerificationStrategy { get; set; }
+
+    /// <summary>
+    /// Optional user override for app execution policy.
+    /// Allowed values: default, lean-tools.
+    /// </summary>
+    public string? AppExecutionPolicy { get; set; }
 }
 
 /// <summary>
@@ -80,6 +86,7 @@ public class UpdateUserSettingsRequest
     private string? _defaultPlanningProvider;
     private bool? _showAiDebugDetails;
     private string? _appVerificationStrategy;
+    private string? _appExecutionPolicy;
 
     /// <summary>
     /// Whether DefaultAiModel was explicitly included in the request payload.
@@ -110,6 +117,11 @@ public class UpdateUserSettingsRequest
     /// Whether AppVerificationStrategy was explicitly included in the request payload.
     /// </summary>
     public bool HasAppVerificationStrategy { get; private set; }
+
+    /// <summary>
+    /// Whether AppExecutionPolicy was explicitly included in the request payload.
+    /// </summary>
+    public bool HasAppExecutionPolicy { get; private set; }
 
     public string? DefaultAiModel
     {
@@ -168,6 +180,16 @@ public class UpdateUserSettingsRequest
         {
             HasAppVerificationStrategy = true;
             _appVerificationStrategy = value;
+        }
+    }
+
+    public string? AppExecutionPolicy
+    {
+        get => _appExecutionPolicy;
+        set
+        {
+            HasAppExecutionPolicy = true;
+            _appExecutionPolicy = value;
         }
     }
 }

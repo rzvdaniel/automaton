@@ -31,6 +31,8 @@ public class UpdateOrganizationRequest
     public string? PrimaryColor { get; set; }
     public string? AppVerificationDefaultStrategy { get; set; }
     public bool AppVerificationAllowUserOverride { get; set; } = true;
+    public string? AppExecutionDefaultPolicy { get; set; }
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
 }
 
 /// <summary>
@@ -56,6 +58,8 @@ public class OrganizationDto
     public OrganizationRole? CurrentUserRole { get; set; }
     public string? AppVerificationDefaultStrategy { get; set; }
     public bool AppVerificationAllowUserOverride { get; set; } = true;
+    public string? AppExecutionDefaultPolicy { get; set; }
+    public bool AppExecutionAllowUserOverride { get; set; } = true;
 }
 
 /// <summary>

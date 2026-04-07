@@ -22,6 +22,8 @@ const settings = ref<AiProvidersOperationalConfig>({
   defaultMaxOutputTokens: 65536,
   appVerificationDefaultStrategy: 'balanced',
   appVerificationAllowUserOverride: true,
+  appExecutionDefaultPolicy: 'default',
+  appExecutionAllowUserOverride: true,
   iterationLimits: {
     simple: 15,
     medium: 25,
@@ -243,6 +245,41 @@ async function saveSettings() {
                 </p>
                 <SelectButton
                   v-model="settings.appVerificationAllowUserOverride"
+                  :options="[
+                    { label: 'Disabled', value: false },
+                    { label: 'Enabled', value: true },
+                  ]"
+                  option-label="label"
+                  option-value="value"
+                />
+              </div>
+
+              <Divider />
+
+              <div class="field">
+                <label class="font-medium block mb-1">Default App Execution Policy</label>
+                <p class="text-color-secondary text-sm mb-2">
+                  Baseline tool-execution behavior for app generation.
+                </p>
+                <Select
+                  v-model="settings.appExecutionDefaultPolicy"
+                  :options="[
+                    { label: 'Default', value: 'default' },
+                    { label: 'Lean Tools', value: 'lean-tools' },
+                  ]"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                />
+              </div>
+
+              <div class="field">
+                <label class="font-medium block mb-1">Allow User Override (Execution Policy)</label>
+                <p class="text-color-secondary text-sm mb-2">
+                  If enabled, users can select a personal execution policy.
+                </p>
+                <SelectButton
+                  v-model="settings.appExecutionAllowUserOverride"
                   :options="[
                     { label: 'Disabled', value: false },
                     { label: 'Enabled', value: true },
