@@ -10,6 +10,7 @@ using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Services.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -144,6 +145,27 @@ public class AiAppConversationController : AiConversationControllerBase
 
         if (string.IsNullOrWhiteSpace(request.ResultJson))
             return BadRequest(new { message = "resultJson is required." });
+
+        bool? success = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(request.ResultJson);
+            if (doc.RootElement.TryGetProperty("success", out var successProp) &&
+                (successProp.ValueKind == JsonValueKind.True || successProp.ValueKind == JsonValueKind.False))
+            {
+                success = successProp.GetBoolean();
+            }
+        }
+        catch
+        {
+            // Temporary diagnostics only: payload might not be JSON in edge cases.
+        }
+
+        _logger.LogDebug(
+            "[TEMP ui-action-report] Ack received for toolCallId={ToolCallId}, payloadLength={PayloadLength}, success={Success}",
+            request.ToolCallId,
+            request.ResultJson.Length,
+            success);
 
         _uiAutomationActionAckService.SubmitResult(request.ToolCallId, request.ResultJson);
         return Ok(new { accepted = true });

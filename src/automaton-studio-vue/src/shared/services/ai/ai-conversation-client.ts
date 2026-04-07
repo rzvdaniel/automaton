@@ -242,6 +242,12 @@ export class AiConversationClient {
       throw new Error('No authentication token found')
     }
 
+    // TEMP diagnostics: helps verify ui-action-report ack loop during rollout.
+    console.debug('[TEMP ui-action-report] sending ack', {
+      toolCallId,
+      payloadLength: resultJson.length,
+    })
+
     const response = await fetch(`${this.baseUrl}/api/ai/app/conversation/ui-action-report`, {
       method: 'POST',
       headers: {
@@ -257,8 +263,17 @@ export class AiConversationClient {
 
     if (!response.ok) {
       const errorText = await response.text()
+      console.debug('[TEMP ui-action-report] ack failed', {
+        toolCallId,
+        status: response.status,
+      })
       throw new Error(`Failed to report UI action result: HTTP ${response.status}: ${errorText}`)
     }
+
+    console.debug('[TEMP ui-action-report] ack accepted', {
+      toolCallId,
+      status: response.status,
+    })
   }
 }
 
