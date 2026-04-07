@@ -4,7 +4,7 @@
  * Usage dashboard for a single app: summary cards + 3 charts.
  * Charts: tokens-per-session (bar), prompts/API calls per session (line), token split (doughnut).
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Bar, Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -32,13 +32,22 @@ ChartJS.register(
   CategoryScale, LinearScale, Filler,
 )
 
-const props = defineProps<{ appId: string }>()
+const props = defineProps<{
+  appId: string
+  refreshToken?: number
+}>()
 
 const isLoading = ref(false)
 const sessions = ref<ChatSession[]>([])
 const stats = ref<AppChatStats | null>(null)
 
-onMounted(loadData)
+watch(
+  () => [props.appId, props.refreshToken],
+  () => {
+    void loadData()
+  },
+  { immediate: true },
+)
 
 async function loadData() {
   if (!props.appId) return

@@ -132,6 +132,7 @@ const versionHistoryRef = ref<any>(null)
 
 // AI Chat app statistics
 const chatStats = ref<AppChatStats | null>(null)
+const usageRefreshTick = ref(0)
 
 // AI Assistant configuration
 const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
@@ -366,12 +367,19 @@ async function refreshChatStats() {
   if (appId.value) {
     try {
       chatStats.value = await aiChatHistoryService.getAppChatStats(appId.value)
+      usageRefreshTick.value += 1
     } catch (err) {
       console.warn('Failed to refresh chat stats:', err)
       // Non-critical error, don't interrupt user workflow
     }
   }
 }
+
+watch(activeTab, (tab) => {
+  if (tab === 'usage') {
+    usageRefreshTick.value += 1
+  }
+})
 
 // Warn before leaving with unsaved changes
 function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -1173,7 +1181,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
       <!-- Usage View -->
       <div v-show="activeTab === 'usage'" class="usage-view">
-        <AppUsageStats :app-id="resolvedAppId" />
+        <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
       </div>
 
       <!-- Settings View -->
