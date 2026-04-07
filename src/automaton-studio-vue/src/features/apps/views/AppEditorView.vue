@@ -35,6 +35,7 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
+import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import type { PublishAppRequest } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
@@ -819,8 +820,8 @@ function handleInitialPromptConsumed() {
 }
 
 // Handle AI tool execution for real-time file updates
-async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
-  console.log('[AppEditor] AI tool executed:', { toolName, args, result })
+async function handleAiToolExecuted(toolName: string, args: any, result?: any, toolCallId?: string) {
+  console.log('[AppEditor] AI tool executed:', { toolName, args, result, toolCallId })
 
   const uiActionNames = new Set<string>([
     UiAutomationAction.Navigate,
@@ -872,6 +873,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any) {
       source: 'preview-runtime',
       message: `${summary}${detailsParts.length > 0 ? ` — ${detailsParts.join(' | ')}` : ''}`,
     })
+
+    if (toolCallId) {
+      try {
+        await aiConversationClient.reportUiActionResult(toolCallId, JSON.stringify(actionResult))
+      } catch (reportError) {
+        console.error('[AppEditor] Failed to report UI action result:', reportError)
+      }
+    }
 
     return {
       success: actionResult.success,

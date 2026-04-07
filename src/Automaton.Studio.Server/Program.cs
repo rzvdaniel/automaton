@@ -341,6 +341,8 @@ services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automato
 // MCP Tool Providers for AI Chat
 services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();
 services.AddScoped<Automaton.Studio.Server.Services.Mcp.AppMcpToolProvider>();
+services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
+                     Automaton.Mcp.Tools.UiAutomationActionAckService>();
 // File IO tool group — wired to app-scoped file system
 services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                    Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();

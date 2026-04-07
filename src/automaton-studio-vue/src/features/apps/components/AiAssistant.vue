@@ -35,7 +35,12 @@ const props = withDefaults(
     systemPrompt?: string
     suggestions?: string[]
     uiLogs?: UiLogEntry[]
-    toolExecutionHandler?: (toolName: string, args: any, result?: any) => any | Promise<any>
+    toolExecutionHandler?: (
+      toolName: string,
+      args: any,
+      result?: any,
+      toolCallId?: string,
+    ) => any | Promise<any>
   }>(),
   {
     runnerId: null,
@@ -52,7 +57,7 @@ const props = withDefaults(
 // Emits
 const emit = defineEmits<{
   (e: 'codeGenerated', code: string): void
-  (e: 'toolExecuted', toolName: string, args: any, result?: any): void
+  (e: 'toolExecuted', toolName: string, args: any, result?: any, toolCallId?: string): void
   (e: 'sessionCreated'): void
   (e: 'chatMessageSent'): void
   (e: 'sessionNameGenerated', name: string): void
@@ -94,10 +99,10 @@ const {
   conversationMode,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
-  onToolExecuted: async (toolName, args, result) => {
-    emit('toolExecuted', toolName, args, result)
+  onToolExecuted: async (toolName, args, result, toolCallId) => {
+    emit('toolExecuted', toolName, args, result, toolCallId)
     if (props.toolExecutionHandler) {
-      return await props.toolExecutionHandler(toolName, args, result)
+      return await props.toolExecutionHandler(toolName, args, result, toolCallId)
     }
     return null
   },

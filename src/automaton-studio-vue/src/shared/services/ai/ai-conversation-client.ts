@@ -231,6 +231,35 @@ export class AiConversationClient {
       return null
     }
   }
+
+  async reportUiActionResult(toolCallId: string, resultJson: string): Promise<void> {
+    if (!this.baseUrl) {
+      throw new Error('API base URL is not configured (VITE_API_BASE_URL).')
+    }
+
+    const token = tokenStorage.getAccessToken() || localStorage.getItem('auth_token')
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/ai/app/conversation/ui-action-report`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        toolCallId,
+        resultJson,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to report UI action result: HTTP ${response.status}: ${errorText}`)
+    }
+  }
 }
 
 /**

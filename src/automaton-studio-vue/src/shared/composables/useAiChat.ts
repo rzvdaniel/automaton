@@ -27,7 +27,7 @@ export interface UseAiChatOptions {
    * @param args - Arguments passed to the tool
    * @param result - Result returned from the tool (if available)
    */
-  onToolExecuted?: (toolName: string, args: any, result?: any) => any | Promise<any>
+  onToolExecuted?: (toolName: string, args: any, result?: any, toolCallId?: string) => any | Promise<any>
 }
 
 export function useAiChat(resourceType: string, resourceId: string, options?: UseAiChatOptions) {
@@ -664,8 +664,58 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       timestamp: new Date(),
     })
 
-    // Note: We don't call onToolExecuted here - only when the result is received
-    // This prevents duplicate calls and ensures we have the result data
+    // UI automation actions must execute on tool-call so client can report result
+    // before MCP tool timeout and unblock the model in the same turn.
+    if (toolName.startsWith('ui_') && options?.onToolExecuted) {
+      try {
+        const feedback = options.onToolExecuted(toolName, toolArgs, undefined, toolCall.id)
+        if (feedback) {
+          Promise.resolve(feedback)
+            .then((resolvedFeedback) => {
+              if (!resolvedFeedback) {
+                return
+              }
+
+              const uiFeedback = resolvedFeedback as {
+                success: boolean
+                action: string
+                details?: string
+                value?: string
+                error?: string
+                logCount?: number
+                snapshotTitle?: string
+                toolResult?: unknown
+              }
+
+              if (uiFeedback.toolResult !== undefined) {
+                const targetMessage = messages.value.find(
+                  (m) => m.id === toolCall.id && m.type === 'toolExecution',
+                )
+                if (targetMessage) {
+                  targetMessage.toolResult = uiFeedback.toolResult
+                }
+              }
+
+              messages.value.push({
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                type: 'uiTestResult',
+                content: uiFeedback.success
+                  ? `UI check passed: ${uiFeedback.action}`
+                  : `UI check failed: ${uiFeedback.action}`,
+                timestamp: new Date(),
+                uiTestResult: uiFeedback,
+              })
+            })
+            .catch((err) => {
+              console.error('Error resolving tool execution feedback:', err)
+            })
+        }
+      } catch (err) {
+        console.error('Error in onToolExecuted callback:', err)
+      }
+    }
+
   }
 
   /**
@@ -699,10 +749,18 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
         }
       }
 
-      // Notify tool execution callback with result
-      if (options?.onToolExecuted && toolMessage.toolName) {
+      const isUiTool = (toolMessage.toolName || '').startsWith('ui_')
+
+      // Notify tool execution callback with result for non-UI tools.
+      // UI tools already execute on tool-call to support blocking client ack.
+      if (options?.onToolExecuted && toolMessage.toolName && !isUiTool) {
         try {
-          const feedback = options.onToolExecuted(toolMessage.toolName, toolMessage.toolArgs || {}, resultData)
+          const feedback = options.onToolExecuted(
+            toolMessage.toolName,
+            toolMessage.toolArgs || {},
+            resultData,
+            toolResult.toolCallId,
+          )
           if (feedback) {
             Promise.resolve(feedback)
               .then((resolvedFeedback) => {

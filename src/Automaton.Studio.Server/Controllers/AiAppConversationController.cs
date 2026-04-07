@@ -3,6 +3,7 @@ using Automaton.Mcp.Models;
 using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
+using Automaton.Mcp.Tools;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
@@ -29,6 +30,7 @@ public class AiAppConversationController : AiConversationControllerBase
     private readonly ISystemAiService _systemAiService;
     private readonly AppMemoryService _appMemoryService;
     private readonly IAppVerificationStrategyResolver _appVerificationStrategyResolver;
+    private readonly IUiAutomationActionAckService _uiAutomationActionAckService;
 
     // Set during BuildSystemPromptAsync; used in OnAfterConversationAsync to detect stale instructions.
     private bool _hadInstructionBlock;
@@ -49,6 +51,7 @@ public class AiAppConversationController : AiConversationControllerBase
         ISystemAiService systemAiService,
         AppMemoryService appMemoryService,
         IAppVerificationStrategyResolver appVerificationStrategyResolver,
+        IUiAutomationActionAckService uiAutomationActionAckService,
         ILogger<AiAppConversationController> logger)
         : base(mcpClient, aiApiKeyService, chatHistoryService, settingsService,
                rateLimitService, providerMetadataService, tokenBudgetService, promptBuilder, logger)
@@ -61,6 +64,7 @@ public class AiAppConversationController : AiConversationControllerBase
         _systemAiService      = systemAiService;
         _appMemoryService     = appMemoryService;
         _appVerificationStrategyResolver = appVerificationStrategyResolver;
+        _uiAutomationActionAckService = uiAutomationActionAckService;
     }
 
     protected override ChatResourceType ResourceType => ChatResourceType.WebApp;
@@ -131,6 +135,19 @@ public class AiAppConversationController : AiConversationControllerBase
         [FromBody] StreamAppConversationRequest request,
         CancellationToken cancellationToken) =>
         ExecuteStreamAsync(request, cancellationToken);
+
+    [HttpPost("ui-action-report")]
+    public IActionResult ReportUiActionResult([FromBody] UiActionReportRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ToolCallId))
+            return BadRequest(new { message = "toolCallId is required." });
+
+        if (string.IsNullOrWhiteSpace(request.ResultJson))
+            return BadRequest(new { message = "resultJson is required." });
+
+        _uiAutomationActionAckService.SubmitResult(request.ToolCallId, request.ResultJson);
+        return Ok(new { accepted = true });
+    }
 
     /// <summary>
     /// Logs at debug level when instruction files were injected but not updated in this session.
@@ -282,6 +299,12 @@ public class AiAppConversationController : AiConversationControllerBase
         if (b == null) return a;
         return (ComplexityTier)Math.Max((int)a, (int)b);
     }
+}
+
+public sealed class UiActionReportRequest
+{
+    public string ToolCallId { get; set; } = string.Empty;
+    public string ResultJson { get; set; } = string.Empty;
 }
 
 /// <summary>

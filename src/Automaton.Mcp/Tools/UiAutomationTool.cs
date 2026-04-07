@@ -32,10 +32,14 @@ public class UiAutomationTool : IMcpTool
     ];
 
     private readonly ILogger<UiAutomationTool> _logger;
+    private readonly IUiAutomationActionAckService _ackService;
 
-    public UiAutomationTool(ILogger<UiAutomationTool> logger)
+    public UiAutomationTool(
+        ILogger<UiAutomationTool> logger,
+        IUiAutomationActionAckService ackService)
     {
         _logger = logger;
+        _ackService = ackService;
     }
 
     public Task<IEnumerable<McpTool>> GetToolsAsync()
@@ -136,32 +140,60 @@ public class UiAutomationTool : IMcpTool
 
     public bool CanHandle(string toolName) => HandledTools.Contains(toolName);
 
-    public Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, Dictionary<string, object>? context)
+    public async Task<McpToolResult> ExecuteToolAsync(string toolName, JsonElement arguments, Dictionary<string, object>? context)
     {
         try
         {
+            var toolCallId = context?.TryGetValue("toolCallId", out var toolCallIdObj) == true
+                ? toolCallIdObj?.ToString()
+                : null;
+            if (string.IsNullOrWhiteSpace(toolCallId))
+                toolCallId = Guid.NewGuid().ToString("N");
+
+            var timeoutMs = context?.TryGetValue("uiActionTimeoutMs", out var timeoutObj) == true
+                && int.TryParse(timeoutObj?.ToString(), out var parsedTimeout)
+                    ? Math.Clamp(parsedTimeout, 2000, 45000)
+                    : 15000;
+
             var envelope = new
             {
                 clientExecutionRequired = true,
+                bridgeProtocol = "ui-action-ack-v1",
+                actionId = toolCallId,
                 action = toolName,
                 arguments = JsonSerializer.Deserialize<object>(arguments.GetRawText()),
-                note = "Execute this action in the App Editor preview bridge and report results in live UI logs."
+                timeoutMs,
+                note = "Execute this action in the App Editor preview bridge and report result via ui-action ack endpoint."
             };
 
-            return Task.FromResult(new McpToolResult
+            var ackResult = await _ackService.WaitForResultAsync(
+                toolCallId,
+                TimeSpan.FromMilliseconds(timeoutMs));
+
+            if (!string.IsNullOrWhiteSpace(ackResult))
+            {
+                return new McpToolResult
+                {
+                    Success = true,
+                    Content = ackResult
+                };
+            }
+
+            // Fallback to envelope content so existing UI flow still works if ack is unavailable.
+            return new McpToolResult
             {
                 Success = true,
                 Content = JsonSerializer.Serialize(envelope)
-            });
+            };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to prepare UI automation tool response for {ToolName}", toolName);
-            return Task.FromResult(new McpToolResult
+            return new McpToolResult
             {
                 Success = false,
                 Error = $"Failed to prepare UI action envelope: {ex.Message}"
-            });
+            };
         }
     }
 }

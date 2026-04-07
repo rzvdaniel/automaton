@@ -275,6 +275,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
                 ? new Dictionary<string, object>(request.Context)
                 : new Dictionary<string, object>();
             toolContext["mode"] = request.Mode ?? "agent";
+            toolContext["toolCallId"] = toolCallId;
 
             var contextId = request.Context?.GetValueOrDefault("contextId")?.ToString();
             var result = await _toolProvider.ExecuteToolAsync(toolName, arguments.RootElement, contextId, toolContext);
