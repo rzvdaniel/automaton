@@ -19,6 +19,7 @@ public class UiAutomationTool : IMcpTool
     public const string AssertName = "ui_assert";
     public const string GetPageSnapshotName = "ui_get_page_snapshot";
     public const string GetConsoleLogsName = "ui_get_console_logs";
+    public const string SetBackendModeName = "ui_set_backend_mode";
 
     private static readonly HashSet<string> HandledTools =
     [
@@ -30,7 +31,8 @@ public class UiAutomationTool : IMcpTool
         WaitForName,
         AssertName,
         GetPageSnapshotName,
-        GetConsoleLogsName
+        GetConsoleLogsName,
+        SetBackendModeName
     ];
 
     private readonly ILogger<UiAutomationTool> _logger;
@@ -143,6 +145,16 @@ public class UiAutomationTool : IMcpTool
                                             }
                                         }
                                         """)
+            }
+            },
+            new()
+            {
+                Name = SetBackendModeName,
+                Capability = ToolCapability.Read,
+                Description = "Switch the preview backend between 'mock' (uses backend/mocks/*.json files, no runner needed) and 'real' (calls actual runners). Always call this with mode='mock' before running UI tests.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"mode":{"type":"string","enum":["mock","real"],"description":"'mock' to use local JSON mock files, 'real' to call actual runners"}},"required":["mode"]}
+                    """)
             }
         };
 

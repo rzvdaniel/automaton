@@ -10,6 +10,7 @@ export const UiAutomationAction = {
   Assert: 'ui_assert',
   GetPageSnapshot: 'ui_get_page_snapshot',
   GetConsoleLogs: 'ui_get_console_logs',
+  SetBackendMode: 'ui_set_backend_mode',
 } as const
 
 export type UiAutomationAction = typeof UiAutomationAction[keyof typeof UiAutomationAction]

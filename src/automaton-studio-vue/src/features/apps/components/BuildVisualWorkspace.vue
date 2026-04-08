@@ -197,10 +197,10 @@ const previewViewportStyle = computed(() => {
         />
         <ToggleButton
           v-model="isMockBackendEnabled"
-          on-label="Mock"
-          off-label="Real"
-          on-icon="pi pi-clone"
-          off-icon="pi pi-server"
+          on-label="Real"
+          off-label="Mock"
+          on-icon="pi pi-server"
+          off-icon="pi pi-clone"
           :disabled="editorStore.isLoadingPreview"
           aria-label="Toggle preview backend mode"
         />

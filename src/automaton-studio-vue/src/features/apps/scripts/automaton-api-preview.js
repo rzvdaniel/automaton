@@ -293,6 +293,18 @@ const uiActionHandlers = {
     const bodyText = (document.body?.innerText || '').slice(0, maxChars);
     return { success: true, details: `Snapshot captured (${bodyText.length} chars)`, snapshot: { title, url, bodyText } };
   },
+
+  async ui_set_backend_mode(args) {
+    const mode = String(args.mode || '').toLowerCase();
+    if (mode !== 'mock' && mode !== 'real') {
+      return { success: false, error: "Invalid mode. Use 'mock' or 'real'" };
+    }
+    if (!window.automatonApi) {
+      return { success: false, error: 'automatonApi is not available in this preview' };
+    }
+    const confirmed = window.automatonApi.setBackendMode(mode);
+    return { success: true, details: `Backend mode set to '${confirmed}'`, mode: confirmed };
+  },
 };
 
 async function executePreviewAutomationAction(action, args = {}) {

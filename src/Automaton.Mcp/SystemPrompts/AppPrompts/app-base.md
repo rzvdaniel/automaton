@@ -293,10 +293,11 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
 - Define explicit done criteria from user requirements (feature behavior + error-free runtime).
 - Execute iterative loop:
   1) implement/update code
-  2) run visible preview tests with `ui_*` tools
-  3) call `ui_get_console_logs` and read UI test outcomes
-  4) fix discovered defects
-  5) rerun tests
+  2) **switch to mock backend**: `ui_set_backend_mode({ mode: "mock" })` — always before running UI tests
+  3) run visible preview tests with `ui_*` tools
+  4) call `ui_get_console_logs` and read UI test outcomes
+  5) fix discovered defects
+  6) rerun tests (mock mode persists across reloads in the same session — no need to set it again)
 - Continue until all done criteria pass.
 
 ### Two-tier verification — use the cheapest check that answers the question:
