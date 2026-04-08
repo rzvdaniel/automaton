@@ -11,6 +11,16 @@ export const UiAutomationAction = {
   GetPageSnapshot: 'ui_get_page_snapshot',
   GetConsoleLogs: 'ui_get_console_logs',
   SetBackendMode: 'ui_set_backend_mode',
+  Evaluate: 'ui_evaluate',
+  Keyboard: 'ui_keyboard',
+  GetAttribute: 'ui_get_attribute',
+  QueryAll: 'ui_query_all',
+  Select: 'ui_select',
+  Hover: 'ui_hover',
+  ScrollTo: 'ui_scroll_to',
+  Check: 'ui_check',
+  GetCanvasData: 'ui_get_canvas_data',
+  NetworkLog: 'ui_network_log',
 } as const
 
 export type UiAutomationAction = typeof UiAutomationAction[keyof typeof UiAutomationAction]
@@ -40,6 +50,29 @@ export interface UiAutomationResult {
     url: string
     bodyText: string
   }
+  // ui_get_attribute
+  attributes?: Record<string, string | null>
+  // ui_query_all
+  count?: number
+  items?: string[]
+  // ui_get_canvas_data
+  width?: number
+  height?: number
+  hasNonBlackPixels?: boolean
+  sampleAlpha?: number
+  // ui_network_log
+  entries?: Array<{
+    type: string
+    url: string
+    method: string
+    status: number | null
+    ok: boolean
+    duration: number
+    timestamp: string
+    error?: string
+  }>
+  // ui_set_backend_mode
+  mode?: string
   error?: string
 }
 
@@ -242,6 +275,23 @@ function resolveSafePreviewNavigationTarget(
   }
 }
 
+// Actions that must run inside the iframe JS context regardless of same/cross origin.
+// These rely on iframe globals (_networkLog, canvas contexts, eval scope, etc.)
+// and are routed through the postMessage bridge for both cases.
+const BRIDGE_ONLY_ACTIONS = new Set<UiAutomationAction>([
+  UiAutomationAction.Evaluate,
+  UiAutomationAction.Keyboard,
+  UiAutomationAction.GetAttribute,
+  UiAutomationAction.QueryAll,
+  UiAutomationAction.Select,
+  UiAutomationAction.Hover,
+  UiAutomationAction.ScrollTo,
+  UiAutomationAction.Check,
+  UiAutomationAction.GetCanvasData,
+  UiAutomationAction.NetworkLog,
+  UiAutomationAction.SetBackendMode,
+])
+
 export async function executeUiAutomationAction(
   action: UiAutomationAction,
   args: Record<string, unknown>,
@@ -249,7 +299,7 @@ export async function executeUiAutomationAction(
 ): Promise<UiAutomationResult> {
   const iframe = getPreviewIframe()
   const requiresDomAccess = action !== UiAutomationAction.GetConsoleLogs
-  const useBridge = requiresDomAccess && isCrossOriginFrame(iframe)
+  const useBridge = BRIDGE_ONLY_ACTIONS.has(action) || (requiresDomAccess && isCrossOriginFrame(iframe))
 
   // Reload is handled specially: it manages its own cross-origin path (fire-and-forget postMessage
   // then waits for the iframe load event from the parent side).

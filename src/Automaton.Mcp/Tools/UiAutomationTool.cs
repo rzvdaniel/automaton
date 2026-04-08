@@ -21,6 +21,19 @@ public class UiAutomationTool : IMcpTool
     public const string GetConsoleLogsName = "ui_get_console_logs";
     public const string SetBackendModeName = "ui_set_backend_mode";
 
+    public const string EvaluateName = "ui_evaluate";
+    public const string KeyboardName = "ui_keyboard";
+    public const string GetAttributeName = "ui_get_attribute";
+
+    public const string QueryAllName = "ui_query_all";
+    public const string SelectName = "ui_select";
+    public const string HoverName = "ui_hover";
+    public const string ScrollToName = "ui_scroll_to";
+
+    public const string CheckName = "ui_check";
+    public const string GetCanvasDataName = "ui_get_canvas_data";
+    public const string NetworkLogName = "ui_network_log";
+
     private static readonly HashSet<string> HandledTools =
     [
         NavigateName,
@@ -32,7 +45,17 @@ public class UiAutomationTool : IMcpTool
         AssertName,
         GetPageSnapshotName,
         GetConsoleLogsName,
-        SetBackendModeName
+        SetBackendModeName,
+        EvaluateName,
+        KeyboardName,
+        GetAttributeName,
+        QueryAllName,
+        SelectName,
+        HoverName,
+        ScrollToName,
+        CheckName,
+        GetCanvasDataName,
+        NetworkLogName
     ];
 
     private readonly ILogger<UiAutomationTool> _logger;
@@ -145,7 +168,6 @@ public class UiAutomationTool : IMcpTool
                                             }
                                         }
                                         """)
-            }
             },
             new()
             {
@@ -154,6 +176,99 @@ public class UiAutomationTool : IMcpTool
                 Description = "Switch the preview backend between 'mock' (uses backend/mocks/*.json files, no runner needed) and 'real' (calls actual runners). Always call this with mode='mock' before running UI tests.",
                 InputSchema = JsonDocument.Parse("""
                     {"type":"object","properties":{"mode":{"type":"string","enum":["mock","real"],"description":"'mock' to use local JSON mock files, 'real' to call actual runners"}},"required":["mode"]}
+                    """)
+            },
+
+            new()
+            {
+                Name = EvaluateName,
+                Capability = ToolCapability.Read,
+                Description = "Evaluate a JavaScript expression inside the preview and return the result. Use this to inspect runtime state: window variables, component stores, counters, flags (e.g. 'window.score', 'document.querySelectorAll(\"li\").length').",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"expression":{"type":"string","description":"JS expression to evaluate — must be synchronous and JSON-serialisable (e.g. 'window.score', 'document.title')"}},"required":["expression"]}
+                    """)
+            },
+            new()
+            {
+                Name = KeyboardName,
+                Capability = ToolCapability.Read,
+                Description = "Dispatch keyboard events (keydown + keypress + keyup) to an element or document.body. Use for games, modals, keyboard-driven UIs (e.g. ArrowUp, Enter, Escape, Space).",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"key":{"type":"string","description":"Key name per KeyboardEvent.key spec (e.g. 'Enter', 'Escape', 'ArrowUp', ' ')"},"selector":{"type":"string","description":"Optional CSS selector to focus before dispatching (default: document.body)"},"repeat":{"type":"number","description":"Number of times to dispatch (default 1, max 20)"},"ctrlKey":{"type":"boolean"},"shiftKey":{"type":"boolean"},"altKey":{"type":"boolean"}},"required":["key"]}
+                    """)
+            },
+            new()
+            {
+                Name = GetAttributeName,
+                Capability = ToolCapability.Read,
+                Description = "Read one or more HTML attributes from an element. Use to verify disabled state, checked state, src, href, class, aria-label, data-* attributes.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string","description":"CSS selector"},"attributes":{"type":"array","items":{"type":"string"},"description":"Attribute names to read (e.g. ['disabled','class','aria-label'])"}},"required":["selector","attributes"]}
+                    """)
+            },
+
+            new()
+            {
+                Name = QueryAllName,
+                Capability = ToolCapability.Read,
+                Description = "Return the count of all elements matching a selector, and optionally their text content. Use to verify list/table row counts or enumerate repeated items.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string"},"includeText":{"type":"boolean","description":"Include textContent of each matched element (default false)"},"limit":{"type":"number","description":"Max elements to return text for (default 20, max 50)"}},"required":["selector"]}
+                    """)
+            },
+            new()
+            {
+                Name = SelectName,
+                Capability = ToolCapability.Read,
+                Description = "Set a <select> dropdown value and fire change events. Use instead of ui_type for native select elements.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string","description":"CSS selector for the <select> element"},"value":{"type":"string","description":"Option value to select"}},"required":["selector","value"]}
+                    """)
+            },
+            new()
+            {
+                Name = HoverName,
+                Capability = ToolCapability.Read,
+                Description = "Trigger mouseover/mouseenter/focus on an element. Use to reveal tooltips, dropdown menus, or hover-only UI content.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string"}},"required":["selector"]}
+                    """)
+            },
+            new()
+            {
+                Name = ScrollToName,
+                Capability = ToolCapability.Read,
+                Description = "Scroll an element into view. Use when the UI lazy-renders content below the fold or a sticky element blocks interaction.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string"},"behavior":{"type":"string","enum":["smooth","instant"],"description":"Scroll behavior (default: instant)"}},"required":["selector"]}
+                    """)
+            },
+
+            new()
+            {
+                Name = CheckName,
+                Capability = ToolCapability.Read,
+                Description = "Set the checked state of a checkbox or radio button and fire change events.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string"},"checked":{"type":"boolean","description":"Target state — true to check, false to uncheck (default true)"}},"required":["selector"]}
+                    """)
+            },
+            new()
+            {
+                Name = GetCanvasDataName,
+                Capability = ToolCapability.Read,
+                Description = "Sample pixel data from a <canvas> element to confirm something rendered. Returns hasNonBlackPixels and average alpha. Works for both 2D and WebGL/Three.js canvases.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"selector":{"type":"string","description":"Canvas CSS selector (default: 'canvas')"},"sampleSize":{"type":"number","description":"NxN grid of sample points (default 4, max 16)"}}}
+                    """)
+            },
+            new()
+            {
+                Name = NetworkLogName,
+                Capability = ToolCapability.Read,
+                Description = "Return captured fetch/XHR calls made by the preview app. Use to verify API calls were made and check response status codes.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"limit":{"type":"number","description":"Max entries to return, most recent first (default 20, max 100)"},"urlPattern":{"type":"string","description":"Optional substring to filter by URL"}}}
                     """)
             }
         };

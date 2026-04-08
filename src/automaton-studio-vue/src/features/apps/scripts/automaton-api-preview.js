@@ -80,6 +80,53 @@ console.error = (...args) => {
 // previous session are never visible after a page reload or navigation.
 window.parent.postMessage({ type: 'previewConsoleClear' }, '*');
 
+// ── Network request capture (for ui_network_log) ──────────────────────────
+// Intercept fetch and XHR before any app code runs so all requests are captured.
+const _networkLog = [];
+const _MAX_NETWORK_LOG = 200;
+
+function _pushNetworkEntry(entry) {
+  _networkLog.push(entry);
+  if (_networkLog.length > _MAX_NETWORK_LOG) {
+    _networkLog.shift();
+  }
+}
+
+const _originalFetch = window.fetch.bind(window);
+window.fetch = async function(input, init) {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input && input.url) || String(input);
+  const method = ((init && init.method) || 'GET').toUpperCase();
+  const start = Date.now();
+  try {
+    const response = await _originalFetch(input, init);
+    _pushNetworkEntry({ type: 'fetch', url, method, status: response.status, ok: response.ok, duration: Date.now() - start, timestamp: new Date().toISOString() });
+    return response;
+  } catch (err) {
+    _pushNetworkEntry({ type: 'fetch', url, method, status: null, ok: false, error: err && err.message, duration: Date.now() - start, timestamp: new Date().toISOString() });
+    throw err;
+  }
+};
+
+const _OriginalXHR = window.XMLHttpRequest;
+window.XMLHttpRequest = function() {
+  const xhr = new _OriginalXHR();
+  let _xhrUrl = '';
+  let _xhrMethod = 'GET';
+  const _open = xhr.open.bind(xhr);
+  const _start = { t: 0 };
+  xhr.open = function(method, url, ...rest) {
+    _xhrUrl = String(url);
+    _xhrMethod = String(method).toUpperCase();
+    _start.t = Date.now();
+    return _open(method, url, ...rest);
+  };
+  xhr.addEventListener('loadend', function() {
+    _pushNetworkEntry({ type: 'xhr', url: _xhrUrl, method: _xhrMethod, status: xhr.status || null, ok: xhr.status >= 200 && xhr.status < 300, duration: Date.now() - _start.t, timestamp: new Date().toISOString() });
+  });
+  return xhr;
+};
+try { window.XMLHttpRequest.prototype = _OriginalXHR.prototype; } catch { /* read-only in some envs */ }
+
 async function apiCall(path, method, body) {
   const url = BASE_URL + path;
   console.log(`[AutomatonAPI] ${method} ${url}`);
@@ -304,6 +351,196 @@ const uiActionHandlers = {
     }
     const confirmed = window.automatonApi.setBackendMode(mode);
     return { success: true, details: `Backend mode set to '${confirmed}'`, mode: confirmed };
+  },
+
+  async ui_evaluate(args) {
+    const expression = String(args.expression || '').trim();
+    if (!expression) return { success: false, error: "Missing required argument 'expression'" };
+    try {
+      // Function() evaluates in the global scope — has access to window variables
+      // eslint-disable-next-line no-new-func
+      const result = Function('"use strict"; return (' + expression + ')')();
+      let serialized;
+      try { serialized = JSON.stringify(result); } catch { serialized = String(result); }
+      return { success: true, value: serialized, details: `Evaluated: ${expression}` };
+    } catch (err) {
+      return { success: false, error: err && err.message ? err.message : 'Evaluation failed' };
+    }
+  },
+
+  async ui_keyboard(args) {
+    const key = String(args.key || '').trim();
+    if (!key) return { success: false, error: "Missing required argument 'key'" };
+    const selector = args.selector !== undefined ? String(args.selector).trim() : '';
+    const repeat = Math.max(1, Math.min(20, Number(args.repeat || 1)));
+    const ctrlKey = Boolean(args.ctrlKey);
+    const shiftKey = Boolean(args.shiftKey);
+    const altKey = Boolean(args.altKey);
+    let target = document.body;
+    if (selector) {
+      const el = document.querySelector(selector);
+      if (!el) return { success: false, error: `Element not found for selector: ${selector}` };
+      target = el;
+      target.focus();
+    }
+    const init = { key, bubbles: true, cancelable: true, ctrlKey, shiftKey, altKey };
+    for (let i = 0; i < repeat; i++) {
+      target.dispatchEvent(new KeyboardEvent('keydown', init));
+      target.dispatchEvent(new KeyboardEvent('keypress', init));
+      target.dispatchEvent(new KeyboardEvent('keyup', init));
+    }
+    return { success: true, details: `Dispatched key '${key}' \u00d7 ${repeat}${selector ? ` to ${selector}` : ' to document.body'}` };
+  },
+
+  async ui_get_attribute(args) {
+    const selector = String(args.selector || '').trim();
+    const attributes = Array.isArray(args.attributes) ? args.attributes.map(String) : [];
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    if (!attributes.length) return { success: false, error: "Missing required argument 'attributes'" };
+    const element = document.querySelector(selector);
+    if (!element) return { success: false, error: `Element not found for selector: ${selector}` };
+    const result = {};
+    for (const attr of attributes) {
+      result[attr] = element.getAttribute(attr);
+    }
+    return { success: true, attributes: result, details: `Read ${attributes.length} attribute(s) from ${selector}` };
+  },
+
+  async ui_query_all(args) {
+    const selector = String(args.selector || '').trim();
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    const includeText = Boolean(args.includeText);
+    const limit = Math.min(50, Math.max(1, Number(args.limit || 20)));
+    const elements = Array.from(document.querySelectorAll(selector));
+    const count = elements.length;
+    const items = includeText ? elements.slice(0, limit).map(el => (el.textContent || '').trim()) : undefined;
+    return { success: true, count, items, details: `Found ${count} element(s) for selector: ${selector}` };
+  },
+
+  async ui_select(args) {
+    const selector = String(args.selector || '').trim();
+    const value = String(args.value !== undefined ? args.value : '');
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    const element = document.querySelector(selector);
+    if (!element || element.tagName !== 'SELECT') {
+      return { success: false, error: `Select element not found for selector: ${selector}` };
+    }
+    element.value = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return { success: true, details: `Selected '${value}' in ${selector}` };
+  },
+
+  async ui_hover(args) {
+    const selector = String(args.selector || '').trim();
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    const element = document.querySelector(selector);
+    if (!element) return { success: false, error: `Element not found for selector: ${selector}` };
+    element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, cancelable: false }));
+    element.focus();
+    return { success: true, details: `Hovered over ${selector}` };
+  },
+
+  async ui_scroll_to(args) {
+    const selector = String(args.selector || '').trim();
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    const behavior = args.behavior === 'smooth' ? 'smooth' : 'instant';
+    const element = document.querySelector(selector);
+    if (!element) return { success: false, error: `Element not found for selector: ${selector}` };
+    element.scrollIntoView({ behavior, block: 'start' });
+    return { success: true, details: `Scrolled to ${selector}` };
+  },
+
+  async ui_check(args) {
+    const selector = String(args.selector || '').trim();
+    const checked = args.checked === undefined ? true : Boolean(args.checked);
+    if (!selector) return { success: false, error: "Missing required argument 'selector'" };
+    const element = document.querySelector(selector);
+    if (!element || (element.type !== 'checkbox' && element.type !== 'radio')) {
+      return { success: false, error: `Checkbox/radio not found for selector: ${selector}` };
+    }
+    if (element.checked !== checked) {
+      element.checked = checked;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return { success: true, details: `${checked ? 'Checked' : 'Unchecked'} ${selector}` };
+  },
+
+  async ui_get_canvas_data(args) {
+    const selector = String(args.selector || 'canvas').trim();
+    const sampleSize = Math.max(1, Math.min(16, Number(args.sampleSize || 4)));
+    const canvas = document.querySelector(selector);
+    if (!canvas || canvas.tagName !== 'CANVAS') {
+      return { success: false, error: `Canvas not found for selector: ${selector}` };
+    }
+    const { width, height } = canvas;
+    if (!width || !height) {
+      return { success: false, error: `Canvas has zero dimensions (${width}x${height})` };
+    }
+    let pixels = null;
+    // Try 2D context
+    const ctx2d = canvas.getContext('2d');
+    if (ctx2d) {
+      try { pixels = ctx2d.getImageData(0, 0, width, height).data; } catch { /* tainted */ }
+    }
+    // Try WebGL if 2D didn't yield data
+    if (!pixels) {
+      const gl = canvas.getContext('webgl') || canvas.getContext('webgl2') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        try {
+          const buf = new Uint8Array(width * height * 4);
+          gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+          pixels = buf;
+        } catch { /* ignore */ }
+      }
+    }
+    if (!pixels) {
+      return { success: false, error: 'Could not read pixel data (tainted canvas or unsupported context type)' };
+    }
+    const stepX = Math.max(1, Math.floor(width / sampleSize));
+    const stepY = Math.max(1, Math.floor(height / sampleSize));
+    let hasNonBlackPixels = false;
+    let totalAlpha = 0;
+    let sampleCount = 0;
+    for (let row = 0; row < sampleSize; row++) {
+      for (let col = 0; col < sampleSize; col++) {
+        const x = Math.min(col * stepX, width - 1);
+        const y = Math.min(row * stepY, height - 1);
+        const i = (y * width + x) * 4;
+        if (pixels[i] > 0 || pixels[i + 1] > 0 || pixels[i + 2] > 0) hasNonBlackPixels = true;
+        totalAlpha += pixels[i + 3];
+        sampleCount++;
+      }
+    }
+    const sampleAlpha = sampleCount > 0 ? Math.round(totalAlpha / sampleCount) : 0;
+    return {
+      success: true,
+      width,
+      height,
+      hasNonBlackPixels,
+      sampleAlpha,
+      details: hasNonBlackPixels
+        ? `Canvas has non-black pixels (${width}\u00d7${height})`
+        : `Canvas appears empty/black (${width}\u00d7${height})`,
+    };
+  },
+
+  async ui_network_log(args) {
+    const limit = Math.min(100, Math.max(1, Number(args.limit || 20)));
+    const urlPattern = args.urlPattern !== undefined ? String(args.urlPattern) : '';
+    let entries = _networkLog.slice();
+    if (urlPattern) {
+      entries = entries.filter(e => e.url && e.url.includes(urlPattern));
+    }
+    const returned = entries.slice(-limit);
+    return {
+      success: true,
+      count: entries.length,
+      entries: returned,
+      details: `Returned ${returned.length} of ${entries.length} network request(s)${urlPattern ? ` matching '${urlPattern}'` : ''}`,
+    };
   },
 };
 
