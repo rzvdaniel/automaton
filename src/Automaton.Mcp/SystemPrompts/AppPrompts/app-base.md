@@ -298,7 +298,25 @@ Never ask the user to paste code or provide details you can fetch yourself. Imme
   4) fix discovered defects
   5) rerun tests
 - Continue until all done criteria pass.
-- For routine checks, call `ui_get_console_logs` with focused args to reduce noise/tokens: `{ "minLevel": "warn", "limit": 120 }`.
+
+### Two-tier verification — use the cheapest check that answers the question:
+
+**Quick check (after each fix):** Only reload and scan for errors. Do NOT repeat the full interaction flow.
+```
+ui_reload({ waitForSelector: "body" })
+ui_get_console_logs({ minLevel: "error", limit: 50 })
+```
+If errors are gone → fix is confirmed. Move on.
+
+**Full flow (final gate only):** Run the complete interaction sequence once at the very end to confirm the happy path end-to-end.
+```
+ui_navigate(page) → ui_wait_for(root element) → ui_click / ui_type → ui_assert → ui_get_console_logs
+```
+
+**Rule:** Never repeat the full interaction flow after a fix. Use `ui_reload` + console check for mid-loop re-verification. This avoids re-running navigate → wait → click → wait sequences that add 3–5 API calls per fix cycle.
+
+- Use `ui_reload` instead of `ui_navigate(currentPage)` + `ui_wait_for` whenever you want to pick up file changes without changing the route.
+- For routine checks, call `ui_get_console_logs` with focused args: `{ "minLevel": "warn", "limit": 120 }`.
 - Before final completion, always call `ui_get_console_logs` with `{ "minLevel": "error", "limit": 120 }`.
 - Verification is complete only when `ui_*` tools return concrete runtime evidence (logs/assert results/snapshots).
 - A response that only contains `clientExecutionRequired: true` is not verification and does not satisfy done criteria.

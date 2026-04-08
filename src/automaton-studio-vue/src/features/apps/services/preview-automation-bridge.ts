@@ -2,6 +2,7 @@ import type { UiLogEntry } from '../types/console.types'
 
 export const UiAutomationAction = {
   Navigate: 'ui_navigate',
+  Reload: 'ui_reload',
   Click: 'ui_click',
   Type: 'ui_type',
   ReadText: 'ui_read_text',
@@ -249,13 +250,16 @@ export async function executeUiAutomationAction(
   const requiresDomAccess = action !== UiAutomationAction.GetConsoleLogs
   const useBridge = requiresDomAccess && isCrossOriginFrame(iframe)
 
-  if (useBridge) {
+  // Reload is handled specially: it manages its own cross-origin path (fire-and-forget postMessage
+  // then waits for the iframe load event from the parent side).
+  if (useBridge && action !== UiAutomationAction.Reload) {
     return executeViaPostMessageBridge(action, args)
   }
 
   const doc = getPreviewDocument()
 
-  if (action !== UiAutomationAction.GetConsoleLogs && !doc) {
+  // Reload does not need doc — it triggers via win.location.reload() or postMessage bridge.
+  if (action !== UiAutomationAction.GetConsoleLogs && action !== UiAutomationAction.Reload && !doc) {
     return { success: false, action, error: 'Preview is not ready. Open Build > Visual mode first.' }
   }
 
@@ -277,6 +281,56 @@ export async function executeUiAutomationAction(
         }
         win.location.assign(safeTarget)
         return { success: true, action, details: `Navigated to ${safeTarget}` }
+      }
+      case UiAutomationAction.Reload: {
+        const waitForSel = args.waitForSelector !== undefined ? String(args.waitForSelector).trim() : ''
+        const timeoutMs = Number(args.timeoutMs ?? 5000)
+
+        const iframeEl = getPreviewIframe()
+        if (!iframeEl) {
+          return { success: false, action, error: 'Preview iframe is not available' }
+        }
+
+        // Register load listener BEFORE triggering reload to avoid a race condition.
+        const loadPromise = new Promise<boolean>((resolve) => {
+          const timeoutHandle = window.setTimeout(() => resolve(false), timeoutMs)
+          iframeEl.addEventListener(
+            'load',
+            () => {
+              window.clearTimeout(timeoutHandle)
+              resolve(true)
+            },
+            { once: true },
+          )
+        })
+
+        if (useBridge) {
+          // Cross-origin: ask the iframe to call window.location.reload() via postMessage.
+          // The response arrives before the navigation actually starts (JS single-threaded),
+          // so we can fire-and-forget and wait for the parent-side load event instead.
+          void executeViaPostMessageBridge(action, args)
+        } else {
+          const win = doc?.defaultView
+          if (!win) return { success: false, action, error: 'Preview window is not available' }
+          win.location.reload()
+        }
+
+        const loaded = await loadPromise
+        if (!loaded) {
+          return { success: false, action, error: `Timed out waiting for page to reload (${timeoutMs}ms)` }
+        }
+
+        if (waitForSel) {
+          const newDoc = getPreviewDocument()
+          if (newDoc) {
+            const found = await waitForSelector(newDoc, waitForSel, timeoutMs, 100)
+            if (!found) {
+              return { success: false, action, error: `Reloaded but timed out waiting for selector: ${waitForSel}` }
+            }
+          }
+        }
+
+        return { success: true, action, details: 'Reloaded preview' }
       }
       case UiAutomationAction.Click: {
         const selector = String(args.selector ?? '').trim()

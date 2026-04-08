@@ -201,6 +201,13 @@ async function executePreviewAutomationAction(action, args = {}) {
         window.location.assign(safeTarget);
         return { success: true, action, details: `Navigated to ${safeTarget}` };
       }
+      case 'ui_reload': {
+        // Trigger a page reload. The parent side waits for the iframe's load event,
+        // so this just schedules the reload and returns before the navigation starts
+        // (JS is single-threaded; postMessage is dispatched before the page unloads).
+        window.location.reload();
+        return { success: true, action, details: 'Reload triggered' };
+      }
       case 'ui_click': {
         const selector = String(args.selector || '').trim();
         if (!selector) return { success: false, action, error: "Missing required argument 'selector'" };

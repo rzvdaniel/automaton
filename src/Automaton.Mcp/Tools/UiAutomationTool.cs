@@ -11,6 +11,7 @@ namespace Automaton.Mcp.Tools;
 public class UiAutomationTool : IMcpTool
 {
     public const string NavigateName = "ui_navigate";
+    public const string ReloadName = "ui_reload";
     public const string ClickName = "ui_click";
     public const string TypeName = "ui_type";
     public const string ReadTextName = "ui_read_text";
@@ -22,6 +23,7 @@ public class UiAutomationTool : IMcpTool
     private static readonly HashSet<string> HandledTools =
     [
         NavigateName,
+        ReloadName,
         ClickName,
         TypeName,
         ReadTextName,
@@ -53,6 +55,15 @@ public class UiAutomationTool : IMcpTool
                 Description = "Navigate the preview app to a URL/hash route in the embedded App Editor preview.",
                 InputSchema = JsonDocument.Parse("""
                     {"type":"object","properties":{"url":{"type":"string","description":"Absolute or relative URL/hash route"}},"required":["url"]}
+                    """)
+            },
+            new()
+            {
+                Name = ReloadName,
+                Capability = ToolCapability.Read,
+                Description = "Reload the current preview page. Use this after editing files to pick up changes — replaces the common ui_navigate + ui_wait_for pattern for re-checks.",
+                InputSchema = JsonDocument.Parse("""
+                    {"type":"object","properties":{"waitForSelector":{"type":"string","description":"Optional CSS selector to wait for after reload (e.g. 'body', '#app')"},"timeoutMs":{"type":"number","description":"Max wait time in ms after reload (default 3000)"}},"required":[]}
                     """)
             },
             new()
