@@ -27,7 +27,7 @@ const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'danger'>('basic')
 
 // Local form state
 const name = ref('')
@@ -352,6 +352,16 @@ function handleDelete() {
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
               />
+              <div v-if="!isLinkedToProject" class="border-top-1 surface-border my-2" />
+              <Button
+                v-if="!isLinkedToProject"
+                label="Danger Zone"
+                icon="pi pi-exclamation-triangle"
+                text
+                :class="{ 'surface-hover': activeSection === 'danger' }"
+                class="w-full justify-content-start text-red-500"
+                @click="activeSection = 'danger'"
+              />
             </div>
           </template>
         </Card>
@@ -407,28 +417,6 @@ function handleDelete() {
                   :disabled="!hasChanges"
                   @click="saveSettings"
                 />
-              </div>
-
-              <!-- Danger Zone -->
-              <div v-if="!isLinkedToProject" class="danger-zone-card mt-2">
-                <div class="flex align-items-center gap-2 mb-3">
-                  <i class="pi pi-exclamation-triangle text-red-500"></i>
-                  <span class="font-semibold text-red-500">Danger Zone</span>
-                </div>
-                <div class="flex align-items-center justify-content-between gap-4">
-                  <div>
-                    <div class="font-medium">Delete this app</div>
-                    <small class="text-color-secondary">Once deleted, all app files and data will be permanently removed.</small>
-                  </div>
-                  <Button
-                    label="Delete App"
-                    icon="pi pi-trash"
-                    severity="danger"
-                    outlined
-                    :loading="isDeleting"
-                    @click="handleDelete"
-                  />
-                </div>
               </div>
             </div>
           </template>
@@ -660,6 +648,29 @@ function handleDelete() {
         </Card>
 
         <!-- Danger Zone -->
+        <Card v-if="activeSection === 'danger'">
+          <template #title>
+            <span class="text-red-500">Danger Zone</span>
+          </template>
+          <template #content>
+            <div class="danger-zone-card">
+              <div class="flex align-items-center justify-content-between gap-4">
+                <div>
+                  <div class="font-medium">Delete this app</div>
+                  <small class="text-color-secondary">Once deleted, all app files and data will be permanently removed. This action cannot be undone.</small>
+                </div>
+                <Button
+                  label="Delete App"
+                  icon="pi pi-trash"
+                  severity="danger"
+                  outlined
+                  :loading="isDeleting"
+                  @click="handleDelete"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
       </div>
     </div>
   </div>
