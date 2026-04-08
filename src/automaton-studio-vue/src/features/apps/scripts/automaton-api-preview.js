@@ -75,6 +75,11 @@ console.error = (...args) => {
   emitPreviewConsoleEvent('error', 'preview-console', args);
 };
 
+// Notify the parent that a new preview session is starting.
+// The parent clears its log buffer on this message so stale errors from the
+// previous session are never visible after a page reload or navigation.
+window.parent.postMessage({ type: 'previewConsoleClear' }, '*');
+
 async function apiCall(path, method, body) {
   const url = BASE_URL + path;
   console.log(`[AutomatonAPI] ${method} ${url}`);

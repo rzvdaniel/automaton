@@ -470,23 +470,23 @@ function handlePreviewMessage(event: MessageEvent) {
     }
   }
 
+  // A new preview page started loading — clear stale logs from the previous session
+  // immediately, before the app's own scripts have a chance to emit new entries.
+  if (event.data?.type === 'previewConsoleClear') {
+    editorStore.clearUiLogs()
+    editorStore.addUiLogEntry({
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      level: 'info',
+      source: 'preview-runtime',
+      message: '[Automaton] Preview restarted — log window reset',
+    })
+  }
+
   if (event.data?.type === 'previewConsoleEvent') {
     const message = event.data as PreviewConsoleMessage
     const level = message.data.level
     const content = message.data.message
-
-    // New preview runtime session marker (emitted on app bootstrap).
-    // Clear old entries so logs remain scoped to current preview run.
-    if (content === '[AutomatonAPI] Ready!') {
-      editorStore.clearUiLogs()
-      editorStore.addUiLogEntry({
-        id: crypto.randomUUID(),
-        timestamp: new Date(message.data.timestamp),
-        level: 'info',
-        source: 'preview-runtime',
-        message: '[Automaton] Preview restarted — log window reset',
-      })
-    }
 
     editorStore.addUiLogEntry({
       id: crypto.randomUUID(),
