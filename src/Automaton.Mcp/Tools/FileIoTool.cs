@@ -41,8 +41,8 @@ public class FileIoTool : IMcpTool
             {
                 Name = ReadFileName,
                 Capability = ToolCapability.Read,
-                Description = "Read a single file by its exact path (e.g. 'index.html' or 'styles/main.css'). One file per call — make parallel calls to read multiple files at once. Use paths exactly as returned by list_files.",
-                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string","description":"Exact relative path of the file to read, e.g. 'index.html' or 'js/game.js'"}},"required":["path"]}""")
+                Description = "Read a file (or a line range within it). Always returns a header: '[Lines X–Y of Z total]' so you know the full size. STRATEGY: for files >100 lines, prefer search_file first to locate the section you need, then read only that range with startLine/endLine. Only omit startLine/endLine when you need the whole file (e.g. before a full rewrite).",
+                InputSchema = JsonDocument.Parse("""{"type":"object","properties":{"path":{"type":"string","description":"Exact relative path, e.g. 'index.html' or 'js/game.js'"},"startLine":{"type":"integer","description":"1-based first line to return (default: 1)"},"endLine":{"type":"integer","description":"1-based last line to return, inclusive (default: end of file)"}},"required":["path"]}""")
             },
             new McpTool
             {
@@ -175,11 +175,32 @@ public class FileIoTool : IMcpTool
                     Error = $"File '{path}' not found. Do NOT retry this path. Only read files that appear in the list_files result. Call list_files first if you are unsure what files exist."
                 };
 
-            var lineCount = content.Count(c => c == '\n') + 1;
-            if (lineCount >= LocalScopedFileSystem.LargeFileThreshold)
-                content = $"[NOTE: {lineCount} lines \u2014 rewrite with write_file when making multiple changes]\n\n" + content;
+            var allLines  = content.Split('\n');
+            var totalLines = allLines.Length;
 
-            return new McpToolResult { Success = true, Content = content };
+            // Parse optional line range (1-based, inclusive)
+            var startLine = arguments.TryGetProperty("startLine", out var startProp) && startProp.TryGetInt32(out var s)
+                ? Math.Max(1, s)
+                : 1;
+            var endLine = arguments.TryGetProperty("endLine", out var endProp) && endProp.TryGetInt32(out var e)
+                ? Math.Min(totalLines, e)
+                : totalLines;
+
+            if (startLine > totalLines)
+                return new McpToolResult { Success = false, Error = $"startLine {startLine} exceeds file length ({totalLines} lines)." };
+
+            var slice        = allLines[(startLine - 1)..endLine];
+            var sliceContent = string.Join('\n', slice);
+            var isPartial    = startLine > 1 || endLine < totalLines;
+
+            var header = isPartial
+                ? $"[Lines {startLine}–{endLine} of {totalLines} total — use startLine/endLine for other ranges]"
+                : $"[{totalLines} lines total]";
+
+            if (totalLines >= LocalScopedFileSystem.LargeFileThreshold && !isPartial)
+                header += " [LARGE FILE — prefer search_file to locate sections, then read with startLine/endLine]";
+
+            return new McpToolResult { Success = true, Content = $"{header}\n\n{sliceContent}" };
         }
         catch (Exception ex)
         {
