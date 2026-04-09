@@ -97,6 +97,69 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Get template apps — same as sample apps, publicly accessible.
+    /// </summary>
+    [HttpGet("templates")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IEnumerable<Models.AppModel>>> GetTemplates()
+    {
+        try
+        {
+            var templates = await appsService.GetSampleAppsAsync();
+            return Ok(templates);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error getting template apps");
+            return StatusCode(500, new { message = "Failed to get templates" });
+        }
+    }
+
+    /// <summary>
+    /// Duplicate an owned app (copies files + metadata). Requires authentication.
+    /// </summary>
+    [HttpPost("{id}/duplicate")]
+    public async Task<ActionResult<Models.AppModel>> Duplicate(Guid id)
+    {
+        try
+        {
+            var newApp = await appsService.DuplicateAsync(id);
+            return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error duplicating app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to duplicate app" });
+        }
+    }
+
+    /// <summary>
+    /// Fork a published template app into the current user's account.
+    /// </summary>
+    [HttpPost("{id}/fork")]
+    public async Task<ActionResult<Models.AppModel>> Fork(Guid id)
+    {
+        try
+        {
+            var newApp = await appsService.ForkAsync(id);
+            return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error forking template app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to fork template" });
+        }
+    }
+
+    /// <summary>
     /// Get published app by public URL slug.
     /// Used by WebAppViewer to load apps accessed via /web/{slug} URLs.
     /// Validates authentication requirements and loads app as the owner.

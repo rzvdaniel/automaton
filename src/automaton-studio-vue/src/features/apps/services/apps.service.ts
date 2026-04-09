@@ -569,6 +569,41 @@ class AppsService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
   }
+
+  /**
+   * Get all published template apps (public)
+   * GET /api/apps/templates
+   */
+  async getTemplates(): Promise<App[]> {
+    const { data } = await apiClient.get<App[]>('/api/apps/templates')
+    return data
+  }
+
+  /**
+   * Duplicate an owned app (copies files + metadata)
+   * POST /api/apps/{id}/duplicate
+   */
+  async duplicate(id: string): Promise<App> {
+    const { data } = await apiClient.post<App>(`/api/apps/${id}/duplicate`)
+    return data
+  }
+
+  /**
+   * Fork a published template app into the current user's account
+   * POST /api/apps/{id}/fork
+   */
+  async fork(id: string): Promise<App> {
+    const { data } = await apiClient.post<App>(`/api/apps/${id}/fork`)
+    return data
+  }
+
+  /**
+   * Set template (sample) status for an app — admin only
+   * PUT /api/apps/{id}/sample
+   */
+  async setTemplateStatus(id: string, isSample: boolean, isFeatured: boolean = false): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/sample`, { isSample, isFeatured })
+  }
 }
 
 export const appsService = new AppsService()

@@ -14,6 +14,7 @@ import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
@@ -24,6 +25,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App } from '../types/apps.types'
+import { appsService } from '../services/apps.service'
 
 const router = useRouter()
 const toast = useToast()
@@ -31,6 +33,7 @@ const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
 const { defaultAiModel } = useUserSettings()
+const apiBase = import.meta.env.VITE_API_BASE_URL || ''
 
 // AI generation state
 const aiDescription = ref('')
@@ -87,6 +90,60 @@ const viewOptions = ref([
   { icon: 'pi pi-th-large', value: 'grid' },
   { icon: 'pi pi-list', value: 'list' },
 ])
+
+// Tab state
+const activeTabIndex = ref(0)
+const tabItems = ref([
+  { label: 'My Apps', icon: 'pi pi-th-large' },
+  { label: 'Templates', icon: 'pi pi-star' },
+])
+
+// Templates state
+const templates = ref<App[]>([])
+const isLoadingTemplates = ref(false)
+const isForkingId = ref<string | null>(null)
+
+const fetchTemplates = async () => {
+  isLoadingTemplates.value = true
+  try {
+    templates.value = await appsService.getTemplates()
+  } catch {
+    // silence — templates just won't show
+  } finally {
+    isLoadingTemplates.value = false
+  }
+}
+
+const handleUseTemplate = async (template: App) => {
+  isForkingId.value = template.id
+  try {
+    const newApp = await appsStore.forkTemplate(template.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Template Forked',
+      detail: `"${newApp.name}" has been added to your apps`,
+      life: 4000,
+    })
+    activeTabIndex.value = 0
+    router.push(`/apps/${newApp.id}`)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to use template'
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+      life: 5000,
+    })
+  } finally {
+    isForkingId.value = null
+  }
+}
+
+watch(activeTabIndex, (index) => {
+  if (index === 1 && templates.value.length === 0) {
+    fetchTemplates()
+  }
+})
 
 // Local state
 const searchQuery = ref('')
@@ -387,6 +444,12 @@ const handleRetry = async () => {
       </template>
     </Card>
 
+    <!-- Tabs: My Apps / Templates -->
+    <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
+
+    <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
+    <template v-if="activeTabIndex === 0">
+
     <!-- Apps List Header -->
     <div class="flex align-items-center justify-content-between mb-4">
       <div class="flex align-items-center gap-3">
@@ -539,6 +602,86 @@ const handleRetry = async () => {
         </template>
       </Card>
     </template>
+    </template><!-- /v-if="activeTabIndex === 0" -->
+
+    <!-- ─── TEMPLATES TAB ────────────────────────────────────────────── -->
+    <template v-if="activeTabIndex === 1">
+      <!-- Loading -->
+      <div v-if="isLoadingTemplates" class="grid">
+        <div v-for="i in 6" :key="i" class="col-12 md:col-6 lg:col-4">
+          <Card class="h-full">
+            <template #content>
+              <div class="flex flex-column gap-3">
+                <Skeleton width="70%" height="1.5rem" />
+                <Skeleton width="100%" height="3rem" />
+                <Skeleton width="5rem" height="1.5rem" border-radius="1rem" />
+                <Skeleton width="100%" height="2.5rem" />
+              </div>
+            </template>
+          </Card>
+        </div>
+      </div>
+
+      <!-- Empty -->
+      <Card v-else-if="templates.length === 0">
+        <template #content>
+          <div class="text-center py-5">
+            <i class="pi pi-star text-6xl text-color-secondary mb-4"></i>
+            <h3 class="text-xl font-semibold mb-2">No templates yet</h3>
+            <p class="text-color-secondary mb-0">
+              Published template apps will appear here so you can fork them into your account.
+            </p>
+          </div>
+        </template>
+      </Card>
+
+      <!-- Template Cards -->
+      <div v-else class="grid">
+        <div
+          v-for="template in templates"
+          :key="template.id"
+          class="col-12 md:col-6 lg:col-4"
+        >
+          <Card class="template-card h-full">
+            <template #header>
+              <div class="template-thumbnail">
+                <img
+                  v-if="template.thumbnailUrl"
+                  :src="template.thumbnailUrl.startsWith('http') ? template.thumbnailUrl : `${apiBase}${template.thumbnailUrl}`"
+                  :alt="template.name"
+                  loading="lazy"
+                />
+                <div v-else class="template-thumbnail-placeholder flex align-items-center justify-content-center">
+                  <i class="pi pi-globe text-4xl text-color-secondary"></i>
+                </div>
+                <Tag v-if="template.isFeatured" value="Featured" severity="warn" class="featured-badge" />
+              </div>
+            </template>
+            <template #title>{{ template.name }}</template>
+            <template #subtitle>
+              <Tag v-if="template.category" :value="template.category" severity="secondary" class="text-xs mr-1" />
+              <span class="text-color-secondary text-sm">{{ template.viewCount }} views</span>
+            </template>
+            <template #content>
+              <p v-if="template.description" class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
+                {{ template.description }}
+              </p>
+              <p v-else-if="template.summary" class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
+                {{ template.summary }}
+              </p>
+              <Button
+                label="Use Template"
+                icon="pi pi-copy"
+                class="w-full"
+                :loading="isForkingId === template.id"
+                :disabled="isForkingId !== null"
+                @click="handleUseTemplate(template)"
+              />
+            </template>
+          </Card>
+        </div>
+      </div>
+    </template><!-- /v-if="activeTabIndex === 1" -->
 
     <!-- Create App Dialog -->
     <Dialog
@@ -664,5 +807,37 @@ const handleRetry = async () => {
 
 .quick-start-card {
   max-width: 600px;
+}
+
+.template-card .template-thumbnail {
+  position: relative;
+  height: 160px;
+  overflow: hidden;
+  border-radius: var(--p-card-border-radius, 8px) var(--p-card-border-radius, 8px) 0 0;
+}
+
+.template-card .template-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.template-card .template-thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--p-surface-100);
+}
+
+.featured-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

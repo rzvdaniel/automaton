@@ -220,6 +220,28 @@ export const useAppsStore = defineStore('apps', () => {
     clearFilters()
   }
 
+  async function duplicateApp(id: string): Promise<App> {
+    try {
+      const newApp = await appsService.duplicate(id)
+      apps.value.push(newApp)
+      return newApp
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err)
+      throw new Error(errorMessage)
+    }
+  }
+
+  async function forkTemplate(id: string): Promise<App> {
+    try {
+      const newApp = await appsService.fork(id)
+      apps.value.push(newApp)
+      return newApp
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err)
+      throw new Error(errorMessage)
+    }
+  }
+
   // Helper to extract error message
   function getErrorMessage(err: unknown): string {
     if (err && typeof err === 'object') {
@@ -275,6 +297,8 @@ export const useAppsStore = defineStore('apps', () => {
     deleteApp,
     publishApp,
     unpublishApp,
+    duplicateApp,
+    forkTemplate,
     setSearchFilter,
     setStatusFilter,
     setProjectFilter,

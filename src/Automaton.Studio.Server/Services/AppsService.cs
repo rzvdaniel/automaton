@@ -548,6 +548,119 @@ public class AppsService
     }
 
     /// <summary>
+    /// Duplicate an app owned by the current user, copying all files.
+    /// </summary>
+    public async Task<Models.AppModel> DuplicateAsync(Guid appId)
+    {
+        var source = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstOrDefaultAsync(x => x.Id == appId && x.WebAppUsers.Any(u => u.UserId == UserId));
+
+        if (source == null)
+            throw new InvalidOperationException("App not found or you do not have access.");
+
+        var newId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var entity = new Entities.WebApp
+        {
+            Id = newId,
+            Name = $"{source.Name} (Copy)",
+            Summary = source.Summary,
+            Description = source.Description,
+            Definition = "{}",
+            IsPublished = false,
+            PublicUrl = null,
+            PublishedAt = null,
+            Version = 1,
+            ExecutionRunnerId = source.ExecutionRunnerId,
+            RequiresAuthentication = source.RequiresAuthentication,
+            Scope = Enums.AccessScope.Personal,
+            ProjectId = null,
+            IsSample = false,
+            IsFeatured = false,
+            ThumbnailUrl = source.ThumbnailUrl,
+            Category = source.Category,
+            Tags = source.Tags,
+            Created = now,
+            Updated = now,
+        };
+
+        dataContext.WebApps.Add(entity);
+        dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
+        await dataContext.SaveChangesAsync();
+
+        await fileStorageService.CopyAppFilesAsync(UserId, appId, UserId, newId);
+
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
+        logger.Information("Duplicated app {SrcAppId} → {NewAppId} for user {UserId}", appId, newId, UserId);
+
+        var newEntity = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstAsync(x => x.Id == newId);
+
+        return MapToModel(newEntity, null);
+    }
+
+    /// <summary>
+    /// Fork a template app (must be IsSample=true and IsPublished=true) into the current user's account.
+    /// </summary>
+    public async Task<Models.AppModel> ForkAsync(Guid templateAppId)
+    {
+        var source = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstOrDefaultAsync(x => x.Id == templateAppId && x.IsSample && x.IsPublished);
+
+        if (source == null)
+            throw new InvalidOperationException("Template app not found.");
+
+        var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
+            ?? throw new InvalidOperationException("Template app has no owner.");
+
+        var newId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var entity = new Entities.WebApp
+        {
+            Id = newId,
+            Name = source.Name,
+            Summary = source.Summary,
+            Description = source.Description,
+            Definition = "{}",
+            IsPublished = false,
+            PublicUrl = null,
+            PublishedAt = null,
+            Version = 1,
+            ExecutionRunnerId = null,
+            RequiresAuthentication = false,
+            Scope = Enums.AccessScope.Personal,
+            ProjectId = null,
+            IsSample = false,
+            IsFeatured = false,
+            ThumbnailUrl = source.ThumbnailUrl,
+            Category = source.Category,
+            Tags = source.Tags,
+            Created = now,
+            Updated = now,
+        };
+
+        dataContext.WebApps.Add(entity);
+        dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
+        await dataContext.SaveChangesAsync();
+
+        await fileStorageService.CopyAppFilesAsync(sourceOwner, templateAppId, UserId, newId);
+
+        await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
+        logger.Information("Forked template {TemplateAppId} → {NewAppId} for user {UserId}", templateAppId, newId, UserId);
+
+        var newEntity = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .FirstAsync(x => x.Id == newId);
+
+        return MapToModel(newEntity, null);
+    }
+
+    /// <summary>
     /// Get all sample apps (publicly accessible)
     /// </summary>
     public async Task<IEnumerable<Models.AppModel>> GetSampleAppsAsync()

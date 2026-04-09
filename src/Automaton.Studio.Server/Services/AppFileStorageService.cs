@@ -58,6 +58,48 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Copy all root-level app files from one user/app to another.
+    /// Used for duplicate (same user) and fork (cross-user).
+    /// Skips the versions/ snapshot subdirectory.
+    /// </summary>
+    public Task CopyAppFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
+    {
+        var srcPath = GetAppPath(srcUserId, srcAppId);
+        var dstPath = GetAppPath(dstUserId, dstAppId);
+
+        Directory.CreateDirectory(dstPath);
+
+        if (!Directory.Exists(srcPath))
+        {
+            logger.Warning("Source app directory not found when copying: {SrcPath}", srcPath);
+            return Task.CompletedTask;
+        }
+
+        var versionsPath = Path.GetFullPath(Path.Combine(srcPath, "versions"));
+
+        foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+        {
+            var fullSourcePath = Path.GetFullPath(sourceFile);
+            if (fullSourcePath.StartsWith(versionsPath, StringComparison.OrdinalIgnoreCase))
+                continue; // Skip version snapshots
+
+            var relativePath = Path.GetRelativePath(srcPath, sourceFile);
+            var targetFilePath = Path.Combine(dstPath, relativePath);
+            var targetDirectory = Path.GetDirectoryName(targetFilePath);
+
+            if (!string.IsNullOrEmpty(targetDirectory))
+                Directory.CreateDirectory(targetDirectory);
+
+            File.Copy(sourceFile, targetFilePath, overwrite: true);
+        }
+
+        logger.Information("Copied app files from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
+            srcAppId, srcUserId, dstAppId, dstUserId);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Save app definition to file system
     /// </summary>
     public async Task SaveAppAsync(Guid userId, Guid appId, AppDefinition definition)

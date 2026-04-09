@@ -17,6 +17,7 @@ import Message from 'primevue/message'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope } from '../types/apps.types'
 
@@ -25,9 +26,16 @@ const confirm = useConfirm()
 const router = useRouter()
 const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
+const authStore = useAuthStore()
+
+const isAdmin = computed(() => {
+  const roles = authStore.user?.roles
+  if (!roles) return false
+  return roles.includes('Admin') || roles.includes('SysAdmin')
+})
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'templates' | 'danger'>('basic')
 
 // Local form state
 const name = ref('')
@@ -62,6 +70,11 @@ function onDrop(e: DragEvent) {
   if (file) handleImageUpload({ files: [file] })
 }
 const isDeleting = ref(false)
+
+// Template (admin) state
+const isSample = ref(false)
+const isFeatured = ref(false)
+const isSavingTemplate = ref(false)
 
 // Computed
 const app = computed(() => editorStore.currentApp)
@@ -110,6 +123,8 @@ watch(
       requiresAuthentication.value = newApp.requiresAuthentication || false
       executionRunnerId.value = newApp.executionRunnerId || null
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
+      isSample.value = newApp.isSample ?? false
+      isFeatured.value = newApp.isFeatured ?? false
     }
   },
   { immediate: true },
@@ -309,6 +324,29 @@ function handleDelete() {
     },
   })
 }
+
+async function handleSaveTemplateStatus() {
+  if (!app.value) return
+  isSavingTemplate.value = true
+  try {
+    await appsService.setTemplateStatus(app.value.id, isSample.value, isFeatured.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Saved',
+      detail: isSample.value ? 'App is now a template' : 'App removed from templates',
+      life: 3000,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err instanceof Error ? err.message : 'Failed to update template status',
+      life: 5000,
+    })
+  } finally {
+    isSavingTemplate.value = false
+  }
+}
 </script>
 
 <template>
@@ -361,6 +399,16 @@ function handleDelete() {
                 :class="{ 'surface-hover': activeSection === 'danger' }"
                 class="w-full justify-content-start text-red-500"
                 @click="activeSection = 'danger'"
+              />
+              <div v-if="isAdmin" class="border-top-1 surface-border my-2" />
+              <Button
+                v-if="isAdmin"
+                label="Templates"
+                icon="pi pi-star"
+                text
+                :class="{ 'surface-hover': activeSection === 'templates' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'templates'"
               />
             </div>
           </template>
@@ -666,6 +714,41 @@ function handleDelete() {
                   outlined
                   :loading="isDeleting"
                   @click="handleDelete"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Templates (Admin only) -->
+        <Card v-if="activeSection === 'templates' && isAdmin">
+          <template #title>Templates</template>
+          <template #content>
+            <div class="flex flex-column gap-4">
+              <p class="text-color-secondary mt-0 mb-0">
+                Mark this app as a template so users can fork it into their own account from the Templates gallery.
+                The app must be published before it can appear as a template.
+              </p>
+              <div class="flex align-items-center gap-3">
+                <InputSwitch v-model="isSample" input-id="is-sample" />
+                <label for="is-sample" class="cursor-pointer">
+                  <span class="font-medium">Publish as Template</span>
+                  <div class="text-color-secondary text-sm">Shows in the Templates tab for all users</div>
+                </label>
+              </div>
+              <div class="flex align-items-center gap-3">
+                <InputSwitch v-model="isFeatured" input-id="is-featured" :disabled="!isSample" />
+                <label for="is-featured" class="cursor-pointer" :class="{ 'text-color-secondary': !isSample }">
+                  <span class="font-medium">Featured</span>
+                  <div class="text-color-secondary text-sm">Pinned to the top of the Templates gallery</div>
+                </label>
+              </div>
+              <div>
+                <Button
+                  label="Save"
+                  icon="pi pi-save"
+                  :loading="isSavingTemplate"
+                  @click="handleSaveTemplateStatus"
                 />
               </div>
             </div>

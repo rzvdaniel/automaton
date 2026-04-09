@@ -120,10 +120,7 @@ const handleUnpublish = async () => {
 
 const handleDuplicate = async () => {
   try {
-    const newApp = await appsStore.createApp({
-      name: `${props.app.name} (Copy)`,
-      executionRunnerId: props.app.executionRunnerId || undefined,
-    })
+    const newApp = await appsStore.duplicateApp(props.app.id)
     toast.add({
       severity: 'success',
       summary: 'Duplicated',
