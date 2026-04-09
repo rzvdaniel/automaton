@@ -150,33 +150,6 @@ function getPreviewIframe(): HTMLIFrameElement | null {
   )
 }
 
-function getPreviewDocument(): Document | null {
-  const iframe = getPreviewIframe()
-  if (!iframe?.contentWindow) {
-    return null
-  }
-
-  try {
-    return iframe.contentWindow.document
-  } catch {
-    // Cross-origin frame; direct DOM access is blocked. Caller should fallback to postMessage bridge.
-    return null
-  }
-}
-
-function isCrossOriginFrame(iframe: HTMLIFrameElement | null): boolean {
-  if (!iframe?.contentWindow) {
-    return false
-  }
-
-  try {
-    void iframe.contentWindow.document
-    return false
-  } catch {
-    return true
-  }
-}
-
 async function executeViaPostMessageBridge(
   action: UiAutomationAction,
   args: Record<string, unknown>,
@@ -256,268 +229,79 @@ async function waitForSelector(
   return null
 }
 
-function resolveSafePreviewNavigationTarget(
-  previewWindow: Window,
-  targetUrl: string,
-): string | null {
-  const trimmed = targetUrl.trim()
-  if (!trimmed) {
-    return null
-  }
-
-  try {
-    const resolved = new URL(trimmed, previewWindow.location.href)
-    const sameOrigin = resolved.origin === previewWindow.location.origin
-    const inPreviewPath = resolved.pathname.includes('/app-preview/')
-    return sameOrigin && inPreviewPath ? resolved.toString() : null
-  } catch {
-    return null
-  }
-}
-
-// Actions that must run inside the iframe JS context regardless of same/cross origin.
-// These rely on iframe globals (_networkLog, canvas contexts, eval scope, etc.)
-// and are routed through the postMessage bridge for both cases.
-const BRIDGE_ONLY_ACTIONS = new Set<UiAutomationAction>([
-  UiAutomationAction.Evaluate,
-  UiAutomationAction.Keyboard,
-  UiAutomationAction.GetAttribute,
-  UiAutomationAction.QueryAll,
-  UiAutomationAction.Select,
-  UiAutomationAction.Hover,
-  UiAutomationAction.ScrollTo,
-  UiAutomationAction.Check,
-  UiAutomationAction.GetCanvasData,
-  UiAutomationAction.NetworkLog,
-  UiAutomationAction.SetBackendMode,
-])
-
 export async function executeUiAutomationAction(
   action: UiAutomationAction,
   args: Record<string, unknown>,
   getUiLogs: () => UiLogEntry[],
 ): Promise<UiAutomationResult> {
-  const iframe = getPreviewIframe()
-  const requiresDomAccess = action !== UiAutomationAction.GetConsoleLogs
-  const useBridge = BRIDGE_ONLY_ACTIONS.has(action) || (requiresDomAccess && isCrossOriginFrame(iframe))
+  // GetConsoleLogs reads parent-frame store data — never goes through the bridge.
+  if (action === UiAutomationAction.GetConsoleLogs) {
+    const requestedLimit = Number(args.limit ?? 120)
+    const limit = Math.min(300, Math.max(20, Number.isFinite(requestedLimit) ? requestedLimit : 120))
+    const minLevel = normalizeUiLogLevel(args.minLevel)
+    const maxMessageCharsRequested = Number(args.maxMessageChars ?? 260)
+    const maxMessageChars = Math.min(600, Math.max(80, Number.isFinite(maxMessageCharsRequested) ? maxMessageCharsRequested : 260))
 
-  // Reload is handled specially: it manages its own cross-origin path (fire-and-forget postMessage
-  // then waits for the iframe load event from the parent side).
-  if (useBridge && action !== UiAutomationAction.Reload) {
-    return executeViaPostMessageBridge(action, args)
+    const allLogs = getUiLogs()
+    const filteredLogs = allLogs.filter((entry) => UI_LOG_LEVEL_RANK[entry.level] >= UI_LOG_LEVEL_RANK[minLevel])
+
+    const logs = filteredLogs.slice(0, limit).map((entry) => ({
+      timestamp: entry.timestamp,
+      level: entry.level,
+      source: entry.source,
+      message: truncateLogMessage(entry.message, maxMessageChars),
+    }))
+
+    const summary = buildUiLogSummary(filteredLogs, logs)
+    const details = summary.hasBlockingIssues
+      ? `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. Blocking errors detected: ${summary.blockingIssueCount}.`
+      : `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. No blocking errors detected.`
+
+    return { success: true, action, logs, logSummary: summary, details }
   }
 
-  const doc = getPreviewDocument()
+  // Reload needs to listen to the iframe load event from the parent side —
+  // it cannot be detected from within the iframe itself.
+  if (action === UiAutomationAction.Reload) {
+    const waitForSel = args.waitForSelector !== undefined ? String(args.waitForSelector).trim() : ''
+    const timeoutMs = Number(args.timeoutMs ?? 5000)
 
-  // Reload does not need doc — it triggers via win.location.reload() or postMessage bridge.
-  if (action !== UiAutomationAction.GetConsoleLogs && action !== UiAutomationAction.Reload && !doc) {
-    return { success: false, action, error: 'Preview is not ready. Open Build > Visual mode first.' }
-  }
+    const iframeEl = getPreviewIframe()
+    if (!iframeEl) {
+      return { success: false, action, error: 'Preview iframe is not available' }
+    }
 
-  try {
-    switch (action) {
-      case UiAutomationAction.Navigate: {
-        const url = String(args.url ?? '').trim()
-        if (!url) return { success: false, action, error: "Missing required argument 'url'" }
-        const win = doc!.defaultView
-        if (!win) return { success: false, action, error: 'Preview window is not available' }
-        const safeTarget = resolveSafePreviewNavigationTarget(win, url)
-        if (!safeTarget) {
-          return {
-            success: false,
-            action,
-            error:
-              'Blocked ui_navigate outside preview app scope. Use a relative app URL like "index.html", "pages/level1.html", "?mode=test", or "#section".',
-          }
-        }
-        win.location.assign(safeTarget)
-        return { success: true, action, details: `Navigated to ${safeTarget}` }
-      }
-      case UiAutomationAction.Reload: {
-        const waitForSel = args.waitForSelector !== undefined ? String(args.waitForSelector).trim() : ''
-        const timeoutMs = Number(args.timeoutMs ?? 5000)
+    // Register load listener BEFORE triggering reload to avoid a race condition.
+    const loadPromise = new Promise<boolean>((resolve) => {
+      const timeoutHandle = window.setTimeout(() => resolve(false), timeoutMs)
+      iframeEl.addEventListener('load', () => { window.clearTimeout(timeoutHandle); resolve(true) }, { once: true })
+    })
 
-        const iframeEl = getPreviewIframe()
-        if (!iframeEl) {
-          return { success: false, action, error: 'Preview iframe is not available' }
-        }
+    // Ask the iframe to reload via the bridge (works for both same-origin and cross-origin).
+    void executeViaPostMessageBridge(action, args)
 
-        // Register load listener BEFORE triggering reload to avoid a race condition.
-        const loadPromise = new Promise<boolean>((resolve) => {
-          const timeoutHandle = window.setTimeout(() => resolve(false), timeoutMs)
-          iframeEl.addEventListener(
-            'load',
-            () => {
-              window.clearTimeout(timeoutHandle)
-              resolve(true)
-            },
-            { once: true },
-          )
-        })
+    const loaded = await loadPromise
+    if (!loaded) {
+      return { success: false, action, error: `Timed out waiting for page to reload (${timeoutMs}ms)` }
+    }
 
-        if (useBridge) {
-          // Cross-origin: ask the iframe to call window.location.reload() via postMessage.
-          // The response arrives before the navigation actually starts (JS single-threaded),
-          // so we can fire-and-forget and wait for the parent-side load event instead.
-          void executeViaPostMessageBridge(action, args)
-        } else {
-          const win = doc?.defaultView
-          if (!win) return { success: false, action, error: 'Preview window is not available' }
-          win.location.reload()
-        }
-
-        const loaded = await loadPromise
-        if (!loaded) {
-          return { success: false, action, error: `Timed out waiting for page to reload (${timeoutMs}ms)` }
-        }
-
-        if (waitForSel) {
-          const newDoc = getPreviewDocument()
-          if (newDoc) {
-            const found = await waitForSelector(newDoc, waitForSel, timeoutMs, 100)
-            if (!found) {
-              return { success: false, action, error: `Reloaded but timed out waiting for selector: ${waitForSel}` }
-            }
-          }
-        }
-
-        return { success: true, action, details: 'Reloaded preview' }
-      }
-      case UiAutomationAction.Click: {
-        const selector = String(args.selector ?? '').trim()
-        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" }
-        const element = doc!.querySelector<HTMLElement>(selector)
-        if (!element) return { success: false, action, error: `Element not found for selector: ${selector}` }
-        element.click()
-        return { success: true, action, details: `Clicked ${selector}` }
-      }
-      case UiAutomationAction.Type: {
-        const selector = String(args.selector ?? '').trim()
-        const text = String(args.text ?? '')
-        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" }
-        const element = doc!.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)
-        if (!element) return { success: false, action, error: `Element not found for selector: ${selector}` }
-        element.focus()
-        element.value = text
-        element.dispatchEvent(new Event('input', { bubbles: true }))
-        element.dispatchEvent(new Event('change', { bubbles: true }))
-        return { success: true, action, details: `Typed into ${selector}` }
-      }
-      case UiAutomationAction.ReadText: {
-        const selector = String(args.selector ?? '').trim()
-        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" }
-        const element = doc!.querySelector<HTMLElement>(selector)
-        if (!element) return { success: false, action, error: `Element not found for selector: ${selector}` }
-        const value = (element.textContent ?? '').trim()
-        return { success: true, action, value, details: `Read text from ${selector}` }
-      }
-      case UiAutomationAction.WaitFor: {
-        const selector = String(args.selector ?? '').trim()
-        const timeoutMs = Number(args.timeoutMs ?? 3000)
-        const intervalMs = Number(args.intervalMs ?? 100)
-        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" }
-        const found = await waitForSelector(doc!, selector, timeoutMs, intervalMs)
+    if (waitForSel) {
+      const newDoc = iframeEl.contentWindow?.document ?? null
+      if (newDoc) {
+        const found = await waitForSelector(newDoc, waitForSel, timeoutMs, 100)
         if (!found) {
-          return {
-            success: false,
-            action,
-            error: `Timed out waiting for selector: ${selector} (${timeoutMs}ms)`,
-          }
-        }
-        return { success: true, action, details: `Selector appeared: ${selector}` }
-      }
-      case UiAutomationAction.Assert: {
-        const selector = String(args.selector ?? '').trim()
-        const exists = args.exists === undefined ? true : Boolean(args.exists)
-        const containsText = args.containsText === undefined ? undefined : String(args.containsText)
-        const equalsText = args.equalsText === undefined ? undefined : String(args.equalsText)
-        if (!selector) return { success: false, action, error: "Missing required argument 'selector'" }
-
-        const element = doc!.querySelector<HTMLElement>(selector)
-        const found = Boolean(element)
-        if (exists !== found) {
-          return {
-            success: false,
-            action,
-            error: `Assertion failed for ${selector}: expected exists=${exists}, actual=${found}`,
-          }
-        }
-
-        if (element && containsText !== undefined) {
-          const text = (element.textContent ?? '').trim()
-          if (!text.includes(containsText)) {
-            return {
-              success: false,
-              action,
-              error: `Assertion failed for ${selector}: text does not include "${containsText}"`,
-            }
-          }
-        }
-
-        if (element && equalsText !== undefined) {
-          const text = (element.textContent ?? '').trim()
-          if (text !== equalsText) {
-            return {
-              success: false,
-              action,
-              error: `Assertion failed for ${selector}: expected "${equalsText}", got "${text}"`,
-            }
-          }
-        }
-
-        return { success: true, action, details: `Assertion passed for ${selector}` }
-      }
-      case UiAutomationAction.GetPageSnapshot: {
-        const maxChars = Math.max(100, Number(args.maxChars ?? 1000))
-        const title = doc!.title ?? ''
-        const url = doc!.location?.href ?? ''
-        const bodyText = (doc!.body?.innerText ?? '').slice(0, maxChars)
-        return {
-          success: true,
-          action,
-          details: `Snapshot captured (${bodyText.length} chars)`,
-          snapshot: { title, url, bodyText },
+          return { success: false, action, error: `Reloaded but timed out waiting for selector: ${waitForSel}` }
         }
       }
-      case UiAutomationAction.GetConsoleLogs: {
-        const requestedLimit = Number(args.limit ?? 120)
-        const limit = Math.min(300, Math.max(20, Number.isFinite(requestedLimit) ? requestedLimit : 120))
-        const minLevel = normalizeUiLogLevel(args.minLevel)
-        const maxMessageCharsRequested = Number(args.maxMessageChars ?? 260)
-        const maxMessageChars = Math.min(600, Math.max(80, Number.isFinite(maxMessageCharsRequested) ? maxMessageCharsRequested : 260))
-
-        const allLogs = getUiLogs()
-        const filteredLogs = allLogs.filter((entry) => UI_LOG_LEVEL_RANK[entry.level] >= UI_LOG_LEVEL_RANK[minLevel])
-
-        const logs = filteredLogs.slice(0, limit).map((entry) => ({
-          timestamp: entry.timestamp,
-          level: entry.level,
-          source: entry.source,
-          message: truncateLogMessage(entry.message, maxMessageChars),
-        }))
-
-        const summary = buildUiLogSummary(filteredLogs, logs)
-        const details = summary.hasBlockingIssues
-          ? `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. Blocking errors detected: ${summary.blockingIssueCount}.`
-          : `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. No blocking errors detected.`
-
-        return {
-          success: true,
-          action,
-          logs,
-          logSummary: summary,
-          details,
-        }
-      }
-      default:
-        return { success: false, action, error: `Unsupported UI action: ${action}` }
     }
-  } catch (error) {
-    return {
-      success: false,
-      action,
-      error: error instanceof Error ? error.message : 'Unknown UI automation error',
-    }
+
+    return { success: true, action, details: 'Reloaded preview' }
   }
+
+  // All other actions are implemented in automaton-api-preview.js inside the iframe.
+  // Routing everything through the postMessage bridge means a single implementation
+  // covers both same-origin and cross-origin frames — adding a new action only
+  // requires adding it to UiAutomationAction and implementing it in automaton-api-preview.js.
+  return executeViaPostMessageBridge(action, args)
 }
 

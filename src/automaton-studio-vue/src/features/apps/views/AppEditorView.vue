@@ -31,6 +31,7 @@ import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
+import AiConsoleView from '../components/AiConsoleView.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -79,7 +80,7 @@ const appNameAutoUpdated = ref(false)
 const selectedRunnerId = ref<string | null>(null)
 
 // Active view tab (code, console, logs, usage, or settings)
-const activeTab = ref<'code' | 'settings' | 'console' | 'logs' | 'usage'>('code')
+const activeTab = ref<'code' | 'settings' | 'console' | 'logs' | 'usage' | 'ai-console'>('code')
 const BUILD_VIEW_MODE_STORAGE_KEY = 'app-editor-build-view-mode'
 type BuildViewMode = 'visual' | 'code'
 
@@ -831,16 +832,7 @@ function handleInitialPromptConsumed() {
 async function handleAiToolExecuted(toolName: string, args: any, result?: any, toolCallId?: string) {
   console.log('[AppEditor] AI tool executed:', { toolName, args, result, toolCallId })
 
-  const uiActionNames = new Set<string>([
-    UiAutomationAction.Navigate,
-    UiAutomationAction.Click,
-    UiAutomationAction.Type,
-    UiAutomationAction.ReadText,
-    UiAutomationAction.WaitFor,
-    UiAutomationAction.Assert,
-    UiAutomationAction.GetPageSnapshot,
-    UiAutomationAction.GetConsoleLogs,
-  ])
+  const uiActionNames = new Set<string>(Object.values(UiAutomationAction))
 
   if (uiActionNames.has(toolName)) {
     const envelope = result && typeof result === 'object' ? (result as Record<string, unknown>) : null
@@ -1005,6 +997,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               </button>
               <button
                 class="view-tab"
+                :class="{ active: activeTab === 'ai-console' }"
+                @click="activeTab = 'ai-console'"
+              >
+                <i class="pi pi-desktop"></i>
+                AI Console
+              </button>
+              <button
+                class="view-tab"
                 :class="{ active: activeTab === 'logs' }"
                 @click="activeTab = 'logs'"
               >
@@ -1146,6 +1146,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       <!-- Console View -->
       <div v-show="activeTab === 'console'" class="console-view">
         <ConsolePanel />
+      </div>
+
+      <!-- AI Console View -->
+      <div v-show="activeTab === 'ai-console'" class="ai-console-view">
+        <AiConsoleView
+          :messages="liveBuildMessages"
+          :session="liveBuildSession"
+          :is-busy="liveBuildIsBusy"
+        />
       </div>
 
       <!-- Logs View -->
@@ -1544,6 +1553,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .console-view {
   flex: 1;
   overflow: hidden;
+}
+
+/* AI Console (terminal) view container */
+.ai-console-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Console badge in tab */
