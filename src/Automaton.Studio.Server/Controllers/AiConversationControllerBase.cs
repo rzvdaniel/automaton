@@ -175,6 +175,19 @@ public abstract class AiConversationControllerBase : BaseController
             // 6. Pre-conversation hook (e.g. create version snapshot)
             var conversationToken = await OnBeforeConversationAsync(request, userId, resolvedSessionId);
 
+            // 6b. Persist user message immediately — before the AI responds.
+            //     Industry standard: the user's message belongs to history the moment it is sent,
+            //     regardless of whether the AI succeeds, fails, or the stream is cancelled.
+            await EnsurePolicyMarkerMessagesAsync(resolvedSessionId, userId);
+            await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
+            {
+                SessionId = resolvedSessionId,
+                Role = "user",
+                Content = request.Message,
+                MessageType = ChatMessageType.Text,
+                Metadata = "{}"
+            }, userId);
+
             // 7. Subscribe to events and run conversation
             eventHandler = (_, e) =>
             {
@@ -215,22 +228,9 @@ public abstract class AiConversationControllerBase : BaseController
 
             var updatesSnapshot = new List<ConversationUpdatedEvent>(pendingUpdates.ToArray());
 
-            // 8. Persist chat messages only on success so aborted attempts don't pollute history.
-            //    Usage counters (tokens/API calls) are persisted on failure/cancellation separately.
+            // 9. Persist AI responses and usage on success.
             if (result.IsSuccess)
             {
-                await EnsurePolicyMarkerMessagesAsync(resolvedSessionId, userId);
-
-                // Save user message first (before AI responses to preserve chronological order)
-                await _chatHistoryService.SaveMessageAsync(new SaveChatMessageRequest
-                {
-                    SessionId = resolvedSessionId,
-                    Role = "user",
-                    Content = request.Message,
-                    MessageType = ChatMessageType.Text,
-                    Metadata = "{}"
-                }, userId);
-
                 var savedToolCallIds = new HashSet<string>();
                 foreach (var update in updatesSnapshot)
                     await SaveConversationUpdateAsync(update, resolvedSessionId, userId, savedToolCallIds);
