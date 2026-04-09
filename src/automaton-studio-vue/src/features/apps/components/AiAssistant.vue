@@ -144,6 +144,53 @@ const getModelDisplayName = (modelId?: string | null) => {
   return modelDisplayNames.value[modelId] || modelId
 }
 
+type VersionSummary = { overview: string; changes: string[] }
+
+/**
+ * Extract a trailing version-summary JSON block emitted by the AI
+ * (e.g. {"overview":"...","changes":[...]} at the end of assistant messages).
+ * Returns the main text and the parsed summary (if found).
+ */
+function extractVersionSummary(content: string): { text: string; summary: VersionSummary | null } {
+  const trimmed = content.trimEnd()
+  if (!trimmed.endsWith('}')) return { text: content, summary: null }
+
+  // Walk backwards to find the opening { that matches the final }
+  let depth = 0
+  let startIdx = -1
+  for (let i = trimmed.length - 1; i >= 0; i--) {
+    if (trimmed[i] === '}') depth++
+    else if (trimmed[i] === '{') {
+      depth--
+      if (depth === 0) {
+        startIdx = i
+        break
+      }
+    }
+  }
+
+  if (startIdx === -1) return { text: content, summary: null }
+
+  const jsonBlock = trimmed.slice(startIdx)
+  if (!jsonBlock.includes('"overview"') || !jsonBlock.includes('"changes"')) {
+    return { text: content, summary: null }
+  }
+
+  try {
+    const parsed = JSON.parse(jsonBlock)
+    if (parsed.overview && Array.isArray(parsed.changes)) {
+      return {
+        text: content.slice(0, startIdx).trimEnd(),
+        summary: parsed as VersionSummary,
+      }
+    }
+  } catch {
+    // Not valid JSON – render as-is
+  }
+
+  return { text: content, summary: null }
+}
+
 const formatVerificationStrategy = (strategy?: string | null) => {
   switch (strategy?.toLowerCase()) {
     case 'continuous':
@@ -916,9 +963,24 @@ function handleKeyPress(event: KeyboardEvent) {
                       v-if="group.message.reasoningContent"
                       :content="group.message.reasoningContent"
                     />
-                    <div class="message-text">
-                      {{ group.message.content }}
-                    </div>
+                    <!-- Use v-for single-item to bind extractVersionSummary result as a template variable -->
+                    <template v-for="extracted in [extractVersionSummary(group.message.content)]" :key="gIdx">
+                      <div v-if="extracted.text" class="message-text">
+                        {{ extracted.text }}
+                      </div>
+                      <div v-if="extracted.summary" class="version-summary">
+                        <p class="version-summary__overview">{{ extracted.summary.overview }}</p>
+                        <div v-if="extracted.summary.changes.length > 0" class="version-summary__changes">
+                          <span class="version-summary__changes-label">Changes:</span>
+                          <ul class="version-summary__list">
+                            <li v-for="(change, idx) in extracted.summary.changes" :key="idx">{{ change }}</li>
+                          </ul>
+                        </div>
+                      </div>
+                      <div v-if="!extracted.text && !extracted.summary" class="message-text">
+                        {{ group.message.content }}
+                      </div>
+                    </template>
                   </template>
                   <!-- Model badge: only shown once model is resolved (not during streaming) -->
                   <span v-if="group.message.model && !group.message.isStreaming" class="message-model-badge">
@@ -1462,6 +1524,46 @@ function handleKeyPress(event: KeyboardEvent) {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.version-summary {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--p-primary-color);
+  background: var(--p-surface-50);
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.version-summary__overview {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0 0 0.625rem 0;
+  color: var(--p-text-color);
+}
+
+.version-summary__changes-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.375rem;
+  color: var(--p-text-color);
+}
+
+.version-summary__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
+.version-summary__list li {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 0.3rem;
+  color: var(--p-text-color);
+}
+
+.version-summary__list li:last-child {
+  margin-bottom: 0;
 }
 
 .message-model-badge {

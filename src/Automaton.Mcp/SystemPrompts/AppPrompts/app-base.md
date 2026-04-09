@@ -331,11 +331,11 @@ ui_navigate(page) → ui_wait_for(root element) → ui_click / ui_type → ui_as
 - If blocked, report exact blocker + what was attempted.
 
 ## FINAL RESPONSE:
-After tool calls, end with a brief **Summary of Changes** (what was done + files modified + any deploy steps needed).
-For small talk or no-change requests, respond normally without a summary.
+After tool calls, end your response with a JSON summary block in this exact format (no markdown wrapper, no extra text after it):
+{"overview":"1-2 sentence summary of what was done","changes":["specific change 1","specific change 2"]}
+- For small talk or no-change requests, respond normally without a summary block.
 - Never narrate future actions after your last tool call
 - Never repeat step-by-step narration the user already saw
-- For large changes, group summary by domain (Backend / Frontend / Shared)
 
 ## UPLOADING AND DOWNLOADING FILES
 
