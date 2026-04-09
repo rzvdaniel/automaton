@@ -212,23 +212,6 @@ async function executeViaPostMessageBridge(
   })
 }
 
-async function waitForSelector(
-  doc: Document,
-  selector: string,
-  timeoutMs: number,
-  intervalMs: number,
-): Promise<Element | null> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const found = doc.querySelector(selector)
-    if (found) {
-      return found
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
-  }
-  return null
-}
-
 export async function executeUiAutomationAction(
   action: UiAutomationAction,
   args: Record<string, unknown>,
@@ -286,12 +269,14 @@ export async function executeUiAutomationAction(
     }
 
     if (waitForSel) {
-      const newDoc = iframeEl.contentWindow?.document ?? null
-      if (newDoc) {
-        const found = await waitForSelector(newDoc, waitForSel, timeoutMs, 100)
-        if (!found) {
-          return { success: false, action, error: `Reloaded but timed out waiting for selector: ${waitForSel}` }
-        }
+      // Delegate the post-reload selector wait to the iframe via the bridge —
+      // we cannot access contentWindow.document from the parent for cross-origin frames.
+      const waitResult = await executeViaPostMessageBridge(UiAutomationAction.WaitFor, {
+        selector: waitForSel,
+        timeoutMs,
+      })
+      if (!waitResult.success) {
+        return { success: false, action, error: `Reloaded but timed out waiting for selector: ${waitForSel}` }
       }
     }
 
