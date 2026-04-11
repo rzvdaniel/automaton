@@ -65,6 +65,8 @@ App_Data/
 # AppSettings files
 appsettings*.json
 
+.vscode/
+
 # Ignore files created by Claude AI
 .claude
 # App file storage
