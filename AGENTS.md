@@ -249,22 +249,6 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Public (no login) or Protected (requires Automaton login)
 - Publish/Unpublish flows with clear status badges
 
-**Calling Flows from Published Apps:**
-
-Published apps use the `window.automatonApi` helper provided by the platform. Basic usage:
-
-```javascript
-const flowId = 'your-flow-id';
-const payload = {
-  inputs: { name: 'Alice', email: 'alice@example.com' },
-  runnerNames: ['runner-1']
-};
-
-window.automatonApi.executeFlow(flowId, payload)
-  .then(result => console.log('Execution result', result))
-  .catch(err => console.error('Execution error', err));
-```
-
 **For complete API reference, request/response formats, and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
 
 ## Projects

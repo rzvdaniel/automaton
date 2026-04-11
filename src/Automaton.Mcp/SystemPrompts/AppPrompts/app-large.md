@@ -12,11 +12,21 @@ You are an expert full-stack developer building large web apps: multi-feature ap
 - **SQLite** _(default)_: Use `import sqlite3` in each controller that needs persistence.
   ```python
   import sqlite3, os
+  from contextlib import contextmanager
   DB_PATH = os.path.join(os.path.dirname(__file__), '../data/app.db')  # shared across controllers
+
+  @contextmanager
   def get_db():
       conn = sqlite3.connect(DB_PATH)
       conn.row_factory = sqlite3.Row
-      return conn
+      try:
+          yield conn
+          conn.commit()
+      except Exception:
+          conn.rollback()
+          raise
+      finally:
+          conn.close()
   ```
   Use a shared `data/app.db` path so all controllers share one database file.
 - **External DB**: Only if the user explicitly provides credentials during clarification.
@@ -138,38 +148,54 @@ Add meta: `<meta name="theme-color" content="#2563eb">`
 Each controller file handles one resource. Use a class per resource with a `handle()` entry point.
 
 ```python
-import sqlite3, os
+import sqlite3, os, functools
+from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '../data/app.db')
+
+@contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def _action(fn):
+    @functools.wraps(fn)
+    def wrapper(self, inputs):
+        try:
+            return fn(self, inputs)
+        except Exception as e:
+            return {"success": False, "data": None, "error": str(e)}
+    return wrapper
 
 class ProductsController:
-    def list(self, inputs):
-        try:
-            page = int(inputs.get('page', 1))
-            limit = int(inputs.get('limit', 20))
-            with get_db() as db:
-                total = db.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-                rows = db.execute("SELECT * FROM products ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                                  (limit, (page - 1) * limit)).fetchall()
-                return {"success": True, "data": {"items": [dict(r) for r in rows], "total": total, "page": page}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
 
+    @_action
+    def list(self, inputs):
+        page = int(inputs.get('page', 1))
+        limit = int(inputs.get('limit', 20))
+        with get_db() as db:
+            total = db.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+            rows = db.execute("SELECT * FROM products ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                              (limit, (page - 1) * limit)).fetchall()
+        return {"success": True, "data": {"items": [dict(r) for r in rows], "total": total, "page": page}, "error": ""}
+
+    @_action
     def create(self, inputs):
-        try:
-            name = inputs.get('name', '').strip()
-            price = float(inputs.get('price', 0))
-            if not name:
-                return {"success": False, "data": None, "error": "name is required"}
-            with get_db() as db:
-                cur = db.execute("INSERT INTO products (name, price) VALUES (?, ?)", (name, price))
-                return {"success": True, "data": {"id": cur.lastrowid, "name": name, "price": price}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        name = inputs.get('name', '').strip()
+        price = float(inputs.get('price', 0))
+        if not name:
+            return {"success": False, "data": None, "error": "name is required"}
+        with get_db() as db:
+            cur = db.execute("INSERT INTO products (name, price) VALUES (?, ?)", (name, price))
+        return {"success": True, "data": {"id": cur.lastrowid, "name": name, "price": price}, "error": ""}
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────

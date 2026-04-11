@@ -16,12 +16,22 @@ You are an expert full-stack developer building enterprise-grade web apps: CRM/E
   ```python
   # shared/db.py
   import sqlite3, os
+  from contextlib import contextmanager
   DB_PATH = os.path.join(os.path.dirname(__file__), '../data/app.db')
+
+  @contextmanager
   def get_db():
       conn = sqlite3.connect(DB_PATH)
       conn.row_factory = sqlite3.Row
       conn.execute("PRAGMA foreign_keys = ON")
-      return conn
+      try:
+          yield conn
+          conn.commit()
+      except Exception:
+          conn.rollback()
+          raise
+      finally:
+          conn.close()
   ```
 - **PostgreSQL**: Use `psycopg2`. Connection string from user: `postgresql://user:pass@host:5432/db`.
 - **MySQL**: Use `mysql-connector-python`. Only if user provides credentials.
@@ -197,73 +207,79 @@ In every HTML `<head>`:
 Each domain gets its own file. Use `shared/db.py` for database connection.
 
 ```python
-import os, sys
+import os, sys, functools
 sys.path.insert(0, os.path.dirname(__file__))
 from shared.db import get_db
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _action(fn):
+    """Wrap a controller method: catch exceptions and return the standard error shape."""
+    @functools.wraps(fn)
+    def wrapper(self, inputs):
+        try:
+            return fn(self, inputs)
+        except Exception as e:
+            return {"success": False, "data": None, "error": str(e)}
+    return wrapper
 
 class CustomersController:
+
+    @_action
     def list(self, inputs):
-        try:
-            page = int(inputs.get('page', 1))
-            limit = int(inputs.get('limit', 25))
-            search = inputs.get('search', '')
-            with get_db() as db:
-                query = "SELECT * FROM customers"
-                params = []
-                if search:
-                    query += " WHERE name LIKE ? OR email LIKE ?"
-                    params = [f'%{search}%', f'%{search}%']
-                query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-                params += [limit, (page - 1) * limit]
-                rows = db.execute(query, params).fetchall()
-                total = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
-                return {"success": True, "data": {"items": [dict(r) for r in rows], "total": total, "page": page}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        page = int(inputs.get('page', 1))
+        limit = int(inputs.get('limit', 25))
+        search = inputs.get('search', '')
+        with get_db() as db:
+            query = "SELECT * FROM customers"
+            params = []
+            if search:
+                query += " WHERE name LIKE ? OR email LIKE ?"
+                params = [f'%{search}%', f'%{search}%']
+            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            params += [limit, (page - 1) * limit]
+            rows = db.execute(query, params).fetchall()
+            total = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+        return {"success": True, "data": {"items": [dict(r) for r in rows], "total": total, "page": page}, "error": ""}
 
+    @_action
     def create(self, inputs):
-        try:
-            name = inputs.get('name', '').strip()
-            email = inputs.get('email', '').strip()
-            if not name:
-                return {"success": False, "data": None, "error": "name is required"}
-            if not email:
-                return {"success": False, "data": None, "error": "email is required"}
-            with get_db() as db:
-                cur = db.execute(
-                    "INSERT INTO customers (name, email, created_at) VALUES (?, ?, ?)",
-                    (name, email, datetime.utcnow().isoformat()))
-                return {"success": True, "data": {"id": cur.lastrowid, "name": name, "email": email}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        name = inputs.get('name', '').strip()
+        email = inputs.get('email', '').strip()
+        if not name:
+            return {"success": False, "data": None, "error": "name is required"}
+        if not email:
+            return {"success": False, "data": None, "error": "email is required"}
+        with get_db() as db:
+            cur = db.execute(
+                "INSERT INTO customers (name, email, created_at) VALUES (?, ?, ?)",
+                (name, email, datetime.now(timezone.utc).isoformat()))
+        return {"success": True, "data": {"id": cur.lastrowid, "name": name, "email": email}, "error": ""}
 
+    @_action
     def update(self, inputs):
-        try:
-            customer_id = inputs.get('id')
-            if not customer_id:
-                return {"success": False, "data": None, "error": "id is required"}
-            fields = {k: v for k, v in inputs.items() if k != 'id' and v is not None}
-            if not fields:
-                return {"success": False, "data": None, "error": "no fields to update"}
-            set_clause = ', '.join(f"{k} = ?" for k in fields)
-            with get_db() as db:
-                db.execute(f"UPDATE customers SET {set_clause} WHERE id = ?",
-                           list(fields.values()) + [customer_id])
-                return {"success": True, "data": {"id": customer_id, **fields}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        customer_id = inputs.get('id')
+        if not customer_id:
+            return {"success": False, "data": None, "error": "id is required"}
+        # ❌ NEVER build SET clauses from user-supplied key names — SQL injection risk.
+        # ✅ Always enumerate the exact columns you allow:
+        ALLOWED = {'name', 'email', 'phone', 'company', 'status', 'notes'}
+        fields = {k: v for k, v in inputs.items() if k in ALLOWED and v is not None}
+        if not fields:
+            return {"success": False, "data": None, "error": "no valid fields to update"}
+        set_clause = ', '.join(f"{k} = ?" for k in fields)
+        with get_db() as db:
+            db.execute(f"UPDATE customers SET {set_clause} WHERE id = ?",
+                       [*fields.values(), customer_id])
+        return {"success": True, "data": {"id": customer_id, **fields}, "error": ""}
 
+    @_action
     def delete(self, inputs):
-        try:
-            customer_id = inputs.get('id')
-            if not customer_id:
-                return {"success": False, "data": None, "error": "id is required"}
-            with get_db() as db:
-                db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
-                return {"success": True, "data": {"deleted": customer_id}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        customer_id = inputs.get('id')
+        if not customer_id:
+            return {"success": False, "data": None, "error": "id is required"}
+        with get_db() as db:
+            db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+        return {"success": True, "data": {"deleted": customer_id}, "error": ""}
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────

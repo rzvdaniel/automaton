@@ -9,11 +9,22 @@ Choose the right persistence strategy up front:
 - **SQLite** _(default for any CRUD app)_: Use `import sqlite3`. Store DB file next to the controller:
   ```python
   import sqlite3, os
+  from contextlib import contextmanager
   DB_PATH = os.path.join(os.path.dirname(__file__), 'app.db')
+
+  @contextmanager
   def get_db():
       conn = sqlite3.connect(DB_PATH)
       conn.row_factory = sqlite3.Row
-      return conn
+      try:
+          yield conn
+          conn.commit()
+      except Exception:
+          conn.rollback()
+          raise
+      finally:
+          conn.close()
+
   def init_db():
       with get_db() as db:
           db.executescript("""
@@ -147,33 +158,49 @@ A reader should be able to jump to the section they care about without reading t
 Each controller file handles one resource. Use a class with a `handle()` entry point that dispatches by action name.
 
 ```python
-import sqlite3, os
+import sqlite3, os, functools
+from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'app.db')
+
+@contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+def _action(fn):
+    @functools.wraps(fn)
+    def wrapper(self, inputs):
+        try:
+            return fn(self, inputs)
+        except Exception as e:
+            return {"success": False, "data": None, "error": str(e)}
+    return wrapper
 
 class UsersController:
-    def list(self, inputs):
-        try:
-            with get_db() as db:
-                rows = db.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
-                return {"success": True, "data": [dict(r) for r in rows], "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
 
+    @_action
+    def list(self, inputs):
+        with get_db() as db:
+            rows = db.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
+        return {"success": True, "data": [dict(r) for r in rows], "error": ""}
+
+    @_action
     def create(self, inputs):
-        try:
-            name = inputs.get('name', '').strip()
-            if not name:
-                return {"success": False, "data": None, "error": "name is required"}
-            with get_db() as db:
-                cur = db.execute("INSERT INTO users (name) VALUES (?)", (name,))
-                return {"success": True, "data": {"id": cur.lastrowid, "name": name}, "error": ""}
-        except Exception as e:
-            return {"success": False, "data": None, "error": str(e)}
+        name = inputs.get('name', '').strip()
+        if not name:
+            return {"success": False, "data": None, "error": "name is required"}
+        with get_db() as db:
+            cur = db.execute("INSERT INTO users (name) VALUES (?)", (name,))
+        return {"success": True, "data": {"id": cur.lastrowid, "name": name}, "error": ""}
 
 
 # ── Dispatch ──────────────────────────────────────────────────────────────

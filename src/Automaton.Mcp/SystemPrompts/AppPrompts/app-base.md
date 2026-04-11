@@ -187,6 +187,10 @@ Controllers run on the runner for real execution; preview checks are useful but 
   ✅ `return {"success": True, "data": data, "error": ""}`
   ✅ `return {"success": False, "data": None, "error": "not found"}`
 
+**❌ NEVER flatten `data` to the top level in `handle()`:**
+`callController` in the frontend returns `res.data` — the unwrapped payload. If you do `return {**result["data"], "success": True, "error": ""}` you remove the `data` key and `callController` returns `undefined`, causing silent failures.
+Always `return method(inputs)` as-is from `handle()` — the `{success, data, error}` shape must be preserved.
+
 **Pre-installed packages** (import directly, no requirements.txt needed):
 ```
 requests, httpx, aiohttp          # HTTP clients

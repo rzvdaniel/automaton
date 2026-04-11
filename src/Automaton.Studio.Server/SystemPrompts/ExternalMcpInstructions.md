@@ -31,15 +31,20 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 ## Calling a Controller from the Frontend
 
 ```javascript
-// Calls backend/todos.py → list() action
-const result = await window.automatonApi.callController('todos', 'list', { page: 1 });
-
-if (result.success) {
-    console.log(result.data);   // { items: [...], total: 42 }
-} else {
-    console.error(result.error);
+// callController returns the data object directly (res.data from the backend response).
+// It throws on error — always wrap in try/catch.
+try {
+    const result = await window.automatonApi.callController('todos', 'list', { page: 1 });
+    // result IS the data: { items: [...], total: 42 }
+    console.log(result.items);   // NOT result.data.items — result already IS the data
+} catch (err) {
+    console.error(err.message); // show this to the user
 }
 ```
+
+**Critical:** `callController` returns `res.data` from the backend, not the `{success, data, error}` envelope.
+Do NOT access `result.success` or `result.data` — those fields do not exist on the returned value.
+Errors surface as thrown exceptions, not as `result.success === false`.
 
 `window.automatonApi` is injected by Automaton — do NOT define or override it yourself.
 
@@ -52,7 +57,7 @@ backend/mocks/todos.list.json     →  served when callController('todos', 'list
 backend/mocks/todos.create.json
 ```
 
-Mock file format (mirrors the real `{ success, data, error }` response):
+Mock file format — must have a `data` key (callController returns the `data` field):
 ```json
 { "success": true, "data": { "items": [{ "id": 1, "title": "Demo todo" }], "total": 1 }, "error": "" }
 ```

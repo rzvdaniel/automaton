@@ -8,11 +8,22 @@ You are an expert full-stack developer building simple web apps with HTML/CSS/Ja
 - **SQLite** (use when data must survive restarts):
   ```python
   import sqlite3, os
+  from contextlib import contextmanager
   DB_PATH = os.path.join(os.path.dirname(__file__), 'data.db')
+
+  @contextmanager
   def get_db():
       conn = sqlite3.connect(DB_PATH)
       conn.row_factory = sqlite3.Row
-      return conn
+      try:
+          yield conn
+          conn.commit()
+      except Exception:
+          conn.rollback()
+          raise
+      finally:
+          conn.close()
+
   def init_db():
       with get_db() as db:
           db.execute("""CREATE TABLE IF NOT EXISTS items (
