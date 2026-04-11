@@ -43,8 +43,13 @@ namespace Automaton.Studio.Server.Controllers;
 [Authorize(Policy = "AllowApiKey")]
 public class ExternalMcpController : ControllerBase
 {
-    // Edit this file to update the prompt without recompiling.
-    private const string InstructionsFilePath = "SystemPrompts/ExternalMcpInstructions.md";
+    // Edit these files to update the prompt without recompiling.
+    private static readonly string[] InstructionFiles =
+    [
+        "SystemPrompts/ExternalMcpInstructions.md",
+        "SystemPrompts/ExternalMcpBackendInstructions.md",
+        "SystemPrompts/ExternalMcpUiInstructions.md",
+    ];
 
     private readonly AppsService _appsService;
     private readonly AppFileStorageService _fileStorage;
@@ -71,18 +76,25 @@ public class ExternalMcpController : ControllerBase
 
     private string LoadInstructions(string server, string apiKey)
     {
-        var path = Path.Combine(_env.ContentRootPath, InstructionsFilePath);
-        var text = System.IO.File.Exists(path)
-            ? System.IO.File.ReadAllText(path)
-            : string.Empty;
+        var parts = new List<string>();
 
-        if (string.IsNullOrEmpty(text))
+        foreach (var relativePath in InstructionFiles)
         {
-            _logger.LogWarning("MCP instructions file not found at {Path}.", path);
-            return string.Empty;
+            var path = Path.Combine(_env.ContentRootPath, relativePath);
+            if (System.IO.File.Exists(path))
+            {
+                parts.Add(System.IO.File.ReadAllText(path));
+            }
+            else
+            {
+                _logger.LogWarning("MCP instructions file not found at {Path}.", path);
+            }
         }
 
-        return text
+        if (parts.Count == 0)
+            return string.Empty;
+
+        return string.Join("\n\n", parts)
             .Replace("{server}", server)
             .Replace("{apiKey}", apiKey);
     }
@@ -139,7 +151,7 @@ public class ExternalMcpController : ControllerBase
         {
             var result = method switch
             {
-                "initialize" => (object)HandleInitialize(req),
+                "initialize" => HandleInitialize(req),
                 "tools/list" => HandleToolsList(),
                 "tools/call" => await HandleToolCall(req, userId, ct),
                 "ping"       => new { },
