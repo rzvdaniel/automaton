@@ -299,6 +299,13 @@ Enterprise apps define a `fetchPage` convenience function in app code:
 async function fetchPage(controllerName, action, page = 1, extraInputs = {}) {
     return automatonApi.callController(controllerName, action, { page, ...extraInputs });
 }
+
+// Usage — callController (and fetchPage) return the data object directly, not {success,data,error}
+// If backend returns {"success": true, "data": {"items": [...], "total": 42}, "error": ""}
+// then fetchPage returns {"items": [...], "total": 42} — destructure accordingly:
+const { items, total } = await fetchPage('customers', 'list', currentPage, { search });
+renderTable(items);
+updatePagination(total);
 ```
 
 ## NAMING:

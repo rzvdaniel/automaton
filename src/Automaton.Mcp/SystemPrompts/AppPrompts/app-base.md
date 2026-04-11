@@ -493,12 +493,21 @@ Rules for mocks:
 ## CALLING A CONTROLLER:
 `automatonApi.callController(controllerName, action, inputs)` is built into the platform — no setup, no import, no boilerplate.
 
+`callController` returns `res.data` directly — the value your Python `handle()` put inside the `"data"` key.
+It throws on error — **always** wrap calls in `try/catch` and show errors via `showToast`.
+
 ```javascript
-// ✅ CORRECT — throws on error, returns data directly
+// ✅ CORRECT — result IS the data object, not {success, data, error}
 try {
-    const users = await automatonApi.callController('users', 'list', { page: 1 });
-    const user  = await automatonApi.callController('users', 'create', { name: 'Alice' });
-    renderList(users);
+    // backend returns {"success": true, "data": {"items": [...], "total": 5}, "error": ""}
+    // callController returns {"items": [...], "total": 5}  ← that's what you get
+    const { items, total } = await automatonApi.callController('users', 'list', { page: 1 });
+
+    // backend returns {"success": true, "data": {"id": 3, "name": "Alice"}, "error": ""}
+    // callController returns {"id": 3, "name": "Alice"}
+    const user = await automatonApi.callController('users', 'create', { name: 'Alice' });
+
+    renderList(items);
 } catch (err) {
     showToast(err.message, 'error');
 }
@@ -506,15 +515,18 @@ try {
 // ❌ WRONG — inputs: {} is not valid JS syntax in a function call
 const res = await automatonApi.callController('users', 'list', inputs: { page: 1 });
 
-// ❌ WRONG — don't check res.success; callController already throws on failure
+// ❌ WRONG — callController already throws on failure; result has no .success or .data
 const res = await automatonApi.callController('users', 'list', { page: 1 });
-if (res.success) { ... }
+if (res.success) { ... }       // ❌ .success doesn't exist on the returned value
+renderList(res.data.items);    // ❌ .data doesn't exist — result IS the data
 ```
 
 ## DATA FORMAT:
 - **Frontend → backend**: pass inputs as a plain object to `callController` — no wrapping needed
-- **Backend returns**: `data` is any Python value (dict, list, str, number) — no `json.dumps()` needed
-- **Frontend receives**: `callController` returns `data` directly — no `.success` check or `JSON.parse()` needed
+- **Backend returns**: `{"success": true, "data": <any Python value>, "error": ""}` — the full envelope
+- **Frontend receives**: `callController` unwraps and returns `data` directly — **not** the `{success, data, error}` envelope
+- So if your backend returns `{"success": true, "data": {"items": [...], "total": 5}, "error": ""}`, the frontend gets `{"items": [...], "total": 5}`
+- No `.success` check, no `JSON.parse()`, no `.data` unwrapping needed in the frontend
 
 ## OUTPUT CONTRACT (every handle() must return):
 ```python

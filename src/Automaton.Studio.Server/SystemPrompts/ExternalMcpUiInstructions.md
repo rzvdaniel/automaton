@@ -43,3 +43,25 @@ Typical structure:
 ```javascript
 document.querySelector('[data-action="save"]').addEventListener('click', handleSave);
 ```
+
+## Calling a Controller from the Frontend
+
+`callController` returns `res.data` — the unwrapped data object from the backend.
+It throws on error, so always wrap in `try/catch`. Never check `result.success` or access `result.data`.
+
+```javascript
+// If backend returns {"success": true, "data": {"items": [...], "total": 5}, "error": ""}
+// callController returns {"items": [...], "total": 5}  ← result IS the data
+
+try {
+    const { items, total } = await window.automatonApi.callController('todos', 'list', {});
+    renderList(items);
+} catch (err) {
+    showToast(err.message, 'error');  // errors surface as thrown exceptions
+}
+
+// ❌ WRONG — result has no .success or .data wrapper
+const res = await window.automatonApi.callController('todos', 'list', {});
+if (res.success) { ... }       // .success doesn't exist
+renderList(res.data.items);    // .data doesn't exist — result IS the data
+```
