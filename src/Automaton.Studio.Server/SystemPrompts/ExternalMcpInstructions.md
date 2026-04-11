@@ -64,9 +64,18 @@ The dev polyfill in `index.html` reads these automatically — no server needed 
 Always write files **locally first** using your native file tools. Automaton is the deployment target — the local copy is the source of truth and should be committed to Git.
 
 1. Check for `automaton.json` → create app if missing
-2. Write all files locally (controllers, frontend, mocks)
-3. Sync to Automaton — see **Uploading Files** below
-4. Call `deploy_backend` if any `backend/*.py` files were added or changed
+2. **On `create_app`:** the response includes a list of available runners. Before writing any code:
+   - Analyse whether the app needs a Python backend (DB, API calls, forms, server logic)
+   - **Purely UI app** → skip runner selection, proceed immediately
+   - **Backend needed + runners listed** → ask the user which runner to use, then call `set_app_runner` before writing any files
+   - **Backend needed + no runners** → inform the user a runner must be registered first, then build the app code anyway
+3. Write all files locally (controllers, frontend, mocks)
+4. Sync to Automaton — see **Uploading Files** below
+5. Call `deploy_backend` if any `backend/*.py` files were added or changed
+
+> **Note:** `deploy_backend` requires a runner to be assigned to the app first.
+> If it returns "No runner is assigned", call `list_runners` to see available runners,
+> ask the user which one to use, call `set_app_runner` to assign it, then retry `deploy_backend`.
 
 Always remind the user to **Deploy Backend** after writing or modifying any controller.
 

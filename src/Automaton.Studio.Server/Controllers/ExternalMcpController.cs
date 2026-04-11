@@ -1,8 +1,10 @@
+using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Mcp.Apps;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -31,6 +33,8 @@ namespace Automaton.Studio.Server.Controllers;
 ///   read_file       — Read a file from the app
 ///   list_files      — List all app files
 ///   delete_file     — Delete one or more files
+///   list_runners    — List the user's connected runners
+///   set_app_runner  — Assign a runner to the app before deploying
 ///   deploy_backend  — Deploy backend Python scripts to the configured runner
 ///
 /// ## Auth
@@ -55,6 +59,7 @@ public class ExternalMcpController : ControllerBase
     private readonly AppFileStorageService _fileStorage;
     private readonly UserContextService _userContext;
     private readonly AppsControllerExecutionService _deployService;
+    private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ExternalMcpController> _logger;
 
@@ -63,6 +68,7 @@ public class ExternalMcpController : ControllerBase
         AppFileStorageService fileStorage,
         UserContextService userContext,
         AppsControllerExecutionService deployService,
+        ApplicationDbContext db,
         IWebHostEnvironment env,
         ILogger<ExternalMcpController> logger)
     {
@@ -70,6 +76,7 @@ public class ExternalMcpController : ControllerBase
         _fileStorage = fileStorage;
         _userContext = userContext;
         _deployService = deployService;
+        _db = db;
         _env = env;
         _logger = logger;
     }
@@ -243,6 +250,17 @@ public class ExternalMcpController : ControllerBase
                     required = new[] { "appId", "paths" }
                 }),
 
+            ToolDef("list_runners",
+                "List the runners available to the current user. Call this before set_app_runner to discover runner names.",
+                new { type = "object", properties = new { }, required = Array.Empty<string>() }),
+
+            ToolDef("set_app_runner",
+                "Assign a runner to the app. Must be called before deploy_backend if no runner is assigned yet.",
+                Props(
+                    Prop("appId",      "string", "App ID — read from automaton.json"),
+                    Prop("runnerName", "string", "Runner name — from list_runners")),
+                ["appId", "runnerName"]),
+
             ToolDef("deploy_backend",
                 "Deploy Python backend scripts to the app's configured runner. Call this after writing backend/*.py files.",
                 Props(
@@ -269,6 +287,8 @@ public class ExternalMcpController : ControllerBase
                 "read_file"      => await ExecReadFile(args, userId),
                 "list_files"     => await ExecListFiles(args, userId),
                 "delete_file"    => await ExecDeleteFile(args, userId),
+                "list_runners"   => await ExecListRunners(userId),
+                "set_app_runner" => await ExecSetAppRunner(args, userId),
                 "deploy_backend" => await ExecDeployBackend(args, userId, ct),
                 _ => throw new InvalidOperationException($"Unknown tool: {name}")
             };
@@ -288,7 +308,18 @@ public class ExternalMcpController : ControllerBase
         var appId  = await _appsService.Create(new NewApp { Name = name });
         var server = $"{Request.Scheme}://{Request.Host}";
 
-        // Return the automaton.json content so the AI writes it to the local workspace.
+        // Also fetch available runners so the AI can prompt the user immediately.
+        var runners = await _db.Runners
+            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
+            .OrderBy(r => r.Name)
+            .Select(r => new { r.Name, Connected = r.ConnectionId != null })
+            .ToListAsync();
+
+        var runnerSection = runners.Count == 0
+            ? "No runners are registered on this account. If the app has a Python backend, register a runner first."
+            : "Available runners:\n" + string.Join("\n", runners.Select(r =>
+                $"- {r.Name} ({(r.Connected ? "connected" : "offline")})"));
+
         return $$"""
             App '{{name}}' created with ID: {{appId}}
 
@@ -298,6 +329,14 @@ public class ExternalMcpController : ControllerBase
               "name": "{{name}}",
               "server": "{{server}}"
             }
+
+            {{runnerSection}}
+
+            RUNNER SELECTION INSTRUCTIONS:
+            - First, analyse the user's request to determine whether the app will need a Python backend (e.g. database access, API calls, form submissions, server-side logic).
+            - If the app is purely static UI (no backend controllers needed), skip runner selection and proceed with building.
+            - If a backend is needed AND runners are listed above, ask the user: "Which runner should be used to deploy the backend? Available: <runner names>". Then call set_app_runner with the chosen runner before writing any code.
+            - If a backend is needed but no runners are available, inform the user that a runner must be registered before the backend can be deployed, then continue building the app code anyway.
             """;
     }
 
@@ -350,16 +389,49 @@ public class ExternalMcpController : ControllerBase
         return $"Deleted {deleted.Count} file(s): {string.Join(", ", deleted)}";
     }
 
+    private async Task<string> ExecListRunners(Guid userId)
+    {
+        var runners = await _db.Runners
+            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
+            .OrderBy(r => r.Name)
+            .Select(r => new { r.Name, Connected = r.ConnectionId != null })
+            .ToListAsync();
+
+        if (!runners.Any())
+            return "No runners found. Register a runner first via the Automaton Studio Runners page.";
+
+        var lines = runners.Select(r => $"- {r.Name} ({(r.Connected ? "connected" : "offline")})");
+        return "Available runners:\n" + string.Join("\n", lines);
+    }
+
+    private async Task<string> ExecSetAppRunner(JsonElement args, Guid userId)
+    {
+        var appId      = RequireAppId(args);
+        var runnerName = RequireString(args, "runnerName");
+
+        var runner = await _db.Runners
+            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId) && r.Name == runnerName)
+            .FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException($"Runner '{runnerName}' not found or not accessible.");
+
+        await _appsService.UpdateRunner(appId, runner.Id);
+        return $"Runner '{runnerName}' assigned to app {appId}.";
+    }
+
     private async Task<string> ExecDeployBackend(JsonElement args, Guid userId, CancellationToken ct)
     {
         var appId  = RequireAppId(args);
         var result = await _deployService.DeployBackendToRunnersAsync(appId, userId, null, ct);
+
+        if (!result.Success && result.RunnerCount == 0)
+            return "No runner is assigned to this app. Call list_runners to see available runners, " +
+                   "ask the user which one to use, then call set_app_runner before retrying deploy_backend.";
+
         return result.Message
             ?? (result.Success
                 ? $"Deployed {result.DeployedCount} script(s) to {result.RunnerCount} runner(s)"
                 : "Deploy failed");
     }
-
     private AppScopedFileSystem GetFileSystem(Guid userId, Guid appId)
     {
         if (!_fileStorage.AppExists(userId, appId))
