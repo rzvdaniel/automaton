@@ -17,6 +17,19 @@ public class AppScopedFileSystem : LocalScopedFileSystem
     public override async Task WriteFileAsync(string relativePath, string content)
     {
         AppFileStorageService.ValidateFileExtensionPublic(relativePath);
+
+        // Enforce backend-only placement for executable scripts.
+        // Python and Batch files must live in backend/ — never at the root or in frontend folders.
+        var ext = Path.GetExtension(relativePath).ToLowerInvariant();
+        if (ext is ".py" or ".bat")
+        {
+            var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+            if (!normalized.StartsWith("backend/"))
+                throw new InvalidOperationException(
+                    $"Python and Batch files must be placed in backend/. " +
+                    $"Use path 'backend/{Path.GetFileName(relativePath)}' instead of '{relativePath}'.");
+        }
+
         await base.WriteFileAsync(relativePath, content);
     }
 

@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IO.Compression;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -925,6 +926,140 @@ public class AppsController : BaseController
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to delete file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Upload a zip archive of app files.
+    /// Files are merged into the existing app directory.
+    /// Use <c>?clean=true</c> to delete all current app files first (full replace).
+    /// For delta / incremental updates, include only changed files in the zip (clean=false).
+    /// Supported via API key authentication — no browser session required.
+    /// </summary>
+    /// <remarks>
+    /// curl example:
+    ///   curl -X POST https://your-server/api/apps/{id}/upload \
+    ///     -H "X-API-Key: ak_execute_xxx" \
+    ///     -F "file=@myapp.zip"
+    /// </remarks>
+    [HttpPost("{id}/upload")]
+    [RequestSizeLimit(52_428_800)] // 50 MB
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadZip(Guid id, IFormFile file, [FromQuery] bool clean = false)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
+
+            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Only .zip archives are supported" });
+
+            // Resolve the app owner for file-system path construction
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+                return NotFound(new { success = false, message = "App not found" });
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var appPath = fileStorageService.GetAppDirectoryPath(ownerId, id);
+
+            // clean=true: delete all current app files before extracting
+            if (clean && Directory.Exists(appPath))
+            {
+                var protectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "_metadata.json", "index.html" };
+                foreach (var f in Directory.GetFiles(appPath, "*", SearchOption.AllDirectories))
+                {
+                    var rel = Path.GetRelativePath(appPath, f);
+                    if (!protectedNames.Contains(Path.GetFileName(f)) && !rel.StartsWith("versions"))
+                        System.IO.File.Delete(f);
+                }
+            }
+
+            var written = new List<string>();
+            var skipped = new List<string>();
+            var errors  = new List<object>();
+
+            using var stream  = file.OpenReadStream();
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            foreach (var entry in archive.Entries)
+            {
+                // Skip directory-only entries
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+
+                var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
+
+                // Skip macOS meta-directories and hidden files
+                if (relativePath.StartsWith("__MACOSX/") || Path.GetFileName(relativePath).StartsWith("."))
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                // Cannot overwrite server-managed files
+                if (relativePath.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                // Validate allowed extensions
+                try { AppFileStorageService.ValidateFileExtensionPublic(relativePath); }
+                catch
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                // .py and .bat must live in backend/
+                var fileExt = Path.GetExtension(relativePath).ToLowerInvariant();
+                if (fileExt is ".py" or ".bat" && !relativePath.StartsWith("backend/"))
+                {
+                    errors.Add(new
+                    {
+                        path   = relativePath,
+                        reason = $"Python/Batch files must be in backend/. Use 'backend/{Path.GetFileName(relativePath)}'."
+                    });
+                    continue;
+                }
+
+                // Zip-slip protection: verify the resolved path stays inside the app root
+                var destPath    = Path.GetFullPath(Path.Combine(appPath, relativePath));
+                var fullAppPath = Path.GetFullPath(appPath);
+                if (!destPath.StartsWith(fullAppPath + Path.DirectorySeparatorChar))
+                {
+                    errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
+                    continue;
+                }
+
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                    using var entryStream = entry.Open();
+                    using var outStream   = System.IO.File.Create(destPath);
+                    await entryStream.CopyToAsync(outStream);
+                    written.Add(relativePath);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new { path = relativePath, reason = ex.Message });
+                }
+            }
+
+            logger.LogInformation(
+                "Zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
+                id, written.Count, skipped.Count, errors.Count, clean);
+
+            return Ok(new { success = true, written, skipped, errors });
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest(new { success = false, message = "Invalid or corrupt zip archive" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload zip for app {AppId}", id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }

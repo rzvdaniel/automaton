@@ -246,6 +246,9 @@ public class AppsService
         .button { background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 20px; }
         .button:hover { background: #5568d3; }
     </style>
+    <!-- Dev polyfill: provides window.automatonApi for local testing via backend/mocks/*.json files.
+         Automaton injects its own implementation at serve time — this block becomes a no-op. -->
+    <script src=""/scripts/automaton-dev.js""></script>
 </head>
 <body>
     <div class=""container"">

@@ -252,6 +252,24 @@ class AppsService {
   }
 
   /**
+   * Upload a zip archive of app files.
+   * Files are merged into the app (clean=false) or the app is fully replaced (clean=true).
+   * POST /api/apps/{id}/upload
+   */
+  async uploadZip(
+    id: string,
+    zipFile: File,
+    clean = false,
+  ): Promise<{ success: boolean; written: string[]; skipped: string[]; errors: { path: string; reason: string }[] }> {
+    const form = new FormData()
+    form.append('file', zipFile)
+    const { data } = await apiClient.post(`/api/apps/${id}/upload?clean=${clean}`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  }
+
+  /**
    * Build file tree from flat list of file paths
    */
   buildFileTree(files: string[]): FileNode[] {
