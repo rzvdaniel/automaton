@@ -40,7 +40,7 @@ namespace Automaton.Studio.Server.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/mcp")]
-[Authorize]
+[Authorize(Policy = "AllowApiKey")]
 public class ExternalMcpController : ControllerBase
 {
     // Edit this file to update the prompt without recompiling.
