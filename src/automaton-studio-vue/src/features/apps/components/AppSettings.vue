@@ -390,6 +390,17 @@ async function handleSaveTemplateStatus() {
                 class="w-full justify-content-start"
                 @click="activeSection = 'appearance'"
               />
+      
+              <Button
+                v-if="isAdmin"
+                label="Templates"
+                icon="pi pi-star"
+                text
+                :class="{ 'surface-hover': activeSection === 'templates' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'templates'"
+              />
+
               <div v-if="!isLinkedToProject" class="border-top-1 surface-border my-2" />
               <Button
                 v-if="!isLinkedToProject"
@@ -399,16 +410,6 @@ async function handleSaveTemplateStatus() {
                 :class="{ 'surface-hover': activeSection === 'danger' }"
                 class="w-full justify-content-start text-red-500"
                 @click="activeSection = 'danger'"
-              />
-              <div v-if="isAdmin" class="border-top-1 surface-border my-2" />
-              <Button
-                v-if="isAdmin"
-                label="Templates"
-                icon="pi pi-star"
-                text
-                :class="{ 'surface-hover': activeSection === 'templates' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'templates'"
               />
             </div>
           </template>
