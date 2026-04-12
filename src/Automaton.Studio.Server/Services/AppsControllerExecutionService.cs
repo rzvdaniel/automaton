@@ -174,8 +174,6 @@ public class AppsControllerExecutionService
 
         try
         {
-            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Starting controller action execution for app '{app.Name}'");
-
             if (useMockBackend)
             {
                 var mockResult = await TryExecuteMockActionAsync(app, controllerName, actionName, inputs, logs, cancellationToken);
@@ -190,8 +188,6 @@ public class AppsControllerExecutionService
             if (!runners.Any())
                 throw new InvalidOperationException("No runners available for execution");
 
-            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Using {runners.Count()} runner(s)");
-
             var results = await ExecuteViaTunnelAsync(app.Id, app.OwnerId ?? Guid.Empty, controllerName, actionName, inputs, runners, cancellationToken, logs);
 
             var success = results.All(r => r.Success);
@@ -204,7 +200,8 @@ public class AppsControllerExecutionService
                     logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Error: {error}");
             }
 
-            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Execution completed. Success: {success}");
+            if (!success)
+                logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Execution failed");
 
             return new AppControllerActionResponse
             {
@@ -351,7 +348,7 @@ public class AppsControllerExecutionService
         {
             try
             {
-                logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
+
                 logger.Debug("Tunnel request: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
                     appId, controllerName, actionName, runner.Name);
 
@@ -380,6 +377,13 @@ public class AppsControllerExecutionService
                     var payload = JsonSerializer.Deserialize<TunnelControllerResponse>(
                         tunnelResponse.Body ?? "{}",
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    // Append any print() output from the controller action
+                    if (!string.IsNullOrWhiteSpace(payload?.Output))
+                    {
+                        foreach (var line in payload.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] {line.TrimEnd()}");
+                    }
 
                     if (payload?.Success == true)
                         logger.Information("Tunnel success: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",

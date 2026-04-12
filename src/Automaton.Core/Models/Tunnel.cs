@@ -26,4 +26,8 @@ public class TunnelControllerResponse
     public bool Success { get; set; }
     public System.Text.Json.JsonElement? Data { get; set; }
     public string? Error { get; set; }
+    /// <summary>
+    /// Captured stdout/stderr from print() calls in the controller action.
+    /// </summary>
+    public string? Output { get; set; }
 }

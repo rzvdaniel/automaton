@@ -116,3 +116,25 @@ Invoke-RestMethod -Uri "{server}/api/apps/<appId>/upload" `
 Response: `{ "written": [...], "skipped": [...], "errors": [...] }`
 
 After any upload containing `backend/*.py` files, call `deploy_backend`.
+
+## Logging in Controllers
+
+Controller actions can use `print()` to emit log lines. These are captured by the runner and surfaced in the Automaton execution logs — visible to the app owner for debugging and monitoring.
+
+**Rules:**
+- Log meaningful events: action start with key inputs, row counts, external API calls, branch decisions, errors
+- Do NOT log on every trivial step — one or two lines per action is enough
+- Do NOT log sensitive data (passwords, tokens, full PII)
+
+```python
+def create(self, inputs: dict) -> dict:
+    title = inputs.get('title', '').strip()
+    print(f"todos.create: title='{title}'")
+    if not title:
+        print("todos.create: rejected — empty title")
+        return {"success": False, "data": None, "error": "title is required"}
+    with get_db() as db:
+        cur = db.execute("INSERT INTO todos (title, done, created_at) VALUES (?, 0, ?)", (title, datetime.utcnow().isoformat()))
+    print(f"todos.create: inserted id={cur.lastrowid}")
+    return {"success": True, "data": {"id": cur.lastrowid, "title": title}, "error": ""}
+```

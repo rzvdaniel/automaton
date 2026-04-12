@@ -1,6 +1,8 @@
 import os
 import sys
+import io
 import importlib.util
+from contextlib import redirect_stdout, redirect_stderr
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -21,6 +23,11 @@ async def shutdown():
 # This must match the path where .NET writes scripts:
 #   AppContext.BaseDirectory/data/apps/{appId}/backend/{controllerName}.py
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR", "/app/data/apps")
+
+@app.get("/debug-scripts-dir")
+async def debug_scripts_dir():
+    return {"scripts_dir": SCRIPTS_DIR, "runner_scripts_dir_env": os.environ.get("RUNNER_SCRIPTS_DIR", "(not set)")}
+
 
 # In a Docker container the base filesystem is ephemeral; packages installed via
 # requirements.txt land in {SCRIPTS_DIR}/{app_id}/packages/ on the persistent volume.
@@ -77,12 +84,17 @@ async def execute_controller(controller_name: str, request: Request) -> JSONResp
         if not hasattr(module, "handle"):
             raise HTTPException(500, f"Controller '{controller_name}' has no handle() function")
 
-        result = module.handle(action_name, inputs)
+        # Capture print() output from the controller action
+        buf = io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(buf):
+            result = module.handle(action_name, inputs)
+        output = buf.getvalue()
 
         return JSONResponse({
             "success": bool(result.get("success", False)),
             "data": result.get("data"),
-            "error": result.get("error", "")
+            "error": result.get("error", ""),
+            "output": output if output else None
         })
 
     except HTTPException:
