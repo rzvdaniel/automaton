@@ -126,13 +126,14 @@ docker compose up -d
 
 ## Environment Variable Reference
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AUTOMATON_SERVER_URL` | Yes | Base URL of the Automaton server |
-| `AUTOMATON_API_KEY` | Yes | Runner API key (format: `ak_runner_xxx`) |
-| `AUTOMATON_RUNNER_NAME` | No | Display name. Defaults to hostname |
-| `RUNNER_SCRIPTS_DIR` | Yes | Where to store deployed app scripts. Set to `/app/data/apps` |
-| `DOTNET_ENVIRONMENT` | No | Set to `Development` **only** when the server uses a self-signed certificate (local dev). Do **not** set this in production |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTOMATON_SERVER_URL` | Yes | `https://api.automaton.monster` | Base URL of the Automaton server |
+| `AUTOMATON_API_KEY` | Yes | _(none)_ | Runner API key (format: `ak_runner_xxx`) |
+| `AUTOMATON_RUNNER_NAME` | No | hostname | Display name shown in the Automaton dashboard |
+| `RUNNER_SCRIPTS_DIR` | No | `/app/data/apps` (Docker) or `<exe-dir>/data/apps` (standalone) | Directory where deployed app controller scripts are stored. Override if you want scripts on a different volume or path. |
+| `DOTNET_ENVIRONMENT` | No | `Production` | Set to `Development` **only** when the server uses a self-signed certificate (local dev). Do **not** set this in production |
+| `PYTHONNET_PYDLL` | No | `/usr/local/lib/libpython3.13.so` | Path to the Python shared library used by PythonNet for custom Python steps. Override if using a different Python version or install path. |
 
 ---
 
@@ -191,6 +192,96 @@ Common causes:
 - Missing or invalid `AUTOMATON_API_KEY`
 - `AUTOMATON_SERVER_URL` unreachable
 - Port conflict (check if another runner is already running)
+
+---
+
+## Running as a Standalone Service (On-Premise, No Docker)
+
+Use this when you want to run the runner directly on a Windows or Linux machine without Docker.
+
+### Prerequisites
+
+- .NET 9.0 Runtime
+- Python 3.x with `pip` (for app controller execution via FastAPI)
+- The runner binary (`automaton-runner` / `automaton-runner.exe`)
+
+### 1. Install Python dependencies
+
+```bash
+pip install fastapi uvicorn[standard]
+```
+
+### 2. Set environment variables
+
+**Linux / macOS:**
+
+```bash
+export AUTOMATON_SERVER_URL=https://api.automaton.monster
+export AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxxxxxxxxxx
+export AUTOMATON_RUNNER_NAME=my-on-premise-runner
+
+# Optional: override script storage location (default: <exe-dir>/data/apps)
+# export RUNNER_SCRIPTS_DIR=/var/lib/automaton/apps
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:AUTOMATON_SERVER_URL = "https://api.automaton.monster"
+$env:AUTOMATON_API_KEY    = "ak_runner_xxxxxxxxxxxxxxxxxxxx"
+$env:AUTOMATON_RUNNER_NAME = "my-on-premise-runner"
+
+# Optional: override script storage location (default: <exe-dir>\data\apps)
+# $env:RUNNER_SCRIPTS_DIR = "C:\AutomatonData\apps"
+```
+
+For a permanent installation, set these as system environment variables or use a `.env` file in the runner directory.
+
+### 3. Run the runner
+
+```bash
+./automaton-runner          # Linux / macOS
+automaton-runner.exe        # Windows
+```
+
+The runner will automatically launch the FastAPI backend for app controller execution. It discovers Python from `PATH`, so ensure Python is available.
+
+### 4. Run as a system service (Linux systemd)
+
+```ini
+# /etc/systemd/system/automaton-runner.service
+[Unit]
+Description=Automaton Runner
+After=network.target
+
+[Service]
+User=automaton
+WorkingDirectory=/opt/automaton-runner
+ExecStart=/opt/automaton-runner/automaton-runner
+Restart=on-failure
+Environment=AUTOMATON_SERVER_URL=https://api.automaton.monster
+Environment=AUTOMATON_API_KEY=ak_runner_xxxxxxxxxxxxxxxxxxxx
+Environment=AUTOMATON_RUNNER_NAME=my-server-runner
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now automaton-runner
+sudo journalctl -u automaton-runner -f
+```
+
+### 5. Run as a Windows Service
+
+Use the `scripts/setup-service.ps1` helper:
+
+```powershell
+.\scripts\setup-service.ps1
+```
+
+Or register manually with `sc.exe` after setting the environment variables in the system settings.
 
 ---
 

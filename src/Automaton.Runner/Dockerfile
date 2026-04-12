@@ -121,6 +121,7 @@ ENV DOTNET_ENVIRONMENT=Production
 ENV AUTOMATON_SERVER_URL="https://api.automaton.monster"
 ENV AUTOMATON_API_KEY=""
 ENV AUTOMATON_RUNNER_NAME=""
+ENV RUNNER_SCRIPTS_DIR=/app/data/apps
 
 # PythonNet configuration - required for Python custom steps on Linux
 ENV PYTHONNET_PYDLL=/usr/local/lib/libpython3.13.so

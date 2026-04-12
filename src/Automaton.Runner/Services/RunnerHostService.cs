@@ -1192,8 +1192,13 @@ public class RunnerHostService
             return;
         }
 
-        // FastAPI inherits the runner's process environment: AUTOMATON_SERVER_URL, AUTOMATON_API_KEY,
-        // and RUNNER_SCRIPTS_DIR are all standard env vars — no per-launch injection needed.
+        // FastAPI inherits the runner's process environment but RUNNER_SCRIPTS_DIR may not be
+        // set when running locally (dotnet run). Always inject it explicitly so the fallback
+        // /app/data/apps (Docker-only) is never used on a standalone machine.
+        var scriptsDir =
+            Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
+            ?? Path.Combine(AppContext.BaseDirectory, "data", "apps");
+
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName = "python",
@@ -1202,6 +1207,7 @@ public class RunnerHostService
             CreateNoWindow = true,
             WorkingDirectory = Path.GetDirectoryName(mainPy)!
         };
+        psi.Environment["RUNNER_SCRIPTS_DIR"] = scriptsDir;
 
         try
         {
