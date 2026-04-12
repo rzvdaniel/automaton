@@ -51,6 +51,11 @@ def load_controller(app_id: str, controller_name: str):
     if not os.path.exists(script_path):
         raise HTTPException(404, f"Controller '{controller_name}' not deployed for app '{app_id}'")
 
+    # Inject the backend/ dir so controllers can do `from shared.db import get_db`
+    # without needing their own sys.path.insert
+    if base not in sys.path:
+        sys.path.insert(0, base)
+
     spec = importlib.util.spec_from_file_location(
         f"{app_id}.{controller_name}", script_path
     )

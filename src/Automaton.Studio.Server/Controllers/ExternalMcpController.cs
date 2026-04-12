@@ -1,7 +1,7 @@
+using Automaton.Mcp.Tools;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Mcp.Apps;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,10 +29,15 @@ namespace Automaton.Studio.Server.Controllers;
 ///
 /// ## Available Tools
 ///   create_app      — Create a new app; returns appId to store in automaton.json
-///   write_file      — Write a file into the app
-///   read_file       — Read a file from the app
+///   write_file      — Write (overwrite) a file
+///   read_file       — Read a file (supports line ranges)
+///   edit_file       — Targeted 1–2 text replacements inside a file
+///   search_file     — Search for a pattern inside a file
 ///   list_files      — List all app files
 ///   delete_file     — Delete one or more files
+///   delete_folder   — Delete a folder and all its contents
+///   rename_file     — Rename or move a file
+///   rename_folder   — Rename or move a folder
 ///   list_runners    — List the user's connected runners
 ///   set_app_runner  — Assign a runner to the app before deploying
 ///   deploy_backend  — Deploy backend Python scripts to the configured runner
@@ -56,7 +61,7 @@ public class ExternalMcpController : ControllerBase
     ];
 
     private readonly AppsService _appsService;
-    private readonly AppFileStorageService _fileStorage;
+    private readonly FileIoTool _fileIoTool;
     private readonly UserContextService _userContext;
     private readonly AppsControllerExecutionService _deployService;
     private readonly ApplicationDbContext _db;
@@ -65,7 +70,7 @@ public class ExternalMcpController : ControllerBase
 
     public ExternalMcpController(
         AppsService appsService,
-        AppFileStorageService fileStorage,
+        FileIoTool fileIoTool,
         UserContextService userContext,
         AppsControllerExecutionService deployService,
         ApplicationDbContext db,
@@ -73,7 +78,7 @@ public class ExternalMcpController : ControllerBase
         ILogger<ExternalMcpController> logger)
     {
         _appsService = appsService;
-        _fileStorage = fileStorage;
+        _fileIoTool = fileIoTool;
         _userContext = userContext;
         _deployService = deployService;
         _db = db;
@@ -217,19 +222,70 @@ public class ExternalMcpController : ControllerBase
                 ["name"]),
 
             ToolDef("write_file",
-                "Write a file to the Automaton app. Creates parent directories if needed. Overwrites if the file already exists.",
+                "Write a file to the Automaton app with concrete content. Overwrites the file if it already exists — never delete or empty a file before writing it. Creates parent directories if needed.",
                 Props(
                     Prop("appId",   "string", "App ID — read from automaton.json"),
-                    Prop("path",    "string", "Relative file path, e.g. 'index.html' or 'backend/score.py'"),
+                    Prop("path",    "string", "Relative file path, e.g. 'index.html' or 'backend/todos.py'"),
                     Prop("content", "string", "Full file content")),
                 ["appId", "path", "content"]),
 
             ToolDef("read_file",
-                "Read the content of a file from the Automaton app.",
-                Props(
-                    Prop("appId", "string", "App ID — read from automaton.json"),
-                    Prop("path",  "string", "Relative file path")),
-                ["appId", "path"]),
+                "Read a file (or a line range within it). Always returns a header showing total lines. STRATEGY: for files >100 lines, prefer search_file first to locate the section, then read only that range.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        appId     = new { type = "string",  description = "App ID — read from automaton.json" },
+                        path      = new { type = "string",  description = "Relative file path" },
+                        startLine = new { type = "integer", description = "1-based first line to return (default: 1)" },
+                        endLine   = new { type = "integer", description = "1-based last line to return, inclusive (default: end of file)" }
+                    },
+                    required = new[] { "appId", "path" }
+                }),
+
+            ToolDef("edit_file",
+                "Make 1\u20132 small targeted edits to a file by replacing specific text fragments. ONLY use this for a few isolated changes. If you need 3 or more changes, use write_file with the full updated content instead.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        appId = new { type = "string", description = "App ID — read from automaton.json" },
+                        path  = new { type = "string", description = "Relative file path" },
+                        edits = new
+                        {
+                            type  = "array",
+                            items = new
+                            {
+                                type       = "object",
+                                properties = new
+                                {
+                                    oldText = new { type = "string" },
+                                    newText = new { type = "string" }
+                                },
+                                required = new[] { "oldText", "newText" }
+                            }
+                        }
+                    },
+                    required = new[] { "appId", "path", "edits" }
+                }),
+
+            ToolDef("search_file",
+                "Search for lines matching a pattern inside a file. Returns each match with surrounding context — use the returned text verbatim as oldText in edit_file for guaranteed accuracy.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        appId        = new { type = "string",  description = "App ID — read from automaton.json" },
+                        path         = new { type = "string",  description = "File to search" },
+                        pattern      = new { type = "string",  description = "Search pattern (literal string or regex)" },
+                        useRegex     = new { type = "boolean", description = "Treat pattern as regex (default: false)" },
+                        contextLines = new { type = "integer", description = "Lines of context around each match (default: 3)" }
+                    },
+                    required = new[] { "appId", "path", "pattern" }
+                }),
 
             ToolDef("list_files",
                 "List all files currently in the Automaton app.",
@@ -238,7 +294,7 @@ public class ExternalMcpController : ControllerBase
                 ["appId"]),
 
             ToolDef("delete_file",
-                "Delete one or more files from the Automaton app.",
+                "Delete one or more files from the Automaton app. Only use when explicitly asked — never call this to replace file content (use write_file instead, which overwrites).",
                 new
                 {
                     type = "object",
@@ -249,6 +305,36 @@ public class ExternalMcpController : ControllerBase
                     },
                     required = new[] { "appId", "paths" }
                 }),
+
+            ToolDef("delete_folder",
+                "Delete a folder and all its contents from the Automaton app. Only use when explicitly asked.",
+                Props(
+                    Prop("appId", "string", "App ID — read from automaton.json"),
+                    Prop("path",  "string", "Relative folder path to delete")),
+                ["appId", "path"]),
+
+            ToolDef("rename_file",
+                "Rename or move a file within the Automaton app.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        appId     = new { type = "string",  description = "App ID — read from automaton.json" },
+                        fromPath  = new { type = "string",  description = "Current relative file path" },
+                        toPath    = new { type = "string",  description = "New relative file path" },
+                        overwrite = new { type = "boolean", description = "Set true to replace destination file if it exists" }
+                    },
+                    required = new[] { "appId", "fromPath", "toPath" }
+                }),
+
+            ToolDef("rename_folder",
+                "Rename or move a folder within the Automaton app.",
+                Props(
+                    Prop("appId",    "string", "App ID — read from automaton.json"),
+                    Prop("fromPath", "string", "Current relative folder path"),
+                    Prop("toPath",   "string", "New relative folder path")),
+                ["appId", "fromPath", "toPath"]),
 
             ToolDef("list_runners",
                 "List the runners available to the current user. Call this before set_app_runner to discover runner names.",
@@ -283,10 +369,10 @@ public class ExternalMcpController : ControllerBase
             var text = name switch
             {
                 "create_app"     => await ExecCreateApp(args, userId),
-                "write_file"     => await ExecWriteFile(args, userId),
-                "read_file"      => await ExecReadFile(args, userId),
-                "list_files"     => await ExecListFiles(args, userId),
-                "delete_file"    => await ExecDeleteFile(args, userId),
+                "write_file" or "read_file" or "edit_file" or "search_file" or
+                "list_files"  or "delete_file" or "delete_folder" or
+                "rename_file" or "rename_folder"
+                                 => await ExecFileTool(name, args),
                 "list_runners"   => await ExecListRunners(userId),
                 "set_app_runner" => await ExecSetAppRunner(args, userId),
                 "deploy_backend" => await ExecDeployBackend(args, userId, ct),
@@ -340,53 +426,12 @@ public class ExternalMcpController : ControllerBase
             """;
     }
 
-    private async Task<string> ExecWriteFile(JsonElement args, Guid userId)
+    private async Task<string> ExecFileTool(string toolName, JsonElement args)
     {
-        var appId   = RequireAppId(args);
-        var path    = RequireString(args, "path");
-        var content = RequireString(args, "content");
-        var fs      = GetFileSystem(userId, appId);
-        await fs.WriteFileAsync(path, content);
-        return $"Written: {path} ({content.Split('\n').Length} lines)";
-    }
-
-    private async Task<string> ExecReadFile(JsonElement args, Guid userId)
-    {
-        var appId   = RequireAppId(args);
-        var path    = RequireString(args, "path");
-        var fs      = GetFileSystem(userId, appId);
-        var content = await fs.ReadFileAsync(path);
-        if (content == null)
-            throw new FileNotFoundException($"File not found: {path}. Call list_files to see available files.");
-        return content;
-    }
-
-    private async Task<string> ExecListFiles(JsonElement args, Guid userId)
-    {
-        var appId = RequireAppId(args);
-        var fs    = GetFileSystem(userId, appId);
-        var files = (await fs.ListFilesAsync()).ToList();
-        return files.Count == 0 ? "(no files yet)" : string.Join('\n', files);
-    }
-
-    private async Task<string> ExecDeleteFile(JsonElement args, Guid userId)
-    {
-        var appId = RequireAppId(args);
-        if (!args.TryGetProperty("paths", out var pathsProp) || pathsProp.ValueKind != JsonValueKind.Array)
-            throw new ArgumentException("Missing required argument 'paths' (array)");
-
-        var fs      = GetFileSystem(userId, appId);
-        var deleted = new List<string>();
-        foreach (var el in pathsProp.EnumerateArray())
-        {
-            var path = el.GetString();
-            if (!string.IsNullOrWhiteSpace(path))
-            {
-                await fs.DeleteFileAsync(path);
-                deleted.Add(path);
-            }
-        }
-        return $"Deleted {deleted.Count} file(s): {string.Join(", ", deleted)}";
+        var result = await _fileIoTool.ExecuteToolAsync(toolName, args, null);
+        if (!result.Success)
+            throw new InvalidOperationException(result.Error ?? "Tool execution failed");
+        return result.Content ?? string.Empty;
     }
 
     private async Task<string> ExecListRunners(Guid userId)
@@ -431,13 +476,6 @@ public class ExternalMcpController : ControllerBase
             ?? (result.Success
                 ? $"Deployed {result.DeployedCount} script(s) to {result.RunnerCount} runner(s)"
                 : "Deploy failed");
-    }
-    private AppScopedFileSystem GetFileSystem(Guid userId, Guid appId)
-    {
-        if (!_fileStorage.AppExists(userId, appId))
-            throw new InvalidOperationException($"App {appId} not found or not accessible.");
-        var appPath = _fileStorage.GetAppDirectoryPath(userId, appId);
-        return new AppScopedFileSystem(appPath);
     }
 
     // ── Response builders ─────────────────────────────────────────────────────

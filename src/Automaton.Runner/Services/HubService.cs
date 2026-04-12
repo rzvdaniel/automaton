@@ -456,16 +456,16 @@ public class HubService
     {
         try
         {
-            var dir = Path.Combine(
+            var backendDir = Path.Combine(
                 AppsRootDir,
                 payload.AppId.ToString(), "backend");
 
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(backendDir);
 
             // requirements.txt — write as plain text, then pip install to volume-backed packages dir
             if (payload.Language == "Text" && payload.ControllerName == "requirements")
             {
-                var reqPath = Path.Combine(dir, "requirements.txt");
+                var reqPath = Path.Combine(backendDir, "requirements.txt");
                 File.WriteAllText(reqPath, payload.Code);
 
                 var packagesDir = Path.Combine(AppsRootDir, payload.AppId.ToString(), "packages");
@@ -478,15 +478,18 @@ public class HubService
             // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
             if (payload.Language == "Text" && payload.ControllerName == "system-requirements")
             {
-                var sysReqPath = Path.Combine(dir, "system-requirements.txt");
+                var sysReqPath = Path.Combine(backendDir, "system-requirements.txt");
                 File.WriteAllText(sysReqPath, payload.Code);
 
                 var aptLogs = InstallSystemPackages(payload.AppId, payload.Code);
                 return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
 
-            var path = Path.Combine(dir, payload.ControllerName + ".py");
-            File.WriteAllText(path, payload.Code);
+            // ControllerName may include a relative path (e.g. "shared/db") — create subdirs as needed
+            var normalizedName = payload.ControllerName.Replace('/', Path.DirectorySeparatorChar);
+            var scriptPath = Path.Combine(backendDir, normalizedName + ".py");
+            Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+            File.WriteAllText(scriptPath, payload.Code);
 
             logger.Information("Deployed controller script {ControllerName} for app {AppId}",
                 payload.ControllerName, payload.AppId);

@@ -556,14 +556,19 @@ public class AppFileStorageService
         if (!Directory.Exists(backendPath)) return [];
 
         var results = new List<BackendScriptFile>();
-        foreach (var file in Directory.GetFiles(backendPath))
+        // SearchOption.AllDirectories so backend/shared/*.py files are included
+        foreach (var file in Directory.GetFiles(backendPath, "*", SearchOption.AllDirectories))
         {
             var ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext is ".py" or ".bat" or ".txt")
             {
                 var code = await File.ReadAllTextAsync(file);
+                // Use forward-slash relative path as ControllerName (e.g. "shared/db")
+                // so the runner can reconstruct the subdirectory
+                var relativePath = Path.GetRelativePath(backendPath, file);
+                var controllerName = Path.ChangeExtension(relativePath, null).Replace('\\', '/');
                 results.Add(new BackendScriptFile(
-                    Path.GetFileNameWithoutExtension(file),
+                    controllerName,
                     code,
                     GetLanguageFromExtension(ext)));
             }

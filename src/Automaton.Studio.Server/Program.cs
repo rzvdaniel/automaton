@@ -346,8 +346,8 @@ services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
 // File IO tool group — wired to app-scoped file system
 services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
                    Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();
-services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
-                   Automaton.Mcp.Tools.FileIoTool>();
+services.AddScoped<Automaton.Mcp.Tools.FileIoTool>();
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool>(sp => sp.GetRequiredService<Automaton.Mcp.Tools.FileIoTool>());
 // Planning tool group — propose_plan
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.PlanningTool>();

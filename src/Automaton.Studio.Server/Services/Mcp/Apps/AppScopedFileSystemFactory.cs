@@ -23,6 +23,8 @@ public class AppScopedFileSystemFactory : IScopedFileSystemFactory
     {
         var userId  = _userContextService.GetUserId();
         var appId   = ResolveAppId(arguments, context);
+        if (!_storage.AppExists(userId, appId))
+            throw new InvalidOperationException($"App {appId} not found or not accessible.");
         var appPath = _storage.GetAppDirectoryPath(userId, appId);
         return new AppScopedFileSystem(appPath);
     }
