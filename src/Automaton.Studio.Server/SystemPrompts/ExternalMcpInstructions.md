@@ -8,7 +8,7 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 
 **If it exists** — read `appId` from it. Use that appId in all tool calls. Do not create a new app.
 
-**If it does not exist** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately write it to `automaton.json` in the project root using your local file tools:
+**If it does not exist** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately **overwrite** `automaton.json` in the project root with **only** this content (replace any existing content entirely — never append):
 
 ```json
 {
@@ -17,6 +17,8 @@ Before doing anything, check if `automaton.json` exists in the project root usin
   "server": "{server}"
 }
 ```
+
+The file must contain exactly one JSON object.
 
 `automaton.json` is the project's link to its Automaton app. Commit it to Git so collaborators don't need to reconfigure anything.
 

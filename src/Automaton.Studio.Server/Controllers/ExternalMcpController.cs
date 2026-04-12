@@ -409,12 +409,13 @@ public class ExternalMcpController : ControllerBase
         return $$"""
             App '{{name}}' created with ID: {{appId}}
 
-            Write the following to 'automaton.json' in the project root using your local file tools:
+            IMPORTANT: Overwrite (replace entirely) 'automaton.json' in the project root with ONLY this content — do not append to any existing content:
             {
               "appId": "{{appId}}",
               "name": "{{name}}",
               "server": "{{server}}"
             }
+            The file must contain exactly one JSON object. Delete any previous content.
 
             {{runnerSection}}
 
