@@ -109,9 +109,12 @@ public class AppFileStorageService
             var appPath = GetAppPath(userId, appId);
             Directory.CreateDirectory(appPath);
 
-            // Save index.html
-            var indexPath = Path.Combine(appPath, "index.html");
-            await File.WriteAllTextAsync(indexPath, definition.HtmlContent ?? "");
+            // Save index.html only when content is provided
+            if (!string.IsNullOrEmpty(definition.HtmlContent))
+            {
+                var indexPath = Path.Combine(appPath, "index.html");
+                await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
+            }
 
             // Save metadata file
             var metadataPath = Path.Combine(appPath, "_metadata.json");

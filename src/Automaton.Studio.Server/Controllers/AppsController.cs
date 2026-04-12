@@ -771,6 +771,7 @@ public class AppsController : BaseController
     /// Get list of all files in an app directory
     /// </summary>
     [HttpGet("{id}/files")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> GetAppFiles(Guid id)
     {
         try
@@ -802,6 +803,7 @@ public class AppsController : BaseController
     /// Read content of a specific file from app directory
     /// </summary>
     [HttpGet("{id}/files/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> GetAppFile(Guid id, string path)
     {
         try
@@ -844,6 +846,7 @@ public class AppsController : BaseController
     /// Write content to a specific file in app directory
     /// </summary>
     [HttpPut("{id}/files/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> PutAppFile(Guid id, string path, [FromBody] WriteFileRequest request)
     {
         try
@@ -892,6 +895,7 @@ public class AppsController : BaseController
     /// Delete a specific file from app directory
     /// </summary>
     [HttpDelete("{id}/files/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> DeleteAppFile(Guid id, string path)
     {
         try
@@ -944,6 +948,7 @@ public class AppsController : BaseController
     ///     -F "file=@myapp.zip"
     /// </remarks>
     [HttpPost("{id}/upload")]
+    [Authorize(Policy = "AllowApiKey")]
     [RequestSizeLimit(52_428_800)] // 50 MB
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadZip(Guid id, IFormFile file, [FromQuery] bool clean = false)
