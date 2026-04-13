@@ -1,5 +1,6 @@
 using Automaton.Mcp.Tools;
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -41,6 +42,7 @@ namespace Automaton.Studio.Server.Controllers;
 ///   list_runners    — List the user's connected runners
 ///   set_app_runner  — Assign a runner to the app before deploying
 ///   deploy_backend  — Deploy backend Python scripts to the configured runner
+///   publish_app     — Save a version snapshot of the app's current files
 ///
 /// ## Auth
 ///   X-API-Key: ak_execute_xxx  (header)
@@ -64,6 +66,7 @@ public class ExternalMcpController : ControllerBase
     private readonly FileIoTool _fileIoTool;
     private readonly UserContextService _userContext;
     private readonly AppsControllerExecutionService _deployService;
+    private readonly AppVersionService _appVersionService;
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ExternalMcpController> _logger;
@@ -73,6 +76,7 @@ public class ExternalMcpController : ControllerBase
         FileIoTool fileIoTool,
         UserContextService userContext,
         AppsControllerExecutionService deployService,
+        AppVersionService appVersionService,
         ApplicationDbContext db,
         IWebHostEnvironment env,
         ILogger<ExternalMcpController> logger)
@@ -81,6 +85,7 @@ public class ExternalMcpController : ControllerBase
         _fileIoTool = fileIoTool;
         _userContext = userContext;
         _deployService = deployService;
+        _appVersionService = appVersionService;
         _db = db;
         _env = env;
         _logger = logger;
@@ -351,6 +356,13 @@ public class ExternalMcpController : ControllerBase
                 "Deploy Python backend scripts to the app's configured runner. Call this after writing backend/*.py files.",
                 Props(
                     Prop("appId", "string", "App ID — read from automaton.json")),
+                ["appId"]),
+
+            ToolDef("publish_app",
+                "Save a version snapshot of the app's current files. Call this after all files have been uploaded (write_file, edit_file, or zip upload). Creates an entry in the app's version history.",
+                Props(
+                    Prop("appId",   "string", "App ID — read from automaton.json"),
+                    Prop("summary", "string", "One-sentence description of what changed in this version (optional)")),
                 ["appId"])
         }
     };
@@ -376,6 +388,7 @@ public class ExternalMcpController : ControllerBase
                 "list_runners"   => await ExecListRunners(userId),
                 "set_app_runner" => await ExecSetAppRunner(args, userId),
                 "deploy_backend" => await ExecDeployBackend(args, userId, ct),
+                "publish_app"    => await ExecPublishApp(args, userId),
                 _ => throw new InvalidOperationException($"Unknown tool: {name}")
             };
             return ToolResult(text);
@@ -477,6 +490,20 @@ public class ExternalMcpController : ControllerBase
             ?? (result.Success
                 ? $"Deployed {result.DeployedCount} script(s) to {result.RunnerCount} runner(s)"
                 : "Deploy failed");
+    }
+
+    private async Task<string> ExecPublishApp(JsonElement args, Guid userId)
+    {
+        var appId   = RequireAppId(args);
+        var summary = args.TryGetProperty("summary", out var s) && s.ValueKind == JsonValueKind.String
+            ? s.GetString()
+            : null;
+
+        var version = await _appVersionService.CreateSnapshotAsync(
+            appId, userId, AppVersionTrigger.ManualSave, summary: summary);
+
+        return $"Version {version.VersionNumber} saved for app {appId}." +
+               (summary != null ? $" Summary: {summary}" : string.Empty);
     }
 
     // ── Response builders ─────────────────────────────────────────────────────

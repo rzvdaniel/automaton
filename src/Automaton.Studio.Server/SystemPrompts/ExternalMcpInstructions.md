@@ -78,7 +78,8 @@ Always write files **locally first** using your native file tools. Automaton is 
    - **Backend needed + no runners** → inform the user a runner must be registered first, then build the app code anyway
 3. Write all files locally (controllers, frontend, mocks)
 4. Sync to Automaton — see **Uploading Files** below
-5. Call `deploy_backend` if any `backend/*.py` files were added or changed
+5. Call `publish_app` to save a version snapshot
+6. Call `deploy_backend` if any `backend/*.py` files were added or changed
 
 > **Note:** `deploy_backend` requires a runner to be assigned to the app first.
 > If it returns "No runner is assigned", call `list_runners` to see available runners,
@@ -114,6 +115,11 @@ Invoke-RestMethod -Uri "{server}/api/apps/<appId>/upload" `
 **Do not use `?clean=true` by default.** The default merge upload adds/overwrites only the files in the zip and leaves everything else untouched. Only add `?clean=true` when the user explicitly asks to replace the entire app (e.g. "start fresh", "delete everything and re-upload").
 
 Response: `{ "written": [...], "skipped": [...], "errors": [...] }`
+
+After uploading files, always call `publish_app` to save a version snapshot:
+```
+publish_app({ appId: "<appId>", summary: "one-sentence description of what changed" })
+```
 
 After any upload containing `backend/*.py` files, call `deploy_backend`.
 
