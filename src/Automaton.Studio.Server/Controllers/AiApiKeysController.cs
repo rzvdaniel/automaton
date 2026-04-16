@@ -33,6 +33,7 @@ public class AiApiKeysController : ControllerBase
             Name = ak.Name,
             ProviderName = ak.ProviderName,
             Description = ak.Description,
+            BaseUrl = ak.BaseUrl,
             CreatedAt = ak.CreatedAt,
             LastUsedAt = ak.LastUsedAt,
             IsActive = ak.IsActive
@@ -50,7 +51,6 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "Administrators")]
     public async Task<ActionResult<AiApiKeyResponse>> CreateAiApiKey([FromBody] CreateAiApiKeyRequest request)
     {
         var userId = GetUserId();
@@ -60,7 +60,9 @@ public class AiApiKeysController : ControllerBase
             request.Name,
             request.ProviderName,
             request.ApiKey,
-            request.Description);
+            request.Description,
+            baseUrl: request.BaseUrl,
+            defaultModel: request.DefaultModel);
 
         var response = new AiApiKeyResponse
         {
@@ -68,6 +70,7 @@ public class AiApiKeysController : ControllerBase
             Name = aiApiKey.Name,
             ProviderName = aiApiKey.ProviderName,
             Description = aiApiKey.Description,
+            BaseUrl = aiApiKey.BaseUrl,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
             IsActive = aiApiKey.IsActive
@@ -91,6 +94,7 @@ public class AiApiKeysController : ControllerBase
             Name = aiApiKey.Name,
             ProviderName = aiApiKey.ProviderName,
             Description = aiApiKey.Description,
+            BaseUrl = aiApiKey.BaseUrl,
             CreatedAt = aiApiKey.CreatedAt,
             LastUsedAt = aiApiKey.LastUsedAt,
             IsActive = aiApiKey.IsActive
@@ -100,7 +104,6 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Policy = "Administrators")]
     public async Task<IActionResult> UpdateAiApiKey(Guid id, [FromBody] UpdateAiApiKeyRequest request)
     {
         var userId = GetUserId();
@@ -113,7 +116,6 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "Administrators")]
     public async Task<IActionResult> DeleteAiApiKey(Guid id)
     {
         var userId = GetUserId();
@@ -177,6 +179,10 @@ public class CreateAiApiKeyRequest
     public string ProviderName { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string? Description { get; set; }
+    /// <summary>Base URL for custom OpenAI-compatible providers (e.g. https://api.moonshot.cn/v1).</summary>
+    public string? BaseUrl { get; set; }
+    /// <summary>Default model ID for custom providers (e.g. kimi-k2.5-turbo). Required when BaseUrl is set.</summary>
+    public string? DefaultModel { get; set; }
 }
 
 public class UpdateAiApiKeyRequest
@@ -191,6 +197,7 @@ public class AiApiKeyResponse
     public string Name { get; set; } = string.Empty;
     public string ProviderName { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? BaseUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
     public bool IsActive { get; set; }

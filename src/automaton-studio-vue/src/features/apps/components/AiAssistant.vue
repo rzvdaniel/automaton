@@ -6,6 +6,7 @@
  * Can be used in any context: Apps, Flows, Steps, etc.
  */
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
@@ -70,6 +71,7 @@ const emit = defineEmits<{
 }>()
 
 const { showAiDebugDetails } = useUserSettings()
+const router = useRouter()
 
 // AI Chat composable with tool execution callback
 const {
@@ -110,6 +112,9 @@ const {
 
 // View state: 'sessions' (list view) or 'chat' (detail view)
 const currentView = ref<'sessions' | 'chat'>('sessions')
+
+// True when providers have loaded but no API keys are configured for any of them
+const hasNoKeys = computed(() => availableModels.value.length === 0)
 
 // Track which tool result messages are expanded
 
@@ -702,6 +707,21 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Sessions List -->
       <div class="sessions-view">
+        <!-- No API keys banner -->
+        <div v-if="hasNoKeys && !isLoadingSessions" class="no-keys-banner">
+          <i class="pi pi-key text-2xl mb-2" style="color: var(--p-yellow-500)"></i>
+          <p class="text-sm font-semibold mb-1">No AI key configured</p>
+          <p class="text-xs text-color-secondary mb-3">Add an API key to start using AI features.</p>
+          <Button
+            label="Add AI Key"
+            icon="pi pi-key"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="router.push('/ai-keys')"
+          />
+        </div>
+
         <div v-if="isLoadingSessions" class="loading-state">
           <i class="pi pi-spin pi-spinner text-2xl text-color-secondary"></i>
           <p class="text-color-secondary text-sm mt-2">Loading sessions...</p>
@@ -1188,6 +1208,23 @@ function handleKeyPress(event: KeyboardEvent) {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+}
+
+.no-keys-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.25rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  background: var(--p-surface-100);
+  border: 1px solid var(--p-surface-200);
+}
+
+:root.app-dark .no-keys-banner {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
 }
 
 .loading-state {

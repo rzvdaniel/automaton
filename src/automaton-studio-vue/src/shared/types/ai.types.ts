@@ -41,6 +41,7 @@ export interface AiApiKey {
   name: string
   providerName: string
   description?: string
+  baseUrl?: string
   createdAt: string
   lastUsedAt?: string
   isActive: boolean

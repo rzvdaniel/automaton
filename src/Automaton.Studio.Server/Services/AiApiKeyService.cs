@@ -25,12 +25,19 @@ public class AiApiKeyService
         this.authorizationService = authorizationService;
     }
 
-    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, string providerName, string apiKey, string? description = null, Guid? projectId = null)
+    public async Task<AiApiKey> CreateAiApiKeyAsync(Guid userId, string name, string providerName, string apiKey, string? description = null, Guid? projectId = null, string? baseUrl = null, string? defaultModel = null)
     {
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
 
-        // Optionally look up AiProvider by name for FK
+        // For custom providers (with BaseUrl), auto-upsert the AiProvider + AiModel records
+        // so the DynamicAiProviderRegistry can find them without admin intervention.
+        if (!string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(defaultModel))
+        {
+            await UpsertCustomProviderAsync(providerName, baseUrl, defaultModel);
+        }
+
+        // Look up AiProvider FK (may have just been created above)
         var aiProvider = await dbContext.AiProviders
             .FirstOrDefaultAsync(p => p.Name == providerName);
 
@@ -43,7 +50,10 @@ public class AiApiKeyService
             EncryptedApiKey = encryptedApiKey,
             CreatedAt = DateTime.UtcNow,
             Description = description,
-            IsActive = true
+            IsActive = true,
+            CreatedByUserId = userId,
+            BaseUrl = baseUrl,
+            DefaultModel = defaultModel
         };
 
         dbContext.AiApiKeys.Add(entity);
@@ -63,23 +73,92 @@ public class AiApiKeyService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key created for provider {ProviderName}", providerName);
+        logger.LogInformation("AI API key created by user {UserId} for provider {ProviderName}", userId, providerName);
         return entity;
+    }
+
+    /// <summary>
+    /// Upserts an AiProvider + a default AiModel when a user adds a custom OpenAI-compatible key.
+    /// Skips the upsert if the provider already exists with a BaseUrl (admin-configured).
+    /// </summary>
+    private async Task UpsertCustomProviderAsync(string providerName, string baseUrl, string defaultModel)
+    {
+        var existing = await dbContext.AiProviders
+            .Include(p => p.Models)
+            .FirstOrDefaultAsync(p => p.Name == providerName);
+
+        if (existing == null)
+        {
+            var provider = new AiProvider
+            {
+                Id = Guid.NewGuid(),
+                Name = providerName,
+                DisplayName = providerName,
+                BaseUrl = baseUrl,
+                IsActive = true,
+                RequiresApiKey = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            dbContext.AiProviders.Add(provider);
+
+            dbContext.AiModels.Add(new AiModel
+            {
+                Id = Guid.NewGuid(),
+                AiProviderId = provider.Id,
+                ModelId = defaultModel,
+                DisplayName = defaultModel,
+                IsActive = true,
+                IsDefault = true,
+                SupportsTools = true,
+                SupportsStreaming = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await dbContext.SaveChangesAsync();
+            logger.LogInformation("Auto-registered custom AI provider '{ProviderName}' at {BaseUrl} with model {Model}", providerName, baseUrl, defaultModel);
+        }
+        else if (!existing.Models.Any(m => m.ModelId == defaultModel && m.IsActive))
+        {
+            // Provider exists but is missing this model — add it
+            dbContext.AiModels.Add(new AiModel
+            {
+                Id = Guid.NewGuid(),
+                AiProviderId = existing.Id,
+                ModelId = defaultModel,
+                DisplayName = defaultModel,
+                IsActive = true,
+                IsDefault = !existing.Models.Any(m => m.IsDefault),
+                SupportsTools = true,
+                SupportsStreaming = true,
+                CreatedAt = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+            logger.LogInformation("Added model {Model} to existing provider '{ProviderName}'", defaultModel, providerName);
+        }
     }
 
     public async Task<IEnumerable<AiApiKey>> GetUserAiApiKeysAsync(Guid userId, Guid? projectId = null)
     {
-        // Use authorization service query to get AI API keys filtered by project context
-        return await authorizationService.GetAiApiKeysQueryByContext(projectId, userId)
+        if (projectId.HasValue)
+        {
+            // Project-scoped: use authorization service
+            return await authorizationService.GetAiApiKeysQueryByContext(projectId, userId)
+                .OrderByDescending(ak => ak.CreatedAt)
+                .ToListAsync();
+        }
+
+        // Personal: return only keys created by this user
+        return await dbContext.AiApiKeys
+            .Where(ak => ak.IsActive && ak.CreatedByUserId == userId)
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }
 
     public async Task<AiApiKey?> GetAiApiKeyAsync(Guid id, Guid userId)
     {
-        // For system-level keys, just check if the key exists and is active
+        // User can access their own key; admin keys (CreatedByUserId == null) are not user-accessible
         return await dbContext.AiApiKeys
-            .FirstOrDefaultAsync(ak => ak.Id == id && ak.IsActive);
+            .FirstOrDefaultAsync(ak => ak.Id == id && ak.IsActive && ak.CreatedByUserId == userId);
     }
 
     public async Task<string?> GetDecryptedApiKeyAsync(Guid id, Guid userId)
@@ -103,45 +182,48 @@ public class AiApiKeyService
     }
 
     /// <summary>
-    /// Get decrypted API key for a specific provider (returns first active key found)
-    /// Used by AI conversation streaming - now uses system-level keys
+    /// Get decrypted API key for a specific provider.
+    /// Checks the user's own keys first, then falls back to admin/system keys (CreatedByUserId == null).
     /// </summary>
     public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
     {
-        logger.LogInformation("Looking up API key for provider '{ProviderName}'", providerName);
+        logger.LogInformation("Looking up API key for provider '{ProviderName}' for user {UserId}", providerName, userId);
 
-        // Get system-level keys for this provider (active keys only)
-        var keys = await dbContext.AiApiKeys
-            .Where(k => k.ProviderName == providerName && k.IsActive)
+        // 1. Prefer user's own key
+        var key = await dbContext.AiApiKeys
+            .Where(k => k.ProviderName == providerName && k.IsActive && k.CreatedByUserId == userId)
             .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
-            .ToListAsync();
+            .FirstOrDefaultAsync();
 
-        logger.LogInformation("Found {Count} active key(s) for provider '{ProviderName}'", keys.Count, providerName);
-
-        var firstActiveKey = keys.FirstOrDefault();
-
-        if (firstActiveKey == null)
+        // 2. Fall back to admin/system keys
+        if (key == null)
         {
-            logger.LogWarning("No active API key found in database for provider '{ProviderName}'", providerName);
+            key = await dbContext.AiApiKeys
+                .Where(k => k.ProviderName == providerName && k.IsActive && k.CreatedByUserId == null)
+                .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        if (key == null)
+        {
+            logger.LogWarning("No active API key found for provider '{ProviderName}' (user {UserId} or system)", providerName, userId);
             return null;
         }
 
         try
         {
-            // Update last used timestamp
-            firstActiveKey.LastUsedAt = DateTime.UtcNow;
+            key.LastUsedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync();
 
-            var decryptedKey = DecryptApiKey(firstActiveKey.EncryptedApiKey);
-
-            logger.LogInformation("Successfully decrypted API key for provider '{ProviderName}'", providerName);
+            var decryptedKey = DecryptApiKey(key.EncryptedApiKey);
+            logger.LogInformation("Successfully retrieved API key for provider '{ProviderName}'", providerName);
             return decryptedKey;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to decrypt API key for provider '{ProviderName}' (key id: {KeyId}). " +
                 "This usually means the AiApiEncryptionKey in appsettings does not match the key used when the API key was stored.",
-                providerName, firstActiveKey.Id);
+                providerName, key.Id);
             return null;
         }
     }
@@ -163,13 +245,15 @@ public class AiApiKeyService
 
     public async Task<bool> DeleteAiApiKeyAsync(Guid id, Guid userId)
     {
-        var aiApiKey = await GetAiApiKeyAsync(id, userId);
+        // Users may only delete keys they own
+        var aiApiKey = await dbContext.AiApiKeys
+            .FirstOrDefaultAsync(ak => ak.Id == id && ak.IsActive && ak.CreatedByUserId == userId);
         if (aiApiKey == null) return false;
 
         aiApiKey.IsActive = false;
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {AiApiKeyId} deactivated", id);
+        logger.LogInformation("AI API key {AiApiKeyId} deactivated by user {UserId}", id, userId);
         return true;
     }
 

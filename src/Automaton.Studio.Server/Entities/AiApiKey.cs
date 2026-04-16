@@ -45,6 +45,25 @@ public class AiApiKey
     [MaxLength(500)]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// The user who created this key. Null for admin/system keys (added via admin panel).
+    /// </summary>
+    public Guid? CreatedByUserId { get; set; }
+
+    /// <summary>
+    /// Optional base URL for custom OpenAI-compatible providers (e.g. Kimi, DeepSeek).
+    /// Only used when the provider is not one of the built-in providers.
+    /// </summary>
+    [MaxLength(500)]
+    public string? BaseUrl { get; set; }
+
+    /// <summary>
+    /// Default model ID to use when this key is paired with a custom provider (BaseUrl is set).
+    /// E.g. "kimi-k2.5-turbo", "deepseek-chat".
+    /// </summary>
+    [MaxLength(200)]
+    public string? DefaultModel { get; set; }
+
     // Navigation property for FK relationship
     public virtual ICollection<ProjectAiApiKey> ProjectAiApiKeys { get; set; } = new List<ProjectAiApiKey>();
 }

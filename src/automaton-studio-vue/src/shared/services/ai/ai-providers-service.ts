@@ -43,6 +43,8 @@ export async function createAiApiKey(request: {
   providerName: string
   apiKey: string
   description?: string
+  baseUrl?: string
+  defaultModel?: string
 }): Promise<AiApiKey> {
   const { data } = await axios.post<AiApiKey>('/api/aiApiKeys', request)
   return data
