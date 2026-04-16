@@ -1,3 +1,4 @@
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ public class AppsController : BaseController
     private readonly GitHubService? githubService;
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
+    private readonly AppVersionService appVersionService;
 
     public AppsController(
         AppsService appsService,
@@ -24,6 +26,7 @@ public class AppsController : BaseController
         IWebHostEnvironment webHostEnvironment,
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
+        AppVersionService appVersionService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -34,6 +37,7 @@ public class AppsController : BaseController
         this.githubService = githubService;
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
+        this.appVersionService = appVersionService;
     }
 
     [HttpGet]
@@ -1055,6 +1059,19 @@ public class AppsController : BaseController
             logger.LogInformation(
                 "Zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
+
+            if (written.Count > 0)
+            {
+                try
+                {
+                    await appVersionService.CreateSnapshotAsync(
+                        id, userContextService.GetUserId(), AppVersionTrigger.ManualSave);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Version snapshot failed for app {AppId} after zip upload — upload still succeeded", id);
+                }
+            }
 
             return Ok(new { success = true, written, skipped, errors });
         }

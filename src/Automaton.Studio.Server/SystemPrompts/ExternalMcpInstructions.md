@@ -78,7 +78,7 @@ Always write files **locally first** using your native file tools. Automaton is 
    - **Backend needed + no runners** → inform the user a runner must be registered first, then build the app code anyway
 3. Write all files locally (controllers, frontend, mocks)
 4. Sync to Automaton — see **Uploading Files** below
-5. Call `publish_app` to save a version snapshot
+5. If you uploaded via `write_file` (not zip), call `publish_app` to save a version snapshot
 6. Call `deploy_backend` if any `backend/*.py` files were added or changed
 
 > **Note:** `deploy_backend` requires a runner to be assigned to the app first.
@@ -88,6 +88,8 @@ Always write files **locally first** using your native file tools. Automaton is 
 Always remind the user to **Deploy Backend** after writing or modifying any controller.
 
 ## Uploading Files
+
+**Always write complete file content** — never patch or modify fragments of a deployed file. If a file needs any change, write the entire updated file via `write_file` or include it in a zip upload.
 
 **Single file changed** → use the `write_file` MCP tool.
 
@@ -116,7 +118,9 @@ Invoke-RestMethod -Uri "{server}/api/apps/<appId>/upload" `
 
 Response: `{ "written": [...], "skipped": [...], "errors": [...] }`
 
-After uploading files, always call `publish_app` to save a version snapshot:
+**Zip upload** → version snapshot is saved automatically. Do NOT call `publish_app`.
+
+**`write_file` upload** → call `publish_app` after all files have been written:
 ```
 publish_app({ appId: "<appId>", summary: "one-sentence description of what changed" })
 ```

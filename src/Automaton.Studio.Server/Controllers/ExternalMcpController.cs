@@ -32,8 +32,6 @@ namespace Automaton.Studio.Server.Controllers;
 ///   create_app      — Create a new app; returns appId to store in automaton.json
 ///   write_file      — Write (overwrite) a file
 ///   read_file       — Read a file (supports line ranges)
-///   edit_file       — Targeted 1–2 text replacements inside a file
-///   search_file     — Search for a pattern inside a file
 ///   list_files      — List all app files
 ///   delete_file     — Delete one or more files
 ///   delete_folder   — Delete a folder and all its contents
@@ -235,7 +233,7 @@ public class ExternalMcpController : ControllerBase
                 ["appId", "path", "content"]),
 
             ToolDef("read_file",
-                "Read a file (or a line range within it). Always returns a header showing total lines. STRATEGY: for files >100 lines, prefer search_file first to locate the section, then read only that range.",
+                "Read a file (or a line range within it). Always returns a header showing total lines.",
                 new
                 {
                     type = "object",
@@ -247,49 +245,6 @@ public class ExternalMcpController : ControllerBase
                         endLine   = new { type = "integer", description = "1-based last line to return, inclusive (default: end of file)" }
                     },
                     required = new[] { "appId", "path" }
-                }),
-
-            ToolDef("edit_file",
-                "Make 1\u20132 small targeted edits to a file by replacing specific text fragments. ONLY use this for a few isolated changes. If you need 3 or more changes, use write_file with the full updated content instead.",
-                new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        appId = new { type = "string", description = "App ID — read from automaton.json" },
-                        path  = new { type = "string", description = "Relative file path" },
-                        edits = new
-                        {
-                            type  = "array",
-                            items = new
-                            {
-                                type       = "object",
-                                properties = new
-                                {
-                                    oldText = new { type = "string" },
-                                    newText = new { type = "string" }
-                                },
-                                required = new[] { "oldText", "newText" }
-                            }
-                        }
-                    },
-                    required = new[] { "appId", "path", "edits" }
-                }),
-
-            ToolDef("search_file",
-                "Search for lines matching a pattern inside a file. Returns each match with surrounding context — use the returned text verbatim as oldText in edit_file for guaranteed accuracy.",
-                new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        appId        = new { type = "string",  description = "App ID — read from automaton.json" },
-                        path         = new { type = "string",  description = "File to search" },
-                        pattern      = new { type = "string",  description = "Search pattern (literal string or regex)" },
-                        useRegex     = new { type = "boolean", description = "Treat pattern as regex (default: false)" },
-                        contextLines = new { type = "integer", description = "Lines of context around each match (default: 3)" }
-                    },
-                    required = new[] { "appId", "path", "pattern" }
                 }),
 
             ToolDef("list_files",
@@ -359,7 +314,7 @@ public class ExternalMcpController : ControllerBase
                 ["appId"]),
 
             ToolDef("publish_app",
-                "Save a version snapshot of the app's current files. Call this after all files have been uploaded (write_file, edit_file, or zip upload). Creates an entry in the app's version history.",
+                "Save a version snapshot of the app's current files. Call this after all files have been uploaded (write_file or zip upload). Creates an entry in the app's version history.",
                 Props(
                     Prop("appId",   "string", "App ID — read from automaton.json"),
                     Prop("summary", "string", "One-sentence description of what changed in this version (optional)")),
@@ -381,7 +336,7 @@ public class ExternalMcpController : ControllerBase
             var text = name switch
             {
                 "create_app"     => await ExecCreateApp(args, userId),
-                "write_file" or "read_file" or "edit_file" or "search_file" or
+                "write_file" or "read_file" or
                 "list_files"  or "delete_file" or "delete_folder" or
                 "rename_file" or "rename_folder"
                                  => await ExecFileTool(name, args),
