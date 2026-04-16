@@ -10,9 +10,10 @@ import type { AiProvider, AiApiKey } from '@/shared/types/ai.types'
  */
 export async function getAvailableProviders(
   includeEnvironment: boolean = false,
+  allProviders: boolean = false,
 ): Promise<AiProvider[]> {
   const { data } = await axios.get<AiProvider[]>('/api/aiApiKeys/providers', {
-    params: { includeEnvironment },
+    params: { includeEnvironment, allProviders },
   })
   return data
 }

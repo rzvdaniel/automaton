@@ -43,10 +43,10 @@ public class AiApiKeysController : ControllerBase
     }
 
     [HttpGet("providers")]
-    public async Task<ActionResult<IEnumerable<AiProviderInfo>>> GetAvailableProviders([FromQuery] bool includeEnvironment = false)
+    public async Task<ActionResult<IEnumerable<AiProviderInfo>>> GetAvailableProviders([FromQuery] bool includeEnvironment = false, [FromQuery] bool allProviders = false)
     {
         var userId = GetUserId();
-        var providers = await aiApiKeyService.GetAvailableProvidersAsync(userId, includeEnvironment);
+        var providers = await aiApiKeyService.GetAvailableProvidersAsync(userId, includeEnvironment, allProviders);
         return Ok(providers);
     }
 

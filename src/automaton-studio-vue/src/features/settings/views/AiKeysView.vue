@@ -68,7 +68,7 @@ async function loadAll() {
   try {
     const [keyData, providerData] = await Promise.all([
       getUserAiApiKeys(),
-      getAvailableProviders(),
+      getAvailableProviders(false, true),
     ])
     keys.value = keyData
     providers.value = providerData

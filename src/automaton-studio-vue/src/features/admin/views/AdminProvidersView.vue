@@ -353,10 +353,10 @@ async function toggleProviderVisibility(provider: AiProviderAdmin) {
                   @click="viewModels(data)"
                 />
                 <Button
-                  :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                  :icon="data.isActive ? 'pi pi-eye' : 'pi pi-eye-slash'"
                   text
                   rounded
-                  :severity="data.isActive ? 'secondary' : 'success'"
+                  :severity="data.isActive ? 'success' : 'secondary'"
                   size="small"
                   :title="data.isActive ? 'Hide provider from chat selectors' : 'Show provider in chat selectors'"
                   @click="toggleProviderVisibility(data)"

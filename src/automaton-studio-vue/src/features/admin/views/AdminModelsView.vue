@@ -386,10 +386,10 @@ async function toggleModelVisibility(model: AiModelAdmin) {
                   @click="openEditDialog(data)"
                 />
                 <Button
-                  :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                  :icon="data.isActive ? 'pi pi-eye' : 'pi pi-eye-slash'"
                   text
                   rounded
-                  :severity="data.isActive ? 'secondary' : 'success'"
+                  :severity="data.isActive ? 'success' : 'secondary'"
                   size="small"
                   :title="data.isActive ? 'Hide model from chat selectors' : 'Show model in chat selectors'"
                   @click="toggleModelVisibility(data)"

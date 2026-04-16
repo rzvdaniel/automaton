@@ -287,7 +287,7 @@ public class AiApiKeyService
     /// Get available AI providers with their key status (for UI selection)
     /// Now returns system-level keys only
     /// </summary>
-    public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false)
+    public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false, bool allProviders = false)
     {
         var providers = new List<AiProviderInfo>();
 
@@ -355,6 +355,10 @@ public class AiApiKeyService
         }
 
         // Only return providers that have keys configured (stored or environment)
+        // unless allProviders is true (used in key-management pages where users need to see all active providers)
+        if (allProviders)
+            return providers;
+
         return providers
             .Where(p => p.HasStoredKeys || p.HasEnvironmentKey)
             .ToList();
