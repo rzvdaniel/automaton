@@ -8,7 +8,13 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 
 **If it exists** — read `appId` from it. Use that appId in all tool calls. Do not create a new app.
 
-**If it does not exist** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately **overwrite** `automaton.json` in the project root with **only** this content (replace any existing content entirely — never append):
+**If it does not exist**, choose the right path based on user intent:
+
+- **User provided an app ID** (e.g. "work on app `abc123`", "the app id is ...") — write `automaton.json` immediately with that ID, then follow the **Resuming Work on an Existing App** section to pull files down before editing. Do **not** call `create_app`.
+
+- **User said they want to resume / continue work on an existing app but gave no ID** — ask: *"What is the app ID? You can find it in `automaton.json` on another machine or in the Automaton dashboard."* Once they provide it, write `automaton.json` and proceed as above.
+
+- **User wants to build a new app** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately **overwrite** `automaton.json` in the project root with **only** this content (replace any existing content entirely — never append):
 
 ```json
 {
@@ -80,6 +86,19 @@ Always write files **locally first** using your native file tools. Automaton is 
 4. Sync to Automaton — see **Uploading Files** below
 5. If you uploaded via `write_file` (not zip), call `publish_app` to save a version snapshot
 6. Call `deploy_backend` if any `backend/*.py` files were added or changed
+
+## Resuming Work on an Existing App
+
+When `automaton.json` already exists (pointing to an existing app) but local files are missing or incomplete — for example, on a new machine or in a fresh clone — pull the files down from Automaton first before editing:
+
+1. Read `appId` from `automaton.json`
+2. Call `list_files(appId)` to see all files in the app
+3. Call `read_file(appId, path)` for each file you need to edit (or all of them for a full local sync)
+4. Write each file to disk using your local file tools, preserving the same relative paths
+5. Edit locally as needed, then upload changes back via `write_file` or zip upload as normal
+6. Call `deploy_backend` if any `backend/*.py` files changed
+
+This round-trip (`list_files` → `read_file` → edit locally → `write_file`) is the full edit cycle for working with an existing Automaton app from any machine.
 
 > **Note:** `deploy_backend` requires a runner to be assigned to the app first.
 > If it returns "No runner is assigned", call `list_runners` to see available runners,
