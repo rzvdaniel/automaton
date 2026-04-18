@@ -30,14 +30,7 @@ public class AiApiKeyService
         // Encrypt the API key for storage
         var encryptedApiKey = EncryptApiKey(apiKey);
 
-        // For custom providers (with BaseUrl), auto-upsert the AiProvider + AiModel records
-        // so the DynamicAiProviderRegistry can find them without admin intervention.
-        if (!string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(defaultModel))
-        {
-            await UpsertCustomProviderAsync(providerName, baseUrl, defaultModel);
-        }
-
-        // Look up AiProvider FK (may have just been created above)
+        // Look up AiProvider FK (admin-configured providers only)
         var aiProvider = await dbContext.AiProviders
             .FirstOrDefaultAsync(p => p.Name == providerName);
 
@@ -75,66 +68,6 @@ public class AiApiKeyService
 
         logger.LogInformation("AI API key created by user {UserId} for provider {ProviderName}", userId, providerName);
         return entity;
-    }
-
-    /// <summary>
-    /// Upserts an AiProvider + a default AiModel when a user adds a custom OpenAI-compatible key.
-    /// Skips the upsert if the provider already exists with a BaseUrl (admin-configured).
-    /// </summary>
-    private async Task UpsertCustomProviderAsync(string providerName, string baseUrl, string defaultModel)
-    {
-        var existing = await dbContext.AiProviders
-            .Include(p => p.Models)
-            .FirstOrDefaultAsync(p => p.Name == providerName);
-
-        if (existing == null)
-        {
-            var provider = new AiProvider
-            {
-                Id = Guid.NewGuid(),
-                Name = providerName,
-                DisplayName = providerName,
-                BaseUrl = baseUrl,
-                IsActive = true,
-                RequiresApiKey = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            dbContext.AiProviders.Add(provider);
-
-            dbContext.AiModels.Add(new AiModel
-            {
-                Id = Guid.NewGuid(),
-                AiProviderId = provider.Id,
-                ModelId = defaultModel,
-                DisplayName = defaultModel,
-                IsActive = true,
-                IsDefault = true,
-                SupportsTools = true,
-                SupportsStreaming = true,
-                CreatedAt = DateTime.UtcNow
-            });
-
-            await dbContext.SaveChangesAsync();
-            logger.LogInformation("Auto-registered custom AI provider '{ProviderName}' at {BaseUrl} with model {Model}", providerName, baseUrl, defaultModel);
-        }
-        else if (!existing.Models.Any(m => m.ModelId == defaultModel && m.IsActive))
-        {
-            // Provider exists but is missing this model — add it
-            dbContext.AiModels.Add(new AiModel
-            {
-                Id = Guid.NewGuid(),
-                AiProviderId = existing.Id,
-                ModelId = defaultModel,
-                DisplayName = defaultModel,
-                IsActive = true,
-                IsDefault = !existing.Models.Any(m => m.IsDefault),
-                SupportsTools = true,
-                SupportsStreaming = true,
-                CreatedAt = DateTime.UtcNow
-            });
-            await dbContext.SaveChangesAsync();
-            logger.LogInformation("Added model {Model} to existing provider '{ProviderName}'", defaultModel, providerName);
-        }
     }
 
     public async Task<IEnumerable<AiApiKey>> GetUserAiApiKeysAsync(Guid userId, Guid? projectId = null)
@@ -351,6 +284,31 @@ public class AiApiKeyService
                     .Where(m => m.IsDefault)
                     .Select(m => m.ModelId)
                     .FirstOrDefault()
+            });
+        }
+
+        // Add virtual provider entries from the user's own custom keys (BaseUrl set, not in AiProviders table).
+        // This keeps the AiProviders table admin-only while still letting users run their custom providers.
+        var userCustomKeys = await dbContext.AiApiKeys
+            .Where(k => k.IsActive && k.CreatedByUserId == userId && k.BaseUrl != null && k.DefaultModel != null)
+            .ToListAsync();
+
+        foreach (var group in userCustomKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase))
+        {
+            // Skip if an admin-configured AiProvider already covers this name
+            if (providers.Any(p => string.Equals(p.ProviderName, group.Key, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            var firstKey = group.First();
+            providers.Add(new AiProviderInfo
+            {
+                ProviderName = group.Key,
+                DisplayName = group.Key,
+                IsActive = true,
+                HasStoredKeys = true,
+                StoredKeyCount = group.Count(),
+                SupportedModels = group.Select(k => k.DefaultModel!).Distinct().ToList(),
+                DefaultModel = firstKey.DefaultModel
             });
         }
 

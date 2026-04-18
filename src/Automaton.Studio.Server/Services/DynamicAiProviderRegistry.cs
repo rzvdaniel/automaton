@@ -100,7 +100,31 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
                 .FirstOrDefault();
 
             if (entity is null)
-                return null;
+            {
+                // Fallback: look for a user-added custom key that carries its own BaseUrl.
+                // This lets users add OpenAI-compatible keys without creating admin AiProvider entries.
+                var customKey = db.AiApiKeys
+                    .Where(k => k.ProviderName == providerName && k.IsActive && k.BaseUrl != null && k.DefaultModel != null)
+                    .OrderByDescending(k => k.CreatedAt)
+                    .FirstOrDefault();
+
+                if (customKey is null)
+                    return null;
+
+                var customProvider = new OpenAiCompatibleProvider(
+                    providerName: customKey.ProviderName,
+                    baseUrl: customKey.BaseUrl!,
+                    defaultModel: customKey.DefaultModel!,
+                    logger: _loggerFactory.CreateLogger($"{customKey.ProviderName}Provider"),
+                    maxConversationHistoryMessages: _maxConversationHistoryMessages);
+
+                _logger.LogInformation(
+                    "Dynamically loaded user-defined OpenAI-compatible provider '{Provider}' → {BaseUrl} (default model: {Model}).",
+                    customKey.ProviderName, customKey.BaseUrl, customKey.DefaultModel);
+
+                _dynamic[providerName] = customProvider;
+                return customProvider;
+            }
 
             var defaultModel = entity.Models
                 .OrderByDescending(m => m.IsDefault)
