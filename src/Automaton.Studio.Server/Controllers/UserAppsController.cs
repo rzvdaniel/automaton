@@ -110,16 +110,18 @@ public class UserAppsController : ControllerBase
             // Normalize path
             if (string.IsNullOrEmpty(path)) path = "index.html";
 
-            // Read the file
-            var content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, path);
+            // Read the file — try frontend/ first (new apps), fall back to root (legacy apps)
+            var content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "frontend/" + path)
+                       ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, path);
 
             if (content == null)
             {
-                // If requesting root or no extension, try index.html in that directory
+                // If requesting a path with no extension, also try index.html inside that directory
                 if (!path.Contains('.'))
                 {
-                    var indexPath = path.TrimEnd('/') + "/index.html";
-                    content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, indexPath);
+                    var subPath = path.TrimEnd('/') + "/index.html";
+                    content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "frontend/" + subPath)
+                           ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, subPath);
                 }
 
                 if (content == null)

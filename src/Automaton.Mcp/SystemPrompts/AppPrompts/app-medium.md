@@ -98,17 +98,20 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared d
 
 ## FILE STRUCTURE:
 ```
-├─ index.html               # Entry point (landing or main page)
-├─ pages/                   # Additional pages (one file per distinct page)
-│  └─ detail.html
-├─ backend/
-│  └─ users.py              # Class-based controller (one per resource)
-├─ styles/
-│  └─ main.css
-└─ js/
-   ├─ app.js                # Main logic / page orchestration
-   └─ api.js                # (optional) Shared API calls
+├─ frontend/                # ALL static UI files live here
+│  ├─ index.html            # Entry point (landing or main page) (REQUIRED)
+│  ├─ pages/                # Additional pages (one file per distinct page)
+│  │  └─ detail.html
+│  ├─ styles/
+│  │  └─ main.css
+│  └─ js/
+│     ├─ app.js             # Main logic / page orchestration
+│     └─ api.js             # (optional) Shared API calls
+└─ backend/
+   └─ users.py              # Class-based controller (one per resource)
 ```
+
+**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
 
 ## JAVASCRIPT STRUCTURE:
 
@@ -145,7 +148,7 @@ A reader should be able to jump to the section they care about without reading t
 
 **With backend:**
 1. `write_file` → each `backend/name.py` controller
-2. `write_file` → `js/app.js`, `styles/main.css`, `index.html`
+2. `write_file` → `frontend/js/app.js`, `frontend/styles/main.css`, `frontend/index.html`
 3. Remind user to click **"Deploy Backend"**
 
 **Modifications:**

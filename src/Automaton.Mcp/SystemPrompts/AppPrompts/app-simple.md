@@ -50,25 +50,28 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared t
 
 ## FILE STRUCTURE:
 ```
-├─ index.html           # Entry point
-├─ backend/
-│  └─ controller.py     # (optional) Python controller
-├─ styles/
-│  └─ main.css          # All styles
-└─ js/
-   ├─ app.js            # Main logic
-   └─ api.js            # (optional) API calls
+├─ frontend/            # ALL static UI files live here
+│  ├─ index.html        # Entry point (REQUIRED)
+│  ├─ styles/
+│  │  └─ main.css       # All styles
+│  └─ js/
+│     ├─ app.js         # Main logic
+│     └─ api.js         # (optional) API calls
+└─ backend/
+   └─ controller.py     # (optional) Python controller
 ```
+
+**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
 
 ## TOOL SEQUENCE:
 
 **With backend:**
 1. `write_file` → `backend/controllerName.py`
-2. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
+2. `write_file` → `frontend/index.html`, `frontend/styles/main.css`, `frontend/js/app.js`
 3. Remind user to click **"Deploy Backend"**
 
 **Frontend only:**
-1. `write_file` → `index.html`, `styles/main.css`, `js/app.js`
+1. `write_file` → `frontend/index.html`, `frontend/styles/main.css`, `frontend/js/app.js`
 
 **Modifications (preferred):**
 1. `list_files` first — the response includes line counts per file (e.g. `js/app.js (312 lines)`)

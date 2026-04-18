@@ -117,32 +117,35 @@ Add meta: `<meta name="theme-color" content="#2563eb">`
 
 ## FILE STRUCTURE (feature-based):
 ```
-├─ index.html                   # Entry point — add pages/ entries for each distinct page
-├─ manifest.json                # PWA manifest
-├─ pages/                       # Additional HTML pages
-│  └─ products.html
+├─ frontend/                    # ALL static UI files live here
+│  ├─ index.html                # Entry point (REQUIRED)
+│  ├─ manifest.json             # PWA manifest
+│  ├─ pages/                    # Additional HTML pages
+│  │  └─ products.html
+│  ├─ features/
+│  │  ├─ products/
+│  │  │  ├─ products-list.js
+│  │  │  └─ products-detail.js
+│  │  ├─ orders/
+│  │  │  └─ orders.js
+│  │  └─ auth/
+│  │     └─ auth.js
+│  ├─ styles/
+│  │  ├─ main.css               # Global styles
+│  │  └─ components.css         # Reusable component styles
+│  └─ js/
+│     ├─ app.js                 # Router / page orchestration
+│     └─ utils/
+│        └─ format.js           # Date, number, string helpers
 ├─ backend/
 │  ├─ products.py               # ProductsController
 │  ├─ orders.py                 # OrdersController
 │  └─ users.py                  # UsersController
-├─ data/                        # SQLite database lives here
-│  └─ app.db                    # Created automatically by Python
-├─ features/
-│  ├─ products/
-│  │  ├─ products-list.js
-│  │  └─ products-detail.js
-│  ├─ orders/
-│  │  └─ orders.js
-│  └─ auth/
-│     └─ auth.js
-├─ styles/
-│  ├─ main.css                  # Global styles
-│  └─ components.css            # Reusable component styles
-└─ js/
-   ├─ app.js                    # Router / page orchestration
-   └─ utils/
-      └─ format.js              # Date, number, string helpers
+└─ data/                        # SQLite database lives here
+   └─ app.db                    # Created automatically by Python
 ```
+
+**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
 
 ## BACKEND CONTROLLERS — handle() DISPATCH:
 Each controller file handles one resource. Use a class per resource with a `handle()` entry point.

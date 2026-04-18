@@ -112,7 +112,9 @@ public class AppFileStorageService
             // Save index.html only when content is provided
             if (!string.IsNullOrEmpty(definition.HtmlContent))
             {
-                var indexPath = Path.Combine(appPath, "index.html");
+                var frontendPath = Path.Combine(appPath, FrontendFolder);
+                Directory.CreateDirectory(frontendPath);
+                var indexPath = Path.Combine(frontendPath, "index.html");
                 await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
             }
 
@@ -294,11 +296,16 @@ public class AppFileStorageService
                 definition = new AppDefinition();
             }
 
-            // Load index.html content
-            var indexPath = Path.Combine(appPath, "index.html");
-            if (File.Exists(indexPath))
+            // Load index.html content — check frontend/ first, then root (backward compat)
+            var frontendIndexPath = Path.Combine(appPath, FrontendFolder, "index.html");
+            var legacyIndexPath = Path.Combine(appPath, "index.html");
+            if (File.Exists(frontendIndexPath))
             {
-                definition.HtmlContent = await File.ReadAllTextAsync(indexPath);
+                definition.HtmlContent = await File.ReadAllTextAsync(frontendIndexPath);
+            }
+            else if (File.Exists(legacyIndexPath))
+            {
+                definition.HtmlContent = await File.ReadAllTextAsync(legacyIndexPath);
             }
 
             logger.Information("Loaded app {AppId} for user {UserId} from file system", appId, userId);
@@ -491,6 +498,7 @@ public class AppFileStorageService
     // ── Backend controller file helpers ──────────────────────────────────────
 
     private const string BackendFolder = "backend";
+    private const string FrontendFolder = "frontend";
 
     /// <summary>
     /// Returns the file extension for a given script language (e.g. "Python" → ".py").

@@ -162,46 +162,49 @@ In every HTML `<head>`:
 
 ## FILE STRUCTURE (enterprise feature-based):
 ```
-├─ index.html                       # App shell — add pages/ entries for each distinct page
-├─ manifest.json                    # PWA manifest
-├─ pages/                           # Top-level pages
-│  └─ dashboard.html
+├─ frontend/                        # ALL static UI files live here
+│  ├─ index.html                    # App shell (REQUIRED)
+│  ├─ manifest.json                 # PWA manifest
+│  ├─ pages/                        # Top-level pages
+│  │  └─ dashboard.html
+│  ├─ features/
+│  │  ├─ customers/
+│  │  │  ├─ customers-list.js
+│  │  │  ├─ customers-detail.js
+│  │  │  └─ customers-form.js
+│  │  ├─ deals/
+│  │  │  ├─ deals-pipeline.js
+│  │  │  └─ deals-form.js
+│  │  ├─ activities/
+│  │  │  └─ activities.js
+│  │  └─ reports/
+│  │     └─ reports.js
+│  ├─ shared/
+│  │  ├─ components/
+│  │  │  ├─ modal.js
+│  │  │  ├─ table.js
+│  │  │  └─ toast.js
+│  │  └─ utils/
+│  │     ├─ format.js               # Date, currency, string helpers
+│  │     ├─ validators.js           # Form validation
+│  │     └─ state.js                # Lightweight state management
+│  ├─ styles/
+│  │  ├─ main.css                   # Global styles
+│  │  ├─ components.css             # Reusable component styles
+│  │  └─ themes.css                 # Color tokens / CSS variables
+│  └─ js/
+│     ├─ app.js                     # Router, layout, module loader
+│     └─ api.js                     # Core API wrapper (callController)
 ├─ backend/
 │  ├─ customers.py                  # CustomersController
 │  ├─ deals.py                      # DealsController
 │  ├─ activities.py                 # ActivitiesController
 │  └─ reports.py                    # ReportsController
-├─ data/                            # Database directory
-│  └─ app.db                        # SQLite DB (created automatically)
-├─ features/
-│  ├─ customers/
-│  │  ├─ customers-list.js
-│  │  ├─ customers-detail.js
-│  │  └─ customers-form.js
-│  ├─ deals/
-│  │  ├─ deals-pipeline.js
-│  │  └─ deals-form.js
-│  ├─ activities/
-│  │  └─ activities.js
-│  └─ reports/
-│     └─ reports.js
-├─ shared/
-│  ├─ components/
-│  │  ├─ modal.js
-│  │  ├─ table.js
-│  │  └─ toast.js
-│  └─ utils/
-│     ├─ format.js                  # Date, currency, string helpers
-│     ├─ validators.js              # Form validation
-│     └─ state.js                   # Lightweight state management
-├─ styles/
-│  ├─ main.css                      # Global styles
-│  ├─ components.css                # Reusable component styles
-│  └─ themes.css                    # Color tokens / CSS variables
-└─ js/
-   ├─ app.js                        # Router, layout, module loader
-   └─ api.js                        # Core API wrapper (callController)
+└─ data/                            # Database directory
+   └─ app.db                        # SQLite DB (created automatically)
 ```
+
+**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
 
 ## BACKEND CONTROLLERS — handle() DISPATCH:
 Each domain gets its own file. Use `shared/db.py` for database connection.

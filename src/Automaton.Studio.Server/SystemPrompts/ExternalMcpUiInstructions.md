@@ -18,18 +18,21 @@ Include Tailwind CSS via CDN in every HTML file. Never write plain unstyled HTML
 
 Typical structure:
 ```
-├─ index.html              # Entry point / dashboard
-├─ pages/                  # Additional top-level pages
-├─ backend/                # Python controllers
-├─ data/                   # SQLite database
-├─ features/               # Feature JS modules (one folder per domain)
-├─ shared/
-│  ├─ components/          # modal.js, toast.js, table.js
-│  └─ utils/               # format.js, validators.js
-└─ js/
-   ├─ api.js               # All callController wrappers
-   └─ app.js               # Router / module loader
+├─ frontend/               # All static UI files MUST live here
+│  ├─ index.html           # Entry point / dashboard (REQUIRED)
+│  ├─ pages/               # Additional pages (e.g. pages/about.html)
+│  ├─ features/            # Feature JS modules (one folder per domain)
+│  ├─ shared/
+│  │  ├─ components/       # modal.js, toast.js, table.js
+│  │  └─ utils/            # format.js, validators.js
+│  └─ js/
+│     ├─ api.js            # All callController wrappers
+│     └─ app.js            # Router / module loader
+├─ backend/                # Python controllers (MUST stay in backend/)
+└─ data/                   # SQLite database
 ```
+
+**Important:** All HTML, CSS, and JS files must be placed inside `frontend/`. The entry point is always `frontend/index.html`. This applies to both Studio-generated apps and locally built apps (React, Vite, etc.) — the `frontend/` folder is the deployment contract.
 
 ## JavaScript — Browser ESM Only
 
