@@ -380,8 +380,7 @@ public class ExternalMcpController : ControllerBase
             IMPORTANT: Overwrite (replace entirely) 'automaton.json' in the project root with ONLY this content — do not append to any existing content:
             {
               "appId": "{{appId}}",
-              "name": "{{name}}",
-              "server": "{{server}}"
+              "name": "{{name}}"
             }
             The file must contain exactly one JSON object. Delete any previous content.
 

@@ -19,8 +19,7 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 ```json
 {
   "appId": "<returned-appId>",
-  "name": "<app-name>",
-  "server": "{server}"
+  "name": "<app-name>"
 }
 ```
 

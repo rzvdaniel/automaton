@@ -21,8 +21,7 @@ same app — no manual setup per project.
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "name": "My App",
-  "server": "https://localhost:7091"
+  "name": "My App"
 }
 ```
 

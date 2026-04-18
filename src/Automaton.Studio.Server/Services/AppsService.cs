@@ -222,6 +222,12 @@ public class AppsService
         };
         await fileStorageService.SaveAppAsync(UserId, entity.Id, defaultDefinition);
 
+        // Write automaton.json so external AI tools (Copilot, Cursor, Claude) can discover the app ID.
+        var automatonConfig = JsonSerializer.Serialize(
+            new { appId = entity.Id, name = entity.Name },
+            new JsonSerializerOptions { WriteIndented = true });
+        await fileStorageService.WriteAppFileAsync(UserId, entity.Id, "automaton.json", automatonConfig);
+
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
 
