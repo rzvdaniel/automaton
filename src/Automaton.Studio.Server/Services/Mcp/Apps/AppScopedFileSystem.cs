@@ -11,6 +11,7 @@ namespace Automaton.Studio.Server.Services.Mcp.Apps;
 public class AppScopedFileSystem : LocalScopedFileSystem
 {
     private const string MainAppFile = "frontend/index.html";
+    private const string MainAppFileDist = "dist/index.html";
     private const string MainAppFileLegacy = "index.html";
 
     public AppScopedFileSystem(string appRootPath) : base(appRootPath) { }
@@ -38,6 +39,7 @@ public class AppScopedFileSystem : LocalScopedFileSystem
     {
         var normalized = relativePath.Replace('\\', '/').TrimStart('/');
         if (normalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
             normalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Cannot delete index.html — it is the main app file.");
 
@@ -49,9 +51,11 @@ public class AppScopedFileSystem : LocalScopedFileSystem
         var fromNormalized = fromRelativePath.Replace('\\', '/').TrimStart('/');
         var toNormalized   = toRelativePath.Replace('\\', '/').TrimStart('/');
         if (fromNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
+            fromNormalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
             fromNormalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Cannot rename index.html — it is the main app file.");
         if (toNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
+            toNormalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
             toNormalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Cannot replace index.html via rename. Edit index.html directly instead.");
         if (IsInternalVersionsPath(fromRelativePath) || IsInternalVersionsPath(toRelativePath))

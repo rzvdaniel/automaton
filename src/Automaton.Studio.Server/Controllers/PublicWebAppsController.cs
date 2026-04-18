@@ -101,11 +101,12 @@ public class PublicWebAppsController : ControllerBase
                 _logger.LogWarning(ex, "Failed to increment view count for app {AppId}", app.Id);
             }
 
-            // Read index.html from file system — try frontend/ first, fall back to root (legacy apps)
+            // Read index.html — priority: dist/ (Vite/webpack builds) → frontend/ (AI-generated) → root (legacy)
             string htmlContent;
             if (app.OwnerId.HasValue)
             {
-                htmlContent = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/index.html")
+                htmlContent = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "dist/index.html")
+                           ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/index.html")
                            ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "index.html")
                            ?? GetDefaultHtmlContent();
             }
@@ -181,8 +182,9 @@ public class PublicWebAppsController : ControllerBase
                 return NotFound(new { message = "App configuration error" });
             }
 
-            // Read file from file system — try frontend/ first, fall back to root (legacy apps)
-            var content = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/" + path)
+            // Read file — priority: dist/ (Vite/webpack builds) → frontend/ (AI-generated) → root (legacy)
+            var content = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "dist/" + path)
+                       ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/" + path)
                        ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, path);
             if (content == null)
             {
