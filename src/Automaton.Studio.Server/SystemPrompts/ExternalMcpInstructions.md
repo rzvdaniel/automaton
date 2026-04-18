@@ -1,6 +1,10 @@
 # Automaton MCP — Instructions
 
-You are connected to Automaton via MCP. You can create and manage apps, write frontend and backend code, and deploy Python scripts to runners — all without leaving your AI coding tool.
+You are connected to Automaton via MCP. You can **discover** apps, **read** files, and **create** new apps.
+
+> **Important:** Writing files and deploying are handled by the **automaton CLI**, not via MCP.
+> After generating code to the local filesystem, the developer runs `automaton deploy` to push it to the server.
+> MCP is for discovery and app creation only.
 
 ## First: Check for automaton.json
 
@@ -73,77 +77,85 @@ The dev polyfill in `index.html` reads these automatically — no server needed 
 
 ## Workflow
 
-Always write files **locally first** using your native file tools. Automaton is the deployment target — the local copy is the source of truth and should be committed to Git.
+1. Check for `automaton.json` → create app via `create_app` if missing (writes `automaton.json` locally)
+2. Write all files to the **local filesystem** using your native file tools (the AI's built-in create/edit capabilities)
+3. Tell the developer to run `automaton deploy` to upload and deploy the backend
 
-1. Check for `automaton.json` → create app if missing
-2. **On `create_app`:** the response includes a list of available runners. Before writing any code:
-   - Analyse whether the app needs a Python backend (DB, API calls, forms, server logic)
-   - **Purely UI app** → skip runner selection, proceed immediately
-   - **Backend needed + runners listed** → ask the user which runner to use, then call `set_app_runner` before writing any files
-   - **Backend needed + no runners** → inform the user a runner must be registered first, then build the app code anyway
-3. Write all files locally (controllers, frontend, mocks)
-4. Sync to Automaton — see **Uploading Files** below
-5. If you uploaded via `write_file` (not zip), call `publish_app` to save a version snapshot
-6. Call `deploy_backend` if any `backend/*.py` files were added or changed
+**You write files locally. The developer runs the CLI to push them.**
+
+## Deploying with the automaton CLI
+
+Install (requires .NET 9 runtime from https://dot.net):
+```bash
+# macOS / Linux
+curl -fsSL https://your-server/install.sh | bash
+
+# Windows PowerShell
+irm https://your-server/install.ps1 | iex
+
+# or via dotnet tool
+dotnet tool install -g Automaton.Cli
+```
+
+One-time setup:
+```bash
+automaton config --server https://your-automaton-server --key ak_execute_xxx
+```
+
+Deploy your app:
+```bash
+automaton deploy             # zip the project, upload, deploy backend
+automaton deploy --clean     # full replace (wipes existing files first)
+automaton deploy --skip-backend  # upload only, no backend deploy
+```
+
+Optional fields in `automaton.json` for advanced deploy:
+```json
+{
+  "appId": "...",
+  "name": "My App",
+  "build": "npm run build",
+  "deployDir": "dist"
+}
+```
+- `build` — shell command to run before uploading (e.g. Vite/webpack build)
+- `deployDir` — which folder to upload (`dist/` → `frontend/` → project root if not set)
+
+Other CLI commands:
+```bash
+automaton pull               # download server files to local directory
+automaton publish -m "what changed"  # save a version snapshot
+automaton runners            # list available runners
+automaton init               # create a new app
+automaton init --app <id>    # link to an existing app
+```
 
 ## Resuming Work on an Existing App
 
 When `automaton.json` already exists (pointing to an existing app) but local files are missing or incomplete — for example, on a new machine or in a fresh clone — pull the files down from Automaton first before editing:
 
+**Via CLI (recommended):**
+```bash
+automaton pull
+```
+
+**Via MCP (if you only need to inspect a few files):**
 1. Read `appId` from `automaton.json`
 2. Call `list_files(appId)` to see all files in the app
-3. Call `read_file(appId, path)` for each file you need to edit (or all of them for a full local sync)
-4. Write each file to disk using your local file tools, preserving the same relative paths
-5. Edit locally as needed, then upload changes back via `write_file` or zip upload as normal
-6. Call `deploy_backend` if any `backend/*.py` files changed
+3. Call `read_file(appId, path)` for each file you need
+4. Write each file to disk using your local file tools, preserving relative paths
+5. Edit locally as needed, then run `automaton deploy`
 
-This round-trip (`list_files` → `read_file` → edit locally → `write_file`) is the full edit cycle for working with an existing Automaton app from any machine.
+## Available MCP Tools
 
-> **Note:** `deploy_backend` requires a runner to be assigned to the app first.
-> If it returns "No runner is assigned", call `list_runners` to see available runners,
-> ask the user which one to use, call `set_app_runner` to assign it, then retry `deploy_backend`.
+| Tool | Purpose |
+|------|------|
+| `create_app` | Create a new app; returns appId to store in `automaton.json` |
+| `read_file` | Read a file from the server (optionally a line range) |
+| `list_files` | List all files in the app |
+| `list_runners` | List available runners (for reference only) |
 
-Always remind the user to **Deploy Backend** after writing or modifying any controller.
-
-## Uploading Files
-
-**Always write complete file content** — never patch or modify fragments of a deployed file. If a file needs any change, write the entire updated file via `write_file` or include it in a zip upload.
-
-**Single file changed** → use the `write_file` MCP tool.
-
-**Two or more files** → zip locally and upload in one request. This is faster and atomic.
-
-**macOS / Linux:**
-```bash
-cd /path/to/your/app
-zip -r /tmp/app.zip . --exclude "*.git*" --exclude "automaton.json"
-curl -X POST "{server}/api/apps/<appId>/upload" \
-  -H "X-API-Key: {apiKey}" \
-  -F "file=@/tmp/app.zip"
-```
-
-**Windows (PowerShell — `Compress-Archive` is built-in):**
-```powershell
-cd C:\path\to\your\app
-Compress-Archive -Path * -DestinationPath "$env:TEMP\app.zip" -Force
-Invoke-RestMethod -Uri "{server}/api/apps/<appId>/upload" `
-  -Method POST `
-  -Headers @{ "X-API-Key" = "{apiKey}" } `
-  -Form @{ file = Get-Item "$env:TEMP\app.zip" }
-```
-
-**Do not use `?clean=true` by default.** The default merge upload adds/overwrites only the files in the zip and leaves everything else untouched. Only add `?clean=true` when the user explicitly asks to replace the entire app (e.g. "start fresh", "delete everything and re-upload").
-
-Response: `{ "written": [...], "skipped": [...], "errors": [...] }`
-
-**Zip upload** → version snapshot is saved automatically. Do NOT call `publish_app`.
-
-**`write_file` upload** → call `publish_app` after all files have been written:
-```
-publish_app({ appId: "<appId>", summary: "one-sentence description of what changed" })
-```
-
-After any upload containing `backend/*.py` files, call `deploy_backend`.
+All write, deploy, and publish operations are handled by the **automaton CLI** (`automaton deploy`, `automaton publish`, etc.).
 
 ## Logging in Controllers
 
