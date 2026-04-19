@@ -992,8 +992,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         <div class="header-right">
           <!-- Build and Code tabs: show action buttons -->
           <template v-if="activeTab === 'build' || activeTab === 'code'">
-            <!-- Runner selector (hidden when user has no runners) -->
-            <div v-if="hasRunners" class="flex align-items-center gap-2">
+            <!-- Runner selector (hidden when confirmed no runners; shown while loading or when runners exist) -->
+            <div v-if="hasRunners !== false" class="flex align-items-center gap-2">
               <span
                 v-tooltip.bottom="'Choose which runner executes this app\'s backend'"
                 class="text-sm text-color-secondary runner-label"

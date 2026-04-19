@@ -218,15 +218,15 @@ public class AiApiKeyService
 
     /// <summary>
     /// Get available AI providers with their key status (for UI selection)
-    /// Now returns system-level keys only
+    /// Returns system-level keys (CreatedByUserId == null) and the current user's own keys.
     /// </summary>
     public async Task<IEnumerable<AiProviderInfo>> GetAvailableProvidersAsync(Guid userId, bool includeEnvironment = false, bool allProviders = false)
     {
         var providers = new List<AiProviderInfo>();
 
-        // Get system-level keys
+        // Get system-level keys (admin) and the current user's own keys only
         var storedKeys = await dbContext.AiApiKeys
-            .Where(k => k.IsActive)
+            .Where(k => k.IsActive && (k.CreatedByUserId == null || k.CreatedByUserId == userId))
             .ToListAsync();
         var groupedKeys = storedKeys.GroupBy(k => k.ProviderName, StringComparer.OrdinalIgnoreCase);
 

@@ -3,7 +3,7 @@ import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
@@ -154,6 +154,36 @@ const showBackendPrompt = computed(
   () => editorStore.hasBackendFolder && !backendConnected.value,
 )
 
+// Card dismissed by user — re-opens if they click the badge
+const backendCardDismissed = ref(false)
+const showBackendCard = computed(() => showBackendPrompt.value && !backendCardDismissed.value)
+
+// Idle hint: show after 12s if preview is loaded and backend is needed
+const showIdleHint = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+function startIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    if (showBackendPrompt.value) showIdleHint.value = true
+  }, 12000)
+}
+
+watch(
+  () => editorStore.previewUrl,
+  (url) => {
+    if (url && showBackendPrompt.value) startIdleTimer()
+  },
+)
+
+onMounted(() => {
+  if (editorStore.previewUrl && showBackendPrompt.value) startIdleTimer()
+})
+
+onUnmounted(() => {
+  if (idleTimer) clearTimeout(idleTimer)
+})
+
 const previewViewportStyle = computed(() => {
   if (editorStore.previewMode === 'desktop') {
     return {
@@ -178,14 +208,20 @@ const previewViewportStyle = computed(() => {
     <!-- Controls bar -->
     <div class="preview-header">
       <div class="flex align-items-center gap-2">
-        <!-- Connection status dot -->
+        <!-- Connection status dot — clickable micro-CTA when backend needed -->
         <div
           class="connection-status"
           :class="backendConnected ? 'connected' : (editorStore.hasBackendFolder ? 'needs-runner' : 'ui-only')"
-          v-tooltip.bottom="backendConnected ? 'Backend connected' : (editorStore.hasBackendFolder ? 'Backend required' : 'UI only')"
+          :style="editorStore.hasBackendFolder && !backendConnected ? 'cursor:pointer' : ''"
+          v-tooltip.bottom="backendConnected ? 'Backend connected' : (editorStore.hasBackendFolder ? 'UI preview is free · Backend execution requires Pro' : 'This app has no backend')"
+          @click="editorStore.hasBackendFolder && !backendConnected ? (backendCardDismissed = false) : undefined"
         >
           <span class="status-dot"></span>
-          <span class="status-label">{{ backendConnected ? 'Live' : (editorStore.hasBackendFolder ? 'Backend required' : 'UI only') }}</span>
+          <span class="status-label">
+            <template v-if="backendConnected">Live</template>
+            <template v-else-if="editorStore.hasBackendFolder">Backend needed · <u>Set up</u></template>
+            <template v-else>UI only</template>
+          </span>
         </div>
         <SelectButton
           :model-value="editorStore.previewMode"
@@ -251,22 +287,39 @@ const previewViewportStyle = computed(() => {
               title="App Preview"
             />
             <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
-            <div v-if="showBackendPrompt" class="backend-prompt">
+            <div v-if="showBackendCard" class="backend-prompt">
               <div class="backend-prompt-card">
-                <div class="backend-prompt-icon">⚠️</div>
+                <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
-                  <p class="backend-prompt-title">Backend not connected</p>
-                  <p class="backend-prompt-desc">This app needs a runner to load data. The UI is fully visible.</p>
+                  <p class="backend-prompt-title">Backend execution requires Pro</p>
+                  <p class="backend-prompt-desc">UI preview is free. Running live logic, APIs, and workflows requires a Pro plan or a self-hosted runner.</p>
                   <div class="backend-prompt-actions">
-                    <button class="prompt-btn prompt-btn--secondary" @click="router.push('/runners')">
-                      <i class="pi pi-server"></i> Connect Runner
+                    <button
+                      class="prompt-btn prompt-btn--primary"
+                      v-tooltip.top="'Your backend starts in seconds. No setup required.'"
+                      @click="router.push('/billing')"
+                    >
+                      <i class="pi pi-bolt"></i> Upgrade to Pro
                     </button>
-                    <button class="prompt-btn prompt-btn--primary" @click="router.push('/billing')">
-                      <i class="pi pi-bolt"></i> Upgrade
+                    <button
+                      class="prompt-btn prompt-btn--secondary"
+                      v-tooltip.top="'Run a lightweight container on your own machine or server. Free, no lock-in.'"
+                      @click="router.push('/runners')"
+                    >
+                      <i class="pi pi-server"></i> Self-host
                     </button>
                   </div>
                 </div>
+                <button class="backend-prompt-dismiss" v-tooltip.top="'Dismiss'" @click="backendCardDismissed = true">
+                  <i class="pi pi-times"></i>
+                </button>
               </div>
+            </div>
+            <!-- Idle hint (appears after ~12s of inactivity) -->
+            <div v-if="showIdleHint && !showBackendCard" class="idle-hint">
+              <i class="pi pi-info-circle"></i>
+              This app includes backend features. Interact with it to see them in action.
+              <button class="idle-hint-dismiss" @click="showIdleHint = false">&times;</button>
             </div>
         </div>
       </div>
@@ -326,22 +379,39 @@ const previewViewportStyle = computed(() => {
               title="App Preview"
             />
             <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
-            <div v-if="showBackendPrompt" class="backend-prompt">
+            <div v-if="showBackendCard" class="backend-prompt">
               <div class="backend-prompt-card">
-                <div class="backend-prompt-icon">⚠️</div>
+                <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
-                  <p class="backend-prompt-title">Backend not connected</p>
-                  <p class="backend-prompt-desc">This app needs a runner to load data. The UI is fully visible.</p>
+                  <p class="backend-prompt-title">Backend execution requires Pro</p>
+                  <p class="backend-prompt-desc">UI preview is free. Running live logic, APIs, and workflows requires a Pro plan or a self-hosted runner.</p>
                   <div class="backend-prompt-actions">
-                    <button class="prompt-btn prompt-btn--secondary" @click="router.push('/runners')">
-                      <i class="pi pi-server"></i> Connect Runner
+                    <button
+                      class="prompt-btn prompt-btn--primary"
+                      v-tooltip.top="'Your backend starts in seconds. No setup required.'"
+                      @click="router.push('/billing')"
+                    >
+                      <i class="pi pi-bolt"></i> Upgrade to Pro
                     </button>
-                    <button class="prompt-btn prompt-btn--primary" @click="router.push('/billing')">
-                      <i class="pi pi-bolt"></i> Upgrade
+                    <button
+                      class="prompt-btn prompt-btn--secondary"
+                      v-tooltip.top="'Run a lightweight container on your own machine or server. Free, no lock-in.'"
+                      @click="router.push('/runners')"
+                    >
+                      <i class="pi pi-server"></i> Self-host
                     </button>
                   </div>
                 </div>
+                <button class="backend-prompt-dismiss" v-tooltip.top="'Dismiss'" @click="backendCardDismissed = true">
+                  <i class="pi pi-times"></i>
+                </button>
               </div>
+            </div>
+            <!-- Idle hint (appears after ~12s of inactivity) -->
+            <div v-if="showIdleHint && !showBackendCard" class="idle-hint">
+              <i class="pi pi-info-circle"></i>
+              This app includes backend features. Interact with it to see them in action.
+              <button class="idle-hint-dismiss" @click="showIdleHint = false">&times;</button>
             </div>
           </div>
         </div>
@@ -508,6 +578,64 @@ const previewViewportStyle = computed(() => {
   background: var(--p-green-600);
   color: #fff;
 }
+
+/* Dismiss button on backend card */
+.backend-prompt-dismiss {
+  flex-shrink: 0;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  padding: 0.2rem;
+  line-height: 1;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+.backend-prompt-dismiss:hover { opacity: 1; }
+
+/* Idle hint banner */
+.idle-hint {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: color-mix(in srgb, var(--p-blue-500) 10%, var(--p-surface-0));
+  border: 1px solid color-mix(in srgb, var(--p-blue-500) 30%, transparent);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  max-width: calc(100% - 2rem);
+  white-space: normal;
+}
+
+.idle-hint i {
+  font-size: 0.8rem;
+  color: var(--p-blue-500);
+  flex-shrink: 0;
+}
+
+.idle-hint-dismiss {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.idle-hint-dismiss:hover { opacity: 1; }
 
 .preview-only {
   display: flex;
