@@ -17,6 +17,7 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string | null): void
+  (e: 'runners-loaded', count: number): void
 }>()
 
 // State
@@ -51,6 +52,7 @@ async function loadRunners() {
   try {
     const { data } = await axios.get<Runner[]>('/api/runners')
     runners.value = data
+    emit('runners-loaded', data.length)
     // Auto-select when no runner is chosen and exactly one online runner exists
     if (!props.modelValue) {
       const onlineRunners = data.filter((r) => r.status === 'Online')

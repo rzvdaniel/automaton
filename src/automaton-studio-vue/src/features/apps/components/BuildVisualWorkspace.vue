@@ -4,6 +4,7 @@ import SelectButton from 'primevue/selectbutton'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
@@ -12,13 +13,16 @@ import LiveUiLogPanel from './LiveUiLogPanel.vue'
 const props = withDefaults(
   defineProps<{
     suspendHeavyRendering?: boolean
+    runnerId?: string | null
   }>(),
   {
     suspendHeavyRendering: false,
+    runnerId: null,
   },
 )
 
 const editorStore = useAppEditorStore()
+const router = useRouter()
 
 const previewModes = [
   { icon: 'pi pi-desktop', value: 'desktop' as PreviewMode, label: 'Desktop' },
@@ -144,6 +148,12 @@ function handleSplitterResizing(): void {
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
 const isAdvancedExpanded = ref(false)
 
+// Backend connection status
+const backendConnected = computed(() => !!props.runnerId)
+const showBackendPrompt = computed(
+  () => editorStore.hasBackendFolder && !backendConnected.value,
+)
+
 const previewViewportStyle = computed(() => {
   if (editorStore.previewMode === 'desktop') {
     return {
@@ -168,6 +178,15 @@ const previewViewportStyle = computed(() => {
     <!-- Controls bar -->
     <div class="preview-header">
       <div class="flex align-items-center gap-2">
+        <!-- Connection status dot -->
+        <div
+          class="connection-status"
+          :class="backendConnected ? 'connected' : (editorStore.hasBackendFolder ? 'needs-runner' : 'ui-only')"
+          v-tooltip.bottom="backendConnected ? 'Backend connected' : (editorStore.hasBackendFolder ? 'Backend required' : 'UI only')"
+        >
+          <span class="status-dot"></span>
+          <span class="status-label">{{ backendConnected ? 'Live' : (editorStore.hasBackendFolder ? 'Backend required' : 'UI only') }}</span>
+        </div>
         <SelectButton
           :model-value="editorStore.previewMode"
           :options="previewModes"
@@ -223,14 +242,32 @@ const previewViewportStyle = computed(() => {
             <p class="mt-2 text-color-secondary">No preview available</p>
           </div>
           <iframe
-            v-else
-            :key="editorStore.previewUrl"
-            :src="editorStore.previewUrl"
-            class="preview-iframe"
-            :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-            title="App Preview"
-          />
+              v-else
+              :key="editorStore.previewUrl"
+              :src="editorStore.previewUrl"
+              class="preview-iframe"
+              :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
+              title="App Preview"
+            />
+            <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
+            <div v-if="showBackendPrompt" class="backend-prompt">
+              <div class="backend-prompt-card">
+                <div class="backend-prompt-icon">⚠️</div>
+                <div class="backend-prompt-body">
+                  <p class="backend-prompt-title">Backend not connected</p>
+                  <p class="backend-prompt-desc">This app needs a runner to load data. The UI is fully visible.</p>
+                  <div class="backend-prompt-actions">
+                    <button class="prompt-btn prompt-btn--secondary" @click="router.push('/runners')">
+                      <i class="pi pi-server"></i> Connect Runner
+                    </button>
+                    <button class="prompt-btn prompt-btn--primary" @click="router.push('/billing')">
+                      <i class="pi pi-bolt"></i> Upgrade
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
       </div>
       <!-- Advanced tools toggle bar (collapsed) -->
@@ -288,6 +325,24 @@ const previewViewportStyle = computed(() => {
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="App Preview"
             />
+            <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
+            <div v-if="showBackendPrompt" class="backend-prompt">
+              <div class="backend-prompt-card">
+                <div class="backend-prompt-icon">⚠️</div>
+                <div class="backend-prompt-body">
+                  <p class="backend-prompt-title">Backend not connected</p>
+                  <p class="backend-prompt-desc">This app needs a runner to load data. The UI is fully visible.</p>
+                  <div class="backend-prompt-actions">
+                    <button class="prompt-btn prompt-btn--secondary" @click="router.push('/runners')">
+                      <i class="pi pi-server"></i> Connect Runner
+                    </button>
+                    <button class="prompt-btn prompt-btn--primary" @click="router.push('/billing')">
+                      <i class="pi pi-bolt"></i> Upgrade
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </SplitterPanel>
@@ -332,6 +387,128 @@ const previewViewportStyle = computed(() => {
   will-change: auto;
 }
 
+/* Connection status indicator */
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+.connection-status.connected {
+  background: color-mix(in srgb, var(--p-green-500) 12%, transparent);
+  border-color: color-mix(in srgb, var(--p-green-500) 30%, transparent);
+  color: var(--p-green-600);
+}
+
+.connection-status.ui-only {
+  background: color-mix(in srgb, var(--p-surface-400) 12%, transparent);
+  border-color: color-mix(in srgb, var(--p-surface-400) 30%, transparent);
+  color: var(--p-text-muted-color);
+}
+
+.connection-status.needs-runner {
+  background: color-mix(in srgb, var(--p-yellow-500) 12%, transparent);
+  border-color: color-mix(in srgb, var(--p-yellow-500) 30%, transparent);
+  color: var(--p-yellow-700);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connected .status-dot { background: var(--p-green-500); }
+.ui-only .status-dot { background: var(--p-surface-400); }
+.needs-runner .status-dot { background: var(--p-yellow-500); }
+
+/* Inline backend prompt */
+.backend-prompt {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+  width: calc(100% - 2rem);
+  max-width: 420px;
+}
+
+.backend-prompt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--p-yellow-500) 10%, var(--p-surface-0));
+  border: 1px solid color-mix(in srgb, var(--p-yellow-500) 40%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  pointer-events: auto;
+}
+
+.backend-prompt-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.backend-prompt-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.backend-prompt-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+  margin: 0 0 0.2rem;
+}
+
+.backend-prompt-desc {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  margin: 0 0 0.6rem;
+  line-height: 1.4;
+}
+
+.backend-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.prompt-btn:hover { opacity: 0.85; }
+
+.prompt-btn--secondary {
+  background: var(--p-surface-0);
+  border-color: var(--p-surface-400);
+  color: var(--p-text-color);
+}
+
+.prompt-btn--primary {
+  background: var(--p-green-600);
+  color: #fff;
+}
+
 .preview-only {
   display: flex;
   flex-direction: column;
@@ -339,6 +516,7 @@ const previewViewportStyle = computed(() => {
   min-height: 0;
   overflow: hidden;
 }
+
 
 /* Show/Hide Advanced Tools toggle bar */
 .advanced-toggle-bar {
@@ -394,6 +572,7 @@ const previewViewportStyle = computed(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   min-height: 0;
   transform: translateZ(0);
+  position: relative;
 }
 
 .preview-iframe {

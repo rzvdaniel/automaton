@@ -78,6 +78,7 @@ const appNameAutoUpdated = ref(false)
 
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
+const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
 const activeTab = ref<'build' | 'code' | 'monitor' | 'settings'>('build')
@@ -991,8 +992,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         <div class="header-right">
           <!-- Build and Code tabs: show action buttons -->
           <template v-if="activeTab === 'build' || activeTab === 'code'">
-            <!-- Runner selector -->
-            <div class="flex align-items-center gap-2">
+            <!-- Runner selector (hidden when user has no runners) -->
+            <div v-if="hasRunners" class="flex align-items-center gap-2">
               <span
                 v-tooltip.bottom="'Choose which runner executes this app\'s backend'"
                 class="text-sm text-color-secondary runner-label"
@@ -1000,6 +1001,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               <RunnerSelector
                 v-model="selectedRunnerId"
                 :disabled="editorStore.isSaving"
+                @runners-loaded="(count) => hasRunners = count > 0"
               />
             </div>
 
@@ -1183,7 +1185,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
               <!-- Visual mode workspace - shown in Build tab -->
               <div v-show="activeTab === 'build'" class="build-visual-view">
-                <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" />
+                <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" :runner-id="selectedRunnerId" />
               </div>
 
               <!-- Code mode: file tree + editor - shown in Code tab -->
